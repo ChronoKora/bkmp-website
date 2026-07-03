@@ -472,22 +472,62 @@ async function saveUpdate(update) {
   const client = bkmpGetSupabaseClient();
   if (!client) return null;
   const payload = bkmpMapUpdateToSupabase(update);
-  let query;
   if (update.id && !String(update.id).startsWith('news-')) {
-    query = client
+    const { data, error } = await client
       .from('updates')
       .update(payload)
       .eq('id', update.id)
       .select('id, title, content, image_urls, created_at')
-      .single();
-  } else {
-    query = client
+      .maybeSingle();
+
+    if (error) throw error;
+    if (data) return bkmpMapUpdateFromSupabase(data);
+
+    const matchDate = update.date || (update.createdAt ? new Date(update.createdAt).toISOString().slice(0, 10) : '');
+    let finder = client
       .from('updates')
-      .insert(payload)
-      .select('id, title, content, image_urls, created_at')
-      .single();
+      .select('id')
+      .eq('title', update.title)
+      .limit(1);
+
+    if (matchDate) {
+      finder = finder
+        .gte('created_at', matchDate + 'T00:00:00.000Z')
+        .lt('created_at', matchDate + 'T23:59:59.999Z');
+    }
+
+    let { data: matches, error: findError } = await finder;
+    if (findError) throw findError;
+    let match = Array.isArray(matches) ? matches[0] : null;
+
+    if (!match && matchDate) {
+      const { data: titleMatches, error: titleFindError } = await client
+        .from('updates')
+        .select('id')
+        .eq('title', update.title)
+        .limit(1);
+      if (titleFindError) throw titleFindError;
+      match = Array.isArray(titleMatches) ? titleMatches[0] : null;
+    }
+
+    if (match && match.id) {
+      const { data: matchedData, error: matchedError } = await client
+        .from('updates')
+        .update(payload)
+        .eq('id', match.id)
+        .select('id, title, content, image_urls, created_at')
+        .single();
+      if (matchedError) throw matchedError;
+      return bkmpMapUpdateFromSupabase(matchedData);
+    }
   }
-  const { data, error } = await query;
+
+  const { data, error } = await client
+    .from('updates')
+    .insert(payload)
+    .select('id, title, content, image_urls, created_at')
+    .single();
+
   if (error) throw error;
   return bkmpMapUpdateFromSupabase(data);
 }

@@ -268,7 +268,7 @@
     }
 
     async function refreshUpdatesFromSupabase() {
-      await syncUpdatesFromSupabase(data, function () { renderAll(); });
+      await syncUpdatesFromSupabase(data, function () { renderAll(); }, { force: true });
     }
 
     async function persistExpense(expense) {
