@@ -55,6 +55,9 @@
   </div>
 
   <header class="hero hero-banner-wrap">
+    <div class="streamer-marquee" id="streamerMarquee" aria-label="Twitch Accounts">
+      <div class="streamer-marquee-track" id="streamerMarqueeTrack"></div>
+    </div>
     <img class="hero-banner" src="assets/top-banner.png" alt="Willkommen bei Bkmp">
   </header>
 
@@ -229,6 +232,9 @@
       } else {
         renderWishes();
       }
+    }, { force: true });
+    syncStreamersFromSupabase(data, function () {
+      renderStreamers();
     }, { force: true });
 
     const totalIncome = bkmpSum(data.income);
@@ -506,6 +512,27 @@
     function escapeHtml(value) {
       return String(value || '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
     }
+
+    function renderStreamers() {
+      const marquee = document.getElementById('streamerMarquee');
+      const track = document.getElementById('streamerMarqueeTrack');
+      if (!marquee || !track) return;
+      const streamers = Array.isArray(data.streamers) ? data.streamers.filter(item => item.name && item.url) : [];
+      if (streamers.length === 0) {
+        marquee.style.display = 'none';
+        track.innerHTML = '';
+        return;
+      }
+      marquee.style.display = 'block';
+      const itemsHtml = streamers.map(item => {
+        const url = String(item.url || '').startsWith('http') ? item.url : 'https://' + item.url;
+        return `<a class="streamer-pill streamer-${item.color || 'purple'}" href="${url}" target="_blank" rel="noopener">
+          <span>Live</span>${escapeHtml(item.name)}
+        </a>`;
+      }).join('');
+      track.innerHTML = `<div class="streamer-marquee-group">${itemsHtml}</div><div class="streamer-marquee-group" aria-hidden="true">${itemsHtml}</div>`;
+    }
+    renderStreamers();
 
     function renderFormattedNewsText(value) {
       let html = escapeHtml(value);

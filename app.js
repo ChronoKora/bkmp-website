@@ -54,7 +54,8 @@ const BKMP_DEFAULT_DATA = {
       date: new Date().toISOString().slice(0, 10)
     }
   ],
-  wishes: []
+  wishes: [],
+  streamers: []
 };
 
 function bkmpLoadData() {
@@ -67,7 +68,8 @@ function bkmpLoadData() {
       expenses: bkmpNormalizeEntryList(parsed.expenses),
       investors: parsed.investors || [],
       news: parsed.news || [],
-      wishes: parsed.wishes || []
+      wishes: parsed.wishes || [],
+      streamers: parsed.streamers || []
     };
   } catch (e) {
     console.error('Fehler beim Laden der Daten:', e);

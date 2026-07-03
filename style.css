@@ -169,6 +169,68 @@ h1.hero-title .brand { font-style: italic; font-weight: 500; }
 .hero-banner-wrap {
   padding: 5.5rem 0.9rem 2.2rem;
 }
+.streamer-marquee {
+  position: absolute;
+  top: 5.95rem;
+  left: 50%;
+  z-index: 3;
+  width: min(1760px, calc(100vw - 1.8rem));
+  transform: translateX(-50%);
+  overflow: hidden;
+  border-radius: 14px 14px 0 0;
+  padding: 0.55rem 0;
+  background: linear-gradient(180deg, rgba(6, 6, 10, 0.9), rgba(6, 6, 10, 0.36));
+  mask-image: linear-gradient(90deg, transparent 0, #000 7%, #000 93%, transparent 100%);
+}
+.streamer-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: streamerScroll 24s linear infinite;
+}
+.streamer-marquee:hover .streamer-marquee-track {
+  animation-play-state: paused;
+}
+.streamer-marquee-group {
+  display: flex;
+  gap: 0.7rem;
+  align-items: center;
+  padding-right: 0.7rem;
+}
+.streamer-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 0.36rem 0.85rem 0.36rem 0.42rem;
+  color: #fff;
+  background: rgba(10, 10, 15, 0.72);
+  text-decoration: none;
+  font-size: 0.82rem;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+}
+.streamer-pill span {
+  border-radius: 999px;
+  padding: 0.22rem 0.48rem;
+  color: #0a0a0f;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.streamer-purple span { background: #a78bfa; }
+.streamer-gold span { background: var(--gold); }
+.streamer-green span { background: #4ade80; }
+.streamer-blue span { background: #38bdf8; }
+.streamer-red span { background: #f87171; }
+.streamer-pink span { background: #f472b6; }
+.streamer-pill:hover { border-color: var(--gold); transform: translateY(-1px); }
+@keyframes streamerScroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
 .hero-banner {
   display: block;
   width: min(1760px, calc(100vw - 1.8rem));
@@ -183,6 +245,8 @@ h1.hero-title .brand { font-style: italic; font-weight: 500; }
 @media (max-width: 720px) {
   .hero-banner-wrap { padding: 5rem 0.7rem 1.8rem; }
   .hero-banner { width: calc(100vw - 1.4rem); border-radius: 10px; aspect-ratio: 24 / 8; }
+  .streamer-marquee { top: 5.35rem; width: calc(100vw - 1.4rem); border-radius: 10px 10px 0 0; }
+  .streamer-pill { font-size: 0.76rem; }
 }
 
 

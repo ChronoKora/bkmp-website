@@ -674,6 +674,89 @@ async function syncWishesFromSupabase(targetData, onSynced, options = {}) {
   }
 }
 
+function bkmpMapStreamerFromSupabase(row) {
+  return {
+    id: row.id,
+    name: row.display_name || row.name || '',
+    url: row.url || '',
+    color: row.color || 'purple',
+    createdAt: row.created_at ? Date.parse(row.created_at) : 0,
+    source: 'supabase'
+  };
+}
+
+function bkmpMapStreamerToSupabase(streamer) {
+  return {
+    display_name: streamer.name || streamer.display_name || '',
+    url: streamer.url || '',
+    color: streamer.color || 'purple'
+  };
+}
+
+async function loadStreamers() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('streamer_links')
+    .select('id, display_name, url, color, created_at')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data || []).map(bkmpMapStreamerFromSupabase);
+}
+
+async function saveStreamer(streamer) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const payload = bkmpMapStreamerToSupabase(streamer);
+  let query;
+  if (streamer.id && !String(streamer.id).startsWith('str-')) {
+    query = client
+      .from('streamer_links')
+      .update(payload)
+      .eq('id', streamer.id)
+      .select('id, display_name, url, color, created_at')
+      .limit(1);
+  } else {
+    query = client
+      .from('streamer_links')
+      .insert(payload)
+      .select('id, display_name, url, color, created_at')
+      .limit(1);
+  }
+  const { data, error } = await query;
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : null;
+  return row ? bkmpMapStreamerFromSupabase(row) : null;
+}
+
+async function deleteStreamer(id) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return false;
+  const { error } = await client.from('streamer_links').delete().eq('id', id);
+  if (error) throw error;
+  return true;
+}
+
+async function syncStreamersFromSupabase(targetData, onSynced, options = {}) {
+  if (typeof loadStreamers !== 'function' || !bkmpGetSupabaseClient()) return false;
+  try {
+    const streamers = await loadStreamers();
+    if (!streamers) return false;
+    const localCount = Array.isArray(targetData.streamers) ? targetData.streamers.length : 0;
+    if (!options.force && localCount > 0 && streamers.length < localCount) {
+      console.warn('Supabase enthaelt weniger Twitch-Accounts als localStorage. Lokale Daten bleiben erhalten.');
+      return false;
+    }
+    targetData.streamers = streamers;
+    bkmpSaveData(targetData);
+    if (typeof onSynced === 'function') onSynced(targetData);
+    return true;
+  } catch (e) {
+    console.warn('Supabase konnte Twitch-Accounts nicht laden. localStorage-Fallback wird verwendet.', e);
+    return false;
+  }
+}
+
 async function importLocalExpensesToSupabase() {
   const client = bkmpGetSupabaseClient();
   if (!client) return { imported: 0, skipped: 0, total: 0 };

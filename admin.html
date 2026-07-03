@@ -91,6 +91,10 @@
           <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 13l2.2-2.2 2.8 3.2 1.7-1.7L20 18"/><circle cx="9" cy="9" r="1.2"/></svg>
           Kartenideen
         </button>
+        <button class="admin-nav-btn" data-page="streamers">
+          <svg viewBox="0 0 24 24"><path d="M4 7h16v10H8l-4 4V7z"/><path d="M9 11v3M14 11v3"/></svg>
+          Twitch-Leiste
+        </button>
       </nav>
 
       <div class="admin-main">
@@ -187,6 +191,32 @@
           </div>
         </section>
 
+        <!-- Twitch-Leiste -->
+        <section class="admin-page" id="page-streamers">
+          <div class="admin-section">
+            <h2>Twitch-Leiste</h2>
+            <div class="entry-table-wrapper"><div class="entry-list" id="streamerList"></div></div>
+            <div class="form-grid form-grid-3">
+              <div><label>Anzeigename</label><input type="text" id="streamerName" placeholder="z. B. Scusy"></div>
+              <div><label>Twitch-Link</label><input type="text" id="streamerUrl" placeholder="https://www.twitch.tv/name"></div>
+              <div><label>Prefix-Farbe</label>
+                <select id="streamerColor">
+                  <option value="purple">Lila</option>
+                  <option value="gold">Gold</option>
+                  <option value="green">Gr&uuml;n</option>
+                  <option value="blue">Blau</option>
+                  <option value="red">Rot</option>
+                  <option value="pink">Pink</option>
+                </select>
+              </div>
+            </div>
+            <div class="investor-form-actions">
+              <button class="btn btn-primary" id="addStreamer">+ Twitch-Account speichern</button>
+              <button class="btn" id="cancelStreamerEdit" type="button" style="display:none;">Abbrechen</button>
+            </div>
+          </div>
+        </section>
+
       </div>
     </div>
 
@@ -213,6 +243,7 @@
       refreshExpensesFromSupabase();
       refreshUpdatesFromSupabase();
       refreshWishesFromSupabase();
+      refreshStreamersFromSupabase();
     }
 
     function showAdmin() {
@@ -249,6 +280,7 @@
         adminNavBtns.forEach(item => item.classList.toggle('active', item === btn));
         adminPages.forEach(section => section.classList.toggle('active', section.id === 'page-' + page));
         if (page === 'wishes') refreshWishesFromSupabase();
+        if (page === 'streamers') refreshStreamersFromSupabase();
       });
     });
 
@@ -256,6 +288,7 @@
     let data = bkmpLoadData();
     let editingInvestorId = null;
     let editingNewsId = null;
+    let editingStreamerId = null;
 
     // Kategorien-Dropdown befüllen
     const incomeNameSelect = document.getElementById('incomeName');
@@ -335,6 +368,10 @@
       }
 
       await syncWishesFromSupabase(data, function () { renderAll(); }, { force: true });
+    }
+
+    async function refreshStreamersFromSupabase() {
+      await syncStreamersFromSupabase(data, function () { renderAll(); }, { force: true });
     }
 
     async function persistExpense(expense) {
@@ -428,6 +465,47 @@
       removeEntry('wishes', id);
     }
 
+    async function persistStreamer(streamer) {
+      if (typeof saveStreamer === 'function' && bkmpGetSupabaseClient()) {
+        try {
+          const saved = await saveStreamer(streamer);
+          if (streamer.id) {
+            data.streamers = data.streamers.map(item => item.id === streamer.id ? saved : item);
+          } else {
+            data.streamers.push(saved);
+          }
+          bkmpSaveData(data);
+          renderAll();
+          return true;
+        } catch (e) {
+          console.warn('Supabase konnte Twitch-Account nicht speichern. localStorage-Fallback wird verwendet.', e);
+        }
+      }
+
+      if (streamer.id) {
+        data.streamers = data.streamers.map(item => item.id === streamer.id ? streamer : item);
+      } else {
+        data.streamers.push({ id: bkmpUid('str'), ...streamer, createdAt: Date.now() });
+      }
+      persist();
+      return true;
+    }
+
+    async function removeStreamer(id) {
+      if (typeof deleteStreamer === 'function' && bkmpGetSupabaseClient() && !String(id).startsWith('str-')) {
+        try {
+          await deleteStreamer(id);
+          data.streamers = data.streamers.filter(item => item.id !== id);
+          bkmpSaveData(data);
+          renderAll();
+          return;
+        } catch (e) {
+          console.warn('Supabase konnte Twitch-Account nicht loeschen. localStorage-Fallback wird verwendet.', e);
+        }
+      }
+      removeEntry('streamers', id);
+    }
+
     async function persistIncome(income) {
       if (typeof saveIncome === 'function' && bkmpGetSupabaseClient()) {
         try {
@@ -513,6 +591,41 @@
       renderInvestorList();
       renderNewsList();
       renderWishAdminList();
+      renderStreamerList();
+    }
+
+    function streamerColorLabel(color) {
+      return ({ purple: 'Lila', gold: 'Gold', green: 'Gruen', blue: 'Blau', red: 'Rot', pink: 'Pink' })[color] || 'Lila';
+    }
+
+    function renderStreamerList() {
+      const el = document.getElementById('streamerList');
+      if (!el) return;
+      if (!data.streamers || data.streamers.length === 0) {
+        el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Noch keine Twitch-Accounts.</p>';
+        return;
+      }
+      el.innerHTML = '';
+      data.streamers.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'entry-row';
+        row.innerHTML = `
+          <div class="desc">
+            <span class="name">${item.name}</span>
+            <span class="meta">${streamerColorLabel(item.color)} · ${item.url}</span>
+          </div>
+          <div class="entry-actions">
+            <button class="edit-btn" type="button">Bearbeiten</button>
+            <button class="del-btn" type="button" aria-label="Twitch-Account loeschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>
+          </div>
+        `;
+        row.querySelector('.edit-btn').addEventListener('click', () => startEditStreamer(item.id));
+        row.querySelector('.del-btn').addEventListener('click', () => {
+          if (editingStreamerId === item.id) clearStreamerForm();
+          removeStreamer(item.id);
+        });
+        el.appendChild(row);
+      });
     }
 
     function renderWishAdminList() {
@@ -700,6 +813,50 @@
       const payload = { name, minecraftName, invested, sharePercent, startDate, endDate };
       if (editingInvestorId) payload.id = editingInvestorId;
       persistInvestor(payload).then(() => clearInvestorForm());
+    });
+
+    /* Twitch-Leiste */
+    const addStreamerBtn = document.getElementById('addStreamer');
+    const cancelStreamerEditBtn = document.getElementById('cancelStreamerEdit');
+    const streamerNameInput = document.getElementById('streamerName');
+    const streamerUrlInput = document.getElementById('streamerUrl');
+    const streamerColorInput = document.getElementById('streamerColor');
+
+    function setStreamerEditMode(isEditing) {
+      addStreamerBtn.textContent = isEditing ? 'Aenderungen speichern' : '+ Twitch-Account speichern';
+      cancelStreamerEditBtn.style.display = isEditing ? 'inline-flex' : 'none';
+    }
+
+    function clearStreamerForm() {
+      editingStreamerId = null;
+      streamerNameInput.value = '';
+      streamerUrlInput.value = '';
+      streamerColorInput.value = 'purple';
+      setStreamerEditMode(false);
+    }
+
+    function startEditStreamer(id) {
+      const streamer = data.streamers.find(item => item.id === id);
+      if (!streamer) return;
+      editingStreamerId = id;
+      streamerNameInput.value = streamer.name || '';
+      streamerUrlInput.value = streamer.url || '';
+      streamerColorInput.value = streamer.color || 'purple';
+      setStreamerEditMode(true);
+      streamerNameInput.focus();
+    }
+
+    cancelStreamerEditBtn.addEventListener('click', clearStreamerForm);
+
+    addStreamerBtn.addEventListener('click', () => {
+      const name = streamerNameInput.value.trim();
+      let url = streamerUrlInput.value.trim();
+      const color = streamerColorInput.value || 'purple';
+      if (!name || !url) return;
+      if (!url.startsWith('http')) url = 'https://' + url;
+      const payload = { name, url, color };
+      if (editingStreamerId) payload.id = editingStreamerId;
+      persistStreamer(payload).then(() => clearStreamerForm());
     });
 
     const addNewsBtn = document.getElementById('addNews');
