@@ -42,3 +42,26 @@ create policy "Allow anon delete wishes" on public.wishes for delete to anon usi
 
 drop policy if exists "Allow anon update updates" on public.updates;
 create policy "Allow anon update updates" on public.updates for update to anon using (true) with check (true);
+
+insert into storage.buckets (id, name, public)
+values ('update-images', 'update-images', true)
+on conflict (id) do update set public = true;
+
+drop policy if exists "Allow anon read update images" on storage.objects;
+create policy "Allow anon read update images"
+on storage.objects for select
+to anon
+using (bucket_id = 'update-images');
+
+drop policy if exists "Allow anon upload update images" on storage.objects;
+create policy "Allow anon upload update images"
+on storage.objects for insert
+to anon
+with check (bucket_id = 'update-images');
+
+drop policy if exists "Allow anon update update images" on storage.objects;
+create policy "Allow anon update update images"
+on storage.objects for update
+to anon
+using (bucket_id = 'update-images')
+with check (bucket_id = 'update-images');
