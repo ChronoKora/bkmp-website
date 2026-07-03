@@ -114,3 +114,7 @@ create policy "Allow anon insert wishes" on public.wishes for insert to anon wit
 
 drop policy if exists "Allow anon delete wishes" on public.wishes;
 create policy "Allow anon delete wishes" on public.wishes for delete to anon using (true);
+
+
+drop policy if exists "Allow anon update updates" on public.updates;
+create policy "Allow anon update updates" on public.updates for update to anon using (true) with check (true);

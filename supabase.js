@@ -448,11 +448,13 @@ function bkmpMapUpdateFromSupabase(row) {
 
 function bkmpMapUpdateToSupabase(update) {
   const images = update.images && update.images.length ? update.images : (update.image ? [update.image] : []);
-  return {
+  const payload = {
     title: update.title,
     content: update.text || update.content || '',
     image_urls: images
   };
+  if (update.date) payload.created_at = update.date + 'T12:00:00.000Z';
+  return payload;
 }
 
 async function loadUpdates() {
@@ -469,11 +471,23 @@ async function loadUpdates() {
 async function saveUpdate(update) {
   const client = bkmpGetSupabaseClient();
   if (!client) return null;
-  const { data, error } = await client
-    .from('updates')
-    .insert(bkmpMapUpdateToSupabase(update))
-    .select('id, title, content, image_urls, created_at')
-    .single();
+  const payload = bkmpMapUpdateToSupabase(update);
+  let query;
+  if (update.id && !String(update.id).startsWith('news-')) {
+    query = client
+      .from('updates')
+      .update(payload)
+      .eq('id', update.id)
+      .select('id, title, content, image_urls, created_at')
+      .single();
+  } else {
+    query = client
+      .from('updates')
+      .insert(payload)
+      .select('id, title, content, image_urls, created_at')
+      .single();
+  }
+  const { data, error } = await query;
   if (error) throw error;
   return bkmpMapUpdateFromSupabase(data);
 }

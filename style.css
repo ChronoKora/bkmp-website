@@ -988,3 +988,16 @@ label {
   .admin-nav-btn { flex: 1 0 auto; }
   .admin-top-actions { position: static; }
 }
+
+
+/* ---------- Update Editor ---------- */
+.format-toolbar { display: flex; flex-wrap: wrap; gap: 0.45rem; margin: -0.2rem 0 0.7rem; }
+.format-btn { min-height: 34px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); color: var(--ink); padding: 0.35rem 0.7rem; cursor: pointer; font: inherit; font-size: 0.78rem; transition: border-color 0.2s ease, transform 0.15s ease, background 0.2s ease; }
+.format-btn:hover { border-color: var(--gold); transform: translateY(-1px); background: var(--paper-2); }
+.format-btn.color-red { color: #F87171; }
+.format-btn.color-green { color: #4ADE80; }
+.format-btn.color-gold { color: var(--gold); }
+.format-btn.color-blue { color: #38BDF8; }
+.form-grid-2 { grid-template-columns: 1fr 1fr; }
+.news-text strong { color: var(--ink); font-weight: 800; }
+.news-text em { color: color-mix(in srgb, var(--ink) 80%, var(--gold)); }

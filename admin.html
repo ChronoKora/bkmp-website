@@ -131,10 +131,23 @@
             <label>Titel</label>
             <input type="text" id="newsTitle" placeholder="Titel des Updates">
             <label>Text</label>
-            <textarea id="newsText" placeholder="Was möchtest du berichten?"></textarea>
-            <label>Bild (optional)</label>
-            <input type="file" multiple id="newsImageFile" accept="image/*">
-            <button class="btn btn-primary" id="addNews">+ Update posten</button>
+            <div class="format-toolbar" aria-label="Text formatieren">
+              <button class="format-btn" type="button" data-format="bold"><strong>B</strong></button>
+              <button class="format-btn" type="button" data-format="italic"><em>I</em></button>
+              <button class="format-btn color-red" type="button" data-format="color" data-color="#F87171">Rot</button>
+              <button class="format-btn color-green" type="button" data-format="color" data-color="#4ADE80">Gr&uuml;n</button>
+              <button class="format-btn color-gold" type="button" data-format="color" data-color="#C9A56A">Gold</button>
+              <button class="format-btn color-blue" type="button" data-format="color" data-color="#38BDF8">Blau</button>
+            </div>
+            <textarea id="newsText" placeholder="Was m?chtest du berichten?"></textarea>
+            <div class="form-grid form-grid-2">
+              <div><label>Datum</label><input type="date" id="newsDate"></div>
+              <div><label>Bild (optional)</label><input type="file" multiple id="newsImageFile" accept="image/*"></div>
+            </div>
+            <div class="investor-form-actions">
+              <button class="btn btn-primary" id="addNews">+ Update posten</button>
+              <button class="btn" id="cancelNewsEdit" type="button" style="display:none;">Abbrechen</button>
+            </div>
           </div>
         </section>
 
@@ -220,6 +233,7 @@
     /* ---------------- Daten-Handling ---------------- */
     let data = bkmpLoadData();
     let editingInvestorId = null;
+    let editingNewsId = null;
 
     // Kategorien-Dropdown befüllen
     const incomeNameSelect = document.getElementById('incomeName');
@@ -234,6 +248,7 @@
     const todayStr = new Date().toISOString().slice(0, 10);
     document.getElementById('incomeDate').value = todayStr;
     document.getElementById('expenseDate').value = todayStr;
+    document.getElementById('newsDate').value = todayStr;
 
     function persist() {
       bkmpSaveData(data);
@@ -291,7 +306,11 @@
       if (typeof saveUpdate === 'function' && bkmpGetSupabaseClient()) {
         try {
           const saved = await saveUpdate(post);
-          data.news.push(saved);
+          if (post.id) {
+            data.news = data.news.map(item => item.id === post.id ? saved : item);
+          } else {
+            data.news.push(saved);
+          }
           bkmpSaveData(data);
           renderAll();
           return;
@@ -299,7 +318,11 @@
           console.warn('Supabase konnte Update nicht speichern. localStorage-Fallback wird verwendet.', e);
         }
       }
-      data.news.push(post);
+      if (post.id) {
+        data.news = data.news.map(item => item.id === post.id ? post : item);
+      } else {
+        data.news.push(post);
+      }
       persist();
     }
 
@@ -401,7 +424,7 @@
       renderEntryList('incomeList', sortByDateDesc(data.income), item => item.name, item => `${formatDate(item.date)} · ${bkmpFormatCurrency(item.amount)}`, id => removeIncome(id));
       renderEntryList('expenseList', sortByDateDesc(data.expenses), item => item.name, item => `${formatDate(item.date)} · ${bkmpFormatCurrency(item.amount)}`, id => removeEntry('expenses', id));
       renderInvestorList();
-      renderEntryList('newsList', sortByDateDesc(data.news), item => item.title, item => item.date, id => removeUpdate(id));
+      renderNewsList();
     }
 
     function renderInvestorList() {
@@ -428,6 +451,35 @@
         row.querySelector('.del-btn').addEventListener('click', () => {
           if (editingInvestorId === item.id) clearInvestorForm();
           removeInvestor(item.id);
+        });
+        el.appendChild(row);
+      });
+    }
+
+
+    function renderNewsList() {
+      const el = document.getElementById('newsList');
+      if (data.news.length === 0) {
+        el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Noch keine Eintr?ge.</p>';
+        return;
+      }
+      el.innerHTML = '';
+      sortByDateDesc(data.news).forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'entry-row';
+        row.innerHTML = '\
+          <div class="desc">\
+            <span class="name">' + item.title + '</span>\
+            <span class="meta">' + (item.date || '') + '</span>\
+          </div>\
+          <div class="entry-actions">\
+            <button class="edit-btn" type="button">Bearbeiten</button>\
+            <button class="del-btn" type="button" aria-label="Update l?schen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>\
+          </div>';
+        row.querySelector('.edit-btn').addEventListener('click', () => startEditUpdate(item.id));
+        row.querySelector('.del-btn').addEventListener('click', () => {
+          if (editingNewsId === item.id) clearNewsForm();
+          removeUpdate(item.id);
         });
         el.appendChild(row);
       });
@@ -537,6 +589,60 @@
       if (editingInvestorId) payload.id = editingInvestorId;
       persistInvestor(payload).then(() => clearInvestorForm());
     });
+
+    const addNewsBtn = document.getElementById('addNews');
+    const cancelNewsEditBtn = document.getElementById('cancelNewsEdit');
+    const newsTitleInput = document.getElementById('newsTitle');
+    const newsTextInput = document.getElementById('newsText');
+    const newsDateInput = document.getElementById('newsDate');
+    const newsFileInput = document.getElementById('newsImageFile');
+
+    function setNewsEditMode(isEditing) {
+      addNewsBtn.textContent = isEditing ? '\u00c4nderungen speichern' : '+ Update posten';
+      cancelNewsEditBtn.style.display = isEditing ? 'inline-flex' : 'none';
+    }
+
+    function clearNewsForm() {
+      editingNewsId = null;
+      newsTitleInput.value = '';
+      newsTextInput.value = '';
+      newsDateInput.value = todayStr;
+      newsFileInput.value = '';
+      setNewsEditMode(false);
+    }
+
+    function startEditUpdate(id) {
+      const post = data.news.find(item => item.id === id);
+      if (!post) return;
+      editingNewsId = id;
+      newsTitleInput.value = post.title || '';
+      newsTextInput.value = post.text || '';
+      newsDateInput.value = post.date || todayStr;
+      newsFileInput.value = '';
+      setNewsEditMode(true);
+      newsTitleInput.focus();
+    }
+
+    function insertNewsCode(type, color) {
+      const input = newsTextInput;
+      const start = input.selectionStart || 0;
+      const end = input.selectionEnd || 0;
+      const selected = input.value.slice(start, end) || 'Text';
+      const wrapped = type === 'bold'
+        ? '[b]' + selected + '[/b]'
+        : type === 'italic'
+          ? '[i]' + selected + '[/i]'
+          : '[color=' + color + ']' + selected + '[/color]';
+      input.value = input.value.slice(0, start) + wrapped + input.value.slice(end);
+      input.focus();
+      input.setSelectionRange(start + wrapped.length, start + wrapped.length);
+    }
+
+    document.querySelectorAll('.format-btn').forEach(btn => {
+      btn.addEventListener('click', () => insertNewsCode(btn.dataset.format, btn.dataset.color));
+    });
+    cancelNewsEditBtn.addEventListener('click', clearNewsForm);
+
     /* News */
     if (sessionStorage.getItem('bkmp-admin-auth') === '1') {
       showAdmin();
@@ -546,30 +652,30 @@
       refreshUpdatesFromSupabase();
     }
 
-    document.getElementById('addNews').addEventListener('click', () => {
-      const title = document.getElementById('newsTitle').value.trim();
-      const text = document.getElementById('newsText').value.trim();
-      const fileInput = document.getElementById('newsImageFile');
+    addNewsBtn.addEventListener('click', () => {
+      const title = newsTitleInput.value.trim();
+      const text = newsTextInput.value.trim();
+      const date = newsDateInput.value || todayStr;
+      const currentPost = editingNewsId ? data.news.find(item => item.id === editingNewsId) : null;
       if (!title || !text) return;
 
       function savePost(imageData) {
+        const keepImages = currentPost ? (currentPost.images && currentPost.images.length ? currentPost.images : (currentPost.image ? [currentPost.image] : [])) : [];
+        const images = Array.isArray(imageData) && imageData.length ? imageData : keepImages;
         const post = {
-          id: bkmpUid('news'),
+          id: editingNewsId || '',
           title,
           text,
-          image: Array.isArray(imageData) ? (imageData[0] || '') : (imageData || ''),
-          images: Array.isArray(imageData) ? imageData : (imageData ? [imageData] : []),
-          date: new Date().toISOString().slice(0, 10),
-          createdAt: Date.now()
+          image: images[0] || '',
+          images,
+          date,
+          createdAt: currentPost && currentPost.createdAt ? currentPost.createdAt : Date.now()
         };
-        document.getElementById('newsTitle').value = '';
-        document.getElementById('newsText').value = '';
-        fileInput.value = '';
-        persistUpdate(post);
+        persistUpdate(post).then(() => clearNewsForm());
       }
 
-      if (fileInput.files && fileInput.files.length) {
-        const files = Array.from(fileInput.files);
+      if (newsFileInput.files && newsFileInput.files.length) {
+        const files = Array.from(newsFileInput.files);
         Promise.all(files.map(file => new Promise(resolve => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result);

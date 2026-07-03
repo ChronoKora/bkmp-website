@@ -486,6 +486,18 @@
       `).join('');
     }
 
+    function escapeHtml(value) {
+      return String(value || '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+    }
+
+    function renderFormattedNewsText(value) {
+      let html = escapeHtml(value);
+      html = html.replace(new RegExp('\\[b\\]([\\s\\S]*?)\\[/b\\]', 'gi'), '<strong>$1</strong>');
+      html = html.replace(new RegExp('\\[i\\]([\\s\\S]*?)\\[/i\\]', 'gi'), '<em>$1</em>');
+      html = html.replace(new RegExp('\\[color=(#[0-9a-fA-F]{3,6})\\]([\\s\\S]*?)\\[/color\\]', 'gi'), '<span style="color:$1">$2</span>');
+      return html;
+    }
+
     /* News */
     const newsFeed = document.getElementById('newsFeed');
     if (data.news.length === 0) {
@@ -504,7 +516,7 @@
             <div class="news-body">
               <div class="news-date">${post.date}</div>
               <div class="news-title">${post.title}</div>
-              <div class="news-text">${post.text}</div>
+              <div class="news-text">${renderFormattedNewsText(post.text)}</div>
             </div>
           </article>`;
       }).join('');
