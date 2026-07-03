@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<script>
+  (function () {
+    var saved = localStorage.getItem('bkmp-theme');
+    var theme = saved === 'light' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', theme);
+  })();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bkmp — Admin</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="joke-overlay" id="jokeOverlay">
+    <div class="joke-card">
+      <p>Meinst du das ernst? ._.</p>
+      <div class="joke-buttons">
+        <button class="btn-ja" id="jokeYes" type="button">Ja</button>
+        <button class="btn-nein" id="jokeNo" type="button">Verdrückt</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="top-actions">
+    <button class="pill-btn" id="themeToggle" type="button" aria-label="Zwischen Hell- und Dunkelmodus wechseln">
+      <span class="toggle-icon">
+        <svg class="icon-sun" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="4"></circle>
+          <line x1="12" y1="2" x2="12" y2="4.5"></line>
+          <line x1="12" y1="19.5" x2="12" y2="22"></line>
+          <line x1="2" y1="12" x2="4.5" y2="12"></line>
+          <line x1="19.5" y1="12" x2="22" y2="12"></line>
+          <line x1="4.9" y1="4.9" x2="6.6" y2="6.6"></line>
+          <line x1="17.4" y1="17.4" x2="19.1" y2="19.1"></line>
+          <line x1="4.9" y1="19.1" x2="6.6" y2="17.4"></line>
+          <line x1="17.4" y1="6.6" x2="19.1" y2="4.9"></line>
+        </svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"></path>
+        </svg>
+      </span>
+      <span id="themeLabel">Hell</span>
+    </button>
+  </div>
+
+  <!-- ================= Login ================= -->
+  <div class="login-card" id="loginCard">
+    <h1>Admin-Login</h1>
+    <p>Nur für dich — hier trägst du Zahlen, Investoren und News ein.</p>
+    <input type="password" id="loginPassword" placeholder="Passwort">
+    <button class="btn btn-primary btn-block" id="loginBtn">Einloggen</button>
+    <p id="loginError" style="color:var(--neg); font-size:0.8rem; margin-top:0.8rem; display:none;">Falsches Passwort.</p>
+  </div>
+
+  <!-- ================= Admin-Bereich ================= -->
+  <div class="admin-wrap" id="adminWrap" style="display:none;">
+    <div class="admin-top-actions">
+      <a href="index.html" class="back-link">&larr; Zurück zur Website</a>
+      <button class="btn" id="logoutBtn">Logout</button>
+    </div>
+    <h1 class="admin-title">Admin-Panel</h1>
+    <p class="admin-sub">Änderungen erscheinen sofort auf der Website.</p>
+
+    <div class="admin-layout">
+      <nav class="admin-sidebar" id="adminSidebar">
+        <button class="admin-nav-btn active" data-page="income">
+          <svg viewBox="0 0 24 24"><path d="M12 3v18M6 8l6-5 6 5M6 16l6 5 6-5"/></svg>
+          Einnahmen
+        </button>
+        <button class="admin-nav-btn" data-page="expenses">
+          <svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          Ausgaben
+        </button>
+        <button class="admin-nav-btn" data-page="news">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h10M7 16h6"/></svg>
+          Updates
+        </button>
+        <button class="admin-nav-btn" data-page="investors">
+          <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3-6 7-6s7 2.7 7 6"/><circle cx="17" cy="8" r="2.6"/><path d="M17 5.2c1.7.3 3 1.5 3 3M22 20c0-2.4-1.7-4.5-4.2-5.4"/></svg>
+          Investoren
+        </button>
+      </nav>
+
+      <div class="admin-main">
+
+        <!-- Einnahmen -->
+        <section class="admin-page active" id="page-income">
+          <div class="admin-section">
+            <h2>Einnahmen</h2>
+            <div class="entry-table-wrapper"><div class="entry-list" id="incomeList"></div></div>
+            <div class="form-grid form-grid-3">
+              <div><label>Kategorie</label>
+                <select id="incomeName">
+                  <option value="">Bitte wählen…</option>
+                </select>
+              </div>
+              <div><label>Betrag (€)</label><input type="number" id="incomeAmount" placeholder="0"></div>
+              <div><label>Datum</label><input type="date" id="incomeDate"></div>
+            </div>
+            <button class="btn btn-primary" id="addIncome">+ Einnahme hinzufügen</button>
+          </div>
+        </section>
+
+        <!-- Ausgaben -->
+        <section class="admin-page" id="page-expenses">
+          <div class="admin-section">
+            <h2>Ausgaben</h2>
+            <div class="entry-table-wrapper"><div class="entry-list" id="expenseList"></div></div>
+            <div class="form-grid form-grid-3">
+              <div><label>Bezeichnung</label><input type="text" id="expenseName" placeholder="z. B. Marketing"></div>
+              <div><label>Betrag (€)</label><input type="number" id="expenseAmount" placeholder="0"></div>
+              <div><label>Datum</label><input type="date" id="expenseDate"></div>
+            </div>
+            <button class="btn btn-primary" id="addExpense">+ Ausgabe hinzufügen</button>
+          </div>
+        </section>
+
+        <!-- Updates / News -->
+        <section class="admin-page" id="page-news">
+          <div class="admin-section">
+            <h2>Was gibt's Neues — Update posten</h2>
+            <div class="entry-table-wrapper"><div class="entry-list" id="newsList"></div></div>
+            <label>Titel</label>
+            <input type="text" id="newsTitle" placeholder="Titel des Updates">
+            <label>Text</label>
+            <textarea id="newsText" placeholder="Was möchtest du berichten?"></textarea>
+            <label>Bild (optional)</label>
+            <input type="file" multiple id="newsImageFile" accept="image/*">
+            <button class="btn btn-primary" id="addNews">+ Update posten</button>
+          </div>
+        </section>
+
+        <!-- Investoren -->
+        <section class="admin-page" id="page-investors">
+          <div class="admin-section">
+            <h2>Investoren</h2>
+            <div class="entry-table-wrapper"><div class="entry-list" id="investorList"></div></div>
+            <div class="form-grid">
+              <div><label>Name</label><input type="text" id="invName" placeholder="z. B. Max Mustermann"></div>
+              <div><label>Minecraft-Name</label><input type="text" id="invMinecraft" placeholder="z. B. Steve"></div>
+            </div>
+            <div class="form-grid">
+              <div><label>Investiert (€)</label><input type="number" id="invAmount" placeholder="0"></div>
+              <div><label>Gewinnbeteiligung (%)</label><input type="number" id="invShare" placeholder="0"></div>
+            </div>
+            <div class="form-grid">
+              <div><label>Startdatum</label><input type="date" id="invStartDate"></div>
+              <div><label>Enddatum (optional)</label><input type="date" id="invEndDate"></div>
+            </div>
+            <div class="investor-form-actions">
+              <button class="btn btn-primary" id="addInvestor">+ Investor hinzufügen</button>
+              <button class="btn" id="cancelInvestorEdit" type="button" style="display:none;">Abbrechen</button>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </div>
+
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    bkmpInitTheme();
+
+    /* ---------------- Login (nur clientseitig, siehe Hinweis) ---------------- */
+    const ADMIN_PASSWORD = 'bkmp2026'; // TODO: vor dem echten Launch ändern / durch echtes Backend-Login ersetzen
+
+    const loginCard = document.getElementById('loginCard');
+    const adminWrap = document.getElementById('adminWrap');
+    const loginBtn = document.getElementById('loginBtn');
+    const loginPassword = document.getElementById('loginPassword');
+    const loginError = document.getElementById('loginError');
+
+    function showAdmin() {
+      loginCard.style.display = 'none';
+      adminWrap.style.display = 'block';
+      renderAll();
+    }
+
+    function tryLogin() {
+      if (loginPassword.value === ADMIN_PASSWORD) {
+        sessionStorage.setItem('bkmp-admin-auth', '1');
+        showAdmin();
+      } else {
+        loginError.style.display = 'block';
+      }
+    }
+
+    loginBtn.addEventListener('click', tryLogin);
+    loginPassword.addEventListener('keydown', e => { if (e.key === 'Enter') tryLogin(); });
+
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      sessionStorage.removeItem('bkmp-admin-auth');
+      location.reload();
+    });
+
+    /* ---------------- Admin-Navigation ---------------- */
+    const adminNavBtns = document.querySelectorAll('.admin-nav-btn');
+    const adminPages = document.querySelectorAll('.admin-page');
+
+    adminNavBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const page = btn.dataset.page;
+        adminNavBtns.forEach(item => item.classList.toggle('active', item === btn));
+        adminPages.forEach(section => section.classList.toggle('active', section.id === 'page-' + page));
+      });
+    });
+
+    /* ---------------- Daten-Handling ---------------- */
+    let data = bkmpLoadData();
+    let editingInvestorId = null;
+
+    // Kategorien-Dropdown befüllen
+    const incomeNameSelect = document.getElementById('incomeName');
+    BKMP_INCOME_CATEGORIES.forEach(cat => {
+      const opt = document.createElement('option');
+      opt.value = cat;
+      opt.textContent = cat;
+      incomeNameSelect.appendChild(opt);
+    });
+
+    // Datumsfelder mit heute vorbefüllen
+    const todayStr = new Date().toISOString().slice(0, 10);
+    document.getElementById('incomeDate').value = todayStr;
+    document.getElementById('expenseDate').value = todayStr;
+
+    function persist() {
+      bkmpSaveData(data);
+      renderAll();
+    }
+
+    function sortByDateDesc(list) {
+      return [...list].sort((a, b) => {
+        const dateCompare = (b.date || b.startDate || '').localeCompare(a.date || a.startDate || '');
+        if (dateCompare !== 0) return dateCompare;
+        return (b.createdAt || 0) - (a.createdAt || 0);
+      });
+    }
+
+    function renderAll() {
+      renderEntryList('incomeList', sortByDateDesc(data.income), item => item.name, item => `${formatDate(item.date)} · ${bkmpFormatCurrency(item.amount)}`, id => removeEntry('income', id));
+      renderEntryList('expenseList', sortByDateDesc(data.expenses), item => item.name, item => `${formatDate(item.date)} · ${bkmpFormatCurrency(item.amount)}`, id => removeEntry('expenses', id));
+      renderInvestorList();
+      renderEntryList('newsList', sortByDateDesc(data.news), item => item.title, item => item.date, id => removeEntry('news', id));
+    }
+
+    function renderInvestorList() {
+      const el = document.getElementById('investorList');
+      if (data.investors.length === 0) {
+        el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Noch keine Investoren.</p>';
+        return;
+      }
+      el.innerHTML = '';
+      sortByDateDesc(data.investors).forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'entry-row';
+        row.innerHTML = `
+          <div class="desc">
+            <span class="name">${item.name}</span>
+            <span class="meta">${item.minecraftName ? item.minecraftName + ' · ' : ''}${bkmpFormatCurrency(item.invested)} · ${item.sharePercent}% · ${item.startDate ? formatDate(item.startDate) : 'ohne Start'}</span>
+          </div>
+          <div class="entry-actions">
+            <button class="edit-btn" type="button">Bearbeiten</button>
+            <button class="del-btn" type="button" aria-label="Investor löschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>
+          </div>
+        `;
+        row.querySelector('.edit-btn').addEventListener('click', () => startEditInvestor(item.id));
+        row.querySelector('.del-btn').addEventListener('click', () => {
+          if (editingInvestorId === item.id) clearInvestorForm();
+          removeEntry('investors', item.id);
+        });
+        el.appendChild(row);
+      });
+    }
+
+    function renderEntryList(containerId, list, nameFn, metaFn, onRemove) {
+      const el = document.getElementById(containerId);
+      if (list.length === 0) {
+        el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Noch keine Einträge.</p>';
+        return;
+      }
+      el.innerHTML = '';
+      list.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'entry-row';
+        row.innerHTML = `
+          <div class="desc">
+            <span class="name">${nameFn(item)}</span>
+            <span class="meta">${metaFn(item)}</span>
+          </div>
+          <button class="del-btn" type="button" aria-label="Eintrag löschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>
+        `;
+        row.querySelector('button').addEventListener('click', () => onRemove(item.id));
+        el.appendChild(row);
+      });
+    }
+
+    function removeEntry(key, id) {
+      data[key] = data[key].filter(item => item.id !== id);
+      persist();
+    }
+
+    /* Einnahmen */
+    document.getElementById('addIncome').addEventListener('click', () => {
+      const name = document.getElementById('incomeName').value.trim();
+      const amountInput = document.getElementById('incomeAmount').value;
+      const amount = Number(amountInput);
+      const date = document.getElementById('incomeDate').value || todayStr;
+      if (!name || amountInput === '' || Number.isNaN(amount)) return;
+      data.income.push({ id: bkmpUid('inc'), name, amount, date, createdAt: Date.now() });
+      document.getElementById('incomeAmount').value = '';
+      persist();
+    });
+
+    /* Ausgaben */
+    document.getElementById('addExpense').addEventListener('click', () => {
+      const name = document.getElementById('expenseName').value.trim();
+      const amount = Number(document.getElementById('expenseAmount').value);
+      const date = document.getElementById('expenseDate').value || todayStr;
+      if (!name || !amount) return;
+      data.expenses.push({ id: bkmpUid('exp'), name, amount, date, createdAt: Date.now() });
+      document.getElementById('expenseName').value = '';
+      document.getElementById('expenseAmount').value = '';
+      document.getElementById('expenseDate').value = todayStr;
+      persist();
+    });
+
+    /* Investoren */
+    const addInvestorBtn = document.getElementById('addInvestor');
+    const cancelInvestorEditBtn = document.getElementById('cancelInvestorEdit');
+
+    function setInvestorEditMode(isEditing) {
+      addInvestorBtn.textContent = isEditing ? 'Änderungen speichern' : '+ Investor hinzufügen';
+      cancelInvestorEditBtn.style.display = isEditing ? 'inline-flex' : 'none';
+    }
+
+    function clearInvestorForm() {
+      editingInvestorId = null;
+      document.getElementById('invName').value = '';
+      document.getElementById('invMinecraft').value = '';
+      document.getElementById('invAmount').value = '';
+      document.getElementById('invShare').value = '';
+      document.getElementById('invStartDate').value = '';
+      document.getElementById('invEndDate').value = '';
+      setInvestorEditMode(false);
+    }
+
+    function startEditInvestor(id) {
+      const investor = data.investors.find(item => item.id === id);
+      if (!investor) return;
+      editingInvestorId = id;
+      document.getElementById('invName').value = investor.name || '';
+      document.getElementById('invMinecraft').value = investor.minecraftName || '';
+      document.getElementById('invAmount').value = investor.invested || '';
+      document.getElementById('invShare').value = investor.sharePercent || '';
+      document.getElementById('invStartDate').value = investor.startDate || '';
+      document.getElementById('invEndDate').value = investor.endDate || '';
+      setInvestorEditMode(true);
+      document.getElementById('invName').focus();
+    }
+
+    cancelInvestorEditBtn.addEventListener('click', clearInvestorForm);
+
+    addInvestorBtn.addEventListener('click', () => {
+      const name = document.getElementById('invName').value.trim();
+      const minecraftName = document.getElementById('invMinecraft').value.trim();
+      const invested = Number(document.getElementById('invAmount').value);
+      const sharePercent = Number(document.getElementById('invShare').value);
+      const startDate = document.getElementById('invStartDate').value;
+      const endDate = document.getElementById('invEndDate').value;
+      if (!name || !invested) return;
+      if (startDate && endDate && endDate < startDate) {
+        alert('Das Enddatum darf nicht vor dem Startdatum liegen.');
+        return;
+      }
+      const payload = { name, minecraftName, invested, sharePercent, startDate, endDate };
+      if (editingInvestorId) {
+        data.investors = data.investors.map(item => item.id === editingInvestorId ? { ...item, ...payload } : item);
+      } else {
+        data.investors.push({ id: bkmpUid('inv'), ...payload });
+      }
+      clearInvestorForm();
+      persist();
+    });
+    /* News */
+    if (sessionStorage.getItem('bkmp-admin-auth') === '1') {
+      showAdmin();
+    }
+
+    document.getElementById('addNews').addEventListener('click', () => {
+      const title = document.getElementById('newsTitle').value.trim();
+      const text = document.getElementById('newsText').value.trim();
+      const fileInput = document.getElementById('newsImageFile');
+      if (!title || !text) return;
+
+      function savePost(imageData) {
+        data.news.push({
+          id: bkmpUid('news'),
+          title,
+          text,
+          image: Array.isArray(imageData) ? (imageData[0] || '') : (imageData || ''),
+          images: Array.isArray(imageData) ? imageData : (imageData ? [imageData] : []),
+          date: new Date().toISOString().slice(0, 10),
+          createdAt: Date.now()
+        });
+        document.getElementById('newsTitle').value = '';
+        document.getElementById('newsText').value = '';
+        fileInput.value = '';
+        persist();
+      }
+
+      if (fileInput.files && fileInput.files.length) {
+        const files = Array.from(fileInput.files);
+        Promise.all(files.map(file => new Promise(resolve => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.readAsDataURL(file);
+        }))).then(images => savePost(images));
+      } else {
+        savePost([]);
+      }
+    });
+  </script>
+
+</body>
+</html>

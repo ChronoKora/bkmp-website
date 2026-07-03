@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<script>
+  // Verhindert Aufblitzen: Theme wird gesetzt, bevor die Seite gerendert wird.
+  (function () {
+    var saved = localStorage.getItem('bkmp-theme');
+    var theme = saved === 'light' ? 'light' : 'dark'; // Dunkel ist Standard
+    document.documentElement.setAttribute('data-theme', theme);
+  })();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bkmp</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="joke-overlay" id="jokeOverlay">
+    <div class="joke-card">
+      <p>Meinst du das ernst? ._.</p>
+      <div class="joke-buttons">
+        <button class="btn-ja" id="jokeYes" type="button">Ja</button>
+        <button class="btn-nein" id="jokeNo" type="button">Verdrückt</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="top-actions">
+    <button class="pill-btn" id="themeToggle" type="button" aria-label="Zwischen Hell- und Dunkelmodus wechseln">
+      <span class="toggle-icon">
+        <svg class="icon-sun" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="4"></circle>
+          <line x1="12" y1="2" x2="12" y2="4.5"></line>
+          <line x1="12" y1="19.5" x2="12" y2="22"></line>
+          <line x1="2" y1="12" x2="4.5" y2="12"></line>
+          <line x1="19.5" y1="12" x2="22" y2="12"></line>
+          <line x1="4.9" y1="4.9" x2="6.6" y2="6.6"></line>
+          <line x1="17.4" y1="17.4" x2="19.1" y2="19.1"></line>
+          <line x1="4.9" y1="19.1" x2="6.6" y2="17.4"></line>
+          <line x1="17.4" y1="6.6" x2="19.1" y2="4.9"></line>
+        </svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"></path>
+        </svg>
+      </span>
+      <span id="themeLabel">Hell</span>
+    </button>
+
+    <a href="admin.html" class="pill-btn login-btn">Login</a>
+  </div>
+
+  <header class="hero hero-banner-wrap">
+    <img class="hero-banner" src="assets/top-banner.png" alt="Willkommen bei Bkmp">
+  </header>
+
+  <nav class="topbar-wrap">
+    <div class="topbar">
+      <button class="tab-arrow" id="prevTab" aria-label="Vorheriger Bereich">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="tabs">
+        <button class="tab-btn active" data-index="0">Hauptseite</button>
+        <button class="tab-btn" data-index="1">Investoren</button>
+        <button class="tab-btn" data-index="2">Was gibt's Neues?</button>
+        <button class="tab-btn" data-index="3">Kartenideen</button>
+      </div>
+      <button class="tab-arrow" id="nextTab" aria-label="Nächster Bereich">
+        <svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+      </button>
+    </div>
+  </nav>
+
+  <div class="panels-viewport" id="panelsViewport">
+    <div class="panels-track" id="panelsTrack">
+
+      <!-- ================= Hauptseite ================= -->
+      <section class="panel" id="panel-main">
+        <div class="stat-row">
+          <div class="stat-card">
+            <div class="stat-label">Gesamteinnahmen</div>
+            <div class="stat-value positive" id="statIncome">–</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Ausgaben</div>
+            <div class="stat-value negative" id="statExpenses">–</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Netto Gewinn</div>
+            <div class="stat-value neutral" id="statNet">–</div>
+          </div>
+        </div>
+
+        <h2 class="panel-title">Woher kommen die Einnahmen?</h2>
+        <div id="chartArea"></div>
+
+        <h2 class="panel-title" style="margin-top:3.2rem; margin-bottom:0.4rem;">Alle Einträge</h2>
+        <p style="text-align:center; color:var(--muted); font-size:0.82rem; margin-bottom:1.4rem;">Die letzten 15 Buchungen</p>
+        <div class="ledger-list" id="ledgerList"></div>
+      </section>
+
+      <!-- ================= Investoren ================= -->
+      <section class="panel" id="panel-investors">
+        <h2 class="panel-title">Unsere Investoren</h2>
+        <div class="investor-grid" id="investorGrid"></div>
+      </section>
+
+      <!-- ================= Was gibt's Neues ================= -->
+      <section class="panel" id="panel-news">
+        <h2 class="panel-title">Was gibt's Neues?</h2>
+        <div class="news-feed" id="newsFeed"></div>
+      </section>
+
+      <!-- ================= Kartenideen ================= -->
+      <section class="panel" id="panel-wishes">
+        <h2 class="panel-title">Kartenideen</h2>
+        <button class="wish-cta" id="openWishForm" type="button">
+          <strong>Du hast einen Wunsch?</strong>
+          <span>Sag uns, welche Karte du dir für deine Wand wünschst</span>
+        </button>
+        <div class="wish-grid" id="wishGrid"></div>
+      </section>
+
+    </div>
+  </div>
+
+  <div class="joke-overlay wish-overlay" id="wishOverlay">
+    <div class="joke-card">
+      <h3>Deine Kartenidee</h3>
+      <label>Dein Name</label>
+      <input type="text" id="wishName" placeholder="Wie heißt du?">
+      <label>Bild hochladen (PNG)</label>
+      <input type="file" id="wishImageFile" accept="image/png">
+      <div class="joke-buttons">
+        <button class="btn-nein" id="wishCancel" type="button">Abbrechen</button>
+        <button class="btn-ja" id="wishSubmit" type="button">Wunsch einreichen</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    bkmpInitTheme();
+
+    /* ---------------- Swipe-Tabs ---------------- */
+    const track = document.getElementById('panelsTrack');
+    const viewport = document.getElementById('panelsViewport');
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const prevBtn = document.getElementById('prevTab');
+    const nextBtn = document.getElementById('nextTab');
+    let current = 0;
+    const total = tabBtns.length;
+
+    function goTo(index) {
+      current = Math.max(0, Math.min(total - 1, index));
+      track.style.transform = `translateX(-${current * 100}%)`;
+      tabBtns.forEach((btn, i) => btn.classList.toggle('active', i === current));
+    }
+
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => goTo(Number(btn.dataset.index)));
+    });
+    prevBtn.addEventListener('click', () => goTo(current - 1));
+    nextBtn.addEventListener('click', () => goTo(current + 1));
+
+    // Touch-Swipe
+    let touchStartX = null;
+    viewport.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; }, { passive: true });
+    viewport.addEventListener('touchend', e => {
+      if (touchStartX === null) return;
+      const diff = e.changedTouches[0].clientX - touchStartX;
+      if (Math.abs(diff) > 50) {
+        diff < 0 ? goTo(current + 1) : goTo(current - 1);
+      }
+      touchStartX = null;
+    });
+
+    /* ---------------- Daten laden & rendern ---------------- */
+    const data = bkmpLoadData();
+
+    const totalIncome = bkmpSum(data.income);
+    const totalExpenses = bkmpSum(data.expenses);
+    const netProfit = totalIncome - totalExpenses;
+
+    document.getElementById('statIncome').textContent = bkmpFormatCurrency(totalIncome);
+    document.getElementById('statExpenses').textContent = bkmpFormatCurrency(totalExpenses);
+    const statNet = document.getElementById('statNet');
+    statNet.textContent = bkmpFormatCurrency(netProfit);
+    statNet.classList.remove('neutral');
+    statNet.classList.add(netProfit >= 0 ? 'positive' : 'negative');
+
+    /* Donut-Chart: Anteil jeder Einnahmequelle an den Gesamteinnahmen */
+    const chartArea = document.getElementById('chartArea');
+    const palette = ['#9333EA', '#C9A56A', '#4ADE80', '#38BDF8', '#F472B6', '#F87171', '#FBBF24'];
+
+    if (data.income.length === 0 || totalIncome === 0) {
+      chartArea.innerHTML = '<p class="empty-hint">Noch keine Einnahmen erfasst. Trage sie im Admin-Panel ein, sobald du eingeloggt bist.</p>';
+    } else {
+      // Gleiche Kategorien zusammenrechnen, aber die Buchungs-Reihenfolge behalten.
+      const grouped = {};
+      const groupedIncome = [];
+      data.income.forEach(item => {
+        if (!grouped[item.name]) {
+          grouped[item.name] = { name: item.name, amount: 0 };
+          groupedIncome.push(grouped[item.name]);
+        }
+        grouped[item.name].amount += Number(item.amount || 0);
+      });
+
+      let gradientParts = [];
+      let cursor = 0;
+      let legendHtml = '';
+
+      groupedIncome.forEach((item, i) => {
+        const pct = (item.amount / totalIncome) * 100;
+        const color = palette[i % palette.length];
+        gradientParts.push(`${color} ${cursor}% ${cursor + pct}%`);
+        cursor += pct;
+        const amountLabel = bkmpFormatCurrency(item.amount);
+        const percentLabel = pct.toFixed(1) + '%';
+        const tooltip = `${item.name}: ${amountLabel} = ${percentLabel}`;
+        legendHtml += `
+          <div class="legend-item" data-tooltip="${tooltip}" tabindex="0" aria-label="${tooltip}">
+            <span class="legend-dot" style="background:${color}"></span>
+            <span>${item.name}</span>
+            <span class="amt">${percentLabel}</span>
+          </div>`;
+      });
+
+      function getIsoWeek(date) {
+        const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+        const day = d.getUTCDay() || 7;
+        d.setUTCDate(d.getUTCDate() + 4 - day);
+        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+      }
+
+      function addDays(date, days) {
+        const next = new Date(date);
+        next.setDate(next.getDate() + days);
+        return next;
+      }
+
+      function toIsoDate(date) {
+        return date.toISOString().slice(0, 10);
+      }
+
+      function shortDateLabel(isoDate) {
+        return new Date(isoDate + 'T00:00:00').toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+      }
+
+      function buildRevenueSeries(mode) {
+        const groups = {};
+        data.income.forEach(item => {
+          if (!item.date) return;
+          const d = new Date(item.date + 'T00:00:00');
+          let key = item.date;
+          let name = formatDate(item.date);
+          let shortDate = shortDateLabel(item.date);
+
+          if (mode === 'weekly') {
+            const monday = addDays(d, -((d.getDay() + 6) % 7));
+            const sunday = addDays(monday, 6);
+            key = toIsoDate(monday);
+            name = `KW ${getIsoWeek(monday)} · ${shortDateLabel(toIsoDate(monday))} - ${shortDateLabel(toIsoDate(sunday))}`;
+            shortDate = `KW ${getIsoWeek(monday)}`;
+          }
+
+          if (mode === 'monthly') {
+            key = item.date.slice(0, 7);
+            name = new Date(item.date.slice(0, 7) + '-01T00:00:00').toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+            shortDate = new Date(item.date.slice(0, 7) + '-01T00:00:00').toLocaleDateString('de-DE', { month: 'short', year: '2-digit' });
+          }
+
+          if (!groups[key]) groups[key] = { key, name, shortDate, amount: 0 };
+          groups[key].amount += Number(item.amount || 0);
+        });
+        const sorted = Object.values(groups).sort((a, b) => a.key.localeCompare(b.key));
+        return mode === 'daily' ? sorted.slice(-14) : sorted;
+      }
+
+      function renderRevenueLineChart(mode) {
+        const chartPoints = buildRevenueSeries(mode);
+        const modeLabel = mode === 'weekly' ? 'Woche' : mode === 'monthly' ? 'Monat' : 'Tag';
+        const compareLabel = mode === 'weekly' ? 'zur Vorwoche' : mode === 'monthly' ? 'zum Vormonat' : 'zum Vortag';
+        const maxAmount = Math.max(...chartPoints.map(item => item.amount), 1);
+        const linePoints = chartPoints.length === 1
+          ? [{ ...chartPoints[0], x: 50, y: 50 }]
+          : chartPoints.map((item, i) => ({
+              ...item,
+              x: 10 + (i / (chartPoints.length - 1)) * 80,
+              y: 82 - (item.amount / maxAmount) * 66
+            }));
+        const areaPath = linePoints.length
+          ? `M ${linePoints[0].x.toFixed(2)} 86 L ${linePoints.map(point => `${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' L ')} L ${linePoints[linePoints.length - 1].x.toFixed(2)} 86 Z`
+          : '';
+        const linePath = linePoints.length
+          ? `M ${linePoints.map(point => `${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' L ')}`
+          : '';
+        const labelStep = Math.max(1, Math.ceil(linePoints.length / 7));
+        const pointHtml = linePoints.map((point, i) => {
+          const previous = i > 0 ? linePoints[i - 1].amount : null;
+          const diff = previous === null ? 0 : point.amount - previous;
+          const diffLabel = previous === null
+            ? `erster ${modeLabel}`
+            : `${diff >= 0 ? '+' : '-'}${bkmpFormatCurrency(Math.abs(diff))} ${compareLabel}`;
+          return `
+            <button class="line-point" style="left:${point.x}%; top:${point.y}%;" type="button" aria-label="${point.name}: ${bkmpFormatCurrency(point.amount)}, ${diffLabel}">
+              <span>${point.name}: ${bkmpFormatCurrency(point.amount)}<small>${diffLabel}</small></span>
+            </button>`;
+        }).join('');
+        const labelHtml = linePoints.map((point, i) => {
+          const show = i === 0 || i === linePoints.length - 1 || i % labelStep === 0;
+          return show ? `<span class="line-date-label" style="left:${point.x}%">${point.shortDate}</span>` : '';
+        }).join('');
+        const active = value => value === mode ? 'active' : '';
+
+        return `
+          <div class="line-card" id="revenueLineCard">
+            <div class="line-head">
+              <div>
+                <h3>Umsatz pro ${modeLabel}</h3>
+                <p>Vergleich ${compareLabel}</p>
+              </div>
+              <div class="line-head-right">
+                <span>Gesamt ${bkmpFormatCurrency(totalIncome)}</span>
+                <div class="line-mode-tabs" aria-label="Zeitraum auswählen">
+                  <button class="${active('daily')}" type="button" data-chart-mode="daily">Täglich</button>
+                  <button class="${active('weekly')}" type="button" data-chart-mode="weekly">Wöchentlich</button>
+                  <button class="${active('monthly')}" type="button" data-chart-mode="monthly">Monatlich</button>
+                </div>
+              </div>
+            </div>
+            <div class="mini-line-chart" aria-label="Umsatz-Verlauf">
+              <div class="line-axis max">${bkmpFormatCurrency(maxAmount)}</div>
+              <div class="line-axis zero">0 €</div>
+              <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                <path class="line-area" d="${areaPath}"></path>
+                <path class="line-stroke" d="${linePath}"></path>
+              </svg>
+              ${pointHtml}
+              <div class="line-date-row">${labelHtml}</div>
+            </div>
+          </div>`;
+      }
+
+      function bindRevenueModeButtons() {
+        chartArea.querySelectorAll('[data-chart-mode]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const lineCard = document.getElementById('revenueLineCard');
+            if (!lineCard) return;
+            lineCard.outerHTML = renderRevenueLineChart(btn.dataset.chartMode);
+            bindRevenueModeButtons();
+          });
+        });
+      }
+
+      chartArea.innerHTML = `
+        <div class="chart-block">
+          <div class="chart-summary">
+            <div class="donut" style="background: conic-gradient(${gradientParts.join(',')})">
+              <div class="donut-center">
+                <span>Gesamt</span>
+                <strong>${bkmpFormatCurrency(totalIncome)}</strong>
+              </div>
+            </div>
+            <div class="legend">${legendHtml}</div>
+          </div>
+          ${renderRevenueLineChart('daily')}
+        </div>`;
+      bindRevenueModeButtons();
+    }
+
+    /* Investoren */
+    const investorGrid = document.getElementById('investorGrid');
+    function isInInvestorPeriod(item, inv) {
+      if (!item.date) return false;
+      if (inv.startDate && item.date < inv.startDate) return false;
+      if (inv.endDate && item.date > inv.endDate) return false;
+      return true;
+    }
+    function sumForInvestorPeriod(list, inv) {
+      return bkmpSum(list.filter(item => isInInvestorPeriod(item, inv)));
+    }
+    function formatInvestorPeriod(inv) {
+      if (inv.startDate && inv.endDate) return `${formatDate(inv.startDate)} - ${formatDate(inv.endDate)}`;
+      if (inv.startDate) return `seit ${formatDate(inv.startDate)}`;
+      if (inv.endDate) return `bis ${formatDate(inv.endDate)}`;
+      return 'Gesamter Zeitraum';
+    }
+
+    if (data.investors.length === 0) {
+      investorGrid.innerHTML = '<p class="empty-hint">Noch keine Investoren eingetragen.</p>';
+    } else {
+      investorGrid.innerHTML = data.investors.map(inv => {
+        const periodIncome = sumForInvestorPeriod(data.income, inv);
+        const periodExpenses = sumForInvestorPeriod(data.expenses, inv);
+        const periodNet = periodIncome - periodExpenses;
+        const payout = periodNet > 0 ? (periodNet * Number(inv.sharePercent || 0)) / 100 : 0;
+        const mcName = (inv.minecraftName || '').trim();
+        const avatar = mcName ? `https://minotar.net/helm/${encodeURIComponent(mcName)}/96.png` : '';
+        return `
+          <div class="investor-card investor-card-rich">
+            <div class="investor-head">
+              ${avatar ? `<img class="investor-avatar" src="${avatar}" alt="Minecraft-Kopf von ${mcName}" loading="lazy">` : `<div class="investor-avatar investor-avatar-fallback">${inv.name.slice(0, 1).toUpperCase()}</div>`}
+              <div class="investor-title-block">
+                <div class="investor-name">${inv.name}</div>
+                ${mcName ? `<div class="investor-mc">${mcName}</div>` : ''}
+              </div>
+            </div>
+            <div class="investor-period">${formatInvestorPeriod(inv)}</div>
+            <div class="investor-highlight">
+              <span>Aktueller Anteil</span>
+              <strong>${bkmpFormatCurrency(payout)}</strong>
+            </div>
+            <div class="investor-metrics">
+              <div><span>Investiert</span><strong>${bkmpFormatCurrency(inv.invested)}</strong></div>
+              <div><span>Beteiligung</span><strong>${Number(inv.sharePercent || 0)}%</strong></div>
+              <div><span>Zeitraum-Gewinn</span><strong class="${periodNet >= 0 ? 'pos' : 'neg'}">${bkmpFormatCurrency(periodNet)}</strong></div>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    /* Alle Einträge (Ledger-Liste) — begrenzt auf die letzten 15 */
+    const ledgerList = document.getElementById('ledgerList');
+    const ledgerEntries = [
+      ...data.income.map((item, index) => ({ ...item, type: 'in', order: item.createdAt || index })),
+      ...data.expenses.map((item, index) => ({ ...item, type: 'out', order: item.createdAt || index }))
+    ]
+      .sort((a, b) => {
+        const dateCompare = (b.date || '').localeCompare(a.date || '');
+        if (dateCompare !== 0) return dateCompare;
+        return (b.order || 0) - (a.order || 0);
+      })
+      .slice(0, 15);
+
+    if (ledgerEntries.length === 0) {
+      ledgerList.innerHTML = '<p class="empty-hint">Noch keine Einträge vorhanden.</p>';
+    } else {
+      ledgerList.innerHTML = ledgerEntries.map(item => `
+        <div class="ledger-row">
+          <div class="l-left">
+            <span class="ledger-tag ${item.type}">${item.type === 'in' ? 'Einnahmen' : 'Ausgaben'}</span>
+            <span>${item.name}</span>
+            <span class="ledger-date">${item.date ? formatDate(item.date) : ''}</span>
+          </div>
+          <span class="amount ${item.type}">${item.type === 'in' ? '+' : '−'} ${bkmpFormatCurrency(item.amount)}</span>
+        </div>
+      `).join('');
+    }
+
+    /* News */
+    const newsFeed = document.getElementById('newsFeed');
+    if (data.news.length === 0) {
+      newsFeed.innerHTML = '<p class="empty-hint">Noch keine Updates gepostet.</p>';
+    } else {
+      const sorted = [...data.news].sort((a, b) => (a.date < b.date ? 1 : -1));
+      newsFeed.innerHTML = sorted.map(post => {
+        const images = post.images && post.images.length ? post.images : (post.image ? [post.image] : []);
+        const imageHtml = images.length ? `
+          <div class="news-images count-${images.length}">
+            ${images.map(img => `<img src="${img}" alt="">`).join('')}
+          </div>` : '';
+        return `
+          <article class="news-card">
+            ${imageHtml}
+            <div class="news-body">
+              <div class="news-date">${post.date}</div>
+              <div class="news-title">${post.title}</div>
+              <div class="news-text">${post.text}</div>
+            </div>
+          </article>`;
+      }).join('');
+    }
+
+    /* Kartenideen */
+    const wishGrid = document.getElementById('wishGrid');
+    function renderWishes() {
+      if (data.wishes.length === 0) {
+        wishGrid.innerHTML = '<p class="empty-hint">Noch keine Kartenideen eingereicht — sei der/die Erste!</p>';
+        return;
+      }
+      wishGrid.innerHTML = [...data.wishes].reverse().map(w => `
+        <div class="wish-card">
+          <img src="${w.image}" alt="Kartenidee von ${w.name}">
+          <div class="wish-name">${w.name}</div>
+        </div>
+      `).join('');
+    }
+    renderWishes();
+
+    const wishOverlay = document.getElementById('wishOverlay');
+    const openWishForm = document.getElementById('openWishForm');
+    const wishCancel = document.getElementById('wishCancel');
+    const wishSubmit = document.getElementById('wishSubmit');
+    const wishName = document.getElementById('wishName');
+    const wishImageFile = document.getElementById('wishImageFile');
+
+    openWishForm.addEventListener('click', () => wishOverlay.classList.add('visible'));
+    wishCancel.addEventListener('click', () => wishOverlay.classList.remove('visible'));
+
+    wishSubmit.addEventListener('click', () => {
+      const name = wishName.value.trim();
+      const file = wishImageFile.files && wishImageFile.files[0];
+      if (!name || !file) {
+        alert('Bitte gib deinen Namen an und wähle ein PNG-Bild aus.');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        data.wishes.push({ id: bkmpUid('wish'), name, image: reader.result, date: new Date().toISOString().slice(0, 10) });
+        bkmpSaveData(data);
+        renderWishes();
+        wishName.value = '';
+        wishImageFile.value = '';
+        wishOverlay.classList.remove('visible');
+      };
+      reader.readAsDataURL(file);
+    });
+  </script>
+
+</body>
+</html>
