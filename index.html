@@ -15,6 +15,7 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="image" href="assets/top-banner.png" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -64,7 +65,7 @@
         <div class="streamer-marquee-track" id="streamerMarqueeTrack"></div>
       </div>
     </div>
-    <img class="hero-banner" src="assets/top-banner.png" alt="Willkommen bei Bkmp">
+    <img class="hero-banner" src="assets/top-banner.png" width="1983" height="793" fetchpriority="high" decoding="async" alt="Willkommen bei Bkmp">
   </header>
 
   <nav class="topbar-wrap">
@@ -224,15 +225,41 @@
     /* ---------------- Daten laden & rendern ---------------- */
     const data = bkmpLoadData();
     const hasInitialSync = sessionStorage.getItem('bkmp-main-synced') === '1';
+    function refreshDeferredPanels() {
+      return Promise.all([
+        syncUpdatesFromSupabase(data, null),
+        syncWishesFromSupabase(data, null),
+        syncStreamersFromSupabase(data, null),
+        syncAboutBlocksFromSupabase(data, null),
+        syncPartnerShopsFromSupabase(data, null)
+      ]).then(results => {
+        const changed = results.some(Boolean);
+        renderStreamers();
+        if (typeof renderWishes === 'function') renderWishes();
+        if (typeof renderAboutBlocks === 'function') renderAboutBlocks();
+        if (typeof renderPartnerShops === 'function') renderPartnerShops();
+        return changed;
+      });
+    }
+
+    function scheduleDeferredSync() {
+      const run = () => refreshDeferredPanels().then(changed => {
+        if (changed && !hasInitialSync) {
+          sessionStorage.setItem('bkmp-main-synced', '1');
+          location.reload();
+        }
+      });
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(run, { timeout: 1800 });
+      } else {
+        setTimeout(run, 450);
+      }
+    }
+
     Promise.all([
       syncIncomesFromSupabase(data, null),
       syncInvestorsFromSupabase(data, null),
-      syncExpensesFromSupabase(data, null),
-      syncUpdatesFromSupabase(data, null),
-      syncWishesFromSupabase(data, null),
-      syncStreamersFromSupabase(data, null),
-      syncAboutBlocksFromSupabase(data, null),
-      syncPartnerShopsFromSupabase(data, null)
+      syncExpensesFromSupabase(data, null)
     ]).then(results => {
       const changed = results.some(Boolean);
       if (changed && !hasInitialSync) {
@@ -244,6 +271,7 @@
       if (typeof renderWishes === 'function') renderWishes();
       if (typeof renderAboutBlocks === 'function') renderAboutBlocks();
       if (typeof renderPartnerShops === 'function') renderPartnerShops();
+      scheduleDeferredSync();
     });
 
     const totalIncome = bkmpSum(data.income);

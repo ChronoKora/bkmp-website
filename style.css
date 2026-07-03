@@ -350,7 +350,12 @@ body.page-loaded .streamer-marquee-track {
 /* ---------- Swipe-Bereich ---------- */
 .panels-viewport { overflow: hidden; width: 100%; max-width: 1760px; margin: 0 auto; position: relative; z-index: 1; touch-action: pan-y; }
 .panels-track { display: flex; transition: transform 0.45s cubic-bezier(0.65, 0, 0.35, 1); }
-.panel { min-width: 100%; padding: 2.4rem 0.9rem 5rem; }
+.panel {
+  min-width: 100%;
+  padding: 2.4rem 0.9rem 5rem;
+  content-visibility: auto;
+  contain-intrinsic-size: 900px;
+}
 
 .panel-title {
   font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.6rem; margin-bottom: 1.7rem;
