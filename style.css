@@ -1109,3 +1109,11 @@ label {
   background: var(--paper);
   flex-shrink: 0;
 }
+.wish-admin-thumb-empty {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}

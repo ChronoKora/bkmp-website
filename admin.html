@@ -207,10 +207,19 @@
     const loginPassword = document.getElementById('loginPassword');
     const loginError = document.getElementById('loginError');
 
+    function refreshAdminDataFromSupabase() {
+      refreshIncomesFromSupabase();
+      refreshInvestorsFromSupabase();
+      refreshExpensesFromSupabase();
+      refreshUpdatesFromSupabase();
+      refreshWishesFromSupabase();
+    }
+
     function showAdmin() {
       loginCard.style.display = 'none';
       adminWrap.style.display = 'block';
       renderAll();
+      refreshAdminDataFromSupabase();
     }
 
     function tryLogin() {
@@ -239,6 +248,7 @@
         const page = btn.dataset.page;
         adminNavBtns.forEach(item => item.classList.toggle('active', item === btn));
         adminPages.forEach(section => section.classList.toggle('active', section.id === 'page-' + page));
+        if (page === 'wishes') refreshWishesFromSupabase();
       });
     });
 
@@ -284,6 +294,46 @@
     }
 
     async function refreshWishesFromSupabase() {
+      const el = document.getElementById('wishAdminList');
+      if (el) el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Kartenideen werden geladen...</p>';
+
+      const client = typeof bkmpGetSupabaseClient === 'function' ? bkmpGetSupabaseClient() : null;
+      if (client) {
+        try {
+          let { data: rows, error } = await client
+            .from('wishes')
+            .select('id, name, likes, dislikes, created_at')
+            .order('created_at', { ascending: false });
+
+          if (error && (String(error.message || '').includes('likes') || String(error.message || '').includes('dislikes'))) {
+            const fallback = await client
+              .from('wishes')
+              .select('id, name, created_at')
+              .order('created_at', { ascending: false });
+            rows = fallback.data;
+            error = fallback.error;
+          }
+
+          if (error) throw error;
+
+          data.wishes = (rows || []).map(row => ({
+            id: row.id,
+            name: row.name,
+            image: '',
+            likes: Number(row.likes || 0),
+            dislikes: Number(row.dislikes || 0),
+            date: row.created_at ? row.created_at.slice(0, 10) : '',
+            createdAt: row.created_at ? Date.parse(row.created_at) : 0,
+            source: 'supabase'
+          }));
+          bkmpSaveData(data);
+          renderAll();
+          return;
+        } catch (e) {
+          console.warn('Supabase konnte Kartenideen-Kurzliste nicht laden. Fallback wird verwendet.', e);
+        }
+      }
+
       await syncWishesFromSupabase(data, function () { renderAll(); }, { force: true });
     }
 
@@ -477,7 +527,7 @@
         const row = document.createElement('div');
         row.className = 'entry-row wish-admin-row';
         row.innerHTML = `
-          <img class="wish-admin-thumb" src="${item.image}" alt="">
+          ${item.image ? `<img class="wish-admin-thumb" src="${item.image}" alt="">` : '<div class="wish-admin-thumb wish-admin-thumb-empty">Bild</div>'}
           <div class="desc">
             <span class="name">${item.name}</span>
             <span class="meta">${item.date ? formatDate(item.date) + ' · ' : ''}Like ${Number(item.likes || 0)} · Dislike ${Number(item.dislikes || 0)}</span>
@@ -768,11 +818,6 @@
     /* News */
     if (sessionStorage.getItem('bkmp-admin-auth') === '1') {
       showAdmin();
-      refreshIncomesFromSupabase();
-      refreshInvestorsFromSupabase();
-      refreshExpensesFromSupabase();
-      refreshUpdatesFromSupabase();
-      refreshWishesFromSupabase();
     }
 
     addNewsBtn.addEventListener('click', () => {
