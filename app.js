@@ -12,7 +12,7 @@ const BKMP_DATA_KEY = 'bkmp-data';
 const BKMP_THEME_KEY = 'bkmp-theme';
 
 const BKMP_INCOME_CATEGORIES = [
-  'Karten', 'B?cher', 'Tr?nke', 'Elytra', 'Raketen', 'Werkzeug', 'Schmiede Vorlagen', 'Netherite', 'Custom'
+  'Karten', 'Bücher', 'Tränke', 'Elytra', 'Raketen', 'Werkzeug', 'Schmiede Vorlagen', 'Netherite', 'Custom'
 ];
 
 const BKMP_DEFAULT_DATA = {
