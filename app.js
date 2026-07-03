@@ -15,6 +15,22 @@ const BKMP_INCOME_CATEGORIES = [
   'Karten', 'Bücher', 'Tränke', 'Elytra', 'Raketen', 'Werkzeug', 'Schmiede Vorlagen', 'Netherite', 'Custom'
 ];
 
+
+function bkmpNormalizeCategoryName(name) {
+  if (name === 'B?cher' || name === 'B\uFFFDcher') return 'B\u00fccher';
+  if (name === 'Tr?nke' || name === 'Tr\uFFFDnke') return 'Tr\u00e4nke';
+  return name;
+}
+
+function bkmpNormalizeEntryList(list) {
+  return (list || []).map(item => {
+    const normalized = { ...item };
+    if (normalized.name) normalized.name = bkmpNormalizeCategoryName(normalized.name);
+    if (normalized.category) normalized.category = bkmpNormalizeCategoryName(normalized.category);
+    return normalized;
+  });
+}
+
 const BKMP_DEFAULT_DATA = {
   income: [
     { id: 'inc-1', name: 'Karten', amount: 4200, date: '2026-06-10' },
@@ -47,15 +63,15 @@ function bkmpLoadData() {
     if (!raw) return structuredClone(BKMP_DEFAULT_DATA);
     const parsed = JSON.parse(raw);
     return {
-      income: parsed.income || [],
-      expenses: parsed.expenses || [],
+      income: bkmpNormalizeEntryList(parsed.income),
+      expenses: bkmpNormalizeEntryList(parsed.expenses),
       investors: parsed.investors || [],
       news: parsed.news || [],
       wishes: parsed.wishes || []
     };
   } catch (e) {
     console.error('Fehler beim Laden der Daten:', e);
-    return structuredClone(BKMP_DEFAULT_DATA);
+    return { ...structuredClone(BKMP_DEFAULT_DATA), income: bkmpNormalizeEntryList(BKMP_DEFAULT_DATA.income), expenses: bkmpNormalizeEntryList(BKMP_DEFAULT_DATA.expenses) };
   }
 }
 

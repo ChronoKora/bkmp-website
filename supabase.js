@@ -36,8 +36,8 @@ function bkmpGetSupabaseClient() {
 function bkmpMapIncomeFromSupabase(row) {
   return {
     id: row.id,
-    name: row.category,
-    category: row.category,
+    name: typeof bkmpNormalizeCategoryName === 'function' ? bkmpNormalizeCategoryName(row.category) : row.category,
+    category: typeof bkmpNormalizeCategoryName === 'function' ? bkmpNormalizeCategoryName(row.category) : row.category,
     amount: Number(row.amount || 0),
     date: row.date,
     note: row.note || '',
@@ -360,8 +360,8 @@ window.importLocalInvestorsToSupabase = importLocalInvestorsToSupabase;
 function bkmpMapExpenseFromSupabase(row) {
   return {
     id: row.id,
-    name: row.category,
-    category: row.category,
+    name: typeof bkmpNormalizeCategoryName === 'function' ? bkmpNormalizeCategoryName(row.category) : row.category,
+    category: typeof bkmpNormalizeCategoryName === 'function' ? bkmpNormalizeCategoryName(row.category) : row.category,
     amount: Number(row.amount || 0),
     date: row.date,
     note: row.note || '',
