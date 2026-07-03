@@ -1096,3 +1096,16 @@ label {
 .form-grid-2 { grid-template-columns: 1fr 1fr; }
 .news-text strong { color: var(--ink); font-weight: 800; }
 .news-text em { color: color-mix(in srgb, var(--ink) 80%, var(--gold)); }
+
+.wish-admin-list .entry-row {
+  align-items: center;
+}
+.wish-admin-thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  flex-shrink: 0;
+}

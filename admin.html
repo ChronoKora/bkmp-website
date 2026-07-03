@@ -87,6 +87,10 @@
           <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3-6 7-6s7 2.7 7 6"/><circle cx="17" cy="8" r="2.6"/><path d="M17 5.2c1.7.3 3 1.5 3 3M22 20c0-2.4-1.7-4.5-4.2-5.4"/></svg>
           Investoren
         </button>
+        <button class="admin-nav-btn" data-page="wishes">
+          <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 13l2.2-2.2 2.8 3.2 1.7-1.7L20 18"/><circle cx="9" cy="9" r="1.2"/></svg>
+          Kartenideen
+        </button>
       </nav>
 
       <div class="admin-main">
@@ -172,6 +176,14 @@
               <button class="btn btn-primary" id="addInvestor">+ Investor hinzufügen</button>
               <button class="btn" id="cancelInvestorEdit" type="button" style="display:none;">Abbrechen</button>
             </div>
+          </div>
+        </section>
+
+        <!-- Kartenideen -->
+        <section class="admin-page" id="page-wishes">
+          <div class="admin-section">
+            <h2>Kartenideen</h2>
+            <div class="entry-table-wrapper"><div class="entry-list wish-admin-list" id="wishAdminList"></div></div>
           </div>
         </section>
 
@@ -271,6 +283,10 @@
       await syncUpdatesFromSupabase(data, function () { renderAll(); }, { force: true });
     }
 
+    async function refreshWishesFromSupabase() {
+      await syncWishesFromSupabase(data, function () { renderAll(); }, { force: true });
+    }
+
     async function persistExpense(expense) {
       if (typeof saveExpense === 'function' && bkmpGetSupabaseClient()) {
         try {
@@ -345,6 +361,21 @@
         }
       }
       removeEntry('news', id);
+    }
+
+    async function removeWish(id) {
+      if (typeof deleteWish === 'function' && bkmpGetSupabaseClient() && !String(id).startsWith('wish-')) {
+        try {
+          await deleteWish(id);
+          data.wishes = data.wishes.filter(item => item.id !== id);
+          bkmpSaveData(data);
+          renderAll();
+          return;
+        } catch (e) {
+          console.warn('Supabase konnte Kartenidee nicht loeschen. localStorage-Fallback wird verwendet.', e);
+        }
+      }
+      removeEntry('wishes', id);
     }
 
     async function persistIncome(income) {
@@ -431,6 +462,31 @@
       renderEntryList('expenseList', sortByDateDesc(data.expenses), item => item.name, item => `${formatDate(item.date)} · ${bkmpFormatCurrency(item.amount)}`, id => removeEntry('expenses', id));
       renderInvestorList();
       renderNewsList();
+      renderWishAdminList();
+    }
+
+    function renderWishAdminList() {
+      const el = document.getElementById('wishAdminList');
+      if (!el) return;
+      if (data.wishes.length === 0) {
+        el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Noch keine Kartenideen.</p>';
+        return;
+      }
+      el.innerHTML = '';
+      sortByDateDesc(data.wishes).forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'entry-row wish-admin-row';
+        row.innerHTML = `
+          <img class="wish-admin-thumb" src="${item.image}" alt="">
+          <div class="desc">
+            <span class="name">${item.name}</span>
+            <span class="meta">${item.date ? formatDate(item.date) + ' · ' : ''}Like ${Number(item.likes || 0)} · Dislike ${Number(item.dislikes || 0)}</span>
+          </div>
+          <button class="del-btn" type="button" aria-label="Kartenidee loeschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>
+        `;
+        row.querySelector('button').addEventListener('click', () => removeWish(item.id));
+        el.appendChild(row);
+      });
     }
 
     function renderInvestorList() {
@@ -716,6 +772,7 @@
       refreshInvestorsFromSupabase();
       refreshExpensesFromSupabase();
       refreshUpdatesFromSupabase();
+      refreshWishesFromSupabase();
     }
 
     addNewsBtn.addEventListener('click', () => {

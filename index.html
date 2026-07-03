@@ -226,8 +226,10 @@
       if (!sessionStorage.getItem('bkmp-wishes-synced')) {
         sessionStorage.setItem('bkmp-wishes-synced', '1');
         location.reload();
+      } else {
+        renderWishes();
       }
-    });
+    }, { force: true });
 
     const totalIncome = bkmpSum(data.income);
     const totalExpenses = bkmpSum(data.expenses);
