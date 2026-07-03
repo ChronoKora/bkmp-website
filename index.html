@@ -77,6 +77,8 @@
         <button class="tab-btn" data-index="1">Investoren</button>
         <button class="tab-btn" data-index="2">Was gibt's Neues?</button>
         <button class="tab-btn" data-index="3">Kartenideen</button>
+        <button class="tab-btn" data-index="4">Wer sind wir?</button>
+        <button class="tab-btn" data-index="5">PartnerShops</button>
       </div>
       <button class="tab-arrow" id="nextTab" aria-label="Nächster Bereich">
         <svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
@@ -135,6 +137,19 @@
         <div class="wish-grid" id="wishGrid"></div>
       </section>
 
+      <!-- ================= Wer sind wir ================= -->
+      <section class="panel" id="panel-about">
+        <h2 class="panel-title">Wer sind wir &uuml;berhaupt?</h2>
+        <div class="about-page" id="aboutPage"></div>
+      </section>
+
+      <!-- ================= PartnerShops ================= -->
+      <section class="panel" id="panel-partners">
+        <h2 class="panel-title">PartnerShops</h2>
+        <div class="partner-filter" id="partnerFilter"></div>
+        <div class="partner-grid" id="partnerGrid"></div>
+      </section>
+
     </div>
   </div>
 
@@ -171,6 +186,7 @@
   <script src="app.js"></script>
   <script>
     bkmpInitTheme();
+    window.addEventListener('load', () => document.body.classList.add('page-loaded'));
 
     /* ---------------- Swipe-Tabs ---------------- */
     const track = document.getElementById('panelsTrack');
@@ -207,41 +223,28 @@
 
     /* ---------------- Daten laden & rendern ---------------- */
     const data = bkmpLoadData();
-    syncIncomesFromSupabase(data, function () {
-      if (!sessionStorage.getItem('bkmp-incomes-synced')) {
-        sessionStorage.setItem('bkmp-incomes-synced', '1');
+    const hasInitialSync = sessionStorage.getItem('bkmp-main-synced') === '1';
+    Promise.all([
+      syncIncomesFromSupabase(data, null),
+      syncInvestorsFromSupabase(data, null),
+      syncExpensesFromSupabase(data, null),
+      syncUpdatesFromSupabase(data, null, { force: true }),
+      syncWishesFromSupabase(data, null, { force: true }),
+      syncStreamersFromSupabase(data, null, { force: true }),
+      syncAboutBlocksFromSupabase(data, null, { force: true }),
+      syncPartnerShopsFromSupabase(data, null, { force: true })
+    ]).then(results => {
+      const changed = results.some(Boolean);
+      if (changed && !hasInitialSync) {
+        sessionStorage.setItem('bkmp-main-synced', '1');
         location.reload();
+        return;
       }
-    });
-    syncInvestorsFromSupabase(data, function () {
-      if (!sessionStorage.getItem('bkmp-investors-synced')) {
-        sessionStorage.setItem('bkmp-investors-synced', '1');
-        location.reload();
-      }
-    });
-    syncExpensesFromSupabase(data, function () {
-      if (!sessionStorage.getItem('bkmp-expenses-synced')) {
-        sessionStorage.setItem('bkmp-expenses-synced', '1');
-        location.reload();
-      }
-    });
-    syncUpdatesFromSupabase(data, function () {
-      if (!sessionStorage.getItem('bkmp-updates-synced')) {
-        sessionStorage.setItem('bkmp-updates-synced', '1');
-        location.reload();
-      }
-    });
-    syncWishesFromSupabase(data, function () {
-      if (!sessionStorage.getItem('bkmp-wishes-synced')) {
-        sessionStorage.setItem('bkmp-wishes-synced', '1');
-        location.reload();
-      } else {
-        renderWishes();
-      }
-    }, { force: true });
-    syncStreamersFromSupabase(data, function () {
       renderStreamers();
-    }, { force: true });
+      if (typeof renderWishes === 'function') renderWishes();
+      if (typeof renderAboutBlocks === 'function') renderAboutBlocks();
+      if (typeof renderPartnerShops === 'function') renderPartnerShops();
+    });
 
     const totalIncome = bkmpSum(data.income);
     const totalExpenses = bkmpSum(data.expenses);
@@ -541,6 +544,84 @@
     }
     renderStreamers();
 
+    function renderAboutBlocks() {
+      const aboutPage = document.getElementById('aboutPage');
+      if (!aboutPage) return;
+      const blocks = Array.isArray(data.aboutBlocks)
+        ? [...data.aboutBlocks].sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0))
+        : [];
+      if (blocks.length === 0) {
+        aboutPage.innerHTML = '<p class="empty-hint">Hier entsteht bald mehr &uuml;ber BKMP.</p>';
+        return;
+      }
+      aboutPage.innerHTML = blocks.map(block => {
+        const title = block.title ? `<h3>${escapeHtml(block.title)}</h3>` : '';
+        const text = block.content ? `<p>${escapeHtml(block.content).replace(/\n/g, '<br>')}</p>` : '';
+        const image = block.image ? `<img src="${block.image}" alt="${escapeHtml(block.title || 'BKMP Bild')}" loading="lazy" decoding="async">` : '';
+        if (block.type === 'heading') return `<section class="about-block about-heading">${title}${text}</section>`;
+        if (block.type === 'image') return `<section class="about-block about-image">${image}${title}</section>`;
+        if (block.type === 'image_text') return `<section class="about-block about-split">${image}<div>${title}${text}</div></section>`;
+        if (block.type === 'team') return `<section class="about-block about-team-card">${image}<div>${title}${text}</div></section>`;
+        if (block.type === 'gallery') {
+          const images = (block.images && block.images.length ? block.images : (block.image ? [block.image] : []));
+          return `<section class="about-block about-gallery">${title}<div>${images.map(src => `<img src="${src}" alt="" loading="lazy" decoding="async">`).join('')}</div>${text}</section>`;
+        }
+        return `<section class="about-block about-text">${title}${text}</section>`;
+      }).join('');
+    }
+    renderAboutBlocks();
+
+    const partnerFilter = document.getElementById('partnerFilter');
+    const partnerGrid = document.getElementById('partnerGrid');
+    let activePartnerCategory = 'Alle';
+
+    function renderPartnerShops() {
+      if (!partnerFilter || !partnerGrid) return;
+      const shops = Array.isArray(data.partnerShops) ? data.partnerShops : [];
+      if (shops.length === 0) {
+        partnerFilter.innerHTML = '';
+        partnerGrid.innerHTML = '<p class="empty-hint">Noch keine PartnerShops eingetragen.</p>';
+        return;
+      }
+
+      const categories = ['Alle', ...new Set(shops.map(shop => shop.category || 'Sonstige'))];
+      if (!categories.includes(activePartnerCategory)) activePartnerCategory = 'Alle';
+      partnerFilter.innerHTML = categories.map(category => `
+        <button class="${category === activePartnerCategory ? 'active' : ''}" type="button" data-partner-category="${escapeHtml(category)}">${escapeHtml(category)}</button>
+      `).join('');
+
+      const visible = activePartnerCategory === 'Alle'
+        ? shops
+        : shops.filter(shop => (shop.category || 'Sonstige') === activePartnerCategory);
+
+      partnerGrid.innerHTML = visible.map(shop => {
+        const href = shop.link ? (String(shop.link).startsWith('http') ? shop.link : 'https://' + shop.link) : '';
+        return `
+          <article class="partner-card">
+            ${shop.image ? `<img src="${shop.image}" alt="${escapeHtml(shop.name)}" loading="lazy" decoding="async">` : '<div class="partner-image-empty">Shop</div>'}
+            <div class="partner-body">
+              <span class="partner-category">${escapeHtml(shop.category || 'Partner')}</span>
+              <h3>${escapeHtml(shop.name)}</h3>
+              ${shop.location ? `<div class="partner-location">${escapeHtml(shop.location)}</div>` : ''}
+              ${shop.description ? `<p>${escapeHtml(shop.description)}</p>` : ''}
+              <div class="partner-actions">
+                ${href ? `<a href="${href}" target="_blank" rel="noopener">Link öffnen</a>` : ''}
+                ${shop.contact ? `<span>${escapeHtml(shop.contact)}</span>` : ''}
+              </div>
+            </div>
+          </article>`;
+      }).join('');
+    }
+    renderPartnerShops();
+    if (partnerFilter) {
+      partnerFilter.addEventListener('click', e => {
+        const btn = e.target.closest('[data-partner-category]');
+        if (!btn) return;
+        activePartnerCategory = btn.dataset.partnerCategory;
+        renderPartnerShops();
+      });
+    }
+
     function renderFormattedNewsText(value) {
       let html = escapeHtml(value);
       html = html.replace(new RegExp('\\[b\\]([\\s\\S]*?)\\[/b\\]', 'gi'), '<strong>$1</strong>');
@@ -559,7 +640,7 @@
         const images = post.images && post.images.length ? post.images : (post.image ? [post.image] : []);
         const imageHtml = images.length ? `
           <div class="news-images count-${images.length}">
-            ${images.map(img => `<img src="${img}" alt="">`).join('')}
+            ${images.map(img => `<img src="${img}" alt="" loading="lazy" decoding="async">`).join('')}
           </div>` : '';
         return `
           <article class="news-card">
@@ -583,7 +664,7 @@
       wishGrid.innerHTML = [...data.wishes].reverse().map(w => `
         <article class="wish-card" data-wish-id="${w.id}">
           <button class="wish-image-btn" type="button" data-action="open" aria-label="Kartenidee von ${escapeHtml(w.name)} gross ansehen">
-            <img src="${w.image}" alt="Kartenidee von ${escapeHtml(w.name)}">
+            <img src="${w.image}" alt="Kartenidee von ${escapeHtml(w.name)}" loading="lazy" decoding="async">
           </button>
           <div class="wish-card-body">
             <div class="wish-name">${escapeHtml(w.name)}</div>

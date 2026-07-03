@@ -757,6 +757,188 @@ async function syncStreamersFromSupabase(targetData, onSynced, options = {}) {
   }
 }
 
+function bkmpMapAboutBlockFromSupabase(row) {
+  return {
+    id: row.id,
+    type: row.block_type || 'text',
+    title: row.title || '',
+    content: row.content || '',
+    image: row.image_url || '',
+    images: Array.isArray(row.image_urls) ? row.image_urls : [],
+    sortOrder: Number(row.sort_order || 0),
+    createdAt: row.created_at ? Date.parse(row.created_at) : 0,
+    source: 'supabase'
+  };
+}
+
+function bkmpMapAboutBlockToSupabase(block) {
+  const images = block.images && block.images.length ? block.images : (block.image ? [block.image] : []);
+  return {
+    block_type: block.type || 'text',
+    title: block.title || '',
+    content: block.content || '',
+    image_url: images[0] || block.image || '',
+    image_urls: images,
+    sort_order: Number(block.sortOrder || block.sort_order || 0)
+  };
+}
+
+async function loadAboutBlocks() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('about_blocks')
+    .select('id, block_type, title, content, image_url, image_urls, sort_order, created_at')
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data || []).map(bkmpMapAboutBlockFromSupabase);
+}
+
+async function saveAboutBlock(block) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const payload = bkmpMapAboutBlockToSupabase(block);
+  let query;
+  if (block.id && !String(block.id).startsWith('about-')) {
+    query = client
+      .from('about_blocks')
+      .update(payload)
+      .eq('id', block.id)
+      .select('id, block_type, title, content, image_url, image_urls, sort_order, created_at')
+      .limit(1);
+  } else {
+    query = client
+      .from('about_blocks')
+      .insert(payload)
+      .select('id, block_type, title, content, image_url, image_urls, sort_order, created_at')
+      .limit(1);
+  }
+  const { data, error } = await query;
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : null;
+  return row ? bkmpMapAboutBlockFromSupabase(row) : null;
+}
+
+async function deleteAboutBlock(id) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return false;
+  const { error } = await client.from('about_blocks').delete().eq('id', id);
+  if (error) throw error;
+  return true;
+}
+
+async function syncAboutBlocksFromSupabase(targetData, onSynced, options = {}) {
+  if (typeof loadAboutBlocks !== 'function' || !bkmpGetSupabaseClient()) return false;
+  try {
+    const blocks = await loadAboutBlocks();
+    if (!blocks) return false;
+    const localCount = Array.isArray(targetData.aboutBlocks) ? targetData.aboutBlocks.length : 0;
+    if (!options.force && localCount > 0 && blocks.length < localCount) {
+      console.warn('Supabase enthaelt weniger About-Bloecke als localStorage. Lokale Daten bleiben erhalten.');
+      return false;
+    }
+    targetData.aboutBlocks = blocks;
+    bkmpSaveData(targetData);
+    if (typeof onSynced === 'function') onSynced(targetData);
+    return true;
+  } catch (e) {
+    console.warn('Supabase konnte About-Bloecke nicht laden. localStorage-Fallback wird verwendet.', e);
+    return false;
+  }
+}
+
+function bkmpMapPartnerShopFromSupabase(row) {
+  return {
+    id: row.id,
+    name: row.shop_name || '',
+    image: row.image_url || '',
+    location: row.location || '',
+    category: row.category || '',
+    description: row.description || '',
+    link: row.link || '',
+    contact: row.contact || '',
+    createdAt: row.created_at ? Date.parse(row.created_at) : 0,
+    source: 'supabase'
+  };
+}
+
+function bkmpMapPartnerShopToSupabase(shop) {
+  return {
+    shop_name: shop.name || shop.shop_name || '',
+    image_url: shop.image || shop.image_url || '',
+    location: shop.location || '',
+    category: shop.category || '',
+    description: shop.description || '',
+    link: shop.link || '',
+    contact: shop.contact || ''
+  };
+}
+
+async function loadPartnerShops() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('partner_shops')
+    .select('id, shop_name, image_url, location, category, description, link, contact, created_at')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(bkmpMapPartnerShopFromSupabase);
+}
+
+async function savePartnerShop(shop) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const payload = bkmpMapPartnerShopToSupabase(shop);
+  let query;
+  if (shop.id && !String(shop.id).startsWith('shop-')) {
+    query = client
+      .from('partner_shops')
+      .update(payload)
+      .eq('id', shop.id)
+      .select('id, shop_name, image_url, location, category, description, link, contact, created_at')
+      .limit(1);
+  } else {
+    query = client
+      .from('partner_shops')
+      .insert(payload)
+      .select('id, shop_name, image_url, location, category, description, link, contact, created_at')
+      .limit(1);
+  }
+  const { data, error } = await query;
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : null;
+  return row ? bkmpMapPartnerShopFromSupabase(row) : null;
+}
+
+async function deletePartnerShop(id) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return false;
+  const { error } = await client.from('partner_shops').delete().eq('id', id);
+  if (error) throw error;
+  return true;
+}
+
+async function syncPartnerShopsFromSupabase(targetData, onSynced, options = {}) {
+  if (typeof loadPartnerShops !== 'function' || !bkmpGetSupabaseClient()) return false;
+  try {
+    const shops = await loadPartnerShops();
+    if (!shops) return false;
+    const localCount = Array.isArray(targetData.partnerShops) ? targetData.partnerShops.length : 0;
+    if (!options.force && localCount > 0 && shops.length < localCount) {
+      console.warn('Supabase enthaelt weniger PartnerShops als localStorage. Lokale Daten bleiben erhalten.');
+      return false;
+    }
+    targetData.partnerShops = shops;
+    bkmpSaveData(targetData);
+    if (typeof onSynced === 'function') onSynced(targetData);
+    return true;
+  } catch (e) {
+    console.warn('Supabase konnte PartnerShops nicht laden. localStorage-Fallback wird verwendet.', e);
+    return false;
+  }
+}
+
 async function importLocalExpensesToSupabase() {
   const client = bkmpGetSupabaseClient();
   if (!client) return { imported: 0, skipped: 0, total: 0 };

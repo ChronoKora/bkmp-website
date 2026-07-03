@@ -55,7 +55,9 @@ const BKMP_DEFAULT_DATA = {
     }
   ],
   wishes: [],
-  streamers: []
+  streamers: [],
+  aboutBlocks: [],
+  partnerShops: []
 };
 
 function bkmpLoadData() {
@@ -69,7 +71,9 @@ function bkmpLoadData() {
       investors: parsed.investors || [],
       news: parsed.news || [],
       wishes: parsed.wishes || [],
-      streamers: parsed.streamers || []
+      streamers: parsed.streamers || [],
+      aboutBlocks: parsed.aboutBlocks || [],
+      partnerShops: parsed.partnerShops || []
     };
   } catch (e) {
     console.error('Fehler beim Laden der Daten:', e);
@@ -82,9 +86,48 @@ function bkmpSaveData(data) {
     localStorage.setItem(BKMP_DATA_KEY, JSON.stringify(data));
     return true;
   } catch (e) {
+    if (e && (e.name === 'QuotaExceededError' || String(e.message || '').includes('quota'))) {
+      try {
+        const lightData = bkmpCreateStorageSafeData(data);
+        localStorage.setItem(BKMP_DATA_KEY, JSON.stringify(lightData));
+        console.warn('Lokaler Speicher war voll. Grosse Bilddaten wurden nur online behalten.');
+        return true;
+      } catch (fallbackError) {
+        console.error('Fehler beim Speichern der reduzierten Daten:', fallbackError);
+        return false;
+      }
+    }
     console.error('Fehler beim Speichern der Daten:', e);
     return false;
   }
+}
+
+function bkmpStripHeavyDataUrl(value) {
+  if (typeof value === 'string' && value.startsWith('data:image/')) return '';
+  return value;
+}
+
+function bkmpCreateStorageSafeData(data) {
+  const clone = structuredClone(data);
+  clone.news = (clone.news || []).map(item => ({
+    ...item,
+    image: bkmpStripHeavyDataUrl(item.image),
+    images: (item.images || []).map(bkmpStripHeavyDataUrl).filter(Boolean)
+  }));
+  clone.wishes = (clone.wishes || []).map(item => ({
+    ...item,
+    image: bkmpStripHeavyDataUrl(item.image)
+  }));
+  clone.aboutBlocks = (clone.aboutBlocks || []).map(item => ({
+    ...item,
+    image: bkmpStripHeavyDataUrl(item.image),
+    images: (item.images || []).map(bkmpStripHeavyDataUrl).filter(Boolean)
+  }));
+  clone.partnerShops = (clone.partnerShops || []).map(item => ({
+    ...item,
+    image: bkmpStripHeavyDataUrl(item.image)
+  }));
+  return clone;
 }
 
 function bkmpUid(prefix) {

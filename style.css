@@ -216,7 +216,11 @@ h1.hero-title .brand { font-style: italic; font-weight: 500; }
 .streamer-marquee-track {
   display: flex;
   width: max-content;
-  animation: streamerScroll 42s linear infinite;
+  animation: streamerScroll 82s linear infinite;
+  animation-play-state: paused;
+}
+body.page-loaded .streamer-marquee-track {
+  animation-play-state: running;
 }
 .streamer-marquee:hover .streamer-marquee-track {
   animation-play-state: paused;
@@ -761,6 +765,81 @@ h1.hero-title .brand { font-style: italic; font-weight: 500; }
 .wish-detail-footer strong { display: block; margin-top: 0.15rem; font-size: 1.05rem; }
 .wish-download { background: linear-gradient(135deg, #f5d58a, var(--gold)); color: #111018; border: 0; padding: 0.65rem 0.95rem; }
 
+/* ---------- Wer sind wir ---------- */
+.about-page {
+  width: min(1080px, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: 1.1rem;
+}
+.about-block {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: linear-gradient(180deg, var(--paper-2), color-mix(in srgb, var(--paper) 86%, transparent));
+  padding: clamp(1.2rem, 2.3vw, 2rem);
+  overflow: hidden;
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.18);
+}
+.about-block h3 {
+  font-family: 'Fraunces', serif;
+  font-size: clamp(1.35rem, 2.6vw, 2.4rem);
+  margin-bottom: 0.65rem;
+}
+.about-block p {
+  color: var(--muted);
+  line-height: 1.7;
+}
+.about-block img {
+  width: 100%;
+  display: block;
+  border-radius: 14px;
+  object-fit: cover;
+  background: var(--paper);
+}
+.about-heading {
+  text-align: center;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--gold) 18%, var(--paper-2)), var(--paper-2));
+}
+.about-image {
+  padding: 0;
+}
+.about-image h3 {
+  padding: 1rem 1.2rem 1.2rem;
+  margin: 0;
+}
+.about-split {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.9fr) 1fr;
+  gap: 1.2rem;
+  align-items: center;
+}
+.about-split img {
+  aspect-ratio: 16 / 10;
+}
+.about-team-card {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 1rem;
+  align-items: center;
+}
+.about-team-card img {
+  width: 120px;
+  height: 120px;
+}
+.about-gallery div {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.7rem;
+}
+.about-gallery img {
+  aspect-ratio: 1 / 1;
+}
+@media (max-width: 760px) {
+  .about-split,
+  .about-team-card { grid-template-columns: 1fr; }
+  .about-team-card img { width: 100%; height: auto; aspect-ratio: 1 / 1; }
+}
+
 /* ---------- Investoren ---------- */
 .investor-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(430px, 100%), 1fr)); gap: 1rem; }
 .investor-card {
@@ -1207,6 +1286,130 @@ label {
   flex-shrink: 0;
 }
 .wish-admin-thumb-empty {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+/* ---------- PartnerShops ---------- */
+.partner-filter {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin: 0 auto 1.5rem;
+}
+.partner-filter button {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper-2);
+  color: var(--muted);
+  min-height: 36px;
+  padding: 0.42rem 0.9rem;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.partner-filter button:hover,
+.partner-filter button.active {
+  color: #08080c;
+  border-color: transparent;
+  background: linear-gradient(135deg, #f5d58a, var(--gold));
+}
+.partner-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(245px, 1fr));
+  gap: 1rem;
+  align-items: stretch;
+}
+.partner-card {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper));
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.2);
+}
+.partner-card > img,
+.partner-image-empty {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  display: block;
+  background: var(--paper-3);
+}
+.partner-image-empty {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.partner-body {
+  padding: 1rem;
+}
+.partner-category {
+  display: inline-flex;
+  margin-bottom: 0.65rem;
+  border-radius: 999px;
+  padding: 0.28rem 0.6rem;
+  background: color-mix(in srgb, var(--gold) 18%, transparent);
+  color: var(--gold);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.partner-card h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1.15rem;
+}
+.partner-location {
+  color: var(--ink);
+  font-weight: 800;
+  margin-bottom: 0.6rem;
+}
+.partner-card p {
+  color: var(--muted);
+  line-height: 1.55;
+  margin: 0.15rem 0 0.9rem;
+}
+.partner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.partner-actions a,
+.partner-actions span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.4rem 0.7rem;
+  color: var(--ink);
+  background: var(--paper-2);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.partner-actions a:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+.partner-admin-row {
+  align-items: center;
+}
+.partner-admin-thumb {
+  width: 58px;
+  height: 42px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  flex-shrink: 0;
+}
+.partner-admin-thumb-empty {
   display: grid;
   place-items: center;
   color: var(--muted);

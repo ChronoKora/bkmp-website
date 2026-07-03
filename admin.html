@@ -95,6 +95,14 @@
           <svg viewBox="0 0 24 24"><path d="M4 7h16v10H8l-4 4V7z"/><path d="M9 11v3M14 11v3"/></svg>
           Twitch-Leiste
         </button>
+        <button class="admin-nav-btn" data-page="about">
+          <svg viewBox="0 0 24 24"><path d="M4 19V5h16v14H4z"/><path d="M8 9h8M8 13h5"/></svg>
+          Wer sind wir?
+        </button>
+        <button class="admin-nav-btn" data-page="partners">
+          <svg viewBox="0 0 24 24"><path d="M4 8h16v11H4z"/><path d="M7 8V5h10v3"/><path d="M8 13h8"/></svg>
+          PartnerShops
+        </button>
       </nav>
 
       <div class="admin-main">
@@ -226,6 +234,62 @@
           </div>
         </section>
 
+        <!-- Wer sind wir -->
+        <section class="admin-page" id="page-about">
+          <div class="admin-section">
+            <h2>Wer sind wir?</h2>
+            <div class="entry-table-wrapper"><div class="entry-list" id="aboutBlockList"></div></div>
+            <div class="form-grid form-grid-3">
+              <div><label>Block-Typ</label>
+                <select id="aboutType">
+                  <option value="heading">Gro&szlig;e &Uuml;berschrift</option>
+                  <option value="text">Textblock</option>
+                  <option value="image">Bildblock</option>
+                  <option value="image_text">Bild + Text</option>
+                  <option value="team">Team-Mitglied Karte</option>
+                  <option value="gallery">Galerie</option>
+                </select>
+              </div>
+              <div><label>Titel</label><input type="text" id="aboutTitle" placeholder="Titel"></div>
+              <div><label>Sortierung</label><input type="number" id="aboutSort" placeholder="0"></div>
+            </div>
+            <label>Text</label>
+            <textarea id="aboutContent" placeholder="Text fuer diesen Block"></textarea>
+            <div class="form-grid form-grid-2">
+              <div><label>Bild / Galerie</label><input type="file" multiple id="aboutImageFile" accept="image/*"></div>
+              <div><label>Hinweis</label><input type="text" value="Mehrere Bilder nur bei Galerie verwenden" disabled></div>
+            </div>
+            <div class="investor-form-actions">
+              <button class="btn btn-primary" id="addAboutBlock">+ Block speichern</button>
+              <button class="btn" id="cancelAboutEdit" type="button" style="display:none;">Abbrechen</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- PartnerShops -->
+        <section class="admin-page" id="page-partners">
+          <div class="admin-section">
+            <h2>PartnerShops</h2>
+            <div class="entry-table-wrapper"><div class="entry-list" id="partnerShopList"></div></div>
+            <div class="form-grid form-grid-3">
+              <div><label>Shopname</label><input type="text" id="partnerName" placeholder="z. B. Karten-Paradies"></div>
+              <div><label>Server / Warp</label><input type="text" id="partnerLocation" placeholder="/sw Beispiel CB2"></div>
+              <div><label>Kategorie</label><input type="text" id="partnerCategory" placeholder="z. B. Anime Karten"></div>
+            </div>
+            <label>Beschreibung</label>
+            <textarea id="partnerDescription" placeholder="Kurze Beschreibung des Shops"></textarea>
+            <div class="form-grid form-grid-3">
+              <div><label>Link / Discord</label><input type="text" id="partnerLink" placeholder="https://..."></div>
+              <div><label>Ansprechpartner</label><input type="text" id="partnerContact" placeholder="Minecraft- oder Discord-Name"></div>
+              <div><label>Logo / Bild</label><input type="file" id="partnerImageFile" accept="image/*"></div>
+            </div>
+            <div class="investor-form-actions">
+              <button class="btn btn-primary" id="addPartnerShop">+ PartnerShop speichern</button>
+              <button class="btn" id="cancelPartnerShopEdit" type="button" style="display:none;">Abbrechen</button>
+            </div>
+          </div>
+        </section>
+
       </div>
     </div>
 
@@ -253,6 +317,8 @@
       refreshUpdatesFromSupabase();
       refreshWishesFromSupabase();
       refreshStreamersFromSupabase();
+      refreshAboutBlocksFromSupabase();
+      refreshPartnerShopsFromSupabase();
     }
 
     function showAdmin() {
@@ -290,6 +356,8 @@
         adminPages.forEach(section => section.classList.toggle('active', section.id === 'page-' + page));
         if (page === 'wishes') refreshWishesFromSupabase();
         if (page === 'streamers') refreshStreamersFromSupabase();
+        if (page === 'about') refreshAboutBlocksFromSupabase();
+        if (page === 'partners') refreshPartnerShopsFromSupabase();
       });
     });
 
@@ -298,6 +366,8 @@
     let editingInvestorId = null;
     let editingNewsId = null;
     let editingStreamerId = null;
+    let editingAboutId = null;
+    let editingPartnerShopId = null;
 
     // Kategorien-Dropdown befüllen
     const incomeNameSelect = document.getElementById('incomeName');
@@ -381,6 +451,14 @@
 
     async function refreshStreamersFromSupabase() {
       await syncStreamersFromSupabase(data, function () { renderAll(); }, { force: true });
+    }
+
+    async function refreshAboutBlocksFromSupabase() {
+      await syncAboutBlocksFromSupabase(data, function () { renderAll(); }, { force: true });
+    }
+
+    async function refreshPartnerShopsFromSupabase() {
+      await syncPartnerShopsFromSupabase(data, function () { renderAll(); }, { force: true });
     }
 
     async function persistExpense(expense) {
@@ -515,6 +593,86 @@
       removeEntry('streamers', id);
     }
 
+    async function persistAboutBlock(block) {
+      if (typeof saveAboutBlock === 'function' && bkmpGetSupabaseClient()) {
+        try {
+          const saved = await saveAboutBlock(block);
+          if (block.id) {
+            data.aboutBlocks = data.aboutBlocks.map(item => item.id === block.id ? saved : item);
+          } else {
+            data.aboutBlocks.push(saved);
+          }
+          bkmpSaveData(data);
+          renderAll();
+          return true;
+        } catch (e) {
+          console.warn('Supabase konnte About-Block nicht speichern. localStorage-Fallback wird verwendet.', e);
+        }
+      }
+      if (block.id) {
+        data.aboutBlocks = data.aboutBlocks.map(item => item.id === block.id ? block : item);
+      } else {
+        data.aboutBlocks.push({ id: bkmpUid('about'), ...block, createdAt: Date.now() });
+      }
+      persist();
+      return true;
+    }
+
+    async function removeAboutBlock(id) {
+      if (typeof deleteAboutBlock === 'function' && bkmpGetSupabaseClient() && !String(id).startsWith('about-')) {
+        try {
+          await deleteAboutBlock(id);
+          data.aboutBlocks = data.aboutBlocks.filter(item => item.id !== id);
+          bkmpSaveData(data);
+          renderAll();
+          return;
+        } catch (e) {
+          console.warn('Supabase konnte About-Block nicht loeschen. localStorage-Fallback wird verwendet.', e);
+        }
+      }
+      removeEntry('aboutBlocks', id);
+    }
+
+    async function persistPartnerShop(shop) {
+      if (typeof savePartnerShop === 'function' && bkmpGetSupabaseClient()) {
+        try {
+          const saved = await savePartnerShop(shop);
+          if (shop.id) {
+            data.partnerShops = data.partnerShops.map(item => item.id === shop.id ? saved : item);
+          } else {
+            data.partnerShops.push(saved);
+          }
+          bkmpSaveData(data);
+          renderAll();
+          return true;
+        } catch (e) {
+          console.warn('Supabase konnte PartnerShop nicht speichern. localStorage-Fallback wird verwendet.', e);
+        }
+      }
+      if (shop.id) {
+        data.partnerShops = data.partnerShops.map(item => item.id === shop.id ? shop : item);
+      } else {
+        data.partnerShops.push({ id: bkmpUid('shop'), ...shop, createdAt: Date.now() });
+      }
+      persist();
+      return true;
+    }
+
+    async function removePartnerShop(id) {
+      if (typeof deletePartnerShop === 'function' && bkmpGetSupabaseClient() && !String(id).startsWith('shop-')) {
+        try {
+          await deletePartnerShop(id);
+          data.partnerShops = data.partnerShops.filter(item => item.id !== id);
+          bkmpSaveData(data);
+          renderAll();
+          return;
+        } catch (e) {
+          console.warn('Supabase konnte PartnerShop nicht loeschen. localStorage-Fallback wird verwendet.', e);
+        }
+      }
+      removeEntry('partnerShops', id);
+    }
+
     async function persistIncome(income) {
       if (typeof saveIncome === 'function' && bkmpGetSupabaseClient()) {
         try {
@@ -601,6 +759,80 @@
       renderNewsList();
       renderWishAdminList();
       renderStreamerList();
+      renderAboutBlockList();
+      renderPartnerShopList();
+    }
+
+    function aboutTypeLabel(type) {
+      return ({ heading: 'Ueberschrift', text: 'Text', image: 'Bild', image_text: 'Bild + Text', team: 'Team-Karte', gallery: 'Galerie' })[type] || 'Text';
+    }
+
+    function renderAboutBlockList() {
+      const el = document.getElementById('aboutBlockList');
+      if (!el) return;
+      const blocks = Array.isArray(data.aboutBlocks)
+        ? [...data.aboutBlocks].sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0))
+        : [];
+      if (blocks.length === 0) {
+        el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Noch keine Bloecke.</p>';
+        return;
+      }
+      el.innerHTML = '';
+      blocks.forEach((item, index) => {
+        const row = document.createElement('div');
+        row.className = 'entry-row';
+        row.innerHTML = `
+          <div class="desc">
+            <span class="name">${item.title || aboutTypeLabel(item.type)}</span>
+            <span class="meta">${aboutTypeLabel(item.type)} · Sortierung ${Number(item.sortOrder || 0)}</span>
+          </div>
+          <div class="entry-actions">
+            <button class="edit-btn move-up" type="button" ${index === 0 ? 'disabled' : ''}>Hoch</button>
+            <button class="edit-btn move-down" type="button" ${index === blocks.length - 1 ? 'disabled' : ''}>Runter</button>
+            <button class="edit-btn edit-about" type="button">Bearbeiten</button>
+            <button class="del-btn" type="button" aria-label="Block loeschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>
+          </div>
+        `;
+        row.querySelector('.edit-about').addEventListener('click', () => startEditAboutBlock(item.id));
+        row.querySelector('.del-btn').addEventListener('click', () => {
+          if (editingAboutId === item.id) clearAboutForm();
+          removeAboutBlock(item.id);
+        });
+        row.querySelector('.move-up').addEventListener('click', () => moveAboutBlock(item.id, -1));
+        row.querySelector('.move-down').addEventListener('click', () => moveAboutBlock(item.id, 1));
+        el.appendChild(row);
+      });
+    }
+
+    function renderPartnerShopList() {
+      const el = document.getElementById('partnerShopList');
+      if (!el) return;
+      if (!data.partnerShops || data.partnerShops.length === 0) {
+        el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Noch keine PartnerShops.</p>';
+        return;
+      }
+      el.innerHTML = '';
+      data.partnerShops.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'entry-row partner-admin-row';
+        row.innerHTML = `
+          ${item.image ? `<img class="partner-admin-thumb" src="${item.image}" alt="">` : '<div class="partner-admin-thumb partner-admin-thumb-empty">Shop</div>'}
+          <div class="desc">
+            <span class="name">${item.name}</span>
+            <span class="meta">${item.category || 'Partner'}${item.location ? ' &middot; ' + item.location : ''}</span>
+          </div>
+          <div class="entry-actions">
+            <button class="edit-btn" type="button">Bearbeiten</button>
+            <button class="del-btn" type="button" aria-label="PartnerShop loeschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>
+          </div>
+        `;
+        row.querySelector('.edit-btn').addEventListener('click', () => startEditPartnerShop(item.id));
+        row.querySelector('.del-btn').addEventListener('click', () => {
+          if (editingPartnerShopId === item.id) clearPartnerShopForm();
+          removePartnerShop(item.id);
+        });
+        el.appendChild(row);
+      });
     }
 
     function streamerColorLabel(color) {
@@ -882,6 +1114,164 @@
       const payload = { name, url, color };
       if (editingStreamerId) payload.id = editingStreamerId;
       persistStreamer(payload).then(() => clearStreamerForm());
+    });
+
+    /* Wer sind wir */
+    const addAboutBlockBtn = document.getElementById('addAboutBlock');
+    const cancelAboutEditBtn = document.getElementById('cancelAboutEdit');
+    const aboutTypeInput = document.getElementById('aboutType');
+    const aboutTitleInput = document.getElementById('aboutTitle');
+    const aboutContentInput = document.getElementById('aboutContent');
+    const aboutSortInput = document.getElementById('aboutSort');
+    const aboutImageFileInput = document.getElementById('aboutImageFile');
+
+    function setAboutEditMode(isEditing) {
+      addAboutBlockBtn.textContent = isEditing ? 'Aenderungen speichern' : '+ Block speichern';
+      cancelAboutEditBtn.style.display = isEditing ? 'inline-flex' : 'none';
+    }
+
+    function clearAboutForm() {
+      editingAboutId = null;
+      aboutTypeInput.value = 'heading';
+      aboutTitleInput.value = '';
+      aboutContentInput.value = '';
+      aboutSortInput.value = '';
+      aboutImageFileInput.value = '';
+      setAboutEditMode(false);
+    }
+
+    function startEditAboutBlock(id) {
+      const block = data.aboutBlocks.find(item => item.id === id);
+      if (!block) return;
+      editingAboutId = id;
+      aboutTypeInput.value = block.type || 'text';
+      aboutTitleInput.value = block.title || '';
+      aboutContentInput.value = block.content || '';
+      aboutSortInput.value = Number(block.sortOrder || 0);
+      aboutImageFileInput.value = '';
+      setAboutEditMode(true);
+      aboutTitleInput.focus();
+    }
+
+    function readAboutFile(file) {
+      return new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function moveAboutBlock(id, direction) {
+      const blocks = [...data.aboutBlocks].sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
+      const index = blocks.findIndex(item => item.id === id);
+      const nextIndex = index + direction;
+      if (index < 0 || nextIndex < 0 || nextIndex >= blocks.length) return;
+      const current = blocks[index];
+      const next = blocks[nextIndex];
+      const currentOrder = Number(current.sortOrder || index);
+      current.sortOrder = Number(next.sortOrder || nextIndex);
+      next.sortOrder = currentOrder;
+      data.aboutBlocks = blocks;
+      bkmpSaveData(data);
+      renderAll();
+      persistAboutBlock(current);
+      persistAboutBlock(next);
+    }
+
+    cancelAboutEditBtn.addEventListener('click', clearAboutForm);
+
+    addAboutBlockBtn.addEventListener('click', () => {
+      const currentBlock = editingAboutId ? data.aboutBlocks.find(item => item.id === editingAboutId) : null;
+      const files = aboutImageFileInput.files ? Array.from(aboutImageFileInput.files) : [];
+      Promise.all(files.map(readAboutFile)).then(images => {
+        const keepImages = currentBlock ? (currentBlock.images && currentBlock.images.length ? currentBlock.images : (currentBlock.image ? [currentBlock.image] : [])) : [];
+        const nextImages = images.length ? images : keepImages;
+        const block = {
+          id: editingAboutId || '',
+          type: aboutTypeInput.value || 'text',
+          title: aboutTitleInput.value.trim(),
+          content: aboutContentInput.value.trim(),
+          image: nextImages[0] || '',
+          images: nextImages,
+          sortOrder: aboutSortInput.value === '' ? (data.aboutBlocks.length + 1) * 10 : Number(aboutSortInput.value)
+        };
+        if (!block.title && !block.content && nextImages.length === 0) return;
+        persistAboutBlock(block).then(() => clearAboutForm());
+      });
+    });
+
+    /* PartnerShops */
+    const addPartnerShopBtn = document.getElementById('addPartnerShop');
+    const cancelPartnerShopEditBtn = document.getElementById('cancelPartnerShopEdit');
+    const partnerNameInput = document.getElementById('partnerName');
+    const partnerLocationInput = document.getElementById('partnerLocation');
+    const partnerCategoryInput = document.getElementById('partnerCategory');
+    const partnerDescriptionInput = document.getElementById('partnerDescription');
+    const partnerLinkInput = document.getElementById('partnerLink');
+    const partnerContactInput = document.getElementById('partnerContact');
+    const partnerImageFileInput = document.getElementById('partnerImageFile');
+
+    function setPartnerShopEditMode(isEditing) {
+      addPartnerShopBtn.textContent = isEditing ? 'Aenderungen speichern' : '+ PartnerShop speichern';
+      cancelPartnerShopEditBtn.style.display = isEditing ? 'inline-flex' : 'none';
+    }
+
+    function clearPartnerShopForm() {
+      editingPartnerShopId = null;
+      partnerNameInput.value = '';
+      partnerLocationInput.value = '';
+      partnerCategoryInput.value = '';
+      partnerDescriptionInput.value = '';
+      partnerLinkInput.value = '';
+      partnerContactInput.value = '';
+      partnerImageFileInput.value = '';
+      setPartnerShopEditMode(false);
+    }
+
+    function startEditPartnerShop(id) {
+      const shop = data.partnerShops.find(item => item.id === id);
+      if (!shop) return;
+      editingPartnerShopId = id;
+      partnerNameInput.value = shop.name || '';
+      partnerLocationInput.value = shop.location || '';
+      partnerCategoryInput.value = shop.category || '';
+      partnerDescriptionInput.value = shop.description || '';
+      partnerLinkInput.value = shop.link || '';
+      partnerContactInput.value = shop.contact || '';
+      partnerImageFileInput.value = '';
+      setPartnerShopEditMode(true);
+      partnerNameInput.focus();
+    }
+
+    function readPartnerShopFile(file) {
+      return new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    cancelPartnerShopEditBtn.addEventListener('click', clearPartnerShopForm);
+
+    addPartnerShopBtn.addEventListener('click', () => {
+      const name = partnerNameInput.value.trim();
+      if (!name) return;
+      const currentShop = editingPartnerShopId ? data.partnerShops.find(item => item.id === editingPartnerShopId) : null;
+      const file = partnerImageFileInput.files && partnerImageFileInput.files[0] ? partnerImageFileInput.files[0] : null;
+      const readImage = file ? readPartnerShopFile(file) : Promise.resolve(currentShop ? currentShop.image || '' : '');
+      readImage.then(image => {
+        const shop = {
+          id: editingPartnerShopId || '',
+          name,
+          location: partnerLocationInput.value.trim(),
+          category: partnerCategoryInput.value.trim(),
+          description: partnerDescriptionInput.value.trim(),
+          link: partnerLinkInput.value.trim(),
+          contact: partnerContactInput.value.trim(),
+          image
+        };
+        persistPartnerShop(shop).then(() => clearPartnerShopForm());
+      });
     });
 
     const addNewsBtn = document.getElementById('addNews');

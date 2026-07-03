@@ -171,3 +171,59 @@ create policy "Allow anon update streamer links" on public.streamer_links for up
 
 drop policy if exists "Allow anon delete streamer links" on public.streamer_links;
 create policy "Allow anon delete streamer links" on public.streamer_links for delete to anon using (true);
+
+create table if not exists public.about_blocks (
+  id uuid primary key default gen_random_uuid(),
+  block_type text not null default 'text',
+  title text,
+  content text,
+  image_url text,
+  image_urls jsonb not null default '[]'::jsonb,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists about_blocks_sort_order_idx on public.about_blocks (sort_order asc, created_at asc);
+
+alter table public.about_blocks enable row level security;
+
+drop policy if exists "Allow anon read about blocks" on public.about_blocks;
+create policy "Allow anon read about blocks" on public.about_blocks for select to anon using (true);
+
+drop policy if exists "Allow anon insert about blocks" on public.about_blocks;
+create policy "Allow anon insert about blocks" on public.about_blocks for insert to anon with check (true);
+
+drop policy if exists "Allow anon update about blocks" on public.about_blocks;
+create policy "Allow anon update about blocks" on public.about_blocks for update to anon using (true) with check (true);
+
+drop policy if exists "Allow anon delete about blocks" on public.about_blocks;
+create policy "Allow anon delete about blocks" on public.about_blocks for delete to anon using (true);
+
+create table if not exists public.partner_shops (
+  id uuid primary key default gen_random_uuid(),
+  shop_name text not null,
+  image_url text,
+  location text,
+  category text,
+  description text,
+  link text,
+  contact text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists partner_shops_created_at_idx on public.partner_shops (created_at desc);
+create index if not exists partner_shops_category_idx on public.partner_shops (category);
+
+alter table public.partner_shops enable row level security;
+
+drop policy if exists "Allow anon read partner shops" on public.partner_shops;
+create policy "Allow anon read partner shops" on public.partner_shops for select to anon using (true);
+
+drop policy if exists "Allow anon insert partner shops" on public.partner_shops;
+create policy "Allow anon insert partner shops" on public.partner_shops for insert to anon with check (true);
+
+drop policy if exists "Allow anon update partner shops" on public.partner_shops;
+create policy "Allow anon update partner shops" on public.partner_shops for update to anon using (true) with check (true);
+
+drop policy if exists "Allow anon delete partner shops" on public.partner_shops;
+create policy "Allow anon delete partner shops" on public.partner_shops for delete to anon using (true);
