@@ -457,6 +457,11 @@ function bkmpMapUpdateToSupabase(update) {
   return payload;
 }
 
+function bkmpDedupeSupabaseUpdates(list) {
+  if (typeof bkmpDedupeUpdates === 'function') return bkmpDedupeUpdates(list);
+  return list || [];
+}
+
 async function loadUpdates() {
   const client = bkmpGetSupabaseClient();
   if (!client) return null;
@@ -465,7 +470,7 @@ async function loadUpdates() {
     .select('id, title, content, image_urls, created_at')
     .order('created_at', { ascending: false });
   if (error) throw error;
-  return (data || []).map(bkmpMapUpdateFromSupabase);
+  return bkmpDedupeSupabaseUpdates((data || []).map(bkmpMapUpdateFromSupabase));
 }
 
 async function saveUpdate(update) {
@@ -473,6 +478,19 @@ async function saveUpdate(update) {
   if (!client) return null;
   const payload = bkmpMapUpdateToSupabase(update);
   if (update.id && !String(update.id).startsWith('news-')) {
+    if (!payload.image_urls.length) {
+      const { data: existingRows, error: existingError } = await client
+        .from('updates')
+        .select('image_urls')
+        .eq('id', update.id)
+        .limit(1);
+      if (existingError) throw existingError;
+      const existingImages = Array.isArray(existingRows) && existingRows[0] && Array.isArray(existingRows[0].image_urls)
+        ? existingRows[0].image_urls
+        : [];
+      if (existingImages.length) payload.image_urls = existingImages;
+    }
+
     const { data, error } = await client
       .from('updates')
       .update(payload)
@@ -524,6 +542,30 @@ async function saveUpdate(update) {
     }
   }
 
+  let existingQuery = client
+    .from('updates')
+    .select('id, title, content, image_urls, created_at')
+    .eq('title', update.title)
+    .eq('content', payload.content)
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  const { data: existingMatches, error: existingMatchError } = await existingQuery;
+  if (existingMatchError) throw existingMatchError;
+  const existingMatch = Array.isArray(existingMatches) ? existingMatches[0] : null;
+  if (existingMatch && existingMatch.id) {
+    if (!payload.image_urls.length && Array.isArray(existingMatch.image_urls)) payload.image_urls = existingMatch.image_urls;
+    const { data: updatedData, error: updatedError } = await client
+      .from('updates')
+      .update(payload)
+      .eq('id', existingMatch.id)
+      .select('id, title, content, image_urls, created_at')
+      .limit(1);
+    if (updatedError) throw updatedError;
+    const updatedMatch = Array.isArray(updatedData) ? updatedData[0] : null;
+    if (updatedMatch) return bkmpMapUpdateFromSupabase(updatedMatch);
+  }
+
   const { data, error } = await client
     .from('updates')
     .insert(payload)
@@ -563,6 +605,48 @@ async function syncUpdatesFromSupabase(targetData, onSynced, options = {}) {
     return false;
   }
 }
+
+async function cleanupDuplicateUpdatesInSupabase() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return { cleaned: 0, kept: 0 };
+  const { data, error } = await client
+    .from('updates')
+    .select('id, title, content, image_urls, created_at')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+
+  const groups = new Map();
+  (data || []).forEach(row => {
+    const key = [row.title || '', row.content || ''].join('|').toLowerCase();
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  });
+
+  let cleaned = 0;
+  for (const rows of groups.values()) {
+    if (rows.length < 2) continue;
+    const keeper = rows[0];
+    const duplicates = rows.slice(1);
+    const mergedImages = [...new Set(rows.flatMap(row => Array.isArray(row.image_urls) ? row.image_urls : []).filter(Boolean))];
+    if (mergedImages.length) {
+      const { error: updateError } = await client
+        .from('updates')
+        .update({ image_urls: mergedImages })
+        .eq('id', keeper.id);
+      if (updateError) throw updateError;
+    }
+    const { error: deleteError } = await client
+      .from('updates')
+      .delete()
+      .in('id', duplicates.map(row => row.id));
+    if (deleteError) throw deleteError;
+    cleaned += duplicates.length;
+  }
+
+  return { cleaned, kept: groups.size };
+}
+
+window.cleanupDuplicateUpdatesInSupabase = cleanupDuplicateUpdatesInSupabase;
 
 function bkmpMapWishFromSupabase(row) {
   return {

@@ -635,7 +635,8 @@
     if (data.news.length === 0) {
       newsFeed.innerHTML = '<p class="empty-hint">Noch keine Updates gepostet.</p>';
     } else {
-      const sorted = [...data.news].sort((a, b) => (a.date < b.date ? 1 : -1));
+      const visibleNews = typeof bkmpDedupeUpdates === 'function' ? bkmpDedupeUpdates(data.news) : data.news;
+      const sorted = [...visibleNews].sort((a, b) => (a.date < b.date ? 1 : -1));
       newsFeed.innerHTML = sorted.map(post => {
         const images = post.images && post.images.length ? post.images : (post.image ? [post.image] : []);
         const imageHtml = images.length ? `

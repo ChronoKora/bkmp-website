@@ -31,6 +31,30 @@ function bkmpNormalizeEntryList(list) {
   });
 }
 
+function bkmpMergeUniqueImages() {
+  const values = Array.from(arguments).flat().filter(Boolean);
+  return [...new Set(values)];
+}
+
+function bkmpDedupeUpdates(list) {
+  const map = new Map();
+  (list || []).forEach(item => {
+    const key = [item.title || '', item.text || item.content || ''].join('|').toLowerCase();
+    const current = map.get(key);
+    const itemImages = bkmpMergeUniqueImages(item.images || [], item.image || '');
+    if (!current) {
+      map.set(key, { ...item, image: itemImages[0] || '', images: itemImages });
+      return;
+    }
+    const currentTime = current.createdAt || Date.parse(current.date || '') || 0;
+    const itemTime = item.createdAt || Date.parse(item.date || '') || 0;
+    const keep = itemTime > currentTime ? item : current;
+    const mergedImages = bkmpMergeUniqueImages(current.images || [], current.image || '', itemImages);
+    map.set(key, { ...keep, image: mergedImages[0] || '', images: mergedImages });
+  });
+  return Array.from(map.values());
+}
+
 const BKMP_DEFAULT_DATA = {
   income: [
     { id: 'inc-1', name: 'Karten', amount: 4200, date: '2026-06-10' },
@@ -69,7 +93,7 @@ function bkmpLoadData() {
       income: bkmpNormalizeEntryList(parsed.income),
       expenses: bkmpNormalizeEntryList(parsed.expenses),
       investors: parsed.investors || [],
-      news: parsed.news || [],
+      news: bkmpDedupeUpdates(parsed.news || []),
       wishes: parsed.wishes || [],
       streamers: parsed.streamers || [],
       aboutBlocks: parsed.aboutBlocks || [],
