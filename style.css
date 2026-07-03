@@ -169,23 +169,54 @@ h1.hero-title .brand { font-style: italic; font-weight: 500; }
 .hero-banner-wrap {
   padding: 5.5rem 0.9rem 2.2rem;
 }
-.streamer-marquee {
-  position: absolute;
-  top: 5.95rem;
-  left: 50%;
-  z-index: 3;
+.streamer-strip {
+  display: none;
+  align-items: center;
+  gap: 0.75rem;
   width: min(1760px, calc(100vw - 1.8rem));
-  transform: translateX(-50%);
+  min-height: 42px;
+  margin-bottom: 0.45rem;
   overflow: hidden;
-  border-radius: 14px 14px 0 0;
-  padding: 0.55rem 0;
-  background: linear-gradient(180deg, rgba(6, 6, 10, 0.9), rgba(6, 6, 10, 0.36));
-  mask-image: linear-gradient(90deg, transparent 0, #000 7%, #000 93%, transparent 100%);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: linear-gradient(90deg, rgba(10, 10, 15, 0.96), rgba(23, 18, 34, 0.92));
+  box-shadow: 0 16px 46px rgba(0, 0, 0, 0.28);
+}
+.streamer-strip-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  align-self: stretch;
+  padding: 0 0.85rem;
+  color: #fff;
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.streamer-strip-title svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.streamer-marquee {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0.28rem 0;
+  mask-image: linear-gradient(90deg, transparent 0, #000 4%, #000 96%, transparent 100%);
 }
 .streamer-marquee-track {
   display: flex;
   width: max-content;
-  animation: streamerScroll 24s linear infinite;
+  animation: streamerScroll 42s linear infinite;
 }
 .streamer-marquee:hover .streamer-marquee-track {
   animation-play-state: paused;
@@ -200,32 +231,33 @@ h1.hero-title .brand { font-style: italic; font-weight: 500; }
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  min-height: 34px;
+  min-height: 30px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 999px;
-  padding: 0.36rem 0.85rem 0.36rem 0.42rem;
-  color: #fff;
+  padding: 0.28rem 0.78rem;
+  color: #0a0a0f;
   background: rgba(10, 10, 15, 0.72);
   text-decoration: none;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 800;
   white-space: nowrap;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
 }
-.streamer-pill span {
-  border-radius: 999px;
-  padding: 0.22rem 0.48rem;
-  color: #0a0a0f;
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-.streamer-purple span { background: #a78bfa; }
-.streamer-gold span { background: var(--gold); }
-.streamer-green span { background: #4ade80; }
-.streamer-blue span { background: #38bdf8; }
-.streamer-red span { background: #f87171; }
-.streamer-pink span { background: #f472b6; }
+.streamer-purple { background: #a78bfa; }
+.streamer-gold { background: var(--gold); }
+.streamer-green { background: #4ade80; }
+.streamer-blue { background: #38bdf8; }
+.streamer-red { background: #f87171; }
+.streamer-pink { background: #f472b6; }
+.streamer-cyan { background: #22d3ee; }
+.streamer-orange { background: #fb923c; }
+.streamer-lime { background: #a3e635; }
+.streamer-rose { background: #fb7185; }
+.streamer-indigo { background: #818cf8; }
+.streamer-emerald { background: #34d399; }
+.streamer-violet { background: #c084fc; }
+.streamer-white { background: #f8fafc; }
+.streamer-rainbow { background: linear-gradient(90deg, #f87171, #fbbf24, #4ade80, #38bdf8, #a78bfa, #f472b6); }
 .streamer-pill:hover { border-color: var(--gold); transform: translateY(-1px); }
 @keyframes streamerScroll {
   from { transform: translateX(0); }
@@ -245,7 +277,8 @@ h1.hero-title .brand { font-style: italic; font-weight: 500; }
 @media (max-width: 720px) {
   .hero-banner-wrap { padding: 5rem 0.7rem 1.8rem; }
   .hero-banner { width: calc(100vw - 1.4rem); border-radius: 10px; aspect-ratio: 24 / 8; }
-  .streamer-marquee { top: 5.35rem; width: calc(100vw - 1.4rem); border-radius: 10px 10px 0 0; }
+  .streamer-strip { width: calc(100vw - 1.4rem); gap: 0.45rem; min-height: 38px; }
+  .streamer-strip-title { padding: 0 0.62rem; font-size: 0.66rem; }
   .streamer-pill { font-size: 0.76rem; }
 }
 

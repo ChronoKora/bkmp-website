@@ -55,8 +55,14 @@
   </div>
 
   <header class="hero hero-banner-wrap">
-    <div class="streamer-marquee" id="streamerMarquee" aria-label="Twitch Accounts">
-      <div class="streamer-marquee-track" id="streamerMarqueeTrack"></div>
+    <div class="streamer-strip" id="streamerStrip">
+      <div class="streamer-strip-title">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h16v11l-4 4h-4l-3 3H8v-3H3V7l2-4z"/><path d="M9 8v5M15 8v5"/></svg>
+        Unsere OPSUCHT Creator
+      </div>
+      <div class="streamer-marquee" id="streamerMarquee" aria-label="Twitch Accounts">
+        <div class="streamer-marquee-track" id="streamerMarqueeTrack"></div>
+      </div>
     </div>
     <img class="hero-banner" src="assets/top-banner.png" alt="Willkommen bei Bkmp">
   </header>
@@ -519,18 +525,19 @@
       if (!marquee || !track) return;
       const streamers = Array.isArray(data.streamers) ? data.streamers.filter(item => item.name && item.url) : [];
       if (streamers.length === 0) {
-        marquee.style.display = 'none';
+        const strip = document.getElementById('streamerStrip');
+        if (strip) strip.style.display = 'none';
         track.innerHTML = '';
         return;
       }
-      marquee.style.display = 'block';
+      const strip = document.getElementById('streamerStrip');
+      if (strip) strip.style.display = 'flex';
       const itemsHtml = streamers.map(item => {
         const url = String(item.url || '').startsWith('http') ? item.url : 'https://' + item.url;
-        return `<a class="streamer-pill streamer-${item.color || 'purple'}" href="${url}" target="_blank" rel="noopener">
-          <span>Live</span>${escapeHtml(item.name)}
-        </a>`;
+        return `<a class="streamer-pill streamer-${item.color || 'purple'}" href="${url}" target="_blank" rel="noopener">${escapeHtml(item.name)}</a>`;
       }).join('');
-      track.innerHTML = `<div class="streamer-marquee-group">${itemsHtml}</div><div class="streamer-marquee-group" aria-hidden="true">${itemsHtml}</div>`;
+      const loopHtml = Array(6).fill(itemsHtml).join('');
+      track.innerHTML = `<div class="streamer-marquee-group">${loopHtml}</div><div class="streamer-marquee-group" aria-hidden="true">${loopHtml}</div>`;
     }
     renderStreamers();
 

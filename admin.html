@@ -207,6 +207,15 @@
                   <option value="blue">Blau</option>
                   <option value="red">Rot</option>
                   <option value="pink">Pink</option>
+                  <option value="cyan">Cyan</option>
+                  <option value="orange">Orange</option>
+                  <option value="lime">Lime</option>
+                  <option value="rose">Rose</option>
+                  <option value="indigo">Indigo</option>
+                  <option value="emerald">Emerald</option>
+                  <option value="violet">Violet</option>
+                  <option value="white">Weiss</option>
+                  <option value="rainbow">Rainbow</option>
                 </select>
               </div>
             </div>
@@ -595,7 +604,23 @@
     }
 
     function streamerColorLabel(color) {
-      return ({ purple: 'Lila', gold: 'Gold', green: 'Gruen', blue: 'Blau', red: 'Rot', pink: 'Pink' })[color] || 'Lila';
+      return ({
+        purple: 'Lila',
+        gold: 'Gold',
+        green: 'Gruen',
+        blue: 'Blau',
+        red: 'Rot',
+        pink: 'Pink',
+        cyan: 'Cyan',
+        orange: 'Orange',
+        lime: 'Lime',
+        rose: 'Rose',
+        indigo: 'Indigo',
+        emerald: 'Emerald',
+        violet: 'Violet',
+        white: 'Weiss',
+        rainbow: 'Rainbow'
+      })[color] || 'Lila';
     }
 
     function renderStreamerList() {
