@@ -55,6 +55,7 @@
   <div class="login-card" id="loginCard">
     <h1>Admin-Login</h1>
     <p>Nur für dich — hier trägst du Zahlen, Investoren und News ein.</p>
+    <input type="text" id="loginName" placeholder="Admin-Name">
     <input type="password" id="loginPassword" placeholder="Passwort">
     <button class="btn btn-primary btn-block" id="loginBtn">Einloggen</button>
     <p id="loginError" style="color:var(--neg); font-size:0.8rem; margin-top:0.8rem; display:none;">Falsches Passwort.</p>
@@ -102,6 +103,10 @@
         <button class="admin-nav-btn" data-page="partners">
           <svg viewBox="0 0 24 24"><path d="M4 8h16v11H4z"/><path d="M7 8V5h10v3"/><path d="M8 13h8"/></svg>
           PartnerShops
+        </button>
+        <button class="admin-nav-btn" data-page="access">
+          <svg viewBox="0 0 24 24"><path d="M12 3a5 5 0 0 0-5 5v3H5v10h14V11h-2V8a5 5 0 0 0-5-5z"/><path d="M9 11V8a3 3 0 0 1 6 0v3"/></svg>
+          Zug&auml;nge
         </button>
       </nav>
 
@@ -290,6 +295,26 @@
           </div>
         </section>
 
+        <!-- Zugaenge -->
+        <section class="admin-page" id="page-access">
+          <div class="admin-section">
+            <h2>Admin-Zug&auml;nge</h2>
+            <div class="entry-table-wrapper"><div class="entry-list" id="adminAccessList"></div></div>
+            <div class="form-grid form-grid-3">
+              <div><label>Name</label><input type="text" id="accessName" placeholder="z. B. David"></div>
+              <div><label>Passwort</label><input type="password" id="accessPassword" placeholder="Mindestens 8 Zeichen"></div>
+              <div><label>Rolle</label>
+                <select id="accessRole">
+                  <option value="admin">Admin</option>
+                  <option value="editor">Editor</option>
+                </select>
+              </div>
+            </div>
+            <p class="admin-help-text">Zug&auml;nge werden &uuml;ber Supabase Auth erstellt. Der Name wird intern als Login-Adresse gespeichert.</p>
+            <button class="btn btn-primary" id="addAccess">+ Zugang erstellen</button>
+          </div>
+        </section>
+
       </div>
     </div>
 
@@ -302,11 +327,11 @@
     bkmpInitTheme();
 
     /* ---------------- Login (nur clientseitig, siehe Hinweis) ---------------- */
-    const ADMIN_PASSWORD = 'bkmp2026'; // TODO: vor dem echten Launch ändern / durch echtes Backend-Login ersetzen
 
     const loginCard = document.getElementById('loginCard');
     const adminWrap = document.getElementById('adminWrap');
     const loginBtn = document.getElementById('loginBtn');
+    const loginName = document.getElementById('loginName');
     const loginPassword = document.getElementById('loginPassword');
     const loginError = document.getElementById('loginError');
 
@@ -328,20 +353,28 @@
       refreshAdminDataFromSupabase();
     }
 
-    function tryLogin() {
-      if (loginPassword.value === ADMIN_PASSWORD) {
-        sessionStorage.setItem('bkmp-admin-auth', '1');
+    async function tryLogin() {
+      loginError.style.display = 'none';
+      loginBtn.disabled = true;
+      loginBtn.textContent = 'Einloggen...';
+      try {
+        await bkmpLoginAdmin(loginName.value, loginPassword.value);
         showAdmin();
-      } else {
+      } catch (e) {
+        console.warn('Admin-Login fehlgeschlagen:', e);
         loginError.style.display = 'block';
+      } finally {
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'Einloggen';
       }
     }
 
     loginBtn.addEventListener('click', tryLogin);
     loginPassword.addEventListener('keydown', e => { if (e.key === 'Enter') tryLogin(); });
+    loginName.addEventListener('keydown', e => { if (e.key === 'Enter') tryLogin(); });
 
-    document.getElementById('logoutBtn').addEventListener('click', () => {
-      sessionStorage.removeItem('bkmp-admin-auth');
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      await bkmpLogoutAdmin();
       location.reload();
     });
 
@@ -358,6 +391,7 @@
         if (page === 'streamers') refreshStreamersFromSupabase();
         if (page === 'about') refreshAboutBlocksFromSupabase();
         if (page === 'partners') refreshPartnerShopsFromSupabase();
+        if (page === 'access') refreshAdminAccessList();
       });
     });
 
@@ -1274,6 +1308,77 @@
       });
     });
 
+    /* Admin-Zugaenge */
+    const addAccessBtn = document.getElementById('addAccess');
+    const accessNameInput = document.getElementById('accessName');
+    const accessPasswordInput = document.getElementById('accessPassword');
+    const accessRoleInput = document.getElementById('accessRole');
+    let adminProfiles = [];
+
+    function renderAdminAccessList() {
+      const el = document.getElementById('adminAccessList');
+      if (!el) return;
+      if (!adminProfiles.length) {
+        el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Noch keine Zug&auml;nge geladen.</p>';
+        return;
+      }
+      el.innerHTML = '';
+      adminProfiles.forEach(profile => {
+        const row = document.createElement('div');
+        row.className = 'entry-row';
+        row.innerHTML = `
+          <div class="desc">
+            <span class="name">${profile.display_name || profile.login_name}</span>
+            <span class="meta">${profile.role || 'admin'} &middot; ${profile.active ? 'Aktiv' : 'Inaktiv'} &middot; ${profile.login_name || ''}</span>
+          </div>
+          <div class="entry-actions">
+            <button class="edit-btn toggle-access" type="button">${profile.active ? 'Deaktivieren' : 'Aktivieren'}</button>
+          </div>
+        `;
+        row.querySelector('.toggle-access').addEventListener('click', async () => {
+          await setAdminAccessActive(profile.id, !profile.active);
+          refreshAdminAccessList();
+        });
+        el.appendChild(row);
+      });
+    }
+
+    async function refreshAdminAccessList() {
+      const el = document.getElementById('adminAccessList');
+      if (el) el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Zug&auml;nge werden geladen...</p>';
+      try {
+        adminProfiles = await loadAdminProfiles();
+      } catch (e) {
+        console.warn('Admin-Zugaenge konnten nicht geladen werden.', e);
+        adminProfiles = [];
+        if (el) el.innerHTML = '<p style="color:var(--neg); font-size:0.85rem;">Zug&auml;nge konnten nicht geladen werden. Bitte SQL ausf&uuml;hren.</p>';
+        return;
+      }
+      renderAdminAccessList();
+    }
+
+    addAccessBtn.addEventListener('click', async () => {
+      const name = accessNameInput.value.trim();
+      const password = accessPasswordInput.value;
+      const role = accessRoleInput.value || 'admin';
+      if (!name || !password) return;
+      addAccessBtn.disabled = true;
+      addAccessBtn.textContent = 'Zugang wird erstellt...';
+      try {
+        await createAdminAccess(name, password, role);
+        accessNameInput.value = '';
+        accessPasswordInput.value = '';
+        accessRoleInput.value = 'admin';
+        refreshAdminAccessList();
+      } catch (e) {
+        console.warn('Zugang konnte nicht erstellt werden.', e);
+        alert('Zugang konnte nicht erstellt werden: ' + (e.message || 'Unbekannter Fehler'));
+      } finally {
+        addAccessBtn.disabled = false;
+        addAccessBtn.textContent = '+ Zugang erstellen';
+      }
+    });
+
     const addNewsBtn = document.getElementById('addNews');
     const cancelNewsEditBtn = document.getElementById('cancelNewsEdit');
     const newsTitleInput = document.getElementById('newsTitle');
@@ -1388,9 +1493,9 @@
     }
 
     /* News */
-    if (sessionStorage.getItem('bkmp-admin-auth') === '1') {
-      showAdmin();
-    }
+    bkmpGetValidAdminSession().then(session => {
+      if (session) showAdmin();
+    });
 
     addNewsBtn.addEventListener('click', () => {
       const title = newsTitleInput.value.trim();

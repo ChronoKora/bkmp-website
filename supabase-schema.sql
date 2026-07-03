@@ -227,3 +227,26 @@ create policy "Allow anon update partner shops" on public.partner_shops for upda
 
 drop policy if exists "Allow anon delete partner shops" on public.partner_shops;
 create policy "Allow anon delete partner shops" on public.partner_shops for delete to anon using (true);
+
+create table if not exists public.admin_profiles (
+  id uuid primary key default gen_random_uuid(),
+  auth_user_id uuid,
+  display_name text not null,
+  login_name text not null unique,
+  role text not null default 'admin',
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists admin_profiles_login_name_idx on public.admin_profiles (login_name);
+
+alter table public.admin_profiles enable row level security;
+
+drop policy if exists "Allow authenticated read admin profiles" on public.admin_profiles;
+create policy "Allow authenticated read admin profiles" on public.admin_profiles for select to authenticated using (true);
+
+drop policy if exists "Allow authenticated insert admin profiles" on public.admin_profiles;
+create policy "Allow authenticated insert admin profiles" on public.admin_profiles for insert to authenticated with check (true);
+
+drop policy if exists "Allow authenticated update admin profiles" on public.admin_profiles;
+create policy "Allow authenticated update admin profiles" on public.admin_profiles for update to authenticated using (true) with check (true);

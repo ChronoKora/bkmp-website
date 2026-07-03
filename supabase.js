@@ -33,6 +33,143 @@ function bkmpGetSupabaseClient() {
   return bkmpSupabaseClient;
 }
 
+function bkmpAdminEmailFromName(name) {
+  const clean = String(name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, '');
+  return clean ? clean + '@bkmp-admin.local' : '';
+}
+
+async function bkmpLoginAdmin(name, password) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const email = bkmpAdminEmailFromName(name);
+  if (!email || !password) throw new Error('Name und Passwort fehlen.');
+  const { data, error } = await client.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+  const userId = data && data.user ? data.user.id : '';
+  const { data: profiles, error: profileError } = await client
+    .from('admin_profiles')
+    .select('id, login_name, active')
+    .order('created_at', { ascending: true });
+  if (profileError) throw profileError;
+  if (!profiles || profiles.length === 0) {
+    const { error: insertError } = await client.from('admin_profiles').insert({
+      auth_user_id: userId,
+      display_name: String(name || '').trim(),
+      login_name: email,
+      role: 'admin',
+      active: true
+    });
+    if (insertError) throw insertError;
+    return data;
+  }
+  const ownProfile = profiles.find(profile => profile.login_name === email);
+  if (!ownProfile || !ownProfile.active) {
+    await client.auth.signOut();
+    throw new Error('Dieser Admin-Zugang ist nicht aktiv.');
+  }
+  return data;
+}
+
+async function bkmpLogoutAdmin() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return;
+  await client.auth.signOut();
+}
+
+async function bkmpGetAdminSession() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client.auth.getSession();
+  if (error) return null;
+  return data && data.session ? data.session : null;
+}
+
+async function bkmpGetValidAdminSession() {
+  const session = await bkmpGetAdminSession();
+  if (!session || !session.user || !session.user.email) return null;
+  const client = bkmpGetSupabaseClient();
+  try {
+    const { data, error } = await client
+      .from('admin_profiles')
+      .select('active')
+      .eq('login_name', session.user.email)
+      .limit(1);
+    if (error) throw error;
+    const profile = Array.isArray(data) ? data[0] : null;
+    if (profile && profile.active) return session;
+  } catch (e) {
+    console.warn('Admin-Session konnte nicht geprueft werden.', e);
+  }
+  await client.auth.signOut();
+  return null;
+}
+
+function bkmpGetAuthCreateClient() {
+  if (!bkmpIsSupabaseConfigured() || !window.supabase) return null;
+  return window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      storageKey: 'bkmp-admin-create-temp'
+    }
+  });
+}
+
+async function loadAdminProfiles() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from('admin_profiles')
+    .select('id, auth_user_id, display_name, login_name, role, active, created_at')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+async function createAdminAccess(name, password, role) {
+  const currentClient = bkmpGetSupabaseClient();
+  const createClient = bkmpGetAuthCreateClient();
+  if (!currentClient || !createClient) throw new Error('Supabase ist nicht verbunden.');
+  const displayName = String(name || '').trim();
+  const email = bkmpAdminEmailFromName(displayName);
+  if (!email) throw new Error('Bitte einen gueltigen Namen eintragen.');
+  if (!password || password.length < 8) throw new Error('Das Passwort braucht mindestens 8 Zeichen.');
+
+  const { data: signUpData, error: signUpError } = await createClient.auth.signUp({
+    email,
+    password,
+    options: { data: { display_name: displayName, role: role || 'admin' } }
+  });
+  if (signUpError) throw signUpError;
+
+  const authUserId = signUpData && signUpData.user ? signUpData.user.id : null;
+  const { data, error } = await currentClient
+    .from('admin_profiles')
+    .upsert({
+      auth_user_id: authUserId,
+      display_name: displayName,
+      login_name: email,
+      role: role || 'admin',
+      active: true
+    }, { onConflict: 'login_name' })
+    .select('id, auth_user_id, display_name, login_name, role, active, created_at')
+    .limit(1);
+  if (error) throw error;
+  return Array.isArray(data) ? data[0] : null;
+}
+
+async function setAdminAccessActive(id, active) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return false;
+  const { error } = await client.from('admin_profiles').update({ active: Boolean(active) }).eq('id', id);
+  if (error) throw error;
+  return true;
+}
+
 function bkmpMapIncomeFromSupabase(row) {
   return {
     id: row.id,
