@@ -244,6 +244,10 @@
       await syncIncomesFromSupabase(data, function () { renderAll(); });
     }
 
+    async function refreshInvestorsFromSupabase() {
+      await syncInvestorsFromSupabase(data, function () { renderAll(); });
+    }
+
     async function persistIncome(income) {
       if (typeof saveIncome === 'function' && bkmpGetSupabaseClient()) {
         try {
@@ -273,6 +277,46 @@
         }
       }
       removeEntry('income', id);
+    }
+
+    async function persistInvestor(investor) {
+      if (typeof saveInvestor === 'function' && bkmpGetSupabaseClient()) {
+        try {
+          const saved = await saveInvestor(investor);
+          if (investor.id) {
+            data.investors = data.investors.map(item => item.id === investor.id ? saved : item);
+          } else {
+            data.investors.push(saved);
+          }
+          bkmpSaveData(data);
+          renderAll();
+          return true;
+        } catch (e) {
+          console.warn('Supabase konnte Investor nicht speichern. localStorage-Fallback wird verwendet.', e);
+        }
+      }
+      if (investor.id) {
+        data.investors = data.investors.map(item => item.id === investor.id ? investor : item);
+      } else {
+        data.investors.push({ id: bkmpUid('inv'), ...investor });
+      }
+      persist();
+      return true;
+    }
+
+    async function removeInvestor(id) {
+      if (typeof deleteInvestor === 'function' && bkmpGetSupabaseClient()) {
+        try {
+          await deleteInvestor(id);
+          data.investors = data.investors.filter(item => item.id !== id);
+          bkmpSaveData(data);
+          renderAll();
+          return;
+        } catch (e) {
+          console.warn('Supabase konnte Investor nicht loeschen. localStorage-Fallback wird verwendet.', e);
+        }
+      }
+      removeEntry('investors', id);
     }
 
     function sortByDateDesc(list) {
@@ -313,7 +357,7 @@
         row.querySelector('.edit-btn').addEventListener('click', () => startEditInvestor(item.id));
         row.querySelector('.del-btn').addEventListener('click', () => {
           if (editingInvestorId === item.id) clearInvestorForm();
-          removeEntry('investors', item.id);
+          removeInvestor(item.id);
         });
         el.appendChild(row);
       });
@@ -420,18 +464,14 @@
         return;
       }
       const payload = { name, minecraftName, invested, sharePercent, startDate, endDate };
-      if (editingInvestorId) {
-        data.investors = data.investors.map(item => item.id === editingInvestorId ? { ...item, ...payload } : item);
-      } else {
-        data.investors.push({ id: bkmpUid('inv'), ...payload });
-      }
-      clearInvestorForm();
-      persist();
+      if (editingInvestorId) payload.id = editingInvestorId;
+      persistInvestor(payload).then(() => clearInvestorForm());
     });
     /* News */
     if (sessionStorage.getItem('bkmp-admin-auth') === '1') {
       showAdmin();
       refreshIncomesFromSupabase();
+      refreshInvestorsFromSupabase();
     }
 
     document.getElementById('addNews').addEventListener('click', () => {

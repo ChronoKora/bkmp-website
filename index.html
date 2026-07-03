@@ -189,6 +189,12 @@
         location.reload();
       }
     });
+    syncInvestorsFromSupabase(data, function () {
+      if (!sessionStorage.getItem('bkmp-investors-synced')) {
+        sessionStorage.setItem('bkmp-investors-synced', '1');
+        location.reload();
+      }
+    });
 
     const totalIncome = bkmpSum(data.income);
     const totalExpenses = bkmpSum(data.expenses);

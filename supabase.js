@@ -211,4 +211,150 @@ async function importLocalIncomesToSupabase() {
   };
 }
 
+function bkmpMapInvestorFromSupabase(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    minecraftName: row.note || '',
+    invested: Number(row.investment || 0),
+    sharePercent: Number(row.profit_percent || 0),
+    startDate: row.start_date || '',
+    endDate: row.end_date || '',
+    createdAt: row.created_at ? Date.parse(row.created_at) : 0,
+    source: 'supabase'
+  };
+}
+
+function bkmpMapInvestorToSupabase(investor) {
+  return {
+    name: investor.name,
+    investment: Number(investor.invested || investor.investment || 0),
+    profit_percent: Number(investor.sharePercent || investor.profit_percent || 0),
+    start_date: investor.startDate || investor.start_date || null,
+    end_date: investor.endDate || investor.end_date || null,
+    note: investor.minecraftName || investor.note || null
+  };
+}
+
+async function loadInvestors() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+
+  const { data, error } = await client
+    .from('investors')
+    .select('id, name, investment, profit_percent, start_date, end_date, note, created_at')
+    .order('created_at', { ascending: true });
+
+  if (error) throw error;
+  return (data || []).map(bkmpMapInvestorFromSupabase);
+}
+
+async function saveInvestor(investor) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+
+  const payload = bkmpMapInvestorToSupabase(investor);
+  let query;
+  if (investor.id && !String(investor.id).startsWith('inv-')) {
+    query = client
+      .from('investors')
+      .update(payload)
+      .eq('id', investor.id)
+      .select('id, name, investment, profit_percent, start_date, end_date, note, created_at')
+      .single();
+  } else {
+    query = client
+      .from('investors')
+      .insert(payload)
+      .select('id, name, investment, profit_percent, start_date, end_date, note, created_at')
+      .single();
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return bkmpMapInvestorFromSupabase(data);
+}
+
+async function deleteInvestor(id) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return false;
+
+  const { error } = await client
+    .from('investors')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
+  return true;
+}
+
+async function syncInvestorsFromSupabase(targetData, onSynced, options = {}) {
+  if (typeof loadInvestors !== 'function' || !bkmpGetSupabaseClient()) return false;
+  try {
+    const investors = await loadInvestors();
+    if (!investors) return false;
+
+    const localInvestorCount = Array.isArray(targetData.investors) ? targetData.investors.length : 0;
+    if (!options.force && localInvestorCount > 0 && investors.length < localInvestorCount) {
+      console.warn('Supabase enthaelt weniger Investoren als localStorage. Lokale Daten bleiben erhalten, bis der Import abgeschlossen ist.');
+      return false;
+    }
+
+    targetData.investors = investors;
+    bkmpSaveData(targetData);
+    if (typeof onSynced === 'function') onSynced(targetData);
+    return true;
+  } catch (e) {
+    console.warn('Supabase konnte Investoren nicht laden. localStorage-Fallback wird verwendet.', e);
+    return false;
+  }
+}
+
+async function importLocalInvestorsToSupabase() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) {
+    console.warn('Supabase ist nicht verbunden. Import wurde abgebrochen.');
+    return { imported: 0, skipped: 0, total: 0 };
+  }
+
+  const localData = bkmpLoadData();
+  const localInvestors = Array.isArray(localData.investors) ? localData.investors : [];
+  const remoteInvestors = await loadInvestors() || [];
+  const existing = new Set(remoteInvestors.map(item => [item.name, item.invested, item.sharePercent, item.startDate, item.endDate, item.minecraftName].join('|')));
+  const rowsToInsert = [];
+  let skipped = 0;
+
+  localInvestors.forEach(investor => {
+    const mapped = bkmpMapInvestorFromSupabase({
+      id: investor.id,
+      name: investor.name,
+      investment: investor.invested,
+      profit_percent: investor.sharePercent,
+      start_date: investor.startDate || null,
+      end_date: investor.endDate || null,
+      note: investor.minecraftName || null,
+      created_at: investor.createdAt ? new Date(investor.createdAt).toISOString() : null
+    });
+    const sig = [mapped.name, mapped.invested, mapped.sharePercent, mapped.startDate, mapped.endDate, mapped.minecraftName].join('|');
+    if (existing.has(sig)) {
+      skipped += 1;
+      return;
+    }
+    existing.add(sig);
+    rowsToInsert.push(bkmpMapInvestorToSupabase(mapped));
+  });
+
+  if (rowsToInsert.length > 0) {
+    const { error } = await client.from('investors').insert(rowsToInsert);
+    if (error) throw error;
+  }
+
+  const refreshed = await loadInvestors() || [];
+  localData.investors = refreshed;
+  bkmpSaveData(localData);
+  return { imported: rowsToInsert.length, skipped, total: refreshed.length };
+}
+
+window.importLocalInvestorsToSupabase = importLocalInvestorsToSupabase;
+
 window.importLocalIncomesToSupabase = importLocalIncomesToSupabase;

@@ -68,3 +68,12 @@ create policy "Allow anon read investors" on public.investors for select to anon
 
 drop policy if exists "Allow anon read updates" on public.updates;
 create policy "Allow anon read updates" on public.updates for select to anon using (true);
+
+drop policy if exists "Allow anon insert investors" on public.investors;
+create policy "Allow anon insert investors" on public.investors for insert to anon with check (true);
+
+drop policy if exists "Allow anon update investors" on public.investors;
+create policy "Allow anon update investors" on public.investors for update to anon using (true) with check (true);
+
+drop policy if exists "Allow anon delete investors" on public.investors;
+create policy "Allow anon delete investors" on public.investors for delete to anon using (true);
