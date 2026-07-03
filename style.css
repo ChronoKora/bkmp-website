@@ -550,24 +550,119 @@ h1.hero-title .brand { font-style: italic; font-weight: 500; }
 
 /* ---------- Kartenideen ---------- */
 .wish-cta {
-  display: block; max-width: 480px; margin: 0 auto 2.5rem; text-align: center;
-  background: var(--paper-2); border: 1px dashed var(--gold); border-radius: 16px;
-  padding: 1.6rem; cursor: pointer; transition: transform 0.15s ease, background 0.2s ease;
+  display: block;
+  width: min(720px, 100%);
+  margin: 0 auto 2.8rem;
+  text-align: center;
+  color: #111018;
+  background:
+    linear-gradient(135deg, #f7d678 0%, #ffb02e 48%, #f472b6 100%);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 22px;
+  padding: 2rem clamp(1.4rem, 4vw, 3rem);
+  cursor: pointer;
+  box-shadow: 0 22px 65px rgba(245, 171, 42, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition: transform 0.15s ease, filter 0.2s ease, box-shadow 0.2s ease;
 }
-.wish-cta:hover { transform: translateY(-2px); background: var(--paper-3); }
-.wish-cta strong { display: block; font-family: 'Fraunces', serif; font-size: 1.15rem; margin-bottom: 0.3rem; }
-.wish-cta span { color: var(--muted); font-size: 0.85rem; }
+.wish-cta:hover { transform: translateY(-3px); filter: saturate(1.08); box-shadow: 0 28px 80px rgba(245, 171, 42, 0.28); }
+.wish-cta-kicker {
+  display: inline-flex;
+  margin-bottom: 0.65rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.18);
+  color: #fff;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.wish-cta strong { display: block; font-family: 'Fraunces', serif; font-size: clamp(1.6rem, 3vw, 2.35rem); margin-bottom: 0.4rem; }
+.wish-cta span { color: rgba(17, 16, 24, 0.78); font-size: 0.98rem; font-weight: 600; }
 
-.wish-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem; }
+.wish-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1.1rem; align-items: start; }
 .wish-card {
-  background: var(--paper-2); border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
+  background: linear-gradient(180deg, var(--paper-2), color-mix(in srgb, var(--paper) 82%, transparent));
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.18);
+  transition: transform 0.15s ease, border-color 0.2s ease;
+}
+.wish-card:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); }
+.wish-image-btn {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
 }
 .wish-card img { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; display: block; background: var(--paper); }
-.wish-card .wish-name { padding: 0.7rem 0.9rem; font-size: 0.85rem; font-weight: 500; }
+.wish-card-body { padding: 0.85rem; }
+.wish-card .wish-name { margin-bottom: 0.75rem; font-size: 0.95rem; font-weight: 800; color: var(--ink); }
+.wish-card-actions { display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center; }
+.wish-vote, .wish-mini-download, .wish-download {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 800;
+  padding: 0.45rem 0.65rem;
+  text-decoration: none;
+}
+.wish-like { color: var(--pos); }
+.wish-dislike { color: var(--neg); }
+.wish-mini-download:hover, .wish-vote:hover, .wish-download:hover { border-color: var(--gold); color: var(--gold); }
 
-.wish-overlay .joke-card { max-width: 380px; text-align: left; }
+.wish-overlay .joke-card { max-width: 460px; text-align: left; border-radius: 22px; }
 .wish-overlay .joke-card h3 { font-family: 'Fraunces', serif; font-size: 1.25rem; margin-bottom: 1.2rem; text-align: center; }
 .wish-overlay .joke-buttons { margin-top: 1rem; justify-content: flex-end; }
+.wish-detail-card {
+  position: relative;
+  width: min(920px, calc(100vw - 2rem));
+  max-height: calc(100vh - 3rem);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--paper-2);
+  box-shadow: 0 32px 120px rgba(0, 0, 0, 0.58);
+}
+.wish-detail-card img {
+  width: 100%;
+  max-height: calc(100vh - 9rem);
+  object-fit: contain;
+  display: block;
+  background: #050506;
+}
+.wish-detail-close {
+  position: absolute;
+  top: 0.8rem;
+  right: 0.8rem;
+  z-index: 2;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  cursor: pointer;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+.wish-detail-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem 1.1rem;
+}
+.wish-detail-footer span { display: block; color: var(--muted); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.wish-detail-footer strong { display: block; margin-top: 0.15rem; font-size: 1.05rem; }
+.wish-download { background: linear-gradient(135deg, #f5d58a, var(--gold)); color: #111018; border: 0; padding: 0.65rem 0.95rem; }
 
 /* ---------- Investoren ---------- */
 .investor-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(430px, 100%), 1fr)); gap: 1rem; }

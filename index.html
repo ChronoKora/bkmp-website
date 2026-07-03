@@ -119,6 +119,7 @@
       <section class="panel" id="panel-wishes">
         <h2 class="panel-title">Kartenideen</h2>
         <button class="wish-cta" id="openWishForm" type="button">
+          <span class="wish-cta-kicker">Kartenidee einreichen</span>
           <strong>Du hast einen Wunsch?</strong>
           <span>Sag uns, welche Karte du dir für deine Wand wünschst</span>
         </button>
@@ -138,6 +139,20 @@
       <div class="joke-buttons">
         <button class="btn-nein" id="wishCancel" type="button">Abbrechen</button>
         <button class="btn-ja" id="wishSubmit" type="button">Wunsch einreichen</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="joke-overlay wish-detail-overlay" id="wishDetailOverlay">
+    <div class="wish-detail-card">
+      <button class="wish-detail-close" id="wishDetailClose" type="button" aria-label="Schliessen">x</button>
+      <img id="wishDetailImage" src="" alt="">
+      <div class="wish-detail-footer">
+        <div>
+          <span>Kartenwunsch</span>
+          <strong id="wishDetailName"></strong>
+        </div>
+        <a class="wish-download" id="wishDownload" href="#" download="kartenwunsch.png">Download</a>
       </div>
     </div>
   </div>
@@ -530,15 +545,29 @@
         return;
       }
       wishGrid.innerHTML = [...data.wishes].reverse().map(w => `
-        <div class="wish-card">
-          <img src="${w.image}" alt="Kartenidee von ${w.name}">
-          <div class="wish-name">${w.name}</div>
-        </div>
+        <article class="wish-card" data-wish-id="${w.id}">
+          <button class="wish-image-btn" type="button" data-action="open" aria-label="Kartenidee von ${escapeHtml(w.name)} gross ansehen">
+            <img src="${w.image}" alt="Kartenidee von ${escapeHtml(w.name)}">
+          </button>
+          <div class="wish-card-body">
+            <div class="wish-name">${escapeHtml(w.name)}</div>
+            <div class="wish-card-actions">
+              <button type="button" class="wish-vote wish-like" data-action="like">Like <span>${Number(w.likes || 0)}</span></button>
+              <button type="button" class="wish-vote wish-dislike" data-action="dislike">Dislike <span>${Number(w.dislikes || 0)}</span></button>
+              <a class="wish-mini-download" href="${w.image}" download="kartenwunsch-${escapeHtml(w.name || 'bkmp')}.png">Download</a>
+            </div>
+          </div>
+        </article>
       `).join('');
     }
     renderWishes();
 
     const wishOverlay = document.getElementById('wishOverlay');
+    const wishDetailOverlay = document.getElementById('wishDetailOverlay');
+    const wishDetailClose = document.getElementById('wishDetailClose');
+    const wishDetailImage = document.getElementById('wishDetailImage');
+    const wishDetailName = document.getElementById('wishDetailName');
+    const wishDownload = document.getElementById('wishDownload');
     const openWishForm = document.getElementById('openWishForm');
     const wishCancel = document.getElementById('wishCancel');
     const wishSubmit = document.getElementById('wishSubmit');
@@ -547,6 +576,51 @@
 
     openWishForm.addEventListener('click', () => wishOverlay.classList.add('visible'));
     wishCancel.addEventListener('click', () => wishOverlay.classList.remove('visible'));
+    wishDetailClose.addEventListener('click', () => wishDetailOverlay.classList.remove('visible'));
+    wishDetailOverlay.addEventListener('click', e => {
+      if (e.target === wishDetailOverlay) wishDetailOverlay.classList.remove('visible');
+    });
+
+    function openWishDetail(wish) {
+      wishDetailImage.src = wish.image;
+      wishDetailImage.alt = 'Kartenidee von ' + wish.name;
+      wishDetailName.textContent = wish.name;
+      wishDownload.href = wish.image;
+      wishDownload.download = 'kartenwunsch-' + (wish.name || 'bkmp') + '.png';
+      wishDetailOverlay.classList.add('visible');
+    }
+
+    function updateWishLocal(updatedWish) {
+      data.wishes = data.wishes.map(item => item.id === updatedWish.id ? updatedWish : item);
+      bkmpSaveData(data);
+      renderWishes();
+    }
+
+    wishGrid.addEventListener('click', e => {
+      const actionElement = e.target.closest('[data-action]');
+      if (!actionElement) return;
+      const card = e.target.closest('.wish-card');
+      if (!card) return;
+      const wish = data.wishes.find(item => String(item.id) === String(card.dataset.wishId));
+      if (!wish) return;
+      const action = actionElement.dataset.action;
+
+      if (action === 'open') {
+        openWishDetail(wish);
+        return;
+      }
+
+      if (action === 'like' || action === 'dislike') {
+        const column = action === 'dislike' ? 'dislikes' : 'likes';
+        const localWish = { ...wish, [column]: Number(wish[column] || 0) + 1 };
+        updateWishLocal(localWish);
+        if (typeof voteWish === 'function' && bkmpGetSupabaseClient() && !String(wish.id).startsWith('wish-')) {
+          voteWish(wish.id, action, wish[column]).then(updated => {
+            if (updated) updateWishLocal(updated);
+          }).catch(err => console.warn('Supabase konnte Bewertung nicht speichern.', err));
+        }
+      }
+    });
 
     wishSubmit.addEventListener('click', () => {
       const name = wishName.value.trim();

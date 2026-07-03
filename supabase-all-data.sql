@@ -12,6 +12,9 @@ create table if not exists public.wishes (
 
 create index if not exists wishes_created_at_idx on public.wishes (created_at desc);
 
+alter table public.wishes add column if not exists likes integer not null default 0;
+alter table public.wishes add column if not exists dislikes integer not null default 0;
+
 alter table public.expenses enable row level security;
 alter table public.investors enable row level security;
 alter table public.updates enable row level security;
@@ -37,6 +40,9 @@ create policy "Allow anon insert wishes" on public.wishes for insert to anon wit
 
 drop policy if exists "Allow anon delete wishes" on public.wishes;
 create policy "Allow anon delete wishes" on public.wishes for delete to anon using (true);
+
+drop policy if exists "Allow anon update wishes" on public.wishes;
+create policy "Allow anon update wishes" on public.wishes for update to anon using (true) with check (true);
 
 
 
