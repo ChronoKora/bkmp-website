@@ -478,10 +478,11 @@ async function saveUpdate(update) {
       .update(payload)
       .eq('id', update.id)
       .select('id, title, content, image_urls, created_at')
-      .maybeSingle();
+      .limit(1);
 
     if (error) throw error;
-    if (data) return bkmpMapUpdateFromSupabase(data);
+    const updated = Array.isArray(data) ? data[0] : null;
+    if (updated) return bkmpMapUpdateFromSupabase(updated);
 
     const matchDate = update.date || (update.createdAt ? new Date(update.createdAt).toISOString().slice(0, 10) : '');
     let finder = client
@@ -516,9 +517,10 @@ async function saveUpdate(update) {
         .update(payload)
         .eq('id', match.id)
         .select('id, title, content, image_urls, created_at')
-        .single();
+        .limit(1);
       if (matchedError) throw matchedError;
-      return bkmpMapUpdateFromSupabase(matchedData);
+      const matchedUpdate = Array.isArray(matchedData) ? matchedData[0] : null;
+      if (matchedUpdate) return bkmpMapUpdateFromSupabase(matchedUpdate);
     }
   }
 
@@ -526,10 +528,12 @@ async function saveUpdate(update) {
     .from('updates')
     .insert(payload)
     .select('id, title, content, image_urls, created_at')
-    .single();
+    .limit(1);
 
   if (error) throw error;
-  return bkmpMapUpdateFromSupabase(data);
+  const inserted = Array.isArray(data) ? data[0] : null;
+  if (!inserted) throw new Error('Supabase hat keinen gespeicherten Update-Eintrag zurueckgegeben.');
+  return bkmpMapUpdateFromSupabase(inserted);
 }
 
 async function deleteUpdate(id) {
