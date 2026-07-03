@@ -313,9 +313,11 @@
           }
           bkmpSaveData(data);
           renderAll();
-          return;
+          return true;
         } catch (e) {
           console.warn('Supabase konnte Update nicht speichern. localStorage-Fallback wird verwendet.', e);
+          alert('Das Update konnte nicht online gespeichert werden. Bitte versuche es mit kleineren Bildern oder pruefe Supabase.');
+          return false;
         }
       }
       if (post.id) {
@@ -324,6 +326,7 @@
         data.news.push(post);
       }
       persist();
+      return true;
     }
 
     async function removeUpdate(id) {
@@ -643,6 +646,37 @@
     });
     cancelNewsEditBtn.addEventListener('click', clearNewsForm);
 
+    function readFileAsDataUrl(file) {
+      return new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function prepareNewsImage(file) {
+      if (!file.type || !file.type.startsWith('image/')) {
+        return readFileAsDataUrl(file);
+      }
+
+      const original = await readFileAsDataUrl(file);
+      return new Promise(resolve => {
+        const img = new Image();
+        img.onload = () => {
+          const maxWidth = 1400;
+          const scale = Math.min(1, maxWidth / img.width);
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/jpeg', 0.82));
+        };
+        img.onerror = () => resolve(original);
+        img.src = original;
+      });
+    }
+
     /* News */
     if (sessionStorage.getItem('bkmp-admin-auth') === '1') {
       showAdmin();
@@ -671,16 +705,14 @@
           date,
           createdAt: currentPost && currentPost.createdAt ? currentPost.createdAt : Date.now()
         };
-        persistUpdate(post).then(() => clearNewsForm());
+        persistUpdate(post).then(saved => {
+          if (saved) clearNewsForm();
+        });
       }
 
       if (newsFileInput.files && newsFileInput.files.length) {
         const files = Array.from(newsFileInput.files);
-        Promise.all(files.map(file => new Promise(resolve => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.readAsDataURL(file);
-        }))).then(images => savePost(images));
+        Promise.all(files.map(prepareNewsImage)).then(images => savePost(images));
       } else {
         savePost([]);
       }
