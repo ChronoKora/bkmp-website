@@ -167,6 +167,8 @@
 
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase.js"></script>
   <script src="app.js"></script>
   <script>
     bkmpInitTheme();
@@ -238,6 +240,41 @@
       renderAll();
     }
 
+    async function refreshIncomesFromSupabase() {
+      await syncIncomesFromSupabase(data, function () { renderAll(); });
+    }
+
+    async function persistIncome(income) {
+      if (typeof saveIncome === 'function' && bkmpGetSupabaseClient()) {
+        try {
+          const saved = await saveIncome(income);
+          data.income.push(saved);
+          bkmpSaveData(data);
+          renderAll();
+          return;
+        } catch (e) {
+          console.warn('Supabase konnte Einnahme nicht speichern. localStorage-Fallback wird verwendet.', e);
+        }
+      }
+      data.income.push(income);
+      persist();
+    }
+
+    async function removeIncome(id) {
+      if (typeof deleteIncome === 'function' && bkmpGetSupabaseClient()) {
+        try {
+          await deleteIncome(id);
+          data.income = data.income.filter(item => item.id !== id);
+          bkmpSaveData(data);
+          renderAll();
+          return;
+        } catch (e) {
+          console.warn('Supabase konnte Einnahme nicht loeschen. localStorage-Fallback wird verwendet.', e);
+        }
+      }
+      removeEntry('income', id);
+    }
+
     function sortByDateDesc(list) {
       return [...list].sort((a, b) => {
         const dateCompare = (b.date || b.startDate || '').localeCompare(a.date || a.startDate || '');
@@ -247,7 +284,7 @@
     }
 
     function renderAll() {
-      renderEntryList('incomeList', sortByDateDesc(data.income), item => item.name, item => `${formatDate(item.date)} · ${bkmpFormatCurrency(item.amount)}`, id => removeEntry('income', id));
+      renderEntryList('incomeList', sortByDateDesc(data.income), item => item.name, item => `${formatDate(item.date)} · ${bkmpFormatCurrency(item.amount)}`, id => removeIncome(id));
       renderEntryList('expenseList', sortByDateDesc(data.expenses), item => item.name, item => `${formatDate(item.date)} · ${bkmpFormatCurrency(item.amount)}`, id => removeEntry('expenses', id));
       renderInvestorList();
       renderEntryList('newsList', sortByDateDesc(data.news), item => item.title, item => item.date, id => removeEntry('news', id));
@@ -316,9 +353,9 @@
       const amount = Number(amountInput);
       const date = document.getElementById('incomeDate').value || todayStr;
       if (!name || amountInput === '' || Number.isNaN(amount)) return;
-      data.income.push({ id: bkmpUid('inc'), name, amount, date, createdAt: Date.now() });
+      const income = { id: bkmpUid('inc'), name, category: name, amount, date, note: '', createdAt: Date.now() };
       document.getElementById('incomeAmount').value = '';
-      persist();
+      persistIncome(income);
     });
 
     /* Ausgaben */
@@ -394,6 +431,7 @@
     /* News */
     if (sessionStorage.getItem('bkmp-admin-auth') === '1') {
       showAdmin();
+      refreshIncomesFromSupabase();
     }
 
     document.getElementById('addNews').addEventListener('click', () => {
