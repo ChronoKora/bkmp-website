@@ -248,6 +248,76 @@
       await syncInvestorsFromSupabase(data, function () { renderAll(); });
     }
 
+    async function refreshExpensesFromSupabase() {
+      await syncExpensesFromSupabase(data, function () { renderAll(); });
+    }
+
+    async function refreshUpdatesFromSupabase() {
+      await syncUpdatesFromSupabase(data, function () { renderAll(); });
+    }
+
+    async function persistExpense(expense) {
+      if (typeof saveExpense === 'function' && bkmpGetSupabaseClient()) {
+        try {
+          const saved = await saveExpense(expense);
+          data.expenses.push(saved);
+          bkmpSaveData(data);
+          renderAll();
+          return;
+        } catch (e) {
+          console.warn('Supabase konnte Ausgabe nicht speichern. localStorage-Fallback wird verwendet.', e);
+        }
+      }
+      data.expenses.push(expense);
+      persist();
+    }
+
+    async function removeExpense(id) {
+      if (typeof deleteExpense === 'function' && bkmpGetSupabaseClient()) {
+        try {
+          await deleteExpense(id);
+          data.expenses = data.expenses.filter(item => item.id !== id);
+          bkmpSaveData(data);
+          renderAll();
+          return;
+        } catch (e) {
+          console.warn('Supabase konnte Ausgabe nicht loeschen. localStorage-Fallback wird verwendet.', e);
+        }
+      }
+      removeEntry('expenses', id);
+    }
+
+    async function persistUpdate(post) {
+      if (typeof saveUpdate === 'function' && bkmpGetSupabaseClient()) {
+        try {
+          const saved = await saveUpdate(post);
+          data.news.push(saved);
+          bkmpSaveData(data);
+          renderAll();
+          return;
+        } catch (e) {
+          console.warn('Supabase konnte Update nicht speichern. localStorage-Fallback wird verwendet.', e);
+        }
+      }
+      data.news.push(post);
+      persist();
+    }
+
+    async function removeUpdate(id) {
+      if (typeof deleteUpdate === 'function' && bkmpGetSupabaseClient()) {
+        try {
+          await deleteUpdate(id);
+          data.news = data.news.filter(item => item.id !== id);
+          bkmpSaveData(data);
+          renderAll();
+          return;
+        } catch (e) {
+          console.warn('Supabase konnte Update nicht loeschen. localStorage-Fallback wird verwendet.', e);
+        }
+      }
+      removeEntry('news', id);
+    }
+
     async function persistIncome(income) {
       if (typeof saveIncome === 'function' && bkmpGetSupabaseClient()) {
         try {
@@ -331,7 +401,7 @@
       renderEntryList('incomeList', sortByDateDesc(data.income), item => item.name, item => `${formatDate(item.date)} · ${bkmpFormatCurrency(item.amount)}`, id => removeIncome(id));
       renderEntryList('expenseList', sortByDateDesc(data.expenses), item => item.name, item => `${formatDate(item.date)} · ${bkmpFormatCurrency(item.amount)}`, id => removeEntry('expenses', id));
       renderInvestorList();
-      renderEntryList('newsList', sortByDateDesc(data.news), item => item.title, item => item.date, id => removeEntry('news', id));
+      renderEntryList('newsList', sortByDateDesc(data.news), item => item.title, item => item.date, id => removeUpdate(id));
     }
 
     function renderInvestorList() {
@@ -408,11 +478,11 @@
       const amount = Number(document.getElementById('expenseAmount').value);
       const date = document.getElementById('expenseDate').value || todayStr;
       if (!name || !amount) return;
-      data.expenses.push({ id: bkmpUid('exp'), name, amount, date, createdAt: Date.now() });
+      const expense = { id: bkmpUid('exp'), name, category: name, amount, date, note: '', createdAt: Date.now() };
       document.getElementById('expenseName').value = '';
       document.getElementById('expenseAmount').value = '';
       document.getElementById('expenseDate').value = todayStr;
-      persist();
+      persistExpense(expense);
     });
 
     /* Investoren */
@@ -472,6 +542,8 @@
       showAdmin();
       refreshIncomesFromSupabase();
       refreshInvestorsFromSupabase();
+      refreshExpensesFromSupabase();
+      refreshUpdatesFromSupabase();
     }
 
     document.getElementById('addNews').addEventListener('click', () => {
@@ -481,7 +553,7 @@
       if (!title || !text) return;
 
       function savePost(imageData) {
-        data.news.push({
+        const post = {
           id: bkmpUid('news'),
           title,
           text,
@@ -489,11 +561,11 @@
           images: Array.isArray(imageData) ? imageData : (imageData ? [imageData] : []),
           date: new Date().toISOString().slice(0, 10),
           createdAt: Date.now()
-        });
+        };
         document.getElementById('newsTitle').value = '';
         document.getElementById('newsText').value = '';
         fileInput.value = '';
-        persist();
+        persistUpdate(post);
       }
 
       if (fileInput.files && fileInput.files.length) {

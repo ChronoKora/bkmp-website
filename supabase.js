@@ -357,4 +357,317 @@ async function importLocalInvestorsToSupabase() {
 
 window.importLocalInvestorsToSupabase = importLocalInvestorsToSupabase;
 
+function bkmpMapExpenseFromSupabase(row) {
+  return {
+    id: row.id,
+    name: row.category,
+    category: row.category,
+    amount: Number(row.amount || 0),
+    date: row.date,
+    note: row.note || '',
+    createdAt: row.created_at ? Date.parse(row.created_at) : 0,
+    source: 'supabase'
+  };
+}
+
+function bkmpMapExpenseToSupabase(expense) {
+  return {
+    category: expense.category || expense.name,
+    amount: Number(expense.amount || 0),
+    date: expense.date,
+    note: expense.note || null
+  };
+}
+
+async function loadExpenses() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('expenses')
+    .select('id, category, amount, date, note, created_at')
+    .order('date', { ascending: true })
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data || []).map(bkmpMapExpenseFromSupabase);
+}
+
+async function saveExpense(expense) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('expenses')
+    .insert(bkmpMapExpenseToSupabase(expense))
+    .select('id, category, amount, date, note, created_at')
+    .single();
+  if (error) throw error;
+  return bkmpMapExpenseFromSupabase(data);
+}
+
+async function deleteExpense(id) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return false;
+  const { error } = await client.from('expenses').delete().eq('id', id);
+  if (error) throw error;
+  return true;
+}
+
+async function syncExpensesFromSupabase(targetData, onSynced, options = {}) {
+  if (typeof loadExpenses !== 'function' || !bkmpGetSupabaseClient()) return false;
+  try {
+    const expenses = await loadExpenses();
+    if (!expenses) return false;
+    const localCount = Array.isArray(targetData.expenses) ? targetData.expenses.length : 0;
+    if (!options.force && localCount > 0 && expenses.length < localCount) {
+      console.warn('Supabase enthaelt weniger Ausgaben als localStorage. Lokale Daten bleiben erhalten, bis der Import abgeschlossen ist.');
+      return false;
+    }
+    targetData.expenses = expenses;
+    bkmpSaveData(targetData);
+    if (typeof onSynced === 'function') onSynced(targetData);
+    return true;
+  } catch (e) {
+    console.warn('Supabase konnte Ausgaben nicht laden. localStorage-Fallback wird verwendet.', e);
+    return false;
+  }
+}
+
+function bkmpMapUpdateFromSupabase(row) {
+  const images = Array.isArray(row.image_urls) ? row.image_urls : [];
+  const createdAt = row.created_at ? Date.parse(row.created_at) : 0;
+  return {
+    id: row.id,
+    title: row.title,
+    text: row.content || '',
+    image: images[0] || '',
+    images,
+    date: row.created_at ? row.created_at.slice(0, 10) : '',
+    createdAt,
+    source: 'supabase'
+  };
+}
+
+function bkmpMapUpdateToSupabase(update) {
+  const images = update.images && update.images.length ? update.images : (update.image ? [update.image] : []);
+  return {
+    title: update.title,
+    content: update.text || update.content || '',
+    image_urls: images
+  };
+}
+
+async function loadUpdates() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('updates')
+    .select('id, title, content, image_urls, created_at')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(bkmpMapUpdateFromSupabase);
+}
+
+async function saveUpdate(update) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('updates')
+    .insert(bkmpMapUpdateToSupabase(update))
+    .select('id, title, content, image_urls, created_at')
+    .single();
+  if (error) throw error;
+  return bkmpMapUpdateFromSupabase(data);
+}
+
+async function deleteUpdate(id) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return false;
+  const { error } = await client.from('updates').delete().eq('id', id);
+  if (error) throw error;
+  return true;
+}
+
+async function syncUpdatesFromSupabase(targetData, onSynced, options = {}) {
+  if (typeof loadUpdates !== 'function' || !bkmpGetSupabaseClient()) return false;
+  try {
+    const updates = await loadUpdates();
+    if (!updates) return false;
+    const localCount = Array.isArray(targetData.news) ? targetData.news.length : 0;
+    if (!options.force && localCount > 0 && updates.length < localCount) {
+      console.warn('Supabase enthaelt weniger Updates als localStorage. Lokale Daten bleiben erhalten, bis der Import abgeschlossen ist.');
+      return false;
+    }
+    targetData.news = updates;
+    bkmpSaveData(targetData);
+    if (typeof onSynced === 'function') onSynced(targetData);
+    return true;
+  } catch (e) {
+    console.warn('Supabase konnte Updates nicht laden. localStorage-Fallback wird verwendet.', e);
+    return false;
+  }
+}
+
+function bkmpMapWishFromSupabase(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    image: row.image_url || '',
+    date: row.created_at ? row.created_at.slice(0, 10) : '',
+    createdAt: row.created_at ? Date.parse(row.created_at) : 0,
+    source: 'supabase'
+  };
+}
+
+function bkmpMapWishToSupabase(wish) {
+  return {
+    name: wish.name,
+    image_url: wish.image || wish.image_url || ''
+  };
+}
+
+async function loadWishes() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('wishes')
+    .select('id, name, image_url, created_at')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(bkmpMapWishFromSupabase);
+}
+
+async function saveWish(wish) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('wishes')
+    .insert(bkmpMapWishToSupabase(wish))
+    .select('id, name, image_url, created_at')
+    .single();
+  if (error) throw error;
+  return bkmpMapWishFromSupabase(data);
+}
+
+async function deleteWish(id) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return false;
+  const { error } = await client.from('wishes').delete().eq('id', id);
+  if (error) throw error;
+  return true;
+}
+
+async function syncWishesFromSupabase(targetData, onSynced, options = {}) {
+  if (typeof loadWishes !== 'function' || !bkmpGetSupabaseClient()) return false;
+  try {
+    const wishes = await loadWishes();
+    if (!wishes) return false;
+    const localCount = Array.isArray(targetData.wishes) ? targetData.wishes.length : 0;
+    if (!options.force && localCount > 0 && wishes.length < localCount) {
+      console.warn('Supabase enthaelt weniger Kartenideen als localStorage. Lokale Daten bleiben erhalten, bis der Import abgeschlossen ist.');
+      return false;
+    }
+    targetData.wishes = wishes;
+    bkmpSaveData(targetData);
+    if (typeof onSynced === 'function') onSynced(targetData);
+    return true;
+  } catch (e) {
+    console.warn('Supabase konnte Kartenideen nicht laden. localStorage-Fallback wird verwendet.', e);
+    return false;
+  }
+}
+
+async function importLocalExpensesToSupabase() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return { imported: 0, skipped: 0, total: 0 };
+  const localData = bkmpLoadData();
+  const localItems = Array.isArray(localData.expenses) ? localData.expenses : [];
+  const remoteItems = await loadExpenses() || [];
+  const existing = new Set(remoteItems.map(item => [item.name, item.amount, item.date, item.note || ''].join('|')));
+  const rows = [];
+  let skipped = 0;
+  localItems.forEach(item => {
+    const mapped = { ...item, category: item.category || item.name };
+    const sig = [mapped.category || mapped.name, Number(mapped.amount || 0), mapped.date || '', mapped.note || ''].join('|');
+    if (existing.has(sig)) { skipped += 1; return; }
+    if (!mapped.category && !mapped.name) { skipped += 1; return; }
+    if (!mapped.date) mapped.date = new Date().toISOString().slice(0, 10);
+    existing.add(sig);
+    rows.push(bkmpMapExpenseToSupabase(mapped));
+  });
+  if (rows.length) {
+    const { error } = await client.from('expenses').insert(rows);
+    if (error) throw error;
+  }
+  const refreshed = await loadExpenses() || [];
+  localData.expenses = refreshed;
+  bkmpSaveData(localData);
+  return { imported: rows.length, skipped, total: refreshed.length };
+}
+
+async function importLocalUpdatesToSupabase() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return { imported: 0, skipped: 0, total: 0 };
+  const localData = bkmpLoadData();
+  const localItems = Array.isArray(localData.news) ? localData.news : [];
+  const remoteItems = await loadUpdates() || [];
+  const existing = new Set(remoteItems.map(item => [item.title, item.text, item.date].join('|')));
+  const rows = [];
+  let skipped = 0;
+  localItems.forEach(item => {
+    const sig = [item.title, item.text || item.content || '', item.date || ''].join('|');
+    if (existing.has(sig)) { skipped += 1; return; }
+    if (!item.title || !(item.text || item.content)) { skipped += 1; return; }
+    existing.add(sig);
+    rows.push(bkmpMapUpdateToSupabase(item));
+  });
+  if (rows.length) {
+    const { error } = await client.from('updates').insert(rows);
+    if (error) throw error;
+  }
+  const refreshed = await loadUpdates() || [];
+  localData.news = refreshed;
+  bkmpSaveData(localData);
+  return { imported: rows.length, skipped, total: refreshed.length };
+}
+
+async function importLocalWishesToSupabase() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return { imported: 0, skipped: 0, total: 0 };
+  const localData = bkmpLoadData();
+  const localItems = Array.isArray(localData.wishes) ? localData.wishes : [];
+  const remoteItems = await loadWishes() || [];
+  const existing = new Set(remoteItems.map(item => [item.name, item.image].join('|')));
+  const rows = [];
+  let skipped = 0;
+  localItems.forEach(item => {
+    const sig = [item.name, item.image || ''].join('|');
+    if (existing.has(sig)) { skipped += 1; return; }
+    if (!item.name || !item.image) { skipped += 1; return; }
+    existing.add(sig);
+    rows.push(bkmpMapWishToSupabase(item));
+  });
+  if (rows.length) {
+    const { error } = await client.from('wishes').insert(rows);
+    if (error) throw error;
+  }
+  const refreshed = await loadWishes() || [];
+  localData.wishes = refreshed;
+  bkmpSaveData(localData);
+  return { imported: rows.length, skipped, total: refreshed.length };
+}
+
+async function importAllLocalDataToSupabase() {
+  return {
+    incomes: await importLocalIncomesToSupabase(),
+    expenses: await importLocalExpensesToSupabase(),
+    investors: await importLocalInvestorsToSupabase(),
+    updates: await importLocalUpdatesToSupabase(),
+    wishes: await importLocalWishesToSupabase()
+  };
+}
+
+window.importLocalExpensesToSupabase = importLocalExpensesToSupabase;
+window.importLocalUpdatesToSupabase = importLocalUpdatesToSupabase;
+window.importLocalWishesToSupabase = importLocalWishesToSupabase;
+window.importAllLocalDataToSupabase = importAllLocalDataToSupabase;
+
 window.importLocalIncomesToSupabase = importLocalIncomesToSupabase;

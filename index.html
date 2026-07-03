@@ -195,6 +195,24 @@
         location.reload();
       }
     });
+    syncExpensesFromSupabase(data, function () {
+      if (!sessionStorage.getItem('bkmp-expenses-synced')) {
+        sessionStorage.setItem('bkmp-expenses-synced', '1');
+        location.reload();
+      }
+    });
+    syncUpdatesFromSupabase(data, function () {
+      if (!sessionStorage.getItem('bkmp-updates-synced')) {
+        sessionStorage.setItem('bkmp-updates-synced', '1');
+        location.reload();
+      }
+    });
+    syncWishesFromSupabase(data, function () {
+      if (!sessionStorage.getItem('bkmp-wishes-synced')) {
+        sessionStorage.setItem('bkmp-wishes-synced', '1');
+        location.reload();
+      }
+    });
 
     const totalIncome = bkmpSum(data.income);
     const totalExpenses = bkmpSum(data.expenses);
@@ -527,12 +545,23 @@
       }
       const reader = new FileReader();
       reader.onload = () => {
-        data.wishes.push({ id: bkmpUid('wish'), name, image: reader.result, date: new Date().toISOString().slice(0, 10) });
-        bkmpSaveData(data);
-        renderWishes();
-        wishName.value = '';
-        wishImageFile.value = '';
-        wishOverlay.classList.remove('visible');
+        const wish = { id: bkmpUid('wish'), name, image: reader.result, date: new Date().toISOString().slice(0, 10), createdAt: Date.now() };
+        function finishWish(savedWish) {
+          data.wishes.push(savedWish || wish);
+          bkmpSaveData(data);
+          renderWishes();
+          wishName.value = '';
+          wishImageFile.value = '';
+          wishOverlay.classList.remove('visible');
+        }
+        if (typeof saveWish === 'function' && bkmpGetSupabaseClient()) {
+          saveWish(wish).then(finishWish).catch(e => {
+            console.warn('Supabase konnte Kartenidee nicht speichern. localStorage-Fallback wird verwendet.', e);
+            finishWish(wish);
+          });
+        } else {
+          finishWish(wish);
+        }
       };
       reader.readAsDataURL(file);
     });
