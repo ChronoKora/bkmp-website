@@ -228,11 +228,11 @@
       syncIncomesFromSupabase(data, null),
       syncInvestorsFromSupabase(data, null),
       syncExpensesFromSupabase(data, null),
-      syncUpdatesFromSupabase(data, null, { force: true }),
-      syncWishesFromSupabase(data, null, { force: true }),
-      syncStreamersFromSupabase(data, null, { force: true }),
-      syncAboutBlocksFromSupabase(data, null, { force: true }),
-      syncPartnerShopsFromSupabase(data, null, { force: true })
+      syncUpdatesFromSupabase(data, null),
+      syncWishesFromSupabase(data, null),
+      syncStreamersFromSupabase(data, null),
+      syncAboutBlocksFromSupabase(data, null),
+      syncPartnerShopsFromSupabase(data, null)
     ]).then(results => {
       const changed = results.some(Boolean);
       if (changed && !hasInitialSync) {

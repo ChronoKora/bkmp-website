@@ -436,63 +436,23 @@
     }
 
     async function refreshUpdatesFromSupabase() {
-      await syncUpdatesFromSupabase(data, function () { renderAll(); }, { force: true });
+      await syncUpdatesFromSupabase(data, function () { renderAll(); });
     }
 
     async function refreshWishesFromSupabase() {
-      const el = document.getElementById('wishAdminList');
-      if (el) el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Kartenideen werden geladen...</p>';
-
-      const client = typeof bkmpGetSupabaseClient === 'function' ? bkmpGetSupabaseClient() : null;
-      if (client) {
-        try {
-          let { data: rows, error } = await client
-            .from('wishes')
-            .select('id, name, likes, dislikes, created_at')
-            .order('created_at', { ascending: false });
-
-          if (error && (String(error.message || '').includes('likes') || String(error.message || '').includes('dislikes'))) {
-            const fallback = await client
-              .from('wishes')
-              .select('id, name, created_at')
-              .order('created_at', { ascending: false });
-            rows = fallback.data;
-            error = fallback.error;
-          }
-
-          if (error) throw error;
-
-          data.wishes = (rows || []).map(row => ({
-            id: row.id,
-            name: row.name,
-            image: '',
-            likes: Number(row.likes || 0),
-            dislikes: Number(row.dislikes || 0),
-            date: row.created_at ? row.created_at.slice(0, 10) : '',
-            createdAt: row.created_at ? Date.parse(row.created_at) : 0,
-            source: 'supabase'
-          }));
-          bkmpSaveData(data);
-          renderAll();
-          return;
-        } catch (e) {
-          console.warn('Supabase konnte Kartenideen-Kurzliste nicht laden. Fallback wird verwendet.', e);
-        }
-      }
-
-      await syncWishesFromSupabase(data, function () { renderAll(); }, { force: true });
+      await syncWishesFromSupabase(data, function () { renderAll(); });
     }
 
     async function refreshStreamersFromSupabase() {
-      await syncStreamersFromSupabase(data, function () { renderAll(); }, { force: true });
+      await syncStreamersFromSupabase(data, function () { renderAll(); });
     }
 
     async function refreshAboutBlocksFromSupabase() {
-      await syncAboutBlocksFromSupabase(data, function () { renderAll(); }, { force: true });
+      await syncAboutBlocksFromSupabase(data, function () { renderAll(); });
     }
 
     async function refreshPartnerShopsFromSupabase() {
-      await syncPartnerShopsFromSupabase(data, function () { renderAll(); }, { force: true });
+      await syncPartnerShopsFromSupabase(data, function () { renderAll(); });
     }
 
     async function persistExpense(expense) {

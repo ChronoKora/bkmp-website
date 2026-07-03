@@ -729,6 +729,10 @@ async function syncUpdatesFromSupabase(targetData, onSynced, options = {}) {
     const updates = await loadUpdates();
     if (!updates) return false;
     const localCount = Array.isArray(targetData.news) ? targetData.news.length : 0;
+    if (localCount > 0 && updates.length === 0) {
+      console.warn('Supabase enthaelt keine Updates. Lokale Updates bleiben erhalten.');
+      return false;
+    }
     if (!options.force && localCount > 0 && updates.length < localCount) {
       console.warn('Supabase enthaelt weniger Updates als localStorage. Lokale Daten bleiben erhalten, bis der Import abgeschlossen ist.');
       return false;
@@ -881,6 +885,10 @@ async function syncWishesFromSupabase(targetData, onSynced, options = {}) {
     const wishes = await loadWishes();
     if (!wishes) return false;
     const localCount = Array.isArray(targetData.wishes) ? targetData.wishes.length : 0;
+    if (localCount > 0 && wishes.length === 0) {
+      console.warn('Supabase enthaelt keine Kartenideen. Lokale Kartenideen bleiben erhalten.');
+      return false;
+    }
     if (!options.force && localCount > 0 && wishes.length < localCount) {
       console.warn('Supabase enthaelt weniger Kartenideen als localStorage. Lokale Daten bleiben erhalten, bis der Import abgeschlossen ist.');
       return false;
@@ -964,6 +972,10 @@ async function syncStreamersFromSupabase(targetData, onSynced, options = {}) {
     const streamers = await loadStreamers();
     if (!streamers) return false;
     const localCount = Array.isArray(targetData.streamers) ? targetData.streamers.length : 0;
+    if (localCount > 0 && streamers.length === 0) {
+      console.warn('Supabase enthaelt keine Twitch-Accounts. Lokale Twitch-Accounts bleiben erhalten.');
+      return false;
+    }
     if (!options.force && localCount > 0 && streamers.length < localCount) {
       console.warn('Supabase enthaelt weniger Twitch-Accounts als localStorage. Lokale Daten bleiben erhalten.');
       return false;
@@ -1055,6 +1067,10 @@ async function syncAboutBlocksFromSupabase(targetData, onSynced, options = {}) {
     const blocks = await loadAboutBlocks();
     if (!blocks) return false;
     const localCount = Array.isArray(targetData.aboutBlocks) ? targetData.aboutBlocks.length : 0;
+    if (localCount > 0 && blocks.length === 0) {
+      console.warn('Supabase enthaelt keine About-Bloecke. Lokale About-Bloecke bleiben erhalten.');
+      return false;
+    }
     if (!options.force && localCount > 0 && blocks.length < localCount) {
       console.warn('Supabase enthaelt weniger About-Bloecke als localStorage. Lokale Daten bleiben erhalten.');
       return false;
@@ -1146,6 +1162,10 @@ async function syncPartnerShopsFromSupabase(targetData, onSynced, options = {}) 
     const shops = await loadPartnerShops();
     if (!shops) return false;
     const localCount = Array.isArray(targetData.partnerShops) ? targetData.partnerShops.length : 0;
+    if (localCount > 0 && shops.length === 0) {
+      console.warn('Supabase enthaelt keine PartnerShops. Lokale PartnerShops bleiben erhalten.');
+      return false;
+    }
     if (!options.force && localCount > 0 && shops.length < localCount) {
       console.warn('Supabase enthaelt weniger PartnerShops als localStorage. Lokale Daten bleiben erhalten.');
       return false;
@@ -1240,19 +1260,103 @@ async function importLocalWishesToSupabase() {
   return { imported: rows.length, skipped, total: refreshed.length };
 }
 
+async function importLocalStreamersToSupabase() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return { imported: 0, skipped: 0, total: 0 };
+  const localData = bkmpLoadData();
+  const localItems = Array.isArray(localData.streamers) ? localData.streamers : [];
+  const remoteItems = await loadStreamers() || [];
+  const existing = new Set(remoteItems.map(item => [item.name, item.url].join('|')));
+  const rows = [];
+  let skipped = 0;
+  localItems.forEach(item => {
+    const sig = [item.name || '', item.url || ''].join('|');
+    if (existing.has(sig)) { skipped += 1; return; }
+    if (!item.name || !item.url) { skipped += 1; return; }
+    existing.add(sig);
+    rows.push(bkmpMapStreamerToSupabase(item));
+  });
+  if (rows.length) {
+    const { error } = await client.from('streamer_links').insert(rows);
+    if (error) throw error;
+  }
+  const refreshed = await loadStreamers() || [];
+  localData.streamers = refreshed;
+  bkmpSaveData(localData);
+  return { imported: rows.length, skipped, total: refreshed.length };
+}
+
+async function importLocalAboutBlocksToSupabase() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return { imported: 0, skipped: 0, total: 0 };
+  const localData = bkmpLoadData();
+  const localItems = Array.isArray(localData.aboutBlocks) ? localData.aboutBlocks : [];
+  const remoteItems = await loadAboutBlocks() || [];
+  const existing = new Set(remoteItems.map(item => [item.type, item.title, item.content].join('|')));
+  const rows = [];
+  let skipped = 0;
+  localItems.forEach(item => {
+    const sig = [item.type || '', item.title || '', item.content || ''].join('|');
+    if (existing.has(sig)) { skipped += 1; return; }
+    if (!item.title && !item.content && !item.image && !(item.images && item.images.length)) { skipped += 1; return; }
+    existing.add(sig);
+    rows.push(bkmpMapAboutBlockToSupabase(item));
+  });
+  if (rows.length) {
+    const { error } = await client.from('about_blocks').insert(rows);
+    if (error) throw error;
+  }
+  const refreshed = await loadAboutBlocks() || [];
+  localData.aboutBlocks = refreshed;
+  bkmpSaveData(localData);
+  return { imported: rows.length, skipped, total: refreshed.length };
+}
+
+async function importLocalPartnerShopsToSupabase() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return { imported: 0, skipped: 0, total: 0 };
+  const localData = bkmpLoadData();
+  const localItems = Array.isArray(localData.partnerShops) ? localData.partnerShops : [];
+  const remoteItems = await loadPartnerShops() || [];
+  const existing = new Set(remoteItems.map(item => [item.name, item.location, item.category].join('|')));
+  const rows = [];
+  let skipped = 0;
+  localItems.forEach(item => {
+    const sig = [item.name || '', item.location || '', item.category || ''].join('|');
+    if (existing.has(sig)) { skipped += 1; return; }
+    if (!item.name) { skipped += 1; return; }
+    existing.add(sig);
+    rows.push(bkmpMapPartnerShopToSupabase(item));
+  });
+  if (rows.length) {
+    const { error } = await client.from('partner_shops').insert(rows);
+    if (error) throw error;
+  }
+  const refreshed = await loadPartnerShops() || [];
+  localData.partnerShops = refreshed;
+  bkmpSaveData(localData);
+  return { imported: rows.length, skipped, total: refreshed.length };
+}
+
 async function importAllLocalDataToSupabase() {
   return {
     incomes: await importLocalIncomesToSupabase(),
     expenses: await importLocalExpensesToSupabase(),
     investors: await importLocalInvestorsToSupabase(),
     updates: await importLocalUpdatesToSupabase(),
-    wishes: await importLocalWishesToSupabase()
+    wishes: await importLocalWishesToSupabase(),
+    streamers: await importLocalStreamersToSupabase(),
+    aboutBlocks: await importLocalAboutBlocksToSupabase(),
+    partnerShops: await importLocalPartnerShopsToSupabase()
   };
 }
 
 window.importLocalExpensesToSupabase = importLocalExpensesToSupabase;
 window.importLocalUpdatesToSupabase = importLocalUpdatesToSupabase;
 window.importLocalWishesToSupabase = importLocalWishesToSupabase;
+window.importLocalStreamersToSupabase = importLocalStreamersToSupabase;
+window.importLocalAboutBlocksToSupabase = importLocalAboutBlocksToSupabase;
+window.importLocalPartnerShopsToSupabase = importLocalPartnerShopsToSupabase;
 window.importAllLocalDataToSupabase = importAllLocalDataToSupabase;
 
 window.importLocalIncomesToSupabase = importLocalIncomesToSupabase;
