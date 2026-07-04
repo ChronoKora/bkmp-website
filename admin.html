@@ -108,6 +108,10 @@
           <svg viewBox="0 0 24 24"><path d="M12 3a5 5 0 0 0-5 5v3H5v10h14V11h-2V8a5 5 0 0 0-5-5z"/><path d="M9 11V8a3 3 0 0 1 6 0v3"/></svg>
           Zug&auml;nge
         </button>
+        <button class="admin-nav-btn" data-page="backup">
+          <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M8 5v5h8V5"/><path d="M8 16h8"/></svg>
+          Backup
+        </button>
       </nav>
 
       <div class="admin-main">
@@ -315,6 +319,28 @@
           </div>
         </section>
 
+        <!-- Backup -->
+        <section class="admin-page" id="page-backup">
+          <div class="admin-section">
+            <h2>Backup</h2>
+            <p class="admin-help-text">Exportiere vor gro&szlig;en &Auml;nderungen eine Sicherung. Beim Import werden deine Daten lokal wiederhergestellt und fehlende Eintr&auml;ge nach Supabase &uuml;bertragen.</p>
+            <div class="backup-grid">
+              <div class="backup-box">
+                <h3>Export</h3>
+                <p>Speichert Einnahmen, Ausgaben, Investoren, Updates, Kartenideen, Creator, Wer-sind-wir-Bl&ouml;cke und PartnerShops als JSON-Datei.</p>
+                <button class="btn btn-primary" id="exportBackup" type="button">Backup exportieren</button>
+              </div>
+              <div class="backup-box">
+                <h3>Import</h3>
+                <p>Spielt eine zuvor exportierte Backup-Datei wieder ein. Bestehende Supabase-Daten werden nicht gel&ouml;scht.</p>
+                <input type="file" id="backupFile" accept="application/json,.json">
+                <button class="btn" id="importBackup" type="button">Backup importieren</button>
+              </div>
+            </div>
+            <p class="admin-help-text" id="backupStatus"></p>
+          </div>
+        </section>
+
       </div>
     </div>
 
@@ -344,6 +370,20 @@
       refreshStreamersFromSupabase();
       refreshAboutBlocksFromSupabase();
       refreshPartnerShopsFromSupabase();
+    }
+
+    async function refreshBackupDataFromSupabase() {
+      await Promise.all([
+        syncIncomesFromSupabase(data, null),
+        syncInvestorsFromSupabase(data, null),
+        syncExpensesFromSupabase(data, null),
+        syncUpdatesFromSupabase(data, null),
+        syncWishesFromSupabase(data, null),
+        syncStreamersFromSupabase(data, null),
+        syncAboutBlocksFromSupabase(data, null),
+        syncPartnerShopsFromSupabase(data, null)
+      ]);
+      renderAll();
     }
 
     function showAdmin() {
@@ -755,6 +795,43 @@
         if (dateCompare !== 0) return dateCompare;
         return (b.createdAt || 0) - (a.createdAt || 0);
       });
+    }
+
+    function makeBackupPayload() {
+      return {
+        type: 'bkmp-dashboard-backup',
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        data: structuredClone(data)
+      };
+    }
+
+    function normalizeImportedBackup(payload) {
+      const raw = payload && payload.data ? payload.data : payload;
+      if (!raw || typeof raw !== 'object') throw new Error('Backup-Datei ist ungueltig.');
+      return {
+        income: bkmpNormalizeEntryList(raw.income || []),
+        expenses: bkmpNormalizeEntryList(raw.expenses || []),
+        investors: raw.investors || [],
+        news: typeof bkmpDedupeUpdates === 'function' ? bkmpDedupeUpdates(raw.news || []) : (raw.news || []),
+        wishes: raw.wishes || [],
+        streamers: raw.streamers || [],
+        aboutBlocks: raw.aboutBlocks || [],
+        partnerShops: raw.partnerShops || []
+      };
+    }
+
+    function downloadBackupFile(payload) {
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'bkmp-backup-' + stamp + '.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
     }
 
     function renderAll() {
@@ -1355,6 +1432,73 @@
         addAccessBtn.disabled = false;
         addAccessBtn.textContent = '+ Zugang erstellen';
       }
+    });
+
+    /* Backup */
+    const exportBackupBtn = document.getElementById('exportBackup');
+    const importBackupBtn = document.getElementById('importBackup');
+    const backupFileInput = document.getElementById('backupFile');
+    const backupStatus = document.getElementById('backupStatus');
+
+    function setBackupStatus(text) {
+      if (backupStatus) backupStatus.textContent = text || '';
+    }
+
+    exportBackupBtn.addEventListener('click', async () => {
+      exportBackupBtn.disabled = true;
+      exportBackupBtn.textContent = 'Backup wird erstellt...';
+      setBackupStatus('Aktueller Stand wird geladen...');
+      try {
+        await refreshBackupDataFromSupabase();
+        downloadBackupFile(makeBackupPayload());
+        setBackupStatus('Backup wurde heruntergeladen.');
+      } catch (e) {
+        console.warn('Backup konnte nicht erstellt werden.', e);
+        downloadBackupFile(makeBackupPayload());
+        setBackupStatus('Online-Abgleich war nicht komplett moeglich. Lokaler Stand wurde exportiert.');
+      } finally {
+        exportBackupBtn.disabled = false;
+        exportBackupBtn.textContent = 'Backup exportieren';
+      }
+    });
+
+    importBackupBtn.addEventListener('click', () => {
+      const file = backupFileInput.files && backupFileInput.files[0];
+      if (!file) {
+        alert('Bitte zuerst eine Backup-Datei auswaehlen.');
+        return;
+      }
+      importBackupBtn.disabled = true;
+      importBackupBtn.textContent = 'Backup wird importiert...';
+      setBackupStatus('Backup-Datei wird gelesen...');
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const imported = normalizeImportedBackup(JSON.parse(reader.result));
+          data = imported;
+          bkmpSaveData(data);
+          renderAll();
+          setBackupStatus('Backup lokal wiederhergestellt. Supabase wird aktualisiert...');
+          if (typeof importAllLocalDataToSupabase === 'function') {
+            const result = await importAllLocalDataToSupabase();
+            console.log('Backup-Import Supabase Ergebnis:', result);
+          }
+          setBackupStatus('Backup importiert. Fehlende Supabase-Eintraege wurden uebertragen.');
+        } catch (e) {
+          console.warn('Backup konnte nicht importiert werden.', e);
+          alert('Backup konnte nicht importiert werden: ' + (e.message || 'Unbekannter Fehler'));
+          setBackupStatus('Import fehlgeschlagen.');
+        } finally {
+          importBackupBtn.disabled = false;
+          importBackupBtn.textContent = 'Backup importieren';
+        }
+      };
+      reader.onerror = () => {
+        importBackupBtn.disabled = false;
+        importBackupBtn.textContent = 'Backup importieren';
+        setBackupStatus('Backup-Datei konnte nicht gelesen werden.');
+      };
+      reader.readAsText(file);
     });
 
     const addNewsBtn = document.getElementById('addNews');
