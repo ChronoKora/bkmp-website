@@ -472,6 +472,9 @@ body.page-loaded .streamer-marquee-track {
   contain-intrinsic-size: 900px;
   contain: layout paint style;
 }
+.panel.active-panel {
+  content-visibility: visible;
+}
 
 .panel-title {
   font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.6rem; margin-bottom: 1.7rem;

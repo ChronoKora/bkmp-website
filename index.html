@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preload" as="image" href="assets/top-banner.png" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260704-live-sync">
+<link rel="stylesheet" href="style.css?v=20260704-image-load">
 </head>
 <body>
 
@@ -191,8 +191,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260704-live-sync"></script>
-  <script src="app.js?v=20260704-live-sync"></script>
+  <script src="supabase.js?v=20260704-image-load"></script>
+  <script src="app.js?v=20260704-image-load"></script>
   <script>
     bkmpInitTheme();
     window.addEventListener('load', () => document.body.classList.add('page-loaded'));
@@ -204,6 +204,7 @@
     const track = document.getElementById('panelsTrack');
     const viewport = document.getElementById('panelsViewport');
     const tabBtns = document.querySelectorAll('.tab-btn');
+    const panels = document.querySelectorAll('.panel');
     const prevBtn = document.getElementById('prevTab');
     const nextBtn = document.getElementById('nextTab');
     let current = 0;
@@ -218,6 +219,7 @@
         btn.classList.toggle('active', active);
         btn.setAttribute('aria-selected', active ? 'true' : 'false');
       });
+      panels.forEach((panel, i) => panel.classList.toggle('active-panel', i === current));
       if (!options.skipSave) sessionStorage.setItem('bkmp-active-tab', String(current));
     }
 
@@ -851,7 +853,7 @@
         const href = shop.link ? (String(shop.link).startsWith('http') ? shop.link : 'https://' + shop.link) : '';
         return `
           <article class="partner-card">
-            ${shop.image ? `<img src="${shop.image}" alt="${escapeHtml(shop.name)}" loading="lazy" decoding="async" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'partner-image-empty',textContent:'Shop'}))">` : '<div class="partner-image-empty">Shop</div>'}
+            ${shop.image ? `<img src="${shop.image}" alt="${escapeHtml(shop.name)}" loading="eager" fetchpriority="low" decoding="async" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'partner-image-empty',textContent:'Shop'}))">` : '<div class="partner-image-empty">Shop</div>'}
             <div class="partner-body">
               <span class="partner-category">${escapeHtml(shop.category || 'Partner')}</span>
               <h3>${escapeHtml(shop.name)}</h3>
@@ -864,6 +866,11 @@
             </div>
           </article>`;
       }).join('');
+      window.requestAnimationFrame(() => {
+        partnerGrid.querySelectorAll('img').forEach(img => {
+          if (!img.complete) img.src = img.src;
+        });
+      });
     }
     renderPartnerShops();
     if (partnerFilter) {
