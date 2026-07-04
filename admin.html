@@ -763,7 +763,10 @@
           return true;
         } catch (e) {
           console.error('Supabase konnte PartnerShop nicht speichern.', e);
-          alert('Der PartnerShop konnte nicht online gespeichert werden. Bitte pruefe Supabase Storage oder versuche ein kleineres Bild.');
+          const errorText = e && (e.message || e.details || e.code)
+            ? [e.message, e.details, e.code].filter(Boolean).join(' | ')
+            : 'Unbekannter Fehler';
+          alert('Der PartnerShop konnte nicht online gespeichert werden.\n\nSupabase meldet: ' + errorText);
           return false;
         }
       }
