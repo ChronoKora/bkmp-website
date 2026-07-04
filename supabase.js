@@ -1174,6 +1174,7 @@ async function savePartnerShop(shop) {
 async function deletePartnerShop(id) {
   const client = bkmpGetSupabaseClient();
   if (!client) return false;
+  if (!id || String(id).trim() === '') throw new Error('PartnerShop-ID fehlt. Loeschen wurde abgebrochen.');
   const { error } = await client.from('partner_shops').delete().eq('id', id);
   if (error) throw error;
   return true;

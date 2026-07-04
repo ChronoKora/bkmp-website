@@ -652,11 +652,22 @@
       return true;
     }
 
-    async function removePartnerShop(id) {
+    async function removePartnerShop(id, localIndex) {
+      const hasUsableId = id !== undefined && id !== null && String(id).trim() !== '';
+      if (!hasUsableId && Number.isInteger(localIndex)) {
+        data.partnerShops.splice(localIndex, 1);
+        bkmpSaveData(data);
+        renderAll();
+        return;
+      }
+      if (!hasUsableId) {
+        console.warn('PartnerShop ohne ID konnte nicht eindeutig geloescht werden.');
+        return;
+      }
       if (typeof deletePartnerShop === 'function' && bkmpGetSupabaseClient() && !String(id).startsWith('shop-')) {
         try {
           await deletePartnerShop(id);
-          data.partnerShops = data.partnerShops.filter(item => item.id !== id);
+          data.partnerShops = data.partnerShops.filter(item => String(item.id) !== String(id));
           bkmpSaveData(data);
           renderAll();
           return;
@@ -805,8 +816,15 @@
         el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Noch keine PartnerShops.</p>';
         return;
       }
+      let repairedIds = false;
+      data.partnerShops = data.partnerShops.map(item => {
+        if (item && item.id !== undefined && item.id !== null && String(item.id).trim() !== '') return item;
+        repairedIds = true;
+        return { ...item, id: bkmpUid('shop') };
+      });
+      if (repairedIds) bkmpSaveData(data);
       el.innerHTML = '';
-      data.partnerShops.forEach(item => {
+      data.partnerShops.forEach((item, index) => {
         const row = document.createElement('div');
         row.className = 'entry-row partner-admin-row';
         row.innerHTML = `
@@ -823,7 +841,7 @@
         row.querySelector('.edit-btn').addEventListener('click', () => startEditPartnerShop(item.id));
         row.querySelector('.del-btn').addEventListener('click', () => {
           if (editingPartnerShopId === item.id) clearPartnerShopForm();
-          removePartnerShop(item.id);
+          removePartnerShop(item.id, index);
         });
         el.appendChild(row);
       });
