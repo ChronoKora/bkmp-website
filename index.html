@@ -160,6 +160,8 @@
     </div>
   </div>
 
+  <div class="live-toast" id="liveToast" aria-live="polite" aria-hidden="true"></div>
+
   <div class="joke-overlay wish-overlay" id="wishOverlay">
     <div class="joke-card">
       <h3>Deine Kartenidee</h3>
@@ -618,6 +620,9 @@
     }
 
     let streamerLiveCache = { checkedAt: 0, live: {} };
+    let liveToastTimer = null;
+    let liveToastHideTimer = null;
+    let liveToastIndex = 0;
 
     function getTwitchUsername(url) {
       const raw = String(url || '').trim();
@@ -640,6 +645,50 @@
         if (label) label.textContent = live ? 'Live' : 'Offline';
         item.title = live ? `${item.textContent.trim()} ist gerade live` : `${item.textContent.trim()} ist gerade offline`;
       });
+      updateLiveToastCycle(liveMap);
+    }
+
+    function hideLiveToast() {
+      const toast = document.getElementById('liveToast');
+      if (!toast) return;
+      toast.classList.remove('visible');
+      toast.setAttribute('aria-hidden', 'true');
+    }
+
+    function showLiveToast(streamer) {
+      const toast = document.getElementById('liveToast');
+      if (!toast || !streamer) return;
+      const url = String(streamer.url || '').startsWith('http') ? streamer.url : 'https://' + streamer.url;
+      toast.innerHTML = `
+        <span class="live-toast-kicker"><span></span> Gerade live auf Twitch</span>
+        <strong>${escapeHtml(streamer.name)}</strong>
+        <a href="${url}" target="_blank" rel="noopener">Stream öffnen</a>
+      `;
+      toast.classList.add('visible');
+      toast.setAttribute('aria-hidden', 'false');
+      clearTimeout(liveToastHideTimer);
+      liveToastHideTimer = setTimeout(hideLiveToast, 9000);
+    }
+
+    function updateLiveToastCycle(liveMap) {
+      const streamers = Array.isArray(data.streamers) ? data.streamers.filter(item => liveMap && liveMap[getTwitchUsername(item.url)]) : [];
+      clearInterval(liveToastTimer);
+      clearTimeout(liveToastHideTimer);
+      if (!streamers.length || document.hidden) {
+        hideLiveToast();
+        return;
+      }
+      liveToastIndex = liveToastIndex % streamers.length;
+      showLiveToast(streamers[liveToastIndex]);
+      liveToastIndex = (liveToastIndex + 1) % streamers.length;
+      liveToastTimer = setInterval(() => {
+        if (document.hidden) {
+          hideLiveToast();
+          return;
+        }
+        showLiveToast(streamers[liveToastIndex]);
+        liveToastIndex = (liveToastIndex + 1) % streamers.length;
+      }, 60000);
     }
 
     function refreshStreamerLiveStatus(streamers) {

@@ -292,6 +292,67 @@ body.page-loaded .streamer-marquee-track {
 .streamer-pill.is-live .streamer-live-label {
   display: inline-flex;
 }
+.live-toast {
+  position: fixed;
+  right: 1.2rem;
+  bottom: 1.2rem;
+  z-index: 45;
+  width: min(310px, calc(100vw - 2rem));
+  padding: 1rem 1.05rem;
+  border: 1px solid rgba(239, 68, 68, 0.38);
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(18, 16, 22, 0.96), rgba(8, 7, 10, 0.94));
+  color: var(--ink);
+  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.38), 0 0 34px rgba(239, 68, 68, 0.18);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(0, 18px, 0) scale(0.96);
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+.live-toast.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+.live-toast-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  margin-bottom: 0.35rem;
+  color: #fca5a5;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.live-toast-kicker span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.18), 0 0 16px rgba(239, 68, 68, 0.7);
+}
+.live-toast strong {
+  display: block;
+  margin-bottom: 0.65rem;
+  font-family: 'Fraunces', serif;
+  font-size: 1.25rem;
+}
+.live-toast a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  border-radius: 999px;
+  padding: 0.42rem 0.78rem;
+  background: linear-gradient(135deg, #8b5cf6, #ef4444);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+.live-toast a:hover {
+  filter: brightness(1.08);
+}
 .streamer-purple { background: #a78bfa; }
 .streamer-gold { background: var(--gold); }
 .streamer-green { background: #4ade80; }
