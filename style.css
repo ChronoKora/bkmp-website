@@ -34,8 +34,14 @@ body {
   font-family: 'Inter', sans-serif;
   position: relative;
   overflow-x: hidden;
-  transition: background 0.4s ease, color 0.4s ease;
   min-height: 100vh;
+}
+
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  transition: none !important;
+  animation-play-state: paused !important;
 }
 
 /* Hintergrund bewusst schlicht gehalten, keine Streifen mehr */

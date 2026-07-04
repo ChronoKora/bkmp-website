@@ -193,9 +193,14 @@ function bkmpInitTheme() {
   }
 
   function setTheme(next) {
+    root.classList.add('theme-switching');
     root.setAttribute('data-theme', next);
     localStorage.setItem(BKMP_THEME_KEY, next);
     updateLabel();
+    window.clearTimeout(window.__bkmpThemeSwitchTimer);
+    window.__bkmpThemeSwitchTimer = window.setTimeout(() => {
+      root.classList.remove('theme-switching');
+    }, 180);
   }
 
   toggleBtn.addEventListener('click', function () {
