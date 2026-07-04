@@ -1098,7 +1098,15 @@ label { display: block; font-size: 0.76rem; color: var(--muted); margin-bottom: 
 
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
 .form-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
-@media (max-width: 620px) { .form-grid, .form-grid-3 { grid-template-columns: 1fr; } }
+.form-grid-4 { grid-template-columns: 1.2fr 1fr 0.8fr 1fr; }
+@media (max-width: 860px) { .form-grid-4 { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 620px) { .form-grid, .form-grid-3, .form-grid-4 { grid-template-columns: 1fr; } }
+.income-calc-hint {
+  min-height: 1.2rem;
+  margin: -0.15rem 0 1rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
 
 .admin-top-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
 .back-link { font-size: 0.85rem; color: var(--muted); display: flex; align-items: center; gap: 0.4rem; }

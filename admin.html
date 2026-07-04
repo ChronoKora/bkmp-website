@@ -127,15 +127,17 @@
           <div class="admin-section">
             <h2>Einnahmen</h2>
             <div class="entry-table-wrapper"><div class="entry-list" id="incomeList"></div></div>
-            <div class="form-grid form-grid-3">
+            <div class="form-grid form-grid-4">
               <div><label>Kategorie</label>
                 <select id="incomeName">
                   <option value="">Bitte wählen…</option>
                 </select>
               </div>
               <div><label>Betrag (€)</label><input type="number" id="incomeAmount" placeholder="0"></div>
+              <div><label>Anzahl</label><input type="number" id="incomeQuantity" min="0" step="1" placeholder="optional"></div>
               <div><label>Datum</label><input type="date" id="incomeDate"></div>
             </div>
+            <p class="income-calc-hint" id="incomeCalcHint">W&auml;hle eine Kategorie und gib optional eine Anzahl ein.</p>
             <button class="btn btn-primary" id="addIncome">+ Einnahme hinzufügen</button>
           </div>
         </section>
@@ -451,12 +453,47 @@
 
     // Kategorien-Dropdown befüllen
     const incomeNameSelect = document.getElementById('incomeName');
+    const incomeQuantityInput = document.getElementById('incomeQuantity');
+    const incomeAmountInput = document.getElementById('incomeAmount');
+    const incomeCalcHint = document.getElementById('incomeCalcHint');
+    const incomeUnitPrices = {
+      'BÃ¼cher': 2500,
+      'Raketen': 1000,
+      'Karten': 150000,
+      'Schmiede Vorlagen': 1500,
+      'Netherite': 11000,
+      'TrÃ¤nke': 1500
+    };
     BKMP_INCOME_CATEGORIES.forEach(cat => {
       const opt = document.createElement('option');
       opt.value = cat;
       opt.textContent = cat;
       incomeNameSelect.appendChild(opt);
     });
+
+    function getIncomeUnitPrice(category) {
+      return incomeUnitPrices[bkmpNormalizeCategoryName(category)];
+    }
+
+    function updateIncomeCalculation() {
+      const category = bkmpNormalizeCategoryName(incomeNameSelect.value);
+      const quantity = Number(incomeQuantityInput.value);
+      const unitPrice = getIncomeUnitPrice(category);
+      if (!unitPrice) {
+        incomeCalcHint.textContent = category ? 'FÃ¼r diese Kategorie gibt es keinen festen StÃ¼ckpreis. Betrag direkt eintragen.' : 'WÃ¤hle eine Kategorie und gib optional eine Anzahl ein.';
+        return;
+      }
+      if (incomeQuantityInput.value === '' || Number.isNaN(quantity) || quantity <= 0) {
+        incomeCalcHint.textContent = `${category}: 1 StÃ¼ck = ${bkmpFormatCurrency(unitPrice)}. Anzahl eintragen oder Betrag direkt setzen.`;
+        return;
+      }
+      const calculated = quantity * unitPrice;
+      incomeAmountInput.value = calculated;
+      incomeCalcHint.textContent = `${quantity} x ${bkmpFormatCurrency(unitPrice)} = ${bkmpFormatCurrency(calculated)}`;
+    }
+
+    incomeNameSelect.addEventListener('change', updateIncomeCalculation);
+    incomeQuantityInput.addEventListener('input', updateIncomeCalculation);
 
     // Datumsfelder mit heute vorbefüllen
     const todayStr = new Date().toISOString().slice(0, 10);
@@ -1091,13 +1128,16 @@
 
     /* Einnahmen */
     document.getElementById('addIncome').addEventListener('click', () => {
+      updateIncomeCalculation();
       const name = document.getElementById('incomeName').value.trim();
-      const amountInput = document.getElementById('incomeAmount').value;
+      const amountInput = incomeAmountInput.value;
       const amount = Number(amountInput);
       const date = document.getElementById('incomeDate').value || todayStr;
       if (!name || amountInput === '' || Number.isNaN(amount)) return;
       const income = { id: bkmpUid('inc'), name, category: name, amount, date, note: '', createdAt: Date.now() };
-      document.getElementById('incomeAmount').value = '';
+      incomeAmountInput.value = '';
+      incomeQuantityInput.value = '';
+      updateIncomeCalculation();
       persistIncome(income);
     });
 
