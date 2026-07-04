@@ -21,7 +21,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260704-creator-cache">
+<link rel="stylesheet" href="style.css?v=20260704-streamer-save">
 </head>
 <body>
 
@@ -246,6 +246,7 @@
             </div>
             <div class="investor-form-actions">
               <button class="btn btn-primary" id="addStreamer">+ Twitch-Account speichern</button>
+              <button class="btn" id="importStreamers" type="button">Lokale Creator online übertragen</button>
               <button class="btn" id="cancelStreamerEdit" type="button" style="display:none;">Abbrechen</button>
             </div>
           </div>
@@ -355,8 +356,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260704-creator-cache"></script>
-  <script src="app.js?v=20260704-creator-cache"></script>
+  <script src="supabase.js?v=20260704-streamer-save"></script>
+  <script src="app.js?v=20260704-streamer-save"></script>
   <script>
     bkmpInitTheme();
 
@@ -671,7 +672,12 @@
           renderAll();
           return true;
         } catch (e) {
-          console.warn('Supabase konnte Twitch-Account nicht speichern. localStorage-Fallback wird verwendet.', e);
+          console.error('Supabase konnte Twitch-Account nicht speichern.', e);
+          const errorText = e && (e.message || e.details || e.code)
+            ? [e.message, e.details, e.code].filter(Boolean).join(' | ')
+            : 'Unbekannter Fehler';
+          alert('Der Twitch-Account konnte nicht online gespeichert werden.\n\nSupabase meldet: ' + errorText);
+          return false;
         }
       }
 
@@ -1278,6 +1284,7 @@
 
     /* Twitch-Leiste */
     const addStreamerBtn = document.getElementById('addStreamer');
+    const importStreamerBtn = document.getElementById('importStreamers');
     const cancelStreamerEditBtn = document.getElementById('cancelStreamerEdit');
     const streamerNameInput = document.getElementById('streamerName');
     const streamerUrlInput = document.getElementById('streamerUrl');
@@ -1309,6 +1316,31 @@
 
     cancelStreamerEditBtn.addEventListener('click', clearStreamerForm);
 
+    if (importStreamerBtn) {
+      importStreamerBtn.addEventListener('click', async () => {
+        if (typeof importLocalStreamersToSupabase !== 'function' || !bkmpGetSupabaseClient()) {
+          alert('Supabase ist gerade nicht verbunden. Import nicht möglich.');
+          return;
+        }
+        importStreamerBtn.disabled = true;
+        importStreamerBtn.textContent = 'Übertrage...';
+        try {
+          const result = await importLocalStreamersToSupabase();
+          await syncStreamersFromSupabase(data, null, { force: true });
+          renderAll();
+          alert('Creator übertragen.\n\nNeu übertragen: ' + result.imported + '\nÜbersprungen: ' + result.skipped + '\nOnline gesamt: ' + result.total);
+        } catch (e) {
+          const errorText = e && (e.message || e.details || e.code)
+            ? [e.message, e.details, e.code].filter(Boolean).join(' | ')
+            : 'Unbekannter Fehler';
+          alert('Creator konnten nicht online übertragen werden.\n\nSupabase meldet: ' + errorText);
+        } finally {
+          importStreamerBtn.disabled = false;
+          importStreamerBtn.textContent = 'Lokale Creator online übertragen';
+        }
+      });
+    }
+
     addStreamerBtn.addEventListener('click', () => {
       const name = streamerNameInput.value.trim();
       let url = streamerUrlInput.value.trim();
@@ -1317,7 +1349,9 @@
       if (!url.startsWith('http')) url = 'https://' + url;
       const payload = { name, url, color };
       if (editingStreamerId) payload.id = editingStreamerId;
-      persistStreamer(payload).then(() => clearStreamerForm());
+      persistStreamer(payload).then(saved => {
+        if (saved) clearStreamerForm();
+      });
     });
 
     /* Wer sind wir */
