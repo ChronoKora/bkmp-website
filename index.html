@@ -284,7 +284,6 @@
 
     /* ---------------- Daten laden & rendern ---------------- */
     const data = bkmpLoadData();
-    const hasInitialSync = sessionStorage.getItem('bkmp-main-synced') === '1';
     function refreshDeferredPanels() {
       return Promise.all([
         syncUpdatesFromSupabase(data, null),
@@ -304,10 +303,7 @@
 
     function scheduleDeferredSync() {
       const run = () => refreshDeferredPanels().then(changed => {
-        if (changed && !hasInitialSync) {
-          sessionStorage.setItem('bkmp-main-synced', '1');
-          location.reload();
-        }
+        if (changed) sessionStorage.setItem('bkmp-main-synced', '1');
       });
       if ('requestIdleCallback' in window) {
         requestIdleCallback(run, { timeout: 1800 });
@@ -322,10 +318,9 @@
       syncExpensesFromSupabase(data, null)
     ]).then(results => {
       const changed = results.some(Boolean);
-      if (changed && !hasInitialSync) {
+      if (changed) {
         sessionStorage.setItem('bkmp-main-synced', '1');
-        location.reload();
-        return;
+        if (typeof renderFinancialSections === 'function') renderFinancialSections();
       }
       renderStreamers();
       if (typeof renderWishes === 'function') renderWishes();
@@ -334,6 +329,7 @@
       scheduleDeferredSync();
     });
 
+    function renderFinancialSections() {
     const totalIncome = bkmpSum(data.income);
     const totalExpenses = bkmpSum(data.expenses);
     const netProfit = totalIncome - totalExpenses;
@@ -605,6 +601,8 @@
         </div>
       `).join('');
     }
+    }
+    renderFinancialSections();
 
     function escapeHtml(value) {
       return String(value || '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
