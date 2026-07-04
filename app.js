@@ -229,3 +229,61 @@ function bkmpInitTheme() {
 
   updateLabel();
 }
+
+/* ============================================================
+   Robuste Bild-Ladehilfe
+   Kurze Netzwerk- oder Storage-Haenger sollen Bilder nicht
+   dauerhaft durch Platzhalter ersetzen.
+   ============================================================ */
+function bkmpEnhanceImages(root) {
+  const scope = root && root.querySelectorAll ? root : document;
+  const images = scope.querySelectorAll('img[data-bkmp-img]');
+
+  images.forEach(img => {
+    if (img.dataset.bkmpImageBound === '1') {
+      if (img.complete && img.naturalWidth > 0) markBkmpImageLoaded(img);
+      return;
+    }
+
+    img.dataset.bkmpImageBound = '1';
+    img.dataset.originalSrc = img.getAttribute('src') || '';
+    img.classList.add('bkmp-image-loading');
+
+    img.addEventListener('load', () => markBkmpImageLoaded(img));
+    img.addEventListener('error', () => retryBkmpImage(img));
+
+    if (img.complete && img.naturalWidth > 0) {
+      markBkmpImageLoaded(img);
+    }
+  });
+}
+
+function markBkmpImageLoaded(img) {
+  img.classList.remove('bkmp-image-loading', 'bkmp-image-missing');
+  img.classList.add('bkmp-image-loaded');
+  const holder = img.closest('[data-bkmp-image-wrap]');
+  if (holder) holder.classList.remove('bkmp-image-missing');
+}
+
+function retryBkmpImage(img) {
+  const retries = Number(img.dataset.bkmpRetries || 0);
+  const originalSrc = img.dataset.originalSrc || img.getAttribute('src') || '';
+
+  if (originalSrc && retries < 3) {
+    img.dataset.bkmpRetries = String(retries + 1);
+    window.setTimeout(() => {
+      const separator = originalSrc.includes('?') ? '&' : '?';
+      img.src = originalSrc + separator + 'bkmp_retry=' + Date.now();
+    }, 450 + retries * 700);
+    return;
+  }
+
+  img.classList.remove('bkmp-image-loading');
+  img.classList.add('bkmp-image-missing');
+  const holder = img.closest('[data-bkmp-image-wrap]');
+  if (holder) holder.classList.add('bkmp-image-missing');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  bkmpEnhanceImages(document);
+});

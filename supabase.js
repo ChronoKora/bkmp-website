@@ -53,6 +53,20 @@ async function bkmpStoreImageIfNeeded(value, folder) {
   return data && data.publicUrl ? data.publicUrl : value;
 }
 
+function bkmpIsPersistentImageUrl(value) {
+  if (!value || typeof value !== 'string') return false;
+  if (value.startsWith('data:image/')) return false;
+  return /^(https?:\/\/|assets\/|\/)/i.test(value);
+}
+
+function bkmpUseLocalImageIfPersistent(target, local) {
+  if (!target || !local || target.image || !bkmpIsPersistentImageUrl(local.image)) return;
+  target.image = local.image;
+  if (Array.isArray(local.images)) {
+    target.images = local.images.filter(bkmpIsPersistentImageUrl);
+  }
+}
+
 function bkmpAdminEmailFromName(name) {
   const clean = String(name || '')
     .trim()
@@ -913,7 +927,7 @@ async function syncWishesFromSupabase(targetData, onSynced, options = {}) {
         String(item.id || '') === String(wish.id || '') ||
         (item.name && item.name === wish.name)
       );
-      if (local && local.image) wish.image = local.image;
+      bkmpUseLocalImageIfPersistent(wish, local);
     });
     const localCount = Array.isArray(targetData.wishes) ? targetData.wishes.length : 0;
     if (localCount > 0 && wishes.length === 0) {
@@ -1113,9 +1127,9 @@ async function syncAboutBlocksFromSupabase(targetData, onSynced, options = {}) {
         (item.title && item.title === block.title && item.content === block.content)
       );
       if (!local) return;
-      if (!block.image && local.image) block.image = local.image;
+      bkmpUseLocalImageIfPersistent(block, local);
       if ((!Array.isArray(block.images) || block.images.length === 0) && Array.isArray(local.images)) {
-        block.images = local.images;
+        block.images = local.images.filter(bkmpIsPersistentImageUrl);
       }
     });
     const localCount = Array.isArray(targetData.aboutBlocks) ? targetData.aboutBlocks.length : 0;
@@ -1222,7 +1236,7 @@ async function syncPartnerShopsFromSupabase(targetData, onSynced, options = {}) 
         String(item.id || '') === String(shop.id || '') ||
         (item.name && item.name === shop.name && item.location === shop.location)
       );
-      if (local && local.image) shop.image = local.image;
+      bkmpUseLocalImageIfPersistent(shop, local);
     });
     const localCount = Array.isArray(targetData.partnerShops) ? targetData.partnerShops.length : 0;
     if (localCount > 0 && shops.length === 0) {

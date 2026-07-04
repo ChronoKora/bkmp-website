@@ -21,7 +21,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260704-stable-audit">
+<link rel="stylesheet" href="style.css?v=20260705-image-retry">
 </head>
 <body>
 
@@ -356,8 +356,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260704-stable-audit"></script>
-  <script src="app.js?v=20260704-stable-audit"></script>
+  <script src="supabase.js?v=20260705-image-retry"></script>
+  <script src="app.js?v=20260705-image-retry"></script>
   <script>
     bkmpInitTheme();
 
@@ -947,6 +947,7 @@
       renderStreamerList();
       renderAboutBlockList();
       renderPartnerShopList();
+      if (window.bkmpEnhanceImages) window.bkmpEnhanceImages(document);
     }
 
     function hasValidEntryId(id) {
@@ -1036,7 +1037,7 @@
         const row = document.createElement('div');
         row.className = 'entry-row partner-admin-row';
         row.innerHTML = `
-          ${item.image ? `<img class="partner-admin-thumb" src="${item.image}" alt="" loading="lazy" decoding="async">` : '<div class="partner-admin-thumb partner-admin-thumb-empty">Shop</div>'}
+          ${item.image ? `<span class="partner-admin-thumb-wrap" data-bkmp-image-wrap data-empty-label="Shop"><img data-bkmp-img class="partner-admin-thumb" src="${item.image}" alt="" loading="lazy" decoding="async"></span>` : '<div class="partner-admin-thumb partner-admin-thumb-empty">Shop</div>'}
           <div class="desc">
             <span class="name">${item.name}</span>
             <span class="meta">${item.category || 'Partner'}${item.location ? ' &middot; ' + item.location : ''}</span>
@@ -1117,7 +1118,7 @@
         const row = document.createElement('div');
         row.className = 'entry-row wish-admin-row';
         row.innerHTML = `
-          ${item.image ? `<img class="wish-admin-thumb" src="${item.image}" alt="" loading="lazy" decoding="async">` : '<div class="wish-admin-thumb wish-admin-thumb-empty">Bild</div>'}
+          ${item.image ? `<span class="wish-admin-thumb-wrap" data-bkmp-image-wrap data-empty-label="Bild"><img data-bkmp-img class="wish-admin-thumb" src="${item.image}" alt="" loading="lazy" decoding="async"></span>` : '<div class="wish-admin-thumb wish-admin-thumb-empty">Bild</div>'}
           <div class="desc">
             <span class="name">${item.name}</span>
             <span class="meta">${item.date ? formatDate(item.date) + ' · ' : ''}Like ${Number(item.likes || 0)} · Dislike ${Number(item.dislikes || 0)}</span>

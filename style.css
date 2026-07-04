@@ -817,10 +817,13 @@ body.page-loaded .streamer-marquee-track {
 .wish-card:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); }
 .wish-image-btn {
   display: block;
+  position: relative;
   width: 100%;
+  aspect-ratio: 1 / 1;
   padding: 0;
   border: 0;
-  background: transparent;
+  overflow: hidden;
+  background: var(--paper-3);
   cursor: zoom-in;
 }
 .wish-card img { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; display: block; background: var(--paper); }
@@ -1507,13 +1510,22 @@ label {
   background: linear-gradient(180deg, var(--paper-2), var(--paper));
   box-shadow: 0 22px 70px rgba(0, 0, 0, 0.2);
 }
-.partner-card > img,
+.partner-image-frame,
 .partner-image-empty {
   width: 100%;
   aspect-ratio: 16 / 9;
-  object-fit: cover;
   display: block;
   background: var(--paper-3);
+}
+.partner-image-frame {
+  position: relative;
+  overflow: hidden;
+}
+.partner-image-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 .partner-image-empty {
   display: grid;
@@ -1590,6 +1602,61 @@ label {
   font-size: 0.68rem;
   font-weight: 800;
   text-transform: uppercase;
+}
+
+img[data-bkmp-img] {
+  transition: opacity 0.18s ease, filter 0.18s ease;
+}
+img[data-bkmp-img].bkmp-image-loading {
+  opacity: 0.88;
+}
+img[data-bkmp-img].bkmp-image-missing {
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+[data-bkmp-image-wrap] img[data-bkmp-img].bkmp-image-missing {
+  opacity: 0;
+  filter: none;
+}
+[data-bkmp-image-wrap]::after {
+  content: attr(data-empty-label);
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--paper-3) 92%, transparent), var(--paper-2));
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+[data-bkmp-image-wrap].bkmp-image-missing::after {
+  opacity: 1;
+}
+.partner-admin-thumb-wrap,
+.wish-admin-thumb-wrap {
+  position: relative;
+  display: block;
+  width: 58px;
+  height: 42px;
+  border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--paper-3);
+}
+.wish-admin-thumb-wrap {
+  width: 56px;
+  height: 56px;
+}
+.partner-admin-thumb-wrap .partner-admin-thumb,
+.wish-admin-thumb-wrap .wish-admin-thumb {
+  width: 100%;
+  height: 100%;
 }
 
 /* ---------- Performance + Easter Egg ---------- */
