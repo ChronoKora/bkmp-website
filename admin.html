@@ -905,7 +905,7 @@
         const row = document.createElement('div');
         row.className = 'entry-row partner-admin-row';
         row.innerHTML = `
-          ${item.image ? `<img class="partner-admin-thumb" src="${item.image}" alt="">` : '<div class="partner-admin-thumb partner-admin-thumb-empty">Shop</div>'}
+          ${item.image ? `<img class="partner-admin-thumb" src="${item.image}" alt="" loading="lazy" decoding="async">` : '<div class="partner-admin-thumb partner-admin-thumb-empty">Shop</div>'}
           <div class="desc">
             <span class="name">${item.name}</span>
             <span class="meta">${item.category || 'Partner'}${item.location ? ' &middot; ' + item.location : ''}</span>
@@ -986,7 +986,7 @@
         const row = document.createElement('div');
         row.className = 'entry-row wish-admin-row';
         row.innerHTML = `
-          ${item.image ? `<img class="wish-admin-thumb" src="${item.image}" alt="">` : '<div class="wish-admin-thumb wish-admin-thumb-empty">Bild</div>'}
+          ${item.image ? `<img class="wish-admin-thumb" src="${item.image}" alt="" loading="lazy" decoding="async">` : '<div class="wish-admin-thumb wish-admin-thumb-empty">Bild</div>'}
           <div class="desc">
             <span class="name">${item.name}</span>
             <span class="meta">${item.date ? formatDate(item.date) + ' · ' : ''}Like ${Number(item.likes || 0)} · Dislike ${Number(item.dislikes || 0)}</span>

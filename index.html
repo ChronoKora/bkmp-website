@@ -197,18 +197,34 @@
     const nextBtn = document.getElementById('nextTab');
     let current = 0;
     const total = tabBtns.length;
+    const savedTab = Number(sessionStorage.getItem('bkmp-active-tab') || 0);
 
-    function goTo(index) {
+    function goTo(index, options = {}) {
       current = Math.max(0, Math.min(total - 1, index));
-      track.style.transform = `translateX(-${current * 100}%)`;
-      tabBtns.forEach((btn, i) => btn.classList.toggle('active', i === current));
+      track.style.transform = `translate3d(-${current * 100}%, 0, 0)`;
+      tabBtns.forEach((btn, i) => {
+        const active = i === current;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+      if (!options.skipSave) sessionStorage.setItem('bkmp-active-tab', String(current));
     }
 
     tabBtns.forEach(btn => {
+      btn.setAttribute('role', 'tab');
+      btn.setAttribute('aria-selected', btn.classList.contains('active') ? 'true' : 'false');
       btn.addEventListener('click', () => goTo(Number(btn.dataset.index)));
     });
     prevBtn.addEventListener('click', () => goTo(current - 1));
     nextBtn.addEventListener('click', () => goTo(current + 1));
+    goTo(Number.isFinite(savedTab) ? savedTab : 0, { skipSave: true });
+
+    document.addEventListener('keydown', e => {
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (e.key === 'ArrowLeft') goTo(current - 1);
+      if (e.key === 'ArrowRight') goTo(current + 1);
+    });
 
     // Touch-Swipe
     let touchStartX = null;
@@ -220,6 +236,50 @@
         diff < 0 ? goTo(current + 1) : goTo(current - 1);
       }
       touchStartX = null;
+    });
+
+    /* ---------------- Kleines Easter Egg ---------------- */
+    const easterTarget = 'bkmp';
+    let easterBuffer = '';
+    let konamiBuffer = [];
+    const konamiCode = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+
+    function triggerBkmpEasterEgg() {
+      if (document.getElementById('bkmpEasterEgg')) return;
+      const overlay = document.createElement('div');
+      overlay.id = 'bkmpEasterEgg';
+      overlay.className = 'bkmp-easter';
+      const sparkles = Array.from({ length: 18 }, (_, i) => `<span style="--i:${i}"></span>`).join('');
+      overlay.innerHTML = `
+        <div class="bkmp-easter-card">
+          <small>BKMP Secret</small>
+          <strong>Boost aktiviert</strong>
+          <p>+2% Style, +2% Flow, +96% gute Laune.</p>
+        </div>
+        ${sparkles}
+      `;
+      document.body.appendChild(overlay);
+      document.body.classList.add('bkmp-boost');
+      requestAnimationFrame(() => overlay.classList.add('visible'));
+      setTimeout(() => {
+        overlay.classList.remove('visible');
+        document.body.classList.remove('bkmp-boost');
+        setTimeout(() => overlay.remove(), 450);
+      }, 3600);
+    }
+
+    document.addEventListener('keydown', e => {
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+      easterBuffer = (easterBuffer + key).slice(-easterTarget.length);
+      konamiBuffer.push(key);
+      konamiBuffer = konamiBuffer.slice(-konamiCode.length);
+      if (easterBuffer === easterTarget || konamiBuffer.join('|') === konamiCode.join('|')) {
+        triggerBkmpEasterEgg();
+        easterBuffer = '';
+        konamiBuffer = [];
+      }
     });
 
     /* ---------------- Daten laden & rendern ---------------- */
@@ -498,7 +558,7 @@
         return `
           <div class="investor-card investor-card-rich">
             <div class="investor-head">
-              ${avatar ? `<img class="investor-avatar" src="${avatar}" alt="Minecraft-Kopf von ${mcName}" loading="lazy">` : `<div class="investor-avatar investor-avatar-fallback">${inv.name.slice(0, 1).toUpperCase()}</div>`}
+              ${avatar ? `<img class="investor-avatar" src="${avatar}" alt="Minecraft-Kopf von ${mcName}" loading="lazy" decoding="async">` : `<div class="investor-avatar investor-avatar-fallback">${inv.name.slice(0, 1).toUpperCase()}</div>`}
               <div class="investor-title-block">
                 <div class="investor-name">${inv.name}</div>
                 ${mcName ? `<div class="investor-mc">${mcName}</div>` : ''}

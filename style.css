@@ -216,8 +216,10 @@ h1.hero-title .brand { font-style: italic; font-weight: 500; }
 .streamer-marquee-track {
   display: flex;
   width: max-content;
-  animation: streamerScroll 82s linear infinite;
+  animation: streamerScroll 118s linear infinite;
   animation-play-state: paused;
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
 }
 body.page-loaded .streamer-marquee-track {
   animation-play-state: running;
@@ -349,12 +351,19 @@ body.page-loaded .streamer-marquee-track {
 
 /* ---------- Swipe-Bereich ---------- */
 .panels-viewport { overflow: hidden; width: 100%; max-width: 1760px; margin: 0 auto; position: relative; z-index: 1; touch-action: pan-y; }
-.panels-track { display: flex; transition: transform 0.45s cubic-bezier(0.65, 0, 0.35, 1); }
+.panels-track {
+  display: flex;
+  transition: transform 0.45s cubic-bezier(0.65, 0, 0.35, 1);
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+  backface-visibility: hidden;
+}
 .panel {
   min-width: 100%;
   padding: 2.4rem 0.9rem 5rem;
   content-visibility: auto;
   contain-intrinsic-size: 900px;
+  contain: layout paint style;
 }
 
 .panel-title {
@@ -1463,4 +1472,99 @@ label {
   font-size: 0.68rem;
   font-weight: 800;
   text-transform: uppercase;
+}
+
+/* ---------- Performance + Easter Egg ---------- */
+.stat-card,
+.news-card,
+.wish-card,
+.partner-card,
+.investor-card,
+.about-block {
+  transform: translateZ(0);
+}
+
+.bkmp-easter {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  background: radial-gradient(circle at center, rgba(201, 165, 106, 0.18), rgba(8, 7, 10, 0.1) 42%, transparent 68%);
+}
+.bkmp-easter.visible { opacity: 1; }
+.bkmp-easter-card {
+  width: min(380px, calc(100vw - 2rem));
+  border: 1px solid rgba(201, 165, 106, 0.45);
+  border-radius: 22px;
+  padding: 1.4rem 1.5rem;
+  text-align: center;
+  background: linear-gradient(145deg, rgba(18, 16, 22, 0.94), rgba(8, 7, 10, 0.9));
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.42), 0 0 42px rgba(201, 165, 106, 0.2);
+  transform: translateY(18px) scale(0.94);
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.bkmp-easter.visible .bkmp-easter-card {
+  transform: translateY(0) scale(1);
+}
+.bkmp-easter-card small {
+  display: inline-flex;
+  margin-bottom: 0.45rem;
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  background: rgba(201, 165, 106, 0.18);
+  color: var(--gold);
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.bkmp-easter-card strong {
+  display: block;
+  font-family: 'Fraunces', serif;
+  font-size: 2rem;
+  line-height: 1;
+}
+.bkmp-easter-card p {
+  margin-top: 0.7rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.bkmp-easter > span {
+  position: absolute;
+  left: calc(50% + (var(--i) - 9) * 38px);
+  top: calc(50% + ((var(--i) % 5) - 2) * 32px);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 16px rgba(201, 165, 106, 0.75);
+  animation: bkmpSpark 1.45s ease-out infinite;
+  animation-delay: calc(var(--i) * -0.08s);
+}
+body.bkmp-boost .hero-banner {
+  filter: saturate(1.12) brightness(1.05);
+}
+@keyframes bkmpSpark {
+  0% { transform: translate3d(0, 0, 0) scale(0.3); opacity: 0; }
+  25% { opacity: 1; }
+  100% { transform: translate3d(calc((var(--i) - 9) * 5px), -90px, 0) scale(1); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+  }
+  .streamer-marquee-track {
+    animation: none !important;
+    transform: none !important;
+  }
 }
