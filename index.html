@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preload" as="image" href="assets/top-banner.png" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260704-creator-sync">
+<link rel="stylesheet" href="style.css?v=20260704-live-sync">
 </head>
 <body>
 
@@ -191,8 +191,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260704-creator-sync"></script>
-  <script src="app.js?v=20260704-creator-sync"></script>
+  <script src="supabase.js?v=20260704-live-sync"></script>
+  <script src="app.js?v=20260704-live-sync"></script>
   <script>
     bkmpInitTheme();
     window.addEventListener('load', () => document.body.classList.add('page-loaded'));
@@ -335,6 +335,33 @@
       refreshDeferredPanels();
     }
 
+    let liveRefreshTimer = null;
+    function scheduleLiveDataRefresh() {
+      window.clearTimeout(liveRefreshTimer);
+      liveRefreshTimer = window.setTimeout(refreshVisibleData, 350);
+    }
+
+    function initSupabaseRealtime() {
+      const client = typeof bkmpGetSupabaseClient === 'function' ? bkmpGetSupabaseClient() : null;
+      if (!client || typeof client.channel !== 'function' || window.__bkmpRealtimeChannel) return;
+      const tables = [
+        'incomes',
+        'expenses',
+        'investors',
+        'updates',
+        'wishes',
+        'streamer_links',
+        'about_blocks',
+        'partner_shops'
+      ];
+      const channel = client.channel('bkmp-live-dashboard');
+      tables.forEach(table => {
+        channel.on('postgres_changes', { event: '*', schema: 'public', table }, scheduleLiveDataRefresh);
+      });
+      channel.subscribe();
+      window.__bkmpRealtimeChannel = channel;
+    }
+
     Promise.all([
       syncIncomesFromSupabase(data, null),
       syncInvestorsFromSupabase(data, null),
@@ -351,9 +378,14 @@
       if (typeof renderAboutBlocks === 'function') renderAboutBlocks();
       if (typeof renderPartnerShops === 'function') renderPartnerShops();
       scheduleDeferredSync();
+      initSupabaseRealtime();
     });
 
-    window.setInterval(refreshVisibleData, 60000);
+    window.setInterval(refreshVisibleData, 15000);
+    window.addEventListener('focus', refreshVisibleData);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) refreshVisibleData();
+    });
 
     function renderFinancialSections() {
     const totalIncome = bkmpSum(data.income);
