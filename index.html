@@ -194,6 +194,9 @@
   <script>
     bkmpInitTheme();
     window.addEventListener('load', () => document.body.classList.add('page-loaded'));
+    document.addEventListener('visibilitychange', () => {
+      document.body.classList.toggle('page-hidden', document.hidden);
+    });
 
     /* ---------------- Swipe-Tabs ---------------- */
     const track = document.getElementById('panelsTrack');
@@ -647,16 +650,23 @@
         applyStreamerLiveState(streamerLiveCache.live);
         return;
       }
-      fetch('/api/twitch-live?users=' + encodeURIComponent(users.join(',')), { cache: 'no-store' })
-        .then(response => response.ok ? response.json() : null)
-        .then(payload => {
-          if (!payload || !payload.live) return;
-          streamerLiveCache = { checkedAt: Date.now(), live: payload.live };
-          applyStreamerLiveState(payload.live);
-        })
-        .catch(() => {
-          applyStreamerLiveState(streamerLiveCache.live);
-        });
+      const run = () => {
+        fetch('/api/twitch-live?users=' + encodeURIComponent(users.join(',')), { cache: 'no-store' })
+          .then(response => response.ok ? response.json() : null)
+          .then(payload => {
+            if (!payload || !payload.live) return;
+            streamerLiveCache = { checkedAt: Date.now(), live: payload.live };
+            applyStreamerLiveState(payload.live);
+          })
+          .catch(() => {
+            applyStreamerLiveState(streamerLiveCache.live);
+          });
+      };
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(run, { timeout: 2200 });
+      } else {
+        setTimeout(run, 900);
+      }
     }
 
     function renderStreamers() {
