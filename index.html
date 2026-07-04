@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preload" as="image" href="assets/top-banner.png" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260704-image-load">
+<link rel="stylesheet" href="style.css?v=20260704-stable-audit">
 </head>
 <body>
 
@@ -191,8 +191,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260704-image-load"></script>
-  <script src="app.js?v=20260704-image-load"></script>
+  <script src="supabase.js?v=20260704-stable-audit"></script>
+  <script src="app.js?v=20260704-stable-audit"></script>
   <script>
     bkmpInitTheme();
     window.addEventListener('load', () => document.body.classList.add('page-loaded'));
@@ -332,7 +332,7 @@
         syncInvestorsFromSupabase(data, null),
         syncExpensesFromSupabase(data, null)
       ]).then(results => {
-        if (results.some(Boolean)) renderAll();
+        if (results.some(Boolean) && typeof renderFinancialSections === 'function') renderFinancialSections();
       });
       refreshDeferredPanels();
     }

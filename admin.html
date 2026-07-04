@@ -21,7 +21,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260704-streamer-save">
+<link rel="stylesheet" href="style.css?v=20260704-stable-audit">
 </head>
 <body>
 
@@ -356,8 +356,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260704-streamer-save"></script>
-  <script src="app.js?v=20260704-streamer-save"></script>
+  <script src="supabase.js?v=20260704-stable-audit"></script>
+  <script src="app.js?v=20260704-stable-audit"></script>
   <script>
     bkmpInitTheme();
 
@@ -383,14 +383,14 @@
 
     async function refreshBackupDataFromSupabase() {
       await Promise.all([
-        syncIncomesFromSupabase(data, null),
-        syncInvestorsFromSupabase(data, null),
-        syncExpensesFromSupabase(data, null),
-        syncUpdatesFromSupabase(data, null),
-        syncWishesFromSupabase(data, null),
-        syncStreamersFromSupabase(data, null),
-        syncAboutBlocksFromSupabase(data, null),
-        syncPartnerShopsFromSupabase(data, null)
+        syncIncomesFromSupabase(data, null, { force: true }),
+        syncInvestorsFromSupabase(data, null, { force: true }),
+        syncExpensesFromSupabase(data, null, { force: true }),
+        syncUpdatesFromSupabase(data, null, { force: true }),
+        syncWishesFromSupabase(data, null, { force: true }),
+        syncStreamersFromSupabase(data, null, { force: true }),
+        syncAboutBlocksFromSupabase(data, null, { force: true }),
+        syncPartnerShopsFromSupabase(data, null, { force: true })
       ]);
       renderAll();
     }
@@ -533,36 +533,42 @@
       renderAll();
     }
 
+    function supabaseErrorText(e) {
+      return e && (e.message || e.details || e.code)
+        ? [e.message, e.details, e.code].filter(Boolean).join(' | ')
+        : 'Unbekannter Fehler';
+    }
+
     async function refreshIncomesFromSupabase() {
-      await syncIncomesFromSupabase(data, function () { renderAll(); });
+      await syncIncomesFromSupabase(data, function () { renderAll(); }, { force: true });
     }
 
     async function refreshInvestorsFromSupabase() {
-      await syncInvestorsFromSupabase(data, function () { renderAll(); });
+      await syncInvestorsFromSupabase(data, function () { renderAll(); }, { force: true });
     }
 
     async function refreshExpensesFromSupabase() {
-      await syncExpensesFromSupabase(data, function () { renderAll(); });
+      await syncExpensesFromSupabase(data, function () { renderAll(); }, { force: true });
     }
 
     async function refreshUpdatesFromSupabase() {
-      await syncUpdatesFromSupabase(data, function () { renderAll(); });
+      await syncUpdatesFromSupabase(data, function () { renderAll(); }, { force: true });
     }
 
     async function refreshWishesFromSupabase() {
-      await syncWishesFromSupabase(data, function () { renderAll(); });
+      await syncWishesFromSupabase(data, function () { renderAll(); }, { force: true });
     }
 
     async function refreshStreamersFromSupabase() {
-      await syncStreamersFromSupabase(data, function () { renderAll(); });
+      await syncStreamersFromSupabase(data, function () { renderAll(); }, { force: true });
     }
 
     async function refreshAboutBlocksFromSupabase() {
-      await syncAboutBlocksFromSupabase(data, function () { renderAll(); });
+      await syncAboutBlocksFromSupabase(data, function () { renderAll(); }, { force: true });
     }
 
     async function refreshPartnerShopsFromSupabase() {
-      await syncPartnerShopsFromSupabase(data, function () { renderAll(); });
+      await syncPartnerShopsFromSupabase(data, function () { renderAll(); }, { force: true });
     }
 
     async function persistExpense(expense) {
@@ -572,13 +578,16 @@
           data.expenses.push(saved);
           bkmpSaveData(data);
           renderAll();
-          return;
+          return true;
         } catch (e) {
-          console.warn('Supabase konnte Ausgabe nicht speichern. localStorage-Fallback wird verwendet.', e);
+          console.error('Supabase konnte Ausgabe nicht speichern.', e);
+          alert('Die Ausgabe konnte nicht online gespeichert werden.\n\nSupabase meldet: ' + supabaseErrorText(e));
+          return false;
         }
       }
       data.expenses.push(expense);
       persist();
+      return true;
     }
 
     async function removeExpense(id) {
@@ -589,7 +598,7 @@
           data.expenses = data.expenses.filter(item => String(item.id) !== String(id));
           bkmpSaveData(data);
           renderAll();
-          return;
+          return true;
         } catch (e) {
           console.warn('Supabase konnte Ausgabe nicht loeschen. localStorage-Fallback wird verwendet.', e);
         }
@@ -812,13 +821,16 @@
           data.income.push(saved);
           bkmpSaveData(data);
           renderAll();
-          return;
+          return true;
         } catch (e) {
-          console.warn('Supabase konnte Einnahme nicht speichern. localStorage-Fallback wird verwendet.', e);
+          console.error('Supabase konnte Einnahme nicht speichern.', e);
+          alert('Die Einnahme konnte nicht online gespeichert werden.\n\nSupabase meldet: ' + supabaseErrorText(e));
+          return false;
         }
       }
       data.income.push(income);
       persist();
+      return true;
     }
 
     async function removeIncome(id) {
@@ -850,7 +862,9 @@
           renderAll();
           return true;
         } catch (e) {
-          console.warn('Supabase konnte Investor nicht speichern. localStorage-Fallback wird verwendet.', e);
+          console.error('Supabase konnte Investor nicht speichern.', e);
+          alert('Der Investor konnte nicht online gespeichert werden.\n\nSupabase meldet: ' + supabaseErrorText(e));
+          return false;
         }
       }
       if (investor.id) {
@@ -1205,7 +1219,7 @@
     }
 
     /* Einnahmen */
-    document.getElementById('addIncome').addEventListener('click', () => {
+    document.getElementById('addIncome').addEventListener('click', async () => {
       updateIncomeCalculation();
       const name = document.getElementById('incomeName').value.trim();
       const amountInput = incomeAmountInput.value;
@@ -1213,23 +1227,30 @@
       const date = document.getElementById('incomeDate').value || todayStr;
       if (!name || amountInput === '' || Number.isNaN(amount)) return;
       const income = { id: bkmpUid('inc'), name, category: name, amount, date, note: '', createdAt: Date.now() };
-      incomeAmountInput.value = '';
-      incomeQuantityInput.value = '';
-      updateIncomeCalculation();
-      persistIncome(income);
+      const saved = await persistIncome(income);
+      if (saved) {
+        incomeAmountInput.value = '';
+        incomeQuantityInput.value = '';
+        updateIncomeCalculation();
+      }
     });
 
     /* Ausgaben */
-    document.getElementById('addExpense').addEventListener('click', () => {
-      const name = document.getElementById('expenseName').value.trim();
-      const amount = Number(document.getElementById('expenseAmount').value);
-      const date = document.getElementById('expenseDate').value || todayStr;
+    document.getElementById('addExpense').addEventListener('click', async () => {
+      const expenseNameInput = document.getElementById('expenseName');
+      const expenseAmountInput = document.getElementById('expenseAmount');
+      const expenseDateInput = document.getElementById('expenseDate');
+      const name = expenseNameInput.value.trim();
+      const amount = Number(expenseAmountInput.value);
+      const date = expenseDateInput.value || todayStr;
       if (!name || !amount) return;
       const expense = { id: bkmpUid('exp'), name, category: name, amount, date, note: '', createdAt: Date.now() };
-      document.getElementById('expenseName').value = '';
-      document.getElementById('expenseAmount').value = '';
-      document.getElementById('expenseDate').value = todayStr;
-      persistExpense(expense);
+      const saved = await persistExpense(expense);
+      if (saved) {
+        expenseNameInput.value = '';
+        expenseAmountInput.value = '';
+        expenseDateInput.value = todayStr;
+      }
     });
 
     /* Investoren */
@@ -1282,7 +1303,9 @@
       }
       const payload = { name, minecraftName, invested, sharePercent, startDate, endDate };
       if (editingInvestorId) payload.id = editingInvestorId;
-      persistInvestor(payload).then(() => clearInvestorForm());
+      persistInvestor(payload).then(saved => {
+        if (saved) clearInvestorForm();
+      });
     });
 
     /* Twitch-Leiste */
