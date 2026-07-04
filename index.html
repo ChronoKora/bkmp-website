@@ -615,19 +615,24 @@
       const track = document.getElementById('streamerMarqueeTrack');
       if (!marquee || !track) return;
       const streamers = Array.isArray(data.streamers) ? data.streamers.filter(item => item.name && item.url) : [];
+      const signature = JSON.stringify(streamers.map(item => [item.name, item.url, item.color || 'purple']));
       if (streamers.length === 0) {
         const strip = document.getElementById('streamerStrip');
         if (strip) strip.style.display = 'none';
         track.innerHTML = '';
+        track.dataset.signature = '';
         return;
       }
       const strip = document.getElementById('streamerStrip');
       if (strip) strip.style.display = 'flex';
+      if (track.dataset.signature === signature) return;
       const itemsHtml = streamers.map(item => {
         const url = String(item.url || '').startsWith('http') ? item.url : 'https://' + item.url;
         return `<a class="streamer-pill streamer-${item.color || 'purple'}" href="${url}" target="_blank" rel="noopener">${escapeHtml(item.name)}</a>`;
       }).join('');
-      const loopHtml = Array(6).fill(itemsHtml).join('');
+      const repeatCount = Math.max(2, Math.ceil(18 / streamers.length));
+      const loopHtml = Array(repeatCount).fill(itemsHtml).join('');
+      track.dataset.signature = signature;
       track.innerHTML = `<div class="streamer-marquee-group">${loopHtml}</div><div class="streamer-marquee-group" aria-hidden="true">${loopHtml}</div>`;
     }
     renderStreamers();
