@@ -257,6 +257,37 @@ body.page-loaded .streamer-marquee-track {
   white-space: nowrap;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
 }
+.streamer-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(10, 10, 15, 0.34);
+  box-shadow: inset 0 0 0 1px rgba(10, 10, 15, 0.22);
+  flex-shrink: 0;
+}
+.streamer-live-label {
+  display: none;
+  border-radius: 999px;
+  padding: 0.11rem 0.36rem;
+  color: #fff;
+  background: #ef4444;
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  box-shadow: 0 0 18px rgba(239, 68, 68, 0.45);
+}
+.streamer-pill.is-live {
+  border-color: rgba(255, 255, 255, 0.38);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.24), 0 0 24px rgba(239, 68, 68, 0.24);
+}
+.streamer-pill.is-live .streamer-live-dot {
+  background: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18), 0 0 14px rgba(239, 68, 68, 0.72);
+}
+.streamer-pill.is-live .streamer-live-label {
+  display: inline-flex;
+}
 .streamer-purple { background: #a78bfa; }
 .streamer-gold { background: var(--gold); }
 .streamer-green { background: #4ade80; }

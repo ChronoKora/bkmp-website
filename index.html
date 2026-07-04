@@ -614,6 +614,51 @@
       return String(value || '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
     }
 
+    let streamerLiveCache = { checkedAt: 0, live: {} };
+
+    function getTwitchUsername(url) {
+      const raw = String(url || '').trim();
+      if (!raw) return '';
+      try {
+        const parsed = new URL(raw.startsWith('http') ? raw : 'https://' + raw);
+        if (!parsed.hostname.includes('twitch.tv')) return '';
+        return (parsed.pathname.split('/').filter(Boolean)[0] || '').toLowerCase();
+      } catch (e) {
+        return raw.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/').filter(Boolean).pop()?.toLowerCase() || '';
+      }
+    }
+
+    function applyStreamerLiveState(liveMap) {
+      document.querySelectorAll('[data-twitch-user]').forEach(item => {
+        const user = item.dataset.twitchUser;
+        const live = Boolean(liveMap && liveMap[user]);
+        item.classList.toggle('is-live', live);
+        const label = item.querySelector('.streamer-live-label');
+        if (label) label.textContent = live ? 'Live' : 'Offline';
+        item.title = live ? `${item.textContent.trim()} ist gerade live` : `${item.textContent.trim()} ist gerade offline`;
+      });
+    }
+
+    function refreshStreamerLiveStatus(streamers) {
+      const users = [...new Set(streamers.map(item => getTwitchUsername(item.url)).filter(Boolean))];
+      if (!users.length) return;
+      const now = Date.now();
+      if (now - streamerLiveCache.checkedAt < 60000) {
+        applyStreamerLiveState(streamerLiveCache.live);
+        return;
+      }
+      fetch('/api/twitch-live?users=' + encodeURIComponent(users.join(',')), { cache: 'no-store' })
+        .then(response => response.ok ? response.json() : null)
+        .then(payload => {
+          if (!payload || !payload.live) return;
+          streamerLiveCache = { checkedAt: Date.now(), live: payload.live };
+          applyStreamerLiveState(payload.live);
+        })
+        .catch(() => {
+          applyStreamerLiveState(streamerLiveCache.live);
+        });
+    }
+
     function renderStreamers() {
       const marquee = document.getElementById('streamerMarquee');
       const track = document.getElementById('streamerMarqueeTrack');
@@ -629,15 +674,20 @@
       }
       const strip = document.getElementById('streamerStrip');
       if (strip) strip.style.display = 'flex';
-      if (track.dataset.signature === signature) return;
+      if (track.dataset.signature === signature) {
+        refreshStreamerLiveStatus(streamers);
+        return;
+      }
       const itemsHtml = streamers.map(item => {
         const url = String(item.url || '').startsWith('http') ? item.url : 'https://' + item.url;
-        return `<a class="streamer-pill streamer-${item.color || 'purple'}" href="${url}" target="_blank" rel="noopener">${escapeHtml(item.name)}</a>`;
+        const twitchUser = getTwitchUsername(url);
+        return `<a class="streamer-pill streamer-${item.color || 'purple'}" href="${url}" target="_blank" rel="noopener" data-twitch-user="${escapeHtml(twitchUser)}"><span class="streamer-live-dot" aria-hidden="true"></span><span class="streamer-name">${escapeHtml(item.name)}</span><span class="streamer-live-label">Offline</span></a>`;
       }).join('');
       const repeatCount = Math.max(2, Math.ceil(18 / streamers.length));
       const loopHtml = Array(repeatCount).fill(itemsHtml).join('');
       track.dataset.signature = signature;
       track.innerHTML = `<div class="streamer-marquee-group">${loopHtml}</div><div class="streamer-marquee-group" aria-hidden="true">${loopHtml}</div>`;
+      refreshStreamerLiveStatus(streamers);
     }
     renderStreamers();
 
