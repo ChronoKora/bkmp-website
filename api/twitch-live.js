@@ -13,8 +13,12 @@ function send(res, status, payload) {
 async function getTwitchToken() {
   const clientId = process.env.TWITCH_CLIENT_ID;
   const clientSecret = process.env.TWITCH_CLIENT_SECRET;
-  if (!clientId || !clientSecret) return null;
-  if (tokenCache.value && Date.now() < tokenCache.expiresAt) return tokenCache.value;
+  if (!clientId || !clientSecret) {
+    return { token: null, reason: 'missing_env' };
+  }
+  if (tokenCache.value && Date.now() < tokenCache.expiresAt) {
+    return { token: tokenCache.value, reason: 'cached' };
+  }
 
   const response = await fetch('https://id.twitch.tv/oauth2/token', {
     method: 'POST',
@@ -26,27 +30,38 @@ async function getTwitchToken() {
     })
   });
 
-  if (!response.ok) throw new Error('Twitch token request failed');
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    const error = new Error('Twitch token request failed');
+    error.reason = 'token_failed';
+    error.detail = detail.slice(0, 180);
+    throw error;
+  }
   const data = await response.json();
   tokenCache.value = data.access_token;
   tokenCache.expiresAt = Date.now() + Math.max(60, Number(data.expires_in || 3600) - 120) * 1000;
-  return tokenCache.value;
+  return { token: tokenCache.value, reason: 'ok' };
 }
 
 module.exports = async function handler(req, res) {
   try {
     const clientId = process.env.TWITCH_CLIENT_ID;
+    const clientSecret = process.env.TWITCH_CLIENT_SECRET;
+    const env = {
+      hasClientId: Boolean(clientId),
+      hasClientSecret: Boolean(clientSecret)
+    };
     const users = String(req.query.users || '')
       .split(',')
       .map(user => user.trim().toLowerCase())
       .filter(Boolean)
       .slice(0, 50);
 
-    if (!users.length) return send(res, 200, { live: {} });
+    if (!users.length) return send(res, 200, { live: {}, configured: env.hasClientId && env.hasClientSecret, env });
 
-    const token = await getTwitchToken();
-    if (!clientId || !token) {
-      return send(res, 200, { live: {}, configured: false });
+    const tokenResult = await getTwitchToken();
+    if (!clientId || !tokenResult.token) {
+      return send(res, 200, { live: {}, configured: false, reason: tokenResult.reason, env });
     }
 
     const params = new URLSearchParams();
@@ -54,11 +69,14 @@ module.exports = async function handler(req, res) {
     const response = await fetch('https://api.twitch.tv/helix/streams?' + params.toString(), {
       headers: {
         'Client-ID': clientId,
-        Authorization: `Bearer ${token}`
+        Authorization: `Bearer ${tokenResult.token}`
       }
     });
 
-    if (!response.ok) throw new Error('Twitch stream request failed');
+    if (!response.ok) {
+      const detail = await response.text().catch(() => '');
+      return send(res, 200, { live: {}, configured: false, reason: 'stream_failed', status: response.status, detail: detail.slice(0, 180), env });
+    }
     const data = await response.json();
     const live = {};
     users.forEach(user => { live[user] = false; });
@@ -66,8 +84,14 @@ module.exports = async function handler(req, res) {
       live[String(stream.user_login || '').toLowerCase()] = true;
     });
 
-    return send(res, 200, { live, configured: true, checkedAt: new Date().toISOString() });
+    return send(res, 200, { live, configured: true, env, checkedAt: new Date().toISOString() });
   } catch (error) {
-    return send(res, 200, { live: {}, configured: false, error: 'twitch_live_unavailable' });
+    return send(res, 200, {
+      live: {},
+      configured: false,
+      error: 'twitch_live_unavailable',
+      reason: error.reason || 'unknown',
+      detail: error.detail || ''
+    });
   }
 };
