@@ -705,6 +705,18 @@ body.page-loaded .streamer-marquee-track {
   cursor: zoom-in;
 }
 .wish-card img { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; display: block; background: var(--paper); }
+.wish-image-empty {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: var(--paper-3);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
 .wish-card-body { padding: 0.85rem; }
 .wish-card .wish-name { margin-bottom: 0.75rem; font-size: 0.95rem; font-weight: 800; color: var(--ink); }
 .wish-card-actions { display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center; }

@@ -33,6 +33,26 @@ function bkmpGetSupabaseClient() {
   return bkmpSupabaseClient;
 }
 
+async function bkmpStoreImageIfNeeded(value, folder) {
+  if (!value || typeof value !== 'string' || !value.startsWith('data:image/')) return value || '';
+  const client = bkmpGetSupabaseClient();
+  if (!client) return value;
+  const response = await fetch(value);
+  const blob = await response.blob();
+  const ext = blob.type.includes('png') ? 'png' : blob.type.includes('jpeg') || blob.type.includes('jpg') ? 'jpg' : 'webp';
+  const safeFolder = String(folder || 'content').replace(/[^a-z0-9_-]/gi, '-').toLowerCase();
+  const fileName = `${safeFolder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const { error } = await client.storage
+    .from('update-images')
+    .upload(fileName, blob, {
+      contentType: blob.type || 'image/webp',
+      upsert: false
+    });
+  if (error) throw error;
+  const { data } = client.storage.from('update-images').getPublicUrl(fileName);
+  return data && data.publicUrl ? data.publicUrl : value;
+}
+
 function bkmpAdminEmailFromName(name) {
   const clean = String(name || '')
     .trim()
@@ -833,16 +853,18 @@ async function loadWishes() {
 async function saveWish(wish) {
   const client = bkmpGetSupabaseClient();
   if (!client) return null;
+  const payload = bkmpMapWishToSupabase(wish);
+  payload.image_url = await bkmpStoreImageIfNeeded(payload.image_url, 'wishes');
   let { data, error } = await client
     .from('wishes')
-    .insert(bkmpMapWishToSupabase(wish))
+    .insert(payload)
     .select('id, name, image_url, likes, dislikes, created_at')
     .single();
 
   if (error && (String(error.message || '').includes('likes') || String(error.message || '').includes('dislikes'))) {
     const fallback = await client
       .from('wishes')
-      .insert(bkmpMapWishToSupabase(wish))
+      .insert(payload)
       .select('id, name, image_url, created_at')
       .single();
     data = fallback.data;
@@ -1127,6 +1149,7 @@ async function savePartnerShop(shop) {
   const client = bkmpGetSupabaseClient();
   if (!client) return null;
   const payload = bkmpMapPartnerShopToSupabase(shop);
+  payload.image_url = await bkmpStoreImageIfNeeded(payload.image_url, 'partner-shops');
   let query;
   if (shop.id && !String(shop.id).startsWith('shop-')) {
     query = client
@@ -1251,6 +1274,9 @@ async function importLocalWishesToSupabase() {
     rows.push(bkmpMapWishToSupabase(item));
   });
   if (rows.length) {
+    for (const row of rows) {
+      row.image_url = await bkmpStoreImageIfNeeded(row.image_url, 'wishes');
+    }
     const { error } = await client.from('wishes').insert(rows);
     if (error) throw error;
   }
@@ -1303,6 +1329,12 @@ async function importLocalAboutBlocksToSupabase() {
     rows.push(bkmpMapAboutBlockToSupabase(item));
   });
   if (rows.length) {
+    for (const row of rows) {
+      row.image_url = await bkmpStoreImageIfNeeded(row.image_url, 'about');
+      if (Array.isArray(row.image_urls)) {
+        row.image_urls = await Promise.all(row.image_urls.map(src => bkmpStoreImageIfNeeded(src, 'about')));
+      }
+    }
     const { error } = await client.from('about_blocks').insert(rows);
     if (error) throw error;
   }
@@ -1329,6 +1361,9 @@ async function importLocalPartnerShopsToSupabase() {
     rows.push(bkmpMapPartnerShopToSupabase(item));
   });
   if (rows.length) {
+    for (const row of rows) {
+      row.image_url = await bkmpStoreImageIfNeeded(row.image_url, 'partner-shops');
+    }
     const { error } = await client.from('partner_shops').insert(rows);
     if (error) throw error;
   }

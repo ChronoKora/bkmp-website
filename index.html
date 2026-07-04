@@ -626,7 +626,7 @@
         const href = shop.link ? (String(shop.link).startsWith('http') ? shop.link : 'https://' + shop.link) : '';
         return `
           <article class="partner-card">
-            ${shop.image ? `<img src="${shop.image}" alt="${escapeHtml(shop.name)}" loading="lazy" decoding="async">` : '<div class="partner-image-empty">Shop</div>'}
+            ${shop.image ? `<img src="${shop.image}" alt="${escapeHtml(shop.name)}" loading="lazy" decoding="async" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'partner-image-empty',textContent:'Shop'}))">` : '<div class="partner-image-empty">Shop</div>'}
             <div class="partner-body">
               <span class="partner-category">${escapeHtml(shop.category || 'Partner')}</span>
               <h3>${escapeHtml(shop.name)}</h3>
@@ -693,7 +693,7 @@
       wishGrid.innerHTML = [...data.wishes].reverse().map(w => `
         <article class="wish-card" data-wish-id="${w.id}">
           <button class="wish-image-btn" type="button" data-action="open" aria-label="Kartenidee von ${escapeHtml(w.name)} gross ansehen">
-            <img src="${w.image}" alt="Kartenidee von ${escapeHtml(w.name)}" loading="lazy" decoding="async">
+            ${w.image ? `<img src="${w.image}" alt="Kartenidee von ${escapeHtml(w.name)}" loading="lazy" decoding="async" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'wish-image-empty',textContent:'Bild fehlt'}))">` : '<span class="wish-image-empty">Bild fehlt</span>'}
           </button>
           <div class="wish-card-body">
             <div class="wish-name">${escapeHtml(w.name)}</div>
