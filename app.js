@@ -203,17 +203,28 @@ function bkmpInitTheme() {
     }, 180);
   }
 
+  function openJokeOverlay() {
+    if (!overlay) return;
+    overlay.classList.add('visible');
+    document.body.classList.add('modal-open');
+  }
+
+  function closeJokeOverlay() {
+    if (overlay) overlay.classList.remove('visible');
+    document.body.classList.remove('modal-open');
+  }
+
   toggleBtn.addEventListener('click', function () {
     const current = root.getAttribute('data-theme');
     const next = current === 'dark' ? 'light' : 'dark';
     setTheme(next);
-    if (next === 'light' && overlay) overlay.classList.add('visible');
+    if (next === 'light') openJokeOverlay();
   });
 
-  if (jokeYes) jokeYes.addEventListener('click', () => overlay.classList.remove('visible'));
+  if (jokeYes) jokeYes.addEventListener('click', closeJokeOverlay);
   if (jokeNo) jokeNo.addEventListener('click', () => {
     setTheme('dark');
-    overlay.classList.remove('visible');
+    closeJokeOverlay();
   });
 
   updateLabel();

@@ -297,11 +297,11 @@
     const data = bkmpLoadData();
     function refreshDeferredPanels() {
       return Promise.all([
-        syncUpdatesFromSupabase(data, null),
-        syncWishesFromSupabase(data, null),
-        syncStreamersFromSupabase(data, null),
-        syncAboutBlocksFromSupabase(data, null),
-        syncPartnerShopsFromSupabase(data, null)
+        syncUpdatesFromSupabase(data, null, { force: true }),
+        syncWishesFromSupabase(data, null, { force: true }),
+        syncStreamersFromSupabase(data, null, { force: true }),
+        syncAboutBlocksFromSupabase(data, null, { force: true }),
+        syncPartnerShopsFromSupabase(data, null, { force: true })
       ]).then(results => {
         const changed = results.some(Boolean);
         renderStreamers();
@@ -323,6 +323,18 @@
       }
     }
 
+    function refreshVisibleData() {
+      if (document.hidden) return;
+      Promise.all([
+        syncIncomesFromSupabase(data, null),
+        syncInvestorsFromSupabase(data, null),
+        syncExpensesFromSupabase(data, null)
+      ]).then(results => {
+        if (results.some(Boolean)) renderAll();
+      });
+      refreshDeferredPanels();
+    }
+
     Promise.all([
       syncIncomesFromSupabase(data, null),
       syncInvestorsFromSupabase(data, null),
@@ -339,6 +351,8 @@
       if (typeof renderPartnerShops === 'function') renderPartnerShops();
       scheduleDeferredSync();
     });
+
+    window.setInterval(refreshVisibleData, 60000);
 
     function renderFinancialSections() {
     const totalIncome = bkmpSum(data.income);
@@ -966,8 +980,8 @@
         }
         if (typeof saveWish === 'function' && bkmpGetSupabaseClient()) {
           saveWish(wish).then(finishWish).catch(e => {
-            console.warn('Supabase konnte Kartenidee nicht speichern. localStorage-Fallback wird verwendet.', e);
-            finishWish(wish);
+            console.error('Supabase konnte Kartenidee nicht speichern.', e);
+            alert('Deine Kartenidee konnte nicht online gespeichert werden. Bitte versuche es mit einem kleineren PNG-Bild nochmal.');
           });
         } else {
           finishWish(wish);

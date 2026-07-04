@@ -906,6 +906,15 @@ async function syncWishesFromSupabase(targetData, onSynced, options = {}) {
   try {
     const wishes = await loadWishes();
     if (!wishes) return false;
+    const localWishes = Array.isArray(targetData.wishes) ? targetData.wishes : [];
+    wishes.forEach(wish => {
+      if (wish.image) return;
+      const local = localWishes.find(item =>
+        String(item.id || '') === String(wish.id || '') ||
+        (item.name && item.name === wish.name)
+      );
+      if (local && local.image) wish.image = local.image;
+    });
     const localCount = Array.isArray(targetData.wishes) ? targetData.wishes.length : 0;
     if (localCount > 0 && wishes.length === 0) {
       console.warn('Supabase enthaelt keine Kartenideen. Lokale Kartenideen bleiben erhalten.');
@@ -1054,6 +1063,15 @@ async function saveAboutBlock(block) {
   const client = bkmpGetSupabaseClient();
   if (!client) return null;
   const payload = bkmpMapAboutBlockToSupabase(block);
+  payload.image_url = await bkmpStoreImageIfNeeded(payload.image_url, 'about');
+  if (Array.isArray(payload.image_urls)) {
+    payload.image_urls = (await Promise.all(
+      payload.image_urls.map(src => bkmpStoreImageIfNeeded(src, 'about'))
+    )).filter(Boolean);
+  }
+  if (!payload.image_url && payload.image_urls && payload.image_urls.length) {
+    payload.image_url = payload.image_urls[0];
+  }
   let query;
   if (block.id && !String(block.id).startsWith('about-')) {
     query = client
@@ -1088,6 +1106,18 @@ async function syncAboutBlocksFromSupabase(targetData, onSynced, options = {}) {
   try {
     const blocks = await loadAboutBlocks();
     if (!blocks) return false;
+    const localBlocks = Array.isArray(targetData.aboutBlocks) ? targetData.aboutBlocks : [];
+    blocks.forEach(block => {
+      const local = localBlocks.find(item =>
+        String(item.id || '') === String(block.id || '') ||
+        (item.title && item.title === block.title && item.content === block.content)
+      );
+      if (!local) return;
+      if (!block.image && local.image) block.image = local.image;
+      if ((!Array.isArray(block.images) || block.images.length === 0) && Array.isArray(local.images)) {
+        block.images = local.images;
+      }
+    });
     const localCount = Array.isArray(targetData.aboutBlocks) ? targetData.aboutBlocks.length : 0;
     if (localCount > 0 && blocks.length === 0) {
       console.warn('Supabase enthaelt keine About-Bloecke. Lokale About-Bloecke bleiben erhalten.');
@@ -1185,6 +1215,15 @@ async function syncPartnerShopsFromSupabase(targetData, onSynced, options = {}) 
   try {
     const shops = await loadPartnerShops();
     if (!shops) return false;
+    const localShops = Array.isArray(targetData.partnerShops) ? targetData.partnerShops : [];
+    shops.forEach(shop => {
+      if (shop.image) return;
+      const local = localShops.find(item =>
+        String(item.id || '') === String(shop.id || '') ||
+        (item.name && item.name === shop.name && item.location === shop.location)
+      );
+      if (local && local.image) shop.image = local.image;
+    });
     const localCount = Array.isArray(targetData.partnerShops) ? targetData.partnerShops.length : 0;
     if (localCount > 0 && shops.length === 0) {
       console.warn('Supabase enthaelt keine PartnerShops. Lokale PartnerShops bleiben erhalten.');

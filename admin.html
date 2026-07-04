@@ -172,7 +172,7 @@
               <button class="format-btn color-gold" type="button" data-format="color" data-color="#C9A56A">Gold</button>
               <button class="format-btn color-blue" type="button" data-format="color" data-color="#38BDF8">Blau</button>
             </div>
-            <textarea id="newsText" placeholder="Was m?chtest du berichten?"></textarea>
+            <textarea id="newsText" placeholder="Was möchtest du berichten?"></textarea>
             <div class="form-grid form-grid-2">
               <div><label>Datum</label><input type="date" id="newsDate"></div>
               <div><label>Bild (optional)</label><input type="file" multiple id="newsImageFile" accept="image/*"></div>
@@ -581,10 +581,11 @@
     }
 
     async function removeExpense(id) {
+      if (!hasValidEntryId(id)) return removeEntry('expenses', id);
       if (typeof deleteExpense === 'function' && bkmpGetSupabaseClient()) {
         try {
           await deleteExpense(id);
-          data.expenses = data.expenses.filter(item => item.id !== id);
+          data.expenses = data.expenses.filter(item => String(item.id) !== String(id));
           bkmpSaveData(data);
           renderAll();
           return;
@@ -626,10 +627,11 @@
     }
 
     async function removeUpdate(id) {
+      if (!hasValidEntryId(id)) return removeEntry('news', id);
       if (typeof deleteUpdate === 'function' && bkmpGetSupabaseClient()) {
         try {
           await deleteUpdate(id);
-          data.news = data.news.filter(item => item.id !== id);
+          data.news = data.news.filter(item => String(item.id) !== String(id));
           bkmpSaveData(data);
           renderAll();
           return;
@@ -641,10 +643,11 @@
     }
 
     async function removeWish(id) {
+      if (!hasValidEntryId(id)) return removeEntry('wishes', id);
       if (typeof deleteWish === 'function' && bkmpGetSupabaseClient() && !String(id).startsWith('wish-')) {
         try {
           await deleteWish(id);
-          data.wishes = data.wishes.filter(item => item.id !== id);
+          data.wishes = data.wishes.filter(item => String(item.id) !== String(id));
           bkmpSaveData(data);
           renderAll();
           return;
@@ -682,10 +685,11 @@
     }
 
     async function removeStreamer(id) {
+      if (!hasValidEntryId(id)) return removeEntry('streamers', id);
       if (typeof deleteStreamer === 'function' && bkmpGetSupabaseClient() && !String(id).startsWith('str-')) {
         try {
           await deleteStreamer(id);
-          data.streamers = data.streamers.filter(item => item.id !== id);
+          data.streamers = data.streamers.filter(item => String(item.id) !== String(id));
           bkmpSaveData(data);
           renderAll();
           return;
@@ -709,7 +713,9 @@
           renderAll();
           return true;
         } catch (e) {
-          console.warn('Supabase konnte About-Block nicht speichern. localStorage-Fallback wird verwendet.', e);
+          console.error('Supabase konnte About-Block nicht speichern.', e);
+          alert('Der Wer-sind-wir-Eintrag konnte nicht online gespeichert werden. Bitte pruefe Supabase Storage oder versuche ein kleineres Bild.');
+          return false;
         }
       }
       if (block.id) {
@@ -722,10 +728,11 @@
     }
 
     async function removeAboutBlock(id) {
+      if (!hasValidEntryId(id)) return removeEntry('aboutBlocks', id);
       if (typeof deleteAboutBlock === 'function' && bkmpGetSupabaseClient() && !String(id).startsWith('about-')) {
         try {
           await deleteAboutBlock(id);
-          data.aboutBlocks = data.aboutBlocks.filter(item => item.id !== id);
+          data.aboutBlocks = data.aboutBlocks.filter(item => String(item.id) !== String(id));
           bkmpSaveData(data);
           renderAll();
           return;
@@ -749,7 +756,9 @@
           renderAll();
           return true;
         } catch (e) {
-          console.warn('Supabase konnte PartnerShop nicht speichern. localStorage-Fallback wird verwendet.', e);
+          console.error('Supabase konnte PartnerShop nicht speichern.', e);
+          alert('Der PartnerShop konnte nicht online gespeichert werden. Bitte pruefe Supabase Storage oder versuche ein kleineres Bild.');
+          return false;
         }
       }
       if (shop.id) {
@@ -804,10 +813,11 @@
     }
 
     async function removeIncome(id) {
+      if (!hasValidEntryId(id)) return removeEntry('income', id);
       if (typeof deleteIncome === 'function' && bkmpGetSupabaseClient()) {
         try {
           await deleteIncome(id);
-          data.income = data.income.filter(item => item.id !== id);
+          data.income = data.income.filter(item => String(item.id) !== String(id));
           bkmpSaveData(data);
           renderAll();
           return;
@@ -844,10 +854,11 @@
     }
 
     async function removeInvestor(id) {
+      if (!hasValidEntryId(id)) return removeEntry('investors', id);
       if (typeof deleteInvestor === 'function' && bkmpGetSupabaseClient()) {
         try {
           await deleteInvestor(id);
-          data.investors = data.investors.filter(item => item.id !== id);
+          data.investors = data.investors.filter(item => String(item.id) !== String(id));
           bkmpSaveData(data);
           renderAll();
           return;
@@ -904,8 +915,9 @@
     }
 
     function renderAll() {
+      repairMissingIds();
       renderEntryList('incomeList', sortByDateDesc(data.income), item => item.name, item => `${formatDate(item.date)} · ${bkmpFormatCurrency(item.amount)}`, id => removeIncome(id));
-      renderEntryList('expenseList', sortByDateDesc(data.expenses), item => item.name, item => `${formatDate(item.date)} · ${bkmpFormatCurrency(item.amount)}`, id => removeEntry('expenses', id));
+      renderEntryList('expenseList', sortByDateDesc(data.expenses), item => item.name, item => `${formatDate(item.date)} · ${bkmpFormatCurrency(item.amount)}`, id => removeExpense(id));
       renderInvestorList();
       renderNewsList();
       renderWishAdminList();
@@ -914,8 +926,35 @@
       renderPartnerShopList();
     }
 
+    function hasValidEntryId(id) {
+      return id !== undefined && id !== null && String(id).trim() !== '';
+    }
+
+    function repairMissingIds() {
+      const lists = [
+        ['income', 'inc'],
+        ['expenses', 'exp'],
+        ['investors', 'inv'],
+        ['news', 'news'],
+        ['wishes', 'wish'],
+        ['streamers', 'str'],
+        ['aboutBlocks', 'about'],
+        ['partnerShops', 'shop']
+      ];
+      let repaired = false;
+      lists.forEach(([key, prefix]) => {
+        if (!Array.isArray(data[key])) return;
+        data[key] = data[key].map(item => {
+          if (item && hasValidEntryId(item.id)) return item;
+          repaired = true;
+          return { ...(item || {}), id: bkmpUid(prefix) };
+        });
+      });
+      if (repaired) bkmpSaveData(data);
+    }
+
     function aboutTypeLabel(type) {
-      return ({ heading: 'Ueberschrift', text: 'Text', image: 'Bild', image_text: 'Bild + Text', team: 'Team-Karte', gallery: 'Galerie' })[type] || 'Text';
+      return ({ heading: 'Überschrift', text: 'Text', image: 'Bild', image_text: 'Bild + Text', team: 'Team-Karte', gallery: 'Galerie' })[type] || 'Text';
     }
 
     function renderAboutBlockList() {
@@ -925,7 +964,7 @@
         ? [...data.aboutBlocks].sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0))
         : [];
       if (blocks.length === 0) {
-        el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Noch keine Bloecke.</p>';
+        el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Noch keine Blöcke.</p>';
         return;
       }
       el.innerHTML = '';
@@ -997,7 +1036,7 @@
       return ({
         purple: 'Lila',
         gold: 'Gold',
-        green: 'Gruen',
+        green: 'Grün',
         blue: 'Blau',
         red: 'Rot',
         pink: 'Pink',
@@ -1100,7 +1139,7 @@
     function renderNewsList() {
       const el = document.getElementById('newsList');
       if (data.news.length === 0) {
-        el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Noch keine Eintr?ge.</p>';
+        el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Noch keine Einträge.</p>';
         return;
       }
       el.innerHTML = '';
@@ -1114,7 +1153,7 @@
           </div>\
           <div class="entry-actions">\
             <button class="edit-btn" type="button">Bearbeiten</button>\
-            <button class="del-btn" type="button" aria-label="Update l?schen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>\
+            <button class="del-btn" type="button" aria-label="Update löschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>\
           </div>';
         row.querySelector('.edit-btn').addEventListener('click', () => startEditUpdate(item.id));
         row.querySelector('.del-btn').addEventListener('click', () => {
@@ -1148,7 +1187,11 @@
     }
 
     function removeEntry(key, id) {
-      data[key] = data[key].filter(item => item.id !== id);
+      if (!hasValidEntryId(id) || !Array.isArray(data[key])) {
+        console.warn('Loeschen abgebrochen: Eintrag hat keine gueltige ID.', key, id);
+        return;
+      }
+      data[key] = data[key].filter(item => String(item.id) !== String(id));
       persist();
     }
 
@@ -1357,7 +1400,9 @@
           sortOrder: aboutSortInput.value === '' ? (data.aboutBlocks.length + 1) * 10 : Number(aboutSortInput.value)
         };
         if (!block.title && !block.content && nextImages.length === 0) return;
-        persistAboutBlock(block).then(() => clearAboutForm());
+        persistAboutBlock(block).then(saved => {
+          if (saved) clearAboutForm();
+        });
       });
     });
 
@@ -1431,7 +1476,9 @@
           contact: partnerContactInput.value.trim(),
           image
         };
-        persistPartnerShop(shop).then(() => clearPartnerShopForm());
+        persistPartnerShop(shop).then(saved => {
+          if (saved) clearPartnerShopForm();
+        });
       });
     });
 
