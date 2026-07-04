@@ -472,7 +472,33 @@
     });
 
     function getIncomeUnitPrice(category) {
-      return incomeUnitPrices[bkmpNormalizeCategoryName(category)];
+      const compactName = String(category || '').toLowerCase().replace(/[^a-z]/g, '');
+      const compactPrices = {
+        bcher: 2500,
+        buecher: 2500,
+        raketen: 1000,
+        karten: 150000,
+        schmiedevorlagen: 1500,
+        netherite: 11000,
+        trnke: 1500,
+        traenke: 1500
+      };
+      if (compactPrices[compactName]) return compactPrices[compactName];
+      const key = String(category || '')
+        .toLowerCase()
+        .replace(/ÃƒÂ¼|Ã¼|\?/g, 'ue')
+        .replace(/ÃƒÂ¤|Ã¤/g, 'ae')
+        .replace(/ÃƒÂ¶|Ã¶/g, 'oe')
+        .replace(/\s+/g, '_');
+      const prices = {
+        buecher: 2500,
+        raketen: 1000,
+        karten: 150000,
+        schmiede_vorlagen: 1500,
+        netherite: 11000,
+        traenke: 1500
+      };
+      return prices[key];
     }
 
     function updateIncomeCalculation() {
