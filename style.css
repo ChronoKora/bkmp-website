@@ -311,7 +311,7 @@ body.page-loaded .streamer-marquee-track {
 .hero-banner {
   display: block;
   width: min(1760px, calc(100vw - 1.8rem));
-  aspect-ratio: 24 / 7;
+  aspect-ratio: 24 / 5.4;
   object-fit: cover;
   border-radius: 14px;
   border: 1px solid var(--line);
@@ -321,7 +321,7 @@ body.page-loaded .streamer-marquee-track {
 }
 @media (max-width: 720px) {
   .hero-banner-wrap { padding: 5rem 0.7rem 1.8rem; }
-  .hero-banner { width: calc(100vw - 1.4rem); border-radius: 10px; aspect-ratio: 24 / 8; }
+  .hero-banner { width: calc(100vw - 1.4rem); border-radius: 10px; aspect-ratio: 24 / 6.8; }
   .streamer-strip { width: calc(100vw - 1.4rem); gap: 0.45rem; min-height: 38px; }
   .streamer-strip-title { padding: 0 0.62rem; font-size: 0.66rem; }
   .streamer-pill { font-size: 0.76rem; }
