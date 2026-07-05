@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260705-cardimg-fix">
+<link rel="stylesheet" href="style.css?v=20260705-investor-requests">
 </head>
 <body>
 
@@ -140,6 +140,11 @@
       <!-- ================= Investoren ================= -->
       <section class="panel" id="panel-investors">
         <h2 class="panel-title">Unsere Investoren</h2>
+        <button class="wish-cta investor-request-cta" id="openInvestorRequestForm" type="button">
+          <span class="wish-cta-kicker">Investieren</span>
+          <strong>Du willst auch investieren?</strong>
+          <span>Stelle eine Anfrage — wir melden uns nach Prüfung bei dir</span>
+        </button>
         <div class="investor-grid" id="investorGrid"></div>
       </section>
 
@@ -203,6 +208,38 @@
     </div>
   </div>
 
+  <div class="joke-overlay investor-request-overlay" id="investorRequestOverlay">
+    <div class="joke-card" id="investorRequestCard">
+      <div id="investorRequestFormView">
+        <h3>Investoren-Anfrage</h3>
+        <label for="investorRequestName">Dein Name</label>
+        <input type="text" id="investorRequestName" placeholder="Wie heißt du?" required>
+        <label for="investorRequestAmount">Investitionssumme (€)</label>
+        <input type="number" id="investorRequestAmount" min="50000000" max="150000000" step="1000000" placeholder="z. B. 100000000" required>
+        <p class="investor-request-hint">Zwischen 50.000.000 € und 150.000.000 €. Deine Gewinnbeteiligung: <strong id="investorRequestSharePreview">–</strong></p>
+        <label for="investorRequestPeriod">Zeitraum</label>
+        <select id="investorRequestPeriod">
+          <option value="1">1 Monat</option>
+          <option value="2">2 Monate</option>
+          <option value="3">3 Monate</option>
+          <option value="6">6 Monate</option>
+          <option value="12">12 Monate</option>
+        </select>
+        <div class="joke-buttons">
+          <button class="btn-nein" id="investorRequestCancel" type="button">Abbrechen</button>
+          <button class="btn-ja" id="investorRequestSubmit" type="button">Anfrage senden</button>
+        </div>
+      </div>
+      <div id="investorRequestSuccessView" style="display:none; text-align:center;">
+        <h3>Danke!</h3>
+        <p>Deine Investoren-Anfrage wurde gesendet und wartet auf Bestätigung.</p>
+        <div class="joke-buttons">
+          <button class="btn-ja" id="investorRequestClose" type="button">Schließen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="joke-overlay wish-detail-overlay" id="wishDetailOverlay">
     <div class="wish-detail-card">
       <button class="wish-detail-close" id="wishDetailClose" type="button" aria-label="Schliessen">x</button>
@@ -218,8 +255,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260705-cardimg-fix"></script>
-  <script src="app.js?v=20260705-cardimg-fix"></script>
+  <script src="supabase.js?v=20260705-investor-requests"></script>
+  <script src="app.js?v=20260705-investor-requests"></script>
   <script>
     bkmpInitTheme();
     window.addEventListener('load', () => document.body.classList.add('page-loaded'));
@@ -1104,6 +1141,90 @@
         alert('Das Bild konnte nicht gelesen werden. Bitte versuche es mit einer anderen PNG-Datei erneut.');
       });
     });
+
+    /* ---------------- Investoren-Anfrage ---------------- */
+    const investorRequestOverlay = document.getElementById('investorRequestOverlay');
+    const investorRequestFormView = document.getElementById('investorRequestFormView');
+    const investorRequestSuccessView = document.getElementById('investorRequestSuccessView');
+    const openInvestorRequestForm = document.getElementById('openInvestorRequestForm');
+    const investorRequestCancel = document.getElementById('investorRequestCancel');
+    const investorRequestClose = document.getElementById('investorRequestClose');
+    const investorRequestSubmit = document.getElementById('investorRequestSubmit');
+    const investorRequestName = document.getElementById('investorRequestName');
+    const investorRequestAmount = document.getElementById('investorRequestAmount');
+    const investorRequestPeriod = document.getElementById('investorRequestPeriod');
+    const investorRequestSharePreview = document.getElementById('investorRequestSharePreview');
+
+    function resetInvestorRequestForm() {
+      investorRequestName.value = '';
+      investorRequestAmount.value = '';
+      investorRequestPeriod.value = '1';
+      investorRequestSharePreview.textContent = '–';
+      investorRequestFormView.style.display = '';
+      investorRequestSuccessView.style.display = 'none';
+    }
+
+    function updateInvestorRequestSharePreview() {
+      const amount = Number(investorRequestAmount.value);
+      if (!investorRequestAmount.value || Number.isNaN(amount)) {
+        investorRequestSharePreview.textContent = '–';
+        return;
+      }
+      const clamped = Math.min(BKMP_INVESTOR_REQUEST_MAX, Math.max(BKMP_INVESTOR_REQUEST_MIN, amount));
+      const share = bkmpCalcInvestorSharePercent(clamped);
+      investorRequestSharePreview.textContent = share.toLocaleString('de-DE', { maximumFractionDigits: 2 }) + ' %';
+    }
+
+    if (investorRequestAmount) {
+      investorRequestAmount.addEventListener('input', updateInvestorRequestSharePreview);
+    }
+
+    if (openInvestorRequestForm) {
+      openInvestorRequestForm.addEventListener('click', () => {
+        resetInvestorRequestForm();
+        investorRequestOverlay.classList.add('visible');
+      });
+    }
+    if (investorRequestCancel) investorRequestCancel.addEventListener('click', () => investorRequestOverlay.classList.remove('visible'));
+    if (investorRequestClose) investorRequestClose.addEventListener('click', () => investorRequestOverlay.classList.remove('visible'));
+
+    if (investorRequestSubmit) {
+      investorRequestSubmit.addEventListener('click', () => {
+        const name = investorRequestName.value.trim();
+        if (!name) { investorRequestName.reportValidity(); return; }
+        const amount = Number(investorRequestAmount.value);
+        if (!investorRequestAmount.value || Number.isNaN(amount) || amount < BKMP_INVESTOR_REQUEST_MIN || amount > BKMP_INVESTOR_REQUEST_MAX) {
+          investorRequestAmount.reportValidity();
+          return;
+        }
+        const periodMonths = Number(investorRequestPeriod.value);
+        const sharePercent = bkmpCalcInvestorSharePercent(amount);
+        const request = { name, amount, sharePercent, periodMonths };
+
+        investorRequestSubmit.disabled = true;
+        investorRequestSubmit.textContent = 'Wird gesendet...';
+
+        function resetSubmitBtn() {
+          investorRequestSubmit.disabled = false;
+          investorRequestSubmit.textContent = 'Anfrage senden';
+        }
+
+        if (typeof saveInvestorRequest === 'function' && bkmpGetSupabaseClient()) {
+          saveInvestorRequest(request).then(() => {
+            resetSubmitBtn();
+            investorRequestFormView.style.display = 'none';
+            investorRequestSuccessView.style.display = '';
+          }).catch(e => {
+            console.error('Investoren-Anfrage konnte nicht gesendet werden.', e);
+            resetSubmitBtn();
+            alert('Deine Anfrage konnte nicht gesendet werden. Bitte versuche es später erneut.');
+          });
+        } else {
+          resetSubmitBtn();
+          alert('Deine Anfrage konnte gerade nicht gesendet werden, da keine Verbindung zur Datenbank besteht.');
+        }
+      });
+    }
   </script>
 
 </body>

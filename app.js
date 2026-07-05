@@ -19,6 +19,26 @@ const BKMP_CARD_SALE_PRICE = 150000;
 const BKMP_CARD_SALE_SELLER_SHARE = 135000;
 const BKMP_CARD_SALE_COMMISSION = 15000;
 
+const BKMP_INVESTOR_REQUEST_MIN = 50000000;
+const BKMP_INVESTOR_REQUEST_MAX = 150000000;
+const BKMP_INVESTOR_REQUEST_MIN_SHARE = 5;
+const BKMP_INVESTOR_REQUEST_MAX_SHARE = 15;
+
+function bkmpCalcInvestorSharePercent(amount) {
+  const clamped = Math.min(BKMP_INVESTOR_REQUEST_MAX, Math.max(BKMP_INVESTOR_REQUEST_MIN, Number(amount) || 0));
+  const ratio = (clamped - BKMP_INVESTOR_REQUEST_MIN) / (BKMP_INVESTOR_REQUEST_MAX - BKMP_INVESTOR_REQUEST_MIN);
+  const share = BKMP_INVESTOR_REQUEST_MIN_SHARE + ratio * (BKMP_INVESTOR_REQUEST_MAX_SHARE - BKMP_INVESTOR_REQUEST_MIN_SHARE);
+  return Math.round(share * 100) / 100;
+}
+
+function bkmpAddMonths(isoDate, months) {
+  const d = new Date(isoDate + 'T00:00:00');
+  d.setMonth(d.getMonth() + Number(months || 0));
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 
 function bkmpNormalizeCategoryName(name) {
   if (name === 'B?cher' || name === 'B\uFFFDcher') return 'B\u00fccher';
@@ -86,7 +106,8 @@ const BKMP_DEFAULT_DATA = {
   streamers: [],
   aboutBlocks: [],
   partnerShops: [],
-  cardSales: []
+  cardSales: [],
+  investorRequests: []
 };
 
 function bkmpLoadData() {
@@ -103,7 +124,8 @@ function bkmpLoadData() {
       streamers: parsed.streamers || [],
       aboutBlocks: parsed.aboutBlocks || [],
       partnerShops: parsed.partnerShops || [],
-      cardSales: parsed.cardSales || []
+      cardSales: parsed.cardSales || [],
+      investorRequests: parsed.investorRequests || []
     };
   } catch (e) {
     console.error('Fehler beim Laden der Daten:', e);

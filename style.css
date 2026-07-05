@@ -825,6 +825,19 @@ body.page-loaded .streamer-marquee-track {
 .wish-overlay .joke-card { max-width: 460px; text-align: left; border-radius: 22px; }
 .wish-overlay .joke-card h3 { font-family: 'Fraunces', serif; font-size: 1.25rem; margin-bottom: 1.2rem; text-align: center; }
 .wish-overlay .joke-buttons { margin-top: 1rem; justify-content: flex-end; }
+
+.investor-request-cta { margin-bottom: 2rem; }
+.investor-request-overlay .joke-card { max-width: 460px; text-align: left; border-radius: 22px; }
+.investor-request-overlay .joke-card h3 { font-family: 'Fraunces', serif; font-size: 1.25rem; margin-bottom: 1.2rem; text-align: center; }
+.investor-request-overlay .joke-buttons { margin-top: 1rem; justify-content: flex-end; }
+.investor-request-overlay #investorRequestSuccessView p { color: var(--muted); line-height: 1.5; margin-bottom: 0.4rem; }
+.investor-request-hint {
+  margin: -0.4rem 0 0.9rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.investor-request-hint strong { color: var(--gold); font-family: 'Fraunces', serif; }
 .wish-detail-card {
   position: relative;
   width: min(920px, calc(100vw - 2rem));
@@ -1779,6 +1792,34 @@ label {
 }
 .cardsale-count-btn:hover { border-color: var(--gold); color: var(--gold); }
 .cardsale-count-value { min-width: 34px; text-align: center; font-weight: 700; font-size: 0.85rem; }
+
+/* ---------- Investoren-Anfragen ---------- */
+.investor-request-status {
+  flex-shrink: 0;
+  border-radius: 999px;
+  padding: 0.28rem 0.65rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid var(--line);
+}
+.investor-request-status.status-pending {
+  color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 14%, transparent);
+  border-color: color-mix(in srgb, var(--gold) 30%, transparent);
+}
+.investor-request-status.status-confirmed {
+  color: var(--pos);
+  background: color-mix(in srgb, var(--pos) 14%, transparent);
+  border-color: color-mix(in srgb, var(--pos) 30%, transparent);
+}
+.investor-request-status.status-rejected {
+  color: var(--neg);
+  background: color-mix(in srgb, var(--neg) 14%, transparent);
+  border-color: color-mix(in srgb, var(--neg) 30%, transparent);
+}
+.investor-request-row { flex-wrap: wrap; gap: 0.6rem; }
 
 .partner-admin-row {
   align-items: center;

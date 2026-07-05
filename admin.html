@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260705-cardimg-fix">
+<link rel="stylesheet" href="style.css?v=20260705-investor-requests">
 </head>
 <body>
 
@@ -101,6 +101,10 @@
         <button class="admin-nav-btn" data-page="investors">
           <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3-6 7-6s7 2.7 7 6"/><circle cx="17" cy="8" r="2.6"/><path d="M17 5.2c1.7.3 3 1.5 3 3M22 20c0-2.4-1.7-4.5-4.2-5.4"/></svg>
           Investoren
+        </button>
+        <button class="admin-nav-btn" data-page="investorRequests">
+          <svg viewBox="0 0 24 24"><path d="M4 4h16v13H8l-4 4V4z"/><path d="M8 9h8M8 13h5"/></svg>
+          Investoren-Anfragen
         </button>
         <button class="admin-nav-btn" data-page="wishes">
           <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 13l2.2-2.2 2.8 3.2 1.7-1.7L20 18"/><circle cx="9" cy="9" r="1.2"/></svg>
@@ -226,6 +230,15 @@
               <button class="btn btn-primary" id="addInvestor">+ Investor hinzufügen</button>
               <button class="btn" id="cancelInvestorEdit" type="button" style="display:none;">Abbrechen</button>
             </div>
+          </div>
+        </section>
+
+        <!-- Investoren-Anfragen -->
+        <section class="admin-page" id="page-investorRequests">
+          <div class="admin-section">
+            <h2>Investoren-Anfragen</h2>
+            <p class="admin-help-text">Anfragen von der Website. Best&auml;tigen erstellt automatisch einen echten Investor mit heutigem Startdatum.</p>
+            <div class="entry-table-wrapper"><div class="entry-list investor-request-list" id="investorRequestList"></div></div>
           </div>
         </section>
 
@@ -400,8 +413,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260705-cardimg-fix"></script>
-  <script src="app.js?v=20260705-cardimg-fix"></script>
+  <script src="supabase.js?v=20260705-investor-requests"></script>
+  <script src="app.js?v=20260705-investor-requests"></script>
   <script>
     bkmpInitTheme();
 
@@ -441,6 +454,7 @@
       refreshAboutBlocksFromSupabase();
       refreshPartnerShopsFromSupabase();
       refreshCardSalesFromSupabase();
+      refreshInvestorRequestsFromSupabase();
     }
 
     async function refreshBackupDataFromSupabase() {
@@ -453,7 +467,8 @@
         syncStreamersFromSupabase(data, null, { force: true }),
         syncAboutBlocksFromSupabase(data, null, { force: true }),
         syncPartnerShopsFromSupabase(data, null, { force: true }),
-        syncCardSalesFromSupabase(data, null, { force: true })
+        syncCardSalesFromSupabase(data, null, { force: true }),
+        syncInvestorRequestsFromSupabase(data, null, { force: true })
       ]);
       renderAll();
     }
@@ -509,6 +524,7 @@
         if (page === 'about') refreshAboutBlocksFromSupabase();
         if (page === 'partners') refreshPartnerShopsFromSupabase();
         if (page === 'cardsales') refreshCardSalesFromSupabase();
+        if (page === 'investorRequests') refreshInvestorRequestsFromSupabase();
         if (page === 'access') refreshAdminAccessList();
       });
     });
@@ -617,6 +633,10 @@
 
     async function refreshCardSalesFromSupabase() {
       await syncCardSalesFromSupabase(data, function () { renderAll(); }, { force: true });
+    }
+
+    async function refreshInvestorRequestsFromSupabase() {
+      await syncInvestorRequestsFromSupabase(data, function () { renderAll(); }, { force: true });
     }
 
     async function persistExpense(expense) {
@@ -913,6 +933,114 @@
       await persistCardSale({ ...item, soldCount: nextCount });
     }
 
+    async function confirmInvestorRequest(id) {
+      const req = data.investorRequests.find(r => r.id === id);
+      if (!req) return;
+      const startDate = todayStr;
+      const endDate = bkmpAddMonths(startDate, req.periodMonths);
+      const investorPayload = {
+        name: req.name,
+        minecraftName: '',
+        invested: req.amount,
+        sharePercent: req.sharePercent,
+        startDate,
+        endDate
+      };
+      const created = await persistInvestor(investorPayload);
+      if (!created) {
+        showAdminToast('Investor konnte nicht erstellt werden — Anfrage bleibt offen.', 'error');
+        return;
+      }
+      if (typeof updateInvestorRequestStatus === 'function' && bkmpGetSupabaseClient()) {
+        try {
+          const updated = await updateInvestorRequestStatus(id, 'confirmed');
+          data.investorRequests = data.investorRequests.map(r => r.id === id ? (updated || { ...r, status: 'confirmed' }) : r);
+          bkmpSaveData(data);
+          renderAll();
+          showAdminToast('Anfrage bestätigt — Investor wurde angelegt.', 'success');
+        } catch (e) {
+          console.error('Status konnte nicht aktualisiert werden.', e);
+          showAdminToast('Investor wurde erstellt, Status der Anfrage konnte aber nicht aktualisiert werden: ' + supabaseErrorText(e), 'error');
+        }
+      }
+    }
+
+    async function rejectInvestorRequest(id) {
+      if (typeof updateInvestorRequestStatus !== 'function' || !bkmpGetSupabaseClient()) {
+        showAdminToast('Supabase ist gerade nicht verbunden.', 'error');
+        return;
+      }
+      try {
+        const updated = await updateInvestorRequestStatus(id, 'rejected');
+        data.investorRequests = data.investorRequests.map(r => r.id === id ? (updated || { ...r, status: 'rejected' }) : r);
+        bkmpSaveData(data);
+        renderAll();
+        showAdminToast('Anfrage abgelehnt.', 'success');
+      } catch (e) {
+        console.error('Anfrage konnte nicht abgelehnt werden.', e);
+        showAdminToast('Anfrage konnte nicht abgelehnt werden: ' + supabaseErrorText(e), 'error');
+      }
+    }
+
+    async function deleteInvestorRequestEntry(id) {
+      if (typeof deleteInvestorRequest === 'function' && bkmpGetSupabaseClient()) {
+        try {
+          await deleteInvestorRequest(id);
+          data.investorRequests = data.investorRequests.filter(r => String(r.id) !== String(id));
+          bkmpSaveData(data);
+          renderAll();
+          showAdminToast('Anfrage gelöscht.', 'success');
+          return;
+        } catch (e) {
+          console.error('Anfrage konnte nicht gelöscht werden.', e);
+          showAdminToast('Anfrage konnte nicht gelöscht werden: ' + supabaseErrorText(e), 'error');
+          return;
+        }
+      }
+      data.investorRequests = data.investorRequests.filter(r => String(r.id) !== String(id));
+      persist();
+    }
+
+    function investorRequestStatusLabel(status) {
+      return ({ pending: 'Offen', confirmed: 'Bestätigt', rejected: 'Abgelehnt' })[status] || 'Offen';
+    }
+
+    function renderInvestorRequestList() {
+      const el = document.getElementById('investorRequestList');
+      if (!el) return;
+      if (!data.investorRequests || data.investorRequests.length === 0) {
+        el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Noch keine Investoren-Anfragen.</p>';
+        return;
+      }
+      el.innerHTML = '';
+      const sorted = [...data.investorRequests].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      sorted.forEach(req => {
+        const row = document.createElement('div');
+        row.className = 'entry-row investor-request-row';
+        const dateLabel = req.createdAtIso ? formatDate(req.createdAtIso.slice(0, 10)) : '';
+        row.innerHTML = `
+          <div class="desc">
+            <span class="name">${escapeHtml(req.name)}</span>
+            <span class="meta">${bkmpFormatCurrency(req.amount)} · ${req.sharePercent}% · ${req.periodMonths} Monate · ${escapeHtml(dateLabel)}</span>
+          </div>
+          <span class="investor-request-status status-${req.status}">${investorRequestStatusLabel(req.status)}</span>
+          <div class="entry-actions">
+            ${req.status === 'pending' ? `
+              <button class="edit-btn confirm-btn" type="button">Bestätigen</button>
+              <button class="edit-btn reject-btn" type="button">Ablehnen</button>
+            ` : ''}
+            <button class="del-btn" type="button" aria-label="Anfrage löschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>
+          </div>
+        `;
+        if (req.status === 'pending') {
+          row.querySelector('.confirm-btn').addEventListener('click', () => confirmInvestorRequest(req.id));
+          row.querySelector('.reject-btn').addEventListener('click', () => rejectInvestorRequest(req.id));
+        }
+        row.querySelector('.del-btn').addEventListener('click', () => deleteInvestorRequestEntry(req.id));
+        el.appendChild(row);
+      });
+    }
+
     async function persistIncome(income) {
       if (typeof saveIncome === 'function' && bkmpGetSupabaseClient()) {
         try {
@@ -1022,7 +1150,8 @@
         streamers: raw.streamers || [],
         aboutBlocks: raw.aboutBlocks || [],
         partnerShops: raw.partnerShops || [],
-        cardSales: raw.cardSales || []
+        cardSales: raw.cardSales || [],
+        investorRequests: raw.investorRequests || []
       };
     }
 
@@ -1051,6 +1180,7 @@
       renderAboutBlockList();
       renderPartnerShopList();
       renderCardSaleList();
+      renderInvestorRequestList();
       if (window.bkmpEnhanceImages) window.bkmpEnhanceImages(document);
     }
 

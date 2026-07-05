@@ -1665,6 +1665,117 @@ async function importLocalCardSalesToSupabase() {
   return { imported: rows.length, skipped, total: refreshed.length };
 }
 
+function bkmpMapInvestorRequestFromSupabase(row) {
+  return {
+    id: row.id,
+    name: row.name || '',
+    amount: Number(row.amount || 0),
+    sharePercent: Number(row.share_percent || 0),
+    periodMonths: Number(row.period_months || 0),
+    status: row.status || 'pending',
+    createdAt: row.created_at ? Date.parse(row.created_at) : 0,
+    createdAtIso: row.created_at || '',
+    source: 'supabase'
+  };
+}
+
+function bkmpMapInvestorRequestToSupabase(item) {
+  return {
+    name: item.name || '',
+    amount: Number(item.amount || 0),
+    share_percent: Number(item.sharePercent || 0),
+    period_months: Number(item.periodMonths || 0)
+  };
+}
+
+async function saveInvestorRequest(item) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const payload = { ...bkmpMapInvestorRequestToSupabase(item), status: 'pending' };
+  const { error } = await client.from('investor_requests').insert(payload);
+  if (error) throw error;
+  return true;
+}
+
+async function loadInvestorRequests() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('investor_requests')
+    .select('id, name, amount, share_percent, period_months, status, created_at')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(bkmpMapInvestorRequestFromSupabase);
+}
+
+async function updateInvestorRequestStatus(id, status) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('investor_requests')
+    .update({ status })
+    .eq('id', id)
+    .select('id, name, amount, share_percent, period_months, status, created_at')
+    .limit(1);
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : null;
+  return row ? bkmpMapInvestorRequestFromSupabase(row) : null;
+}
+
+async function deleteInvestorRequest(id) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return false;
+  const { error } = await client.from('investor_requests').delete().eq('id', id);
+  if (error) throw error;
+  return true;
+}
+
+async function syncInvestorRequestsFromSupabase(targetData, onSynced, options = {}) {
+  if (typeof loadInvestorRequests !== 'function' || !bkmpGetSupabaseClient()) return false;
+  try {
+    const items = await loadInvestorRequests();
+    if (!items) return false;
+    const localCount = Array.isArray(targetData.investorRequests) ? targetData.investorRequests.length : 0;
+    if (!options.force && localCount > 0 && items.length < localCount) {
+      console.warn('Supabase enthaelt weniger Investoren-Anfragen als localStorage. Lokale Daten bleiben erhalten.');
+      return false;
+    }
+    targetData.investorRequests = items;
+    bkmpSaveData(targetData);
+    if (typeof onSynced === 'function') onSynced(targetData);
+    return true;
+  } catch (e) {
+    console.warn('Supabase konnte Investoren-Anfragen nicht laden.', e);
+    return false;
+  }
+}
+
+async function importLocalInvestorRequestsToSupabase() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return { imported: 0, skipped: 0, total: 0 };
+  const localData = bkmpLoadData();
+  const localItems = Array.isArray(localData.investorRequests) ? localData.investorRequests : [];
+  const remoteItems = await loadInvestorRequests() || [];
+  const existing = new Set(remoteItems.map(item => [item.name, item.amount, item.periodMonths].join('|')));
+  const rows = [];
+  let skipped = 0;
+  localItems.forEach(item => {
+    const sig = [item.name || '', item.amount || 0, item.periodMonths || 0].join('|');
+    if (existing.has(sig)) { skipped += 1; return; }
+    if (!item.name) { skipped += 1; return; }
+    existing.add(sig);
+    rows.push({ ...bkmpMapInvestorRequestToSupabase(item), status: item.status || 'pending' });
+  });
+  if (rows.length) {
+    const { error } = await client.from('investor_requests').insert(rows);
+    if (error) throw error;
+  }
+  const refreshed = await loadInvestorRequests() || [];
+  localData.investorRequests = refreshed;
+  bkmpSaveData(localData);
+  return { imported: rows.length, skipped, total: refreshed.length };
+}
+
 async function importAllLocalDataToSupabase() {
   return {
     incomes: await importLocalIncomesToSupabase(),
@@ -1675,7 +1786,8 @@ async function importAllLocalDataToSupabase() {
     streamers: await importLocalStreamersToSupabase(),
     aboutBlocks: await importLocalAboutBlocksToSupabase(),
     partnerShops: await importLocalPartnerShopsToSupabase(),
-    cardSales: await importLocalCardSalesToSupabase()
+    cardSales: await importLocalCardSalesToSupabase(),
+    investorRequests: await importLocalInvestorRequestsToSupabase()
   };
 }
 
@@ -1686,6 +1798,7 @@ window.importLocalStreamersToSupabase = importLocalStreamersToSupabase;
 window.importLocalAboutBlocksToSupabase = importLocalAboutBlocksToSupabase;
 window.importLocalPartnerShopsToSupabase = importLocalPartnerShopsToSupabase;
 window.importLocalCardSalesToSupabase = importLocalCardSalesToSupabase;
+window.importLocalInvestorRequestsToSupabase = importLocalInvestorRequestsToSupabase;
 window.importAllLocalDataToSupabase = importAllLocalDataToSupabase;
 
 window.importLocalIncomesToSupabase = importLocalIncomesToSupabase;
