@@ -53,6 +53,125 @@ async function bkmpStoreImageIfNeeded(value, folder) {
   return data && data.publicUrl ? data.publicUrl : value;
 }
 
+/* ============================================================
+   Nachtraegliche Komprimierung bereits hochgeladener Bilder
+   Betrifft nur Bilder, die VOR der Kompressions-Funktion
+   hochgeladen wurden (about_blocks, partner_shops, wishes).
+   Bilder unter 150 KB werden uebersprungen, da sich eine erneute
+   Komprimierung dort kaum noch lohnt.
+   ============================================================ */
+async function bkmpCompressRemoteImageUrl(url, folder) {
+  if (!url || typeof url !== 'string' || !/^https?:\/\//i.test(url)) return null;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    if (!blob.type || !blob.type.startsWith('image/')) return null;
+    if (blob.size < 150000) return null;
+    const file = new File([blob], 'image', { type: blob.type });
+    const compressedDataUrl = await bkmpCompressImageFile(file, { maxWidth: 1000, quality: 0.74 });
+    if (typeof compressedDataUrl !== 'string' || !compressedDataUrl.startsWith('data:image/')) return null;
+    const uploadedUrl = await bkmpStoreImageIfNeeded(compressedDataUrl, folder);
+    if (!uploadedUrl || uploadedUrl === compressedDataUrl) return null;
+    return { newUrl: uploadedUrl, beforeBytes: blob.size };
+  } catch (e) {
+    console.warn('Bild konnte nicht nachkomprimiert werden:', url, e);
+    return null;
+  }
+}
+
+async function compressAboutBlockImages(onProgress) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return { processed: 0, compressed: 0 };
+  const { data: rows, error } = await client.from('about_blocks').select('id, image_url, image_urls');
+  if (error) throw error;
+  let processed = 0;
+  let compressed = 0;
+  for (const row of rows || []) {
+    const urls = Array.isArray(row.image_urls) && row.image_urls.length ? row.image_urls : (row.image_url ? [row.image_url] : []);
+    if (!urls.length) continue;
+    const nextUrls = [];
+    let changed = false;
+    for (const url of urls) {
+      processed++;
+      if (typeof onProgress === 'function') onProgress({ table: 'about_blocks', processed, compressed });
+      const result = await bkmpCompressRemoteImageUrl(url, 'about');
+      if (result) {
+        nextUrls.push(result.newUrl);
+        changed = true;
+        compressed++;
+      } else {
+        nextUrls.push(url);
+      }
+    }
+    if (changed) {
+      const { error: updateError } = await client
+        .from('about_blocks')
+        .update({ image_url: nextUrls[0] || '', image_urls: nextUrls })
+        .eq('id', row.id);
+      if (updateError) console.warn('about_blocks Update fehlgeschlagen:', row.id, updateError);
+    }
+  }
+  return { processed, compressed };
+}
+
+async function compressPartnerShopImages(onProgress) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return { processed: 0, compressed: 0 };
+  const { data: rows, error } = await client.from('partner_shops').select('id, image_url');
+  if (error) throw error;
+  let processed = 0;
+  let compressed = 0;
+  for (const row of rows || []) {
+    if (!row.image_url) continue;
+    processed++;
+    if (typeof onProgress === 'function') onProgress({ table: 'partner_shops', processed, compressed });
+    const result = await bkmpCompressRemoteImageUrl(row.image_url, 'partner-shops');
+    if (result) {
+      const { error: updateError } = await client.from('partner_shops').update({ image_url: result.newUrl }).eq('id', row.id);
+      if (updateError) console.warn('partner_shops Update fehlgeschlagen:', row.id, updateError);
+      else compressed++;
+    }
+  }
+  return { processed, compressed };
+}
+
+async function compressWishImages(onProgress) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return { processed: 0, compressed: 0 };
+  const { data: rows, error } = await client.from('wishes').select('id, image_url');
+  if (error) throw error;
+  let processed = 0;
+  let compressed = 0;
+  for (const row of rows || []) {
+    if (!row.image_url) continue;
+    processed++;
+    if (typeof onProgress === 'function') onProgress({ table: 'wishes', processed, compressed });
+    const result = await bkmpCompressRemoteImageUrl(row.image_url, 'wishes');
+    if (result) {
+      const { error: updateError } = await client.from('wishes').update({ image_url: result.newUrl }).eq('id', row.id);
+      if (updateError) console.warn('wishes Update fehlgeschlagen:', row.id, updateError);
+      else compressed++;
+    }
+  }
+  return { processed, compressed };
+}
+
+async function compressAllExistingImages(onProgress) {
+  const about = await compressAboutBlockImages(onProgress);
+  const shops = await compressPartnerShopImages(onProgress);
+  const wishes = await compressWishImages(onProgress);
+  return {
+    processed: about.processed + shops.processed + wishes.processed,
+    compressed: about.compressed + shops.compressed + wishes.compressed,
+    about,
+    shops,
+    wishes
+  };
+}
+
+window.compressAllExistingImages = compressAllExistingImages;
+
 function bkmpIsPersistentImageUrl(value) {
   if (!value || typeof value !== 'string') return false;
   if (value.startsWith('data:image/')) return false;

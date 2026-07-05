@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260705-quickwins">
+<link rel="stylesheet" href="style.css?v=20260705-imgfix">
 </head>
 <body>
 
@@ -347,6 +347,11 @@
                 <input type="file" id="backupFile" accept="application/json,.json" aria-label="Backup-Datei auswählen">
                 <button class="btn" id="importBackup" type="button">Backup importieren</button>
               </div>
+              <div class="backup-box">
+                <h3>Bilder optimieren</h3>
+                <p>Verkleinert nachtr&auml;glich alle Bilder bei Kartenideen, PartnerShops und "Wer sind wir", die vor der automatischen Komprimierung hochgeladen wurden. Einmalig ausf&uuml;hren, kann je nach Anzahl Bilder etwas dauern.</p>
+                <button class="btn btn-primary" id="compressExistingImages" type="button">Alte Bilder jetzt komprimieren</button>
+              </div>
             </div>
             <p class="admin-help-text" id="backupStatus"></p>
           </div>
@@ -358,8 +363,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260705-quickwins"></script>
-  <script src="app.js?v=20260705-quickwins"></script>
+  <script src="supabase.js?v=20260705-imgfix"></script>
+  <script src="app.js?v=20260705-imgfix"></script>
   <script>
     bkmpInitTheme();
 
@@ -1658,6 +1663,34 @@
       };
       reader.readAsText(file);
     });
+
+    const compressExistingImagesBtn = document.getElementById('compressExistingImages');
+    if (compressExistingImagesBtn) {
+      compressExistingImagesBtn.addEventListener('click', async () => {
+        if (typeof compressAllExistingImages !== 'function' || !bkmpGetSupabaseClient()) {
+          alert('Supabase ist gerade nicht verbunden.');
+          return;
+        }
+        if (!confirm('Alte Bilder jetzt nachträglich komprimieren? Das kann je nach Anzahl Bilder etwas dauern und sollte nur einmal ausgeführt werden.')) return;
+        compressExistingImagesBtn.disabled = true;
+        compressExistingImagesBtn.textContent = 'Komprimiere...';
+        try {
+          const result = await compressAllExistingImages(progress => {
+            setBackupStatus(`Komprimiere Bilder... (${progress.table}: ${progress.processed} geprüft, ${progress.compressed} verkleinert)`);
+          });
+          await refreshBackupDataFromSupabase();
+          setBackupStatus(`Fertig: ${result.compressed} von ${result.processed} Bildern verkleinert.`);
+          alert(`Fertig!\n\nGeprüft: ${result.processed}\nVerkleinert: ${result.compressed}`);
+        } catch (e) {
+          console.error('Bilder konnten nicht komprimiert werden.', e);
+          alert('Bilder konnten nicht komprimiert werden: ' + supabaseErrorText(e));
+          setBackupStatus('Komprimierung fehlgeschlagen.');
+        } finally {
+          compressExistingImagesBtn.disabled = false;
+          compressExistingImagesBtn.textContent = 'Alte Bilder jetzt komprimieren';
+        }
+      });
+    }
 
     const addNewsBtn = document.getElementById('addNews');
     const cancelNewsEditBtn = document.getElementById('cancelNewsEdit');
