@@ -427,8 +427,8 @@ async function syncIncomesFromSupabase(targetData, onSynced, options = {}) {
     if (!incomes) return false;
 
     const localIncomeCount = Array.isArray(targetData.income) ? targetData.income.length : 0;
-    if (!options.force && localIncomeCount > 0 && incomes.length < localIncomeCount) {
-      console.warn('Supabase enthaelt weniger Einnahmen als localStorage. Lokale Daten bleiben erhalten, bis der Import abgeschlossen ist.');
+    if (localIncomeCount > 0 && incomes.length === 0) {
+      console.warn('Supabase enthaelt keine Einnahmen. Lokale Daten bleiben erhalten.');
       return false;
     }
 
@@ -589,8 +589,8 @@ async function syncInvestorsFromSupabase(targetData, onSynced, options = {}) {
     if (!investors) return false;
 
     const localInvestorCount = Array.isArray(targetData.investors) ? targetData.investors.length : 0;
-    if (!options.force && localInvestorCount > 0 && investors.length < localInvestorCount) {
-      console.warn('Supabase enthaelt weniger Investoren als localStorage. Lokale Daten bleiben erhalten, bis der Import abgeschlossen ist.');
+    if (localInvestorCount > 0 && investors.length === 0) {
+      console.warn('Supabase enthaelt keine Investoren. Lokale Daten bleiben erhalten.');
       return false;
     }
 
@@ -711,8 +711,8 @@ async function syncExpensesFromSupabase(targetData, onSynced, options = {}) {
     const expenses = await loadExpenses();
     if (!expenses) return false;
     const localCount = Array.isArray(targetData.expenses) ? targetData.expenses.length : 0;
-    if (!options.force && localCount > 0 && expenses.length < localCount) {
-      console.warn('Supabase enthaelt weniger Ausgaben als localStorage. Lokale Daten bleiben erhalten, bis der Import abgeschlossen ist.');
+    if (localCount > 0 && expenses.length === 0) {
+      console.warn('Supabase enthaelt keine Ausgaben. Lokale Daten bleiben erhalten.');
       return false;
     }
     targetData.expenses = expenses;
@@ -890,10 +890,6 @@ async function syncUpdatesFromSupabase(targetData, onSynced, options = {}) {
       console.warn('Supabase enthaelt keine Updates. Lokale Updates bleiben erhalten.');
       return false;
     }
-    if (!options.force && localCount > 0 && updates.length < localCount) {
-      console.warn('Supabase enthaelt weniger Updates als localStorage. Lokale Daten bleiben erhalten, bis der Import abgeschlossen ist.');
-      return false;
-    }
     targetData.news = updates;
     bkmpSaveData(targetData);
     if (typeof onSynced === 'function') onSynced(targetData);
@@ -1057,10 +1053,6 @@ async function syncWishesFromSupabase(targetData, onSynced, options = {}) {
       console.warn('Supabase enthaelt keine Kartenideen. Lokale Kartenideen bleiben erhalten.');
       return false;
     }
-    if (!options.force && localCount > 0 && wishes.length < localCount) {
-      console.warn('Supabase enthaelt weniger Kartenideen als localStorage. Lokale Daten bleiben erhalten, bis der Import abgeschlossen ist.');
-      return false;
-    }
     targetData.wishes = wishes;
     bkmpSaveData(targetData);
     if (typeof onSynced === 'function') onSynced(targetData);
@@ -1142,10 +1134,6 @@ async function syncStreamersFromSupabase(targetData, onSynced, options = {}) {
     const localCount = Array.isArray(targetData.streamers) ? targetData.streamers.length : 0;
     if (localCount > 0 && streamers.length === 0) {
       console.warn('Supabase enthaelt keine Twitch-Accounts. Lokale Twitch-Accounts bleiben erhalten.');
-      return false;
-    }
-    if (!options.force && localCount > 0 && streamers.length < localCount) {
-      console.warn('Supabase enthaelt weniger Twitch-Accounts als localStorage. Lokale Daten bleiben erhalten.');
       return false;
     }
     targetData.streamers = streamers;
@@ -1260,10 +1248,6 @@ async function syncAboutBlocksFromSupabase(targetData, onSynced, options = {}) {
       console.warn('Supabase enthaelt keine About-Bloecke. Lokale About-Bloecke bleiben erhalten.');
       return false;
     }
-    if (!options.force && localCount > 0 && blocks.length < localCount) {
-      console.warn('Supabase enthaelt weniger About-Bloecke als localStorage. Lokale Daten bleiben erhalten.');
-      return false;
-    }
     targetData.aboutBlocks = blocks;
     bkmpSaveData(targetData);
     if (typeof onSynced === 'function') onSynced(targetData);
@@ -1364,10 +1348,6 @@ async function syncPartnerShopsFromSupabase(targetData, onSynced, options = {}) 
     const localCount = Array.isArray(targetData.partnerShops) ? targetData.partnerShops.length : 0;
     if (localCount > 0 && shops.length === 0) {
       console.warn('Supabase enthaelt keine PartnerShops. Lokale PartnerShops bleiben erhalten.');
-      return false;
-    }
-    if (!options.force && localCount > 0 && shops.length < localCount) {
-      console.warn('Supabase enthaelt weniger PartnerShops als localStorage. Lokale Daten bleiben erhalten.');
       return false;
     }
     targetData.partnerShops = shops;
@@ -1624,10 +1604,6 @@ async function syncCardSalesFromSupabase(targetData, onSynced, options = {}) {
       console.warn('Supabase enthaelt keine Karten-Verkaeufe. Lokale Daten bleiben erhalten.');
       return false;
     }
-    if (!options.force && localCount > 0 && items.length < localCount) {
-      console.warn('Supabase enthaelt weniger Karten-Verkaeufe als localStorage. Lokale Daten bleiben erhalten.');
-      return false;
-    }
     targetData.cardSales = items;
     bkmpSaveData(targetData);
     if (typeof onSynced === 'function') onSynced(targetData);
@@ -1742,8 +1718,8 @@ async function syncInvestorRequestsFromSupabase(targetData, onSynced, options = 
     const items = await loadInvestorRequests();
     if (!items) return false;
     const localCount = Array.isArray(targetData.investorRequests) ? targetData.investorRequests.length : 0;
-    if (!options.force && localCount > 0 && items.length < localCount) {
-      console.warn('Supabase enthaelt weniger Investoren-Anfragen als localStorage. Lokale Daten bleiben erhalten.');
+    if (localCount > 0 && items.length === 0) {
+      console.warn('Supabase enthaelt keine Investoren-Anfragen. Lokale Daten bleiben erhalten.');
       return false;
     }
     targetData.investorRequests = items;
