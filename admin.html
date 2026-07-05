@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260706-fire-egg">
+<link rel="stylesheet" href="style.css?v=20260706-about-preview">
 </head>
 <body>
 
@@ -299,29 +299,44 @@
           <div class="admin-section">
             <h2>Wer sind wir?</h2>
             <div class="entry-table-wrapper"><div class="entry-list" id="aboutBlockList"></div></div>
-            <div class="form-grid form-grid-3">
-              <div><label for="aboutType">Block-Typ</label>
-                <select id="aboutType">
-                  <option value="heading">Gro&szlig;e &Uuml;berschrift</option>
-                  <option value="text">Textblock</option>
-                  <option value="image">Bildblock</option>
-                  <option value="image_text">Bild + Text</option>
-                  <option value="team">Team-Mitglied Karte</option>
-                  <option value="gallery">Galerie</option>
-                </select>
+
+            <div class="about-editor">
+              <div class="about-editor-form">
+                <div class="form-grid form-grid-3">
+                  <div><label for="aboutType">Block-Typ</label>
+                    <select id="aboutType">
+                      <option value="heading">Gro&szlig;e &Uuml;berschrift</option>
+                      <option value="text">Textblock</option>
+                      <option value="image">Bildblock</option>
+                      <option value="image_text">Bild + Text</option>
+                      <option value="team">Team-Mitglied Karte</option>
+                      <option value="gallery">Galerie</option>
+                    </select>
+                  </div>
+                  <div><label for="aboutTitle">Titel</label><input type="text" id="aboutTitle" placeholder="Titel"></div>
+                  <div><label for="aboutSort">Sortierung</label><input type="number" id="aboutSort" placeholder="0"></div>
+                </div>
+                <label for="aboutContent">Text</label>
+                <textarea id="aboutContent" placeholder="Text fuer diesen Block"></textarea>
+                <div class="form-grid form-grid-2">
+                  <div><label for="aboutImageFile">Bild / Galerie</label><input type="file" multiple id="aboutImageFile" accept="image/*"></div>
+                  <div><label for="aboutImageHint">Hinweis</label><input type="text" id="aboutImageHint" value="Mehrere Bilder nur bei Galerie verwenden" disabled></div>
+                </div>
+                <div class="investor-form-actions">
+                  <button class="btn btn-primary" id="addAboutBlock">+ Block speichern</button>
+                  <button class="btn" id="cancelAboutEdit" type="button" style="display:none;">Abbrechen</button>
+                </div>
               </div>
-              <div><label for="aboutTitle">Titel</label><input type="text" id="aboutTitle" placeholder="Titel"></div>
-              <div><label for="aboutSort">Sortierung</label><input type="number" id="aboutSort" placeholder="0"></div>
-            </div>
-            <label for="aboutContent">Text</label>
-            <textarea id="aboutContent" placeholder="Text fuer diesen Block"></textarea>
-            <div class="form-grid form-grid-2">
-              <div><label for="aboutImageFile">Bild / Galerie</label><input type="file" multiple id="aboutImageFile" accept="image/*"></div>
-              <div><label for="aboutImageHint">Hinweis</label><input type="text" id="aboutImageHint" value="Mehrere Bilder nur bei Galerie verwenden" disabled></div>
-            </div>
-            <div class="investor-form-actions">
-              <button class="btn btn-primary" id="addAboutBlock">+ Block speichern</button>
-              <button class="btn" id="cancelAboutEdit" type="button" style="display:none;">Abbrechen</button>
+
+              <div class="about-editor-preview">
+                <div class="about-editor-preview-head">
+                  <span class="about-editor-preview-dot"></span>
+                  Live-Vorschau
+                </div>
+                <div class="about-editor-preview-frame">
+                  <div class="about-page" id="aboutPreviewMount"></div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -1815,6 +1830,46 @@
       cancelAboutEditBtn.style.display = isEditing ? 'inline-flex' : 'none';
     }
 
+    let aboutPreviewObjectUrls = [];
+    function renderAboutPreview() {
+      const mount = document.getElementById('aboutPreviewMount');
+      if (!mount) return;
+      aboutPreviewObjectUrls.forEach(url => URL.revokeObjectURL(url));
+      aboutPreviewObjectUrls = [];
+
+      const type = aboutTypeInput.value || 'text';
+      const title = aboutTitleInput.value.trim();
+      const content = aboutContentInput.value.trim();
+      const currentBlock = editingAboutId ? data.aboutBlocks.find(item => item.id === editingAboutId) : null;
+      const files = aboutImageFileInput.files ? Array.from(aboutImageFileInput.files) : [];
+      const newImages = files.map(file => {
+        const url = URL.createObjectURL(file);
+        aboutPreviewObjectUrls.push(url);
+        return url;
+      });
+      const keepImages = currentBlock ? (currentBlock.images && currentBlock.images.length ? currentBlock.images : (currentBlock.image ? [currentBlock.image] : [])) : [];
+      const images = newImages.length ? newImages : keepImages;
+
+      if (!title && !content && images.length === 0) {
+        mount.innerHTML = '<p class="empty-hint">Noch nichts zum Anzeigen &ndash; f&uuml;lle Titel, Text oder ein Bild aus.</p>';
+        return;
+      }
+
+      const titleHtml = title ? `<h3>${escapeHtml(title)}</h3>` : '';
+      const textHtml = content ? `<p>${escapeHtml(content).replace(/\n/g, '<br>')}</p>` : '';
+      const imageHtml = images[0] ? `<img src="${images[0]}" alt="">` : '';
+
+      let html;
+      if (type === 'heading') html = `<section class="about-block about-heading">${titleHtml}${textHtml}</section>`;
+      else if (type === 'image') html = `<section class="about-block about-image">${imageHtml}${titleHtml}</section>`;
+      else if (type === 'image_text') html = `<section class="about-block about-split">${imageHtml}<div>${titleHtml}${textHtml}</div></section>`;
+      else if (type === 'team') html = `<section class="about-block about-team-card">${imageHtml}<div>${titleHtml}${textHtml}</div></section>`;
+      else if (type === 'gallery') html = `<section class="about-block about-gallery">${titleHtml}<div>${images.map(src => `<img src="${src}" alt="">`).join('')}</div>${textHtml}</section>`;
+      else html = `<section class="about-block about-text">${titleHtml}${textHtml}</section>`;
+
+      mount.innerHTML = html;
+    }
+
     function clearAboutForm() {
       editingAboutId = null;
       aboutTypeInput.value = 'heading';
@@ -1823,6 +1878,7 @@
       aboutSortInput.value = '';
       aboutImageFileInput.value = '';
       setAboutEditMode(false);
+      renderAboutPreview();
     }
 
     function startEditAboutBlock(id) {
@@ -1836,7 +1892,16 @@
       aboutImageFileInput.value = '';
       setAboutEditMode(true);
       aboutTitleInput.focus();
+      renderAboutPreview();
     }
+
+    ['input', 'change'].forEach(evt => {
+      aboutTypeInput.addEventListener(evt, renderAboutPreview);
+      aboutTitleInput.addEventListener(evt, renderAboutPreview);
+      aboutContentInput.addEventListener(evt, renderAboutPreview);
+      aboutImageFileInput.addEventListener(evt, renderAboutPreview);
+    });
+    renderAboutPreview();
 
     function moveAboutBlock(id, direction) {
       const blocks = [...data.aboutBlocks].sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
