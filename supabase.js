@@ -61,7 +61,9 @@ async function bkmpStoreImageIfNeeded(value, folder) {
    Komprimierung dort kaum noch lohnt.
    ============================================================ */
 async function bkmpCompressRemoteImageUrl(url, folder) {
-  if (!url || typeof url !== 'string' || !/^https?:\/\//i.test(url)) return null;
+  if (!url || typeof url !== 'string') return null;
+  const isFetchable = /^https?:\/\//i.test(url) || url.startsWith('data:image/');
+  if (!isFetchable) return null;
   try {
     const response = await fetch(url);
     if (!response.ok) return null;
@@ -75,7 +77,7 @@ async function bkmpCompressRemoteImageUrl(url, folder) {
     if (!uploadedUrl || uploadedUrl === compressedDataUrl) return null;
     return { newUrl: uploadedUrl, beforeBytes: blob.size };
   } catch (e) {
-    console.warn('Bild konnte nicht nachkomprimiert werden:', url, e);
+    console.warn('Bild konnte nicht nachkomprimiert werden:', url.slice(0, 60), e);
     return null;
   }
 }
