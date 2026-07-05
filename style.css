@@ -1697,6 +1697,27 @@ img[data-bkmp-img].bkmp-image-missing {
 body.bkmp-boost .hero-banner {
   filter: saturate(1.12) brightness(1.05);
 }
+
+/* ---------- Dauerhafte Aura (Easter Egg Toggle) ---------- */
+body.bkmp-aura-active::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 60px 8px color-mix(in srgb, var(--gold) 55%, transparent),
+    inset 0 0 160px 40px color-mix(in srgb, var(--purple) 35%, transparent);
+  animation: bkmpAuraPulse 4.5s ease-in-out infinite;
+}
+@keyframes bkmpAuraPulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.bkmp-aura-active::after { animation: none; opacity: 0.75; }
+}
+
 @keyframes bkmpSpark {
   0% { transform: translate3d(0, 0, 0) scale(0.3); opacity: 0; }
   25% { opacity: 1; }

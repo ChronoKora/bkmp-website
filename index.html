@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260705-tabimgfix">
+<link rel="stylesheet" href="style.css?v=20260705-aura">
 </head>
 <body>
 
@@ -206,8 +206,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260705-tabimgfix"></script>
-  <script src="app.js?v=20260705-tabimgfix"></script>
+  <script src="supabase.js?v=20260705-aura"></script>
+  <script src="app.js?v=20260705-aura"></script>
   <script>
     bkmpInitTheme();
     window.addEventListener('load', () => document.body.classList.add('page-loaded'));
@@ -277,7 +277,14 @@
     let konamiBuffer = [];
     const konamiCode = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
 
+    const BKMP_AURA_KEY = 'bkmp-aura-active';
+    if (localStorage.getItem(BKMP_AURA_KEY) === '1') document.body.classList.add('bkmp-aura-active');
+
     function triggerBkmpEasterEgg() {
+      const auraNowActive = !document.body.classList.contains('bkmp-aura-active');
+      document.body.classList.toggle('bkmp-aura-active', auraNowActive);
+      try { localStorage.setItem(BKMP_AURA_KEY, auraNowActive ? '1' : '0'); } catch (e) {}
+
       if (document.getElementById('bkmpEasterEgg')) return;
       const overlay = document.createElement('div');
       overlay.id = 'bkmpEasterEgg';
@@ -286,8 +293,8 @@
       overlay.innerHTML = `
         <div class="bkmp-easter-card">
           <small>BKMP Secret</small>
-          <strong>Boost aktiviert</strong>
-          <p>+2% Style, +2% Flow, +96% gute Laune.</p>
+          <strong>${auraNowActive ? 'Aura aktiviert' : 'Aura deaktiviert'}</strong>
+          <p>${auraNowActive ? '+2% Style, +2% Flow, +96% gute Laune.' : 'Bis zum nächsten Mal.'}</p>
         </div>
         ${sparkles}
       `;
