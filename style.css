@@ -20,7 +20,7 @@ html[data-theme="light"] {
   --gold: #B08D57;
   --purple: #7C3AED;
   --line: rgba(14, 28, 23, 0.12);
-  --muted: rgba(14, 28, 23, 0.6);
+  --muted: rgba(14, 28, 23, 0.64);
   --pos: #16A34A;
   --neg: #DC2626;
 }
@@ -138,42 +138,6 @@ body.modal-open .bkmp-easter > span {
   padding-top: 7vh; padding-bottom: 3rem;
   position: relative; z-index: 1;
 }
-
-.eyebrow {
-  font-size: 0.75rem; font-weight: 500; letter-spacing: 0.28em;
-  text-transform: uppercase; color: var(--gold); margin-bottom: 1.4rem;
-  opacity: 0; animation: fadeUp 0.7s ease forwards;
-}
-
-h1.hero-title {
-  font-family: 'Fraunces', serif; font-optical-sizing: auto; font-weight: 600;
-  font-size: clamp(2.2rem, 6vw, 4.4rem); line-height: 1.05; text-align: center;
-  max-width: 18ch; opacity: 0; animation-delay: 0.15s;
-  background: linear-gradient(100deg, #0A0A0F 0%, #4C1D95 25%, #C026D3 50%, #4C1D95 75%, #0A0A0F 100%);
-  background-size: 200% auto; -webkit-background-clip: text; background-clip: text; color: transparent;
-  background-position: 0% center;
-  animation: fadeUp 0.8s ease forwards, shine 9s linear infinite;
-  animation-delay: 0.15s, 0.9s;
-}
-html[data-theme="light"] h1.hero-title {
-  background: linear-gradient(100deg, #0A0A0F 0%, #6D28D9 25%, #A21CAF 50%, #6D28D9 75%, #0A0A0F 100%);
-  background-size: 200% auto; -webkit-background-clip: text; background-clip: text;
-}
-@keyframes shine {
-  from { background-position: 0% center; }
-  to   { background-position: -200% center; }
-}
-h1.hero-title .brand { font-style: italic; font-weight: 500; }
-
-.underline {
-  margin-top: 1.5rem; width: 64px; height: 2px; background: var(--gold);
-  opacity: 0; animation: fadeUp 0.8s ease forwards; animation-delay: 0.35s;
-}
-.subtitle {
-  margin-top: 1.3rem; font-size: 1rem; color: var(--muted); text-align: center; max-width: 40ch;
-  opacity: 0; animation: fadeUp 0.8s ease forwards; animation-delay: 0.5s;
-}
-@keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
 
 .hero-banner-wrap {
   padding: 5.5rem 0.9rem 2.2rem;
@@ -1762,4 +1726,25 @@ body.bkmp-boost .hero-banner {
   .admin-section {
     box-shadow: 0 12px 34px rgba(0, 0, 0, 0.18);
   }
+}
+
+/* ---------- Tastatur-Fokus ---------- */
+.tab-btn:focus-visible,
+.tab-arrow:focus-visible,
+.wish-vote:focus-visible,
+.wish-mini-download:focus-visible,
+.wish-download:focus-visible,
+.partner-filter button:focus-visible,
+.partner-actions a:focus-visible,
+.admin-nav-btn:focus-visible,
+.edit-btn:focus-visible,
+.del-btn:focus-visible,
+.btn:focus-visible,
+.format-btn:focus-visible,
+.line-mode-tabs button:focus-visible,
+.streamer-pill:focus-visible,
+.wish-image-btn:focus-visible,
+.wish-detail-close:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
 }

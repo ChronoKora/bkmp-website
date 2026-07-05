@@ -17,13 +17,22 @@
 <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
 <link rel="manifest" href="site.webmanifest">
-<title>Bkmp</title>
+<title>Bkmp – Minecraft Server Investment Dashboard</title>
+<meta name="description" content="Transparente Einblicke in Einnahmen, Investoren, News, Kartenideen und PartnerShops rund um den Bkmp Minecraft-Server.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Bkmp – Minecraft Server Investment Dashboard">
+<meta property="og:description" content="Transparente Einblicke in Einnahmen, Investoren, News, Kartenideen und PartnerShops rund um den Bkmp Minecraft-Server.">
+<meta property="og:image" content="assets/top-banner.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Bkmp – Minecraft Server Investment Dashboard">
+<meta name="twitter:description" content="Transparente Einblicke in Einnahmen, Investoren, News, Kartenideen und PartnerShops rund um den Bkmp Minecraft-Server.">
+<meta name="twitter:image" content="assets/top-banner.png">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="preload" as="image" href="assets/top-banner.png" fetchpriority="high">
+<link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260705-image-retry">
+<link rel="stylesheet" href="style.css?v=20260705-perf-pass">
 </head>
 <body>
 
@@ -71,7 +80,10 @@
         <div class="streamer-marquee-track" id="streamerMarqueeTrack"></div>
       </div>
     </div>
-    <img class="hero-banner" src="assets/top-banner.png" width="1983" height="793" fetchpriority="high" decoding="async" alt="Willkommen bei Bkmp">
+    <picture>
+      <source srcset="assets/top-banner.webp" type="image/webp">
+      <img class="hero-banner" src="assets/top-banner.png" width="1983" height="793" fetchpriority="high" decoding="async" alt="Willkommen bei Bkmp">
+    </picture>
   </header>
 
   <nav class="topbar-wrap">
@@ -79,7 +91,7 @@
       <button class="tab-arrow" id="prevTab" aria-label="Vorheriger Bereich">
         <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <div class="tabs">
+      <div class="tabs" role="tablist" aria-label="Bereiche">
         <button class="tab-btn active" data-index="0">Hauptseite</button>
         <button class="tab-btn" data-index="1">Investoren</button>
         <button class="tab-btn" data-index="2">Was gibt's Neues?</button>
@@ -165,9 +177,9 @@
   <div class="joke-overlay wish-overlay" id="wishOverlay">
     <div class="joke-card">
       <h3>Deine Kartenidee</h3>
-      <label>Dein Name</label>
+      <label for="wishName">Dein Name</label>
       <input type="text" id="wishName" placeholder="Wie heißt du?">
-      <label>Bild hochladen (PNG)</label>
+      <label for="wishImageFile">Bild hochladen (PNG)</label>
       <input type="file" id="wishImageFile" accept="image/png">
       <div class="joke-buttons">
         <button class="btn-nein" id="wishCancel" type="button">Abbrechen</button>
@@ -191,8 +203,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260705-image-retry"></script>
-  <script src="app.js?v=20260705-image-retry"></script>
+  <script src="supabase.js?v=20260705-perf-pass"></script>
+  <script src="app.js?v=20260705-perf-pass"></script>
   <script>
     bkmpInitTheme();
     window.addEventListener('load', () => document.body.classList.add('page-loaded'));
@@ -223,9 +235,13 @@
       if (!options.skipSave) sessionStorage.setItem('bkmp-active-tab', String(current));
     }
 
-    tabBtns.forEach(btn => {
+    tabBtns.forEach((btn, i) => {
       btn.setAttribute('role', 'tab');
+      btn.setAttribute('id', 'tab-' + i);
+      btn.setAttribute('aria-controls', panels[i].id);
       btn.setAttribute('aria-selected', btn.classList.contains('active') ? 'true' : 'false');
+      panels[i].setAttribute('role', 'tabpanel');
+      panels[i].setAttribute('aria-labelledby', 'tab-' + i);
       btn.addEventListener('click', () => goTo(Number(btn.dataset.index)));
     });
     prevBtn.addEventListener('click', () => goTo(current - 1));
@@ -383,7 +399,8 @@
       initSupabaseRealtime();
     });
 
-    window.setInterval(refreshVisibleData, 15000);
+    // Realtime-Channel deckt sofortige Updates ab; das Polling ist nur ein Fallback fuer verpasste Events.
+    window.setInterval(refreshVisibleData, 90000);
     window.addEventListener('focus', refreshVisibleData);
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) refreshVisibleData();
@@ -430,11 +447,11 @@
         cursor += pct;
         const amountLabel = bkmpFormatCurrency(item.amount);
         const percentLabel = pct.toFixed(1) + '%';
-        const tooltip = `${item.name}: ${amountLabel} = ${percentLabel}`;
+        const tooltip = escapeHtml(`${item.name}: ${amountLabel} = ${percentLabel}`);
         legendHtml += `
           <div class="legend-item" data-tooltip="${tooltip}" tabindex="0" aria-label="${tooltip}">
             <span class="legend-dot" style="background:${color}"></span>
-            <span>${item.name}</span>
+            <span>${escapeHtml(item.name)}</span>
             <span class="amt">${percentLabel}</span>
           </div>`;
       });
@@ -611,13 +628,14 @@
         const payout = periodNet > 0 ? (periodNet * Number(inv.sharePercent || 0)) / 100 : 0;
         const mcName = (inv.minecraftName || '').trim();
         const avatar = mcName ? `https://minotar.net/helm/${encodeURIComponent(mcName)}/96.png` : '';
+        const invName = inv.name || '';
         return `
           <div class="investor-card investor-card-rich">
             <div class="investor-head">
-              ${avatar ? `<img class="investor-avatar" src="${avatar}" alt="Minecraft-Kopf von ${mcName}" loading="lazy" decoding="async">` : `<div class="investor-avatar investor-avatar-fallback">${inv.name.slice(0, 1).toUpperCase()}</div>`}
+              ${avatar ? `<img class="investor-avatar" src="${avatar}" alt="Minecraft-Kopf von ${escapeHtml(mcName)}" loading="lazy" decoding="async">` : `<div class="investor-avatar investor-avatar-fallback">${escapeHtml(invName.slice(0, 1).toUpperCase())}</div>`}
               <div class="investor-title-block">
-                <div class="investor-name">${inv.name}</div>
-                ${mcName ? `<div class="investor-mc">${mcName}</div>` : ''}
+                <div class="investor-name">${escapeHtml(invName)}</div>
+                ${mcName ? `<div class="investor-mc">${escapeHtml(mcName)}</div>` : ''}
               </div>
             </div>
             <div class="investor-period">${formatInvestorPeriod(inv)}</div>
@@ -654,8 +672,8 @@
         <div class="ledger-row">
           <div class="l-left">
             <span class="ledger-tag ${item.type}">${item.type === 'in' ? 'Einnahmen' : 'Ausgaben'}</span>
-            <span>${item.name}</span>
-            <span class="ledger-date">${item.date ? formatDate(item.date) : ''}</span>
+            <span>${escapeHtml(item.name)}</span>
+            <span class="ledger-date">${item.date ? escapeHtml(formatDate(item.date)) : ''}</span>
           </div>
           <span class="amount ${item.type}">${item.type === 'in' ? '+' : '−'} ${bkmpFormatCurrency(item.amount)}</span>
         </div>
@@ -663,10 +681,6 @@
     }
     }
     renderFinancialSections();
-
-    function escapeHtml(value) {
-      return String(value || '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-    }
 
     let streamerLiveCache = { checkedAt: 0, live: {} };
     let liveToastTimer = null;
@@ -911,8 +925,8 @@
           <article class="news-card">
             ${imageHtml}
             <div class="news-body">
-              <div class="news-date">${post.date}</div>
-              <div class="news-title">${post.title}</div>
+              <div class="news-date">${escapeHtml(post.date)}</div>
+              <div class="news-title">${escapeHtml(post.title)}</div>
               <div class="news-text">${renderFormattedNewsText(post.text)}</div>
             </div>
           </article>`;
@@ -1032,6 +1046,9 @@
         } else {
           finishWish(wish);
         }
+      };
+      reader.onerror = () => {
+        alert('Das Bild konnte nicht gelesen werden. Bitte versuche es mit einer anderen PNG-Datei erneut.');
       };
       reader.readAsDataURL(file);
     });

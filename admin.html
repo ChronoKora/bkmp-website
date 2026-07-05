@@ -16,12 +16,13 @@
 <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
 <link rel="manifest" href="site.webmanifest">
+<meta name="robots" content="noindex, nofollow">
 <title>Bkmp — Admin</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260705-image-retry">
+<link rel="stylesheet" href="style.css?v=20260705-perf-pass">
 </head>
 <body>
 
@@ -61,8 +62,8 @@
   <div class="login-card" id="loginCard">
     <h1>Admin-Login</h1>
     <p>Nur für dich — hier trägst du Zahlen, Investoren und News ein.</p>
-    <input type="text" id="loginName" placeholder="Admin-Name">
-    <input type="password" id="loginPassword" placeholder="Passwort">
+    <input type="text" id="loginName" placeholder="Admin-Name" aria-label="Admin-Name">
+    <input type="password" id="loginPassword" placeholder="Passwort" aria-label="Passwort">
     <button class="btn btn-primary btn-block" id="loginBtn">Einloggen</button>
     <p id="loginError" style="color:var(--neg); font-size:0.8rem; margin-top:0.8rem; display:none;">Falsches Passwort.</p>
   </div>
@@ -128,14 +129,14 @@
             <h2>Einnahmen</h2>
             <div class="entry-table-wrapper"><div class="entry-list" id="incomeList"></div></div>
             <div class="form-grid form-grid-4">
-              <div><label>Kategorie</label>
-                <select id="incomeName">
+              <div><label for="incomeName">Kategorie</label>
+                <select id="incomeName" required>
                   <option value="">Bitte wählen…</option>
                 </select>
               </div>
-              <div><label>Betrag (€)</label><input type="number" id="incomeAmount" placeholder="0"></div>
-              <div><label>Anzahl</label><input type="number" id="incomeQuantity" min="0" step="1" placeholder="optional"></div>
-              <div><label>Datum</label><input type="date" id="incomeDate"></div>
+              <div><label for="incomeAmount">Betrag (€)</label><input type="number" id="incomeAmount" placeholder="0" required></div>
+              <div><label for="incomeQuantity">Anzahl</label><input type="number" id="incomeQuantity" min="0" step="1" placeholder="optional"></div>
+              <div><label for="incomeDate">Datum</label><input type="date" id="incomeDate"></div>
             </div>
             <p class="income-calc-hint" id="incomeCalcHint">W&auml;hle eine Kategorie und gib optional eine Anzahl ein.</p>
             <button class="btn btn-primary" id="addIncome">+ Einnahme hinzufügen</button>
@@ -148,9 +149,9 @@
             <h2>Ausgaben</h2>
             <div class="entry-table-wrapper"><div class="entry-list" id="expenseList"></div></div>
             <div class="form-grid form-grid-3">
-              <div><label>Bezeichnung</label><input type="text" id="expenseName" placeholder="z. B. Marketing"></div>
-              <div><label>Betrag (€)</label><input type="number" id="expenseAmount" placeholder="0"></div>
-              <div><label>Datum</label><input type="date" id="expenseDate"></div>
+              <div><label for="expenseName">Bezeichnung</label><input type="text" id="expenseName" placeholder="z. B. Marketing" required></div>
+              <div><label for="expenseAmount">Betrag (€)</label><input type="number" id="expenseAmount" placeholder="0" required></div>
+              <div><label for="expenseDate">Datum</label><input type="date" id="expenseDate"></div>
             </div>
             <button class="btn btn-primary" id="addExpense">+ Ausgabe hinzufügen</button>
           </div>
@@ -161,9 +162,9 @@
           <div class="admin-section">
             <h2>Was gibt's Neues — Update posten</h2>
             <div class="entry-table-wrapper"><div class="entry-list" id="newsList"></div></div>
-            <label>Titel</label>
-            <input type="text" id="newsTitle" placeholder="Titel des Updates">
-            <label>Text</label>
+            <label for="newsTitle">Titel</label>
+            <input type="text" id="newsTitle" placeholder="Titel des Updates" required>
+            <label for="newsText">Text</label>
             <div class="format-toolbar" aria-label="Text formatieren">
               <button class="format-btn" type="button" data-format="bold"><strong>B</strong></button>
               <button class="format-btn" type="button" data-format="italic"><em>I</em></button>
@@ -172,10 +173,10 @@
               <button class="format-btn color-gold" type="button" data-format="color" data-color="#C9A56A">Gold</button>
               <button class="format-btn color-blue" type="button" data-format="color" data-color="#38BDF8">Blau</button>
             </div>
-            <textarea id="newsText" placeholder="Was möchtest du berichten?"></textarea>
+            <textarea id="newsText" placeholder="Was möchtest du berichten?" required></textarea>
             <div class="form-grid form-grid-2">
-              <div><label>Datum</label><input type="date" id="newsDate"></div>
-              <div><label>Bild (optional)</label><input type="file" multiple id="newsImageFile" accept="image/*"></div>
+              <div><label for="newsDate">Datum</label><input type="date" id="newsDate"></div>
+              <div><label for="newsImageFile">Bild (optional)</label><input type="file" multiple id="newsImageFile" accept="image/*"></div>
             </div>
             <div class="investor-form-actions">
               <button class="btn btn-primary" id="addNews">+ Update posten</button>
@@ -190,16 +191,16 @@
             <h2>Investoren</h2>
             <div class="entry-table-wrapper"><div class="entry-list" id="investorList"></div></div>
             <div class="form-grid">
-              <div><label>Name</label><input type="text" id="invName" placeholder="z. B. Max Mustermann"></div>
-              <div><label>Minecraft-Name</label><input type="text" id="invMinecraft" placeholder="z. B. Steve"></div>
+              <div><label for="invName">Name</label><input type="text" id="invName" placeholder="z. B. Max Mustermann" required></div>
+              <div><label for="invMinecraft">Minecraft-Name</label><input type="text" id="invMinecraft" placeholder="z. B. Steve"></div>
             </div>
             <div class="form-grid">
-              <div><label>Investiert (€)</label><input type="number" id="invAmount" placeholder="0"></div>
-              <div><label>Gewinnbeteiligung (%)</label><input type="number" id="invShare" placeholder="0"></div>
+              <div><label for="invAmount">Investiert (€)</label><input type="number" id="invAmount" placeholder="0" required></div>
+              <div><label for="invShare">Gewinnbeteiligung (%)</label><input type="number" id="invShare" placeholder="0"></div>
             </div>
             <div class="form-grid">
-              <div><label>Startdatum</label><input type="date" id="invStartDate"></div>
-              <div><label>Enddatum (optional)</label><input type="date" id="invEndDate"></div>
+              <div><label for="invStartDate">Startdatum</label><input type="date" id="invStartDate"></div>
+              <div><label for="invEndDate">Enddatum (optional)</label><input type="date" id="invEndDate"></div>
             </div>
             <div class="investor-form-actions">
               <button class="btn btn-primary" id="addInvestor">+ Investor hinzufügen</button>
@@ -222,9 +223,9 @@
             <h2>Twitch-Leiste</h2>
             <div class="entry-table-wrapper"><div class="entry-list" id="streamerList"></div></div>
             <div class="form-grid form-grid-3">
-              <div><label>Anzeigename</label><input type="text" id="streamerName" placeholder="z. B. Scusy"></div>
-              <div><label>Twitch-Link</label><input type="text" id="streamerUrl" placeholder="https://www.twitch.tv/name"></div>
-              <div><label>Prefix-Farbe</label>
+              <div><label for="streamerName">Anzeigename</label><input type="text" id="streamerName" placeholder="z. B. Scusy" required></div>
+              <div><label for="streamerUrl">Twitch-Link</label><input type="text" id="streamerUrl" placeholder="https://www.twitch.tv/name" required></div>
+              <div><label for="streamerColor">Prefix-Farbe</label>
                 <select id="streamerColor">
                   <option value="purple">Lila</option>
                   <option value="gold">Gold</option>
@@ -258,7 +259,7 @@
             <h2>Wer sind wir?</h2>
             <div class="entry-table-wrapper"><div class="entry-list" id="aboutBlockList"></div></div>
             <div class="form-grid form-grid-3">
-              <div><label>Block-Typ</label>
+              <div><label for="aboutType">Block-Typ</label>
                 <select id="aboutType">
                   <option value="heading">Gro&szlig;e &Uuml;berschrift</option>
                   <option value="text">Textblock</option>
@@ -268,14 +269,14 @@
                   <option value="gallery">Galerie</option>
                 </select>
               </div>
-              <div><label>Titel</label><input type="text" id="aboutTitle" placeholder="Titel"></div>
-              <div><label>Sortierung</label><input type="number" id="aboutSort" placeholder="0"></div>
+              <div><label for="aboutTitle">Titel</label><input type="text" id="aboutTitle" placeholder="Titel"></div>
+              <div><label for="aboutSort">Sortierung</label><input type="number" id="aboutSort" placeholder="0"></div>
             </div>
-            <label>Text</label>
+            <label for="aboutContent">Text</label>
             <textarea id="aboutContent" placeholder="Text fuer diesen Block"></textarea>
             <div class="form-grid form-grid-2">
-              <div><label>Bild / Galerie</label><input type="file" multiple id="aboutImageFile" accept="image/*"></div>
-              <div><label>Hinweis</label><input type="text" value="Mehrere Bilder nur bei Galerie verwenden" disabled></div>
+              <div><label for="aboutImageFile">Bild / Galerie</label><input type="file" multiple id="aboutImageFile" accept="image/*"></div>
+              <div><label for="aboutImageHint">Hinweis</label><input type="text" id="aboutImageHint" value="Mehrere Bilder nur bei Galerie verwenden" disabled></div>
             </div>
             <div class="investor-form-actions">
               <button class="btn btn-primary" id="addAboutBlock">+ Block speichern</button>
@@ -290,16 +291,16 @@
             <h2>PartnerShops</h2>
             <div class="entry-table-wrapper"><div class="entry-list" id="partnerShopList"></div></div>
             <div class="form-grid form-grid-3">
-              <div><label>Shopname</label><input type="text" id="partnerName" placeholder="z. B. Karten-Paradies"></div>
-              <div><label>Server / Warp</label><input type="text" id="partnerLocation" placeholder="/sw Beispiel CB2"></div>
-              <div><label>Kategorie</label><input type="text" id="partnerCategory" placeholder="z. B. Anime Karten"></div>
+              <div><label for="partnerName">Shopname</label><input type="text" id="partnerName" placeholder="z. B. Karten-Paradies" required></div>
+              <div><label for="partnerLocation">Server / Warp</label><input type="text" id="partnerLocation" placeholder="/sw Beispiel CB2"></div>
+              <div><label for="partnerCategory">Kategorie</label><input type="text" id="partnerCategory" placeholder="z. B. Anime Karten"></div>
             </div>
-            <label>Beschreibung</label>
+            <label for="partnerDescription">Beschreibung</label>
             <textarea id="partnerDescription" placeholder="Kurze Beschreibung des Shops"></textarea>
             <div class="form-grid form-grid-3">
-              <div><label>Link / Discord</label><input type="text" id="partnerLink" placeholder="https://..."></div>
-              <div><label>Ansprechpartner</label><input type="text" id="partnerContact" placeholder="Minecraft- oder Discord-Name"></div>
-              <div><label>Logo / Bild</label><input type="file" id="partnerImageFile" accept="image/*"></div>
+              <div><label for="partnerLink">Link / Discord</label><input type="text" id="partnerLink" placeholder="https://..."></div>
+              <div><label for="partnerContact">Ansprechpartner</label><input type="text" id="partnerContact" placeholder="Minecraft- oder Discord-Name"></div>
+              <div><label for="partnerImageFile">Logo / Bild</label><input type="file" id="partnerImageFile" accept="image/*"></div>
             </div>
             <div class="investor-form-actions">
               <button class="btn btn-primary" id="addPartnerShop">+ PartnerShop speichern</button>
@@ -314,9 +315,9 @@
             <h2>Admin-Zug&auml;nge</h2>
             <div class="entry-table-wrapper"><div class="entry-list" id="adminAccessList"></div></div>
             <div class="form-grid form-grid-3">
-              <div><label>Name</label><input type="text" id="accessName" placeholder="z. B. David"></div>
-              <div><label>Passwort</label><input type="password" id="accessPassword" placeholder="Mindestens 8 Zeichen"></div>
-              <div><label>Rolle</label>
+              <div><label for="accessName">Name</label><input type="text" id="accessName" placeholder="z. B. David" required></div>
+              <div><label for="accessPassword">Passwort</label><input type="password" id="accessPassword" placeholder="Mindestens 8 Zeichen" required minlength="8"></div>
+              <div><label for="accessRole">Rolle</label>
                 <select id="accessRole">
                   <option value="admin">Admin</option>
                   <option value="editor">Editor</option>
@@ -342,7 +343,7 @@
               <div class="backup-box">
                 <h3>Import</h3>
                 <p>Spielt eine zuvor exportierte Backup-Datei wieder ein. Bestehende Supabase-Daten werden nicht gel&ouml;scht.</p>
-                <input type="file" id="backupFile" accept="application/json,.json">
+                <input type="file" id="backupFile" accept="application/json,.json" aria-label="Backup-Datei auswählen">
                 <button class="btn" id="importBackup" type="button">Backup importieren</button>
               </div>
             </div>
@@ -356,8 +357,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260705-image-retry"></script>
-  <script src="app.js?v=20260705-image-retry"></script>
+  <script src="supabase.js?v=20260705-perf-pass"></script>
+  <script src="app.js?v=20260705-perf-pass"></script>
   <script>
     bkmpInitTheme();
 
@@ -423,7 +424,11 @@
     loginName.addEventListener('keydown', e => { if (e.key === 'Enter') tryLogin(); });
 
     document.getElementById('logoutBtn').addEventListener('click', async () => {
-      await bkmpLogoutAdmin();
+      try {
+        await bkmpLogoutAdmin();
+      } catch (e) {
+        console.warn('Logout meldete einen Fehler, Seite wird trotzdem neu geladen.', e);
+      }
       location.reload();
     });
 
@@ -458,12 +463,12 @@
     const incomeAmountInput = document.getElementById('incomeAmount');
     const incomeCalcHint = document.getElementById('incomeCalcHint');
     const incomeUnitPrices = {
-      'BÃ¼cher': 2500,
+      'Bücher': 2500,
       'Raketen': 1000,
       'Karten': 150000,
       'Schmiede Vorlagen': 1500,
       'Netherite': 11000,
-      'TrÃ¤nke': 1500
+      'Tränke': 1500
     };
     BKMP_INCOME_CATEGORIES.forEach(cat => {
       const opt = document.createElement('option');
@@ -473,33 +478,7 @@
     });
 
     function getIncomeUnitPrice(category) {
-      const compactName = String(category || '').toLowerCase().replace(/[^a-z]/g, '');
-      const compactPrices = {
-        bcher: 2500,
-        buecher: 2500,
-        raketen: 1000,
-        karten: 150000,
-        schmiedevorlagen: 1500,
-        netherite: 11000,
-        trnke: 1500,
-        traenke: 1500
-      };
-      if (compactPrices[compactName]) return compactPrices[compactName];
-      const key = String(category || '')
-        .toLowerCase()
-        .replace(/ÃƒÂ¼|Ã¼|\?/g, 'ue')
-        .replace(/ÃƒÂ¤|Ã¤/g, 'ae')
-        .replace(/ÃƒÂ¶|Ã¶/g, 'oe')
-        .replace(/\s+/g, '_');
-      const prices = {
-        buecher: 2500,
-        raketen: 1000,
-        karten: 150000,
-        schmiede_vorlagen: 1500,
-        netherite: 11000,
-        traenke: 1500
-      };
-      return prices[key];
+      return incomeUnitPrices[bkmpNormalizeCategoryName(category)];
     }
 
     function updateIncomeCalculation() {
@@ -507,11 +486,11 @@
       const quantity = Number(incomeQuantityInput.value);
       const unitPrice = getIncomeUnitPrice(category);
       if (!unitPrice) {
-        incomeCalcHint.textContent = category ? 'FÃ¼r diese Kategorie gibt es keinen festen StÃ¼ckpreis. Betrag direkt eintragen.' : 'WÃ¤hle eine Kategorie und gib optional eine Anzahl ein.';
+        incomeCalcHint.textContent = category ? 'Für diese Kategorie gibt es keinen festen Stückpreis. Betrag direkt eintragen.' : 'Wähle eine Kategorie und gib optional eine Anzahl ein.';
         return;
       }
       if (incomeQuantityInput.value === '' || Number.isNaN(quantity) || quantity <= 0) {
-        incomeCalcHint.textContent = `${category}: 1 StÃ¼ck = ${bkmpFormatCurrency(unitPrice)}. Anzahl eintragen oder Betrag direkt setzen.`;
+        incomeCalcHint.textContent = `${category}: 1 Stück = ${bkmpFormatCurrency(unitPrice)}. Anzahl eintragen oder Betrag direkt setzen.`;
         return;
       }
       const calculated = quantity * unitPrice;
@@ -620,9 +599,7 @@
           return true;
         } catch (e) {
           console.error('Supabase konnte Update nicht speichern:', e);
-          const errorText = e && (e.message || e.details || e.code)
-            ? [e.message, e.details, e.code].filter(Boolean).join(' | ')
-            : 'Unbekannter Fehler';
+          const errorText = supabaseErrorText(e);
           alert('Das Update konnte nicht online gespeichert werden.\n\nSupabase meldet: ' + errorText);
           return false;
         }
@@ -682,9 +659,7 @@
           return true;
         } catch (e) {
           console.error('Supabase konnte Twitch-Account nicht speichern.', e);
-          const errorText = e && (e.message || e.details || e.code)
-            ? [e.message, e.details, e.code].filter(Boolean).join(' | ')
-            : 'Unbekannter Fehler';
+          const errorText = supabaseErrorText(e);
           alert('Der Twitch-Account konnte nicht online gespeichert werden.\n\nSupabase meldet: ' + errorText);
           return false;
         }
@@ -772,9 +747,7 @@
           return true;
         } catch (e) {
           console.error('Supabase konnte PartnerShop nicht speichern.', e);
-          const errorText = e && (e.message || e.details || e.code)
-            ? [e.message, e.details, e.code].filter(Boolean).join(' | ')
-            : 'Unbekannter Fehler';
+          const errorText = supabaseErrorText(e);
           alert('Der PartnerShop konnte nicht online gespeichert werden.\n\nSupabase meldet: ' + errorText);
           return false;
         }
@@ -939,8 +912,8 @@
 
     function renderAll() {
       repairMissingIds();
-      renderEntryList('incomeList', sortByDateDesc(data.income), item => item.name, item => `${formatDate(item.date)} · ${bkmpFormatCurrency(item.amount)}`, id => removeIncome(id));
-      renderEntryList('expenseList', sortByDateDesc(data.expenses), item => item.name, item => `${formatDate(item.date)} · ${bkmpFormatCurrency(item.amount)}`, id => removeExpense(id));
+      renderEntryList('incomeList', sortByDateDesc(data.income), item => escapeHtml(item.name), item => `${escapeHtml(formatDate(item.date))} · ${bkmpFormatCurrency(item.amount)}`, id => removeIncome(id));
+      renderEntryList('expenseList', sortByDateDesc(data.expenses), item => escapeHtml(item.name), item => `${escapeHtml(formatDate(item.date))} · ${bkmpFormatCurrency(item.amount)}`, id => removeExpense(id));
       renderInvestorList();
       renderNewsList();
       renderWishAdminList();
@@ -997,7 +970,7 @@
         row.className = 'entry-row';
         row.innerHTML = `
           <div class="desc">
-            <span class="name">${item.title || aboutTypeLabel(item.type)}</span>
+            <span class="name">${escapeHtml(item.title) || aboutTypeLabel(item.type)}</span>
             <span class="meta">${aboutTypeLabel(item.type)} · Sortierung ${Number(item.sortOrder || 0)}</span>
           </div>
           <div class="entry-actions">
@@ -1039,8 +1012,8 @@
         row.innerHTML = `
           ${item.image ? `<span class="partner-admin-thumb-wrap" data-bkmp-image-wrap data-empty-label="Shop"><img data-bkmp-img class="partner-admin-thumb" src="${item.image}" alt="" loading="lazy" decoding="async"></span>` : '<div class="partner-admin-thumb partner-admin-thumb-empty">Shop</div>'}
           <div class="desc">
-            <span class="name">${item.name}</span>
-            <span class="meta">${item.category || 'Partner'}${item.location ? ' &middot; ' + item.location : ''}</span>
+            <span class="name">${escapeHtml(item.name)}</span>
+            <span class="meta">${escapeHtml(item.category || 'Partner')}${item.location ? ' &middot; ' + escapeHtml(item.location) : ''}</span>
           </div>
           <div class="entry-actions">
             <button class="edit-btn" type="button">Bearbeiten</button>
@@ -1089,8 +1062,8 @@
         row.className = 'entry-row';
         row.innerHTML = `
           <div class="desc">
-            <span class="name">${item.name}</span>
-            <span class="meta">${streamerColorLabel(item.color)} · ${item.url}</span>
+            <span class="name">${escapeHtml(item.name)}</span>
+            <span class="meta">${streamerColorLabel(item.color)} · ${escapeHtml(item.url)}</span>
           </div>
           <div class="entry-actions">
             <button class="edit-btn" type="button">Bearbeiten</button>
@@ -1120,8 +1093,8 @@
         row.innerHTML = `
           ${item.image ? `<span class="wish-admin-thumb-wrap" data-bkmp-image-wrap data-empty-label="Bild"><img data-bkmp-img class="wish-admin-thumb" src="${item.image}" alt="" loading="lazy" decoding="async"></span>` : '<div class="wish-admin-thumb wish-admin-thumb-empty">Bild</div>'}
           <div class="desc">
-            <span class="name">${item.name}</span>
-            <span class="meta">${item.date ? formatDate(item.date) + ' · ' : ''}Like ${Number(item.likes || 0)} · Dislike ${Number(item.dislikes || 0)}</span>
+            <span class="name">${escapeHtml(item.name)}</span>
+            <span class="meta">${item.date ? escapeHtml(formatDate(item.date)) + ' · ' : ''}Like ${Number(item.likes || 0)} · Dislike ${Number(item.dislikes || 0)}</span>
           </div>
           <button class="del-btn" type="button" aria-label="Kartenidee loeschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>
         `;
@@ -1142,8 +1115,8 @@
         row.className = 'entry-row';
         row.innerHTML = `
           <div class="desc">
-            <span class="name">${item.name}</span>
-            <span class="meta">${item.minecraftName ? item.minecraftName + ' · ' : ''}${bkmpFormatCurrency(item.invested)} · ${item.sharePercent}% · ${item.startDate ? formatDate(item.startDate) : 'ohne Start'}</span>
+            <span class="name">${escapeHtml(item.name)}</span>
+            <span class="meta">${item.minecraftName ? escapeHtml(item.minecraftName) + ' · ' : ''}${bkmpFormatCurrency(item.invested)} · ${item.sharePercent}% · ${item.startDate ? escapeHtml(formatDate(item.startDate)) : 'ohne Start'}</span>
           </div>
           <div class="entry-actions">
             <button class="edit-btn" type="button">Bearbeiten</button>
@@ -1170,15 +1143,15 @@
       sortByDateDesc(data.news).forEach(item => {
         const row = document.createElement('div');
         row.className = 'entry-row';
-        row.innerHTML = '\
-          <div class="desc">\
-            <span class="name">' + item.title + '</span>\
-            <span class="meta">' + (item.date || '') + '</span>\
-          </div>\
-          <div class="entry-actions">\
-            <button class="edit-btn" type="button">Bearbeiten</button>\
-            <button class="del-btn" type="button" aria-label="Update löschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>\
-          </div>';
+        row.innerHTML = `
+          <div class="desc">
+            <span class="name">${escapeHtml(item.title)}</span>
+            <span class="meta">${escapeHtml(item.date || '')}</span>
+          </div>
+          <div class="entry-actions">
+            <button class="edit-btn" type="button">Bearbeiten</button>
+            <button class="del-btn" type="button" aria-label="Update löschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>
+          </div>`;
         row.querySelector('.edit-btn').addEventListener('click', () => startEditUpdate(item.id));
         row.querySelector('.del-btn').addEventListener('click', () => {
           if (editingNewsId === item.id) clearNewsForm();
@@ -1226,7 +1199,8 @@
       const amountInput = incomeAmountInput.value;
       const amount = Number(amountInput);
       const date = document.getElementById('incomeDate').value || todayStr;
-      if (!name || amountInput === '' || Number.isNaN(amount)) return;
+      if (!name) { incomeNameSelect.reportValidity(); return; }
+      if (amountInput === '' || Number.isNaN(amount)) { incomeAmountInput.reportValidity(); return; }
       const income = { id: bkmpUid('inc'), name, category: name, amount, date, note: '', createdAt: Date.now() };
       const saved = await persistIncome(income);
       if (saved) {
@@ -1244,7 +1218,8 @@
       const name = expenseNameInput.value.trim();
       const amount = Number(expenseAmountInput.value);
       const date = expenseDateInput.value || todayStr;
-      if (!name || !amount) return;
+      if (!name) { expenseNameInput.reportValidity(); return; }
+      if (!amount) { expenseAmountInput.reportValidity(); return; }
       const expense = { id: bkmpUid('exp'), name, category: name, amount, date, note: '', createdAt: Date.now() };
       const saved = await persistExpense(expense);
       if (saved) {
@@ -1297,7 +1272,8 @@
       const sharePercent = Number(document.getElementById('invShare').value);
       const startDate = document.getElementById('invStartDate').value;
       const endDate = document.getElementById('invEndDate').value;
-      if (!name || !invested) return;
+      if (!name) { document.getElementById('invName').reportValidity(); return; }
+      if (!invested) { document.getElementById('invAmount').reportValidity(); return; }
       if (startDate && endDate && endDate < startDate) {
         alert('Das Enddatum darf nicht vor dem Startdatum liegen.');
         return;
@@ -1357,9 +1333,7 @@
           renderAll();
           alert('Creator übertragen.\n\nNeu übertragen: ' + result.imported + '\nÜbersprungen: ' + result.skipped + '\nOnline gesamt: ' + result.total);
         } catch (e) {
-          const errorText = e && (e.message || e.details || e.code)
-            ? [e.message, e.details, e.code].filter(Boolean).join(' | ')
-            : 'Unbekannter Fehler';
+          const errorText = supabaseErrorText(e);
           alert('Creator konnten nicht online übertragen werden.\n\nSupabase meldet: ' + errorText);
         } finally {
           importStreamerBtn.disabled = false;
@@ -1372,7 +1346,8 @@
       const name = streamerNameInput.value.trim();
       let url = streamerUrlInput.value.trim();
       const color = streamerColorInput.value || 'purple';
-      if (!name || !url) return;
+      if (!name) { streamerNameInput.reportValidity(); return; }
+      if (!url) { streamerUrlInput.reportValidity(); return; }
       if (!url.startsWith('http')) url = 'https://' + url;
       const payload = { name, url, color };
       if (editingStreamerId) payload.id = editingStreamerId;
@@ -1418,14 +1393,6 @@
       aboutTitleInput.focus();
     }
 
-    function readAboutFile(file) {
-      return new Promise(resolve => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.readAsDataURL(file);
-      });
-    }
-
     function moveAboutBlock(id, direction) {
       const blocks = [...data.aboutBlocks].sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
       const index = blocks.findIndex(item => item.id === id);
@@ -1448,7 +1415,7 @@
     addAboutBlockBtn.addEventListener('click', () => {
       const currentBlock = editingAboutId ? data.aboutBlocks.find(item => item.id === editingAboutId) : null;
       const files = aboutImageFileInput.files ? Array.from(aboutImageFileInput.files) : [];
-      Promise.all(files.map(readAboutFile)).then(images => {
+      Promise.all(files.map(readFileAsDataUrl)).then(images => {
         const keepImages = currentBlock ? (currentBlock.images && currentBlock.images.length ? currentBlock.images : (currentBlock.image ? [currentBlock.image] : [])) : [];
         const nextImages = images.length ? images : keepImages;
         const block = {
@@ -1460,10 +1427,16 @@
           images: nextImages,
           sortOrder: aboutSortInput.value === '' ? (data.aboutBlocks.length + 1) * 10 : Number(aboutSortInput.value)
         };
-        if (!block.title && !block.content && nextImages.length === 0) return;
+        if (!block.title && !block.content && nextImages.length === 0) {
+          alert('Bitte mindestens Titel, Text oder ein Bild ausfüllen.');
+          return;
+        }
         persistAboutBlock(block).then(saved => {
           if (saved) clearAboutForm();
         });
+      }).catch(e => {
+        console.error('Bild konnte nicht gelesen werden.', e);
+        alert('Eines der ausgewählten Bilder konnte nicht gelesen werden. Bitte versuche es mit einer anderen Datei erneut.');
       });
     });
 
@@ -1510,22 +1483,14 @@
       partnerNameInput.focus();
     }
 
-    function readPartnerShopFile(file) {
-      return new Promise(resolve => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.readAsDataURL(file);
-      });
-    }
-
     cancelPartnerShopEditBtn.addEventListener('click', clearPartnerShopForm);
 
     addPartnerShopBtn.addEventListener('click', () => {
       const name = partnerNameInput.value.trim();
-      if (!name) return;
+      if (!name) { partnerNameInput.reportValidity(); return; }
       const currentShop = editingPartnerShopId ? data.partnerShops.find(item => item.id === editingPartnerShopId) : null;
       const file = partnerImageFileInput.files && partnerImageFileInput.files[0] ? partnerImageFileInput.files[0] : null;
-      const readImage = file ? readPartnerShopFile(file) : Promise.resolve(currentShop ? currentShop.image || '' : '');
+      const readImage = file ? readFileAsDataUrl(file) : Promise.resolve(currentShop ? currentShop.image || '' : '');
       readImage.then(image => {
         const shop = {
           id: editingPartnerShopId || '',
@@ -1540,6 +1505,9 @@
         persistPartnerShop(shop).then(saved => {
           if (saved) clearPartnerShopForm();
         });
+      }).catch(e => {
+        console.error('Bild konnte nicht gelesen werden.', e);
+        alert('Das ausgewählte Bild konnte nicht gelesen werden. Bitte versuche es mit einer anderen Datei erneut.');
       });
     });
 
@@ -1563,16 +1531,24 @@
         row.className = 'entry-row';
         row.innerHTML = `
           <div class="desc">
-            <span class="name">${profile.display_name || profile.login_name}</span>
-            <span class="meta">${profile.role || 'admin'} &middot; ${profile.active ? 'Aktiv' : 'Inaktiv'} &middot; ${profile.login_name || ''}</span>
+            <span class="name">${escapeHtml(profile.display_name || profile.login_name)}</span>
+            <span class="meta">${escapeHtml(profile.role || 'admin')} &middot; ${profile.active ? 'Aktiv' : 'Inaktiv'} &middot; ${escapeHtml(profile.login_name || '')}</span>
           </div>
           <div class="entry-actions">
             <button class="edit-btn toggle-access" type="button">${profile.active ? 'Deaktivieren' : 'Aktivieren'}</button>
           </div>
         `;
-        row.querySelector('.toggle-access').addEventListener('click', async () => {
-          await setAdminAccessActive(profile.id, !profile.active);
-          refreshAdminAccessList();
+        row.querySelector('.toggle-access').addEventListener('click', async e => {
+          const btn = e.currentTarget;
+          btn.disabled = true;
+          try {
+            await setAdminAccessActive(profile.id, !profile.active);
+            await refreshAdminAccessList();
+          } catch (err) {
+            console.error('Zugang konnte nicht umgeschaltet werden.', err);
+            alert('Zugang konnte nicht umgeschaltet werden: ' + supabaseErrorText(err));
+            btn.disabled = false;
+          }
         });
         el.appendChild(row);
       });
@@ -1596,7 +1572,8 @@
       const name = accessNameInput.value.trim();
       const password = accessPasswordInput.value;
       const role = accessRoleInput.value || 'admin';
-      if (!name || !password) return;
+      if (!name) { accessNameInput.reportValidity(); return; }
+      if (!password) { accessPasswordInput.reportValidity(); return; }
       addAccessBtn.disabled = true;
       addAccessBtn.textContent = 'Zugang wird erstellt...';
       try {
@@ -1735,9 +1712,10 @@
     cancelNewsEditBtn.addEventListener('click', clearNewsForm);
 
     function readFileAsDataUrl(file) {
-      return new Promise(resolve => {
+      return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error || new Error('Datei konnte nicht gelesen werden.'));
         reader.readAsDataURL(file);
       });
     }
@@ -1785,8 +1763,13 @@
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
           const dataUrl = canvas.toDataURL('image/webp', 0.74);
           canvasToBlob(canvas, 'image/webp', 0.74).then(async blob => {
-            const publicUrl = await uploadNewsImageToSupabase(blob, index);
-            resolve(publicUrl || dataUrl);
+            try {
+              const publicUrl = await uploadNewsImageToSupabase(blob, index);
+              resolve(publicUrl || dataUrl);
+            } catch (e) {
+              console.warn('Upload zu Supabase Storage fehlgeschlagen. Lokales Bild wird verwendet.', e);
+              resolve(dataUrl);
+            }
           });
         };
         img.onerror = () => resolve(original);
@@ -1804,7 +1787,8 @@
       const text = newsTextInput.value.trim();
       const date = newsDateInput.value || todayStr;
       const currentPost = editingNewsId ? data.news.find(item => item.id === editingNewsId) : null;
-      if (!title || !text) return;
+      if (!title) { newsTitleInput.reportValidity(); return; }
+      if (!text) { newsTextInput.reportValidity(); return; }
 
       function savePost(imageData) {
         const keepImages = currentPost ? (currentPost.images && currentPost.images.length ? currentPost.images : (currentPost.image ? [currentPost.image] : [])) : [];
@@ -1825,7 +1809,10 @@
 
       if (newsFileInput.files && newsFileInput.files.length) {
         const files = Array.from(newsFileInput.files);
-        Promise.all(files.map((file, index) => prepareNewsImage(file, index))).then(images => savePost(images));
+        Promise.all(files.map((file, index) => prepareNewsImage(file, index))).then(images => savePost(images)).catch(e => {
+          console.error('Bild konnte nicht verarbeitet werden.', e);
+          alert('Eines der ausgewählten Bilder konnte nicht verarbeitet werden. Bitte versuche es mit einer anderen Datei erneut.');
+        });
       } else {
         savePost([]);
       }
