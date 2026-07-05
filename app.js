@@ -297,7 +297,15 @@ function bkmpEnhanceImages(root) {
 
   images.forEach(img => {
     if (img.dataset.bkmpImageBound === '1') {
-      if (img.complete && img.naturalWidth > 0) markBkmpImageLoaded(img);
+      if (img.complete && img.naturalWidth > 0) {
+        markBkmpImageLoaded(img);
+      } else if (img.classList.contains('bkmp-image-missing')) {
+        // Panel war beim ersten Ladeversuch nicht sichtbar (content-visibility),
+        // dadurch ist der Ladeversuch damals fehlgeschlagen. Jetzt, wo der Tab
+        // aktiv ist, lohnt sich ein frischer Versuch.
+        img.dataset.bkmpRetries = '0';
+        retryBkmpImage(img);
+      }
       return;
     }
 
