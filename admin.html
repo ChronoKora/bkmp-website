@@ -1100,7 +1100,7 @@
           ${item.image ? `<span class="partner-admin-thumb-wrap" data-bkmp-image-wrap data-empty-label="Karte"><img data-bkmp-img class="partner-admin-thumb" src="${item.image}" alt="" loading="lazy" decoding="async"></span>` : '<div class="partner-admin-thumb partner-admin-thumb-empty">Karte</div>'}
           <div class="desc">
             <span class="name">${escapeHtml(item.name)}</span>
-            <span class="meta">${item.category ? escapeHtml(item.category) + ' · ' : ''}${item.shopName ? escapeHtml(item.shopName) + ' · ' : ''}${item.cb ? escapeHtml(item.cb) + ' · ' : ''}${item.submittedBy ? 'von ' + escapeHtml(item.submittedBy) : ''}</span>
+            <span class="meta">${item.category ? escapeHtml(item.category) + ' · ' : ''}${item.shopName ? escapeHtml(item.shopName.toUpperCase()) + ' · ' : ''}${item.cb ? escapeHtml(item.cb) + ' · ' : ''}${item.submittedBy ? 'von ' + escapeHtml(item.submittedBy) : ''}</span>
           </div>
           <div class="entry-actions">
             <button class="del-btn" type="button" aria-label="Karte löschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>

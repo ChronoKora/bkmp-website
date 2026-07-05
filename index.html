@@ -1099,7 +1099,7 @@
 
       const categories = ['Alle', ...new Set(items.map(item => item.category || 'Sonstige'))];
       if (!categories.includes(activeCardCatalogCategory)) activeCardCatalogCategory = 'Alle';
-      const shops = ['Alle', ...new Set(items.map(item => item.shopName || 'Unbekannt'))];
+      const shops = ['Alle', ...new Set(items.map(item => (item.shopName || 'Unbekannt').toUpperCase()))];
       if (!shops.includes(activeCardCatalogShop)) activeCardCatalogShop = 'Alle';
 
       if (cardCatalogCategoryFilterEl) {
@@ -1115,7 +1115,7 @@
 
       const visible = items.filter(item => {
         const matchesCategory = activeCardCatalogCategory === 'Alle' || (item.category || 'Sonstige') === activeCardCatalogCategory;
-        const matchesShop = activeCardCatalogShop === 'Alle' || (item.shopName || 'Unbekannt') === activeCardCatalogShop;
+        const matchesShop = activeCardCatalogShop === 'Alle' || (item.shopName || 'Unbekannt').toUpperCase() === activeCardCatalogShop;
         return matchesCategory && matchesShop;
       });
 
@@ -1132,7 +1132,7 @@
           <div class="cardcatalog-body">
             ${item.category ? `<span class="cardcatalog-category">${escapeHtml(item.category)}</span>` : ''}
             <h3>${escapeHtml(item.name)}</h3>
-            ${item.shopName ? `<div class="cardcatalog-shop">${escapeHtml(item.shopName)}${item.cb ? ' · ' + escapeHtml(item.cb) : ''}</div>` : (item.cb ? `<div class="cardcatalog-shop">${escapeHtml(item.cb)}</div>` : '')}
+            ${item.shopName ? `<div class="cardcatalog-shop">${escapeHtml(item.shopName.toUpperCase())}${item.cb ? ' · ' + escapeHtml(item.cb) : ''}</div>` : (item.cb ? `<div class="cardcatalog-shop">${escapeHtml(item.cb)}</div>` : '')}
             ${item.description ? `<p>${escapeHtml(item.description)}</p>` : ''}
             ${item.submittedBy ? `<div class="cardcatalog-submitter">Eingetragen von ${escapeHtml(item.submittedBy)}</div>` : ''}
           </div>
@@ -1194,7 +1194,7 @@
         const name = cardCatalogNameInput.value.trim();
         if (!name) { cardCatalogNameInput.reportValidity(); return; }
         const category = cardCatalogCategoryInput.value.trim();
-        const shopName = cardCatalogShopInput.value.trim();
+        const shopName = cardCatalogShopInput.value.trim().toUpperCase();
         const cb = cardCatalogCbInput.value.trim();
         const submittedBy = cardCatalogWhoInput.value.trim();
         const description = cardCatalogDescriptionInput.value.trim();
