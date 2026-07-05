@@ -1758,6 +1758,127 @@ async function importLocalInvestorRequestsToSupabase() {
   return { imported: rows.length, skipped, total: refreshed.length };
 }
 
+function bkmpMapCardCatalogFromSupabase(row) {
+  return {
+    id: row.id,
+    name: row.name || '',
+    category: row.category || '',
+    shopName: row.shop_name || '',
+    cb: row.cb || '',
+    submittedBy: row.submitted_by || '',
+    description: row.description || '',
+    image: row.image_url || '',
+    createdAt: row.created_at ? Date.parse(row.created_at) : 0,
+    source: 'supabase'
+  };
+}
+
+function bkmpMapCardCatalogToSupabase(item) {
+  return {
+    name: item.name || '',
+    category: item.category || '',
+    shop_name: item.shopName || '',
+    cb: item.cb || '',
+    submitted_by: item.submittedBy || '',
+    description: item.description || '',
+    image_url: item.image || ''
+  };
+}
+
+async function loadCardCatalog() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('card_catalog')
+    .select('id, name, category, shop_name, cb, submitted_by, description, image_url, created_at')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(bkmpMapCardCatalogFromSupabase);
+}
+
+async function saveCardCatalogEntry(item) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const payload = bkmpMapCardCatalogToSupabase(item);
+  payload.image_url = await bkmpStoreImageIfNeeded(payload.image_url, 'card-catalog');
+  let query;
+  if (item.id && !String(item.id).startsWith('cardcat-')) {
+    query = client
+      .from('card_catalog')
+      .update(payload)
+      .eq('id', item.id)
+      .select('id, name, category, shop_name, cb, submitted_by, description, image_url, created_at')
+      .limit(1);
+  } else {
+    query = client
+      .from('card_catalog')
+      .insert(payload)
+      .select('id, name, category, shop_name, cb, submitted_by, description, image_url, created_at')
+      .limit(1);
+  }
+  const { data, error } = await query;
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : null;
+  return row ? bkmpMapCardCatalogFromSupabase(row) : null;
+}
+
+async function deleteCardCatalogEntry(id) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return false;
+  const { error } = await client.from('card_catalog').delete().eq('id', id);
+  if (error) throw error;
+  return true;
+}
+
+async function syncCardCatalogFromSupabase(targetData, onSynced, options = {}) {
+  if (typeof loadCardCatalog !== 'function' || !bkmpGetSupabaseClient()) return false;
+  try {
+    const items = await loadCardCatalog();
+    if (!items) return false;
+    const localCount = Array.isArray(targetData.cardCatalog) ? targetData.cardCatalog.length : 0;
+    if (localCount > 0 && items.length === 0) {
+      console.warn('Supabase enthaelt keine Kartendatenbank-Eintraege. Lokale Daten bleiben erhalten.');
+      return false;
+    }
+    targetData.cardCatalog = items;
+    bkmpSaveData(targetData);
+    if (typeof onSynced === 'function') onSynced(targetData);
+    return true;
+  } catch (e) {
+    console.warn('Supabase konnte Kartendatenbank nicht laden. localStorage-Fallback wird verwendet.', e);
+    return false;
+  }
+}
+
+async function importLocalCardCatalogToSupabase() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return { imported: 0, skipped: 0, total: 0 };
+  const localData = bkmpLoadData();
+  const localItems = Array.isArray(localData.cardCatalog) ? localData.cardCatalog : [];
+  const remoteItems = await loadCardCatalog() || [];
+  const existing = new Set(remoteItems.map(item => [item.name, item.shopName, item.cb].join('|')));
+  const rows = [];
+  let skipped = 0;
+  localItems.forEach(item => {
+    const sig = [item.name || '', item.shopName || '', item.cb || ''].join('|');
+    if (existing.has(sig)) { skipped += 1; return; }
+    if (!item.name) { skipped += 1; return; }
+    existing.add(sig);
+    rows.push(bkmpMapCardCatalogToSupabase(item));
+  });
+  if (rows.length) {
+    for (const row of rows) {
+      row.image_url = await bkmpStoreImageIfNeeded(row.image_url, 'card-catalog');
+    }
+    const { error } = await client.from('card_catalog').insert(rows);
+    if (error) throw error;
+  }
+  const refreshed = await loadCardCatalog() || [];
+  localData.cardCatalog = refreshed;
+  bkmpSaveData(localData);
+  return { imported: rows.length, skipped, total: refreshed.length };
+}
+
 async function importAllLocalDataToSupabase() {
   return {
     incomes: await importLocalIncomesToSupabase(),
@@ -1769,7 +1890,8 @@ async function importAllLocalDataToSupabase() {
     aboutBlocks: await importLocalAboutBlocksToSupabase(),
     partnerShops: await importLocalPartnerShopsToSupabase(),
     cardSales: await importLocalCardSalesToSupabase(),
-    investorRequests: await importLocalInvestorRequestsToSupabase()
+    investorRequests: await importLocalInvestorRequestsToSupabase(),
+    cardCatalog: await importLocalCardCatalogToSupabase()
   };
 }
 
@@ -1781,6 +1903,7 @@ window.importLocalAboutBlocksToSupabase = importLocalAboutBlocksToSupabase;
 window.importLocalPartnerShopsToSupabase = importLocalPartnerShopsToSupabase;
 window.importLocalCardSalesToSupabase = importLocalCardSalesToSupabase;
 window.importLocalInvestorRequestsToSupabase = importLocalInvestorRequestsToSupabase;
+window.importLocalCardCatalogToSupabase = importLocalCardCatalogToSupabase;
 window.importAllLocalDataToSupabase = importAllLocalDataToSupabase;
 
 window.importLocalIncomesToSupabase = importLocalIncomesToSupabase;

@@ -107,7 +107,8 @@ const BKMP_DEFAULT_DATA = {
   aboutBlocks: [],
   partnerShops: [],
   cardSales: [],
-  investorRequests: []
+  investorRequests: [],
+  cardCatalog: []
 };
 
 function bkmpLoadData() {
@@ -125,7 +126,8 @@ function bkmpLoadData() {
       aboutBlocks: parsed.aboutBlocks || [],
       partnerShops: parsed.partnerShops || [],
       cardSales: parsed.cardSales || [],
-      investorRequests: parsed.investorRequests || []
+      investorRequests: parsed.investorRequests || [],
+      cardCatalog: parsed.cardCatalog || []
     };
   } catch (e) {
     console.error('Fehler beim Laden der Daten:', e);
