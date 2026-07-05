@@ -13,6 +13,8 @@
 create table if not exists public.investor_requests (
   id uuid primary key default gen_random_uuid(),
   name text not null,
+  minecraft_name text,
+  anonymous boolean not null default false,
   amount numeric not null,
   share_percent numeric not null,
   period_months integer not null,

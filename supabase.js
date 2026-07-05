@@ -512,6 +512,7 @@ function bkmpMapInvestorFromSupabase(row) {
     sharePercent: Number(row.profit_percent || 0),
     startDate: row.start_date || '',
     endDate: row.end_date || '',
+    anonymous: Boolean(row.anonymous),
     createdAt: row.created_at ? Date.parse(row.created_at) : 0,
     source: 'supabase'
   };
@@ -524,7 +525,8 @@ function bkmpMapInvestorToSupabase(investor) {
     profit_percent: Number(investor.sharePercent || investor.profit_percent || 0),
     start_date: investor.startDate || investor.start_date || null,
     end_date: investor.endDate || investor.end_date || null,
-    note: investor.minecraftName || investor.note || null
+    note: investor.minecraftName || investor.note || null,
+    anonymous: Boolean(investor.anonymous)
   };
 }
 
@@ -1669,6 +1671,8 @@ function bkmpMapInvestorRequestFromSupabase(row) {
   return {
     id: row.id,
     name: row.name || '',
+    minecraftName: row.minecraft_name || '',
+    anonymous: Boolean(row.anonymous),
     amount: Number(row.amount || 0),
     sharePercent: Number(row.share_percent || 0),
     periodMonths: Number(row.period_months || 0),
@@ -1682,6 +1686,8 @@ function bkmpMapInvestorRequestFromSupabase(row) {
 function bkmpMapInvestorRequestToSupabase(item) {
   return {
     name: item.name || '',
+    minecraft_name: item.minecraftName || '',
+    anonymous: Boolean(item.anonymous),
     amount: Number(item.amount || 0),
     share_percent: Number(item.sharePercent || 0),
     period_months: Number(item.periodMonths || 0)
@@ -1702,7 +1708,7 @@ async function loadInvestorRequests() {
   if (!client) return null;
   const { data, error } = await client
     .from('investor_requests')
-    .select('id, name, amount, share_percent, period_months, status, created_at')
+    .select('id, name, minecraft_name, anonymous, amount, share_percent, period_months, status, created_at')
     .order('created_at', { ascending: false });
   if (error) throw error;
   return (data || []).map(bkmpMapInvestorRequestFromSupabase);
@@ -1715,7 +1721,7 @@ async function updateInvestorRequestStatus(id, status) {
     .from('investor_requests')
     .update({ status })
     .eq('id', id)
-    .select('id, name, amount, share_percent, period_months, status, created_at')
+    .select('id, name, minecraft_name, anonymous, amount, share_percent, period_months, status, created_at')
     .limit(1);
   if (error) throw error;
   const row = Array.isArray(data) ? data[0] : null;

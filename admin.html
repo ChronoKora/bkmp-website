@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260705-investor-requests">
+<link rel="stylesheet" href="style.css?v=20260705-anon-investors">
 </head>
 <body>
 
@@ -226,6 +226,10 @@
               <div><label for="invStartDate">Startdatum</label><input type="date" id="invStartDate"></div>
               <div><label for="invEndDate">Enddatum (optional)</label><input type="date" id="invEndDate"></div>
             </div>
+            <label class="investor-request-visibility">
+              <input type="checkbox" id="invAnonymous">
+              Anonym auf der Website anzeigen (Name/Minecraft-Kopf nur im Admin-Panel sichtbar)
+            </label>
             <div class="investor-form-actions">
               <button class="btn btn-primary" id="addInvestor">+ Investor hinzufügen</button>
               <button class="btn" id="cancelInvestorEdit" type="button" style="display:none;">Abbrechen</button>
@@ -413,8 +417,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260705-investor-requests"></script>
-  <script src="app.js?v=20260705-investor-requests"></script>
+  <script src="supabase.js?v=20260705-anon-investors"></script>
+  <script src="app.js?v=20260705-anon-investors"></script>
   <script>
     bkmpInitTheme();
 
@@ -940,11 +944,12 @@
       const endDate = bkmpAddMonths(startDate, req.periodMonths);
       const investorPayload = {
         name: req.name,
-        minecraftName: '',
+        minecraftName: req.minecraftName || '',
         invested: req.amount,
         sharePercent: req.sharePercent,
         startDate,
-        endDate
+        endDate,
+        anonymous: Boolean(req.anonymous)
       };
       const created = await persistInvestor(investorPayload);
       if (!created) {
@@ -1020,8 +1025,8 @@
         const dateLabel = req.createdAtIso ? formatDate(req.createdAtIso.slice(0, 10)) : '';
         row.innerHTML = `
           <div class="desc">
-            <span class="name">${escapeHtml(req.name)}</span>
-            <span class="meta">${bkmpFormatCurrency(req.amount)} · ${req.sharePercent}% · ${req.periodMonths} Monate · ${escapeHtml(dateLabel)}</span>
+            <span class="name">${escapeHtml(req.name)}${req.anonymous ? ' <span class="investor-anonymous-badge">Möchte anonym sein</span>' : ''}</span>
+            <span class="meta">${req.minecraftName ? escapeHtml(req.minecraftName) + ' · ' : ''}${bkmpFormatCurrency(req.amount)} · ${req.sharePercent}% · ${req.periodMonths} Monate · ${escapeHtml(dateLabel)}</span>
           </div>
           <span class="investor-request-status status-${req.status}">${investorRequestStatusLabel(req.status)}</span>
           <div class="entry-actions">
@@ -1485,7 +1490,7 @@
         row.className = 'entry-row';
         row.innerHTML = `
           <div class="desc">
-            <span class="name">${escapeHtml(item.name)}</span>
+            <span class="name">${escapeHtml(item.name)}${item.anonymous ? ' <span class="investor-anonymous-badge">Anonym auf Website</span>' : ''}</span>
             <span class="meta">${item.minecraftName ? escapeHtml(item.minecraftName) + ' · ' : ''}${bkmpFormatCurrency(item.invested)} · ${item.sharePercent}% · ${item.startDate ? escapeHtml(formatDate(item.startDate)) : 'ohne Start'}</span>
           </div>
           <div class="entry-actions">
@@ -1616,6 +1621,7 @@
       document.getElementById('invShare').value = '';
       document.getElementById('invStartDate').value = '';
       document.getElementById('invEndDate').value = '';
+      document.getElementById('invAnonymous').checked = false;
       setInvestorEditMode(false);
     }
 
@@ -1629,6 +1635,7 @@
       document.getElementById('invShare').value = investor.sharePercent || '';
       document.getElementById('invStartDate').value = investor.startDate || '';
       document.getElementById('invEndDate').value = investor.endDate || '';
+      document.getElementById('invAnonymous').checked = Boolean(investor.anonymous);
       setInvestorEditMode(true);
       document.getElementById('invName').focus();
     }
@@ -1642,13 +1649,14 @@
       const sharePercent = Number(document.getElementById('invShare').value);
       const startDate = document.getElementById('invStartDate').value;
       const endDate = document.getElementById('invEndDate').value;
+      const anonymous = document.getElementById('invAnonymous').checked;
       if (!name) { document.getElementById('invName').reportValidity(); return; }
       if (!invested) { document.getElementById('invAmount').reportValidity(); return; }
       if (startDate && endDate && endDate < startDate) {
         showAdminToast('Das Enddatum darf nicht vor dem Startdatum liegen.', 'error');
         return;
       }
-      const payload = { name, minecraftName, invested, sharePercent, startDate, endDate };
+      const payload = { name, minecraftName, invested, sharePercent, startDate, endDate, anonymous };
       if (editingInvestorId) payload.id = editingInvestorId;
       persistInvestor(payload).then(saved => {
         if (saved) clearInvestorForm();

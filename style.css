@@ -838,6 +838,24 @@ body.page-loaded .streamer-marquee-track {
   line-height: 1.5;
 }
 .investor-request-hint strong { color: var(--gold); font-family: 'Fraunces', serif; }
+.investor-request-visibility {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin: -0.2rem 0 0.9rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.4;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.investor-request-visibility input {
+  width: auto;
+  margin: 0.15rem 0 0;
+  flex-shrink: 0;
+  accent-color: var(--gold);
+}
 .wish-detail-card {
   position: relative;
   width: min(920px, calc(100vw - 2rem));
@@ -1820,6 +1838,20 @@ label {
   border-color: color-mix(in srgb, var(--neg) 30%, transparent);
 }
 .investor-request-row { flex-wrap: wrap; gap: 0.6rem; }
+.investor-anonymous-badge {
+  display: inline-flex;
+  margin-left: 0.4rem;
+  border-radius: 999px;
+  padding: 0.16rem 0.5rem;
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--line) 60%, transparent);
+  border: 1px solid var(--line);
+  vertical-align: middle;
+}
 
 .partner-admin-row {
   align-items: center;
