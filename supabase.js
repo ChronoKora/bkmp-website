@@ -536,7 +536,7 @@ async function loadInvestors() {
 
   const { data, error } = await client
     .from('investors')
-    .select('id, name, investment, profit_percent, start_date, end_date, note, created_at')
+    .select('id, name, investment, profit_percent, start_date, end_date, note, anonymous, created_at')
     .order('created_at', { ascending: true });
 
   if (error) throw error;
@@ -554,13 +554,13 @@ async function saveInvestor(investor) {
       .from('investors')
       .update(payload)
       .eq('id', investor.id)
-      .select('id, name, investment, profit_percent, start_date, end_date, note, created_at')
+      .select('id, name, investment, profit_percent, start_date, end_date, note, anonymous, created_at')
       .single();
   } else {
     query = client
       .from('investors')
       .insert(payload)
-      .select('id, name, investment, profit_percent, start_date, end_date, note, created_at')
+      .select('id, name, investment, profit_percent, start_date, end_date, note, anonymous, created_at')
       .single();
   }
 
