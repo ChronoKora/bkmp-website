@@ -2143,6 +2143,58 @@ body.bkmp-aura-active::after {
   .bkmp-loot-rain-banner { transition: opacity 0.15s ease; }
 }
 
+/* ---------- Drachenfeuer (Easter Egg: "drache" tippen) ---------- */
+.bkmp-fire {
+  position: fixed;
+  inset: 0;
+  z-index: 96;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 1;
+  transition: opacity 0.5s ease;
+}
+.bkmp-fire.fading { opacity: 0; }
+.bkmp-fire span {
+  position: absolute;
+  bottom: -10%;
+  animation-name: bkmpFireRise;
+  animation-timing-function: ease-out;
+  animation-iteration-count: 1;
+  filter: drop-shadow(0 0 12px rgba(255, 120, 30, 0.75));
+}
+@keyframes bkmpFireRise {
+  0% { transform: translate3d(0, 0, 0) scale(0.7) rotate(0deg); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: translate3d(0, -115vh, 0) scale(1.1) rotate(-8deg); opacity: 0; }
+}
+body.bkmp-burning {
+  animation: bkmpBurningShake 0.35s ease-in-out 4;
+}
+body.bkmp-burning::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 94;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 100%, rgba(255, 100, 20, 0.55), rgba(255, 40, 0, 0.25) 45%, transparent 75%);
+  animation: bkmpFireFlicker 0.5s ease-in-out infinite alternate;
+}
+@keyframes bkmpFireFlicker {
+  0% { opacity: 0.65; }
+  100% { opacity: 1; }
+}
+@keyframes bkmpBurningShake {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  25% { transform: translate3d(-2px, 1px, 0); }
+  50% { transform: translate3d(2px, -1px, 0); }
+  75% { transform: translate3d(-1px, 2px, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bkmp-fire span { animation: none; opacity: 0; }
+  body.bkmp-burning { animation: none; }
+  body.bkmp-burning::before { animation: none; opacity: 0.5; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

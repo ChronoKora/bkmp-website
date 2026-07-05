@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260705-typo-fix">
+<link rel="stylesheet" href="style.css?v=20260706-fire-egg">
 </head>
 <body>
 
@@ -376,6 +376,8 @@
     /* ---------------- Kleines Easter Egg ---------------- */
     const easterTarget = 'bkmp';
     let easterBuffer = '';
+    const dracheTarget = 'drache';
+    let dracheBuffer = '';
     let konamiBuffer = [];
     const konamiCode = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
 
@@ -437,16 +439,43 @@
       }, 4200);
     }
 
+    function triggerBkmpFireEasterEgg() {
+      if (document.getElementById('bkmpFireOverlay')) return;
+      const overlay = document.createElement('div');
+      overlay.id = 'bkmpFireOverlay';
+      overlay.className = 'bkmp-fire';
+      const flames = Array.from({ length: 22 }, () => {
+        const left = Math.round(Math.random() * 100);
+        const duration = (1.1 + Math.random() * 0.9).toFixed(2);
+        const delay = (Math.random() * 0.5).toFixed(2);
+        const size = (1.6 + Math.random() * 1.6).toFixed(2);
+        return `<span style="left:${left}%; animation-duration:${duration}s; animation-delay:${delay}s; font-size:${size}rem;">🔥</span>`;
+      }).join('');
+      overlay.innerHTML = flames;
+      document.body.appendChild(overlay);
+      document.body.classList.add('bkmp-burning');
+      setTimeout(() => {
+        document.body.classList.remove('bkmp-burning');
+        overlay.classList.add('fading');
+        setTimeout(() => overlay.remove(), 500);
+      }, 1800);
+    }
+
     document.addEventListener('keydown', e => {
       const tag = document.activeElement?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
       const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
       easterBuffer = (easterBuffer + key).slice(-easterTarget.length);
+      dracheBuffer = (dracheBuffer + key).slice(-dracheTarget.length);
       konamiBuffer.push(key);
       konamiBuffer = konamiBuffer.slice(-konamiCode.length);
       if (easterBuffer === easterTarget) {
         triggerBkmpEasterEgg();
         easterBuffer = '';
+      }
+      if (dracheBuffer === dracheTarget) {
+        triggerBkmpFireEasterEgg();
+        dracheBuffer = '';
       }
       if (konamiBuffer.join('|') === konamiCode.join('|')) {
         triggerBkmpLootRain();
