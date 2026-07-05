@@ -15,6 +15,10 @@ const BKMP_INCOME_CATEGORIES = [
   'Karten', 'Bücher', 'Tränke', 'Elytra', 'Raketen', 'Werkzeug', 'Schmiede Vorlagen', 'Netherite', 'Custom'
 ];
 
+const BKMP_CARD_SALE_PRICE = 150000;
+const BKMP_CARD_SALE_SELLER_SHARE = 135000;
+const BKMP_CARD_SALE_COMMISSION = 15000;
+
 
 function bkmpNormalizeCategoryName(name) {
   if (name === 'B?cher' || name === 'B\uFFFDcher') return 'B\u00fccher';
@@ -81,7 +85,8 @@ const BKMP_DEFAULT_DATA = {
   wishes: [],
   streamers: [],
   aboutBlocks: [],
-  partnerShops: []
+  partnerShops: [],
+  cardSales: []
 };
 
 function bkmpLoadData() {
@@ -97,7 +102,8 @@ function bkmpLoadData() {
       wishes: parsed.wishes || [],
       streamers: parsed.streamers || [],
       aboutBlocks: parsed.aboutBlocks || [],
-      partnerShops: parsed.partnerShops || []
+      partnerShops: parsed.partnerShops || [],
+      cardSales: parsed.cardSales || []
     };
   } catch (e) {
     console.error('Fehler beim Laden der Daten:', e);
@@ -148,6 +154,10 @@ function bkmpCreateStorageSafeData(data) {
     images: (item.images || []).map(bkmpStripHeavyDataUrl).filter(Boolean)
   }));
   clone.partnerShops = (clone.partnerShops || []).map(item => ({
+    ...item,
+    image: bkmpStripHeavyDataUrl(item.image)
+  }));
+  clone.cardSales = (clone.cardSales || []).map(item => ({
     ...item,
     image: bkmpStripHeavyDataUrl(item.image)
   }));

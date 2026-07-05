@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260705-datauri-fix">
+<link rel="stylesheet" href="style.css?v=20260705-cardsales">
 </head>
 <body>
 
@@ -101,6 +101,7 @@
         <button class="tab-btn" data-index="3">Kartenideen</button>
         <button class="tab-btn" data-index="4">Wer sind wir?</button>
         <button class="tab-btn" data-index="5">PartnerShops</button>
+        <button class="tab-btn" data-index="6">Karten Verkaufen</button>
       </div>
       <button class="tab-arrow" id="nextTab" aria-label="Nächster Bereich">
         <svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
@@ -172,6 +173,17 @@
         <div class="partner-grid" id="partnerGrid"></div>
       </section>
 
+      <!-- ================= Karten Verkaufen ================= -->
+      <section class="panel" id="panel-cardsales">
+        <h2 class="panel-title">Karten Verkaufen</h2>
+        <div class="cardsale-banner">
+          <span class="cardsale-banner-kicker">Verkaufsservice</span>
+          <strong>Verkaufe deine 15er-Karte über uns</strong>
+          <p>Du bekommst <b>135.000 €</b> pro verkaufter Karte, wir behalten nur <b>15.000 €</b> Provision (bei einem Kartenpreis von 150.000 €). Gib uns 10 Bundles mit Kopien deiner Karte — dafür bekommst du Shop-Trust und kannst jederzeit selbst nachschauen, ob noch alles da ist.</p>
+        </div>
+        <div class="cardsale-grid" id="cardsaleGrid"></div>
+      </section>
+
     </div>
   </div>
 
@@ -206,8 +218,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260705-datauri-fix"></script>
-  <script src="app.js?v=20260705-datauri-fix"></script>
+  <script src="supabase.js?v=20260705-cardsales"></script>
+  <script src="app.js?v=20260705-cardsales"></script>
   <script>
     bkmpInitTheme();
     window.addEventListener('load', () => document.body.classList.add('page-loaded'));
@@ -330,13 +342,15 @@
         syncWishesFromSupabase(data, null, { force: true }),
         syncStreamersFromSupabase(data, null, { force: true }),
         syncAboutBlocksFromSupabase(data, null, { force: true }),
-        syncPartnerShopsFromSupabase(data, null, { force: true })
+        syncPartnerShopsFromSupabase(data, null, { force: true }),
+        syncCardSalesFromSupabase(data, null, { force: true })
       ]).then(results => {
         const changed = results.some(Boolean);
         renderStreamers();
         if (typeof renderWishes === 'function') renderWishes();
         if (typeof renderAboutBlocks === 'function') renderAboutBlocks();
         if (typeof renderPartnerShops === 'function') renderPartnerShops();
+        if (typeof renderCardSales === 'function') renderCardSales();
         return changed;
       });
     }
@@ -381,7 +395,8 @@
         'wishes',
         'streamer_links',
         'about_blocks',
-        'partner_shops'
+        'partner_shops',
+        'card_sales'
       ];
       const channel = client.channel('bkmp-live-dashboard');
       tables.forEach(table => {
@@ -406,6 +421,7 @@
       if (typeof renderWishes === 'function') renderWishes();
       if (typeof renderAboutBlocks === 'function') renderAboutBlocks();
       if (typeof renderPartnerShops === 'function') renderPartnerShops();
+      if (typeof renderCardSales === 'function') renderCardSales();
       scheduleDeferredSync();
       initSupabaseRealtime();
     });
@@ -910,6 +926,34 @@
         renderPartnerShops();
       });
     }
+
+    const cardsaleGrid = document.getElementById('cardsaleGrid');
+    function renderCardSales() {
+      if (!cardsaleGrid) return;
+      const items = Array.isArray(data.cardSales) ? data.cardSales : [];
+      if (items.length === 0) {
+        cardsaleGrid.innerHTML = '<p class="empty-hint">Noch keine Karten im Verkauf.</p>';
+        return;
+      }
+      cardsaleGrid.innerHTML = items.map(item => {
+        const earned = Number(item.soldCount || 0) * BKMP_CARD_SALE_SELLER_SHARE;
+        return `
+          <article class="cardsale-card">
+            <div class="cardsale-image-frame" data-bkmp-image-wrap data-empty-label="Kein Bild">
+              ${item.image ? `<img data-bkmp-img src="${item.image}" alt="Karte von ${escapeHtml(item.playerName)}" loading="lazy" decoding="async">` : '<div class="cardsale-image-empty">Kein Bild</div>'}
+            </div>
+            <div class="cardsale-body">
+              <h3>${escapeHtml(item.playerName)}</h3>
+              <div class="cardsale-stats">
+                <div><span>Verkauft</span><strong>${Number(item.soldCount || 0)}x</strong></div>
+                <div><span>Bereits verdient</span><strong class="gold">${bkmpFormatCurrency(earned)}</strong></div>
+              </div>
+            </div>
+          </article>`;
+      }).join('');
+      if (window.bkmpEnhanceImages) window.bkmpEnhanceImages(cardsaleGrid);
+    }
+    renderCardSales();
 
     function renderFormattedNewsText(value) {
       let html = escapeHtml(value);

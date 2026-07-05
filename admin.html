@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260705-datauri-fix">
+<link rel="stylesheet" href="style.css?v=20260705-cardsales">
 </head>
 <body>
 
@@ -117,6 +117,10 @@
         <button class="admin-nav-btn" data-page="partners">
           <svg viewBox="0 0 24 24"><path d="M4 8h16v11H4z"/><path d="M7 8V5h10v3"/><path d="M8 13h8"/></svg>
           PartnerShops
+        </button>
+        <button class="admin-nav-btn" data-page="cardsales">
+          <svg viewBox="0 0 24 24"><rect x="3" y="6" width="14" height="10" rx="2"/><rect x="7" y="9" width="14" height="10" rx="2"/></svg>
+          Karten Verkaufen
         </button>
         <button class="admin-nav-btn" data-page="access">
           <svg viewBox="0 0 24 24"><path d="M12 3a5 5 0 0 0-5 5v3H5v10h14V11h-2V8a5 5 0 0 0-5-5z"/><path d="M9 11V8a3 3 0 0 1 6 0v3"/></svg>
@@ -325,6 +329,24 @@
           </div>
         </section>
 
+        <!-- Karten Verkaufen -->
+        <section class="admin-page" id="page-cardsales">
+          <div class="admin-section">
+            <h2>Karten Verkaufen</h2>
+            <p class="admin-help-text">135.000 &euro; gehen an den Spieler, 15.000 &euro; Provision bei uns (Kartenpreis 150.000 &euro;). Verkaufszahl hier bei jedem Verkauf hochz&auml;hlen.</p>
+            <div class="entry-table-wrapper"><div class="entry-list cardsale-admin-list" id="cardSaleList"></div></div>
+            <div class="form-grid form-grid-3">
+              <div><label for="cardSaleName">Spielername</label><input type="text" id="cardSaleName" placeholder="z. B. Steve" required></div>
+              <div><label for="cardSaleImageFile">Bild der Karte</label><input type="file" id="cardSaleImageFile" accept="image/*"></div>
+              <div><label for="cardSaleCount">Bereits verkauft</label><input type="number" id="cardSaleCount" min="0" step="1" placeholder="0"></div>
+            </div>
+            <div class="investor-form-actions">
+              <button class="btn btn-primary" id="addCardSale">+ Verk&auml;ufer hinzuf&uuml;gen</button>
+              <button class="btn" id="cancelCardSaleEdit" type="button" style="display:none;">Abbrechen</button>
+            </div>
+          </div>
+        </section>
+
         <!-- Zugaenge -->
         <section class="admin-page" id="page-access">
           <div class="admin-section">
@@ -378,8 +400,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260705-datauri-fix"></script>
-  <script src="app.js?v=20260705-datauri-fix"></script>
+  <script src="supabase.js?v=20260705-cardsales"></script>
+  <script src="app.js?v=20260705-cardsales"></script>
   <script>
     bkmpInitTheme();
 
@@ -418,6 +440,7 @@
       refreshStreamersFromSupabase();
       refreshAboutBlocksFromSupabase();
       refreshPartnerShopsFromSupabase();
+      refreshCardSalesFromSupabase();
     }
 
     async function refreshBackupDataFromSupabase() {
@@ -429,7 +452,8 @@
         syncWishesFromSupabase(data, null, { force: true }),
         syncStreamersFromSupabase(data, null, { force: true }),
         syncAboutBlocksFromSupabase(data, null, { force: true }),
-        syncPartnerShopsFromSupabase(data, null, { force: true })
+        syncPartnerShopsFromSupabase(data, null, { force: true }),
+        syncCardSalesFromSupabase(data, null, { force: true })
       ]);
       renderAll();
     }
@@ -484,6 +508,7 @@
         if (page === 'streamers') refreshStreamersFromSupabase();
         if (page === 'about') refreshAboutBlocksFromSupabase();
         if (page === 'partners') refreshPartnerShopsFromSupabase();
+        if (page === 'cardsales') refreshCardSalesFromSupabase();
         if (page === 'access') refreshAdminAccessList();
       });
     });
@@ -495,6 +520,7 @@
     let editingStreamerId = null;
     let editingAboutId = null;
     let editingPartnerShopId = null;
+    let editingCardSaleId = null;
 
     // Kategorien-Dropdown befüllen
     const incomeNameSelect = document.getElementById('incomeName');
@@ -587,6 +613,10 @@
 
     async function refreshPartnerShopsFromSupabase() {
       await syncPartnerShopsFromSupabase(data, function () { renderAll(); }, { force: true });
+    }
+
+    async function refreshCardSalesFromSupabase() {
+      await syncCardSalesFromSupabase(data, function () { renderAll(); }, { force: true });
     }
 
     async function persistExpense(expense) {
@@ -831,6 +861,58 @@
       removeEntry('partnerShops', id);
     }
 
+    async function persistCardSale(item) {
+      if (typeof saveCardSale === 'function' && bkmpGetSupabaseClient()) {
+        try {
+          const saved = await saveCardSale(item);
+          if (item.id) {
+            data.cardSales = data.cardSales.map(row => row.id === item.id ? saved : row);
+          } else {
+            data.cardSales.push(saved);
+          }
+          bkmpSaveData(data);
+          renderAll();
+          showAdminToast('Karten-Verkäufer gespeichert.', 'success');
+          return true;
+        } catch (e) {
+          console.error('Supabase konnte Karten-Verkäufer nicht speichern.', e);
+          showAdminToast('Konnte nicht gespeichert werden: ' + supabaseErrorText(e), 'error');
+          return false;
+        }
+      }
+      if (item.id) {
+        data.cardSales = data.cardSales.map(row => row.id === item.id ? item : row);
+      } else {
+        data.cardSales.push({ id: bkmpUid('cardsale'), ...item, createdAt: Date.now() });
+      }
+      persist();
+      return true;
+    }
+
+    async function removeCardSale(id) {
+      if (!hasValidEntryId(id)) return removeEntry('cardSales', id);
+      if (typeof deleteCardSale === 'function' && bkmpGetSupabaseClient() && !String(id).startsWith('cardsale-')) {
+        try {
+          await deleteCardSale(id);
+          data.cardSales = data.cardSales.filter(item => String(item.id) !== String(id));
+          bkmpSaveData(data);
+          renderAll();
+          return;
+        } catch (e) {
+          console.warn('Supabase konnte Karten-Verkäufer nicht löschen. localStorage-Fallback wird verwendet.', e);
+        }
+      }
+      removeEntry('cardSales', id);
+    }
+
+    async function incrementCardSale(id, delta) {
+      const item = data.cardSales.find(row => String(row.id) === String(id));
+      if (!item) return;
+      const nextCount = Math.max(0, Number(item.soldCount || 0) + delta);
+      if (nextCount === Number(item.soldCount || 0)) return;
+      await persistCardSale({ ...item, soldCount: nextCount });
+    }
+
     async function persistIncome(income) {
       if (typeof saveIncome === 'function' && bkmpGetSupabaseClient()) {
         try {
@@ -939,7 +1021,8 @@
         wishes: raw.wishes || [],
         streamers: raw.streamers || [],
         aboutBlocks: raw.aboutBlocks || [],
-        partnerShops: raw.partnerShops || []
+        partnerShops: raw.partnerShops || [],
+        cardSales: raw.cardSales || []
       };
     }
 
@@ -967,6 +1050,7 @@
       renderStreamerList();
       renderAboutBlockList();
       renderPartnerShopList();
+      renderCardSaleList();
       if (window.bkmpEnhanceImages) window.bkmpEnhanceImages(document);
     }
 
@@ -1045,7 +1129,8 @@
         ['wishes', 'wish'],
         ['streamers', 'str'],
         ['aboutBlocks', 'about'],
-        ['partnerShops', 'shop']
+        ['partnerShops', 'shop'],
+        ['cardSales', 'cardsale']
       ];
       let repaired = false;
       lists.forEach(([key, prefix]) => {
@@ -1133,6 +1218,52 @@
         row.querySelector('.del-btn').addEventListener('click', () => {
           if (editingPartnerShopId === item.id) clearPartnerShopForm();
           removePartnerShop(item.id, index);
+        });
+        el.appendChild(row);
+      });
+    }
+
+    function renderCardSaleList() {
+      const el = document.getElementById('cardSaleList');
+      if (!el) return;
+      if (!data.cardSales || data.cardSales.length === 0) {
+        el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Noch keine Karten-Verkäufer.</p>';
+        return;
+      }
+      let repairedIds = false;
+      data.cardSales = data.cardSales.map(item => {
+        if (item && hasValidEntryId(item.id)) return item;
+        repairedIds = true;
+        return { ...item, id: bkmpUid('cardsale') };
+      });
+      if (repairedIds) bkmpSaveData(data);
+      el.innerHTML = '';
+      data.cardSales.forEach(item => {
+        const earned = Number(item.soldCount || 0) * BKMP_CARD_SALE_SELLER_SHARE;
+        const row = document.createElement('div');
+        row.className = 'entry-row cardsale-admin-row';
+        row.innerHTML = `
+          ${item.image ? `<span class="partner-admin-thumb-wrap" data-bkmp-image-wrap data-empty-label="Karte"><img data-bkmp-img class="partner-admin-thumb" src="${item.image}" alt="" loading="lazy" decoding="async"></span>` : '<div class="partner-admin-thumb partner-admin-thumb-empty">Karte</div>'}
+          <div class="desc">
+            <span class="name">${escapeHtml(item.playerName)}</span>
+            <span class="meta">${bkmpFormatCurrency(earned)} verdient</span>
+          </div>
+          <div class="cardsale-counter">
+            <button class="cardsale-count-btn" type="button" data-action="minus" aria-label="Einen Verkauf abziehen">−</button>
+            <span class="cardsale-count-value">${Number(item.soldCount || 0)}x</span>
+            <button class="cardsale-count-btn" type="button" data-action="plus" aria-label="Verkauf hinzufügen">+</button>
+          </div>
+          <div class="entry-actions">
+            <button class="edit-btn" type="button">Bearbeiten</button>
+            <button class="del-btn" type="button" aria-label="Karten-Verkäufer löschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>
+          </div>
+        `;
+        row.querySelector('[data-action="plus"]').addEventListener('click', () => incrementCardSale(item.id, 1));
+        row.querySelector('[data-action="minus"]').addEventListener('click', () => incrementCardSale(item.id, -1));
+        row.querySelector('.edit-btn').addEventListener('click', () => startEditCardSale(item.id));
+        row.querySelector('.del-btn').addEventListener('click', () => {
+          if (editingCardSaleId === item.id) clearCardSaleForm();
+          removeCardSale(item.id);
         });
         el.appendChild(row);
       });
@@ -1613,6 +1744,62 @@
         };
         persistPartnerShop(shop).then(saved => {
           if (saved) clearPartnerShopForm();
+        });
+      }).catch(e => {
+        console.error('Bild konnte nicht gelesen werden.', e);
+        showAdminToast('Das ausgewählte Bild konnte nicht gelesen werden. Bitte versuche es mit einer anderen Datei erneut.', 'error');
+      });
+    });
+
+    /* Karten Verkaufen */
+    const addCardSaleBtn = document.getElementById('addCardSale');
+    const cancelCardSaleEditBtn = document.getElementById('cancelCardSaleEdit');
+    const cardSaleNameInput = document.getElementById('cardSaleName');
+    const cardSaleImageFileInput = document.getElementById('cardSaleImageFile');
+    const cardSaleCountInput = document.getElementById('cardSaleCount');
+
+    function setCardSaleEditMode(isEditing) {
+      addCardSaleBtn.textContent = isEditing ? 'Änderungen speichern' : '+ Verkäufer hinzufügen';
+      cancelCardSaleEditBtn.style.display = isEditing ? 'inline-flex' : 'none';
+    }
+
+    function clearCardSaleForm() {
+      editingCardSaleId = null;
+      cardSaleNameInput.value = '';
+      cardSaleImageFileInput.value = '';
+      cardSaleCountInput.value = '';
+      setCardSaleEditMode(false);
+    }
+
+    function startEditCardSale(id) {
+      const item = data.cardSales.find(row => row.id === id);
+      if (!item) return;
+      editingCardSaleId = id;
+      cardSaleNameInput.value = item.playerName || '';
+      cardSaleImageFileInput.value = '';
+      cardSaleCountInput.value = Number(item.soldCount || 0);
+      setCardSaleEditMode(true);
+      cardSaleNameInput.focus();
+    }
+
+    cancelCardSaleEditBtn.addEventListener('click', clearCardSaleForm);
+
+    addCardSaleBtn.addEventListener('click', () => {
+      const playerName = cardSaleNameInput.value.trim();
+      if (!playerName) { cardSaleNameInput.reportValidity(); return; }
+      const currentItem = editingCardSaleId ? data.cardSales.find(row => row.id === editingCardSaleId) : null;
+      const file = cardSaleImageFileInput.files && cardSaleImageFileInput.files[0] ? cardSaleImageFileInput.files[0] : null;
+      const readImage = file ? bkmpCompressImageFile(file) : Promise.resolve(currentItem ? currentItem.image || '' : '');
+      const soldCount = cardSaleCountInput.value === '' ? (currentItem ? Number(currentItem.soldCount || 0) : 0) : Math.max(0, Number(cardSaleCountInput.value));
+      readImage.then(image => {
+        const item = {
+          id: editingCardSaleId || '',
+          playerName,
+          image,
+          soldCount
+        };
+        persistCardSale(item).then(saved => {
+          if (saved) clearCardSaleForm();
         });
       }).catch(e => {
         console.error('Bild konnte nicht gelesen werden.', e);

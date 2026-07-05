@@ -1548,6 +1548,123 @@ async function importLocalPartnerShopsToSupabase() {
   return { imported: rows.length, skipped, total: refreshed.length };
 }
 
+function bkmpMapCardSaleFromSupabase(row) {
+  return {
+    id: row.id,
+    playerName: row.player_name || '',
+    image: row.image_url || '',
+    soldCount: Number(row.sold_count || 0),
+    createdAt: row.created_at ? Date.parse(row.created_at) : 0,
+    source: 'supabase'
+  };
+}
+
+function bkmpMapCardSaleToSupabase(item) {
+  return {
+    player_name: item.playerName || item.player_name || '',
+    image_url: item.image || item.image_url || '',
+    sold_count: Number(item.soldCount || item.sold_count || 0)
+  };
+}
+
+async function loadCardSales() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('card_sales')
+    .select('id, player_name, image_url, sold_count, created_at')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(bkmpMapCardSaleFromSupabase);
+}
+
+async function saveCardSale(item) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const payload = bkmpMapCardSaleToSupabase(item);
+  payload.image_url = await bkmpStoreImageIfNeeded(payload.image_url, 'card-sales');
+  let query;
+  if (item.id && !String(item.id).startsWith('cardsale-')) {
+    query = client
+      .from('card_sales')
+      .update(payload)
+      .eq('id', item.id)
+      .select('id, player_name, image_url, sold_count, created_at')
+      .limit(1);
+  } else {
+    query = client
+      .from('card_sales')
+      .insert(payload)
+      .select('id, player_name, image_url, sold_count, created_at')
+      .limit(1);
+  }
+  const { data, error } = await query;
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : null;
+  return row ? bkmpMapCardSaleFromSupabase(row) : null;
+}
+
+async function deleteCardSale(id) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return false;
+  const { error } = await client.from('card_sales').delete().eq('id', id);
+  if (error) throw error;
+  return true;
+}
+
+async function syncCardSalesFromSupabase(targetData, onSynced, options = {}) {
+  if (typeof loadCardSales !== 'function' || !bkmpGetSupabaseClient()) return false;
+  try {
+    const items = await loadCardSales();
+    if (!items) return false;
+    const localCount = Array.isArray(targetData.cardSales) ? targetData.cardSales.length : 0;
+    if (localCount > 0 && items.length === 0) {
+      console.warn('Supabase enthaelt keine Karten-Verkaeufe. Lokale Daten bleiben erhalten.');
+      return false;
+    }
+    if (!options.force && localCount > 0 && items.length < localCount) {
+      console.warn('Supabase enthaelt weniger Karten-Verkaeufe als localStorage. Lokale Daten bleiben erhalten.');
+      return false;
+    }
+    targetData.cardSales = items;
+    bkmpSaveData(targetData);
+    if (typeof onSynced === 'function') onSynced(targetData);
+    return true;
+  } catch (e) {
+    console.warn('Supabase konnte Karten-Verkaeufe nicht laden. localStorage-Fallback wird verwendet.', e);
+    return false;
+  }
+}
+
+async function importLocalCardSalesToSupabase() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return { imported: 0, skipped: 0, total: 0 };
+  const localData = bkmpLoadData();
+  const localItems = Array.isArray(localData.cardSales) ? localData.cardSales : [];
+  const remoteItems = await loadCardSales() || [];
+  const existing = new Set(remoteItems.map(item => [item.playerName, item.soldCount].join('|')));
+  const rows = [];
+  let skipped = 0;
+  localItems.forEach(item => {
+    const sig = [item.playerName || '', item.soldCount || 0].join('|');
+    if (existing.has(sig)) { skipped += 1; return; }
+    if (!item.playerName) { skipped += 1; return; }
+    existing.add(sig);
+    rows.push(bkmpMapCardSaleToSupabase(item));
+  });
+  if (rows.length) {
+    for (const row of rows) {
+      row.image_url = await bkmpStoreImageIfNeeded(row.image_url, 'card-sales');
+    }
+    const { error } = await client.from('card_sales').insert(rows);
+    if (error) throw error;
+  }
+  const refreshed = await loadCardSales() || [];
+  localData.cardSales = refreshed;
+  bkmpSaveData(localData);
+  return { imported: rows.length, skipped, total: refreshed.length };
+}
+
 async function importAllLocalDataToSupabase() {
   return {
     incomes: await importLocalIncomesToSupabase(),
@@ -1557,7 +1674,8 @@ async function importAllLocalDataToSupabase() {
     wishes: await importLocalWishesToSupabase(),
     streamers: await importLocalStreamersToSupabase(),
     aboutBlocks: await importLocalAboutBlocksToSupabase(),
-    partnerShops: await importLocalPartnerShopsToSupabase()
+    partnerShops: await importLocalPartnerShopsToSupabase(),
+    cardSales: await importLocalCardSalesToSupabase()
   };
 }
 
@@ -1567,6 +1685,7 @@ window.importLocalWishesToSupabase = importLocalWishesToSupabase;
 window.importLocalStreamersToSupabase = importLocalStreamersToSupabase;
 window.importLocalAboutBlocksToSupabase = importLocalAboutBlocksToSupabase;
 window.importLocalPartnerShopsToSupabase = importLocalPartnerShopsToSupabase;
+window.importLocalCardSalesToSupabase = importLocalCardSalesToSupabase;
 window.importAllLocalDataToSupabase = importAllLocalDataToSupabase;
 
 window.importLocalIncomesToSupabase = importLocalIncomesToSupabase;
