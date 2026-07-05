@@ -158,8 +158,60 @@ function bkmpUid(prefix) {
   return prefix + '-' + Math.random().toString(36).slice(2, 9);
 }
 
+function bkmpImageExtension(src) {
+  const dataMatch = /^data:image\/(\w+)/.exec(src || '');
+  if (dataMatch) return dataMatch[1] === 'jpeg' ? 'jpg' : dataMatch[1];
+  const urlMatch = /\.(\w+)(?:\?.*)?$/.exec(src || '');
+  return urlMatch ? urlMatch[1] : 'png';
+}
+
 function escapeHtml(value) {
   return String(value || '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
+/* ============================================================
+   Bild-Komprimierung fuer Uploads
+   Verkleinert grosse Bilder client-seitig auf eine sinnvolle
+   Breite und wandelt sie in WebP um, bevor sie hochgeladen
+   werden. Das ist der Grund, warum Bilder sonst sehr lange
+   laden koennen: ohne das hier wird die Originaldatei 1:1
+   hochgeladen und bei jedem Seitenaufruf erneut geladen.
+   ============================================================ */
+function bkmpCompressImageFile(file, options = {}) {
+  const maxWidth = options.maxWidth || 1000;
+  const quality = options.quality || 0.74;
+
+  function readAsDataUrl() {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error || new Error('Datei konnte nicht gelesen werden.'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  if (!file || !file.type || !file.type.startsWith('image/')) {
+    return readAsDataUrl();
+  }
+
+  return readAsDataUrl().then(original => new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxWidth / img.width);
+      if (scale >= 1) {
+        resolve(original);
+        return;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/webp', quality));
+    };
+    img.onerror = () => resolve(original);
+    img.src = original;
+  }));
 }
 
 function bkmpFormatCurrency(value) {

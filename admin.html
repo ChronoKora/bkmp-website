@@ -1415,7 +1415,7 @@
     addAboutBlockBtn.addEventListener('click', () => {
       const currentBlock = editingAboutId ? data.aboutBlocks.find(item => item.id === editingAboutId) : null;
       const files = aboutImageFileInput.files ? Array.from(aboutImageFileInput.files) : [];
-      Promise.all(files.map(readFileAsDataUrl)).then(images => {
+      Promise.all(files.map(file => bkmpCompressImageFile(file))).then(images => {
         const keepImages = currentBlock ? (currentBlock.images && currentBlock.images.length ? currentBlock.images : (currentBlock.image ? [currentBlock.image] : [])) : [];
         const nextImages = images.length ? images : keepImages;
         const block = {
@@ -1490,7 +1490,7 @@
       if (!name) { partnerNameInput.reportValidity(); return; }
       const currentShop = editingPartnerShopId ? data.partnerShops.find(item => item.id === editingPartnerShopId) : null;
       const file = partnerImageFileInput.files && partnerImageFileInput.files[0] ? partnerImageFileInput.files[0] : null;
-      const readImage = file ? readFileAsDataUrl(file) : Promise.resolve(currentShop ? currentShop.image || '' : '');
+      const readImage = file ? bkmpCompressImageFile(file) : Promise.resolve(currentShop ? currentShop.image || '' : '');
       readImage.then(image => {
         const shop = {
           id: editingPartnerShopId || '',

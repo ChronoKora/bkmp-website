@@ -951,7 +951,7 @@
             <div class="wish-card-actions">
               <button type="button" class="wish-vote wish-like" data-action="like">Like <span>${Number(w.likes || 0)}</span></button>
               <button type="button" class="wish-vote wish-dislike" data-action="dislike">Dislike <span>${Number(w.dislikes || 0)}</span></button>
-              <a class="wish-mini-download" href="${w.image}" download="kartenwunsch-${escapeHtml(w.name || 'bkmp')}.png">Download</a>
+              <a class="wish-mini-download" href="${w.image}" download="kartenwunsch-${escapeHtml(w.name || 'bkmp')}.${bkmpImageExtension(w.image)}">Download</a>
             </div>
           </div>
         </article>
@@ -984,7 +984,7 @@
       wishDetailImage.alt = 'Kartenidee von ' + wish.name;
       wishDetailName.textContent = wish.name;
       wishDownload.href = wish.image;
-      wishDownload.download = 'kartenwunsch-' + (wish.name || 'bkmp') + '.png';
+      wishDownload.download = 'kartenwunsch-' + (wish.name || 'bkmp') + '.' + bkmpImageExtension(wish.image);
       wishDetailOverlay.classList.add('visible');
     }
 
@@ -1027,9 +1027,8 @@
         alert('Bitte gib deinen Namen an und wähle ein PNG-Bild aus.');
         return;
       }
-      const reader = new FileReader();
-      reader.onload = () => {
-        const wish = { id: bkmpUid('wish'), name, image: reader.result, date: new Date().toISOString().slice(0, 10), createdAt: Date.now() };
+      bkmpCompressImageFile(file).then(image => {
+        const wish = { id: bkmpUid('wish'), name, image, date: new Date().toISOString().slice(0, 10), createdAt: Date.now() };
         function finishWish(savedWish) {
           data.wishes.push(savedWish || wish);
           bkmpSaveData(data);
@@ -1046,11 +1045,9 @@
         } else {
           finishWish(wish);
         }
-      };
-      reader.onerror = () => {
+      }).catch(() => {
         alert('Das Bild konnte nicht gelesen werden. Bitte versuche es mit einer anderen PNG-Datei erneut.');
-      };
-      reader.readAsDataURL(file);
+      });
     });
   </script>
 
