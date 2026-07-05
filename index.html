@@ -497,6 +497,7 @@
       ]).then(results => {
         const changed = results.some(Boolean);
         renderStreamers();
+        if (typeof renderNews === 'function') renderNews();
         if (typeof renderWishes === 'function') renderWishes();
         if (typeof renderAboutBlocks === 'function') renderAboutBlocks();
         if (typeof renderPartnerShops === 'function') renderPartnerShops();
@@ -570,6 +571,7 @@
         if (typeof renderFinancialSections === 'function') renderFinancialSections();
       }
       renderStreamers();
+      if (typeof renderNews === 'function') renderNews();
       if (typeof renderWishes === 'function') renderWishes();
       if (typeof renderAboutBlocks === 'function') renderAboutBlocks();
       if (typeof renderPartnerShops === 'function') renderPartnerShops();
@@ -1273,9 +1275,11 @@
 
     /* News */
     const newsFeed = document.getElementById('newsFeed');
-    if (data.news.length === 0) {
-      newsFeed.innerHTML = '<p class="empty-hint">Noch keine Updates gepostet.</p>';
-    } else {
+    function renderNews() {
+      if (data.news.length === 0) {
+        newsFeed.innerHTML = '<p class="empty-hint">Noch keine Updates gepostet.</p>';
+        return;
+      }
       const visibleNews = typeof bkmpDedupeUpdates === 'function' ? bkmpDedupeUpdates(data.news) : data.news;
       const sorted = [...visibleNews].sort((a, b) => (a.date < b.date ? 1 : -1));
       newsFeed.innerHTML = sorted.map(post => {
@@ -1296,6 +1300,7 @@
       }).join('');
       if (window.bkmpEnhanceImages) window.bkmpEnhanceImages(newsFeed);
     }
+    renderNews();
 
     /* Kartenideen */
     const wishGrid = document.getElementById('wishGrid');
