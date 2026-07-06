@@ -2508,6 +2508,72 @@ body.bkmp-burning::before {
   body.bkmp-burning::before { animation: none; opacity: 0.5; }
 }
 
+/* ---------- Creeper (Easter Egg: "creeper" tippen) ---------- */
+body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
+.bkmp-creeper-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 96;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 50%, rgba(74, 222, 128, 0.55), rgba(20, 60, 30, 0.25) 55%, transparent 80%);
+  animation: bkmpCreeperPulse 0.35s ease-in-out infinite;
+}
+.bkmp-creeper-flash.bkmp-creeper-defused {
+  animation: none;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  transition: opacity 0.4s ease;
+}
+.bkmp-creeper-message {
+  background: color-mix(in srgb, var(--paper-2) 92%, transparent);
+  border: 1px solid color-mix(in srgb, #4ade80 45%, var(--line));
+  color: #4ade80;
+  font-family: 'Fraunces', serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+  padding: 0.9rem 1.6rem;
+  border-radius: 999px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+}
+@keyframes bkmpCreeperPulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.bkmp-creeper-shake { animation: none; }
+  .bkmp-creeper-flash { animation: none; opacity: 0.7; }
+}
+
+/* ---------- Matrix-Regen (Easter Egg: "matrix" tippen) ---------- */
+.bkmp-matrix-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 97;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.6s ease;
+}
+.bkmp-matrix-overlay.fading { opacity: 0; }
+
+/* ---------- Idle-Easter-Egg: Zzz-Blase ---------- */
+.bkmp-zzz-bubble {
+  position: fixed;
+  z-index: 98;
+  transform: translate(-50%, -120%);
+  font-size: 1.8rem;
+  pointer-events: none;
+  animation: bkmpZzzFloat 2.4s ease-in-out infinite;
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.35));
+}
+@keyframes bkmpZzzFloat {
+  0%, 100% { transform: translate(-50%, -120%) translateY(0); opacity: 0.85; }
+  50% { transform: translate(-50%, -120%) translateY(-10px); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bkmp-zzz-bubble { animation: none; }
+}
+
 /* ---------- Geheimer Hinweis-Button ---------- */
 .secret-hint {
   position: fixed;

@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260706-leaderboard">
+<link rel="stylesheet" href="style.css?v=20260706-eggs2">
 </head>
 <body>
 
@@ -465,6 +465,12 @@
     let easterBuffer = '';
     const dracheTarget = 'drache';
     let dracheBuffer = '';
+    const philTarget = 'phil';
+    let philBuffer = '';
+    const creeperTarget = 'creeper';
+    let creeperBuffer = '';
+    const matrixTarget = 'matrix';
+    let matrixBuffer = '';
     let konamiBuffer = [];
     const konamiCode = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
 
@@ -548,12 +554,195 @@
       }, 1800);
     }
 
+    /* Easter Egg: "phil" tippen spielt einen Sound ab */
+    function triggerBkmpPhilEasterEgg() {
+      try {
+        const audio = new Audio('assets/phil.mp3');
+        audio.volume = 0.85;
+        audio.play().catch(() => {});
+      } catch (e) {}
+    }
+
+    /* Easter Egg: "creeper" tippen - Zischen, Wackeln, Entwarnung */
+    function bkmpPlayHissSound() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const bufferSize = ctx.sampleRate * 1.1;
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 2);
+        const noise = ctx.createBufferSource();
+        noise.buffer = buffer;
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'highpass';
+        filter.frequency.value = 900;
+        const gain = ctx.createGain();
+        gain.gain.value = 0.35;
+        noise.connect(filter).connect(gain).connect(ctx.destination);
+        noise.start();
+        noise.onended = () => ctx.close();
+      } catch (e) {}
+    }
+
+    function triggerBkmpCreeperEasterEgg() {
+      if (document.getElementById('bkmpCreeperOverlay')) return;
+      bkmpPlayHissSound();
+      document.body.classList.add('bkmp-creeper-shake');
+      const overlay = document.createElement('div');
+      overlay.id = 'bkmpCreeperOverlay';
+      overlay.className = 'bkmp-creeper-flash';
+      document.body.appendChild(overlay);
+      setTimeout(() => {
+        document.body.classList.remove('bkmp-creeper-shake');
+        overlay.classList.add('bkmp-creeper-defused');
+        overlay.innerHTML = '<div class="bkmp-creeper-message">Puh... nochmal gutgegangen. 🟩</div>';
+        setTimeout(() => overlay.remove(), 1800);
+      }, 1100);
+    }
+
+    /* Easter Egg: 7x aufs Banner klicken - Diamanten-Regen + Cha-Ching */
+    function bkmpPlayChaChing() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        [880, 1318.5].forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.frequency.value = freq;
+          osc.type = 'sine';
+          gain.gain.setValueAtTime(0.25, ctx.currentTime + i * 0.09);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.09 + 0.35);
+          osc.connect(gain).connect(ctx.destination);
+          osc.start(ctx.currentTime + i * 0.09);
+          osc.stop(ctx.currentTime + i * 0.09 + 0.4);
+        });
+        setTimeout(() => ctx.close(), 700);
+      } catch (e) {}
+    }
+
+    function triggerBkmpDiamondRain() {
+      if (document.getElementById('bkmpDiamondRain')) return;
+      bkmpPlayChaChing();
+      const loot = ['💎', '💵', '🤑'];
+      const overlay = document.createElement('div');
+      overlay.id = 'bkmpDiamondRain';
+      overlay.className = 'bkmp-loot-rain';
+      const pieces = Array.from({ length: 30 }, (_, i) => {
+        const emoji = loot[i % loot.length];
+        const left = Math.round(Math.random() * 100);
+        const duration = (2.4 + Math.random() * 1.8).toFixed(2);
+        const delay = (Math.random() * 1).toFixed(2);
+        const size = (1.4 + Math.random() * 1.3).toFixed(2);
+        return `<span style="left:${left}%; animation-duration:${duration}s; animation-delay:${delay}s; font-size:${size}rem;">${emoji}</span>`;
+      }).join('');
+      overlay.innerHTML = pieces;
+      document.body.appendChild(overlay);
+      const banner = document.createElement('div');
+      banner.className = 'bkmp-loot-rain-banner';
+      banner.textContent = 'Diamanten-Regen! 💎';
+      overlay.appendChild(banner);
+      requestAnimationFrame(() => banner.classList.add('visible'));
+      setTimeout(() => {
+        banner.classList.remove('visible');
+        setTimeout(() => overlay.remove(), 500);
+      }, 4200);
+    }
+
+    let bkmpBannerClickCount = 0;
+    let bkmpBannerClickResetTimer = null;
+    const bkmpHeroBannerEl = document.querySelector('.hero-banner');
+    if (bkmpHeroBannerEl) {
+      bkmpHeroBannerEl.style.cursor = 'pointer';
+      bkmpHeroBannerEl.addEventListener('click', () => {
+        bkmpBannerClickCount++;
+        clearTimeout(bkmpBannerClickResetTimer);
+        bkmpBannerClickResetTimer = setTimeout(() => { bkmpBannerClickCount = 0; }, 2500);
+        if (bkmpBannerClickCount >= 7) {
+          bkmpBannerClickCount = 0;
+          triggerBkmpDiamondRain();
+          if (typeof bkmpMarkEggFound === 'function') bkmpMarkEggFound('diamond');
+        }
+      });
+    }
+
+    /* Easter Egg: "matrix" tippen - Matrix-Regen */
+    function triggerBkmpMatrixRain() {
+      if (document.getElementById('bkmpMatrixOverlay')) return;
+      const overlay = document.createElement('canvas');
+      overlay.id = 'bkmpMatrixOverlay';
+      overlay.className = 'bkmp-matrix-overlay';
+      document.body.appendChild(overlay);
+      const ctx2d = overlay.getContext('2d');
+      function resize() { overlay.width = window.innerWidth; overlay.height = window.innerHeight; }
+      resize();
+      const chars = 'アイウエオカキクケコサシスセソ01BKMP';
+      const fontSize = 16;
+      const columns = Math.floor(overlay.width / fontSize);
+      const drops = Array(columns).fill(1);
+      let frame = 0;
+      const maxFrames = 260;
+      function draw() {
+        ctx2d.fillStyle = 'rgba(5, 10, 8, 0.15)';
+        ctx2d.fillRect(0, 0, overlay.width, overlay.height);
+        ctx2d.fillStyle = '#4ade80';
+        ctx2d.font = fontSize + 'px monospace';
+        drops.forEach((y, i) => {
+          const char = chars[Math.floor(Math.random() * chars.length)];
+          ctx2d.fillText(char, i * fontSize, y * fontSize);
+          if (y * fontSize > overlay.height && Math.random() > 0.975) drops[i] = 0;
+          drops[i]++;
+        });
+        frame++;
+        if (frame < maxFrames) {
+          requestAnimationFrame(draw);
+        } else {
+          overlay.classList.add('fading');
+          setTimeout(() => overlay.remove(), 600);
+        }
+      }
+      draw();
+    }
+
+    /* Easter Egg: 3 Minuten inaktiv - schläfriger Titel + Zzz-Blase */
+    let bkmpIdleTimer = null;
+    const bkmpOriginalTitle = document.title;
+    let bkmpIsIdle = false;
+    let bkmpLastMouseX = null;
+    let bkmpLastMouseY = null;
+    function bkmpResetIdleTimer() {
+      if (bkmpIsIdle) {
+        document.title = bkmpOriginalTitle;
+        bkmpIsIdle = false;
+        const bubble = document.getElementById('bkmpZzzBubble');
+        if (bubble) bubble.remove();
+      }
+      clearTimeout(bkmpIdleTimer);
+      bkmpIdleTimer = setTimeout(triggerBkmpIdleEasterEgg, 3 * 60 * 1000);
+    }
+    function triggerBkmpIdleEasterEgg() {
+      bkmpIsIdle = true;
+      document.title = '😴 Bist du noch da...?';
+      if (typeof bkmpMarkEggFound === 'function') bkmpMarkEggFound('idle');
+      const bubble = document.createElement('div');
+      bubble.id = 'bkmpZzzBubble';
+      bubble.className = 'bkmp-zzz-bubble';
+      bubble.textContent = '💤';
+      bubble.style.left = (bkmpLastMouseX !== null ? bkmpLastMouseX : window.innerWidth / 2) + 'px';
+      bubble.style.top = (bkmpLastMouseY !== null ? bkmpLastMouseY : window.innerHeight / 2) + 'px';
+      document.body.appendChild(bubble);
+    }
+    document.addEventListener('mousemove', e => { bkmpLastMouseX = e.clientX; bkmpLastMouseY = e.clientY; bkmpResetIdleTimer(); });
+    ['keydown', 'click', 'scroll', 'touchstart'].forEach(evt => document.addEventListener(evt, bkmpResetIdleTimer, { passive: true }));
+    bkmpResetIdleTimer();
+
     document.addEventListener('keydown', e => {
       const tag = document.activeElement?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
       const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
       easterBuffer = (easterBuffer + key).slice(-easterTarget.length);
       dracheBuffer = (dracheBuffer + key).slice(-dracheTarget.length);
+      philBuffer = (philBuffer + key).slice(-philTarget.length);
+      creeperBuffer = (creeperBuffer + key).slice(-creeperTarget.length);
+      matrixBuffer = (matrixBuffer + key).slice(-matrixTarget.length);
       konamiBuffer.push(key);
       konamiBuffer = konamiBuffer.slice(-konamiCode.length);
       if (easterBuffer === easterTarget) {
@@ -565,6 +754,21 @@
         triggerBkmpFireEasterEgg();
         if (typeof bkmpMarkEggFound === 'function') bkmpMarkEggFound('drache');
         dracheBuffer = '';
+      }
+      if (philBuffer === philTarget) {
+        triggerBkmpPhilEasterEgg();
+        if (typeof bkmpMarkEggFound === 'function') bkmpMarkEggFound('phil');
+        philBuffer = '';
+      }
+      if (creeperBuffer === creeperTarget) {
+        triggerBkmpCreeperEasterEgg();
+        if (typeof bkmpMarkEggFound === 'function') bkmpMarkEggFound('creeper');
+        creeperBuffer = '';
+      }
+      if (matrixBuffer === matrixTarget) {
+        triggerBkmpMatrixRain();
+        if (typeof bkmpMarkEggFound === 'function') bkmpMarkEggFound('matrix');
+        matrixBuffer = '';
       }
       if (konamiBuffer.join('|') === konamiCode.join('|')) {
         triggerBkmpLootRain();
@@ -1888,7 +2092,12 @@
       { id: 'egg_bkmp', category: 'Easter Eggs', title: '???', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Manche Namen tippt man öfter, als man denkt.', check: ctx => ctx.eggsFound.includes('bkmp') },
       { id: 'egg_konami', category: 'Easter Eggs', title: '???', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Hoch, hoch, runter, runter... eine uralte Cheat-Tradition.', check: ctx => ctx.eggsFound.includes('konami') },
       { id: 'egg_fire', category: 'Easter Eggs', title: '???', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Was fürchten Dörfer und Ritter gleichermaßen? Tipp es einfach.', check: ctx => ctx.eggsFound.includes('drache') },
-      { id: 'egg_all', category: 'Easter Eggs', title: 'Osterhase', desc: 'Finde alle 3 versteckten Easter Eggs.', progress: ctx => [ctx.eggsFound.length, 3], check: ctx => ctx.eggsFound.length >= 3 },
+      { id: 'egg_phil', category: 'Easter Eggs', title: '???', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Es gibt da diesen einen Bodybuilder in der Kartendatenbank...', check: ctx => ctx.eggsFound.includes('phil') },
+      { id: 'egg_creeper', category: 'Easter Eggs', title: '???', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Sssss... ein sehr grünes, sehr explosives Minecraft-Wesen.', check: ctx => ctx.eggsFound.includes('creeper') },
+      { id: 'egg_diamond', category: 'Easter Eggs', title: '???', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Klick oft und schnell auf das Banner ganz oben auf der Seite.', check: ctx => ctx.eggsFound.includes('diamond') },
+      { id: 'egg_matrix', category: 'Easter Eggs', title: '???', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Rot oder blau? Tipp den Namen eines berühmten Filmuniversums.', check: ctx => ctx.eggsFound.includes('matrix') },
+      { id: 'egg_idle', category: 'Easter Eggs', title: '???', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Lass die Seite einfach mal ein paar Minuten in Ruhe.', check: ctx => ctx.eggsFound.includes('idle') },
+      { id: 'egg_all', category: 'Easter Eggs', title: 'Osterhase', desc: 'Finde alle 8 versteckten Easter Eggs.', progress: ctx => [ctx.eggsFound.length, 8], check: ctx => ctx.eggsFound.length >= 8 },
       { id: 'combo_card_wish', category: 'Sonstiges', title: 'Vielseitig', desc: 'Reiche mindestens 1 Karte und 1 Kartenidee ein.', check: ctx => ctx.cardCount >= 1 && ctx.wishCount >= 1 },
       { id: 'night_owl', category: 'Sonstiges', title: 'Nachteule', desc: 'Besuche die Seite zwischen 0 und 5 Uhr nachts.', check: ctx => ctx.nightOwl },
       { id: 'early_bird', category: 'Sonstiges', title: 'Frühaufsteher', desc: 'Besuche die Seite zwischen 5 und 7 Uhr morgens.', check: ctx => ctx.earlyBird },
