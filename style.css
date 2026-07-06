@@ -2015,6 +2015,58 @@ input.cardcatalog-search:focus {
 .cardcatalog-filter-row .partner-filter { margin: 0; }
 
 .cardcatalog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1.1rem; }
+
+/* ---------- Bestenliste ---------- */
+.leaderboard-intro {
+  max-width: 68ch;
+  margin: 0 auto 1.6rem;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.94rem;
+  line-height: 1.6;
+}
+.leaderboard-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-bottom: 1.6rem;
+}
+.leaderboard-tab {
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 0.55rem 1.1rem;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.leaderboard-tab:hover { border-color: var(--gold); color: var(--ink); }
+.leaderboard-tab.active {
+  background: linear-gradient(135deg, #f5d58a, var(--gold));
+  color: #0A0A0F;
+  border-color: transparent;
+}
+.leaderboard-list { max-width: 640px; margin: 0 auto; display: grid; gap: 0.6rem; }
+.leaderboard-row {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.75rem 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--paper-2), color-mix(in srgb, var(--paper) 84%, transparent));
+}
+.leaderboard-row.is-me {
+  border-color: color-mix(in srgb, var(--gold) 55%, var(--line));
+  box-shadow: 0 0 14px color-mix(in srgb, var(--gold) 25%, transparent);
+}
+.leaderboard-rank { flex-shrink: 0; width: 2.2rem; text-align: center; font-weight: 800; font-size: 1.05rem; }
+.leaderboard-name { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.leaderboard-value { flex-shrink: 0; color: var(--gold); font-weight: 700; font-size: 0.88rem; }
 .cardcatalog-card {
   background: linear-gradient(180deg, var(--paper-2), color-mix(in srgb, var(--paper) 82%, transparent));
   border: 1px solid var(--line);
@@ -2534,6 +2586,156 @@ body.bkmp-burning::before {
 }
 .achievement-progress-label { font-size: 0.68rem; color: var(--muted); margin-left: 0.4rem; }
 .achievements-card .joke-buttons { margin-top: 1rem; justify-content: space-between; }
+
+.achievements-subtabs { display: flex; gap: 0.5rem; margin-bottom: 0.8rem; }
+.achievements-subtab {
+  flex: 1;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 0.45rem 0.8rem;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.achievements-subtab.active {
+  background: linear-gradient(135deg, #f5d58a, var(--gold));
+  color: #0A0A0F;
+  border-color: transparent;
+}
+
+.achievement-category { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.achievement-category + .achievement-category { margin-top: 0.5rem; }
+.achievement-category-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 0.9rem;
+  background: color-mix(in srgb, var(--paper-2) 80%, transparent);
+  border: 0;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  color: var(--ink);
+  text-align: left;
+}
+.achievement-category-toggle { color: var(--gold); flex-shrink: 0; }
+.achievement-category-title { font-weight: 700; font-size: 0.88rem; flex: 1; }
+.achievement-category-count { font-size: 0.76rem; color: var(--muted); }
+.achievement-category-body { display: grid; gap: 0.5rem; padding: 0.6rem; background: color-mix(in srgb, var(--paper) 90%, transparent); }
+.achievement-category-body .achievement-row { border-radius: 12px; }
+
+.cosmetics-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.6rem;
+  max-height: 50vh;
+  overflow-y: auto;
+  margin-bottom: 0.4rem;
+}
+.cosmetic-swatch {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.8rem;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.cosmetic-swatch:not(.locked):hover { transform: translateY(-2px); }
+.cosmetic-swatch.active { border-color: var(--gold); box-shadow: 0 0 0 2px color-mix(in srgb, var(--gold) 35%, transparent); }
+.cosmetic-swatch.locked { opacity: 0.55; cursor: not-allowed; }
+.cosmetic-swatch-name { font-weight: 700; font-size: 0.85rem; }
+.cosmetic-swatch-desc { font-size: 0.72rem; color: var(--muted); }
+
+/* ---------- Kosmetik: Namens-Effekte ---------- */
+#mcNameBadge.mc-cosmetic-shadow { border-color: rgba(0, 0, 0, 0.5); background: #0d0d10; color: #b8b8c2; }
+#mcNameBadge.mc-cosmetic-gold { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 50%, var(--line)); }
+#mcNameBadge.mc-cosmetic-ice {
+  color: #7dd3fc;
+  border-color: color-mix(in srgb, #38bdf8 50%, var(--line));
+  box-shadow: 0 0 12px color-mix(in srgb, #38bdf8 35%, transparent);
+}
+#mcNameBadge.mc-cosmetic-glow {
+  color: var(--gold);
+  border-color: color-mix(in srgb, var(--gold) 55%, var(--line));
+  box-shadow: 0 0 16px color-mix(in srgb, var(--gold) 45%, transparent);
+}
+#mcNameBadge.mc-cosmetic-matrix {
+  color: #4ade80;
+  border-color: color-mix(in srgb, #4ade80 45%, var(--line));
+  background: #05100a;
+  box-shadow: 0 0 10px color-mix(in srgb, #4ade80 30%, transparent);
+}
+#mcNameBadge.mc-cosmetic-fire {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box,
+              linear-gradient(120deg, #ff7a1a, #ffd166, #ff2d00) border-box;
+  border: 1px solid transparent;
+  box-shadow: 0 0 16px rgba(255, 100, 20, 0.45);
+}
+#mcNameBadge.mc-cosmetic-fire #mcNameBadgeText {
+  background: linear-gradient(120deg, #ffb703, #ff5400, #ffd166);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: bkmpTierGlow 2.2s ease infinite;
+}
+#mcNameBadge.mc-cosmetic-aurora {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box,
+              linear-gradient(120deg, #38bdf8, #a78bfa, #34d399) border-box;
+  border: 1px solid transparent;
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.35);
+}
+#mcNameBadge.mc-cosmetic-aurora #mcNameBadgeText {
+  background: linear-gradient(120deg, #38bdf8, #a78bfa, #34d399);
+  background-size: 220% 220%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: bkmpTierGlow 4s ease infinite;
+}
+#mcNameBadge.mc-cosmetic-royal {
+  color: #c4b5fd;
+  border-color: color-mix(in srgb, #a78bfa 55%, var(--line));
+  background: linear-gradient(160deg, #241a3d, var(--paper-2));
+  box-shadow: 0 0 16px rgba(167, 139, 250, 0.35);
+}
+#mcNameBadge.mc-cosmetic-rainbow {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box,
+              linear-gradient(90deg, #ff5e5e, #ffd166, #4ade80, #38bdf8, #a78bfa, #ff5e5e) border-box;
+  background-size: 100% 100%, 300% 100%;
+  border: 1px solid transparent;
+  box-shadow: 0 0 20px rgba(167, 139, 250, 0.4);
+  animation: bkmpRainbowBorder 4s linear infinite;
+}
+#mcNameBadge.mc-cosmetic-rainbow #mcNameBadgeText {
+  background: linear-gradient(90deg, #ff5e5e, #ffd166, #4ade80, #38bdf8, #a78bfa, #ff5e5e);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: bkmpRainbowBorder 4s linear infinite;
+}
+@keyframes bkmpRainbowBorder {
+  0% { background-position: 100% 100%, 0% 50%; }
+  100% { background-position: 100% 100%, 300% 50%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #mcNameBadge.mc-cosmetic-fire #mcNameBadgeText,
+  #mcNameBadge.mc-cosmetic-aurora #mcNameBadgeText,
+  #mcNameBadge.mc-cosmetic-rainbow,
+  #mcNameBadge.mc-cosmetic-rainbow #mcNameBadgeText { animation: none; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *,

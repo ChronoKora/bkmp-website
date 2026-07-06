@@ -1929,6 +1929,40 @@ async function importAllLocalDataToSupabase() {
   };
 }
 
+function bkmpMapPlayerStatsFromSupabase(row) {
+  return {
+    name: row.mc_name,
+    minutesSpent: Number(row.minutes_spent || 0),
+    achievementsUnlocked: Number(row.achievements_unlocked || 0),
+    updatedAt: row.updated_at ? Date.parse(row.updated_at) : 0
+  };
+}
+
+async function loadLeaderboardStats() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('player_stats')
+    .select('mc_name, minutes_spent, achievements_unlocked, updated_at');
+  if (error) throw error;
+  return (data || []).map(bkmpMapPlayerStatsFromSupabase);
+}
+
+async function upsertPlayerStats(mcName, minutesSpent, achievementsUnlocked) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return false;
+  const { error } = await client
+    .from('player_stats')
+    .upsert({
+      mc_name: mcName,
+      minutes_spent: Math.max(0, Math.round(minutesSpent)),
+      achievements_unlocked: Math.max(0, Math.round(achievementsUnlocked)),
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'mc_name' });
+  if (error) throw error;
+  return true;
+}
+
 window.importLocalExpensesToSupabase = importLocalExpensesToSupabase;
 window.importLocalUpdatesToSupabase = importLocalUpdatesToSupabase;
 window.importLocalWishesToSupabase = importLocalWishesToSupabase;

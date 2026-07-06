@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260706-achievements">
+<link rel="stylesheet" href="style.css?v=20260706-leaderboard">
 </head>
 <body>
 
@@ -98,7 +98,12 @@
     <div class="joke-card achievements-card">
       <h3>Deine Erfolge</h3>
       <p class="achievements-summary" id="achievementsSummary"></p>
+      <div class="achievements-subtabs">
+        <button type="button" class="achievements-subtab active" id="achievementsSubtabAchievements">Erfolge</button>
+        <button type="button" class="achievements-subtab" id="achievementsSubtabCosmetics">Kosmetik</button>
+      </div>
       <div class="achievements-list" id="achievementsList"></div>
+      <div class="cosmetics-list" id="cosmeticsList" style="display:none;"></div>
       <div class="joke-buttons">
         <button class="btn-nein" id="achievementsChangeName" type="button">Namen &auml;ndern</button>
         <button class="btn-ja" id="achievementsClose" type="button">Schlie&szlig;en</button>
@@ -136,6 +141,7 @@
         <button class="tab-btn" data-index="5">PartnerShops</button>
         <button class="tab-btn" data-index="6">Karten Verkaufen</button>
         <button class="tab-btn" data-index="7">Kartendatenbank</button>
+        <button class="tab-btn" data-index="8">Bestenliste</button>
       </div>
       <button class="tab-arrow" id="nextTab" aria-label="Nächster Bereich">
         <svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
@@ -247,6 +253,19 @@
           </div>
         </div>
         <div class="cardcatalog-grid" id="cardCatalogGrid"></div>
+      </section>
+
+      <!-- ================= Bestenliste ================= -->
+      <section class="panel" id="panel-leaderboard">
+        <h2 class="panel-title">Bestenliste</h2>
+        <p class="leaderboard-intro">Wer hat die meisten Erfolge, Karten, Kartenideen oder Zeit auf der Seite? Trag oben rechts deinen Minecraft-Namen ein, um mitzumachen. Da es kein Login gibt, sind das selbst gemeldete Werte &ndash; nur zum Spa&szlig;.</p>
+        <div class="leaderboard-tabs">
+          <button type="button" class="leaderboard-tab active" data-board="achievements">Erfolge</button>
+          <button type="button" class="leaderboard-tab" data-board="cards">Karten</button>
+          <button type="button" class="leaderboard-tab" data-board="wishes">Kartenideen</button>
+          <button type="button" class="leaderboard-tab" data-board="time">Zeit verbracht</button>
+        </div>
+        <div class="leaderboard-list" id="leaderboardList"></div>
       </section>
 
     </div>
@@ -376,7 +395,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260706-wish-status"></script>
+  <script src="supabase.js?v=20260706-player-stats"></script>
   <script src="app.js?v=20260706-cooldown"></script>
   <script>
     bkmpInitTheme();
@@ -575,6 +594,7 @@
         if (typeof renderCardSales === 'function') renderCardSales();
         if (typeof renderCardCatalog === 'function') renderCardCatalog();
         if (typeof renderAchievementBadge === 'function') renderAchievementBadge();
+        if (typeof renderLeaderboard === 'function') renderLeaderboard();
         return changed;
       });
     }
@@ -650,8 +670,10 @@
       if (typeof renderCardSales === 'function') renderCardSales();
       if (typeof renderCardCatalog === 'function') renderCardCatalog();
       if (typeof renderAchievementBadge === 'function') renderAchievementBadge();
+      if (typeof renderLeaderboard === 'function') renderLeaderboard();
       scheduleDeferredSync();
       initSupabaseRealtime();
+      if (typeof refreshLeaderboardData === 'function') refreshLeaderboardData();
     });
 
     // Realtime-Channel deckt sofortige Updates ab; das Polling ist nur ein Fallback fuer verpasste Events.
@@ -1681,6 +1703,9 @@
     const BKMP_MC_NAME_KEY = 'bkmp-mc-name';
     const BKMP_TIME_SPENT_KEY = 'bkmp-time-spent-ms';
     const BKMP_EGGS_FOUND_KEY = 'bkmp-eggs-found';
+    const BKMP_DAYS_VISITED_KEY = 'bkmp-days-visited';
+    const BKMP_FLAGS_KEY = 'bkmp-flags';
+    const BKMP_PANEL_OPENS_KEY = 'bkmp-panel-opens';
 
     function bkmpGetMcName() {
       try { return (localStorage.getItem(BKMP_MC_NAME_KEY) || '').trim(); } catch (e) { return ''; }
@@ -1703,6 +1728,57 @@
       try { ms = Number(localStorage.getItem(BKMP_TIME_SPENT_KEY) || 0); } catch (e) {}
       return Math.floor(ms / 60000);
     }
+    function bkmpGetDaysVisited() {
+      try { return JSON.parse(localStorage.getItem(BKMP_DAYS_VISITED_KEY) || '[]'); } catch (e) { return []; }
+    }
+    function bkmpTrackDayVisited() {
+      const today = new Date().toISOString().slice(0, 10);
+      const days = bkmpGetDaysVisited();
+      if (days.includes(today)) return;
+      days.push(today);
+      try { localStorage.setItem(BKMP_DAYS_VISITED_KEY, JSON.stringify(days)); } catch (e) {}
+    }
+    function bkmpGetFlags() {
+      try { return JSON.parse(localStorage.getItem(BKMP_FLAGS_KEY) || '{}'); } catch (e) { return {}; }
+    }
+    function bkmpSetFlag(name) {
+      const flags = bkmpGetFlags();
+      if (flags[name]) return;
+      flags[name] = true;
+      try { localStorage.setItem(BKMP_FLAGS_KEY, JSON.stringify(flags)); } catch (e) {}
+    }
+    function bkmpTrackTimeBasedFlags() {
+      const now = new Date();
+      const hour = now.getHours();
+      const day = now.getDay();
+      if (hour >= 0 && hour < 5) bkmpSetFlag('nightOwl');
+      if (hour >= 5 && hour < 7) bkmpSetFlag('earlyBird');
+      if (day === 6) bkmpSetFlag('visitedSaturday');
+      if (day === 0) bkmpSetFlag('visitedSunday');
+    }
+    function bkmpTrackPanelOpen() {
+      let count = 0;
+      try { count = Number(localStorage.getItem(BKMP_PANEL_OPENS_KEY) || 0); } catch (e) {}
+      count += 1;
+      try { localStorage.setItem(BKMP_PANEL_OPENS_KEY, String(count)); } catch (e) {}
+      return count;
+    }
+    function bkmpGetPanelOpens() {
+      try { return Number(localStorage.getItem(BKMP_PANEL_OPENS_KEY) || 0); } catch (e) { return 0; }
+    }
+
+    let bkmpLastStatsSyncAt = 0;
+    function bkmpSyncPlayerStats(unlockedCount) {
+      const name = bkmpGetMcName();
+      if (!name || typeof upsertPlayerStats !== 'function' || !bkmpGetSupabaseClient()) return;
+      const now = Date.now();
+      if (now - bkmpLastStatsSyncAt < 45000) return;
+      bkmpLastStatsSyncAt = now;
+      upsertPlayerStats(name, bkmpGetTimeSpentMinutes(), unlockedCount).catch(e => console.warn('Konnte Erfolge/Zeit nicht mit dem Leaderboard synchronisieren.', e));
+    }
+
+    bkmpTrackDayVisited();
+    bkmpTrackTimeBasedFlags();
 
     let bkmpTimeTrackStart = document.visibilityState === 'visible' ? Date.now() : null;
     function bkmpFlushTimeSpent() {
@@ -1720,42 +1796,251 @@
         bkmpTimeTrackStart = null;
       } else {
         bkmpTimeTrackStart = Date.now();
+        bkmpTrackDayVisited();
+        bkmpTrackTimeBasedFlags();
       }
     });
     window.addEventListener('beforeunload', bkmpFlushTimeSpent);
-    window.setInterval(() => { bkmpFlushTimeSpent(); renderAchievementBadge(); }, 30000);
+    window.setInterval(() => { bkmpFlushTimeSpent(); bkmpTrackTimeBasedFlags(); renderAchievementBadge(); }, 30000);
 
     function bkmpBuildAchievementContext() {
       const name = bkmpGetMcName().toLowerCase();
-      const cardCount = name ? (data.cardCatalog || []).filter(item => (item.submittedBy || '').trim().toLowerCase() === name).length : 0;
+      const myCards = name ? (data.cardCatalog || []).filter(item => (item.submittedBy || '').trim().toLowerCase() === name) : [];
+      const cardCount = myCards.length;
       const wishCount = name ? (data.wishes || []).filter(item => (item.name || '').trim().toLowerCase() === name).length : 0;
+      const categoryDiversity = new Set(myCards.map(item => (item.category || '').trim().toLowerCase()).filter(Boolean)).size;
+      const isInvestor = name ? (data.investors || []).some(inv => (inv.name || '').trim().toLowerCase() === name || (inv.minecraftName || '').trim().toLowerCase() === name) : false;
+      const flags = bkmpGetFlags();
       return {
         hasName: Boolean(name),
         cardCount,
         wishCount,
+        categoryDiversity,
         minutesSpent: bkmpGetTimeSpentMinutes(),
-        eggsFound: bkmpGetEggsFound()
+        daysVisited: bkmpGetDaysVisited().length,
+        eggsFound: bkmpGetEggsFound(),
+        isInvestor,
+        nightOwl: Boolean(flags.nightOwl),
+        earlyBird: Boolean(flags.earlyBird),
+        weekendBoth: Boolean(flags.visitedSaturday && flags.visitedSunday),
+        panelOpens: bkmpGetPanelOpens()
       };
     }
 
-    const BKMP_ACHIEVEMENTS = [
-      { id: 'name_set', title: 'Angekommen', desc: 'Trag deinen Minecraft-Namen ein.', check: ctx => ctx.hasName },
-      { id: 'card_1', title: 'Erste Karte', desc: 'Reiche 1 Karte in der Kartendatenbank ein.', progress: ctx => [ctx.cardCount, 1], check: ctx => ctx.cardCount >= 1 },
-      { id: 'card_10', title: 'Kartensammler', desc: 'Reiche 10 Karten in der Kartendatenbank ein.', progress: ctx => [ctx.cardCount, 10], check: ctx => ctx.cardCount >= 10 },
-      { id: 'wish_1', title: 'Erster Wunsch', desc: 'Reiche 1 Kartenidee ein.', progress: ctx => [ctx.wishCount, 1], check: ctx => ctx.wishCount >= 1 },
-      { id: 'wish_10', title: 'Wunschsammler', desc: 'Reiche 10 Kartenideen ein.', progress: ctx => [ctx.wishCount, 10], check: ctx => ctx.wishCount >= 10 },
-      { id: 'time_10', title: 'Stammgast', desc: '10 Minuten auf der Seite verbracht.', progress: ctx => [ctx.minutesSpent, 10], check: ctx => ctx.minutesSpent >= 10 },
-      { id: 'time_60', title: 'Wohnt hier jetzt', desc: '60 Minuten auf der Seite verbracht.', progress: ctx => [ctx.minutesSpent, 60], check: ctx => ctx.minutesSpent >= 60 },
-      { id: 'egg_bkmp', title: '???', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Manche Namen tippt man öfter, als man denkt.', check: ctx => ctx.eggsFound.includes('bkmp') },
-      { id: 'egg_konami', title: '???', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Hoch, hoch, runter, runter... eine uralte Cheat-Tradition.', check: ctx => ctx.eggsFound.includes('konami') },
-      { id: 'egg_fire', title: '???', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Was fürchten Dörfer und Ritter gleichermaßen? Tipp es einfach.', check: ctx => ctx.eggsFound.includes('drache') },
-      { id: 'egg_all', title: 'Osterhase', desc: 'Finde alle 3 versteckten Easter Eggs.', progress: ctx => [ctx.eggsFound.length, 3], check: ctx => ctx.eggsFound.length >= 3 }
+    function bkmpTieredAchievements(idPrefix, category, metricKey, tiers, descFn) {
+      return tiers.map(([n, title]) => ({
+        id: `${idPrefix}_${n}`,
+        category,
+        title,
+        desc: descFn(n),
+        progress: ctx => [ctx[metricKey], n],
+        check: ctx => ctx[metricKey] >= n
+      }));
+    }
+
+    const BKMP_CARD_TIERS = [
+      [1, 'Erste Karte'], [2, 'Zweite Karte'], [3, 'Dreifach'], [5, 'Kartenfan'], [10, 'Kartensammler'],
+      [15, 'Kartenkenner'], [20, 'Kartenprofi'], [25, 'Viertelhundert'], [30, 'Kartenmeister'], [40, 'Fleißarbeit'],
+      [50, 'Halbes Hundert'], [60, 'Unaufhaltsam'], [75, 'Dreiviertelhundert'], [100, 'Kartenlegende'],
+      [125, 'Kartenwahnsinn'], [150, 'Anderthalbhundert'], [175, 'Fast am Ziel'], [200, 'Zweihundert'],
+      [250, 'Viertel-Tausend'], [300, 'Dreihundert'], [350, '350er-Klub'], [400, 'Vierhundert'],
+      [450, 'Fast 500'], [500, 'Kartengott']
+    ];
+    const BKMP_WISH_TIERS = [
+      [1, 'Erster Wunsch'], [2, 'Zweiter Wunsch'], [3, 'Dreifachwunsch'], [5, 'Wunschfan'], [10, 'Wunschsammler'],
+      [15, 'Wunschkenner'], [20, 'Wunschprofi'], [25, 'Viertelhundert Wünsche'], [30, 'Wunschmeister'], [40, 'Fleißiger Wünscher'],
+      [50, 'Halbes Hundert Wünsche'], [60, 'Unaufhaltsam'], [75, 'Dreiviertelhundert Wünsche'], [100, 'Wunschlegende'],
+      [125, 'Wunschwahnsinn'], [150, 'Anderthalbhundert Wünsche'], [175, 'Fast am Ziel'], [200, 'Zweihundert Wünsche'],
+      [250, 'Viertel-Tausend Wünsche'], [300, 'Dreihundert Wünsche'], [350, '350er-Klub'], [400, 'Vierhundert Wünsche'],
+      [450, 'Fast 500 Wünsche'], [500, 'Wunschgott']
+    ];
+    const BKMP_TIME_TIERS = [
+      [1, 'Erster Besuch'], [2, 'Zwei Minuten'], [5, 'Kurz reingeschaut'], [10, 'Stammgast'], [15, 'Viertelstunde'],
+      [20, 'Zwanzig Minuten'], [30, 'Halbe Stunde'], [45, 'Fast eine Stunde'], [60, 'Wohnt hier jetzt'], [90, 'Anderthalb Stunden'],
+      [120, 'Zwei Stunden'], [150, 'Zweieinhalb Stunden'], [180, 'Drei Stunden'], [240, 'Vier Stunden'], [300, 'Fünf Stunden'],
+      [360, 'Sechs Stunden'], [480, 'Ein Arbeitstag'], [600, 'Zehn Stunden'], [720, 'Zwölf Stunden'],
+      [900, 'Fünfzehn Stunden'], [1200, 'Zwanzig Stunden'], [1440, 'Ein voller Tag'], [1800, 'Dreißig Stunden'],
+      [2400, 'Vierzig Stunden'], [3000, 'Fünfzig Stunden']
+    ];
+    const BKMP_DAYS_TIERS = [
+      [1, 'Erster Tag'], [2, 'Zweiter Tag'], [3, 'Drei Tage'], [5, 'Fünf Tage'], [7, 'Eine Woche'], [10, 'Zehn Tage'],
+      [14, 'Zwei Wochen'], [21, 'Drei Wochen'], [30, 'Ein Monat'], [45, 'Sechs Wochen'], [60, 'Zwei Monate'],
+      [90, 'Ein Quartal'], [120, 'Vier Monate'], [180, 'Ein halbes Jahr'], [270, 'Neun Monate'], [365, 'Ein ganzes Jahr']
+    ];
+    const BKMP_DIVERSITY_TIERS = [
+      [1, 'Erste Kategorie'], [2, 'Zwei Kategorien'], [3, 'Drei Kategorien'], [4, 'Vier Kategorien'],
+      [5, 'Fünf Kategorien'], [6, 'Sechs Kategorien'], [7, 'Sieben Kategorien'], [8, 'Alleskönner']
+    ];
+    const BKMP_META_TIERS = [
+      [5, 'Erste Schritte'], [10, 'Zehn Erfolge'], [20, 'Zwanzig Erfolge'], [30, 'Dreißig Erfolge'], [40, 'Vierzig Erfolge'],
+      [50, 'Fünfzig Erfolge'], [60, 'Sechzig Erfolge'], [70, 'Siebzig Erfolge'], [80, 'Achtzig Erfolge'], [90, 'Neunzig Erfolge'],
+      [100, 'Hundert Erfolge'], [110, 'Hundertzehn Erfolge'], [120, 'Hundertzwanzig Erfolge'], [125, 'Fast alles']
     ];
 
+    const BKMP_ACHIEVEMENTS = [
+      { id: 'name_set', category: 'Sonstiges', title: 'Angekommen', desc: 'Trag deinen Minecraft-Namen ein.', check: ctx => ctx.hasName },
+      ...bkmpTieredAchievements('card', 'Karten', 'cardCount', BKMP_CARD_TIERS, n => `Reiche ${n} Karte${n === 1 ? '' : 'n'} in der Kartendatenbank ein.`),
+      ...bkmpTieredAchievements('wish', 'Kartenideen', 'wishCount', BKMP_WISH_TIERS, n => `Reiche ${n} Kartenidee${n === 1 ? '' : 'n'} ein.`),
+      ...bkmpTieredAchievements('time', 'Zeit & Treue', 'minutesSpent', BKMP_TIME_TIERS, n => `Verbringe insgesamt ${n} Minute${n === 1 ? '' : 'n'} auf der Seite.`),
+      ...bkmpTieredAchievements('days', 'Zeit & Treue', 'daysVisited', BKMP_DAYS_TIERS, n => `Besuche die Seite an ${n} verschiedenen Tagen.`),
+      ...bkmpTieredAchievements('diversity', 'Vielfalt', 'categoryDiversity', BKMP_DIVERSITY_TIERS, n => `Reiche Karten in ${n} verschiedenen Kategorien ein.`),
+      ...bkmpTieredAchievements('meta', 'Meilensteine', 'baseUnlockedCount', BKMP_META_TIERS, n => `Schalte ${n} andere Erfolge frei.`),
+      { id: 'egg_bkmp', category: 'Easter Eggs', title: '???', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Manche Namen tippt man öfter, als man denkt.', check: ctx => ctx.eggsFound.includes('bkmp') },
+      { id: 'egg_konami', category: 'Easter Eggs', title: '???', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Hoch, hoch, runter, runter... eine uralte Cheat-Tradition.', check: ctx => ctx.eggsFound.includes('konami') },
+      { id: 'egg_fire', category: 'Easter Eggs', title: '???', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Was fürchten Dörfer und Ritter gleichermaßen? Tipp es einfach.', check: ctx => ctx.eggsFound.includes('drache') },
+      { id: 'egg_all', category: 'Easter Eggs', title: 'Osterhase', desc: 'Finde alle 3 versteckten Easter Eggs.', progress: ctx => [ctx.eggsFound.length, 3], check: ctx => ctx.eggsFound.length >= 3 },
+      { id: 'combo_card_wish', category: 'Sonstiges', title: 'Vielseitig', desc: 'Reiche mindestens 1 Karte und 1 Kartenidee ein.', check: ctx => ctx.cardCount >= 1 && ctx.wishCount >= 1 },
+      { id: 'night_owl', category: 'Sonstiges', title: 'Nachteule', desc: 'Besuche die Seite zwischen 0 und 5 Uhr nachts.', check: ctx => ctx.nightOwl },
+      { id: 'early_bird', category: 'Sonstiges', title: 'Frühaufsteher', desc: 'Besuche die Seite zwischen 5 und 7 Uhr morgens.', check: ctx => ctx.earlyBird },
+      { id: 'weekend_warrior', category: 'Sonstiges', title: 'Wochenend-Grinder', desc: 'Besuche die Seite an einem Samstag und einem Sonntag.', check: ctx => ctx.weekendBoth },
+      { id: 'investor_match', category: 'Sonstiges', title: 'Investor', desc: 'Dein Name taucht als echter Investor auf der Seite auf.', check: ctx => ctx.isInvestor },
+      { id: 'panel_opener', category: 'Sonstiges', title: 'Erfolgs-Jäger', desc: 'Öffne dieses Erfolge-Fenster 10 Mal.', progress: ctx => [ctx.panelOpens, 10], check: ctx => ctx.panelOpens >= 10 }
+    ];
+
+    function bkmpAchievementContextWithMeta() {
+      const ctx = bkmpBuildAchievementContext();
+      ctx.baseUnlockedCount = BKMP_ACHIEVEMENTS.filter(a => a.category !== 'Meilensteine' && a.check({ ...ctx, baseUnlockedCount: 0 })).length;
+      return ctx;
+    }
+
+    /* ---------------- Kosmetik: Namens-Effekte ---------------- */
+    const BKMP_ACTIVE_COSMETIC_KEY = 'bkmp-active-cosmetic';
+    const BKMP_COSMETICS = [
+      { id: 'default', name: 'Automatisch', desc: 'Wird automatisch stärker, je mehr Erfolge du hast.', unlockAt: 0 },
+      { id: 'shadow', name: 'Schatten', desc: 'Dezent und dunkel.', unlockAt: 5 },
+      { id: 'gold', name: 'Gold-Glanz', desc: 'Klassisches Gold.', unlockAt: 8 },
+      { id: 'ice', name: 'Eis-Blau', desc: 'Kühles Blau.', unlockAt: 15 },
+      { id: 'glow', name: 'Gold-Glühen', desc: 'Gold mit Leuchten.', unlockAt: 25 },
+      { id: 'matrix', name: 'Matrix-Grün', desc: 'Digitales Grün.', unlockAt: 40 },
+      { id: 'fire', name: 'Feuer-Rahmen', desc: 'Nur für Drachenjäger.', unlockEgg: 'drache' },
+      { id: 'aurora', name: 'Aurora', desc: 'Wandernder Farbverlauf.', unlockAt: 60 },
+      { id: 'royal', name: 'Königlich', desc: 'Violett & edel.', unlockAt: 100 },
+      { id: 'rainbow', name: 'Regenbogen', desc: 'Für absolute Legenden.', unlockAt: 122 }
+    ];
+    function bkmpGetActiveCosmetic() {
+      try { return localStorage.getItem(BKMP_ACTIVE_COSMETIC_KEY) || ''; } catch (e) { return ''; }
+    }
+    function bkmpSetActiveCosmetic(id) {
+      try { localStorage.setItem(BKMP_ACTIVE_COSMETIC_KEY, id); } catch (e) {}
+      renderAchievementBadge();
+    }
+    function bkmpCosmeticUnlocked(cosmetic, unlockedCount, eggsFound) {
+      if (cosmetic.unlockEgg) return eggsFound.includes(cosmetic.unlockEgg);
+      return unlockedCount >= (cosmetic.unlockAt || 0);
+    }
+    function bkmpApplyActiveCosmetic(badge, unlockedCount) {
+      BKMP_COSMETICS.forEach(c => badge.classList.remove('mc-cosmetic-' + c.id));
+      const active = bkmpGetActiveCosmetic();
+      if (!active || active === 'default') return;
+      const eggsFound = bkmpGetEggsFound();
+      const cosmetic = BKMP_COSMETICS.find(c => c.id === active);
+      if (cosmetic && bkmpCosmeticUnlocked(cosmetic, unlockedCount, eggsFound)) {
+        badge.classList.add('mc-cosmetic-' + cosmetic.id);
+      }
+    }
+    function renderCosmeticsPanel() {
+      const ctx = bkmpAchievementContextWithMeta();
+      const unlockedCount = BKMP_ACHIEVEMENTS.filter(a => a.check(ctx)).length;
+      const eggsFound = ctx.eggsFound;
+      const active = bkmpGetActiveCosmetic() || 'default';
+      const el = document.getElementById('cosmeticsList');
+      el.innerHTML = BKMP_COSMETICS.map(c => {
+        const unlocked = bkmpCosmeticUnlocked(c, unlockedCount, eggsFound);
+        const isActive = active === c.id;
+        return `
+          <button type="button" class="cosmetic-swatch mc-cosmetic-${c.id} ${unlocked ? '' : 'locked'} ${isActive ? 'active' : ''}" data-cosmetic-id="${escapeHtml(c.id)}" ${unlocked ? '' : 'disabled'}>
+            <span class="cosmetic-swatch-name">${unlocked ? escapeHtml(c.name) : '🔒'}</span>
+            <span class="cosmetic-swatch-desc">${unlocked ? escapeHtml(c.desc) : (c.unlockEgg ? 'Finde das passende Easter Egg.' : `Ab ${c.unlockAt} Erfolgen`)}</span>
+          </button>`;
+      }).join('');
+      el.querySelectorAll('.cosmetic-swatch:not(.locked)').forEach(btn => {
+        btn.addEventListener('click', () => {
+          bkmpSetActiveCosmetic(btn.dataset.cosmeticId);
+          renderCosmeticsPanel();
+        });
+      });
+    }
+
+    /* ---------------- Bestenliste ---------------- */
+    let bkmpLeaderboardStats = [];
+    let bkmpActiveLeaderboardTab = 'achievements';
+
+    function bkmpAggregateSubmissions(items, nameKey) {
+      const counts = new Map();
+      (items || []).forEach(item => {
+        const name = (item[nameKey] || '').trim();
+        if (!name) return;
+        const key = name.toLowerCase();
+        if (!counts.has(key)) counts.set(key, { name, value: 0 });
+        counts.get(key).value += 1;
+      });
+      return [...counts.values()].sort((a, b) => b.value - a.value);
+    }
+
+    function renderLeaderboard() {
+      const list = document.getElementById('leaderboardList');
+      if (!list) return;
+      const myName = bkmpGetMcName().trim().toLowerCase();
+
+      let rows;
+      let valueLabel;
+      if (bkmpActiveLeaderboardTab === 'achievements') {
+        rows = bkmpLeaderboardStats.map(s => ({ name: s.name, value: s.achievementsUnlocked })).sort((a, b) => b.value - a.value);
+        valueLabel = v => `${v} Erfolge`;
+      } else if (bkmpActiveLeaderboardTab === 'time') {
+        rows = bkmpLeaderboardStats.map(s => ({ name: s.name, value: s.minutesSpent })).sort((a, b) => b.value - a.value);
+        valueLabel = v => `${v} Min.`;
+      } else if (bkmpActiveLeaderboardTab === 'cards') {
+        rows = bkmpAggregateSubmissions(data.cardCatalog, 'submittedBy');
+        valueLabel = v => `${v} Karte${v === 1 ? '' : 'n'}`;
+      } else {
+        rows = bkmpAggregateSubmissions(data.wishes, 'name');
+        valueLabel = v => `${v} Kartenidee${v === 1 ? '' : 'n'}`;
+      }
+
+      rows = rows.filter(r => r.value > 0).slice(0, 25);
+
+      if (rows.length === 0) {
+        list.innerHTML = '<p class="empty-hint">Noch keine Daten für diese Bestenliste.</p>';
+        return;
+      }
+
+      list.innerHTML = rows.map((row, i) => {
+        const isMe = Boolean(myName) && row.name.trim().toLowerCase() === myName;
+        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
+        return `
+          <div class="leaderboard-row ${isMe ? 'is-me' : ''}">
+            <span class="leaderboard-rank">${medal}</span>
+            <span class="leaderboard-name">${escapeHtml(row.name)}</span>
+            <span class="leaderboard-value">${valueLabel(row.value)}</span>
+          </div>`;
+      }).join('');
+    }
+
+    async function refreshLeaderboardData() {
+      if (typeof loadLeaderboardStats !== 'function' || !bkmpGetSupabaseClient()) { renderLeaderboard(); return; }
+      try {
+        const stats = await loadLeaderboardStats();
+        if (stats) bkmpLeaderboardStats = stats;
+      } catch (e) {
+        console.warn('Bestenliste konnte nicht geladen werden.', e);
+      }
+      renderLeaderboard();
+    }
+
+    document.querySelectorAll('.leaderboard-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.leaderboard-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        bkmpActiveLeaderboardTab = btn.dataset.board;
+        renderLeaderboard();
+      });
+    });
+
     function bkmpNameTier(unlockedCount) {
-      if (unlockedCount >= 9) return 3;
-      if (unlockedCount >= 5) return 2;
-      if (unlockedCount >= 2) return 1;
+      if (unlockedCount >= 60) return 3;
+      if (unlockedCount >= 25) return 2;
+      if (unlockedCount >= 8) return 1;
       return 0;
     }
 
@@ -1764,9 +2049,10 @@
       const badgeText = document.getElementById('mcNameBadgeText');
       if (!badge || !badgeText) return;
       const name = bkmpGetMcName();
-      const ctx = bkmpBuildAchievementContext();
+      const ctx = bkmpAchievementContextWithMeta();
       const unlockedCount = BKMP_ACHIEVEMENTS.filter(a => a.check(ctx)).length;
       badge.classList.remove('tier-1', 'tier-2', 'tier-3');
+      bkmpApplyActiveCosmetic(badge, unlockedCount);
       if (!name) {
         badgeText.textContent = 'Wer bist du?';
         badge.title = '';
@@ -1774,32 +2060,63 @@
       }
       badgeText.textContent = `${name} · ${unlockedCount}/${BKMP_ACHIEVEMENTS.length}`;
       badge.title = 'Deine Erfolge ansehen';
-      const tier = bkmpNameTier(unlockedCount);
-      if (tier > 0) badge.classList.add('tier-' + tier);
+      const activeCosmetic = bkmpGetActiveCosmetic();
+      if (!activeCosmetic || activeCosmetic === 'default') {
+        const tier = bkmpNameTier(unlockedCount);
+        if (tier > 0) badge.classList.add('tier-' + tier);
+      }
+      if (typeof bkmpSyncPlayerStats === 'function') bkmpSyncPlayerStats(unlockedCount);
     }
 
+    const BKMP_ACHIEVEMENT_CATEGORY_ORDER = ['Karten', 'Kartenideen', 'Zeit & Treue', 'Vielfalt', 'Meilensteine', 'Easter Eggs', 'Sonstiges'];
+    const bkmpAchievementCategoryOpen = {};
+
     function renderAchievementsPanel() {
-      const ctx = bkmpBuildAchievementContext();
+      const ctx = bkmpAchievementContextWithMeta();
       const list = document.getElementById('achievementsList');
       const unlockedCount = BKMP_ACHIEVEMENTS.filter(a => a.check(ctx)).length;
       document.getElementById('achievementsSummary').textContent = `${unlockedCount} von ${BKMP_ACHIEVEMENTS.length} Erfolgen freigeschaltet.`;
-      list.innerHTML = BKMP_ACHIEVEMENTS.map(a => {
-        const unlocked = a.check(ctx);
-        const progress = a.progress ? a.progress(ctx) : null;
-        const progressHtml = progress ? `
-          <div class="achievement-progress"><div class="achievement-progress-bar" style="width:${Math.min(100, (progress[0] / progress[1]) * 100)}%"></div></div>
-          <span class="achievement-progress-label">${Math.min(progress[0], progress[1])}/${progress[1]}</span>` : '';
-        const showHint = Boolean(a.hint) && !unlocked;
+
+      list.innerHTML = BKMP_ACHIEVEMENT_CATEGORY_ORDER.map(category => {
+        const items = BKMP_ACHIEVEMENTS.filter(a => a.category === category);
+        if (items.length === 0) return '';
+        const unlockedInCategory = items.filter(a => a.check(ctx)).length;
+        const isOpen = bkmpAchievementCategoryOpen[category] || false;
+        const rows = items.map(a => {
+          const unlocked = a.check(ctx);
+          const progress = a.progress ? a.progress(ctx) : null;
+          const progressHtml = progress ? `
+            <div class="achievement-progress"><div class="achievement-progress-bar" style="width:${Math.min(100, (progress[0] / progress[1]) * 100)}%"></div></div>
+            <span class="achievement-progress-label">${Math.min(progress[0], progress[1])}/${progress[1]}</span>` : '';
+          const showHint = Boolean(a.hint) && !unlocked;
+          return `
+            <div class="achievement-row ${unlocked ? 'unlocked' : 'locked'}">
+              <span class="achievement-icon">${unlocked ? '✅' : '🔒'}</span>
+              <div class="achievement-body">
+                <div class="achievement-title">${escapeHtml(a.title)}</div>
+                <div class="achievement-desc">${showHint ? escapeHtml(a.hint) : escapeHtml(a.desc)}</div>
+                ${progressHtml}
+              </div>
+            </div>`;
+        }).join('');
         return `
-          <div class="achievement-row ${unlocked ? 'unlocked' : 'locked'}">
-            <span class="achievement-icon">${unlocked ? '✅' : '🔒'}</span>
-            <div class="achievement-body">
-              <div class="achievement-title">${escapeHtml(a.title)}</div>
-              <div class="achievement-desc">${showHint ? escapeHtml(a.hint) : escapeHtml(a.desc)}</div>
-              ${progressHtml}
-            </div>
+          <div class="achievement-category">
+            <button type="button" class="achievement-category-head" data-category="${escapeHtml(category)}">
+              <span class="achievement-category-toggle">${isOpen ? '▾' : '▸'}</span>
+              <span class="achievement-category-title">${escapeHtml(category)}</span>
+              <span class="achievement-category-count">${unlockedInCategory}/${items.length}</span>
+            </button>
+            <div class="achievement-category-body" ${isOpen ? '' : 'style="display:none;"'}>${rows}</div>
           </div>`;
       }).join('');
+
+      list.querySelectorAll('.achievement-category-head').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const category = btn.dataset.category;
+          bkmpAchievementCategoryOpen[category] = !bkmpAchievementCategoryOpen[category];
+          renderAchievementsPanel();
+        });
+      });
     }
 
     const mcNameOverlay = document.getElementById('mcNameOverlay');
@@ -1810,6 +2127,11 @@
     if (mcNameBadge) {
       mcNameBadge.addEventListener('click', () => {
         if (bkmpGetMcName()) {
+          bkmpTrackPanelOpen();
+          document.getElementById('achievementsSubtabAchievements').classList.add('active');
+          document.getElementById('achievementsSubtabCosmetics').classList.remove('active');
+          document.getElementById('achievementsList').style.display = '';
+          document.getElementById('cosmeticsList').style.display = 'none';
           renderAchievementsPanel();
           achievementsOverlay.classList.add('visible');
         } else {
@@ -1835,6 +2157,26 @@
 
     const secretHintBtn = document.getElementById('secretHintBtn');
     if (secretHintBtn) secretHintBtn.addEventListener('click', () => mcNameBadge.click());
+
+    const achievementsSubtabAchievements = document.getElementById('achievementsSubtabAchievements');
+    const achievementsSubtabCosmetics = document.getElementById('achievementsSubtabCosmetics');
+    const achievementsListEl = document.getElementById('achievementsList');
+    const cosmeticsListEl = document.getElementById('cosmeticsList');
+    if (achievementsSubtabAchievements && achievementsSubtabCosmetics) {
+      achievementsSubtabAchievements.addEventListener('click', () => {
+        achievementsSubtabAchievements.classList.add('active');
+        achievementsSubtabCosmetics.classList.remove('active');
+        achievementsListEl.style.display = '';
+        cosmeticsListEl.style.display = 'none';
+      });
+      achievementsSubtabCosmetics.addEventListener('click', () => {
+        achievementsSubtabCosmetics.classList.add('active');
+        achievementsSubtabAchievements.classList.remove('active');
+        achievementsListEl.style.display = 'none';
+        cosmeticsListEl.style.display = '';
+        renderCosmeticsPanel();
+      });
+    }
 
     const achievementsCloseBtn = document.getElementById('achievementsClose');
     if (achievementsCloseBtn) achievementsCloseBtn.addEventListener('click', () => achievementsOverlay.classList.remove('visible'));
