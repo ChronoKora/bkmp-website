@@ -2830,32 +2830,38 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 .cosmetic-swatch-desc { font-size: 0.72rem; color: var(--muted); }
 
 /* ---------- Kosmetik: Namens-Effekte ---------- */
-#mcNameBadge.mc-cosmetic-shadow { border-color: rgba(0, 0, 0, 0.5); background: #0d0d10; color: #b8b8c2; }
-#mcNameBadge.mc-cosmetic-gold { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 50%, var(--line)); }
-#mcNameBadge.mc-cosmetic-ice {
+/* Diese Klassen werden an drei Stellen benutzt: am echten Namens-Badge
+   (#mcNameBadge), an der Auswahl-Kachel im Kosmetik-Tab (.cosmetic-swatch)
+   und am Namen in der Bestenliste (.leaderboard-name-wrap) - deshalb sind
+   die Selektoren bewusst generisch (keine ID-Bindung). */
+.mc-cosmetic-shadow { border-color: rgba(0, 0, 0, 0.5); background: #0d0d10; color: #b8b8c2; }
+.mc-cosmetic-gold { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 50%, var(--line)); }
+.mc-cosmetic-ice {
   color: #7dd3fc;
   border-color: color-mix(in srgb, #38bdf8 50%, var(--line));
   box-shadow: 0 0 12px color-mix(in srgb, #38bdf8 35%, transparent);
 }
-#mcNameBadge.mc-cosmetic-glow {
+.mc-cosmetic-glow {
   color: var(--gold);
   border-color: color-mix(in srgb, var(--gold) 55%, var(--line));
   box-shadow: 0 0 16px color-mix(in srgb, var(--gold) 45%, transparent);
 }
-#mcNameBadge.mc-cosmetic-matrix {
+.mc-cosmetic-matrix {
   color: #4ade80;
   border-color: color-mix(in srgb, #4ade80 45%, var(--line));
   background: #05100a;
   box-shadow: 0 0 10px color-mix(in srgb, #4ade80 30%, transparent);
 }
-#mcNameBadge.mc-cosmetic-fire {
+.mc-cosmetic-fire {
   border-color: transparent;
   background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box,
               linear-gradient(120deg, #ff7a1a, #ffd166, #ff2d00) border-box;
   border: 1px solid transparent;
   box-shadow: 0 0 16px rgba(255, 100, 20, 0.45);
 }
-#mcNameBadge.mc-cosmetic-fire #mcNameBadgeText {
+.mc-cosmetic-fire #mcNameBadgeText,
+.mc-cosmetic-fire .cosmetic-swatch-name,
+.mc-cosmetic-fire .leaderboard-name-text {
   background: linear-gradient(120deg, #ffb703, #ff5400, #ffd166);
   background-size: 200% 200%;
   -webkit-background-clip: text;
@@ -2863,14 +2869,16 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   color: transparent;
   animation: bkmpTierGlow 2.2s ease infinite;
 }
-#mcNameBadge.mc-cosmetic-aurora {
+.mc-cosmetic-aurora {
   border-color: transparent;
   background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box,
               linear-gradient(120deg, #38bdf8, #a78bfa, #34d399) border-box;
   border: 1px solid transparent;
   box-shadow: 0 0 16px rgba(56, 189, 248, 0.35);
 }
-#mcNameBadge.mc-cosmetic-aurora #mcNameBadgeText {
+.mc-cosmetic-aurora #mcNameBadgeText,
+.mc-cosmetic-aurora .cosmetic-swatch-name,
+.mc-cosmetic-aurora .leaderboard-name-text {
   background: linear-gradient(120deg, #38bdf8, #a78bfa, #34d399);
   background-size: 220% 220%;
   -webkit-background-clip: text;
@@ -2878,13 +2886,13 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   color: transparent;
   animation: bkmpTierGlow 4s ease infinite;
 }
-#mcNameBadge.mc-cosmetic-royal {
+.mc-cosmetic-royal {
   color: #c4b5fd;
   border-color: color-mix(in srgb, #a78bfa 55%, var(--line));
   background: linear-gradient(160deg, #241a3d, var(--paper-2));
   box-shadow: 0 0 16px rgba(167, 139, 250, 0.35);
 }
-#mcNameBadge.mc-cosmetic-rainbow {
+.mc-cosmetic-rainbow {
   border-color: transparent;
   background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box,
               linear-gradient(90deg, #ff5e5e, #ffd166, #4ade80, #38bdf8, #a78bfa, #ff5e5e) border-box;
@@ -2893,7 +2901,9 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   box-shadow: 0 0 20px rgba(167, 139, 250, 0.4);
   animation: bkmpRainbowBorder 4s linear infinite;
 }
-#mcNameBadge.mc-cosmetic-rainbow #mcNameBadgeText {
+.mc-cosmetic-rainbow #mcNameBadgeText,
+.mc-cosmetic-rainbow .cosmetic-swatch-name,
+.mc-cosmetic-rainbow .leaderboard-name-text {
   background: linear-gradient(90deg, #ff5e5e, #ffd166, #4ade80, #38bdf8, #a78bfa, #ff5e5e);
   background-size: 300% 100%;
   -webkit-background-clip: text;
@@ -2906,10 +2916,10 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   100% { background-position: 100% 100%, 300% 50%; }
 }
 @media (prefers-reduced-motion: reduce) {
-  #mcNameBadge.mc-cosmetic-fire #mcNameBadgeText,
-  #mcNameBadge.mc-cosmetic-aurora #mcNameBadgeText,
-  #mcNameBadge.mc-cosmetic-rainbow,
-  #mcNameBadge.mc-cosmetic-rainbow #mcNameBadgeText { animation: none; }
+  .mc-cosmetic-fire #mcNameBadgeText, .mc-cosmetic-fire .cosmetic-swatch-name, .mc-cosmetic-fire .leaderboard-name-text,
+  .mc-cosmetic-aurora #mcNameBadgeText, .mc-cosmetic-aurora .cosmetic-swatch-name, .mc-cosmetic-aurora .leaderboard-name-text,
+  .mc-cosmetic-rainbow,
+  .mc-cosmetic-rainbow #mcNameBadgeText, .mc-cosmetic-rainbow .cosmetic-swatch-name, .mc-cosmetic-rainbow .leaderboard-name-text { animation: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
