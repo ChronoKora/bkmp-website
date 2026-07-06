@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260706-derliber-svg">
+<link rel="stylesheet" href="style.css?v=20260706-rainbow-firework">
 </head>
 <body>
 
@@ -1192,36 +1192,86 @@
       bindRevenueModeButtons();
     }
 
-    /* Easter Egg: Donut-Chart oft klicken -> Regenbogen-Drehscheibe */
+    /* Easter Egg: Donut-Chart oft klicken -> dreht sich immer schneller, Farben
+       mischen sich zu Regenbogen, am Ende Feuerwerk + Erfolg */
+    const BKMP_DONUT_MAX_CLICKS = 18;
     let bkmpDonutClickCount = 0;
+    let bkmpDonutSpinDeg = 0;
     let bkmpDonutClickResetTimer = null;
-    function triggerBkmpRainbowDonut(donut) {
-      donut.classList.remove('bkmp-donut-spin-1', 'bkmp-donut-spin-2', 'bkmp-donut-spin-3');
-      donut.classList.add('bkmp-donut-rainbow');
-      if (typeof bkmpMarkEggFound === 'function') bkmpMarkEggFound('rainbow');
-      setTimeout(() => donut.classList.remove('bkmp-donut-rainbow'), 3600);
+
+    function bkmpPlayFireworkChime() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.frequency.value = freq;
+          osc.type = 'triangle';
+          gain.gain.setValueAtTime(0.22, ctx.currentTime + i * 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.08 + 0.5);
+          osc.connect(gain).connect(ctx.destination);
+          osc.start(ctx.currentTime + i * 0.08);
+          osc.stop(ctx.currentTime + i * 0.08 + 0.55);
+        });
+        setTimeout(() => ctx.close(), 900);
+      } catch (e) {}
     }
+
+    function bkmpSpawnFirework(centerX, centerY) {
+      const overlay = document.createElement('div');
+      overlay.className = 'bkmp-firework';
+      overlay.style.left = centerX + 'px';
+      overlay.style.top = centerY + 'px';
+      const colors = ['#ff5e5e', '#ffd166', '#4ade80', '#38bdf8', '#a78bfa', '#f472b6'];
+      overlay.innerHTML = Array.from({ length: 30 }, (_, i) => {
+        const angle = Math.round((i / 30) * 360 + Math.random() * 8);
+        const distance = Math.round(80 + Math.random() * 80);
+        const color = colors[i % colors.length];
+        return `<span style="--angle:${angle}deg; --distance:${distance}px; background:${color};"></span>`;
+      }).join('');
+      document.body.appendChild(overlay);
+      setTimeout(() => overlay.remove(), 1400);
+    }
+
+    function bkmpResetDonutSpin(donut) {
+      bkmpDonutClickCount = 0;
+      bkmpDonutSpinDeg = 0;
+      donut.classList.remove('bkmp-donut-mixing');
+      donut.style.setProperty('--bkmp-rainbow-mix', '0');
+      donut.style.transition = 'transform 0.7s ease-out';
+      donut.style.transform = 'rotate(0deg)';
+    }
+
+    function triggerBkmpRainbowDonut(donut) {
+      const rect = donut.getBoundingClientRect();
+      bkmpSpawnFirework(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      bkmpPlayFireworkChime();
+      donut.classList.add('bkmp-donut-firework');
+      setTimeout(() => donut.classList.remove('bkmp-donut-firework'), 700);
+      if (typeof bkmpMarkEggFound === 'function') bkmpMarkEggFound('rainbow');
+      bkmpResetDonutSpin(donut);
+    }
+
     if (chartArea) {
       chartArea.addEventListener('click', e => {
         const donut = e.target.closest('.donut');
-        if (!donut || donut.classList.contains('bkmp-donut-rainbow')) return;
+        if (!donut) return;
         bkmpDonutClickCount++;
         clearTimeout(bkmpDonutClickResetTimer);
-        bkmpDonutClickResetTimer = setTimeout(() => {
-          bkmpDonutClickCount = 0;
-          donut.classList.remove('bkmp-donut-spin-1', 'bkmp-donut-spin-2', 'bkmp-donut-spin-3');
-        }, 2500);
-        donut.classList.remove('bkmp-donut-spin-1', 'bkmp-donut-spin-2', 'bkmp-donut-spin-3');
-        if (bkmpDonutClickCount >= 15) {
-          bkmpDonutClickCount = 0;
+        bkmpDonutClickResetTimer = setTimeout(() => bkmpResetDonutSpin(donut), 2200);
+
+        if (bkmpDonutClickCount >= BKMP_DONUT_MAX_CLICKS) {
           triggerBkmpRainbowDonut(donut);
-        } else if (bkmpDonutClickCount >= 10) {
-          donut.classList.add('bkmp-donut-spin-3');
-        } else if (bkmpDonutClickCount >= 5) {
-          donut.classList.add('bkmp-donut-spin-2');
-        } else {
-          donut.classList.add('bkmp-donut-spin-1');
+          return;
         }
+
+        const spinAmount = 55 + bkmpDonutClickCount * 35;
+        bkmpDonutSpinDeg += spinAmount;
+        const duration = Math.max(0.12, 1.1 - bkmpDonutClickCount * 0.055);
+        donut.classList.add('bkmp-donut-mixing');
+        donut.style.setProperty('--bkmp-rainbow-mix', Math.min(1, bkmpDonutClickCount / BKMP_DONUT_MAX_CLICKS).toFixed(2));
+        donut.style.transition = `transform ${duration}s cubic-bezier(0.22, 0.7, 0.3, 1)`;
+        donut.style.transform = `rotate(${bkmpDonutSpinDeg}deg)`;
       });
     }
 
