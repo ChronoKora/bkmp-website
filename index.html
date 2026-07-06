@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260706-search-style2">
+<link rel="stylesheet" href="style.css?v=20260706-achievements">
 </head>
 <body>
 
@@ -71,6 +71,39 @@
     </button>
 
     <a href="admin.html" class="pill-btn login-btn">Login</a>
+
+    <button class="pill-btn" id="mcNameBadge" type="button">
+      <span class="mc-name-badge-icon" aria-hidden="true">⛏️</span>
+      <span id="mcNameBadgeText">Wer bist du?</span>
+    </button>
+  </div>
+
+  <button class="secret-hint" id="secretHintBtn" type="button" title="Es gibt Geheimnisse auf dieser Seite...">
+    <span aria-hidden="true">✨</span> Geheimnisse hier...
+  </button>
+
+  <div class="joke-overlay" id="mcNameOverlay">
+    <div class="joke-card">
+      <h3>Wie hei&szlig;t du in Minecraft?</h3>
+      <p>Kein Passwort, keine Anmeldung &ndash; nur dein Name, damit wir deine Karten &amp; Kartenideen dir zuordnen und deine Erfolge freischalten k&ouml;nnen.</p>
+      <input type="text" id="mcNameInput" placeholder="Dein Minecraft-Name" maxlength="32">
+      <div class="joke-buttons">
+        <button class="btn-nein" id="mcNameSkip" type="button">Sp&auml;ter</button>
+        <button class="btn-ja" id="mcNameSave" type="button">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="joke-overlay" id="achievementsOverlay">
+    <div class="joke-card achievements-card">
+      <h3>Deine Erfolge</h3>
+      <p class="achievements-summary" id="achievementsSummary"></p>
+      <div class="achievements-list" id="achievementsList"></div>
+      <div class="joke-buttons">
+        <button class="btn-nein" id="achievementsChangeName" type="button">Namen &auml;ndern</button>
+        <button class="btn-ja" id="achievementsClose" type="button">Schlie&szlig;en</button>
+      </div>
+    </div>
   </div>
 
   <header class="hero hero-banner-wrap">
@@ -506,14 +539,17 @@
       konamiBuffer = konamiBuffer.slice(-konamiCode.length);
       if (easterBuffer === easterTarget) {
         triggerBkmpEasterEgg();
+        if (typeof bkmpMarkEggFound === 'function') bkmpMarkEggFound('bkmp');
         easterBuffer = '';
       }
       if (dracheBuffer === dracheTarget) {
         triggerBkmpFireEasterEgg();
+        if (typeof bkmpMarkEggFound === 'function') bkmpMarkEggFound('drache');
         dracheBuffer = '';
       }
       if (konamiBuffer.join('|') === konamiCode.join('|')) {
         triggerBkmpLootRain();
+        if (typeof bkmpMarkEggFound === 'function') bkmpMarkEggFound('konami');
         konamiBuffer = [];
       }
     });
@@ -538,6 +574,7 @@
         if (typeof renderPartnerShops === 'function') renderPartnerShops();
         if (typeof renderCardSales === 'function') renderCardSales();
         if (typeof renderCardCatalog === 'function') renderCardCatalog();
+        if (typeof renderAchievementBadge === 'function') renderAchievementBadge();
         return changed;
       });
     }
@@ -612,6 +649,7 @@
       if (typeof renderPartnerShops === 'function') renderPartnerShops();
       if (typeof renderCardSales === 'function') renderCardSales();
       if (typeof renderCardCatalog === 'function') renderCardCatalog();
+      if (typeof renderAchievementBadge === 'function') renderAchievementBadge();
       scheduleDeferredSync();
       initSupabaseRealtime();
     });
@@ -1638,6 +1676,179 @@
         }
       });
     }
+
+    /* ---------------- MC-Name Identity + Erfolge ---------------- */
+    const BKMP_MC_NAME_KEY = 'bkmp-mc-name';
+    const BKMP_TIME_SPENT_KEY = 'bkmp-time-spent-ms';
+    const BKMP_EGGS_FOUND_KEY = 'bkmp-eggs-found';
+
+    function bkmpGetMcName() {
+      try { return (localStorage.getItem(BKMP_MC_NAME_KEY) || '').trim(); } catch (e) { return ''; }
+    }
+    function bkmpSetMcName(name) {
+      try { localStorage.setItem(BKMP_MC_NAME_KEY, name); } catch (e) {}
+    }
+    function bkmpGetEggsFound() {
+      try { return JSON.parse(localStorage.getItem(BKMP_EGGS_FOUND_KEY) || '[]'); } catch (e) { return []; }
+    }
+    function bkmpMarkEggFound(id) {
+      const found = bkmpGetEggsFound();
+      if (found.includes(id)) return;
+      found.push(id);
+      try { localStorage.setItem(BKMP_EGGS_FOUND_KEY, JSON.stringify(found)); } catch (e) {}
+      renderAchievementBadge();
+    }
+    function bkmpGetTimeSpentMinutes() {
+      let ms = 0;
+      try { ms = Number(localStorage.getItem(BKMP_TIME_SPENT_KEY) || 0); } catch (e) {}
+      return Math.floor(ms / 60000);
+    }
+
+    let bkmpTimeTrackStart = document.visibilityState === 'visible' ? Date.now() : null;
+    function bkmpFlushTimeSpent() {
+      if (bkmpTimeTrackStart === null) return;
+      const elapsed = Date.now() - bkmpTimeTrackStart;
+      let total = 0;
+      try { total = Number(localStorage.getItem(BKMP_TIME_SPENT_KEY) || 0); } catch (e) {}
+      total += elapsed;
+      try { localStorage.setItem(BKMP_TIME_SPENT_KEY, String(total)); } catch (e) {}
+      bkmpTimeTrackStart = Date.now();
+    }
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        bkmpFlushTimeSpent();
+        bkmpTimeTrackStart = null;
+      } else {
+        bkmpTimeTrackStart = Date.now();
+      }
+    });
+    window.addEventListener('beforeunload', bkmpFlushTimeSpent);
+    window.setInterval(() => { bkmpFlushTimeSpent(); renderAchievementBadge(); }, 30000);
+
+    function bkmpBuildAchievementContext() {
+      const name = bkmpGetMcName().toLowerCase();
+      const cardCount = name ? (data.cardCatalog || []).filter(item => (item.submittedBy || '').trim().toLowerCase() === name).length : 0;
+      const wishCount = name ? (data.wishes || []).filter(item => (item.name || '').trim().toLowerCase() === name).length : 0;
+      return {
+        hasName: Boolean(name),
+        cardCount,
+        wishCount,
+        minutesSpent: bkmpGetTimeSpentMinutes(),
+        eggsFound: bkmpGetEggsFound()
+      };
+    }
+
+    const BKMP_ACHIEVEMENTS = [
+      { id: 'name_set', title: 'Angekommen', desc: 'Trag deinen Minecraft-Namen ein.', check: ctx => ctx.hasName },
+      { id: 'card_1', title: 'Erste Karte', desc: 'Reiche 1 Karte in der Kartendatenbank ein.', progress: ctx => [ctx.cardCount, 1], check: ctx => ctx.cardCount >= 1 },
+      { id: 'card_10', title: 'Kartensammler', desc: 'Reiche 10 Karten in der Kartendatenbank ein.', progress: ctx => [ctx.cardCount, 10], check: ctx => ctx.cardCount >= 10 },
+      { id: 'wish_1', title: 'Erster Wunsch', desc: 'Reiche 1 Kartenidee ein.', progress: ctx => [ctx.wishCount, 1], check: ctx => ctx.wishCount >= 1 },
+      { id: 'wish_10', title: 'Wunschsammler', desc: 'Reiche 10 Kartenideen ein.', progress: ctx => [ctx.wishCount, 10], check: ctx => ctx.wishCount >= 10 },
+      { id: 'time_10', title: 'Stammgast', desc: '10 Minuten auf der Seite verbracht.', progress: ctx => [ctx.minutesSpent, 10], check: ctx => ctx.minutesSpent >= 10 },
+      { id: 'time_60', title: 'Wohnt hier jetzt', desc: '60 Minuten auf der Seite verbracht.', progress: ctx => [ctx.minutesSpent, 60], check: ctx => ctx.minutesSpent >= 60 },
+      { id: 'egg_bkmp', title: '???', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Manche Namen tippt man öfter, als man denkt.', check: ctx => ctx.eggsFound.includes('bkmp') },
+      { id: 'egg_konami', title: '???', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Hoch, hoch, runter, runter... eine uralte Cheat-Tradition.', check: ctx => ctx.eggsFound.includes('konami') },
+      { id: 'egg_fire', title: '???', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Was fürchten Dörfer und Ritter gleichermaßen? Tipp es einfach.', check: ctx => ctx.eggsFound.includes('drache') },
+      { id: 'egg_all', title: 'Osterhase', desc: 'Finde alle 3 versteckten Easter Eggs.', progress: ctx => [ctx.eggsFound.length, 3], check: ctx => ctx.eggsFound.length >= 3 }
+    ];
+
+    function bkmpNameTier(unlockedCount) {
+      if (unlockedCount >= 9) return 3;
+      if (unlockedCount >= 5) return 2;
+      if (unlockedCount >= 2) return 1;
+      return 0;
+    }
+
+    function renderAchievementBadge() {
+      const badge = document.getElementById('mcNameBadge');
+      const badgeText = document.getElementById('mcNameBadgeText');
+      if (!badge || !badgeText) return;
+      const name = bkmpGetMcName();
+      const ctx = bkmpBuildAchievementContext();
+      const unlockedCount = BKMP_ACHIEVEMENTS.filter(a => a.check(ctx)).length;
+      badge.classList.remove('tier-1', 'tier-2', 'tier-3');
+      if (!name) {
+        badgeText.textContent = 'Wer bist du?';
+        badge.title = '';
+        return;
+      }
+      badgeText.textContent = `${name} · ${unlockedCount}/${BKMP_ACHIEVEMENTS.length}`;
+      badge.title = 'Deine Erfolge ansehen';
+      const tier = bkmpNameTier(unlockedCount);
+      if (tier > 0) badge.classList.add('tier-' + tier);
+    }
+
+    function renderAchievementsPanel() {
+      const ctx = bkmpBuildAchievementContext();
+      const list = document.getElementById('achievementsList');
+      const unlockedCount = BKMP_ACHIEVEMENTS.filter(a => a.check(ctx)).length;
+      document.getElementById('achievementsSummary').textContent = `${unlockedCount} von ${BKMP_ACHIEVEMENTS.length} Erfolgen freigeschaltet.`;
+      list.innerHTML = BKMP_ACHIEVEMENTS.map(a => {
+        const unlocked = a.check(ctx);
+        const progress = a.progress ? a.progress(ctx) : null;
+        const progressHtml = progress ? `
+          <div class="achievement-progress"><div class="achievement-progress-bar" style="width:${Math.min(100, (progress[0] / progress[1]) * 100)}%"></div></div>
+          <span class="achievement-progress-label">${Math.min(progress[0], progress[1])}/${progress[1]}</span>` : '';
+        const showHint = Boolean(a.hint) && !unlocked;
+        return `
+          <div class="achievement-row ${unlocked ? 'unlocked' : 'locked'}">
+            <span class="achievement-icon">${unlocked ? '✅' : '🔒'}</span>
+            <div class="achievement-body">
+              <div class="achievement-title">${escapeHtml(a.title)}</div>
+              <div class="achievement-desc">${showHint ? escapeHtml(a.hint) : escapeHtml(a.desc)}</div>
+              ${progressHtml}
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    const mcNameOverlay = document.getElementById('mcNameOverlay');
+    const mcNameInput = document.getElementById('mcNameInput');
+    const mcNameBadge = document.getElementById('mcNameBadge');
+    const achievementsOverlay = document.getElementById('achievementsOverlay');
+
+    if (mcNameBadge) {
+      mcNameBadge.addEventListener('click', () => {
+        if (bkmpGetMcName()) {
+          renderAchievementsPanel();
+          achievementsOverlay.classList.add('visible');
+        } else {
+          mcNameInput.value = '';
+          mcNameOverlay.classList.add('visible');
+          mcNameInput.focus();
+        }
+      });
+    }
+    const mcNameSkipBtn = document.getElementById('mcNameSkip');
+    if (mcNameSkipBtn) mcNameSkipBtn.addEventListener('click', () => mcNameOverlay.classList.remove('visible'));
+    const mcNameSaveBtn = document.getElementById('mcNameSave');
+    if (mcNameSaveBtn) {
+      mcNameSaveBtn.addEventListener('click', () => {
+        const name = mcNameInput.value.trim();
+        if (!name) { mcNameInput.focus(); return; }
+        bkmpSetMcName(name);
+        mcNameOverlay.classList.remove('visible');
+        renderAchievementBadge();
+      });
+    }
+    if (mcNameInput) mcNameInput.addEventListener('keydown', e => { if (e.key === 'Enter') mcNameSaveBtn.click(); });
+
+    const secretHintBtn = document.getElementById('secretHintBtn');
+    if (secretHintBtn) secretHintBtn.addEventListener('click', () => mcNameBadge.click());
+
+    const achievementsCloseBtn = document.getElementById('achievementsClose');
+    if (achievementsCloseBtn) achievementsCloseBtn.addEventListener('click', () => achievementsOverlay.classList.remove('visible'));
+    const achievementsChangeNameBtn = document.getElementById('achievementsChangeName');
+    if (achievementsChangeNameBtn) {
+      achievementsChangeNameBtn.addEventListener('click', () => {
+        achievementsOverlay.classList.remove('visible');
+        mcNameInput.value = bkmpGetMcName();
+        mcNameOverlay.classList.add('visible');
+        mcNameInput.focus();
+      });
+    }
+
+    renderAchievementBadge();
   </script>
 
 </body>
