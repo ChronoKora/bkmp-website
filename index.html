@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260706-catalog-mod">
+<link rel="stylesheet" href="style.css?v=20260706-catalog-search">
 </head>
 <body>
 
@@ -199,6 +199,7 @@
           <strong>Kennst du eine Karte, die hier fehlt?</strong>
           <span>Trag sie ein — Kategorie, Shop und Standort inklusive</span>
         </button>
+        <input type="search" id="cardCatalogSearch" class="cardcatalog-search" placeholder="Suche nach Kartenname, z. B. Hunter...">
         <div class="cardcatalog-filters">
           <div class="cardcatalog-filter-row">
             <span class="cardcatalog-filter-label">Kategorie:</span>
@@ -1136,6 +1137,7 @@
     const cardCatalogGrid = document.getElementById('cardCatalogGrid');
     const cardCatalogCategoryFilterEl = document.getElementById('cardCatalogCategoryFilter');
     const cardCatalogShopFilterEl = document.getElementById('cardCatalogShopFilter');
+    const cardCatalogSearchEl = document.getElementById('cardCatalogSearch');
     let activeCardCatalogCategory = 'Alle';
     let activeCardCatalogShop = 'Alle';
 
@@ -1165,10 +1167,12 @@
         `).join('');
       }
 
+      const searchQuery = cardCatalogSearchEl ? cardCatalogSearchEl.value.trim().toLowerCase() : '';
       const visible = items.filter(item => {
         const matchesCategory = activeCardCatalogCategory === 'Alle' || (item.category || 'Sonstige') === activeCardCatalogCategory;
         const matchesShop = activeCardCatalogShop === 'Alle' || (item.shopName || 'Unbekannt').toUpperCase() === activeCardCatalogShop;
-        return matchesCategory && matchesShop;
+        const matchesSearch = !searchQuery || (item.name || '').toLowerCase().includes(searchQuery);
+        return matchesCategory && matchesShop && matchesSearch;
       });
 
       if (visible.length === 0) {
@@ -1209,6 +1213,9 @@
         activeCardCatalogShop = btn.dataset.cardcatalogShop;
         renderCardCatalog();
       });
+    }
+    if (cardCatalogSearchEl) {
+      cardCatalogSearchEl.addEventListener('input', renderCardCatalog);
     }
 
     const cardCatalogOverlay = document.getElementById('cardCatalogOverlay');

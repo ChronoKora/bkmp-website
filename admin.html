@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260706-catalog-mod">
+<link rel="stylesheet" href="style.css?v=20260706-catalog-search">
 </head>
 <body>
 
@@ -388,8 +388,53 @@
         <section class="admin-page" id="page-cardcatalog">
           <div class="admin-section">
             <h2>Kartendatenbank</h2>
-            <p class="admin-help-text">Jeder kann auf der Website Karten eintragen. Hier kannst du Spam/Duplikate entfernen.</p>
-            <div class="entry-table-wrapper"><div class="entry-list" id="cardCatalogList"></div></div>
+            <p class="admin-help-text">Jeder kann auf der Website Karten eintragen. Hier kannst du sie freigeben, ablehnen, bearbeiten oder Spam/Duplikate entfernen.</p>
+
+            <input type="text" id="cardCatalogSearch" class="cardcatalog-admin-search" placeholder="Suche nach Name, Shop, Kategorie oder Eintrager...">
+
+            <div class="cardcatalog-edit-form" id="cardCatalogEditForm" style="display:none;">
+              <h3>Karte bearbeiten</h3>
+              <div class="form-grid form-grid-3">
+                <div><label for="cardCatalogEditName">Name</label><input type="text" id="cardCatalogEditName"></div>
+                <div><label for="cardCatalogEditCategory">Kategorie</label><input type="text" id="cardCatalogEditCategory"></div>
+                <div><label for="cardCatalogEditShop">Shop</label><input type="text" id="cardCatalogEditShop"></div>
+              </div>
+              <div class="form-grid form-grid-2">
+                <div><label for="cardCatalogEditCb">CB</label><input type="text" id="cardCatalogEditCb"></div>
+                <div><label for="cardCatalogEditWho">Eingetragen von</label><input type="text" id="cardCatalogEditWho"></div>
+              </div>
+              <label for="cardCatalogEditDescription">Beschreibung</label>
+              <textarea id="cardCatalogEditDescription"></textarea>
+              <div class="investor-form-actions">
+                <button class="btn btn-primary" id="cardCatalogEditSave" type="button">Speichern</button>
+                <button class="btn" id="cardCatalogEditCancel" type="button">Abbrechen</button>
+              </div>
+            </div>
+
+            <div class="cardcatalog-admin-group">
+              <h3>Offene Anfragen <span class="cardcatalog-admin-count" id="cardCatalogPendingCount"></span></h3>
+              <div class="entry-table-wrapper"><div class="entry-list" id="cardCatalogPendingList"></div></div>
+            </div>
+            <div class="cardcatalog-admin-group">
+              <h3>Angenommen <span class="cardcatalog-admin-count" id="cardCatalogApprovedCount"></span></h3>
+              <div class="entry-table-wrapper"><div class="entry-list" id="cardCatalogApprovedList"></div></div>
+            </div>
+            <div class="cardcatalog-admin-group">
+              <h3>Abgelehnt <span class="cardcatalog-admin-count" id="cardCatalogRejectedCount"></span></h3>
+              <div class="entry-table-wrapper"><div class="entry-list" id="cardCatalogRejectedList"></div></div>
+            </div>
+
+            <div class="cardcatalog-merge-tool">
+              <h3>Kategorien zusammenf&uuml;hren</h3>
+              <p class="admin-help-text">W&auml;hle eine oder mehrere Kategorien aus und benenne sie in eine gemeinsame Kategorie um &ndash; z. B. "Harry Potter" + "Starwars" &rarr; "Filme". Gilt auch f&uuml;r zuk&uuml;nftige Karten in dieser Kategorie nicht automatisch, aber du kannst das jederzeit hier wiederholen.</p>
+              <div id="cardCatalogCategoryMergeList" class="cardcatalog-merge-checklist"></div>
+              <div class="form-grid form-grid-2">
+                <div><label for="cardCatalogMergeTarget">Neue/Gemeinsame Kategorie</label><input type="text" id="cardCatalogMergeTarget" placeholder="z. B. Filme"></div>
+              </div>
+              <div class="investor-form-actions">
+                <button class="btn btn-primary" id="cardCatalogMergeApply" type="button">Zusammenf&uuml;hren</button>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -1101,60 +1146,217 @@
       persist();
     }
 
-    function cardCatalogStatusLabel(status) {
-      return status === 'pending' ? 'Wartet auf Freigabe' : 'Freigegeben';
-    }
-
-    async function approveCardCatalogEntry(id) {
+    async function setCardCatalogStatus(id, status, successMessage) {
       if (typeof updateCardCatalogStatus !== 'function' || !bkmpGetSupabaseClient()) {
         showAdminToast('Supabase ist gerade nicht verbunden.', 'error');
         return;
       }
       try {
-        const updated = await updateCardCatalogStatus(id, 'approved');
-        data.cardCatalog = data.cardCatalog.map(item => String(item.id) === String(id) ? (updated || { ...item, status: 'approved' }) : item);
+        const updated = await updateCardCatalogStatus(id, status);
+        data.cardCatalog = data.cardCatalog.map(item => String(item.id) === String(id) ? (updated || { ...item, status }) : item);
         bkmpSaveData(data);
         renderAll();
-        showAdminToast('Karte freigegeben.', 'success');
+        showAdminToast(successMessage, 'success');
       } catch (e) {
-        console.error('Karte konnte nicht freigegeben werden.', e);
-        showAdminToast('Karte konnte nicht freigegeben werden: ' + supabaseErrorText(e), 'error');
+        console.error('Status konnte nicht geändert werden.', e);
+        showAdminToast('Status konnte nicht geändert werden: ' + supabaseErrorText(e), 'error');
       }
     }
 
-    function renderCardCatalogList() {
-      const el = document.getElementById('cardCatalogList');
+    const approveCardCatalogEntry = id => setCardCatalogStatus(id, 'approved', 'Karte freigegeben.');
+    const rejectCardCatalogEntry = id => setCardCatalogStatus(id, 'rejected', 'Karte abgelehnt.');
+
+    let editingCardCatalogId = null;
+    const cardCatalogSearchInput = document.getElementById('cardCatalogSearch');
+    const cardCatalogEditForm = document.getElementById('cardCatalogEditForm');
+    const cardCatalogEditName = document.getElementById('cardCatalogEditName');
+    const cardCatalogEditCategory = document.getElementById('cardCatalogEditCategory');
+    const cardCatalogEditShop = document.getElementById('cardCatalogEditShop');
+    const cardCatalogEditCb = document.getElementById('cardCatalogEditCb');
+    const cardCatalogEditWho = document.getElementById('cardCatalogEditWho');
+    const cardCatalogEditDescription = document.getElementById('cardCatalogEditDescription');
+
+    function startEditCardCatalogEntry(id) {
+      const item = data.cardCatalog.find(i => String(i.id) === String(id));
+      if (!item) return;
+      editingCardCatalogId = id;
+      cardCatalogEditName.value = item.name || '';
+      cardCatalogEditCategory.value = item.category || '';
+      cardCatalogEditShop.value = item.shopName || '';
+      cardCatalogEditCb.value = item.cb || '';
+      cardCatalogEditWho.value = item.submittedBy || '';
+      cardCatalogEditDescription.value = item.description || '';
+      cardCatalogEditForm.style.display = '';
+      cardCatalogEditForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function closeCardCatalogEditForm() {
+      editingCardCatalogId = null;
+      cardCatalogEditForm.style.display = 'none';
+    }
+
+    const cardCatalogEditSaveBtn = document.getElementById('cardCatalogEditSave');
+    const cardCatalogEditCancelBtn = document.getElementById('cardCatalogEditCancel');
+    if (cardCatalogEditCancelBtn) cardCatalogEditCancelBtn.addEventListener('click', closeCardCatalogEditForm);
+    if (cardCatalogEditSaveBtn) {
+      cardCatalogEditSaveBtn.addEventListener('click', async () => {
+        if (!editingCardCatalogId) return;
+        const current = data.cardCatalog.find(i => String(i.id) === String(editingCardCatalogId));
+        if (!current) return;
+        const updatedItem = {
+          ...current,
+          name: cardCatalogEditName.value.trim() || current.name,
+          category: cardCatalogEditCategory.value.trim(),
+          shopName: cardCatalogEditShop.value.trim().toUpperCase(),
+          cb: cardCatalogEditCb.value.trim(),
+          submittedBy: cardCatalogEditWho.value.trim(),
+          description: cardCatalogEditDescription.value.trim()
+        };
+        if (typeof saveCardCatalogEntry === 'function' && bkmpGetSupabaseClient()) {
+          try {
+            const saved = await saveCardCatalogEntry(updatedItem);
+            data.cardCatalog = data.cardCatalog.map(i => String(i.id) === String(editingCardCatalogId) ? (saved || updatedItem) : i);
+            bkmpSaveData(data);
+            closeCardCatalogEditForm();
+            renderAll();
+            showAdminToast('Karte aktualisiert.', 'success');
+          } catch (e) {
+            console.error('Karte konnte nicht aktualisiert werden.', e);
+            showAdminToast('Karte konnte nicht aktualisiert werden: ' + supabaseErrorText(e), 'error');
+          }
+        } else {
+          data.cardCatalog = data.cardCatalog.map(i => String(i.id) === String(editingCardCatalogId) ? updatedItem : i);
+          closeCardCatalogEditForm();
+          persist();
+        }
+      });
+    }
+
+    function cardCatalogMatchesSearch(item, query) {
+      if (!query) return true;
+      const haystack = [item.name, item.category, item.shopName, item.submittedBy].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(query);
+    }
+
+    function renderCardCatalogGroup(listId, countId, items, actionsHtml, wireActions) {
+      const el = document.getElementById(listId);
+      const countEl = document.getElementById(countId);
       if (!el) return;
-      if (!data.cardCatalog || data.cardCatalog.length === 0) {
-        el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Noch keine Karten eingetragen.</p>';
+      if (countEl) countEl.textContent = items.length ? `(${items.length})` : '';
+      if (items.length === 0) {
+        el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem; padding:0.6rem 0.2rem;">Nichts hier.</p>';
         return;
       }
       el.innerHTML = '';
-      [...data.cardCatalog]
-        .sort((a, b) => {
-          if ((a.status === 'pending') !== (b.status === 'pending')) return a.status === 'pending' ? -1 : 1;
-          return (b.createdAt || 0) - (a.createdAt || 0);
-        })
-        .forEach(item => {
-          const isPending = item.status === 'pending';
-          const row = document.createElement('div');
-          row.className = 'entry-row partner-admin-row';
-          row.innerHTML = `
-            ${item.image ? `<span class="partner-admin-thumb-wrap" data-bkmp-image-wrap data-empty-label="Karte"><img data-bkmp-img class="partner-admin-thumb" src="${item.image}" alt="" loading="lazy" decoding="async"></span>` : '<div class="partner-admin-thumb partner-admin-thumb-empty">Karte</div>'}
-            <div class="desc">
-              <span class="name">${escapeHtml(item.name)}</span>
-              <span class="meta">${item.category ? escapeHtml(item.category) + ' · ' : ''}${item.shopName ? escapeHtml(item.shopName.toUpperCase()) + ' · ' : ''}${item.cb ? escapeHtml(item.cb) + ' · ' : ''}${item.submittedBy ? 'von ' + escapeHtml(item.submittedBy) : ''}</span>
-            </div>
-            <span class="investor-request-status status-${isPending ? 'pending' : 'confirmed'}">${cardCatalogStatusLabel(item.status)}</span>
-            <div class="entry-actions">
-              ${isPending ? '<button class="edit-btn confirm-btn" type="button">Freigeben</button>' : ''}
-              <button class="del-btn" type="button" aria-label="Karte löschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>
-            </div>
-          `;
-          if (isPending) row.querySelector('.confirm-btn').addEventListener('click', () => approveCardCatalogEntry(item.id));
-          row.querySelector('.del-btn').addEventListener('click', () => removeCardCatalogEntry(item.id));
-          el.appendChild(row);
+      items.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'entry-row partner-admin-row';
+        row.innerHTML = `
+          ${item.image ? `<span class="partner-admin-thumb-wrap" data-bkmp-image-wrap data-empty-label="Karte"><img data-bkmp-img class="partner-admin-thumb" src="${item.image}" alt="" loading="lazy" decoding="async"></span>` : '<div class="partner-admin-thumb partner-admin-thumb-empty">Karte</div>'}
+          <div class="desc">
+            <span class="name">${escapeHtml(item.name)}</span>
+            <span class="meta">${item.category ? escapeHtml(item.category) + ' · ' : ''}${item.shopName ? escapeHtml(item.shopName.toUpperCase()) + ' · ' : ''}${item.cb ? escapeHtml(item.cb) + ' · ' : ''}${item.submittedBy ? 'von ' + escapeHtml(item.submittedBy) : ''}</span>
+          </div>
+          <div class="entry-actions">
+            ${actionsHtml(item)}
+            <button class="edit-btn edit-cardcatalog" type="button">Bearbeiten</button>
+            <button class="del-btn" type="button" aria-label="Karte löschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>
+          </div>
+        `;
+        wireActions(row, item);
+        row.querySelector('.edit-cardcatalog').addEventListener('click', () => startEditCardCatalogEntry(item.id));
+        row.querySelector('.del-btn').addEventListener('click', () => removeCardCatalogEntry(item.id));
+        el.appendChild(row);
+      });
+    }
+
+    function renderCardCatalogCategoryChecklist() {
+      const el = document.getElementById('cardCatalogCategoryMergeList');
+      if (!el) return;
+      const counts = new Map();
+      (data.cardCatalog || []).forEach(item => {
+        const cat = (item.category || '').trim();
+        if (!cat) return;
+        counts.set(cat, (counts.get(cat) || 0) + 1);
+      });
+      const categories = [...counts.keys()].sort((a, b) => a.localeCompare(b));
+      if (categories.length === 0) {
+        el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Noch keine Kategorien vorhanden.</p>';
+        return;
+      }
+      el.innerHTML = categories.map(cat => `
+        <label class="cardcatalog-merge-item">
+          <input type="checkbox" value="${escapeHtml(cat)}">
+          ${escapeHtml(cat)} <span class="cardcatalog-admin-count">(${counts.get(cat)})</span>
+        </label>
+      `).join('');
+    }
+
+    function renderCardCatalogList() {
+      renderCardCatalogCategoryChecklist();
+      const query = (cardCatalogSearchInput ? cardCatalogSearchInput.value.trim().toLowerCase() : '');
+      const all = (Array.isArray(data.cardCatalog) ? data.cardCatalog : []).filter(item => cardCatalogMatchesSearch(item, query));
+      const byDateDesc = (a, b) => (b.createdAt || 0) - (a.createdAt || 0);
+      const pending = all.filter(item => item.status === 'pending').sort(byDateDesc);
+      const approved = all.filter(item => item.status !== 'pending' && item.status !== 'rejected').sort(byDateDesc);
+      const rejected = all.filter(item => item.status === 'rejected').sort(byDateDesc);
+
+      renderCardCatalogGroup('cardCatalogPendingList', 'cardCatalogPendingCount', pending,
+        () => '<button class="edit-btn confirm-btn" type="button">Freigeben</button><button class="edit-btn reject-btn" type="button">Ablehnen</button>',
+        (row, item) => {
+          row.querySelector('.confirm-btn').addEventListener('click', () => approveCardCatalogEntry(item.id));
+          row.querySelector('.reject-btn').addEventListener('click', () => rejectCardCatalogEntry(item.id));
         });
+
+      renderCardCatalogGroup('cardCatalogApprovedList', 'cardCatalogApprovedCount', approved,
+        () => '<button class="edit-btn reject-btn" type="button">Ablehnen</button>',
+        (row, item) => row.querySelector('.reject-btn').addEventListener('click', () => rejectCardCatalogEntry(item.id)));
+
+      renderCardCatalogGroup('cardCatalogRejectedList', 'cardCatalogRejectedCount', rejected,
+        () => '<button class="edit-btn confirm-btn" type="button">Freigeben</button>',
+        (row, item) => row.querySelector('.confirm-btn').addEventListener('click', () => approveCardCatalogEntry(item.id)));
+    }
+
+    if (cardCatalogSearchInput) cardCatalogSearchInput.addEventListener('input', renderCardCatalogList);
+
+    const cardCatalogMergeApplyBtn = document.getElementById('cardCatalogMergeApply');
+    if (cardCatalogMergeApplyBtn) {
+      cardCatalogMergeApplyBtn.addEventListener('click', async () => {
+        const target = document.getElementById('cardCatalogMergeTarget').value.trim();
+        const checked = Array.from(document.querySelectorAll('#cardCatalogCategoryMergeList input:checked')).map(cb => cb.value);
+        if (!target) { document.getElementById('cardCatalogMergeTarget').reportValidity(); return; }
+        if (checked.length === 0) { showAdminToast('Wähle mindestens eine Kategorie aus.', 'error'); return; }
+        const affected = data.cardCatalog.filter(item => checked.includes((item.category || '').trim()) && (item.category || '').trim() !== target);
+        if (affected.length === 0) { showAdminToast('Nichts zu tun – Kategorien stimmen bereits überein.', 'success'); return; }
+
+        cardCatalogMergeApplyBtn.disabled = true;
+        cardCatalogMergeApplyBtn.textContent = 'Wird zusammengeführt...';
+        let failures = 0;
+        for (const item of affected) {
+          const updatedItem = { ...item, category: target };
+          if (typeof saveCardCatalogEntry === 'function' && bkmpGetSupabaseClient()) {
+            try {
+              const saved = await saveCardCatalogEntry(updatedItem);
+              data.cardCatalog = data.cardCatalog.map(i => String(i.id) === String(item.id) ? (saved || updatedItem) : i);
+            } catch (e) {
+              console.error('Kategorie konnte nicht umbenannt werden.', item.id, e);
+              failures++;
+            }
+          } else {
+            data.cardCatalog = data.cardCatalog.map(i => String(i.id) === String(item.id) ? updatedItem : i);
+          }
+        }
+        bkmpSaveData(data);
+        renderAll();
+        cardCatalogMergeApplyBtn.disabled = false;
+        cardCatalogMergeApplyBtn.textContent = 'Zusammenführen';
+        document.getElementById('cardCatalogMergeTarget').value = '';
+        if (failures) {
+          showAdminToast(`${affected.length - failures} von ${affected.length} Karten umbenannt, ${failures} fehlgeschlagen.`, 'error');
+        } else {
+          showAdminToast(`${affected.length} Karte(n) zu „${target}" zusammengeführt.`, 'success');
+        }
+      });
     }
 
     async function persistIncome(income) {

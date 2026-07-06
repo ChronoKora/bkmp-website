@@ -1923,6 +1923,12 @@ label {
   line-height: 1.6;
 }
 .cardcatalog-cta { margin-bottom: 2rem; }
+.cardcatalog-search {
+  display: block;
+  width: min(420px, 100%);
+  margin: 0 auto 1.2rem;
+  text-align: center;
+}
 .cardcatalog-filters {
   display: flex;
   flex-direction: column;
@@ -2085,6 +2091,53 @@ label {
   font-weight: 800;
   text-transform: uppercase;
 }
+
+/* ---------- Kartendatenbank: Admin-Moderation ---------- */
+.cardcatalog-admin-search {
+  margin: 0 0 1.2rem;
+}
+.cardcatalog-admin-group { margin-bottom: 1.4rem; }
+.cardcatalog-admin-group h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  font-family: 'Fraunces', serif;
+  font-size: 1rem;
+  margin-bottom: 0.6rem;
+}
+.cardcatalog-admin-count { color: var(--muted); font-size: 0.78rem; font-weight: 400; }
+.cardcatalog-edit-form {
+  border: 1px solid color-mix(in srgb, var(--gold) 40%, var(--line));
+  border-radius: 16px;
+  padding: 1.1rem 1.2rem;
+  margin-bottom: 1.4rem;
+  background: color-mix(in srgb, var(--gold) 6%, transparent);
+}
+.cardcatalog-edit-form h3 { font-family: 'Fraunces', serif; font-size: 1rem; margin-bottom: 0.8rem; }
+.cardcatalog-merge-tool {
+  border-top: 1px solid var(--line);
+  padding-top: 1.3rem;
+  margin-top: 0.6rem;
+}
+.cardcatalog-merge-tool h3 { font-family: 'Fraunces', serif; font-size: 1rem; margin-bottom: 0.4rem; }
+.cardcatalog-merge-checklist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.9rem;
+  margin: 0.8rem 0 1rem;
+}
+.cardcatalog-merge-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.84rem;
+  color: var(--ink);
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 500;
+}
+.cardcatalog-merge-item input { width: auto; accent-color: var(--gold); }
 
 img[data-bkmp-img] {
   transition: opacity 0.18s ease, filter 0.18s ease;
