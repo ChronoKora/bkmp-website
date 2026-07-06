@@ -1797,7 +1797,7 @@
         }
 
         bkmpCompressImageFile(file).then(image => {
-          const entry = { id: bkmpUid('cardcat'), name, category, shopName, cb, submittedBy, description, image, createdAt: Date.now() };
+          const entry = { id: bkmpUid('cardcat'), name, category, shopName, cb, submittedBy, description, image, status: 'pending', createdAt: Date.now() };
           if (typeof saveCardCatalogEntry === 'function' && bkmpGetSupabaseClient()) {
             saveCardCatalogEntry(entry).then(() => {
               bkmpStartSubmitCooldown('cardcatalog');
@@ -1933,7 +1933,7 @@
 
         const readImage = file ? bkmpCompressImageFile(file) : Promise.resolve('');
         readImage.then(image => {
-          const shop = { id: '', name, location, category, description, link, contact, image };
+          const shop = { id: '', name, location, category, description, link, contact, image, status: 'pending' };
           if (typeof savePartnerShop === 'function' && bkmpGetSupabaseClient()) {
             savePartnerShop(shop).then(() => {
               bkmpStartSubmitCooldown('partnershop');
@@ -2116,7 +2116,7 @@
       }
 
       bkmpCompressImageFile(file).then(image => {
-        const wish = { id: bkmpUid('wish'), name, image, date: new Date().toISOString().slice(0, 10), createdAt: Date.now() };
+        const wish = { id: bkmpUid('wish'), name, image, status: 'pending', date: new Date().toISOString().slice(0, 10), createdAt: Date.now() };
         if (typeof saveWish === 'function' && bkmpGetSupabaseClient()) {
           saveWish(wish).then(() => {
             bkmpStartSubmitCooldown('wish');
