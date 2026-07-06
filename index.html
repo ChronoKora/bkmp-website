@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260706-titles">
+<link rel="stylesheet" href="style.css?v=20260706-derliber-svg">
 </head>
 <body>
 
@@ -447,7 +447,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260706-partner-mod"></script>
+  <script src="supabase.js?v=20260706-block-width"></script>
   <script src="app.js?v=20260706-error-text"></script>
   <script>
     bkmpInitTheme();
@@ -806,7 +806,15 @@
       fig.type = 'button';
       fig.className = 'bkmp-derliber';
       fig.setAttribute('aria-label', 'Hmm?');
-      fig.textContent = '🧍';
+      fig.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="5" r="2.3"></circle>
+          <path d="M12 7.6v7.4"></path>
+          <path d="M12 9.8 7 7.2"></path>
+          <path d="M12 10.4l5.5 1.6"></path>
+          <path d="M12 15l-4 6"></path>
+          <path d="M12 15l4.2 6"></path>
+        </svg>`;
       fig.addEventListener('click', e => {
         e.preventDefault();
         e.stopPropagation();
@@ -1445,15 +1453,16 @@
         const title = block.title ? `<h3>${escapeHtml(block.title)}</h3>` : '';
         const text = block.content ? `<p>${escapeHtml(block.content).replace(/\n/g, '<br>')}</p>` : '';
         const image = block.image ? `<img data-bkmp-img src="${block.image}" alt="${escapeHtml(block.title || 'BKMP Bild')}" loading="lazy" decoding="async">` : '';
-        if (block.type === 'heading') return `<section class="about-block about-heading">${title}${text}</section>`;
-        if (block.type === 'image') return `<section class="about-block about-image">${image}${title}</section>`;
-        if (block.type === 'image_text') return `<section class="about-block about-split">${image}<div>${title}${text}</div></section>`;
-        if (block.type === 'team') return `<section class="about-block about-team-card">${image}<div>${title}${text}</div></section>`;
+        const widthCls = block.width === 'half' ? ' about-block-half' : '';
+        if (block.type === 'heading') return `<section class="about-block about-heading${widthCls}">${title}${text}</section>`;
+        if (block.type === 'image') return `<section class="about-block about-image${widthCls}">${image}${title}</section>`;
+        if (block.type === 'image_text') return `<section class="about-block about-split${widthCls}">${image}<div>${title}${text}</div></section>`;
+        if (block.type === 'team') return `<section class="about-block about-team-card${widthCls}">${image}<div>${title}${text}</div></section>`;
         if (block.type === 'gallery') {
           const images = (block.images && block.images.length ? block.images : (block.image ? [block.image] : []));
-          return `<section class="about-block about-gallery">${title}<div>${images.map(src => `<img data-bkmp-img src="${src}" alt="" loading="lazy" decoding="async">`).join('')}</div>${text}</section>`;
+          return `<section class="about-block about-gallery${widthCls}">${title}<div>${images.map(src => `<img data-bkmp-img src="${src}" alt="" loading="lazy" decoding="async">`).join('')}</div>${text}</section>`;
         }
-        return `<section class="about-block about-text">${title}${text}</section>`;
+        return `<section class="about-block about-text${widthCls}">${title}${text}</section>`;
       }).join('');
       if (window.bkmpEnhanceImages) window.bkmpEnhanceImages(aboutPage);
     }

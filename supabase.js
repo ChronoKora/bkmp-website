@@ -1172,6 +1172,7 @@ function bkmpMapAboutBlockFromSupabase(row) {
     image: row.image_url || '',
     images: Array.isArray(row.image_urls) ? row.image_urls : [],
     sortOrder: Number(row.sort_order || 0),
+    width: row.width || 'full',
     createdAt: row.created_at ? Date.parse(row.created_at) : 0,
     source: 'supabase'
   };
@@ -1185,7 +1186,8 @@ function bkmpMapAboutBlockToSupabase(block) {
     content: block.content || '',
     image_url: images[0] || block.image || '',
     image_urls: images,
-    sort_order: Number(block.sortOrder || block.sort_order || 0)
+    sort_order: Number(block.sortOrder || block.sort_order || 0),
+    width: block.width === 'half' ? 'half' : 'full'
   };
 }
 
@@ -1194,7 +1196,7 @@ async function loadAboutBlocks() {
   if (!client) return null;
   const { data, error } = await client
     .from('about_blocks')
-    .select('id, block_type, title, content, image_url, image_urls, sort_order, created_at')
+    .select('id, block_type, title, content, image_url, image_urls, sort_order, width, created_at')
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: true });
   if (error) throw error;
@@ -1220,13 +1222,13 @@ async function saveAboutBlock(block) {
       .from('about_blocks')
       .update(payload)
       .eq('id', block.id)
-      .select('id, block_type, title, content, image_url, image_urls, sort_order, created_at')
+      .select('id, block_type, title, content, image_url, image_urls, sort_order, width, created_at')
       .limit(1);
   } else {
     query = client
       .from('about_blocks')
       .insert(payload)
-      .select('id, block_type, title, content, image_url, image_urls, sort_order, created_at')
+      .select('id, block_type, title, content, image_url, image_urls, sort_order, width, created_at')
       .limit(1);
   }
   const { data, error } = await query;

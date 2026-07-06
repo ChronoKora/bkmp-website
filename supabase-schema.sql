@@ -196,8 +196,13 @@ create table if not exists public.about_blocks (
   image_url text,
   image_urls jsonb not null default '[]'::jsonb,
   sort_order integer not null default 0,
+  width text not null default 'full',
   created_at timestamptz not null default now()
 );
+
+alter table public.about_blocks add column if not exists width text not null default 'full';
+alter table public.about_blocks drop constraint if exists about_blocks_width_check;
+alter table public.about_blocks add constraint about_blocks_width_check check (width in ('full', 'half'));
 
 create index if not exists about_blocks_sort_order_idx on public.about_blocks (sort_order asc, created_at asc);
 

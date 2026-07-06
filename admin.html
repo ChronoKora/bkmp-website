@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260706-titles">
+<link rel="stylesheet" href="style.css?v=20260706-derliber-svg">
 </head>
 <body>
 
@@ -325,7 +325,7 @@
 
             <div class="about-editor">
               <div class="about-editor-form">
-                <div class="form-grid form-grid-3">
+                <div class="form-grid form-grid-4">
                   <div><label for="aboutType">Block-Typ</label>
                     <select id="aboutType">
                       <option value="heading">Gro&szlig;e &Uuml;berschrift</option>
@@ -338,6 +338,12 @@
                   </div>
                   <div><label for="aboutTitle">Titel</label><input type="text" id="aboutTitle" placeholder="Titel"></div>
                   <div><label for="aboutSort">Sortierung</label><input type="number" id="aboutSort" placeholder="0"></div>
+                  <div><label for="aboutWidth">Blockbreite</label>
+                    <select id="aboutWidth">
+                      <option value="full">Volle Breite</option>
+                      <option value="half">Halbe Breite (nebeneinander)</option>
+                    </select>
+                  </div>
                 </div>
                 <label for="aboutContent">Text</label>
                 <textarea id="aboutContent" placeholder="Text fuer diesen Block"></textarea>
@@ -528,7 +534,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260706-partner-mod"></script>
+  <script src="supabase.js?v=20260706-block-width"></script>
   <script src="app.js?v=20260706-error-text"></script>
   <script>
     bkmpInitTheme();
@@ -2217,6 +2223,7 @@
     const aboutTitleInput = document.getElementById('aboutTitle');
     const aboutContentInput = document.getElementById('aboutContent');
     const aboutSortInput = document.getElementById('aboutSort');
+    const aboutWidthInput = document.getElementById('aboutWidth');
     const aboutImageFileInput = document.getElementById('aboutImageFile');
 
     function setAboutEditMode(isEditing) {
@@ -2260,7 +2267,8 @@
       const keepImages = currentBlock ? (currentBlock.images && currentBlock.images.length ? currentBlock.images : (currentBlock.image ? [currentBlock.image] : [])) : [];
       const images = newImages.length ? newImages : keepImages;
       const hasDraftContent = Boolean(title || content || images.length);
-      const draftBlock = { id: editingAboutId || '__about_draft__', type, title, content, image: images[0] || '', images, isDraft: true };
+      const width = aboutWidthInput.value === 'half' ? 'half' : 'full';
+      const draftBlock = { id: editingAboutId || '__about_draft__', type, title, content, image: images[0] || '', images, width, isDraft: true };
 
       if (editingAboutId) return stored.map(item => item.id === editingAboutId ? draftBlock : item);
       if (hasDraftContent) return [...stored, draftBlock];
@@ -2281,7 +2289,8 @@
       mount.innerHTML = blocks.map(block => {
         const { cls, html } = aboutBlockPreviewMarkup(block);
         const draggable = !block.isDraft;
-        return `<section class="about-block ${cls} about-preview-block${block.isDraft ? ' is-draft' : ''}" data-about-preview-id="${escapeHtml(String(block.id))}" ${draggable ? 'draggable="true"' : ''}>${block.isDraft ? '<span class="about-preview-draft-badge">Entwurf</span>' : ''}${html}</section>`;
+        const widthCls = block.width === 'half' ? 'about-block-half' : '';
+        return `<section class="about-block ${cls} ${widthCls} about-preview-block${block.isDraft ? ' is-draft' : ''}" data-about-preview-id="${escapeHtml(String(block.id))}" ${draggable ? 'draggable="true"' : ''}>${block.isDraft ? '<span class="about-preview-draft-badge">Entwurf</span>' : ''}${html}</section>`;
       }).join('');
       wireAboutPreviewDrag(mount);
     }
@@ -2349,6 +2358,7 @@
       aboutTitleInput.value = '';
       aboutContentInput.value = '';
       aboutSortInput.value = '';
+      aboutWidthInput.value = 'full';
       aboutImageFileInput.value = '';
       setAboutEditMode(false);
       renderAboutPreview();
@@ -2362,6 +2372,7 @@
       aboutTitleInput.value = block.title || '';
       aboutContentInput.value = block.content || '';
       aboutSortInput.value = Number(block.sortOrder || 0);
+      aboutWidthInput.value = block.width === 'half' ? 'half' : 'full';
       aboutImageFileInput.value = '';
       setAboutEditMode(true);
       aboutTitleInput.focus();
@@ -2373,6 +2384,7 @@
       aboutTitleInput.addEventListener(evt, renderAboutPreview);
       aboutContentInput.addEventListener(evt, renderAboutPreview);
       aboutImageFileInput.addEventListener(evt, renderAboutPreview);
+      aboutWidthInput.addEventListener(evt, renderAboutPreview);
     });
     renderAboutPreview();
 
@@ -2408,7 +2420,8 @@
           content: aboutContentInput.value.trim(),
           image: nextImages[0] || '',
           images: nextImages,
-          sortOrder: aboutSortInput.value === '' ? (data.aboutBlocks.length + 1) * 10 : Number(aboutSortInput.value)
+          sortOrder: aboutSortInput.value === '' ? (data.aboutBlocks.length + 1) * 10 : Number(aboutSortInput.value),
+          width: aboutWidthInput.value === 'half' ? 'half' : 'full'
         };
         if (!block.title && !block.content && nextImages.length === 0) {
           showAdminToast('Bitte mindestens Titel, Text oder ein Bild ausfüllen.', 'error');
