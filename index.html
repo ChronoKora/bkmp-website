@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260706-about-preview">
+<link rel="stylesheet" href="style.css?v=20260706-catalog-mod">
 </head>
 <body>
 
@@ -285,30 +285,51 @@
 
   <div class="joke-overlay cardcatalog-overlay" id="cardCatalogOverlay">
     <div class="joke-card" id="cardCatalogCard">
-      <h3>Karte eintragen</h3>
-      <label for="cardCatalogName">Name (was ist auf der Karte drauf?)</label>
-      <input type="text" id="cardCatalogName" placeholder="z. B. Naruto" required>
-      <div class="form-grid form-grid-2">
-        <div><label for="cardCatalogCategory">Kategorie</label><input type="text" id="cardCatalogCategory" placeholder="z. B. Anime"></div>
-        <div><label for="cardCatalogShop">Shop-Name</label><input type="text" id="cardCatalogShop" placeholder="z. B. Karten-Paradies"></div>
+      <div id="cardCatalogFormView">
+        <h3>Karte eintragen</h3>
+        <label for="cardCatalogName">Name (was ist auf der Karte drauf?)</label>
+        <input type="text" id="cardCatalogName" placeholder="z. B. Naruto" required>
+        <div class="form-grid form-grid-2">
+          <div><label for="cardCatalogCategory">Kategorie</label><input type="text" id="cardCatalogCategory" placeholder="z. B. Anime"></div>
+          <div><label for="cardCatalogShop">Shop-Name</label><input type="text" id="cardCatalogShop" placeholder="z. B. Karten-Paradies"></div>
+        </div>
+        <div class="form-grid form-grid-2">
+          <div><label for="cardCatalogCb">Welcher CB?</label><input type="text" id="cardCatalogCb" placeholder="z. B. CB1"></div>
+          <div><label for="cardCatalogWho">Wer trägt ein?</label><input type="text" id="cardCatalogWho" placeholder="Dein Name"></div>
+        </div>
+        <label for="cardCatalogDescription">Was ist das? (optional)</label>
+        <textarea id="cardCatalogDescription" placeholder="Kurze Beschreibung"></textarea>
+        <label for="cardCatalogImageFile">Bild (Pflicht)</label>
+        <input type="file" id="cardCatalogImageFile" accept="image/*" required>
+        <p class="cardcatalog-confirm-hint">Jede neue Karte wird erst nach Pr&uuml;fung durch einen Admin &ouml;ffentlich sichtbar.</p>
+        <div class="joke-buttons">
+          <button class="btn-nein" id="cardCatalogCancel" type="button">Abbrechen</button>
+          <button class="btn-ja" id="cardCatalogSubmit" type="button">Weiter</button>
+        </div>
       </div>
-      <div class="form-grid form-grid-2">
-        <div><label for="cardCatalogCb">Welcher CB?</label><input type="text" id="cardCatalogCb" placeholder="z. B. CB1"></div>
-        <div><label for="cardCatalogWho">Wer trägt ein?</label><input type="text" id="cardCatalogWho" placeholder="Dein Name"></div>
+
+      <div id="cardCatalogConfirmView" style="display:none;">
+        <h3>Alles richtig?</h3>
+        <p class="cardcatalog-confirm-hint">Bitte pr&uuml;fe deine Angaben, bevor die Karte zur Freigabe eingereicht wird.</p>
+        <div class="cardcatalog-confirm-summary" id="cardCatalogConfirmSummary"></div>
+        <div class="joke-buttons">
+          <button class="btn-nein" id="cardCatalogConfirmBack" type="button">Zur&uuml;ck</button>
+          <button class="btn-ja" id="cardCatalogConfirmYes" type="button">Ja, einreichen</button>
+        </div>
       </div>
-      <label for="cardCatalogDescription">Was ist das? (optional)</label>
-      <textarea id="cardCatalogDescription" placeholder="Kurze Beschreibung"></textarea>
-      <label for="cardCatalogImageFile">Bild (optional)</label>
-      <input type="file" id="cardCatalogImageFile" accept="image/*">
-      <div class="joke-buttons">
-        <button class="btn-nein" id="cardCatalogCancel" type="button">Abbrechen</button>
-        <button class="btn-ja" id="cardCatalogSubmit" type="button">Karte eintragen</button>
+
+      <div id="cardCatalogSuccessView" style="display:none; text-align:center;">
+        <h3>Danke!</h3>
+        <p>Deine Karte wurde eingereicht und erscheint hier, sobald ein Admin sie gepr&uuml;ft hat.</p>
+        <div class="joke-buttons">
+          <button class="btn-ja" id="cardCatalogSuccessClose" type="button">Schlie&szlig;en</button>
+        </div>
       </div>
     </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260705-typo-fix"></script>
+  <script src="supabase.js?v=20260706-catalog-status"></script>
   <script src="app.js?v=20260705-typo-fix"></script>
   <script>
     bkmpInitTheme();
@@ -1201,6 +1222,21 @@
     const cardCatalogWhoInput = document.getElementById('cardCatalogWho');
     const cardCatalogDescriptionInput = document.getElementById('cardCatalogDescription');
     const cardCatalogImageFileInput = document.getElementById('cardCatalogImageFile');
+    const cardCatalogFormView = document.getElementById('cardCatalogFormView');
+    const cardCatalogConfirmView = document.getElementById('cardCatalogConfirmView');
+    const cardCatalogConfirmSummary = document.getElementById('cardCatalogConfirmSummary');
+    const cardCatalogConfirmBack = document.getElementById('cardCatalogConfirmBack');
+    const cardCatalogConfirmYes = document.getElementById('cardCatalogConfirmYes');
+    const cardCatalogSuccessView = document.getElementById('cardCatalogSuccessView');
+    const cardCatalogSuccessClose = document.getElementById('cardCatalogSuccessClose');
+    let cardCatalogConfirmPreviewUrl = null;
+    let cardCatalogPendingEntry = null;
+
+    function showCardCatalogView(view) {
+      [cardCatalogFormView, cardCatalogConfirmView, cardCatalogSuccessView].forEach(el => {
+        if (el) el.style.display = el === view ? '' : 'none';
+      });
+    }
 
     function clearCardCatalogForm() {
       cardCatalogNameInput.value = '';
@@ -1210,6 +1246,12 @@
       cardCatalogWhoInput.value = '';
       cardCatalogDescriptionInput.value = '';
       cardCatalogImageFileInput.value = '';
+      if (cardCatalogConfirmPreviewUrl) {
+        URL.revokeObjectURL(cardCatalogConfirmPreviewUrl);
+        cardCatalogConfirmPreviewUrl = null;
+      }
+      cardCatalogPendingEntry = null;
+      showCardCatalogView(cardCatalogFormView);
     }
 
     if (openCardCatalogForm) {
@@ -1224,45 +1266,79 @@
       cardCatalogSubmit.addEventListener('click', () => {
         const name = cardCatalogNameInput.value.trim();
         if (!name) { cardCatalogNameInput.reportValidity(); return; }
+        const file = cardCatalogImageFileInput.files && cardCatalogImageFileInput.files[0];
+        if (!file) { cardCatalogImageFileInput.reportValidity(); return; }
+
         const category = cardCatalogCategoryInput.value.trim();
         const shopName = cardCatalogShopInput.value.trim().toUpperCase();
         const cb = cardCatalogCbInput.value.trim();
         const submittedBy = cardCatalogWhoInput.value.trim();
         const description = cardCatalogDescriptionInput.value.trim();
-        const file = cardCatalogImageFileInput.files && cardCatalogImageFileInput.files[0];
+        cardCatalogPendingEntry = { name, category, shopName, cb, submittedBy, description, file };
 
-        cardCatalogSubmit.disabled = true;
-        cardCatalogSubmit.textContent = 'Wird gespeichert...';
+        if (cardCatalogConfirmPreviewUrl) URL.revokeObjectURL(cardCatalogConfirmPreviewUrl);
+        cardCatalogConfirmPreviewUrl = URL.createObjectURL(file);
+        const rows = [
+          ['Name', name],
+          ['Kategorie', category],
+          ['Shop', shopName],
+          ['CB', cb],
+          ['Wer trägt ein', submittedBy],
+          ['Beschreibung', description]
+        ].filter(([, value]) => value);
+        cardCatalogConfirmSummary.innerHTML = `
+          <img src="${cardCatalogConfirmPreviewUrl}" alt="" class="cardcatalog-confirm-image">
+          <dl>${rows.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}</dl>
+        `;
+        showCardCatalogView(cardCatalogConfirmView);
+      });
+    }
+
+    if (cardCatalogConfirmBack) {
+      cardCatalogConfirmBack.addEventListener('click', () => showCardCatalogView(cardCatalogFormView));
+    }
+
+    if (cardCatalogConfirmYes) {
+      cardCatalogConfirmYes.addEventListener('click', () => {
+        if (!cardCatalogPendingEntry) return;
+        const { name, category, shopName, cb, submittedBy, description, file } = cardCatalogPendingEntry;
+
+        cardCatalogConfirmYes.disabled = true;
+        cardCatalogConfirmYes.textContent = 'Wird gespeichert...';
 
         function resetBtn() {
-          cardCatalogSubmit.disabled = false;
-          cardCatalogSubmit.textContent = 'Karte eintragen';
+          cardCatalogConfirmYes.disabled = false;
+          cardCatalogConfirmYes.textContent = 'Ja, einreichen';
         }
 
-        const readImage = file ? bkmpCompressImageFile(file) : Promise.resolve('');
-        readImage.then(image => {
+        bkmpCompressImageFile(file).then(image => {
           const entry = { id: bkmpUid('cardcat'), name, category, shopName, cb, submittedBy, description, image, createdAt: Date.now() };
-          function finish(saved) {
-            data.cardCatalog.unshift(saved || entry);
-            bkmpSaveData(data);
-            renderCardCatalog();
-            resetBtn();
-            cardCatalogOverlay.classList.remove('visible');
-          }
           if (typeof saveCardCatalogEntry === 'function' && bkmpGetSupabaseClient()) {
-            saveCardCatalogEntry(entry).then(finish).catch(e => {
+            saveCardCatalogEntry(entry).then(() => {
+              resetBtn();
+              clearCardCatalogForm();
+              showCardCatalogView(cardCatalogSuccessView);
+            }).catch(e => {
               console.error('Karte konnte nicht gespeichert werden.', e);
               resetBtn();
               alert('Die Karte konnte nicht gespeichert werden. Bitte versuche es erneut.');
             });
           } else {
-            finish(null);
+            data.cardCatalog.unshift(entry);
+            bkmpSaveData(data);
+            renderCardCatalog();
+            resetBtn();
+            cardCatalogOverlay.classList.remove('visible');
           }
         }).catch(() => {
           resetBtn();
           alert('Das Bild konnte nicht gelesen werden. Bitte versuche es mit einer anderen Datei erneut.');
         });
       });
+    }
+
+    if (cardCatalogSuccessClose) {
+      cardCatalogSuccessClose.addEventListener('click', () => cardCatalogOverlay.classList.remove('visible'));
     }
 
     function renderFormattedNewsText(value) {

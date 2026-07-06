@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260706-about-preview">
+<link rel="stylesheet" href="style.css?v=20260706-catalog-mod">
 </head>
 <body>
 
@@ -331,7 +331,8 @@
               <div class="about-editor-preview">
                 <div class="about-editor-preview-head">
                   <span class="about-editor-preview-dot"></span>
-                  Live-Vorschau
+                  Live-Vorschau &middot; ganze Seite
+                  <span class="about-editor-preview-hint">Bl&ouml;cke zum Sortieren ziehen</span>
                 </div>
                 <div class="about-editor-preview-frame">
                   <div class="about-page" id="aboutPreviewMount"></div>
@@ -445,7 +446,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260705-typo-fix"></script>
+  <script src="supabase.js?v=20260706-catalog-status"></script>
   <script src="app.js?v=20260705-typo-fix"></script>
   <script>
     bkmpInitTheme();
@@ -1100,6 +1101,27 @@
       persist();
     }
 
+    function cardCatalogStatusLabel(status) {
+      return status === 'pending' ? 'Wartet auf Freigabe' : 'Freigegeben';
+    }
+
+    async function approveCardCatalogEntry(id) {
+      if (typeof updateCardCatalogStatus !== 'function' || !bkmpGetSupabaseClient()) {
+        showAdminToast('Supabase ist gerade nicht verbunden.', 'error');
+        return;
+      }
+      try {
+        const updated = await updateCardCatalogStatus(id, 'approved');
+        data.cardCatalog = data.cardCatalog.map(item => String(item.id) === String(id) ? (updated || { ...item, status: 'approved' }) : item);
+        bkmpSaveData(data);
+        renderAll();
+        showAdminToast('Karte freigegeben.', 'success');
+      } catch (e) {
+        console.error('Karte konnte nicht freigegeben werden.', e);
+        showAdminToast('Karte konnte nicht freigegeben werden: ' + supabaseErrorText(e), 'error');
+      }
+    }
+
     function renderCardCatalogList() {
       const el = document.getElementById('cardCatalogList');
       if (!el) return;
@@ -1108,22 +1130,31 @@
         return;
       }
       el.innerHTML = '';
-      [...data.cardCatalog].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).forEach(item => {
-        const row = document.createElement('div');
-        row.className = 'entry-row partner-admin-row';
-        row.innerHTML = `
-          ${item.image ? `<span class="partner-admin-thumb-wrap" data-bkmp-image-wrap data-empty-label="Karte"><img data-bkmp-img class="partner-admin-thumb" src="${item.image}" alt="" loading="lazy" decoding="async"></span>` : '<div class="partner-admin-thumb partner-admin-thumb-empty">Karte</div>'}
-          <div class="desc">
-            <span class="name">${escapeHtml(item.name)}</span>
-            <span class="meta">${item.category ? escapeHtml(item.category) + ' · ' : ''}${item.shopName ? escapeHtml(item.shopName.toUpperCase()) + ' · ' : ''}${item.cb ? escapeHtml(item.cb) + ' · ' : ''}${item.submittedBy ? 'von ' + escapeHtml(item.submittedBy) : ''}</span>
-          </div>
-          <div class="entry-actions">
-            <button class="del-btn" type="button" aria-label="Karte löschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>
-          </div>
-        `;
-        row.querySelector('.del-btn').addEventListener('click', () => removeCardCatalogEntry(item.id));
-        el.appendChild(row);
-      });
+      [...data.cardCatalog]
+        .sort((a, b) => {
+          if ((a.status === 'pending') !== (b.status === 'pending')) return a.status === 'pending' ? -1 : 1;
+          return (b.createdAt || 0) - (a.createdAt || 0);
+        })
+        .forEach(item => {
+          const isPending = item.status === 'pending';
+          const row = document.createElement('div');
+          row.className = 'entry-row partner-admin-row';
+          row.innerHTML = `
+            ${item.image ? `<span class="partner-admin-thumb-wrap" data-bkmp-image-wrap data-empty-label="Karte"><img data-bkmp-img class="partner-admin-thumb" src="${item.image}" alt="" loading="lazy" decoding="async"></span>` : '<div class="partner-admin-thumb partner-admin-thumb-empty">Karte</div>'}
+            <div class="desc">
+              <span class="name">${escapeHtml(item.name)}</span>
+              <span class="meta">${item.category ? escapeHtml(item.category) + ' · ' : ''}${item.shopName ? escapeHtml(item.shopName.toUpperCase()) + ' · ' : ''}${item.cb ? escapeHtml(item.cb) + ' · ' : ''}${item.submittedBy ? 'von ' + escapeHtml(item.submittedBy) : ''}</span>
+            </div>
+            <span class="investor-request-status status-${isPending ? 'pending' : 'confirmed'}">${cardCatalogStatusLabel(item.status)}</span>
+            <div class="entry-actions">
+              ${isPending ? '<button class="edit-btn confirm-btn" type="button">Freigeben</button>' : ''}
+              <button class="del-btn" type="button" aria-label="Karte löschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>
+            </div>
+          `;
+          if (isPending) row.querySelector('.confirm-btn').addEventListener('click', () => approveCardCatalogEntry(item.id));
+          row.querySelector('.del-btn').addEventListener('click', () => removeCardCatalogEntry(item.id));
+          el.appendChild(row);
+        });
     }
 
     async function persistIncome(income) {
@@ -1264,6 +1295,7 @@
       renderWishAdminList();
       renderStreamerList();
       renderAboutBlockList();
+      if (typeof renderAboutPreview === 'function') renderAboutPreview();
       renderPartnerShopList();
       renderCardSaleList();
       renderInvestorRequestList();
@@ -1831,16 +1863,32 @@
     }
 
     let aboutPreviewObjectUrls = [];
-    function renderAboutPreview() {
-      const mount = document.getElementById('aboutPreviewMount');
-      if (!mount) return;
-      aboutPreviewObjectUrls.forEach(url => URL.revokeObjectURL(url));
-      aboutPreviewObjectUrls = [];
+    let draggedAboutBlockId = null;
+
+    function aboutBlockPreviewMarkup(block) {
+      const title = block.title ? `<h3>${escapeHtml(block.title)}</h3>` : '';
+      const text = block.content ? `<p>${escapeHtml(block.content).replace(/\n/g, '<br>')}</p>` : '';
+      const image = block.image ? `<img src="${escapeHtml(block.image)}" alt="">` : '';
+      if (block.type === 'heading') return { cls: 'about-heading', html: `${title}${text}` };
+      if (block.type === 'image') return { cls: 'about-image', html: `${image}${title}` };
+      if (block.type === 'image_text') return { cls: 'about-split', html: `${image}<div>${title}${text}</div>` };
+      if (block.type === 'team') return { cls: 'about-team-card', html: `${image}<div>${title}${text}</div>` };
+      if (block.type === 'gallery') {
+        const images = block.images && block.images.length ? block.images : (block.image ? [block.image] : []);
+        return { cls: 'about-gallery', html: `${title}<div>${images.map(src => `<img src="${escapeHtml(src)}" alt="">`).join('')}</div>${text}` };
+      }
+      return { cls: 'about-text', html: `${title}${text}` };
+    }
+
+    function buildAboutPreviewBlocks() {
+      const stored = Array.isArray(data.aboutBlocks)
+        ? [...data.aboutBlocks].sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0))
+        : [];
 
       const type = aboutTypeInput.value || 'text';
       const title = aboutTitleInput.value.trim();
       const content = aboutContentInput.value.trim();
-      const currentBlock = editingAboutId ? data.aboutBlocks.find(item => item.id === editingAboutId) : null;
+      const currentBlock = editingAboutId ? stored.find(item => item.id === editingAboutId) : null;
       const files = aboutImageFileInput.files ? Array.from(aboutImageFileInput.files) : [];
       const newImages = files.map(file => {
         const url = URL.createObjectURL(file);
@@ -1849,25 +1897,88 @@
       });
       const keepImages = currentBlock ? (currentBlock.images && currentBlock.images.length ? currentBlock.images : (currentBlock.image ? [currentBlock.image] : [])) : [];
       const images = newImages.length ? newImages : keepImages;
+      const hasDraftContent = Boolean(title || content || images.length);
+      const draftBlock = { id: editingAboutId || '__about_draft__', type, title, content, image: images[0] || '', images, isDraft: true };
 
-      if (!title && !content && images.length === 0) {
-        mount.innerHTML = '<p class="empty-hint">Noch nichts zum Anzeigen &ndash; f&uuml;lle Titel, Text oder ein Bild aus.</p>';
+      if (editingAboutId) return stored.map(item => item.id === editingAboutId ? draftBlock : item);
+      if (hasDraftContent) return [...stored, draftBlock];
+      return stored;
+    }
+
+    function renderAboutPreview() {
+      const mount = document.getElementById('aboutPreviewMount');
+      if (!mount) return;
+      aboutPreviewObjectUrls.forEach(url => URL.revokeObjectURL(url));
+      aboutPreviewObjectUrls = [];
+
+      const blocks = buildAboutPreviewBlocks();
+      if (blocks.length === 0) {
+        mount.innerHTML = '<p class="empty-hint">Noch keine Bl&ouml;cke &ndash; f&uuml;lle links das Formular aus.</p>';
         return;
       }
+      mount.innerHTML = blocks.map(block => {
+        const { cls, html } = aboutBlockPreviewMarkup(block);
+        const draggable = !block.isDraft;
+        return `<section class="about-block ${cls} about-preview-block${block.isDraft ? ' is-draft' : ''}" data-about-preview-id="${escapeHtml(String(block.id))}" ${draggable ? 'draggable="true"' : ''}>${block.isDraft ? '<span class="about-preview-draft-badge">Entwurf</span>' : ''}${html}</section>`;
+      }).join('');
+      wireAboutPreviewDrag(mount);
+    }
 
-      const titleHtml = title ? `<h3>${escapeHtml(title)}</h3>` : '';
-      const textHtml = content ? `<p>${escapeHtml(content).replace(/\n/g, '<br>')}</p>` : '';
-      const imageHtml = images[0] ? `<img src="${images[0]}" alt="">` : '';
+    function wireAboutPreviewDrag(container) {
+      const items = Array.from(container.querySelectorAll('.about-preview-block[draggable="true"]'));
+      items.forEach(el => {
+        el.addEventListener('dragstart', () => {
+          draggedAboutBlockId = el.dataset.aboutPreviewId;
+          el.classList.add('dragging');
+        });
+        el.addEventListener('dragend', () => {
+          el.classList.remove('dragging');
+          draggedAboutBlockId = null;
+          items.forEach(i => i.classList.remove('drag-over-before', 'drag-over-after'));
+        });
+        el.addEventListener('dragover', e => {
+          if (!draggedAboutBlockId || draggedAboutBlockId === el.dataset.aboutPreviewId) return;
+          e.preventDefault();
+          const before = (e.clientY - el.getBoundingClientRect().top) < el.offsetHeight / 2;
+          el.classList.toggle('drag-over-before', before);
+          el.classList.toggle('drag-over-after', !before);
+        });
+        el.addEventListener('dragleave', () => {
+          el.classList.remove('drag-over-before', 'drag-over-after');
+        });
+        el.addEventListener('drop', e => {
+          e.preventDefault();
+          const targetId = el.dataset.aboutPreviewId;
+          el.classList.remove('drag-over-before', 'drag-over-after');
+          if (!draggedAboutBlockId || draggedAboutBlockId === targetId) return;
+          const before = (e.clientY - el.getBoundingClientRect().top) < el.offsetHeight / 2;
+          reorderAboutBlocks(draggedAboutBlockId, targetId, before);
+        });
+      });
+    }
 
-      let html;
-      if (type === 'heading') html = `<section class="about-block about-heading">${titleHtml}${textHtml}</section>`;
-      else if (type === 'image') html = `<section class="about-block about-image">${imageHtml}${titleHtml}</section>`;
-      else if (type === 'image_text') html = `<section class="about-block about-split">${imageHtml}<div>${titleHtml}${textHtml}</div></section>`;
-      else if (type === 'team') html = `<section class="about-block about-team-card">${imageHtml}<div>${titleHtml}${textHtml}</div></section>`;
-      else if (type === 'gallery') html = `<section class="about-block about-gallery">${titleHtml}<div>${images.map(src => `<img src="${src}" alt="">`).join('')}</div>${textHtml}</section>`;
-      else html = `<section class="about-block about-text">${titleHtml}${textHtml}</section>`;
+    function reorderAboutBlocks(draggedId, targetId, before) {
+      const blocks = [...data.aboutBlocks].sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
+      const fromIndex = blocks.findIndex(item => String(item.id) === String(draggedId));
+      if (fromIndex < 0) return;
+      const [moved] = blocks.splice(fromIndex, 1);
+      let toIndex = blocks.findIndex(item => String(item.id) === String(targetId));
+      if (toIndex < 0) toIndex = blocks.length;
+      else if (!before) toIndex += 1;
+      blocks.splice(toIndex, 0, moved);
 
-      mount.innerHTML = html;
+      const changed = [];
+      blocks.forEach((item, index) => {
+        const nextOrder = (index + 1) * 10;
+        if (Number(item.sortOrder || 0) !== nextOrder) {
+          item.sortOrder = nextOrder;
+          changed.push(item);
+        }
+      });
+      data.aboutBlocks = blocks;
+      bkmpSaveData(data);
+      renderAll();
+      changed.forEach(item => persistAboutBlock(item));
     }
 
     function clearAboutForm() {
