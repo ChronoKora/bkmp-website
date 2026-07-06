@@ -1285,13 +1285,14 @@ function bkmpMapPartnerShopFromSupabase(row) {
     description: row.description || '',
     link: row.link || '',
     contact: row.contact || '',
+    status: row.status || 'approved',
     createdAt: row.created_at ? Date.parse(row.created_at) : 0,
     source: 'supabase'
   };
 }
 
 function bkmpMapPartnerShopToSupabase(shop) {
-  return {
+  const payload = {
     shop_name: shop.name || shop.shop_name || '',
     image_url: shop.image || shop.image_url || '',
     location: shop.location || '',
@@ -1300,6 +1301,8 @@ function bkmpMapPartnerShopToSupabase(shop) {
     link: shop.link || '',
     contact: shop.contact || ''
   };
+  if (shop.status) payload.status = shop.status;
+  return payload;
 }
 
 async function loadPartnerShops() {
@@ -1307,7 +1310,7 @@ async function loadPartnerShops() {
   if (!client) return null;
   const { data, error } = await client
     .from('partner_shops')
-    .select('id, shop_name, image_url, location, category, description, link, contact, created_at')
+    .select('id, shop_name, image_url, location, category, description, link, contact, status, created_at')
     .order('created_at', { ascending: false });
   if (error) throw error;
   return (data || []).map(bkmpMapPartnerShopFromSupabase);
@@ -1324,16 +1327,30 @@ async function savePartnerShop(shop) {
       .from('partner_shops')
       .update(payload)
       .eq('id', shop.id)
-      .select('id, shop_name, image_url, location, category, description, link, contact, created_at')
+      .select('id, shop_name, image_url, location, category, description, link, contact, status, created_at')
       .limit(1);
   } else {
     query = client
       .from('partner_shops')
       .insert(payload)
-      .select('id, shop_name, image_url, location, category, description, link, contact, created_at')
+      .select('id, shop_name, image_url, location, category, description, link, contact, status, created_at')
       .limit(1);
   }
   const { data, error } = await query;
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : null;
+  return row ? bkmpMapPartnerShopFromSupabase(row) : null;
+}
+
+async function updatePartnerShopStatus(id, status) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('partner_shops')
+    .update({ status })
+    .eq('id', id)
+    .select('id, shop_name, image_url, location, category, description, link, contact, status, created_at')
+    .limit(1);
   if (error) throw error;
   const row = Array.isArray(data) ? data[0] : null;
   return row ? bkmpMapPartnerShopFromSupabase(row) : null;
@@ -1931,34 +1948,60 @@ async function importAllLocalDataToSupabase() {
 
 function bkmpMapPlayerStatsFromSupabase(row) {
   return {
-    name: row.mc_name,
+    name: row.display_name,
     minutesSpent: Number(row.minutes_spent || 0),
     achievementsUnlocked: Number(row.achievements_unlocked || 0),
+    eggsFound: Array.isArray(row.eggs_found) ? row.eggs_found : [],
+    daysVisited: Array.isArray(row.days_visited) ? row.days_visited : [],
+    flags: row.flags && typeof row.flags === 'object' ? row.flags : {},
+    panelOpens: Number(row.panel_opens || 0),
+    activeTitle: row.active_title || '',
     updatedAt: row.updated_at ? Date.parse(row.updated_at) : 0
   };
 }
+
+const BKMP_PLAYER_STATS_COLUMNS = 'display_name, minutes_spent, achievements_unlocked, eggs_found, days_visited, flags, panel_opens, active_title, updated_at';
 
 async function loadLeaderboardStats() {
   const client = bkmpGetSupabaseClient();
   if (!client) return null;
   const { data, error } = await client
     .from('player_stats')
-    .select('mc_name, minutes_spent, achievements_unlocked, updated_at');
+    .select(BKMP_PLAYER_STATS_COLUMNS);
   if (error) throw error;
   return (data || []).map(bkmpMapPlayerStatsFromSupabase);
 }
 
-async function upsertPlayerStats(mcName, minutesSpent, achievementsUnlocked) {
+async function loadPlayerStatsByName(name) {
   const client = bkmpGetSupabaseClient();
-  if (!client) return false;
+  if (!client || !name) return null;
+  const { data, error } = await client
+    .from('player_stats')
+    .select(BKMP_PLAYER_STATS_COLUMNS)
+    .eq('name_key', String(name).trim().toLowerCase())
+    .limit(1);
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : null;
+  return row ? bkmpMapPlayerStatsFromSupabase(row) : null;
+}
+
+async function upsertPlayerStats(displayName, stats) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !displayName) return false;
   const { error } = await client
     .from('player_stats')
     .upsert({
-      mc_name: mcName,
-      minutes_spent: Math.max(0, Math.round(minutesSpent)),
-      achievements_unlocked: Math.max(0, Math.round(achievementsUnlocked)),
+      name_key: String(displayName).trim().toLowerCase(),
+      display_name: displayName,
+      minutes_spent: Math.max(0, Math.round(stats.minutesSpent || 0)),
+      achievements_unlocked: Math.max(0, Math.round(stats.achievementsUnlocked || 0)),
+      eggs_found: Array.isArray(stats.eggsFound) ? stats.eggsFound : [],
+      days_visited: Array.isArray(stats.daysVisited) ? stats.daysVisited : [],
+      flags: stats.flags && typeof stats.flags === 'object' ? stats.flags : {},
+      panel_opens: Math.max(0, Math.round(stats.panelOpens || 0)),
+      active_title: stats.activeTitle || '',
       updated_at: new Date().toISOString()
-    }, { onConflict: 'mc_name' });
+    }, { onConflict: 'name_key' });
   if (error) throw error;
   return true;
 }

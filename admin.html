@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260706-eggs2">
+<link rel="stylesheet" href="style.css?v=20260706-titles">
 </head>
 <body>
 
@@ -369,7 +369,21 @@
         <section class="admin-page" id="page-partners">
           <div class="admin-section">
             <h2>PartnerShops</h2>
-            <div class="entry-table-wrapper"><div class="entry-list" id="partnerShopList"></div></div>
+            <p class="admin-help-text">Shop-Betreiber können ihren Shop selbst einreichen. Hier kannst du ihn freigeben, ablehnen oder bearbeiten.</p>
+
+            <div class="cardcatalog-admin-group">
+              <h3>Offene Anfragen <span class="cardcatalog-admin-count" id="partnerShopPendingCount"></span></h3>
+              <div class="entry-table-wrapper"><div class="entry-list" id="partnerShopPendingList"></div></div>
+            </div>
+            <div class="cardcatalog-admin-group">
+              <h3>Angenommen <span class="cardcatalog-admin-count" id="partnerShopApprovedCount"></span></h3>
+              <div class="entry-table-wrapper"><div class="entry-list" id="partnerShopApprovedList"></div></div>
+            </div>
+            <div class="cardcatalog-admin-group">
+              <h3>Abgelehnt <span class="cardcatalog-admin-count" id="partnerShopRejectedCount"></span></h3>
+              <div class="entry-table-wrapper"><div class="entry-list" id="partnerShopRejectedList"></div></div>
+            </div>
+
             <div class="form-grid form-grid-3">
               <div><label for="partnerName">Shopname</label><input type="text" id="partnerName" placeholder="z. B. Karten-Paradies" required></div>
               <div><label for="partnerLocation">Server / Warp</label><input type="text" id="partnerLocation" placeholder="/sw Beispiel CB2"></div>
@@ -514,8 +528,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260706-player-stats"></script>
-  <script src="app.js?v=20260706-cooldown"></script>
+  <script src="supabase.js?v=20260706-partner-mod"></script>
+  <script src="app.js?v=20260706-error-text"></script>
   <script>
     bkmpInitTheme();
 
@@ -729,12 +743,6 @@
     function persist() {
       bkmpSaveData(data);
       renderAll();
-    }
-
-    function supabaseErrorText(e) {
-      return e && (e.message || e.details || e.code)
-        ? [e.message, e.details, e.code].filter(Boolean).join(' | ')
-        : 'Unbekannter Fehler';
     }
 
     async function refreshIncomesFromSupabase() {
@@ -1693,42 +1701,89 @@
       });
     }
 
-    function renderPartnerShopList() {
-      const el = document.getElementById('partnerShopList');
-      if (!el) return;
-      if (!data.partnerShops || data.partnerShops.length === 0) {
-        el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Noch keine PartnerShops.</p>';
+    async function setPartnerShopStatus(id, status, successMessage) {
+      if (typeof updatePartnerShopStatus !== 'function' || !bkmpGetSupabaseClient()) {
+        showAdminToast('Supabase ist gerade nicht verbunden.', 'error');
         return;
       }
-      let repairedIds = false;
-      data.partnerShops = data.partnerShops.map(item => {
-        if (item && item.id !== undefined && item.id !== null && String(item.id).trim() !== '') return item;
-        repairedIds = true;
-        return { ...item, id: bkmpUid('shop') };
-      });
-      if (repairedIds) bkmpSaveData(data);
+      try {
+        const updated = await updatePartnerShopStatus(id, status);
+        data.partnerShops = data.partnerShops.map(item => String(item.id) === String(id) ? (updated || { ...item, status }) : item);
+        bkmpSaveData(data);
+        renderAll();
+        showAdminToast(successMessage, 'success');
+      } catch (e) {
+        console.error('Status konnte nicht geändert werden.', e);
+        showAdminToast('Status konnte nicht geändert werden: ' + supabaseErrorText(e), 'error');
+      }
+    }
+    const approvePartnerShop = id => setPartnerShopStatus(id, 'approved', 'PartnerShop freigegeben.');
+    const rejectPartnerShop = id => setPartnerShopStatus(id, 'rejected', 'PartnerShop abgelehnt.');
+
+    function renderPartnerShopGroup(listId, countId, items, actionsHtml, wireActions) {
+      const el = document.getElementById(listId);
+      const countEl = document.getElementById(countId);
+      if (!el) return;
+      if (countEl) countEl.textContent = items.length ? `(${items.length})` : '';
+      if (items.length === 0) {
+        el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem; padding:0.6rem 0.2rem;">Nichts hier.</p>';
+        return;
+      }
       el.innerHTML = '';
-      data.partnerShops.forEach((item, index) => {
+      items.forEach(item => {
         const row = document.createElement('div');
         row.className = 'entry-row partner-admin-row';
         row.innerHTML = `
           ${item.image ? `<span class="partner-admin-thumb-wrap" data-bkmp-image-wrap data-empty-label="Shop"><img data-bkmp-img class="partner-admin-thumb" src="${item.image}" alt="" loading="lazy" decoding="async"></span>` : '<div class="partner-admin-thumb partner-admin-thumb-empty">Shop</div>'}
           <div class="desc">
             <span class="name">${escapeHtml(item.name)}</span>
-            <span class="meta">${escapeHtml(item.category || 'Partner')}${item.location ? ' &middot; ' + escapeHtml(item.location) : ''}</span>
+            <span class="meta">${escapeHtml(item.category || 'Partner')}${item.location ? ' &middot; ' + escapeHtml(item.location) : ''}${item.contact ? ' &middot; ' + escapeHtml(item.contact) : ''}</span>
           </div>
           <div class="entry-actions">
-            <button class="edit-btn" type="button">Bearbeiten</button>
-            <button class="del-btn" type="button" aria-label="PartnerShop loeschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>
+            ${actionsHtml(item)}
+            <button class="edit-btn edit-partner" type="button">Bearbeiten</button>
+            <button class="del-btn" type="button" aria-label="PartnerShop löschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>
           </div>
         `;
-        row.querySelector('.edit-btn').addEventListener('click', () => startEditPartnerShop(item.id));
+        wireActions(row, item);
+        row.querySelector('.edit-partner').addEventListener('click', () => startEditPartnerShop(item.id));
         row.querySelector('.del-btn').addEventListener('click', () => {
           if (editingPartnerShopId === item.id) clearPartnerShopForm();
-          removePartnerShop(item.id, index);
+          removePartnerShop(item.id);
         });
         el.appendChild(row);
       });
+    }
+
+    function renderPartnerShopList() {
+      let repairedIds = false;
+      data.partnerShops = (data.partnerShops || []).map(item => {
+        if (item && item.id !== undefined && item.id !== null && String(item.id).trim() !== '') return item;
+        repairedIds = true;
+        return { ...item, id: bkmpUid('shop') };
+      });
+      if (repairedIds) bkmpSaveData(data);
+
+      const byDateDesc = (a, b) => (b.createdAt || 0) - (a.createdAt || 0);
+      const all = data.partnerShops;
+      const pending = all.filter(item => item.status === 'pending').sort(byDateDesc);
+      const approved = all.filter(item => item.status !== 'pending' && item.status !== 'rejected').sort(byDateDesc);
+      const rejected = all.filter(item => item.status === 'rejected').sort(byDateDesc);
+
+      renderPartnerShopGroup('partnerShopPendingList', 'partnerShopPendingCount', pending,
+        () => '<button class="edit-btn confirm-btn" type="button">Freigeben</button><button class="edit-btn reject-btn" type="button">Ablehnen</button>',
+        (row, item) => {
+          row.querySelector('.confirm-btn').addEventListener('click', () => approvePartnerShop(item.id));
+          row.querySelector('.reject-btn').addEventListener('click', () => rejectPartnerShop(item.id));
+        });
+
+      renderPartnerShopGroup('partnerShopApprovedList', 'partnerShopApprovedCount', approved,
+        () => '<button class="edit-btn reject-btn" type="button">Ablehnen</button>',
+        (row, item) => row.querySelector('.reject-btn').addEventListener('click', () => rejectPartnerShop(item.id)));
+
+      renderPartnerShopGroup('partnerShopRejectedList', 'partnerShopRejectedCount', rejected,
+        () => '<button class="edit-btn confirm-btn" type="button">Freigeben</button>',
+        (row, item) => row.querySelector('.confirm-btn').addEventListener('click', () => approvePartnerShop(item.id)));
     }
 
     function renderCardSaleList() {
@@ -2428,7 +2483,8 @@
           description: partnerDescriptionInput.value.trim(),
           link: partnerLinkInput.value.trim(),
           contact: partnerContactInput.value.trim(),
-          image
+          image,
+          status: 'approved'
         };
         persistPartnerShop(shop).then(saved => {
           if (saved) clearPartnerShopForm();

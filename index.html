@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260706-eggs2">
+<link rel="stylesheet" href="style.css?v=20260706-titles">
 </head>
 <body>
 
@@ -101,9 +101,11 @@
       <div class="achievements-subtabs">
         <button type="button" class="achievements-subtab active" id="achievementsSubtabAchievements">Erfolge</button>
         <button type="button" class="achievements-subtab" id="achievementsSubtabCosmetics">Kosmetik</button>
+        <button type="button" class="achievements-subtab" id="achievementsSubtabTitles">Titel</button>
       </div>
       <div class="achievements-list" id="achievementsList"></div>
       <div class="cosmetics-list" id="cosmeticsList" style="display:none;"></div>
+      <div class="cosmetics-list" id="titlesList" style="display:none;"></div>
       <div class="joke-buttons">
         <button class="btn-nein" id="achievementsChangeName" type="button">Namen &auml;ndern</button>
         <button class="btn-ja" id="achievementsClose" type="button">Schlie&szlig;en</button>
@@ -183,7 +185,7 @@
         <button class="wish-cta investor-request-cta" id="openInvestorRequestForm" type="button">
           <span class="wish-cta-kicker">Investieren</span>
           <strong>Du willst auch investieren?</strong>
-          <span>Stelle eine Anfrage — wir melden uns nach Prüfung bei dir</span>
+          <span>Stelle eine Anfrage — wir melden uns nach der Prüfung bei dir</span>
         </button>
         <div class="investor-grid" id="investorGrid"></div>
       </section>
@@ -214,6 +216,11 @@
       <!-- ================= PartnerShops ================= -->
       <section class="panel" id="panel-partners">
         <h2 class="panel-title">PartnerShops</h2>
+        <button class="wish-cta cardcatalog-cta" id="openPartnerShopForm" type="button">
+          <span class="wish-cta-kicker">Kostenlos &middot; Mitmachen</span>
+          <strong>Betreibst du einen Shop auf dem Server?</strong>
+          <span>Trag ihn kostenlos ein — wir schalten ihn nach kurzer Prüfung frei</span>
+        </button>
         <div class="partner-filter" id="partnerFilter"></div>
         <div class="partner-grid" id="partnerGrid"></div>
       </section>
@@ -272,6 +279,51 @@
   </div>
 
   <div class="live-toast" id="liveToast" aria-live="polite" aria-hidden="true"></div>
+
+  <div class="joke-overlay cardcatalog-overlay" id="partnerShopOverlay">
+    <div class="joke-card" id="partnerShopCard">
+      <div id="partnerShopFormView">
+        <h3>Shop eintragen</h3>
+        <label for="partnerShopName">Shopname</label>
+        <input type="text" id="partnerShopName" placeholder="z. B. Karten-Paradies" required>
+        <div class="form-grid form-grid-2">
+          <div><label for="partnerShopLocation">Server / Warp</label><input type="text" id="partnerShopLocation" placeholder="/sw Beispiel CB2"></div>
+          <div><label for="partnerShopCategory">Kategorie</label><input type="text" id="partnerShopCategory" placeholder="z. B. Anime Karten"></div>
+        </div>
+        <label for="partnerShopDescription">Beschreibung (optional)</label>
+        <textarea id="partnerShopDescription" placeholder="Kurze Beschreibung des Shops"></textarea>
+        <div class="form-grid form-grid-2">
+          <div><label for="partnerShopLink">Link (optional)</label><input type="text" id="partnerShopLink" placeholder="z. B. Discord-Link"></div>
+          <div><label for="partnerShopContact">Kontakt (optional)</label><input type="text" id="partnerShopContact" placeholder="Dein Minecraft-Name"></div>
+        </div>
+        <label for="partnerShopImageFile">Bild (optional)</label>
+        <input type="file" id="partnerShopImageFile" accept="image/*">
+        <p class="cardcatalog-confirm-hint">Kostenlos &ndash; dein Shop wird erst nach Pr&uuml;fung durch einen Admin &ouml;ffentlich sichtbar.</p>
+        <div class="joke-buttons">
+          <button class="btn-nein" id="partnerShopCancel" type="button">Abbrechen</button>
+          <button class="btn-ja" id="partnerShopSubmit" type="button">Weiter</button>
+        </div>
+      </div>
+
+      <div id="partnerShopConfirmView" style="display:none;">
+        <h3>Alles richtig?</h3>
+        <p class="cardcatalog-confirm-hint">Bitte pr&uuml;fe deine Angaben, bevor der Shop zur Freigabe eingereicht wird.</p>
+        <div class="cardcatalog-confirm-summary" id="partnerShopConfirmSummary"></div>
+        <div class="joke-buttons">
+          <button class="btn-nein" id="partnerShopConfirmBack" type="button">Zur&uuml;ck</button>
+          <button class="btn-ja" id="partnerShopConfirmYes" type="button">Ja, einreichen</button>
+        </div>
+      </div>
+
+      <div id="partnerShopSuccessView" style="display:none; text-align:center;">
+        <h3>Danke!</h3>
+        <p>Dein Shop wurde eingereicht und erscheint hier, sobald ein Admin ihn gepr&uuml;ft hat.</p>
+        <div class="joke-buttons">
+          <button class="btn-ja" id="partnerShopSuccessClose" type="button">Schlie&szlig;en</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <div class="joke-overlay wish-overlay" id="wishOverlay">
     <div class="joke-card">
@@ -395,8 +447,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260706-player-stats"></script>
-  <script src="app.js?v=20260706-cooldown"></script>
+  <script src="supabase.js?v=20260706-partner-mod"></script>
+  <script src="app.js?v=20260706-error-text"></script>
   <script>
     bkmpInitTheme();
     window.addEventListener('load', () => document.body.classList.add('page-loaded'));
@@ -733,6 +785,57 @@
     document.addEventListener('mousemove', e => { bkmpLastMouseX = e.clientX; bkmpLastMouseY = e.clientY; bkmpResetIdleTimer(); });
     ['keydown', 'click', 'scroll', 'touchstart'].forEach(evt => document.addEventListener(evt, bkmpResetIdleTimer, { passive: true }));
     bkmpResetIdleTimer();
+
+    /* Easter Egg: 10 versteckte "DerLiber"-Strichmaennchen auf der ganzen Seite */
+    const BKMP_DERLIBER_SPOTS = ['panel-main', 'panel-investors', 'panel-news', 'panel-wishes', 'panel-about', 'panel-partners', 'panel-cardsales', 'panel-cardcatalog', 'panel-leaderboard'];
+    function bkmpGetDerLiberFound() {
+      try { return JSON.parse(localStorage.getItem('bkmp-derliber-found') || '[]'); } catch (e) { return []; }
+    }
+    function bkmpMarkDerLiberFound(spotId) {
+      const found = bkmpGetDerLiberFound();
+      if (found.includes(spotId)) return;
+      found.push(spotId);
+      try { localStorage.setItem('bkmp-derliber-found', JSON.stringify(found)); } catch (e) {}
+      if (found.length >= BKMP_DERLIBER_SPOTS.length + 1 && typeof bkmpMarkEggFound === 'function') {
+        bkmpMarkEggFound('derliber');
+      }
+      if (typeof renderAchievementBadge === 'function') renderAchievementBadge();
+    }
+    function bkmpMakeDerLiberFigure(spotId) {
+      const fig = document.createElement('button');
+      fig.type = 'button';
+      fig.className = 'bkmp-derliber';
+      fig.setAttribute('aria-label', 'Hmm?');
+      fig.textContent = '🧍';
+      fig.addEventListener('click', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        fig.classList.add('found');
+        bkmpMarkDerLiberFound(spotId);
+        setTimeout(() => fig.remove(), 400);
+      });
+      return fig;
+    }
+    function bkmpSpawnDerLiberFigures() {
+      const found = bkmpGetDerLiberFound();
+      BKMP_DERLIBER_SPOTS.forEach(panelId => {
+        if (found.includes(panelId)) return;
+        const container = document.getElementById(panelId);
+        if (!container || container.querySelector('.bkmp-derliber')) return;
+        const fig = bkmpMakeDerLiberFigure(panelId);
+        fig.style.left = (4 + Math.random() * 88) + '%';
+        fig.style.top = (6 + Math.random() * 80) + '%';
+        container.appendChild(fig);
+      });
+      if (!found.includes('header') && !document.getElementById('bkmpDerLiberHeader')) {
+        const fig = bkmpMakeDerLiberFigure('header');
+        fig.id = 'bkmpDerLiberHeader';
+        fig.classList.add('bkmp-derliber-fixed');
+        document.body.appendChild(fig);
+      }
+    }
+    bkmpSpawnDerLiberFigures();
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => setTimeout(bkmpSpawnDerLiberFigures, 200)));
 
     document.addEventListener('keydown', e => {
       const tag = document.activeElement?.tagName;
@@ -1079,6 +1182,39 @@
           ${renderRevenueLineChart('daily')}
         </div>`;
       bindRevenueModeButtons();
+    }
+
+    /* Easter Egg: Donut-Chart oft klicken -> Regenbogen-Drehscheibe */
+    let bkmpDonutClickCount = 0;
+    let bkmpDonutClickResetTimer = null;
+    function triggerBkmpRainbowDonut(donut) {
+      donut.classList.remove('bkmp-donut-spin-1', 'bkmp-donut-spin-2', 'bkmp-donut-spin-3');
+      donut.classList.add('bkmp-donut-rainbow');
+      if (typeof bkmpMarkEggFound === 'function') bkmpMarkEggFound('rainbow');
+      setTimeout(() => donut.classList.remove('bkmp-donut-rainbow'), 3600);
+    }
+    if (chartArea) {
+      chartArea.addEventListener('click', e => {
+        const donut = e.target.closest('.donut');
+        if (!donut || donut.classList.contains('bkmp-donut-rainbow')) return;
+        bkmpDonutClickCount++;
+        clearTimeout(bkmpDonutClickResetTimer);
+        bkmpDonutClickResetTimer = setTimeout(() => {
+          bkmpDonutClickCount = 0;
+          donut.classList.remove('bkmp-donut-spin-1', 'bkmp-donut-spin-2', 'bkmp-donut-spin-3');
+        }, 2500);
+        donut.classList.remove('bkmp-donut-spin-1', 'bkmp-donut-spin-2', 'bkmp-donut-spin-3');
+        if (bkmpDonutClickCount >= 15) {
+          bkmpDonutClickCount = 0;
+          triggerBkmpRainbowDonut(donut);
+        } else if (bkmpDonutClickCount >= 10) {
+          donut.classList.add('bkmp-donut-spin-3');
+        } else if (bkmpDonutClickCount >= 5) {
+          donut.classList.add('bkmp-donut-spin-2');
+        } else {
+          donut.classList.add('bkmp-donut-spin-1');
+        }
+      });
     }
 
     /* Investoren */
@@ -1608,7 +1744,7 @@
             }).catch(e => {
               console.error('Karte konnte nicht gespeichert werden.', e);
               resetBtn();
-              alert('Die Karte konnte nicht gespeichert werden. Bitte versuche es erneut.');
+              alert('Die Karte konnte nicht gespeichert werden: ' + supabaseErrorText(e) + '\n\nBitte versuche es erneut oder mit einem anderen Bild.');
             });
           } else {
             data.cardCatalog.unshift(entry);
@@ -1626,6 +1762,139 @@
 
     if (cardCatalogSuccessClose) {
       cardCatalogSuccessClose.addEventListener('click', () => cardCatalogOverlay.classList.remove('visible'));
+    }
+
+    /* ---------------- PartnerShop-Einreichung ---------------- */
+    const partnerShopOverlay = document.getElementById('partnerShopOverlay');
+    const openPartnerShopForm = document.getElementById('openPartnerShopForm');
+    const partnerShopCancel = document.getElementById('partnerShopCancel');
+    const partnerShopSubmit = document.getElementById('partnerShopSubmit');
+    const partnerShopNameInput = document.getElementById('partnerShopName');
+    const partnerShopLocationInput = document.getElementById('partnerShopLocation');
+    const partnerShopCategoryInput = document.getElementById('partnerShopCategory');
+    const partnerShopDescriptionInput = document.getElementById('partnerShopDescription');
+    const partnerShopLinkInput = document.getElementById('partnerShopLink');
+    const partnerShopContactInput = document.getElementById('partnerShopContact');
+    const partnerShopImageFileInput = document.getElementById('partnerShopImageFile');
+    const partnerShopFormView = document.getElementById('partnerShopFormView');
+    const partnerShopConfirmView = document.getElementById('partnerShopConfirmView');
+    const partnerShopConfirmSummary = document.getElementById('partnerShopConfirmSummary');
+    const partnerShopConfirmBack = document.getElementById('partnerShopConfirmBack');
+    const partnerShopConfirmYes = document.getElementById('partnerShopConfirmYes');
+    const partnerShopSuccessView = document.getElementById('partnerShopSuccessView');
+    const partnerShopSuccessClose = document.getElementById('partnerShopSuccessClose');
+    let partnerShopConfirmPreviewUrl = null;
+    let partnerShopPendingEntry = null;
+
+    function showPartnerShopView(view) {
+      [partnerShopFormView, partnerShopConfirmView, partnerShopSuccessView].forEach(el => {
+        if (el) el.style.display = el === view ? '' : 'none';
+      });
+    }
+
+    function clearPartnerShopForm() {
+      partnerShopNameInput.value = '';
+      partnerShopLocationInput.value = '';
+      partnerShopCategoryInput.value = '';
+      partnerShopDescriptionInput.value = '';
+      partnerShopLinkInput.value = '';
+      partnerShopContactInput.value = '';
+      partnerShopImageFileInput.value = '';
+      if (partnerShopConfirmPreviewUrl) {
+        URL.revokeObjectURL(partnerShopConfirmPreviewUrl);
+        partnerShopConfirmPreviewUrl = null;
+      }
+      partnerShopPendingEntry = null;
+      showPartnerShopView(partnerShopFormView);
+    }
+
+    if (openPartnerShopForm) {
+      openPartnerShopForm.addEventListener('click', () => {
+        clearPartnerShopForm();
+        partnerShopOverlay.classList.add('visible');
+      });
+    }
+    if (partnerShopCancel) partnerShopCancel.addEventListener('click', () => partnerShopOverlay.classList.remove('visible'));
+
+    if (partnerShopSubmit) {
+      partnerShopSubmit.addEventListener('click', () => {
+        const name = partnerShopNameInput.value.trim();
+        if (!name) { partnerShopNameInput.reportValidity(); return; }
+
+        const location = partnerShopLocationInput.value.trim();
+        const category = partnerShopCategoryInput.value.trim();
+        const description = partnerShopDescriptionInput.value.trim();
+        const link = partnerShopLinkInput.value.trim();
+        const contact = partnerShopContactInput.value.trim();
+        const file = partnerShopImageFileInput.files && partnerShopImageFileInput.files[0];
+        partnerShopPendingEntry = { name, location, category, description, link, contact, file };
+
+        if (partnerShopConfirmPreviewUrl) URL.revokeObjectURL(partnerShopConfirmPreviewUrl);
+        const rows = [
+          ['Shopname', name],
+          ['Server / Warp', location],
+          ['Kategorie', category],
+          ['Beschreibung', description],
+          ['Link', link],
+          ['Kontakt', contact]
+        ].filter(([, value]) => value);
+        const imageHtml = file
+          ? (() => { partnerShopConfirmPreviewUrl = URL.createObjectURL(file); return `<img src="${partnerShopConfirmPreviewUrl}" alt="" class="cardcatalog-confirm-image">`; })()
+          : '';
+        partnerShopConfirmSummary.innerHTML = `
+          ${imageHtml}
+          <dl>${rows.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}</dl>
+        `;
+        showPartnerShopView(partnerShopConfirmView);
+      });
+    }
+
+    if (partnerShopConfirmBack) {
+      partnerShopConfirmBack.addEventListener('click', () => showPartnerShopView(partnerShopFormView));
+    }
+
+    if (partnerShopConfirmYes) {
+      partnerShopConfirmYes.addEventListener('click', () => {
+        if (!partnerShopPendingEntry) return;
+        const cooldown = bkmpSubmitCooldownSecondsLeft('partnershop');
+        if (cooldown > 0) { alert(`Bitte warte noch ${cooldown} Sekunde(n), bevor du erneut einreichst.`); return; }
+        const { name, location, category, description, link, contact, file } = partnerShopPendingEntry;
+
+        partnerShopConfirmYes.disabled = true;
+        partnerShopConfirmYes.textContent = 'Wird gespeichert...';
+
+        function resetBtn() {
+          partnerShopConfirmYes.disabled = false;
+          partnerShopConfirmYes.textContent = 'Ja, einreichen';
+        }
+
+        const readImage = file ? bkmpCompressImageFile(file) : Promise.resolve('');
+        readImage.then(image => {
+          const shop = { id: '', name, location, category, description, link, contact, image };
+          if (typeof savePartnerShop === 'function' && bkmpGetSupabaseClient()) {
+            savePartnerShop(shop).then(() => {
+              bkmpStartSubmitCooldown('partnershop');
+              resetBtn();
+              clearPartnerShopForm();
+              showPartnerShopView(partnerShopSuccessView);
+            }).catch(e => {
+              console.error('PartnerShop konnte nicht gespeichert werden.', e);
+              resetBtn();
+              alert('Der Shop konnte nicht gespeichert werden: ' + supabaseErrorText(e) + '\n\nBitte versuche es erneut.');
+            });
+          } else {
+            resetBtn();
+            alert('Der Shop konnte gerade nicht gespeichert werden, da keine Verbindung zur Datenbank besteht.');
+          }
+        }).catch(() => {
+          resetBtn();
+          alert('Das Bild konnte nicht gelesen werden. Bitte versuche es mit einer anderen Datei erneut.');
+        });
+      });
+    }
+
+    if (partnerShopSuccessClose) {
+      partnerShopSuccessClose.addEventListener('click', () => partnerShopOverlay.classList.remove('visible'));
     }
 
     function renderFormattedNewsText(value) {
@@ -1794,7 +2063,7 @@
           }).catch(e => {
             console.error('Supabase konnte Kartenidee nicht speichern.', e);
             resetSubmitBtn();
-            alert('Deine Kartenidee konnte nicht online gespeichert werden. Bitte versuche es mit einem kleineren PNG-Bild nochmal.');
+            alert('Deine Kartenidee konnte nicht gespeichert werden: ' + supabaseErrorText(e) + '\n\nBitte versuche es erneut oder mit einem anderen Bild.');
           });
         } else {
           data.wishes.push(wish);
@@ -1978,7 +2247,55 @@
       const now = Date.now();
       if (now - bkmpLastStatsSyncAt < 45000) return;
       bkmpLastStatsSyncAt = now;
-      upsertPlayerStats(name, bkmpGetTimeSpentMinutes(), unlockedCount).catch(e => console.warn('Konnte Erfolge/Zeit nicht mit dem Leaderboard synchronisieren.', e));
+      upsertPlayerStats(name, {
+        minutesSpent: bkmpGetTimeSpentMinutes(),
+        achievementsUnlocked: unlockedCount,
+        eggsFound: bkmpGetEggsFound(),
+        daysVisited: bkmpGetDaysVisited(),
+        flags: bkmpGetFlags(),
+        panelOpens: bkmpGetPanelOpens(),
+        activeTitle: typeof bkmpGetActiveTitleName === 'function' ? bkmpGetActiveTitleName() : ''
+      }).catch(e => console.warn('Konnte Erfolge/Zeit nicht mit dem Leaderboard synchronisieren.', e));
+    }
+
+    /* Beim Namen-Eintragen: bestehenden Fortschritt fuer diesen Namen von
+       Supabase holen und mit dem lokalen Fortschritt zusammenfuehren, damit
+       PC und Handy denselben Stand zeigen (nimmt jeweils das Bessere/mehr). */
+    async function bkmpMergeRemoteStatsIntoLocal(name) {
+      if (typeof loadPlayerStatsByName !== 'function' || !bkmpGetSupabaseClient()) return name;
+      try {
+        const remote = await loadPlayerStatsByName(name);
+        if (!remote) return name;
+
+        const localMinutes = bkmpGetTimeSpentMinutes();
+        const mergedMinutes = Math.max(localMinutes, remote.minutesSpent || 0);
+        try { localStorage.setItem(BKMP_TIME_SPENT_KEY, String(mergedMinutes * 60000)); } catch (e) {}
+
+        const localEggs = bkmpGetEggsFound();
+        const mergedEggs = [...new Set([...localEggs, ...(remote.eggsFound || [])])];
+        try { localStorage.setItem(BKMP_EGGS_FOUND_KEY, JSON.stringify(mergedEggs)); } catch (e) {}
+
+        const localDays = bkmpGetDaysVisited();
+        const mergedDays = [...new Set([...localDays, ...(remote.daysVisited || [])])];
+        try { localStorage.setItem(BKMP_DAYS_VISITED_KEY, JSON.stringify(mergedDays)); } catch (e) {}
+
+        const localFlags = bkmpGetFlags();
+        const mergedFlags = { ...localFlags, ...(remote.flags || {}) };
+        try { localStorage.setItem(BKMP_FLAGS_KEY, JSON.stringify(mergedFlags)); } catch (e) {}
+
+        const mergedPanelOpens = Math.max(bkmpGetPanelOpens(), remote.panelOpens || 0);
+        try { localStorage.setItem(BKMP_PANEL_OPENS_KEY, String(mergedPanelOpens)); } catch (e) {}
+
+        if (!bkmpGetActiveTitle() && remote.activeTitle) {
+          const remoteTitle = BKMP_TITLES.find(t => t.name === remote.activeTitle);
+          if (remoteTitle) { try { localStorage.setItem(BKMP_ACTIVE_TITLE_KEY, remoteTitle.id); } catch (e) {} }
+        }
+
+        return remote.name || name;
+      } catch (e) {
+        console.warn('Konnte bestehenden Fortschritt nicht laden.', e);
+        return name;
+      }
     }
 
     bkmpTrackDayVisited();
@@ -2027,7 +2344,8 @@
         nightOwl: Boolean(flags.nightOwl),
         earlyBird: Boolean(flags.earlyBird),
         weekendBoth: Boolean(flags.visitedSaturday && flags.visitedSunday),
-        panelOpens: bkmpGetPanelOpens()
+        panelOpens: bkmpGetPanelOpens(),
+        derLiberFound: bkmpGetDerLiberFound().length
       };
     }
 
@@ -2089,15 +2407,17 @@
       ...bkmpTieredAchievements('days', 'Zeit & Treue', 'daysVisited', BKMP_DAYS_TIERS, n => `Besuche die Seite an ${n} verschiedenen Tagen.`),
       ...bkmpTieredAchievements('diversity', 'Vielfalt', 'categoryDiversity', BKMP_DIVERSITY_TIERS, n => `Reiche Karten in ${n} verschiedenen Kategorien ein.`),
       ...bkmpTieredAchievements('meta', 'Meilensteine', 'baseUnlockedCount', BKMP_META_TIERS, n => `Schalte ${n} andere Erfolge frei.`),
-      { id: 'egg_bkmp', category: 'Easter Eggs', title: '???', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Manche Namen tippt man öfter, als man denkt.', check: ctx => ctx.eggsFound.includes('bkmp') },
-      { id: 'egg_konami', category: 'Easter Eggs', title: '???', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Hoch, hoch, runter, runter... eine uralte Cheat-Tradition.', check: ctx => ctx.eggsFound.includes('konami') },
-      { id: 'egg_fire', category: 'Easter Eggs', title: '???', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Was fürchten Dörfer und Ritter gleichermaßen? Tipp es einfach.', check: ctx => ctx.eggsFound.includes('drache') },
-      { id: 'egg_phil', category: 'Easter Eggs', title: '???', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Es gibt da diesen einen Bodybuilder in der Kartendatenbank...', check: ctx => ctx.eggsFound.includes('phil') },
-      { id: 'egg_creeper', category: 'Easter Eggs', title: '???', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Sssss... ein sehr grünes, sehr explosives Minecraft-Wesen.', check: ctx => ctx.eggsFound.includes('creeper') },
-      { id: 'egg_diamond', category: 'Easter Eggs', title: '???', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Klick oft und schnell auf das Banner ganz oben auf der Seite.', check: ctx => ctx.eggsFound.includes('diamond') },
-      { id: 'egg_matrix', category: 'Easter Eggs', title: '???', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Rot oder blau? Tipp den Namen eines berühmten Filmuniversums.', check: ctx => ctx.eggsFound.includes('matrix') },
-      { id: 'egg_idle', category: 'Easter Eggs', title: '???', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Lass die Seite einfach mal ein paar Minuten in Ruhe.', check: ctx => ctx.eggsFound.includes('idle') },
-      { id: 'egg_all', category: 'Easter Eggs', title: 'Osterhase', desc: 'Finde alle 8 versteckten Easter Eggs.', progress: ctx => [ctx.eggsFound.length, 8], check: ctx => ctx.eggsFound.length >= 8 },
+      { id: 'egg_bkmp', category: 'Easter Eggs', title: '???', revealName: 'BKMP-Flüsterer', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Manche Namen tippt man öfter, als man denkt.', check: ctx => ctx.eggsFound.includes('bkmp') },
+      { id: 'egg_konami', category: 'Easter Eggs', title: '???', revealName: 'Konami-Veteran', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Hoch, hoch, runter, runter... eine uralte Cheat-Tradition.', check: ctx => ctx.eggsFound.includes('konami') },
+      { id: 'egg_fire', category: 'Easter Eggs', title: '???', revealName: 'Drachenbändiger', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Was fürchten Dörfer und Ritter gleichermaßen? Tipp es einfach.', check: ctx => ctx.eggsFound.includes('drache') },
+      { id: 'egg_phil', category: 'Easter Eggs', title: '???', revealName: 'Phil-Fan', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Es gibt da diesen einen Bodybuilder in der Kartendatenbank...', check: ctx => ctx.eggsFound.includes('phil') },
+      { id: 'egg_creeper', category: 'Easter Eggs', title: '???', revealName: 'Creeper-Entschärfer', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Sssss... ein sehr grünes, sehr explosives Minecraft-Wesen.', check: ctx => ctx.eggsFound.includes('creeper') },
+      { id: 'egg_diamond', category: 'Easter Eggs', title: '???', revealName: 'Diamantenregen-Macher', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Klick oft und schnell auf das Banner ganz oben auf der Seite.', check: ctx => ctx.eggsFound.includes('diamond') },
+      { id: 'egg_matrix', category: 'Easter Eggs', title: '???', revealName: 'Der Auserwählte', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Rot oder blau? Tipp den Namen eines berühmten Filmuniversums.', check: ctx => ctx.eggsFound.includes('matrix') },
+      { id: 'egg_idle', category: 'Easter Eggs', title: '???', revealName: 'Schlummer-Entdecker', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Lass die Seite einfach mal ein paar Minuten in Ruhe.', check: ctx => ctx.eggsFound.includes('idle') },
+      { id: 'egg_rainbow', category: 'Easter Eggs', title: '???', revealName: 'Regenbogen-Dreher', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Du wirst suchen müssen... oder drücken? Irgendwas Rundes auf der Seite dreht sich vielleicht gerne.', check: ctx => ctx.eggsFound.includes('rainbow') },
+      { id: 'egg_derliber', category: 'Easter Eggs', title: '???', revealName: 'Liber-Jäger', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Suche 10 kleine Liber-Strichmännchen, versteckt auf der ganzen Website.', progress: ctx => [ctx.derLiberFound, 10], check: ctx => ctx.eggsFound.includes('derliber') },
+      { id: 'egg_all', category: 'Easter Eggs', title: 'Osterhase', desc: 'Finde alle 10 versteckten Easter Eggs.', progress: ctx => [ctx.eggsFound.length, 10], check: ctx => ctx.eggsFound.length >= 10 },
       { id: 'combo_card_wish', category: 'Sonstiges', title: 'Vielseitig', desc: 'Reiche mindestens 1 Karte und 1 Kartenidee ein.', check: ctx => ctx.cardCount >= 1 && ctx.wishCount >= 1 },
       { id: 'night_owl', category: 'Sonstiges', title: 'Nachteule', desc: 'Besuche die Seite zwischen 0 und 5 Uhr nachts.', check: ctx => ctx.nightOwl },
       { id: 'early_bird', category: 'Sonstiges', title: 'Frühaufsteher', desc: 'Besuche die Seite zwischen 5 und 7 Uhr morgens.', check: ctx => ctx.earlyBird },
@@ -2124,7 +2444,7 @@
       { id: 'fire', name: 'Feuer-Rahmen', desc: 'Nur für Drachenjäger.', unlockEgg: 'drache' },
       { id: 'aurora', name: 'Aurora', desc: 'Wandernder Farbverlauf.', unlockAt: 60 },
       { id: 'royal', name: 'Königlich', desc: 'Violett & edel.', unlockAt: 100 },
-      { id: 'rainbow', name: 'Regenbogen', desc: 'Für absolute Legenden.', unlockAt: 122 }
+      { id: 'rainbow', name: 'Regenbogen', desc: 'Nur für Drehscheiben-Entdecker.', unlockEgg: 'rainbow' }
     ];
     function bkmpGetActiveCosmetic() {
       try { return localStorage.getItem(BKMP_ACTIVE_COSMETIC_KEY) || ''; } catch (e) { return ''; }
@@ -2166,6 +2486,63 @@
         btn.addEventListener('click', () => {
           bkmpSetActiveCosmetic(btn.dataset.cosmeticId);
           renderCosmeticsPanel();
+        });
+      });
+    }
+
+    /* ---------------- Titel ---------------- */
+    const BKMP_ACTIVE_TITLE_KEY = 'bkmp-active-title';
+    const BKMP_TITLES = [
+      { id: 'none', name: 'Kein Titel', desc: 'Nur dein Name.', unlockAlways: true },
+      { id: 'neuling', name: 'Neuling', desc: 'Erste Schritte gemacht.', unlockAt: 5 },
+      { id: 'kartensammler', name: 'Kartensammler', desc: 'Für echte Kartenfans.', unlockAchievement: 'card_50' },
+      { id: 'wunschdenker', name: 'Wunschdenker', desc: 'Für fleißige Wünscher.', unlockAchievement: 'wish_50' },
+      { id: 'nachtschwaermer', name: 'Nachtschwärmer', desc: 'Für die, die nachts nicht schlafen.', unlockAchievement: 'night_owl' },
+      { id: 'ostereier', name: 'Der EasterEggHunter', desc: 'Alle Easter Eggs gefunden.', unlockAchievement: 'egg_all' },
+      { id: 'liberjaeger', name: 'Liber-Jäger', desc: 'Alle Strichmännchen gefunden.', unlockAchievement: 'egg_derliber' },
+      { id: 'legende', name: 'BKMP-Legende', desc: 'Weit über dem Durchschnitt.', unlockAt: 60 },
+      { id: 'unaufhaltsam', name: 'Unaufhaltsam', desc: 'Kaum zu stoppen.', unlockAt: 100 },
+      { id: 'allmaechtig', name: 'Der/Die Allmächtige', desc: 'Fast alles erreicht.', unlockAt: 120 }
+    ];
+    function bkmpGetActiveTitle() {
+      try { return localStorage.getItem(BKMP_ACTIVE_TITLE_KEY) || ''; } catch (e) { return ''; }
+    }
+    function bkmpSetActiveTitle(id) {
+      try { localStorage.setItem(BKMP_ACTIVE_TITLE_KEY, id); } catch (e) {}
+      renderAchievementBadge();
+    }
+    function bkmpTitleUnlocked(title, unlockedCount, ctx) {
+      if (title.unlockAlways) return true;
+      if (title.unlockAchievement) {
+        const ach = BKMP_ACHIEVEMENTS.find(a => a.id === title.unlockAchievement);
+        return ach ? ach.check(ctx) : false;
+      }
+      return unlockedCount >= (title.unlockAt || 0);
+    }
+    function bkmpGetActiveTitleName() {
+      const activeId = bkmpGetActiveTitle();
+      if (!activeId || activeId === 'none') return '';
+      const title = BKMP_TITLES.find(t => t.id === activeId);
+      return title ? title.name : '';
+    }
+    function renderTitlesPanel() {
+      const ctx = bkmpAchievementContextWithMeta();
+      const unlockedCount = BKMP_ACHIEVEMENTS.filter(a => a.check(ctx)).length;
+      const active = bkmpGetActiveTitle() || 'none';
+      const el = document.getElementById('titlesList');
+      el.innerHTML = BKMP_TITLES.map(t => {
+        const unlocked = bkmpTitleUnlocked(t, unlockedCount, ctx);
+        const isActive = active === t.id;
+        return `
+          <button type="button" class="cosmetic-swatch ${unlocked ? '' : 'locked'} ${isActive ? 'active' : ''}" data-title-id="${escapeHtml(t.id)}" ${unlocked ? '' : 'disabled'}>
+            <span class="cosmetic-swatch-name">${unlocked ? escapeHtml(t.name) : '🔒'}</span>
+            <span class="cosmetic-swatch-desc">${unlocked ? escapeHtml(t.desc) : (t.unlockAchievement ? 'Erst diesen Erfolg freischalten.' : `Ab ${t.unlockAt} Erfolgen`)}</span>
+          </button>`;
+      }).join('');
+      el.querySelectorAll('.cosmetic-swatch:not(.locked)').forEach(btn => {
+        btn.addEventListener('click', () => {
+          bkmpSetActiveTitle(btn.dataset.titleId);
+          renderTitlesPanel();
         });
       });
     }
@@ -2216,11 +2593,14 @@
 
       list.innerHTML = rows.map((row, i) => {
         const isMe = Boolean(myName) && row.name.trim().toLowerCase() === myName;
+        const stat = bkmpLeaderboardStats.find(s => s.name.trim().toLowerCase() === row.name.trim().toLowerCase());
+        const title = stat && stat.activeTitle ? stat.activeTitle : '';
+        const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : '';
         const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
         return `
-          <div class="leaderboard-row ${isMe ? 'is-me' : ''}">
+          <div class="leaderboard-row ${rankClass} ${isMe ? 'is-me' : ''}">
             <span class="leaderboard-rank">${medal}</span>
-            <span class="leaderboard-name">${escapeHtml(row.name)}</span>
+            <span class="leaderboard-name">${escapeHtml(row.name)}${title ? `<span class="leaderboard-title">${escapeHtml(title)}</span>` : ''}</span>
             <span class="leaderboard-value">${valueLabel(row.value)}</span>
           </div>`;
       }).join('');
@@ -2267,7 +2647,8 @@
         badge.title = '';
         return;
       }
-      badgeText.textContent = `${name} · ${unlockedCount}/${BKMP_ACHIEVEMENTS.length}`;
+      const activeTitleName = typeof bkmpGetActiveTitleName === 'function' ? bkmpGetActiveTitleName() : '';
+      badgeText.textContent = `${name}${activeTitleName ? ' — ' + activeTitleName : ''} · ${unlockedCount}/${BKMP_ACHIEVEMENTS.length}`;
       badge.title = 'Deine Erfolge ansehen';
       const activeCosmetic = bkmpGetActiveCosmetic();
       if (!activeCosmetic || activeCosmetic === 'default') {
@@ -2297,13 +2678,13 @@
           const progressHtml = progress ? `
             <div class="achievement-progress"><div class="achievement-progress-bar" style="width:${Math.min(100, (progress[0] / progress[1]) * 100)}%"></div></div>
             <span class="achievement-progress-label">${Math.min(progress[0], progress[1])}/${progress[1]}</span>` : '';
-          const showHint = Boolean(a.hint) && !unlocked;
+          const displayTitle = unlocked && a.revealName ? a.revealName : a.title;
           return `
             <div class="achievement-row ${unlocked ? 'unlocked' : 'locked'}">
               <span class="achievement-icon">${unlocked ? '✅' : '🔒'}</span>
               <div class="achievement-body">
-                <div class="achievement-title">${escapeHtml(a.title)}</div>
-                <div class="achievement-desc">${showHint ? escapeHtml(a.hint) : escapeHtml(a.desc)}</div>
+                <div class="achievement-title">${escapeHtml(displayTitle)}</div>
+                <div class="achievement-desc">${a.hint ? escapeHtml(a.hint) : escapeHtml(a.desc)}</div>
                 ${progressHtml}
               </div>
             </div>`;
@@ -2339,8 +2720,10 @@
           bkmpTrackPanelOpen();
           document.getElementById('achievementsSubtabAchievements').classList.add('active');
           document.getElementById('achievementsSubtabCosmetics').classList.remove('active');
+          document.getElementById('achievementsSubtabTitles').classList.remove('active');
           document.getElementById('achievementsList').style.display = '';
           document.getElementById('cosmeticsList').style.display = 'none';
+          document.getElementById('titlesList').style.display = 'none';
           renderAchievementsPanel();
           achievementsOverlay.classList.add('visible');
         } else {
@@ -2354,10 +2737,15 @@
     if (mcNameSkipBtn) mcNameSkipBtn.addEventListener('click', () => mcNameOverlay.classList.remove('visible'));
     const mcNameSaveBtn = document.getElementById('mcNameSave');
     if (mcNameSaveBtn) {
-      mcNameSaveBtn.addEventListener('click', () => {
+      mcNameSaveBtn.addEventListener('click', async () => {
         const name = mcNameInput.value.trim();
         if (!name) { mcNameInput.focus(); return; }
-        bkmpSetMcName(name);
+        mcNameSaveBtn.disabled = true;
+        mcNameSaveBtn.textContent = 'Wird geladen...';
+        const canonicalName = await bkmpMergeRemoteStatsIntoLocal(name);
+        bkmpSetMcName(canonicalName);
+        mcNameSaveBtn.disabled = false;
+        mcNameSaveBtn.textContent = 'Speichern';
         mcNameOverlay.classList.remove('visible');
         renderAchievementBadge();
       });
@@ -2369,23 +2757,25 @@
 
     const achievementsSubtabAchievements = document.getElementById('achievementsSubtabAchievements');
     const achievementsSubtabCosmetics = document.getElementById('achievementsSubtabCosmetics');
+    const achievementsSubtabTitles = document.getElementById('achievementsSubtabTitles');
     const achievementsListEl = document.getElementById('achievementsList');
     const cosmeticsListEl = document.getElementById('cosmeticsList');
-    if (achievementsSubtabAchievements && achievementsSubtabCosmetics) {
-      achievementsSubtabAchievements.addEventListener('click', () => {
-        achievementsSubtabAchievements.classList.add('active');
-        achievementsSubtabCosmetics.classList.remove('active');
-        achievementsListEl.style.display = '';
-        cosmeticsListEl.style.display = 'none';
+    const titlesListEl = document.getElementById('titlesList');
+    const bkmpAchievementSubtabs = [
+      { btn: achievementsSubtabAchievements, panel: achievementsListEl, render: null },
+      { btn: achievementsSubtabCosmetics, panel: cosmeticsListEl, render: renderCosmeticsPanel },
+      { btn: achievementsSubtabTitles, panel: titlesListEl, render: renderTitlesPanel }
+    ];
+    bkmpAchievementSubtabs.forEach(({ btn, panel, render }) => {
+      if (!btn) return;
+      btn.addEventListener('click', () => {
+        bkmpAchievementSubtabs.forEach(other => {
+          other.btn.classList.toggle('active', other.btn === btn);
+          other.panel.style.display = other.btn === btn ? '' : 'none';
+        });
+        if (typeof render === 'function') render();
       });
-      achievementsSubtabCosmetics.addEventListener('click', () => {
-        achievementsSubtabCosmetics.classList.add('active');
-        achievementsSubtabAchievements.classList.remove('active');
-        achievementsListEl.style.display = 'none';
-        cosmeticsListEl.style.display = '';
-        renderCosmeticsPanel();
-      });
-    }
+    });
 
     const achievementsCloseBtn = document.getElementById('achievementsClose');
     if (achievementsCloseBtn) achievementsCloseBtn.addEventListener('click', () => achievementsOverlay.classList.remove('visible'));

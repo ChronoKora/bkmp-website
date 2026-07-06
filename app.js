@@ -216,6 +216,12 @@ function escapeHtml(value) {
   return String(value || '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 }
 
+function supabaseErrorText(e) {
+  return e && (e.message || e.details || e.code)
+    ? [e.message, e.details, e.code].filter(Boolean).join(' | ')
+    : 'Unbekannter Fehler';
+}
+
 /* ============================================================
    Bild-Komprimierung fuer Uploads
    Verkleinert grosse Bilder client-seitig auf eine sinnvolle
@@ -249,12 +255,17 @@ function bkmpCompressImageFile(file, options = {}) {
         resolve(original);
         return;
       }
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL('image/webp', quality));
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const compressed = canvas.toDataURL('image/webp', quality);
+        resolve(compressed && compressed.startsWith('data:image/') ? compressed : original);
+      } catch (e) {
+        resolve(original);
+      }
     };
     img.onerror = () => resolve(original);
     img.src = original;
