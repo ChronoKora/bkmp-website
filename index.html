@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260706-rainbow-firework">
+<link rel="stylesheet" href="style.css?v=20260706-noselect">
 </head>
 <body>
 
@@ -704,6 +704,7 @@
     const bkmpHeroBannerEl = document.querySelector('.hero-banner');
     if (bkmpHeroBannerEl) {
       bkmpHeroBannerEl.style.cursor = 'pointer';
+      bkmpHeroBannerEl.addEventListener('mousedown', e => e.preventDefault());
       bkmpHeroBannerEl.addEventListener('click', () => {
         bkmpBannerClickCount++;
         clearTimeout(bkmpBannerClickResetTimer);
@@ -1253,6 +1254,9 @@
     }
 
     if (chartArea) {
+      chartArea.addEventListener('mousedown', e => {
+        if (e.target.closest('.donut')) e.preventDefault();
+      });
       chartArea.addEventListener('click', e => {
         const donut = e.target.closest('.donut');
         if (!donut) return;
