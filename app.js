@@ -24,6 +24,19 @@ const BKMP_INVESTOR_REQUEST_MAX = 150000000;
 const BKMP_INVESTOR_REQUEST_MIN_SHARE = 5;
 const BKMP_INVESTOR_REQUEST_MAX_SHARE = 15;
 
+const BKMP_SUBMIT_COOLDOWN_MS = 15000;
+
+function bkmpSubmitCooldownSecondsLeft(key) {
+  let last = 0;
+  try { last = Number(localStorage.getItem('bkmp-cooldown-' + key) || 0); } catch (e) {}
+  const remaining = BKMP_SUBMIT_COOLDOWN_MS - (Date.now() - last);
+  return remaining > 0 ? Math.ceil(remaining / 1000) : 0;
+}
+
+function bkmpStartSubmitCooldown(key) {
+  try { localStorage.setItem('bkmp-cooldown-' + key, String(Date.now())); } catch (e) {}
+}
+
 function bkmpCalcInvestorSharePercent(amount) {
   const clamped = Math.min(BKMP_INVESTOR_REQUEST_MAX, Math.max(BKMP_INVESTOR_REQUEST_MIN, Number(amount) || 0));
   const ratio = (clamped - BKMP_INVESTOR_REQUEST_MIN) / (BKMP_INVESTOR_REQUEST_MAX - BKMP_INVESTOR_REQUEST_MIN);

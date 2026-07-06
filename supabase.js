@@ -949,6 +949,7 @@ function bkmpMapWishFromSupabase(row) {
     image: row.image_url || '',
     likes: Number(row.likes || 0),
     dislikes: Number(row.dislikes || 0),
+    status: row.status || 'approved',
     date: row.created_at ? row.created_at.slice(0, 10) : '',
     createdAt: row.created_at ? Date.parse(row.created_at) : 0,
     source: 'supabase'
@@ -956,10 +957,12 @@ function bkmpMapWishFromSupabase(row) {
 }
 
 function bkmpMapWishToSupabase(wish) {
-  return {
+  const payload = {
     name: wish.name,
     image_url: wish.image || wish.image_url || ''
   };
+  if (wish.status) payload.status = wish.status;
+  return payload;
 }
 
 async function loadWishes() {
@@ -967,7 +970,7 @@ async function loadWishes() {
   if (!client) return null;
   let { data, error } = await client
     .from('wishes')
-    .select('id, name, image_url, likes, dislikes, created_at')
+    .select('id, name, image_url, likes, dislikes, status, created_at')
     .order('created_at', { ascending: false });
 
   if (error && (String(error.message || '').includes('likes') || String(error.message || '').includes('dislikes'))) {
@@ -991,7 +994,7 @@ async function saveWish(wish) {
   let { data, error } = await client
     .from('wishes')
     .insert(payload)
-    .select('id, name, image_url, likes, dislikes, created_at')
+    .select('id, name, image_url, likes, dislikes, status, created_at')
     .single();
 
   if (error && (String(error.message || '').includes('likes') || String(error.message || '').includes('dislikes'))) {
@@ -1008,6 +1011,20 @@ async function saveWish(wish) {
   return bkmpMapWishFromSupabase(data);
 }
 
+async function updateWishStatus(id, status) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('wishes')
+    .update({ status })
+    .eq('id', id)
+    .select('id, name, image_url, likes, dislikes, status, created_at')
+    .limit(1);
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : null;
+  return row ? bkmpMapWishFromSupabase(row) : null;
+}
+
 async function voteWish(id, type, currentValue) {
   const client = bkmpGetSupabaseClient();
   if (!client) return null;
@@ -1018,7 +1035,7 @@ async function voteWish(id, type, currentValue) {
     .from('wishes')
     .update({ [column]: nextValue })
     .eq('id', id)
-    .select('id, name, image_url, likes, dislikes, created_at')
+    .select('id, name, image_url, likes, dislikes, status, created_at')
     .limit(1);
 
   if (error) throw error;

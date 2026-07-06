@@ -1190,11 +1190,14 @@ body.page-loaded .streamer-marquee-track {
 .login-card h1 { font-family: 'Fraunces', serif; font-size: 1.5rem; margin-bottom: 0.4rem; }
 .login-card p { color: var(--muted); font-size: 0.85rem; margin-bottom: 1.6rem; }
 
-input[type="text"], input[type="password"], input[type="number"], input[type="file"], input[type="date"], textarea, select {
+input[type="text"], input[type="search"], input[type="password"], input[type="number"], input[type="file"], input[type="date"], textarea, select {
   width: 100%; background: var(--paper); border: 1px solid var(--line); border-radius: 10px;
   padding: 0.7rem 0.9rem; color: var(--ink); font-family: 'Inter', sans-serif; font-size: 0.9rem;
   margin-bottom: 0.9rem; transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
+input[type="search"] { appearance: none; -webkit-appearance: none; }
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
 select { cursor: pointer; }
 input[type="date"] {
   cursor: pointer;
@@ -1646,12 +1649,12 @@ body:has(.admin-wrap), body:has(.login-card) {
 .entry-row .meta {
   margin-top: 0.18rem;
 }
-input[type="text"], input[type="password"], input[type="number"], input[type="file"], input[type="date"], textarea, select {
+input[type="text"], input[type="search"], input[type="password"], input[type="number"], input[type="file"], input[type="date"], textarea, select {
   min-height: 44px;
   border-radius: 13px;
   background: color-mix(in srgb, var(--paper) 86%, transparent);
 }
-input[type="text"]:focus, input[type="password"]:focus, input[type="number"]:focus, input[type="file"]:focus, input[type="date"]:focus, textarea:focus, select:focus {
+input[type="text"]:focus, input[type="search"]:focus, input[type="password"]:focus, input[type="number"]:focus, input[type="file"]:focus, input[type="date"]:focus, textarea:focus, select:focus {
   transform: translateY(-1px);
 }
 label {
@@ -1923,12 +1926,38 @@ label {
   line-height: 1.6;
 }
 .cardcatalog-cta { margin-bottom: 2rem; }
-.cardcatalog-search {
-  display: block;
+.cardcatalog-search-wrap {
+  position: relative;
   width: min(420px, 100%);
   margin: 0 auto 1.2rem;
-  text-align: center;
 }
+.cardcatalog-search-icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 2;
+  stroke-linecap: round;
+  pointer-events: none;
+  transition: stroke 0.2s ease;
+}
+input.cardcatalog-search {
+  width: 100%;
+  margin: 0;
+  padding: 0.75rem 1.1rem 0.75rem 2.7rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--paper) 86%, transparent);
+}
+input.cardcatalog-search::placeholder { color: var(--muted); }
+input.cardcatalog-search:focus {
+  border-color: color-mix(in srgb, var(--gold) 55%, var(--line));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 16%, transparent);
+}
+.cardcatalog-search-wrap:focus-within .cardcatalog-search-icon { stroke: var(--gold); }
 .cardcatalog-filters {
   display: flex;
   flex-direction: column;
@@ -2138,6 +2167,10 @@ label {
   font-weight: 500;
 }
 .cardcatalog-merge-item input { width: auto; accent-color: var(--gold); }
+
+.admin-pending-popup-card { max-width: 380px; }
+.admin-pending-popup-card h3 { font-family: 'Fraunces', serif; font-size: 1.3rem; }
+.admin-pending-popup-card p { color: var(--muted); font-size: 0.94rem; }
 
 img[data-bkmp-img] {
   transition: opacity 0.18s ease, filter 0.18s ease;
