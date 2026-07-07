@@ -124,6 +124,20 @@ const BKMP_DEFAULT_DATA = {
   cardCatalog: []
 };
 
+/* Vor der Server-API (api/submit-entry.js) speicherte das Formular bei
+   fehlender Supabase-Verbindung Einreichungen nur lokal im Browser ab
+   (id-Prefix "cardcat-"/"wish-"). Diese Eintraege haben es nie in die
+   Datenbank geschafft und tauchten trotzdem in der eigenen Karten-/
+   Wunschliste auf ("Geister-Eintraege"), weil ein Sync-Fehlschlag die
+   alten lokalen Daten nicht ueberschrieben hat. Da neue Einreichungen
+   jetzt nie mehr lokal-only gespeichert werden, ist jeder Eintrag mit
+   diesem Prefix garantiert so ein Ueberbleibsel und wird beim Laden
+   entfernt. */
+function bkmpPurgeOrphanedLocalEntries(list, prefix) {
+  if (!Array.isArray(list)) return [];
+  return list.filter(item => !(item && typeof item.id === 'string' && item.id.startsWith(prefix)));
+}
+
 function bkmpLoadData() {
   try {
     const raw = localStorage.getItem(BKMP_DATA_KEY);
@@ -134,13 +148,13 @@ function bkmpLoadData() {
       expenses: bkmpNormalizeEntryList(parsed.expenses),
       investors: parsed.investors || [],
       news: bkmpDedupeUpdates(parsed.news || []),
-      wishes: parsed.wishes || [],
+      wishes: bkmpPurgeOrphanedLocalEntries(parsed.wishes, 'wish-'),
       streamers: parsed.streamers || [],
       aboutBlocks: parsed.aboutBlocks || [],
       partnerShops: parsed.partnerShops || [],
       cardSales: parsed.cardSales || [],
       investorRequests: parsed.investorRequests || [],
-      cardCatalog: parsed.cardCatalog || []
+      cardCatalog: bkmpPurgeOrphanedLocalEntries(parsed.cardCatalog, 'cardcat-')
     };
   } catch (e) {
     console.error('Fehler beim Laden der Daten:', e);
