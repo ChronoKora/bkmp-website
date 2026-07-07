@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260707-dailyevents">
+<link rel="stylesheet" href="style.css?v=20260707-streamerach">
 </head>
 <body>
 
@@ -471,7 +471,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260707-dailyevents"></script>
+  <script src="supabase.js?v=20260707-streamerach"></script>
   <script src="app.js?v=20260707-plushiesdb"></script>
   <script>
     bkmpInitTheme();
@@ -1644,7 +1644,7 @@
       toast.innerHTML = `
         <span class="live-toast-kicker"><span></span> Gerade live auf Twitch</span>
         <strong>${escapeHtml(streamer.name)}</strong>
-        <a href="${url}" target="_blank" rel="noopener">Stream öffnen</a>
+        <a href="${url}" target="_blank" rel="noopener" data-streamer-id="${escapeHtml(streamer.id)}">Stream öffnen</a>
       `;
       toast.classList.add('visible');
       toast.setAttribute('aria-hidden', 'false');
@@ -1705,7 +1705,7 @@
       const track = document.getElementById('streamerMarqueeTrack');
       if (!marquee || !track) return;
       const streamers = Array.isArray(data.streamers) ? data.streamers.filter(item => item.name && item.url) : [];
-      const signature = JSON.stringify(streamers.map(item => [item.name, item.url, item.color || 'purple']));
+      const signature = JSON.stringify(streamers.map(item => [item.id, item.name, item.url, item.color || 'purple', item.countsForAchievement !== false]));
       if (streamers.length === 0) {
         const strip = document.getElementById('streamerStrip');
         if (strip) strip.style.display = 'none';
@@ -1722,14 +1722,28 @@
       const itemsHtml = streamers.map(item => {
         const url = String(item.url || '').startsWith('http') ? item.url : 'https://' + item.url;
         const twitchUser = getTwitchUsername(url);
-        return `<a class="streamer-pill streamer-${item.color || 'purple'}" href="${url}" target="_blank" rel="noopener" data-twitch-user="${escapeHtml(twitchUser)}"><span class="streamer-live-dot" aria-hidden="true"></span><span class="streamer-name">${escapeHtml(item.name)}</span><span class="streamer-live-label">Offline</span></a>`;
+        return `<a class="streamer-pill streamer-${item.color || 'purple'}" href="${url}" target="_blank" rel="noopener" data-twitch-user="${escapeHtml(twitchUser)}" data-streamer-id="${escapeHtml(item.id)}"><span class="streamer-live-dot" aria-hidden="true"></span><span class="streamer-name">${escapeHtml(item.name)}</span><span class="streamer-live-label">Offline</span></a>`;
       }).join('');
       const repeatCount = Math.max(2, Math.ceil(18 / streamers.length));
       const loopHtml = Array(repeatCount).fill(itemsHtml).join('');
       track.dataset.signature = signature;
       track.innerHTML = `<div class="streamer-marquee-group">${loopHtml}</div><div class="streamer-marquee-group" aria-hidden="true">${loopHtml}</div>`;
       refreshStreamerLiveStatus(streamers);
+      // bkmpAchievementSystemReady ist erst true, NACHDEM BKMP_ACHIEVEMENTS/
+      // BKMP_TITLES weiter unten im Skript initialisiert wurden. Der ALLERERSTE
+      // renderStreamers()-Aufruf passiert schon vorher (beim initialen Laden) -
+      // ohne diese Absicherung wuerde der Rebuild-Versuch dort abstuerzen
+      // (Zugriff auf "let"-Variablen vor ihrer Deklaration).
+      if (bkmpAchievementSystemReady) {
+        BKMP_ACHIEVEMENTS = bkmpBuildAchievementsList();
+        BKMP_TITLES = bkmpBuildTitlesList();
+        renderAchievementBadge();
+      }
     }
+    document.addEventListener('click', e => {
+      const streamerLink = e.target.closest('[data-streamer-id]');
+      if (streamerLink) bkmpMarkStreamerClicked(streamerLink.dataset.streamerId);
+    });
     renderStreamers();
 
     function renderAboutBlocks() {
@@ -2645,7 +2659,8 @@
         bonkCount: bkmpGetBonkCount(),
         ownedPlushies: bkmpOwnedPlushies,
         dailyEventWins: bkmpGetDailyEventWins(),
-        wonGoldenHour: bkmpGetWonGoldenHour()
+        wonGoldenHour: bkmpGetWonGoldenHour(),
+        streamersClicked: bkmpGetStreamersClicked()
       };
     }
     /* Daily-Code-Event-Gewinne: lokal gecacht (wird bei Sieg gesetzt, siehe
@@ -2655,6 +2670,21 @@
     }
     function bkmpGetWonGoldenHour() {
       try { return localStorage.getItem('bkmp-won-golden-hour') === '1'; } catch (e) { return false; }
+    }
+    /* Welche Creator-Streams wurden schon mindestens einmal angeklickt
+       (Twitch-Leiste oben ODER "Stream öffnen" im Live-Popup unten) - fuer
+       den Erfolg "Stream von X angeschaut" pro Creator. */
+    const BKMP_STREAMERS_CLICKED_KEY = 'bkmp-streamers-clicked';
+    function bkmpGetStreamersClicked() {
+      try { return JSON.parse(localStorage.getItem(BKMP_STREAMERS_CLICKED_KEY) || '[]'); } catch (e) { return []; }
+    }
+    function bkmpMarkStreamerClicked(id) {
+      if (!id) return;
+      const found = bkmpGetStreamersClicked();
+      if (found.includes(id)) return;
+      found.push(id);
+      try { localStorage.setItem(BKMP_STREAMERS_CLICKED_KEY, JSON.stringify(found)); } catch (e) {}
+      if (typeof renderAchievementBadge === 'function') renderAchievementBadge();
     }
 
     function bkmpTieredAchievements(idPrefix, category, metricKey, tiers, descFn) {
@@ -2743,6 +2773,17 @@
       { id: 'weekend_warrior', category: 'Sonstiges', title: 'Wochenend-Grinder', desc: 'Besuche die Seite an einem Samstag und einem Sonntag.', check: ctx => ctx.weekendBoth },
       { id: 'investor_match', category: 'Sonstiges', title: 'Investor', desc: 'Dein Name taucht als echter Investor auf der Seite auf.', check: ctx => ctx.isInvestor },
       { id: 'panel_opener', category: 'Sonstiges', title: 'Erfolgs-Jäger', desc: 'Öffne dieses Erfolge-Fenster 10 Mal.', progress: ctx => [ctx.panelOpens, 10], check: ctx => ctx.panelOpens >= 10 },
+      ...(Array.isArray(data.streamers) ? data.streamers : []).filter(s => s.countsForAchievement !== false).map(s => ({
+        id: `streamer_watch_${s.id}`,
+        category: 'Sonstiges',
+        title: '???',
+        revealName: `${s.name}-Fan`,
+        desc: `Schau dir den Stream von ${s.name} an.`,
+        check: ctx => ctx.streamersClicked.includes(s.id)
+      })),
+      { id: 'streamer_watch_all', category: 'Sonstiges', title: 'Streaming-Marathon', desc: 'Schau dir alle Creator-Streams mindestens einmal an.',
+        progress: ctx => { const eligible = (Array.isArray(data.streamers) ? data.streamers : []).filter(s => s.countsForAchievement !== false); return [eligible.filter(s => ctx.streamersClicked.includes(s.id)).length, eligible.length]; },
+        check: ctx => { const eligible = (Array.isArray(data.streamers) ? data.streamers : []).filter(s => s.countsForAchievement !== false); return eligible.length > 0 && eligible.every(s => ctx.streamersClicked.includes(s.id)); } },
       ...BKMP_PLUSHIES.map(p => ({
         id: `plushie_${p.id}`,
         category: 'Plüshies',
@@ -2906,6 +2947,7 @@
     ];
     }
     let BKMP_TITLES = bkmpBuildTitlesList();
+    var bkmpAchievementSystemReady = true;
     function bkmpGetActiveTitle() {
       try { return localStorage.getItem(BKMP_ACTIVE_TITLE_KEY) || ''; } catch (e) { return ''; }
     }

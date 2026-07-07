@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260707-dailyevents">
+<link rel="stylesheet" href="style.css?v=20260707-streamerach">
 </head>
 <body>
 
@@ -317,6 +317,7 @@
                 </select>
               </div>
             </div>
+            <label class="admin-checkbox-label"><input type="checkbox" id="streamerCountsAchievement" checked> Z&auml;hlt f&uuml;r den Erfolg "Stream angeschaut" (bei reinen YouTube-Kan&auml;len o. &auml;. deaktivieren)</label>
             <div class="investor-form-actions">
               <button class="btn btn-primary" id="addStreamer">+ Twitch-Account speichern</button>
               <button class="btn" id="importStreamers" type="button">Lokale Creator online übertragen</button>
@@ -609,7 +610,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260707-dailyevents"></script>
+  <script src="supabase.js?v=20260707-streamerach"></script>
   <script src="app.js?v=20260707-plushiesdb"></script>
   <script>
     bkmpInitTheme();
@@ -1949,7 +1950,7 @@
         row.innerHTML = `
           <div class="desc">
             <span class="name">${escapeHtml(item.name)}</span>
-            <span class="meta">${streamerColorLabel(item.color)} · ${escapeHtml(item.url)}</span>
+            <span class="meta">${streamerColorLabel(item.color)} · ${escapeHtml(item.url)}${item.countsForAchievement === false ? ' · zählt nicht für Erfolg' : ''}</span>
           </div>
           <div class="entry-actions">
             <button class="edit-btn" type="button">Bearbeiten</button>
@@ -2230,6 +2231,7 @@
     const streamerNameInput = document.getElementById('streamerName');
     const streamerUrlInput = document.getElementById('streamerUrl');
     const streamerColorInput = document.getElementById('streamerColor');
+    const streamerCountsAchievementInput = document.getElementById('streamerCountsAchievement');
 
     function setStreamerEditMode(isEditing) {
       addStreamerBtn.textContent = isEditing ? 'Aenderungen speichern' : '+ Twitch-Account speichern';
@@ -2241,6 +2243,7 @@
       streamerNameInput.value = '';
       streamerUrlInput.value = '';
       streamerColorInput.value = 'purple';
+      if (streamerCountsAchievementInput) streamerCountsAchievementInput.checked = true;
       setStreamerEditMode(false);
     }
 
@@ -2251,6 +2254,7 @@
       streamerNameInput.value = streamer.name || '';
       streamerUrlInput.value = streamer.url || '';
       streamerColorInput.value = streamer.color || 'purple';
+      if (streamerCountsAchievementInput) streamerCountsAchievementInput.checked = streamer.countsForAchievement !== false;
       setStreamerEditMode(true);
       streamerNameInput.focus();
     }
@@ -2287,7 +2291,8 @@
       if (!name) { streamerNameInput.reportValidity(); return; }
       if (!url) { streamerUrlInput.reportValidity(); return; }
       if (!url.startsWith('http')) url = 'https://' + url;
-      const payload = { name, url, color };
+      const countsForAchievement = streamerCountsAchievementInput ? streamerCountsAchievementInput.checked : true;
+      const payload = { name, url, color, countsForAchievement };
       if (editingStreamerId) payload.id = editingStreamerId;
       persistStreamer(payload).then(saved => {
         if (saved) clearStreamerForm();

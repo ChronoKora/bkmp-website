@@ -1086,6 +1086,7 @@ function bkmpMapStreamerFromSupabase(row) {
     name: row.display_name || row.name || '',
     url: row.url || '',
     color: row.color || 'purple',
+    countsForAchievement: row.counts_for_achievement !== false,
     createdAt: row.created_at ? Date.parse(row.created_at) : 0,
     source: 'supabase'
   };
@@ -1095,7 +1096,8 @@ function bkmpMapStreamerToSupabase(streamer) {
   return {
     display_name: streamer.name || streamer.display_name || '',
     url: streamer.url || '',
-    color: streamer.color || 'purple'
+    color: streamer.color || 'purple',
+    counts_for_achievement: streamer.countsForAchievement !== false
   };
 }
 
@@ -1104,7 +1106,7 @@ async function loadStreamers() {
   if (!client) return null;
   const { data, error } = await client
     .from('streamer_links')
-    .select('id, display_name, url, color, created_at')
+    .select('id, display_name, url, color, counts_for_achievement, created_at')
     .order('created_at', { ascending: true });
   if (error) throw error;
   return (data || []).map(bkmpMapStreamerFromSupabase);
@@ -1120,13 +1122,13 @@ async function saveStreamer(streamer) {
       .from('streamer_links')
       .update(payload)
       .eq('id', streamer.id)
-      .select('id, display_name, url, color, created_at')
+      .select('id, display_name, url, color, counts_for_achievement, created_at')
       .limit(1);
   } else {
     query = client
       .from('streamer_links')
       .insert(payload)
-      .select('id, display_name, url, color, created_at')
+      .select('id, display_name, url, color, counts_for_achievement, created_at')
       .limit(1);
   }
   const { data, error } = await query;
