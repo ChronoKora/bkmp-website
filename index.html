@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260707-jannik">
+<link rel="stylesheet" href="style.css?v=20260707-janniksprite">
 </head>
 <body>
 
@@ -814,7 +814,6 @@
       bkmpPlayJannikHopSound();
       const bunny = document.createElement('div');
       bunny.className = 'bkmp-jannik-bunny';
-      bunny.textContent = '🐰';
       document.body.appendChild(bunny);
       bkmpShowJannikToast('🐰 Jannik der Hase wurde entdeckt!', 2600);
       setTimeout(bkmpShowJannikAchievementCard, 900);
@@ -835,7 +834,6 @@
         bkmpPlayJannikHopSound();
         const bunny = document.createElement('div');
         bunny.className = 'bkmp-jannik-bunny';
-        bunny.textContent = '🐰';
         bunny.style.bottom = (100 - landYvh) + 'vh';
         document.body.appendChild(bunny);
         const collectDelay = Math.max(150, ((landXvw + 14) / 122) * 2400);

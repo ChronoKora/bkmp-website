@@ -2731,19 +2731,32 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   position: fixed;
   bottom: 8vh;
   left: -14vw;
-  font-size: 3.4rem;
+  width: 80px;
+  height: 85px;
   z-index: 97;
   pointer-events: none;
-  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35));
-  animation: bkmpJannikHop 2.4s ease-in-out forwards, bkmpJannikBounce 0.35s ease-in-out infinite;
+  background-image: url('assets/jannik-sprite.png');
+  background-repeat: no-repeat;
+  background-size: 880px 85px;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.35));
+  animation: bkmpJannikHop 2.4s ease-in-out forwards, bkmpJannikBounce 0.88s ease-in-out infinite, bkmpJannikSpriteFrames 0.88s steps(11) infinite;
 }
 @keyframes bkmpJannikHop {
   0% { left: -14vw; }
   100% { left: 108vw; }
 }
 @keyframes bkmpJannikBounce {
-  0%, 100% { transform: translateY(0) scaleX(1); }
-  50% { transform: translateY(-26px) scaleX(0.96); }
+  0% { transform: translateY(0); }
+  27% { transform: translateY(-2px); }
+  45% { transform: translateY(-24px); }
+  64% { transform: translateY(-4px); }
+  100% { transform: translateY(0); }
+}
+@keyframes bkmpJannikSpriteFrames {
+  from { background-position-x: 0; }
+  to { background-position-x: -880px; }
 }
 
 .bkmp-jannik-toast {
