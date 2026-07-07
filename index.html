@@ -1528,7 +1528,7 @@
 
     function renderPartnerShops() {
       if (!partnerFilter || !partnerGrid) return;
-      const shops = Array.isArray(data.partnerShops) ? data.partnerShops : [];
+      const shops = (Array.isArray(data.partnerShops) ? data.partnerShops : []).filter(shop => !shop.status || shop.status === 'approved');
       if (shops.length === 0) {
         partnerFilter.innerHTML = '';
         partnerGrid.innerHTML = '<p class="empty-hint">Noch keine PartnerShops eingetragen.</p>';
@@ -1619,7 +1619,11 @@
 
     function renderCardCatalog() {
       if (!cardCatalogGrid) return;
-      const items = Array.isArray(data.cardCatalog) ? data.cardCatalog : [];
+      /* Admins sehen per RLS auch "pending"/"rejected" Eintraege (fuer die
+         Moderation im Admin-Panel), aber auf der oeffentlichen Seite duerfen
+         nur freigegebene Karten sichtbar sein - auch wenn ein Admin gerade
+         in diesem Browser eingeloggt ist und die Seite besucht. */
+      const items = (Array.isArray(data.cardCatalog) ? data.cardCatalog : []).filter(item => !item.status || item.status === 'approved');
       if (items.length === 0) {
         if (cardCatalogCategoryFilterEl) cardCatalogCategoryFilterEl.innerHTML = '';
         if (cardCatalogShopFilterEl) cardCatalogShopFilterEl.innerHTML = '';
@@ -1985,11 +1989,12 @@
     /* Kartenideen */
     const wishGrid = document.getElementById('wishGrid');
     function renderWishes() {
-      if (data.wishes.length === 0) {
+      const approvedWishes = (Array.isArray(data.wishes) ? data.wishes : []).filter(w => !w.status || w.status === 'approved');
+      if (approvedWishes.length === 0) {
         wishGrid.innerHTML = '<p class="empty-hint">Noch keine Kartenideen eingereicht — sei der/die Erste!</p>';
         return;
       }
-      wishGrid.innerHTML = [...data.wishes].reverse().map(w => `
+      wishGrid.innerHTML = [...approvedWishes].reverse().map(w => `
         <article class="wish-card" data-wish-id="${w.id}">
           <button class="wish-image-btn" type="button" data-action="open" data-bkmp-image-wrap data-empty-label="Kein Bild" aria-label="Kartenidee von ${escapeHtml(w.name)} gross ansehen">
             ${w.image ? `<img data-bkmp-img src="${w.image}" alt="Kartenidee von ${escapeHtml(w.name)}" loading="lazy" decoding="async">` : '<span class="wish-image-empty">Kein Bild</span>'}
