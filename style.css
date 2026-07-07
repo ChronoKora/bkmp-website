@@ -2741,11 +2741,11 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.35));
-  animation: bkmpJannikHop 2.4s ease-in-out forwards, bkmpJannikBounce 0.88s ease-in-out infinite, bkmpJannikSpriteFrames 0.88s steps(11) infinite;
+  animation: bkmpJannikHop 6s ease-in-out forwards, bkmpJannikBounce 1.4s ease-in-out infinite, bkmpJannikSpriteFrames 1.4s steps(11) infinite;
 }
 @keyframes bkmpJannikHop {
-  0% { left: -14vw; }
-  100% { left: 108vw; }
+  0% { left: 108vw; }
+  100% { left: -14vw; }
 }
 @keyframes bkmpJannikBounce {
   0% { transform: translateY(0); }
