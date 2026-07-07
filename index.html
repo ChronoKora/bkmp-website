@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260707-bonkslb">
+<link rel="stylesheet" href="style.css?v=20260707-namecosmetics">
 </head>
 <body>
 
@@ -2832,7 +2832,14 @@
       { id: 'bonk_silver', name: 'Bonk-Silber', desc: 'Schon ordentlich geboxt.', unlockAchievement: 'bonk_500' },
       { id: 'bonk_gold', name: 'Bonk-Gold', desc: 'Ein wahrer Boxchampion.', unlockAchievement: 'bonk_10000' },
       { id: 'bonk_inferno', name: 'Bonk-Inferno', desc: 'Nur für die Unaufhaltsamen.', unlockAchievement: 'bonk_100000' },
-      { id: 'bonk_legend', name: 'Bonk-Legende', desc: 'Der ultimative Bonker.', unlockAchievement: 'bonk_1000000' }
+      { id: 'bonk_legend', name: 'Bonk-Legende', desc: 'Der ultimative Bonker.', unlockAchievement: 'bonk_1000000' },
+      { id: 'herzschlag', name: 'Herzschlag', desc: 'Pulsiert im Herzschlag-Rhythmus.', unlockAt: 12 },
+      { id: 'gruenrot', name: 'Grün-Rot-Verlauf', desc: 'Wandelt sich von Grün zu Rot.', unlockAt: 20 },
+      { id: 'toxic', name: 'Toxic-Grün', desc: 'Grelles, leuchtendes Grün.', unlockAt: 35 },
+      { id: 'sonnenuntergang', name: 'Sonnenuntergang', desc: 'Orange, Pink und Violett.', unlockAt: 50 },
+      { id: 'neonpink', name: 'Neon-Pink', desc: 'Leuchtendes Pink.', unlockAt: 70 },
+      { id: 'galaxy', name: 'Galaxy', desc: 'Schimmernder Sternenverlauf.', unlockAt: 80 },
+      { id: 'mitternacht', name: 'Mitternacht', desc: 'Tiefes Nachtblau.', unlockAt: 90 }
     ];
     function bkmpGetActiveCosmetic() {
       try { return localStorage.getItem(BKMP_ACTIVE_COSMETIC_KEY) || ''; } catch (e) { return ''; }

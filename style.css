@@ -3275,6 +3275,82 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   color: transparent;
   animation: bkmpRainbowBorder 3.5s linear infinite;
 }
+
+/* ---------- Weitere Namens-Kosmetiken (passend zu den Prefix-Farben) ---------- */
+.mc-cosmetic-herzschlag {
+  color: #fb7185;
+  border-color: color-mix(in srgb, #f43f5e 55%, var(--line));
+  box-shadow: 0 0 16px rgba(244, 63, 94, 0.45);
+  animation: streamerHeartbeat 1.15s ease-in-out infinite;
+}
+.mc-cosmetic-toxic {
+  color: #a3e635;
+  border-color: color-mix(in srgb, #a3e635 50%, var(--line));
+  box-shadow: 0 0 16px rgba(163, 230, 53, 0.45);
+  animation: streamerGlowPulseToxic 2s ease-in-out infinite;
+}
+.mc-cosmetic-neonpink {
+  color: #f9a8d4;
+  border-color: color-mix(in srgb, #ec4899 55%, var(--line));
+  box-shadow: 0 0 16px rgba(236, 72, 153, 0.5);
+  animation: streamerGlowPulsePink 1.8s ease-in-out infinite;
+}
+.mc-cosmetic-mitternacht {
+  color: #c7d2fe;
+  border-color: transparent;
+  background: linear-gradient(160deg, #1e1b4b, #4c1d95, #1e3a8a);
+  box-shadow: 0 0 16px rgba(76, 29, 149, 0.4);
+}
+.mc-cosmetic-gruenrot {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box,
+              linear-gradient(90deg, #4ade80, #f87171) border-box;
+  border: 1px solid transparent;
+  box-shadow: 0 0 16px rgba(74, 222, 128, 0.3);
+}
+.mc-cosmetic-gruenrot #mcNameBadgeText,
+.mc-cosmetic-gruenrot .cosmetic-swatch-name,
+.mc-cosmetic-gruenrot .leaderboard-name-text {
+  background: linear-gradient(90deg, #4ade80, #f87171);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.mc-cosmetic-sonnenuntergang {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box,
+              linear-gradient(90deg, #fb923c, #f472b6, #a78bfa) border-box;
+  border: 1px solid transparent;
+  box-shadow: 0 0 16px rgba(251, 146, 60, 0.3);
+}
+.mc-cosmetic-sonnenuntergang #mcNameBadgeText,
+.mc-cosmetic-sonnenuntergang .cosmetic-swatch-name,
+.mc-cosmetic-sonnenuntergang .leaderboard-name-text {
+  background: linear-gradient(90deg, #fb923c, #f472b6, #a78bfa);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.mc-cosmetic-galaxy {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box,
+              linear-gradient(120deg, #7c3aed, #a78bfa, #f472b6, #7c3aed) border-box;
+  background-size: 100% 100%, 300% 100%;
+  border: 1px solid transparent;
+  box-shadow: 0 0 16px rgba(124, 58, 237, 0.35);
+  animation: streamerShimmer 6s linear infinite;
+}
+.mc-cosmetic-galaxy #mcNameBadgeText,
+.mc-cosmetic-galaxy .cosmetic-swatch-name,
+.mc-cosmetic-galaxy .leaderboard-name-text {
+  background: linear-gradient(120deg, #7c3aed, #a78bfa, #f472b6, #7c3aed);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: streamerShimmer 6s linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .mc-cosmetic-fire #mcNameBadgeText, .mc-cosmetic-fire .cosmetic-swatch-name, .mc-cosmetic-fire .leaderboard-name-text,
   .mc-cosmetic-aurora #mcNameBadgeText, .mc-cosmetic-aurora .cosmetic-swatch-name, .mc-cosmetic-aurora .leaderboard-name-text,
@@ -3283,7 +3359,12 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   .mc-cosmetic-bonk_gold,
   .mc-cosmetic-bonk_inferno #mcNameBadgeText, .mc-cosmetic-bonk_inferno .cosmetic-swatch-name, .mc-cosmetic-bonk_inferno .leaderboard-name-text,
   .mc-cosmetic-bonk_legend,
-  .mc-cosmetic-bonk_legend #mcNameBadgeText, .mc-cosmetic-bonk_legend .cosmetic-swatch-name, .mc-cosmetic-bonk_legend .leaderboard-name-text { animation: none; }
+  .mc-cosmetic-bonk_legend #mcNameBadgeText, .mc-cosmetic-bonk_legend .cosmetic-swatch-name, .mc-cosmetic-bonk_legend .leaderboard-name-text,
+  .mc-cosmetic-herzschlag,
+  .mc-cosmetic-toxic,
+  .mc-cosmetic-neonpink,
+  .mc-cosmetic-galaxy,
+  .mc-cosmetic-galaxy #mcNameBadgeText, .mc-cosmetic-galaxy .cosmetic-swatch-name, .mc-cosmetic-galaxy .leaderboard-name-text { animation: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
