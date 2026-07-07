@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260707-leadercos">
+<link rel="stylesheet" href="style.css?v=20260707-jannik">
 </head>
 <body>
 
@@ -277,6 +277,12 @@
 
     </div>
   </div>
+
+  <footer class="bkmp-footer">
+    <p class="bkmp-footer-text">BKMP &middot; Danke, dass du hier vorbeischaust.</p>
+    <div class="bkmp-secret-zone" id="bkmpSecretZone" aria-hidden="true"></div>
+    <button type="button" class="bkmp-secret-hint" id="bkmpSecretHint">Psst... Jannik war hier 🐰</button>
+  </footer>
 
   <div class="live-toast" id="liveToast" aria-live="polite" aria-hidden="true"></div>
 
@@ -753,6 +759,128 @@
         }
       }
       draw();
+    }
+
+    /* Easter Egg: "Jannik der Hase" - versteckter Bereich im Footer.
+       Desktop: mehrfach ueber die unsichtbare Zone hovern. Mobil: 5s halten. */
+    function bkmpPlayJannikHopSound() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        [660, 880, 990].forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.frequency.value = freq;
+          osc.type = 'triangle';
+          gain.gain.setValueAtTime(0.001, ctx.currentTime + i * 0.14);
+          gain.gain.linearRampToValueAtTime(0.16, ctx.currentTime + i * 0.14 + 0.03);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.14 + 0.22);
+          osc.connect(gain).connect(ctx.destination);
+          osc.start(ctx.currentTime + i * 0.14);
+          osc.stop(ctx.currentTime + i * 0.14 + 0.25);
+        });
+        setTimeout(() => ctx.close(), 700);
+      } catch (e) {}
+    }
+
+    function bkmpShowJannikToast(text, ms) {
+      const toast = document.createElement('div');
+      toast.className = 'bkmp-jannik-toast';
+      toast.textContent = text;
+      document.body.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.add('visible'));
+      setTimeout(() => {
+        toast.classList.remove('visible');
+        setTimeout(() => toast.remove(), 450);
+      }, ms);
+    }
+
+    function bkmpShowJannikAchievementCard() {
+      const card = document.createElement('div');
+      card.className = 'bkmp-jannik-card';
+      card.innerHTML = `
+        <div class="bkmp-jannik-card-title">Jannik der Hase</div>
+        <p class="bkmp-jannik-card-desc">Man sagt, irgendwo auf dieser Website hoppelt ein kleiner Hase herum. Herzlichen Glückwunsch – du hast ihn gefunden! 🥕</p>
+        <div class="bkmp-jannik-card-unlock">🏆 Achievement freigeschaltet<strong>„Jannik der Hase“</strong></div>
+      `;
+      document.body.appendChild(card);
+      requestAnimationFrame(() => card.classList.add('visible'));
+      setTimeout(() => {
+        card.classList.remove('visible');
+        setTimeout(() => card.remove(), 450);
+      }, 5100);
+    }
+
+    function triggerBkmpJannikNormal() {
+      bkmpPlayJannikHopSound();
+      const bunny = document.createElement('div');
+      bunny.className = 'bkmp-jannik-bunny';
+      bunny.textContent = '🐰';
+      document.body.appendChild(bunny);
+      bkmpShowJannikToast('🐰 Jannik der Hase wurde entdeckt!', 2600);
+      setTimeout(bkmpShowJannikAchievementCard, 900);
+      setTimeout(() => bunny.remove(), 2500);
+    }
+
+    function triggerBkmpJannikRare() {
+      bkmpShowJannikToast('🥕 Der Hase hat eine Karotte verloren...', 3200);
+      const landXvw = 25 + Math.random() * 45;
+      const landYvh = 42 + Math.random() * 18;
+      const carrot = document.createElement('div');
+      carrot.className = 'bkmp-jannik-carrot';
+      carrot.textContent = '🥕';
+      carrot.style.left = landXvw + 'vw';
+      carrot.style.setProperty('--bkmp-carrot-land', landYvh + 'vh');
+      document.body.appendChild(carrot);
+      setTimeout(() => {
+        bkmpPlayJannikHopSound();
+        const bunny = document.createElement('div');
+        bunny.className = 'bkmp-jannik-bunny';
+        bunny.textContent = '🐰';
+        bunny.style.bottom = (100 - landYvh) + 'vh';
+        document.body.appendChild(bunny);
+        const collectDelay = Math.max(150, ((landXvw + 14) / 122) * 2400);
+        setTimeout(() => carrot.remove(), collectDelay);
+        setTimeout(() => bunny.remove(), 2500);
+      }, 1050);
+    }
+
+    function triggerBkmpJannikEasterEgg() {
+      if (document.querySelector('.bkmp-jannik-bunny') || document.querySelector('.bkmp-jannik-carrot')) return;
+      if (typeof bkmpMarkEggFound === 'function') bkmpMarkEggFound('jannik');
+      if (Math.random() < 0.05) {
+        triggerBkmpJannikRare();
+      } else {
+        triggerBkmpJannikNormal();
+      }
+    }
+
+    const bkmpSecretZone = document.getElementById('bkmpSecretZone');
+    const bkmpSecretHint = document.getElementById('bkmpSecretHint');
+    if (bkmpSecretZone && bkmpSecretHint) {
+      let bkmpJannikHoverCount = 0;
+      let bkmpJannikHoverResetTimer = null;
+      const BKMP_JANNIK_HOVERS_NEEDED = 4;
+      function bkmpRevealJannikHint() {
+        bkmpSecretHint.classList.add('visible');
+      }
+      bkmpSecretZone.addEventListener('pointerenter', e => {
+        if (e.pointerType !== 'mouse' || bkmpSecretHint.classList.contains('visible')) return;
+        bkmpJannikHoverCount++;
+        clearTimeout(bkmpJannikHoverResetTimer);
+        bkmpJannikHoverResetTimer = setTimeout(() => { bkmpJannikHoverCount = 0; }, 3000);
+        if (bkmpJannikHoverCount >= BKMP_JANNIK_HOVERS_NEEDED) bkmpRevealJannikHint();
+      });
+      let bkmpJannikPressTimer = null;
+      function bkmpCancelJannikPress() { clearTimeout(bkmpJannikPressTimer); bkmpJannikPressTimer = null; }
+      bkmpSecretZone.addEventListener('touchstart', () => {
+        if (bkmpSecretHint.classList.contains('visible')) return;
+        bkmpCancelJannikPress();
+        bkmpJannikPressTimer = setTimeout(bkmpRevealJannikHint, 5000);
+      }, { passive: true });
+      ['touchend', 'touchmove', 'touchcancel'].forEach(evt => {
+        bkmpSecretZone.addEventListener(evt, bkmpCancelJannikPress, { passive: true });
+      });
+      bkmpSecretHint.addEventListener('click', triggerBkmpJannikEasterEgg);
     }
 
     /* Easter Egg: 3 Minuten inaktiv - schläfriger Titel + Zzz-Blase */
@@ -2467,6 +2595,7 @@
       { id: 'egg_idle', category: 'Easter Eggs', title: '???', revealName: 'Schlummer-Entdecker', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Lass die Seite einfach mal ein paar Minuten in Ruhe.', check: ctx => ctx.eggsFound.includes('idle') },
       { id: 'egg_rainbow', category: 'Easter Eggs', title: '???', revealName: 'Regenbogen-Dreher', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Du wirst suchen müssen... oder drücken? Irgendwas Rundes auf der Seite dreht sich vielleicht gerne.', check: ctx => ctx.eggsFound.includes('rainbow') },
       { id: 'egg_derliber', category: 'Easter Eggs', title: '???', revealName: 'Liber-Jäger', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Suche 10 kleine Liber-Strichmännchen, versteckt auf der ganzen Website.', progress: ctx => [ctx.derLiberFound, 10], check: ctx => ctx.eggsFound.includes('derliber') },
+      { id: 'egg_jannik', category: 'Easter Eggs', title: '???', revealName: 'Jannik der Hase', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Ganz unten auf der Seite gibt es einen unsichtbaren Bereich. Fahr auf dem Computer mehrfach mit der Maus darüber oder halte ihn auf dem Handy 5 Sekunden lang gedrückt.', check: ctx => ctx.eggsFound.includes('jannik') },
       { id: 'egg_all', category: 'Easter Eggs', title: 'Osterhase', desc: 'Finde alle 10 versteckten Easter Eggs.', progress: ctx => [ctx.eggsFound.length, 10], check: ctx => ctx.eggsFound.length >= 10 },
       { id: 'combo_card_wish', category: 'Sonstiges', title: 'Vielseitig', desc: 'Reiche mindestens 1 Karte und 1 Kartenidee ein.', check: ctx => ctx.cardCount >= 1 && ctx.wishCount >= 1 },
       { id: 'night_owl', category: 'Sonstiges', title: 'Nachteule', desc: 'Besuche die Seite zwischen 0 und 5 Uhr nachts.', check: ctx => ctx.nightOwl },
