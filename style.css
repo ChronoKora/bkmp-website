@@ -131,6 +131,14 @@ a { color: inherit; text-decoration: none; }
 
 #mcNameBadge { padding: 0.6rem 1.1rem 0.6rem 0.9rem; }
 .mc-name-badge-icon { font-size: 0.95rem; line-height: 1; }
+.mc-name-badge-plushie {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--gold) 55%, var(--line));
+}
 #mcNameBadge.tier-1 { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); }
 #mcNameBadge.tier-2 {
   color: var(--gold);
@@ -2170,7 +2178,8 @@ input.cardcatalog-search:focus {
   box-shadow: 0 0 14px color-mix(in srgb, var(--gold) 25%, transparent);
 }
 .leaderboard-rank { flex-shrink: 0; width: 2.2rem; text-align: center; font-weight: 800; font-size: 1.05rem; }
-.leaderboard-name { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.leaderboard-name { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 0.4rem; }
+.leaderboard-plushie { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; flex-shrink: 0; box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--gold) 45%, var(--line)); }
 .leaderboard-value { flex-shrink: 0; color: var(--gold); font-weight: 700; font-size: 0.88rem; }
 .leaderboard-title {
   display: block;
@@ -3014,6 +3023,56 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 .cosmetic-swatch.locked .cosmetic-swatch-desc { color: color-mix(in srgb, var(--ink) 55%, transparent); }
 .cosmetic-swatch-name { font-weight: 700; font-size: 0.85rem; }
 .cosmetic-swatch-desc { font-size: 0.72rem; color: var(--muted); }
+
+/* ---------- Pluschies ---------- */
+.plushie-swatch { align-items: center; text-align: center; }
+.plushie-swatch-img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--paper) 70%, transparent);
+  margin-bottom: 0.15rem;
+}
+.plushie-swatch-lock {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--paper) 70%, transparent);
+  font-size: 1.4rem;
+  margin-bottom: 0.15rem;
+}
+.plushie-swatch.active { border-color: var(--gold); box-shadow: 0 0 0 2px color-mix(in srgb, var(--gold) 40%, transparent), 0 0 18px color-mix(in srgb, var(--gold) 30%, transparent); }
+
+.plushie-redeem-box {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--paper-2) 92%, transparent), color-mix(in srgb, var(--paper-2) 80%, transparent));
+  padding: 0.9rem 1rem;
+  margin-bottom: 0.8rem;
+}
+.plushie-redeem-box label { display: block; font-size: 0.8rem; font-weight: 700; margin-bottom: 0.4rem; }
+.plushie-redeem-row { display: flex; gap: 0.5rem; }
+.plushie-redeem-row input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink);
+  padding: 0.55rem 0.7rem;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.plushie-redeem-row input:focus { outline: none; border-color: color-mix(in srgb, var(--gold) 55%, var(--line)); }
+.plushie-redeem-msg { min-height: 1.2em; margin: 0.5rem 0 0; font-size: 0.78rem; }
+.plushie-redeem-msg.success { color: #4ade80; }
+.plushie-redeem-msg.error { color: #f87171; }
 
 /* ---------- Kosmetik: Namens-Effekte ---------- */
 /* Diese Klassen werden an drei Stellen benutzt: am echten Namens-Badge

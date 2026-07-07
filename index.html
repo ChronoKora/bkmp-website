@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260707-bonk">
+<link rel="stylesheet" href="style.css?v=20260707-plushies">
 </head>
 <body>
 
@@ -80,7 +80,7 @@
     <a href="admin.html" class="pill-btn login-btn">Login</a>
 
     <button class="pill-btn" id="mcNameBadge" type="button">
-      <span class="mc-name-badge-icon" aria-hidden="true">⛏️</span>
+      <span class="mc-name-badge-icon" id="mcNameBadgeIcon" aria-hidden="true">⛏️</span>
       <span id="mcNameBadgeText">Wer bist du?</span>
     </button>
   </div>
@@ -109,10 +109,22 @@
         <button type="button" class="achievements-subtab active" id="achievementsSubtabAchievements">Erfolge</button>
         <button type="button" class="achievements-subtab" id="achievementsSubtabCosmetics">Kosmetik</button>
         <button type="button" class="achievements-subtab" id="achievementsSubtabTitles">Titel</button>
+        <button type="button" class="achievements-subtab" id="achievementsSubtabPlushies">Plüshies</button>
       </div>
       <div class="achievements-list" id="achievementsList"></div>
       <div class="cosmetics-list" id="cosmeticsList" style="display:none;"></div>
       <div class="cosmetics-list" id="titlesList" style="display:none;"></div>
+      <div id="plushiesPanel" style="display:none;">
+        <div class="plushie-redeem-box">
+          <label for="plushieCodeInput">Code einl&ouml;sen</label>
+          <div class="plushie-redeem-row">
+            <input type="text" id="plushieCodeInput" placeholder="z. B. YAKSHA-8F4K-2Q9M" autocomplete="off" spellcheck="false">
+            <button type="button" class="btn-ja" id="plushieRedeemBtn">Einl&ouml;sen</button>
+          </div>
+          <p class="plushie-redeem-msg" id="plushieRedeemMsg"></p>
+        </div>
+        <div class="cosmetics-list" id="plushiesList"></div>
+      </div>
       <div class="joke-buttons">
         <button class="btn-nein" id="achievementsChangeName" type="button">Namen &auml;ndern</button>
         <button class="btn-ja" id="achievementsClose" type="button">Schlie&szlig;en</button>
@@ -460,8 +472,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260707-bonk"></script>
-  <script src="app.js?v=20260707-purgeghost"></script>
+  <script src="supabase.js?v=20260707-plushies"></script>
+  <script src="app.js?v=20260707-plushies"></script>
   <script>
     bkmpInitTheme();
     window.addEventListener('load', () => document.body.classList.add('page-loaded'));
@@ -2528,7 +2540,8 @@
         panelOpens: bkmpGetPanelOpens(),
         activeTitle: typeof bkmpGetActiveTitleName === 'function' ? bkmpGetActiveTitleName() : '',
         activeCosmetic: bkmpGetActiveCosmetic(),
-        bonkCount: bkmpGetBonkCount()
+        bonkCount: bkmpGetBonkCount(),
+        activePlushie: typeof bkmpGetActivePlushie === 'function' ? bkmpGetActivePlushie() : ''
       }).catch(e => console.warn('Konnte Erfolge/Zeit nicht mit dem Leaderboard synchronisieren.', e));
     }
 
@@ -2572,6 +2585,11 @@
         if (!bkmpGetActiveCosmetic() && remote.activeCosmetic) {
           const remoteCosmetic = BKMP_COSMETICS.find(c => c.id === remote.activeCosmetic);
           if (remoteCosmetic) { try { localStorage.setItem(BKMP_ACTIVE_COSMETIC_KEY, remoteCosmetic.id); } catch (e) {} }
+        }
+
+        if (!bkmpGetActivePlushie() && remote.activePlushie) {
+          const remotePlushie = BKMP_PLUSHIES.find(p => p.id === remote.activePlushie);
+          if (remotePlushie) { try { localStorage.setItem(BKMP_ACTIVE_PLUSHIE_KEY, remotePlushie.id); } catch (e) {} }
         }
 
         return remote.name || name;
@@ -2629,7 +2647,8 @@
         weekendBoth: Boolean(flags.visitedSaturday && flags.visitedSunday),
         panelOpens: bkmpGetPanelOpens(),
         derLiberFound: bkmpGetDerLiberFound().length,
-        bonkCount: bkmpGetBonkCount()
+        bonkCount: bkmpGetBonkCount(),
+        ownedPlushies: bkmpOwnedPlushies
       };
     }
 
@@ -2717,7 +2736,16 @@
       { id: 'early_bird', category: 'Sonstiges', title: 'Frühaufsteher', desc: 'Besuche die Seite zwischen 5 und 7 Uhr morgens.', check: ctx => ctx.earlyBird },
       { id: 'weekend_warrior', category: 'Sonstiges', title: 'Wochenend-Grinder', desc: 'Besuche die Seite an einem Samstag und einem Sonntag.', check: ctx => ctx.weekendBoth },
       { id: 'investor_match', category: 'Sonstiges', title: 'Investor', desc: 'Dein Name taucht als echter Investor auf der Seite auf.', check: ctx => ctx.isInvestor },
-      { id: 'panel_opener', category: 'Sonstiges', title: 'Erfolgs-Jäger', desc: 'Öffne dieses Erfolge-Fenster 10 Mal.', progress: ctx => [ctx.panelOpens, 10], check: ctx => ctx.panelOpens >= 10 }
+      { id: 'panel_opener', category: 'Sonstiges', title: 'Erfolgs-Jäger', desc: 'Öffne dieses Erfolge-Fenster 10 Mal.', progress: ctx => [ctx.panelOpens, 10], check: ctx => ctx.panelOpens >= 10 },
+      ...BKMP_PLUSHIES.map(p => ({
+        id: `plushie_${p.id}`,
+        category: 'Plüshies',
+        title: '???? Plüshie',
+        revealName: p.name,
+        desc: 'Schalte diesen Plüshie per Code frei.',
+        check: ctx => ctx.ownedPlushies.includes(p.id)
+      })),
+      { id: 'plushie_all', category: 'Plüshies', title: 'Besitze sie alle', desc: 'Schalte alle Plüshies frei.', progress: ctx => [ctx.ownedPlushies.length, BKMP_PLUSHIES.length], check: ctx => BKMP_PLUSHIES.every(p => ctx.ownedPlushies.includes(p.id)) }
     ];
 
     function bkmpAchievementContextWithMeta() {
@@ -2854,6 +2882,98 @@
       });
     }
 
+    /* ---------------- Pluschies ---------------- */
+    const BKMP_ACTIVE_PLUSHIE_KEY = 'bkmp-active-plushie';
+    let bkmpOwnedPlushies = [];
+    function bkmpGetActivePlushie() {
+      try { return localStorage.getItem(BKMP_ACTIVE_PLUSHIE_KEY) || ''; } catch (e) { return ''; }
+    }
+    function bkmpSetActivePlushie(id) {
+      try { localStorage.setItem(BKMP_ACTIVE_PLUSHIE_KEY, id); } catch (e) {}
+      renderAchievementBadge();
+    }
+    async function bkmpRefreshOwnedPlushies() {
+      const name = bkmpGetMcName();
+      if (!name || typeof loadOwnedPlushies !== 'function' || !bkmpGetSupabaseClient()) return;
+      try {
+        bkmpOwnedPlushies = await loadOwnedPlushies(name);
+        renderAchievementBadge();
+        const panel = document.getElementById('plushiesPanel');
+        if (panel && panel.style.display !== 'none') renderPlushiesPanel();
+      } catch (e) {
+        console.warn('Konnte Pluschies nicht laden.', e);
+      }
+    }
+    function renderPlushiesPanel() {
+      const el = document.getElementById('plushiesList');
+      if (!el) return;
+      const active = bkmpGetActivePlushie();
+      el.innerHTML = BKMP_PLUSHIES.map(p => {
+        const unlocked = bkmpOwnedPlushies.includes(p.id);
+        const isActive = active === p.id;
+        return `
+          <button type="button" class="cosmetic-swatch plushie-swatch ${unlocked ? '' : 'locked'} ${isActive ? 'active' : ''}" data-plushie-id="${escapeHtml(p.id)}" ${unlocked ? '' : 'disabled'}>
+            ${unlocked ? `<img class="plushie-swatch-img" src="${escapeHtml(p.image)}" alt="" loading="lazy">` : '<span class="plushie-swatch-lock">🔒</span>'}
+            <span class="cosmetic-swatch-name">${unlocked ? escapeHtml(p.name) : '???'}</span>
+            <span class="cosmetic-swatch-desc">${unlocked ? escapeHtml(p.desc) : 'Nur per Code freischaltbar.'}</span>
+          </button>`;
+      }).join('');
+      el.querySelectorAll('.plushie-swatch:not(.locked)').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.plushieId;
+          bkmpSetActivePlushie(active === id ? '' : id);
+          renderPlushiesPanel();
+        });
+      });
+    }
+    const plushieRedeemBtn = document.getElementById('plushieRedeemBtn');
+    const plushieCodeInput = document.getElementById('plushieCodeInput');
+    const plushieRedeemMsg = document.getElementById('plushieRedeemMsg');
+    function bkmpShowPlushieMsg(text, isError) {
+      if (!plushieRedeemMsg) return;
+      plushieRedeemMsg.textContent = text;
+      plushieRedeemMsg.classList.toggle('error', Boolean(isError));
+      plushieRedeemMsg.classList.toggle('success', !isError);
+    }
+    if (plushieRedeemBtn && plushieCodeInput) {
+      plushieRedeemBtn.addEventListener('click', async () => {
+        const code = plushieCodeInput.value.trim();
+        if (!code) { plushieCodeInput.focus(); return; }
+        const name = bkmpGetMcName();
+        if (!name) {
+          bkmpShowPlushieMsg('Bitte trag zuerst deinen Minecraft-Namen ein.', true);
+          return;
+        }
+        plushieRedeemBtn.disabled = true;
+        plushieRedeemBtn.textContent = 'Wird geprüft...';
+        bkmpShowPlushieMsg('', false);
+        try {
+          const { ok, body } = await redeemPlushieCode(code, name);
+          if (ok && body.ok) {
+            const plushie = BKMP_PLUSHIES.find(p => p.id === body.plushieId);
+            bkmpShowPlushieMsg(`Du hast ${plushie ? plushie.name : 'einen neuen Plüshie'} freigeschaltet!`, false);
+            plushieCodeInput.value = '';
+            await bkmpRefreshOwnedPlushies();
+            renderPlushiesPanel();
+          } else {
+            const errorMap = {
+              invalid_code: 'Dieser Code ist ungültig.',
+              already_redeemed: 'Dieser Code wurde bereits eingelöst.',
+              already_owned: 'Du hast diesen Plüshie schon freigeschaltet.',
+              missing_name: 'Bitte trag zuerst deinen Minecraft-Namen ein.',
+              missing_code: 'Bitte gib einen Code ein.'
+            };
+            bkmpShowPlushieMsg(errorMap[body.error] || 'Der Code konnte nicht eingelöst werden. Versuch es später erneut.', true);
+          }
+        } catch (e) {
+          bkmpShowPlushieMsg('Verbindungsfehler. Versuch es später erneut.', true);
+        }
+        plushieRedeemBtn.disabled = false;
+        plushieRedeemBtn.textContent = 'Einlösen';
+      });
+      plushieCodeInput.addEventListener('keydown', e => { if (e.key === 'Enter') plushieRedeemBtn.click(); });
+    }
+
     /* ---------------- Bestenliste ---------------- */
     let bkmpLeaderboardStats = [];
     let bkmpActiveLeaderboardTab = 'achievements';
@@ -2904,13 +3024,15 @@
         const title = stat && stat.activeTitle ? stat.activeTitle : '';
         const cosmetic = stat && stat.activeCosmetic && stat.activeCosmetic !== 'default' ? stat.activeCosmetic : '';
         const cosmeticCls = cosmetic ? ` mc-cosmetic-${cosmetic}` : '';
+        const plushie = stat && stat.activePlushie ? BKMP_PLUSHIES.find(p => p.id === stat.activePlushie) : null;
+        const plushieImg = plushie ? `<img src="${escapeHtml(plushie.image)}" alt="" class="leaderboard-plushie" title="${escapeHtml(plushie.name)}">` : '';
         const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : '';
         const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
         return `
           <div class="leaderboard-row ${rankClass} ${isMe ? 'is-me' : ''}">
             <span class="leaderboard-rank">${medal}</span>
             <span class="leaderboard-name">
-              <span class="leaderboard-name-wrap${cosmeticCls}"><span class="leaderboard-name-text">${escapeHtml(row.name)}</span></span>${title ? `<span class="leaderboard-title">${escapeHtml(title)}</span>` : ''}
+              ${plushieImg}<span class="leaderboard-name-wrap${cosmeticCls}"><span class="leaderboard-name-text">${escapeHtml(row.name)}</span></span>${title ? `<span class="leaderboard-title">${escapeHtml(title)}</span>` : ''}
             </span>
             <span class="leaderboard-value">${valueLabel(row.value)}</span>
           </div>`;
@@ -2947,6 +3069,7 @@
     function renderAchievementBadge() {
       const badge = document.getElementById('mcNameBadge');
       const badgeText = document.getElementById('mcNameBadgeText');
+      const badgeIcon = document.getElementById('mcNameBadgeIcon');
       if (!badge || !badgeText) return;
       const name = bkmpGetMcName();
       const ctx = bkmpAchievementContextWithMeta();
@@ -2954,6 +3077,13 @@
       if (typeof bkmpCheckForNewAchievementUnlocks === 'function') bkmpCheckForNewAchievementUnlocks(ctx);
       badge.classList.remove('tier-1', 'tier-2', 'tier-3');
       bkmpApplyActiveCosmetic(badge, unlockedCount, ctx);
+      const activePlushieId = typeof bkmpGetActivePlushie === 'function' ? bkmpGetActivePlushie() : '';
+      const activePlushie = activePlushieId && ctx.ownedPlushies.includes(activePlushieId) ? BKMP_PLUSHIES.find(p => p.id === activePlushieId) : null;
+      if (badgeIcon) {
+        badgeIcon.innerHTML = activePlushie
+          ? `<img src="${escapeHtml(activePlushie.image)}" alt="" class="mc-name-badge-plushie">`
+          : '⛏️';
+      }
       if (!name) {
         badgeText.textContent = 'Wer bist du?';
         badge.title = '';
@@ -2970,7 +3100,7 @@
       if (typeof bkmpSyncPlayerStats === 'function') bkmpSyncPlayerStats(unlockedCount);
     }
 
-    const BKMP_ACHIEVEMENT_CATEGORY_ORDER = ['Karten', 'Kartenideen', 'Zeit & Treue', 'Vielfalt', 'Bonk', 'Meilensteine', 'Easter Eggs', 'Sonstiges'];
+    const BKMP_ACHIEVEMENT_CATEGORY_ORDER = ['Karten', 'Kartenideen', 'Zeit & Treue', 'Vielfalt', 'Bonk', 'Plüshies', 'Meilensteine', 'Easter Eggs', 'Sonstiges'];
     const bkmpAchievementCategoryOpen = {};
 
     function renderAchievementsPanel() {
@@ -3033,9 +3163,11 @@
           document.getElementById('achievementsSubtabAchievements').classList.add('active');
           document.getElementById('achievementsSubtabCosmetics').classList.remove('active');
           document.getElementById('achievementsSubtabTitles').classList.remove('active');
+          document.getElementById('achievementsSubtabPlushies').classList.remove('active');
           document.getElementById('achievementsList').style.display = '';
           document.getElementById('cosmeticsList').style.display = 'none';
           document.getElementById('titlesList').style.display = 'none';
+          document.getElementById('plushiesPanel').style.display = 'none';
           renderAchievementsPanel();
           achievementsOverlay.classList.add('visible');
         } else {
@@ -3060,6 +3192,7 @@
         mcNameSaveBtn.textContent = 'Speichern';
         mcNameOverlay.classList.remove('visible');
         renderAchievementBadge();
+        bkmpRefreshOwnedPlushies();
       });
     }
     if (mcNameInput) mcNameInput.addEventListener('keydown', e => { if (e.key === 'Enter') mcNameSaveBtn.click(); });
@@ -3070,13 +3203,16 @@
     const achievementsSubtabAchievements = document.getElementById('achievementsSubtabAchievements');
     const achievementsSubtabCosmetics = document.getElementById('achievementsSubtabCosmetics');
     const achievementsSubtabTitles = document.getElementById('achievementsSubtabTitles');
+    const achievementsSubtabPlushies = document.getElementById('achievementsSubtabPlushies');
     const achievementsListEl = document.getElementById('achievementsList');
     const cosmeticsListEl = document.getElementById('cosmeticsList');
     const titlesListEl = document.getElementById('titlesList');
+    const plushiesPanelEl = document.getElementById('plushiesPanel');
     const bkmpAchievementSubtabs = [
       { btn: achievementsSubtabAchievements, panel: achievementsListEl, render: null },
       { btn: achievementsSubtabCosmetics, panel: cosmeticsListEl, render: renderCosmeticsPanel },
-      { btn: achievementsSubtabTitles, panel: titlesListEl, render: renderTitlesPanel }
+      { btn: achievementsSubtabTitles, panel: titlesListEl, render: renderTitlesPanel },
+      { btn: achievementsSubtabPlushies, panel: plushiesPanelEl, render: renderPlushiesPanel }
     ];
     bkmpAchievementSubtabs.forEach(({ btn, panel, render }) => {
       if (!btn) return;
@@ -3102,6 +3238,7 @@
     }
 
     renderAchievementBadge();
+    bkmpRefreshOwnedPlushies();
   </script>
 
 </body>

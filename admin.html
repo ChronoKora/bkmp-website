@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260707-bonk">
+<link rel="stylesheet" href="style.css?v=20260707-plushies">
 </head>
 <body>
 
@@ -139,6 +139,10 @@
         <button class="admin-nav-btn" data-page="cardcatalog">
           <svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>
           Kartendatenbank
+        </button>
+        <button class="admin-nav-btn" data-page="plushies">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M9 10h.01M15 10h.01M9 15c1 1 5 1 6 0"/></svg>
+          Pl&uuml;shie Codes
         </button>
         <button class="admin-nav-btn" data-page="access">
           <svg viewBox="0 0 24 24"><path d="M12 3a5 5 0 0 0-5 5v3H5v10h14V11h-2V8a5 5 0 0 0-5-5z"/><path d="M9 11V8a3 3 0 0 1 6 0v3"/></svg>
@@ -481,6 +485,45 @@
           </div>
         </section>
 
+        <!-- Pluschie Codes -->
+        <section class="admin-page" id="page-plushies">
+          <div class="admin-section">
+            <h2>Pl&uuml;shie Codes</h2>
+            <p class="admin-help-text">Erstelle einmalig nutzbare Codes f&uuml;r einen Pl&uuml;shie, z.&nbsp;B. f&uuml;r eine Verlosung. Spieler l&ouml;sen den Code auf der Website unter "Erfolge &rarr; Pl&uuml;shies" ein.</p>
+
+            <div class="form-grid form-grid-3">
+              <div>
+                <label for="plushieCodeSelect">Pl&uuml;shie</label>
+                <select id="plushieCodeSelect"></select>
+              </div>
+              <div><label for="plushieCodeCount">Anzahl Codes</label><input type="number" id="plushieCodeCount" value="1" min="1" max="200"></div>
+              <div><label for="plushieCodeNote">Notiz (optional)</label><input type="text" id="plushieCodeNote" placeholder="z. B. Yaksha Verlosung"></div>
+            </div>
+            <button class="btn btn-primary" id="generatePlushieCodes">Codes generieren</button>
+
+            <div id="plushieCodesGenerated" style="display:none; margin-top:1rem;">
+              <h3>Neu erstellt</h3>
+              <div class="entry-table-wrapper"><div class="entry-list" id="plushieCodesGeneratedList"></div></div>
+              <button class="btn" id="copyAllPlushieCodes" type="button">Alle kopieren</button>
+            </div>
+
+            <h3 style="margin-top:1.4rem;">Alle Codes <span class="cardcatalog-admin-count" id="plushieCodesCount"></span></h3>
+            <div class="form-grid form-grid-2">
+              <div><label for="plushieCodesFilterPlushie">Nach Pl&uuml;shie filtern</label>
+                <select id="plushieCodesFilterPlushie"><option value="">Alle</option></select>
+              </div>
+              <div><label for="plushieCodesFilterStatus">Nach Status filtern</label>
+                <select id="plushieCodesFilterStatus">
+                  <option value="">Alle</option>
+                  <option value="open">Offen</option>
+                  <option value="redeemed">Eingel&ouml;st</option>
+                </select>
+              </div>
+            </div>
+            <div class="entry-table-wrapper"><div class="entry-list" id="plushieCodesList"></div></div>
+          </div>
+        </section>
+
         <!-- Zugaenge -->
         <section class="admin-page" id="page-access">
           <div class="admin-section">
@@ -534,8 +577,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260707-bonk"></script>
-  <script src="app.js?v=20260707-purgeghost"></script>
+  <script src="supabase.js?v=20260707-plushies"></script>
+  <script src="app.js?v=20260707-plushies"></script>
   <script>
     bkmpInitTheme();
 
@@ -683,6 +726,7 @@
         if (page === 'cardsales') refreshCardSalesFromSupabase();
         if (page === 'investorRequests') refreshInvestorRequestsFromSupabase();
         if (page === 'cardcatalog') refreshCardCatalogFromSupabase();
+        if (page === 'plushies') refreshPlushieCodesList();
         if (page === 'access') refreshAdminAccessList();
       });
     });
@@ -2644,6 +2688,145 @@
         addAccessBtn.textContent = '+ Zugang erstellen';
       }
     });
+
+    /* ---------------- Pluschie Codes ---------------- */
+    const BKMP_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // ohne 0/O/1/I/L, damit Codes nicht verwechselt werden
+    function bkmpRandomCodeSegment(len) {
+      const bytes = new Uint8Array(len);
+      crypto.getRandomValues(bytes);
+      return Array.from(bytes, b => BKMP_CODE_CHARS[b % BKMP_CODE_CHARS.length]).join('');
+    }
+    function bkmpGeneratePlushieCode(plushieId) {
+      const plushie = BKMP_PLUSHIES.find(p => p.id === plushieId);
+      const prefix = (plushie ? plushie.name.split(' ')[0] : plushieId).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8) || 'CODE';
+      return `${prefix}-${bkmpRandomCodeSegment(4)}-${bkmpRandomCodeSegment(4)}`;
+    }
+
+    let plushieCodesCache = [];
+
+    function populatePlushieDropdowns() {
+      const select = document.getElementById('plushieCodeSelect');
+      const filterSelect = document.getElementById('plushieCodesFilterPlushie');
+      if (select) select.innerHTML = BKMP_PLUSHIES.map(p => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)}</option>`).join('');
+      if (filterSelect) filterSelect.innerHTML = '<option value="">Alle</option>' + BKMP_PLUSHIES.map(p => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)}</option>`).join('');
+    }
+    populatePlushieDropdowns();
+
+    function bkmpCopyText(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).catch(() => {});
+      }
+    }
+
+    const generatePlushieCodesBtn = document.getElementById('generatePlushieCodes');
+    if (generatePlushieCodesBtn) {
+      generatePlushieCodesBtn.addEventListener('click', async () => {
+        const plushieId = document.getElementById('plushieCodeSelect').value;
+        const count = Math.max(1, Math.min(200, Number(document.getElementById('plushieCodeCount').value) || 1));
+        const note = document.getElementById('plushieCodeNote').value.trim();
+        if (!plushieId) return;
+        generatePlushieCodesBtn.disabled = true;
+        generatePlushieCodesBtn.textContent = 'Wird erstellt...';
+        try {
+          const seen = new Set();
+          const rows = [];
+          while (rows.length < count) {
+            const code = bkmpGeneratePlushieCode(plushieId);
+            if (seen.has(code)) continue;
+            seen.add(code);
+            rows.push({ code, plushie_id: plushieId, note });
+          }
+          const created = await createPlushieCodes(rows);
+          const genList = document.getElementById('plushieCodesGeneratedList');
+          const genWrap = document.getElementById('plushieCodesGenerated');
+          if (genList) {
+            genList.innerHTML = '';
+            created.forEach(row => {
+              const el = document.createElement('div');
+              el.className = 'entry-row';
+              el.innerHTML = `
+                <div class="desc"><span class="name">${escapeHtml(row.code)}</span></div>
+                <div class="entry-actions"><button class="edit-btn copy-code" type="button">Kopieren</button></div>
+              `;
+              el.querySelector('.copy-code').addEventListener('click', () => bkmpCopyText(row.code));
+              genList.appendChild(el);
+            });
+          }
+          if (genWrap) genWrap.style.display = created.length ? '' : 'none';
+          const plushieName = (BKMP_PLUSHIES.find(p => p.id === plushieId) || {}).name || plushieId;
+          showAdminToast(`${created.length} Code(s) für ${plushieName} erstellt.`, 'success');
+          document.getElementById('plushieCodeNote').value = '';
+          refreshPlushieCodesList();
+        } catch (e) {
+          console.error('Codes konnten nicht erstellt werden.', e);
+          showAdminToast('Codes konnten nicht erstellt werden: ' + supabaseErrorText(e), 'error');
+        }
+        generatePlushieCodesBtn.disabled = false;
+        generatePlushieCodesBtn.textContent = 'Codes generieren';
+      });
+    }
+
+    const copyAllPlushieCodesBtn = document.getElementById('copyAllPlushieCodes');
+    if (copyAllPlushieCodesBtn) {
+      copyAllPlushieCodesBtn.addEventListener('click', () => {
+        const codes = [...document.querySelectorAll('#plushieCodesGeneratedList .name')].map(el => el.textContent).join('\n');
+        bkmpCopyText(codes);
+      });
+    }
+
+    async function refreshPlushieCodesList() {
+      const el = document.getElementById('plushieCodesList');
+      if (el) el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Codes werden geladen...</p>';
+      try {
+        plushieCodesCache = (await loadPlushieCodes()) || [];
+      } catch (e) {
+        console.warn('Codes konnten nicht geladen werden.', e);
+        plushieCodesCache = [];
+        if (el) el.innerHTML = '<p style="color:var(--neg); font-size:0.85rem;">Codes konnten nicht geladen werden. Bitte SQL ausf&uuml;hren.</p>';
+        return;
+      }
+      renderPlushieCodesList();
+    }
+
+    function renderPlushieCodesList() {
+      const el = document.getElementById('plushieCodesList');
+      const countEl = document.getElementById('plushieCodesCount');
+      if (!el) return;
+      const filterPlushie = document.getElementById('plushieCodesFilterPlushie').value;
+      const filterStatus = document.getElementById('plushieCodesFilterStatus').value;
+      let rows = plushieCodesCache;
+      if (filterPlushie) rows = rows.filter(r => r.plushie_id === filterPlushie);
+      if (filterStatus === 'open') rows = rows.filter(r => !r.is_redeemed);
+      if (filterStatus === 'redeemed') rows = rows.filter(r => r.is_redeemed);
+      if (countEl) countEl.textContent = `(${rows.length})`;
+      if (rows.length === 0) {
+        el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Keine Codes gefunden.</p>';
+        return;
+      }
+      el.innerHTML = '';
+      rows.forEach(row => {
+        const plushie = BKMP_PLUSHIES.find(p => p.id === row.plushie_id);
+        const status = row.is_redeemed ? 'Eingelöst' : 'Offen';
+        const meta = [
+          plushie ? plushie.name : row.plushie_id,
+          status,
+          row.is_redeemed ? `von ${row.redeemed_by_display_name || '?'} am ${new Date(row.redeemed_at).toLocaleDateString('de-DE')}` : '',
+          row.note ? `Notiz: ${row.note}` : ''
+        ].filter(Boolean).join(' · ');
+        const div = document.createElement('div');
+        div.className = 'entry-row';
+        div.innerHTML = `
+          <div class="desc"><span class="name">${escapeHtml(row.code)}</span><span class="meta">${escapeHtml(meta)}</span></div>
+          <div class="entry-actions"><button class="edit-btn copy-code" type="button">Kopieren</button></div>
+        `;
+        div.querySelector('.copy-code').addEventListener('click', () => bkmpCopyText(row.code));
+        el.appendChild(div);
+      });
+    }
+    const plushieCodesFilterPlushieEl = document.getElementById('plushieCodesFilterPlushie');
+    const plushieCodesFilterStatusEl = document.getElementById('plushieCodesFilterStatus');
+    if (plushieCodesFilterPlushieEl) plushieCodesFilterPlushieEl.addEventListener('change', renderPlushieCodesList);
+    if (plushieCodesFilterStatusEl) plushieCodesFilterStatusEl.addEventListener('change', renderPlushieCodesList);
 
     /* Backup */
     const exportBackupBtn = document.getElementById('exportBackup');

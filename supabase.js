@@ -1960,11 +1960,12 @@ function bkmpMapPlayerStatsFromSupabase(row) {
     activeTitle: row.active_title || '',
     activeCosmetic: row.active_cosmetic || '',
     bonkCount: Number(row.bonk_count || 0),
+    activePlushie: row.active_plushie || '',
     updatedAt: row.updated_at ? Date.parse(row.updated_at) : 0
   };
 }
 
-const BKMP_PLAYER_STATS_COLUMNS = 'display_name, minutes_spent, achievements_unlocked, eggs_found, days_visited, flags, panel_opens, active_title, active_cosmetic, bonk_count, updated_at';
+const BKMP_PLAYER_STATS_COLUMNS = 'display_name, minutes_spent, achievements_unlocked, eggs_found, days_visited, flags, panel_opens, active_title, active_cosmetic, bonk_count, active_plushie, updated_at';
 
 async function loadLeaderboardStats() {
   const client = bkmpGetSupabaseClient();
@@ -2006,10 +2007,57 @@ async function upsertPlayerStats(displayName, stats) {
       active_title: stats.activeTitle || '',
       active_cosmetic: stats.activeCosmetic || '',
       bonk_count: Math.max(0, Math.round(stats.bonkCount || 0)),
+      active_plushie: stats.activePlushie || '',
       updated_at: new Date().toISOString()
     }, { onConflict: 'name_key' });
   if (error) throw error;
   return true;
+}
+
+/* ---------------- Pluschies ---------------- */
+async function loadOwnedPlushies(name) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !name) return [];
+  const { data, error } = await client
+    .from('user_plushies')
+    .select('plushie_id')
+    .eq('name_key', String(name).trim().toLowerCase());
+  if (error) throw error;
+  return (data || []).map(row => row.plushie_id);
+}
+
+async function redeemPlushieCode(code, playerName) {
+  const response = await fetch('/api/redeem-plushie-code', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code, playerName })
+  });
+  let body = null;
+  try { body = await response.json(); } catch (e) {}
+  return { ok: response.ok, status: response.status, body: body || {} };
+}
+
+/* Admin-only: Codes anlegen/auflisten (RLS erlaubt das nur eingeloggten Admins). */
+async function loadPlushieCodes() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('plushie_codes')
+    .select('id, code, plushie_id, note, is_redeemed, redeemed_by_display_name, redeemed_at, created_at, created_by_admin')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+async function createPlushieCodes(rows) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { data, error } = await client
+    .from('plushie_codes')
+    .insert(rows)
+    .select('id, code, plushie_id, note');
+  if (error) throw error;
+  return data || [];
 }
 
 window.importLocalExpensesToSupabase = importLocalExpensesToSupabase;

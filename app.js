@@ -26,6 +26,19 @@ const BKMP_INVESTOR_REQUEST_MAX_SHARE = 15;
 
 const BKMP_SUBMIT_COOLDOWN_MS = 15000;
 
+/* Pluschie-Definitionen: gemeinsam fuer index.html (Anzeige/Auswahl) und
+   admin.html (Code-Generator-Dropdown). Reine Code-Konstanten, genau wie
+   Kosmetiken/Titel - nur der Freischalt-Status (wer besitzt was) lebt in
+   der Datenbank (Tabelle user_plushies), nicht die Definitionen hier. */
+const BKMP_PLUSHIES = [
+  { id: 'yaksha', name: 'Yaksha Plüshie', image: 'assets/plushies/yaksha.png', desc: 'Kleiner Kristalldrache mit rotem Blick.', rarity: 'Legendär' },
+  { id: 'darkorius', name: 'Darkorius Plüshie', image: 'assets/plushies/darkorius.png', desc: 'Dunkel, mysteriös, unglaublich knuffig.', rarity: 'Episch' },
+  { id: 'lukas', name: 'Lukas Plüshie', image: 'assets/plushies/lukas.png', desc: 'Für echte Fans von XxLukaas_.', rarity: 'Episch' },
+  { id: 'obsi', name: 'Obsi Plüshie', image: 'assets/plushies/obsi.png', desc: 'Hart wie Obsidian, süß wie ein Plüschtier.', rarity: 'Episch' },
+  { id: 'pekka14', name: 'Pekka14 Plüshie', image: 'assets/plushies/pekka14.png', desc: 'Der Pekka14-Plüschie fürs Regal.', rarity: 'Episch' },
+  { id: 'roggberd', name: 'Roggberd Plüshie', image: 'assets/plushies/roggberd.png', desc: 'Ein Roggberd zum Knuddeln.', rarity: 'Episch' }
+];
+
 function bkmpSubmitCooldownSecondsLeft(key) {
   let last = 0;
   try { last = Number(localStorage.getItem('bkmp-cooldown-' + key) || 0); } catch (e) {}
