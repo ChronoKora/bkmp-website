@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260707-streamerach">
+<link rel="stylesheet" href="style.css?v=20260707-bonkslb">
 </head>
 <body>
 
@@ -290,6 +290,7 @@
           <button type="button" class="leaderboard-tab" data-board="cards">Karten</button>
           <button type="button" class="leaderboard-tab" data-board="wishes">Kartenideen</button>
           <button type="button" class="leaderboard-tab" data-board="time">Zeit verbracht</button>
+          <button type="button" class="leaderboard-tab" data-board="bonks">Die meisten Bonks</button>
         </div>
         <div class="leaderboard-list" id="leaderboardList"></div>
       </section>
@@ -3327,6 +3328,9 @@
       } else if (bkmpActiveLeaderboardTab === 'time') {
         rows = bkmpLeaderboardStats.map(s => ({ name: s.name, value: s.minutesSpent })).sort((a, b) => b.value - a.value);
         valueLabel = v => `${v} Min.`;
+      } else if (bkmpActiveLeaderboardTab === 'bonks') {
+        rows = bkmpLeaderboardStats.map(s => ({ name: s.name, value: s.bonkCount || 0 })).sort((a, b) => b.value - a.value);
+        valueLabel = v => `${bkmpFormatBonkCount(v)} Bonk${v === 1 ? '' : 's'}`;
       } else if (bkmpActiveLeaderboardTab === 'cards') {
         rows = bkmpAggregateSubmissions(data.cardCatalog, 'submittedBy');
         valueLabel = v => `${v} Karte${v === 1 ? '' : 'n'}`;

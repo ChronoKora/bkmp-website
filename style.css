@@ -439,6 +439,44 @@ body.page-loaded .streamer-marquee-track {
 .streamer-violet { background: #c084fc; }
 .streamer-white { background: #f8fafc; }
 .streamer-rainbow { background: linear-gradient(90deg, #f87171, #fbbf24, #4ade80, #38bdf8, #a78bfa, #f472b6); }
+
+/* ---------- Weitere kosmetische Prefix-Farben (mit Effekten) ---------- */
+.streamer-herzschlag { background: linear-gradient(135deg, #f43f5e, #fb7185); animation: streamerHeartbeat 1.15s ease-in-out infinite; }
+.streamer-gruenrot { background: linear-gradient(90deg, #4ade80, #f87171); }
+.streamer-feuer { background: linear-gradient(90deg, #fde047, #fb923c, #ef4444); }
+.streamer-eis { background: linear-gradient(90deg, #e0f2fe, #7dd3fc, #38bdf8); }
+.streamer-galaxy { background: linear-gradient(120deg, #7c3aed, #a78bfa, #f472b6, #7c3aed); background-size: 300% 100%; animation: streamerShimmer 6s linear infinite; }
+.streamer-sonnenuntergang { background: linear-gradient(90deg, #fb923c, #f472b6, #a78bfa); }
+.streamer-goldglut { background: var(--gold); animation: streamerGlowPulseGold 2s ease-in-out infinite; }
+.streamer-toxic { background: #a3e635; animation: streamerGlowPulseToxic 2s ease-in-out infinite; }
+.streamer-mitternacht { background: linear-gradient(135deg, #1e1b4b, #4c1d95, #1e3a8a); color: #e0e7ff; }
+.streamer-neonpink { background: #ec4899; animation: streamerGlowPulsePink 1.8s ease-in-out infinite; }
+.streamer-regenbogenpuls { background: linear-gradient(90deg, #f87171, #fbbf24, #4ade80, #38bdf8, #a78bfa, #f472b6, #f87171); background-size: 300% 100%; animation: streamerShimmer 4s linear infinite; }
+
+@keyframes streamerHeartbeat {
+  0%, 100% { transform: scale(1); }
+  14% { transform: scale(1.1); }
+  28% { transform: scale(1); }
+  42% { transform: scale(1.1); }
+  70% { transform: scale(1); }
+}
+@keyframes streamerShimmer {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 300% 50%; }
+}
+@keyframes streamerGlowPulseGold {
+  0%, 100% { box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22), 0 0 6px color-mix(in srgb, var(--gold) 40%, transparent); }
+  50% { box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22), 0 0 20px color-mix(in srgb, var(--gold) 85%, transparent); }
+}
+@keyframes streamerGlowPulseToxic {
+  0%, 100% { box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22), 0 0 6px rgba(163, 230, 53, 0.4); }
+  50% { box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22), 0 0 20px rgba(163, 230, 53, 0.85); }
+}
+@keyframes streamerGlowPulsePink {
+  0%, 100% { box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22), 0 0 6px rgba(236, 72, 153, 0.45); }
+  50% { box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22), 0 0 22px rgba(236, 72, 153, 0.9); }
+}
+
 .streamer-pill:hover { border-color: var(--gold); transform: translateY(-1px); }
 @keyframes streamerScroll {
   from { transform: translate3d(0, 0, 0); }
