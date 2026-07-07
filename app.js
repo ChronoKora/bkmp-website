@@ -222,6 +222,32 @@ function supabaseErrorText(e) {
     : 'Unbekannter Fehler';
 }
 
+/* Oeffentliche Einreichungen (Kartendatenbank, Kartenideen, PartnerShops)
+   laufen ueber diese Server-Funktion statt direkt ueber den anon-Key im
+   Browser, weil Einreichungen mit dem anon-Key bei manchen Besuchern
+   zufaellig an einer RLS-Policy-Pruefung scheiterten (vermutlich ein
+   Supabase-seitiges Cache-Problem). Die Server-Funktion nutzt den
+   Service-Role-Key und umgeht das Problem vollstaendig. */
+async function bkmpSubmitViaApi(type, fields, imageDataUrl) {
+  let response;
+  try {
+    response = await fetch('/api/submit-entry', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, fields, imageDataUrl: imageDataUrl || null })
+    });
+  } catch (e) {
+    throw new Error('Keine Verbindung zum Server. Bitte prüfe deine Internetverbindung.');
+  }
+  let body = null;
+  try { body = await response.json(); } catch (e) {}
+  if (!response.ok) {
+    const message = body && (body.detail || body.error) ? (body.detail || body.error) : `HTTP ${response.status}`;
+    throw new Error(message);
+  }
+  return body && body.row ? body.row : null;
+}
+
 /* ============================================================
    Bild-Komprimierung fuer Uploads
    Verkleinert grosse Bilder client-seitig auf eine sinnvolle

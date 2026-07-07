@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260706-noselect">
+<link rel="stylesheet" href="style.css?v=20260707-leadercos">
 </head>
 <body>
 
@@ -447,8 +447,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260706-block-width"></script>
-  <script src="app.js?v=20260706-error-text"></script>
+  <script src="supabase.js?v=20260707-leadercos"></script>
+  <script src="app.js?v=20260707-submitapi"></script>
   <script>
     bkmpInitTheme();
     window.addEventListener('load', () => document.body.classList.add('page-loaded'));
@@ -1797,25 +1797,16 @@
         }
 
         bkmpCompressImageFile(file).then(image => {
-          const entry = { id: bkmpUid('cardcat'), name, category, shopName, cb, submittedBy, description, image, status: 'pending', createdAt: Date.now() };
-          if (typeof saveCardCatalogEntry === 'function' && bkmpGetSupabaseClient()) {
-            saveCardCatalogEntry(entry).then(() => {
-              bkmpStartSubmitCooldown('cardcatalog');
-              resetBtn();
-              clearCardCatalogForm();
-              showCardCatalogView(cardCatalogSuccessView);
-            }).catch(e => {
-              console.error('Karte konnte nicht gespeichert werden.', e);
-              resetBtn();
-              alert('Die Karte konnte nicht gespeichert werden: ' + supabaseErrorText(e) + '\n\nBitte versuche es erneut oder mit einem anderen Bild.');
-            });
-          } else {
-            data.cardCatalog.unshift(entry);
-            bkmpSaveData(data);
-            renderCardCatalog();
+          bkmpSubmitViaApi('card_catalog', { name, category, shop_name: shopName, cb, submitted_by: submittedBy, description }, image).then(() => {
+            bkmpStartSubmitCooldown('cardcatalog');
             resetBtn();
-            cardCatalogOverlay.classList.remove('visible');
-          }
+            clearCardCatalogForm();
+            showCardCatalogView(cardCatalogSuccessView);
+          }).catch(e => {
+            console.error('Karte konnte nicht gespeichert werden.', e);
+            resetBtn();
+            alert('Die Karte konnte nicht gespeichert werden: ' + (e && e.message || e) + '\n\nBitte versuche es erneut oder mit einem anderen Bild.');
+          });
         }).catch(() => {
           resetBtn();
           alert('Das Bild konnte nicht gelesen werden. Bitte versuche es mit einer anderen Datei erneut.');
@@ -1933,22 +1924,16 @@
 
         const readImage = file ? bkmpCompressImageFile(file) : Promise.resolve('');
         readImage.then(image => {
-          const shop = { id: '', name, location, category, description, link, contact, image, status: 'pending' };
-          if (typeof savePartnerShop === 'function' && bkmpGetSupabaseClient()) {
-            savePartnerShop(shop).then(() => {
-              bkmpStartSubmitCooldown('partnershop');
-              resetBtn();
-              clearPartnerShopForm();
-              showPartnerShopView(partnerShopSuccessView);
-            }).catch(e => {
-              console.error('PartnerShop konnte nicht gespeichert werden.', e);
-              resetBtn();
-              alert('Der Shop konnte nicht gespeichert werden: ' + supabaseErrorText(e) + '\n\nBitte versuche es erneut.');
-            });
-          } else {
+          bkmpSubmitViaApi('partner_shops', { name, location, category, description, link, contact }, image || null).then(() => {
+            bkmpStartSubmitCooldown('partnershop');
             resetBtn();
-            alert('Der Shop konnte gerade nicht gespeichert werden, da keine Verbindung zur Datenbank besteht.');
-          }
+            clearPartnerShopForm();
+            showPartnerShopView(partnerShopSuccessView);
+          }).catch(e => {
+            console.error('PartnerShop konnte nicht gespeichert werden.', e);
+            resetBtn();
+            alert('Der Shop konnte nicht gespeichert werden: ' + (e && e.message || e) + '\n\nBitte versuche es erneut.');
+          });
         }).catch(() => {
           resetBtn();
           alert('Das Bild konnte nicht gelesen werden. Bitte versuche es mit einer anderen Datei erneut.');
@@ -2116,25 +2101,16 @@
       }
 
       bkmpCompressImageFile(file).then(image => {
-        const wish = { id: bkmpUid('wish'), name, image, status: 'pending', date: new Date().toISOString().slice(0, 10), createdAt: Date.now() };
-        if (typeof saveWish === 'function' && bkmpGetSupabaseClient()) {
-          saveWish(wish).then(() => {
-            bkmpStartSubmitCooldown('wish');
-            resetSubmitBtn();
-            wishFormView.style.display = 'none';
-            wishSuccessView.style.display = '';
-          }).catch(e => {
-            console.error('Supabase konnte Kartenidee nicht speichern.', e);
-            resetSubmitBtn();
-            alert('Deine Kartenidee konnte nicht gespeichert werden: ' + supabaseErrorText(e) + '\n\nBitte versuche es erneut oder mit einem anderen Bild.');
-          });
-        } else {
-          data.wishes.push(wish);
-          bkmpSaveData(data);
-          renderWishes();
+        bkmpSubmitViaApi('wishes', { name }, image).then(() => {
+          bkmpStartSubmitCooldown('wish');
           resetSubmitBtn();
-          wishOverlay.classList.remove('visible');
-        }
+          wishFormView.style.display = 'none';
+          wishSuccessView.style.display = '';
+        }).catch(e => {
+          console.error('Kartenidee konnte nicht gespeichert werden.', e);
+          resetSubmitBtn();
+          alert('Deine Kartenidee konnte nicht gespeichert werden: ' + (e && e.message || e) + '\n\nBitte versuche es erneut oder mit einem anderen Bild.');
+        });
       }).catch(() => {
         resetSubmitBtn();
         alert('Das Bild konnte nicht gelesen werden. Bitte versuche es mit einer anderen PNG-Datei erneut.');
@@ -2317,7 +2293,8 @@
         daysVisited: bkmpGetDaysVisited(),
         flags: bkmpGetFlags(),
         panelOpens: bkmpGetPanelOpens(),
-        activeTitle: typeof bkmpGetActiveTitleName === 'function' ? bkmpGetActiveTitleName() : ''
+        activeTitle: typeof bkmpGetActiveTitleName === 'function' ? bkmpGetActiveTitleName() : '',
+        activeCosmetic: bkmpGetActiveCosmetic()
       }).catch(e => console.warn('Konnte Erfolge/Zeit nicht mit dem Leaderboard synchronisieren.', e));
     }
 
@@ -2352,6 +2329,11 @@
         if (!bkmpGetActiveTitle() && remote.activeTitle) {
           const remoteTitle = BKMP_TITLES.find(t => t.name === remote.activeTitle);
           if (remoteTitle) { try { localStorage.setItem(BKMP_ACTIVE_TITLE_KEY, remoteTitle.id); } catch (e) {} }
+        }
+
+        if (!bkmpGetActiveCosmetic() && remote.activeCosmetic) {
+          const remoteCosmetic = BKMP_COSMETICS.find(c => c.id === remote.activeCosmetic);
+          if (remoteCosmetic) { try { localStorage.setItem(BKMP_ACTIVE_COSMETIC_KEY, remoteCosmetic.id); } catch (e) {} }
         }
 
         return remote.name || name;
@@ -2658,12 +2640,16 @@
         const isMe = Boolean(myName) && row.name.trim().toLowerCase() === myName;
         const stat = bkmpLeaderboardStats.find(s => s.name.trim().toLowerCase() === row.name.trim().toLowerCase());
         const title = stat && stat.activeTitle ? stat.activeTitle : '';
+        const cosmetic = stat && stat.activeCosmetic && stat.activeCosmetic !== 'default' ? stat.activeCosmetic : '';
+        const cosmeticCls = cosmetic ? ` mc-cosmetic-${cosmetic}` : '';
         const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : '';
         const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
         return `
           <div class="leaderboard-row ${rankClass} ${isMe ? 'is-me' : ''}">
             <span class="leaderboard-rank">${medal}</span>
-            <span class="leaderboard-name">${escapeHtml(row.name)}${title ? `<span class="leaderboard-title">${escapeHtml(title)}</span>` : ''}</span>
+            <span class="leaderboard-name">
+              <span class="leaderboard-name-wrap${cosmeticCls}"><span class="leaderboard-name-text">${escapeHtml(row.name)}</span></span>${title ? `<span class="leaderboard-title">${escapeHtml(title)}</span>` : ''}
+            </span>
             <span class="leaderboard-value">${valueLabel(row.value)}</span>
           </div>`;
       }).join('');

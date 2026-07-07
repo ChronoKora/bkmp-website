@@ -2834,6 +2834,13 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
    (#mcNameBadge), an der Auswahl-Kachel im Kosmetik-Tab (.cosmetic-swatch)
    und am Namen in der Bestenliste (.leaderboard-name-wrap) - deshalb sind
    die Selektoren bewusst generisch (keine ID-Bindung). */
+.leaderboard-name-wrap[class*="mc-cosmetic-"] {
+  display: inline-flex;
+  padding: 0.1rem 0.55rem;
+  border-radius: 8px;
+  border-width: 1px;
+  border-style: solid;
+}
 .mc-cosmetic-shadow { border-color: rgba(0, 0, 0, 0.5); background: #0d0d10; color: #b8b8c2; }
 .mc-cosmetic-gold { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 50%, var(--line)); }
 .mc-cosmetic-ice {
