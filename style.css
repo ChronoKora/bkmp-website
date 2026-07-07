@@ -2781,9 +2781,12 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 }
 .bkmp-jannik-toast.visible { opacity: 1; transform: translate(-50%, 0); }
 
-.bkmp-jannik-card {
+/* Generisches Achievement-Freischalt-Popup - unten links (unten rechts ist
+   schon das Live-Streamer-Popup belegt). Wird fuer JEDEN Erfolg benutzt,
+   nicht nur fuer Jannik. */
+.bkmp-achievement-popup {
   position: fixed;
-  right: 1.2rem;
+  left: 1.2rem;
   bottom: 1.2rem;
   z-index: 98;
   width: min(300px, calc(100vw - 2rem));
@@ -2798,11 +2801,11 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   transition: opacity 0.4s ease, transform 0.4s ease;
   pointer-events: none;
 }
-.bkmp-jannik-card.visible { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
-.bkmp-jannik-card-title { font-family: 'Fraunces', serif; font-size: 1.1rem; font-weight: 700; margin-bottom: 0.35rem; }
-.bkmp-jannik-card-desc { font-size: 0.82rem; color: var(--muted); margin-bottom: 0.6rem; }
-.bkmp-jannik-card-unlock { font-size: 0.78rem; font-weight: 800; color: var(--gold); text-transform: uppercase; letter-spacing: 0.03em; }
-.bkmp-jannik-card-unlock strong { display: block; color: var(--ink); font-size: 0.92rem; text-transform: none; letter-spacing: 0; margin-top: 0.15rem; font-family: 'Fraunces', serif; }
+.bkmp-achievement-popup.visible { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+.bkmp-achievement-popup-title { font-family: 'Fraunces', serif; font-size: 1.1rem; font-weight: 700; margin-bottom: 0.35rem; }
+.bkmp-achievement-popup-desc { font-size: 0.82rem; color: var(--muted); margin-bottom: 0.6rem; }
+.bkmp-achievement-popup-unlock { font-size: 0.78rem; font-weight: 800; color: var(--gold); text-transform: uppercase; letter-spacing: 0.03em; }
+.bkmp-achievement-popup-unlock strong { display: block; color: var(--ink); font-size: 0.92rem; text-transform: none; letter-spacing: 0; margin-top: 0.15rem; font-family: 'Fraunces', serif; }
 
 .bkmp-jannik-carrot {
   position: fixed;

@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260707-jannikslow">
+<link rel="stylesheet" href="style.css?v=20260707-achpopup">
 </head>
 <body>
 
@@ -794,20 +794,70 @@
       }, ms);
     }
 
-    function bkmpShowJannikAchievementCard() {
+    /* Generisches "Achievement freigeschaltet"-Popup fuer JEDEN Erfolg (nicht
+       nur Jannik) - unten links, damit es sich nicht mit dem Live-Popup
+       unten rechts ueberschneidet. bkmpCheckForNewAchievementUnlocks()
+       vergleicht bei jedem renderAchievementBadge()-Aufruf die aktuell
+       freigeschalteten Erfolge mit den bereits gemeldeten (localStorage) und
+       queued neue Freischaltungen nacheinander. Beim allerersten Aufruf
+       (localStorage noch leer) werden bereits erreichte Erfolge nur
+       gespeichert, nicht angezeigt - sonst wuerden bei Bestandsspielern
+       ploetzlich dutzende Popups auf einmal aufploppen. */
+    const BKMP_ACHIEVEMENTS_NOTIFIED_KEY = 'bkmp-achievements-notified';
+    function bkmpGetNotifiedAchievements() {
+      try { return JSON.parse(localStorage.getItem(BKMP_ACHIEVEMENTS_NOTIFIED_KEY) || 'null'); } catch (e) { return null; }
+    }
+    function bkmpSaveNotifiedAchievements(list) {
+      try { localStorage.setItem(BKMP_ACHIEVEMENTS_NOTIFIED_KEY, JSON.stringify(list)); } catch (e) {}
+    }
+    let bkmpAchievementPopupQueue = [];
+    let bkmpAchievementPopupShowing = false;
+    function bkmpShowAchievementPopup(achievement) {
+      const name = achievement.revealName || achievement.title;
+      const desc = achievement.revealDesc || achievement.desc || '';
       const card = document.createElement('div');
-      card.className = 'bkmp-jannik-card';
+      card.className = 'bkmp-achievement-popup';
       card.innerHTML = `
-        <div class="bkmp-jannik-card-title">Jannik der Hase</div>
-        <p class="bkmp-jannik-card-desc">Man sagt, irgendwo auf dieser Website hoppelt ein kleiner Hase herum. Herzlichen Glückwunsch – du hast ihn gefunden! 🥕</p>
-        <div class="bkmp-jannik-card-unlock">🏆 Achievement freigeschaltet<strong>„Jannik der Hase“</strong></div>
+        <div class="bkmp-achievement-popup-title">${escapeHtml(name)}</div>
+        <p class="bkmp-achievement-popup-desc">${escapeHtml(desc)}</p>
+        <div class="bkmp-achievement-popup-unlock">🏆 Achievement freigeschaltet<strong>„${escapeHtml(name)}“</strong></div>
       `;
       document.body.appendChild(card);
       requestAnimationFrame(() => card.classList.add('visible'));
       setTimeout(() => {
         card.classList.remove('visible');
-        setTimeout(() => card.remove(), 450);
-      }, 5100);
+        setTimeout(() => {
+          card.remove();
+          bkmpAchievementPopupShowing = false;
+          bkmpProcessAchievementPopupQueue();
+        }, 450);
+      }, 4200);
+    }
+    function bkmpProcessAchievementPopupQueue() {
+      if (bkmpAchievementPopupShowing || bkmpAchievementPopupQueue.length === 0) return;
+      bkmpAchievementPopupShowing = true;
+      const next = bkmpAchievementPopupQueue.shift();
+      setTimeout(() => bkmpShowAchievementPopup(next), 400);
+    }
+    function bkmpQueueAchievementPopup(achievement) {
+      bkmpAchievementPopupQueue.push(achievement);
+      bkmpProcessAchievementPopupQueue();
+    }
+    function bkmpCheckForNewAchievementUnlocks(ctx) {
+      const notified = bkmpGetNotifiedAchievements();
+      const unlocked = BKMP_ACHIEVEMENTS.filter(a => a.check(ctx));
+      if (notified === null) {
+        bkmpSaveNotifiedAchievements(unlocked.map(a => a.id));
+        return;
+      }
+      const notifiedSet = new Set(notified);
+      const newlyUnlocked = unlocked.filter(a => !notifiedSet.has(a.id));
+      if (newlyUnlocked.length === 0) return;
+      newlyUnlocked.forEach(a => {
+        notifiedSet.add(a.id);
+        bkmpQueueAchievementPopup(a);
+      });
+      bkmpSaveNotifiedAchievements([...notifiedSet]);
     }
 
     function triggerBkmpJannikNormal() {
@@ -816,7 +866,6 @@
       bunny.className = 'bkmp-jannik-bunny';
       document.body.appendChild(bunny);
       bkmpShowJannikToast('🐰 Jannik der Hase wurde entdeckt!', 2600);
-      setTimeout(bkmpShowJannikAchievementCard, 900);
       setTimeout(() => bunny.remove(), 6000);
     }
 
@@ -2593,7 +2642,7 @@
       { id: 'egg_idle', category: 'Easter Eggs', title: '???', revealName: 'Schlummer-Entdecker', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Lass die Seite einfach mal ein paar Minuten in Ruhe.', check: ctx => ctx.eggsFound.includes('idle') },
       { id: 'egg_rainbow', category: 'Easter Eggs', title: '???', revealName: 'Regenbogen-Dreher', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Du wirst suchen müssen... oder drücken? Irgendwas Rundes auf der Seite dreht sich vielleicht gerne.', check: ctx => ctx.eggsFound.includes('rainbow') },
       { id: 'egg_derliber', category: 'Easter Eggs', title: '???', revealName: 'Liber-Jäger', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Suche 10 kleine Liber-Strichmännchen, versteckt auf der ganzen Website.', progress: ctx => [ctx.derLiberFound, 10], check: ctx => ctx.eggsFound.includes('derliber') },
-      { id: 'egg_jannik', category: 'Easter Eggs', title: '???', revealName: 'Jannik der Hase', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Ganz unten auf der Seite gibt es einen unsichtbaren Bereich. Fahr auf dem Computer mehrfach mit der Maus darüber oder halte ihn auf dem Handy 5 Sekunden lang gedrückt.', check: ctx => ctx.eggsFound.includes('jannik') },
+      { id: 'egg_jannik', category: 'Easter Eggs', title: '???', revealName: 'Jannik der Hase', desc: 'Finde ein verstecktes Easter Egg.', revealDesc: 'Man sagt, irgendwo auf dieser Website hoppelt ein kleiner Hase herum. Herzlichen Glückwunsch – du hast ihn gefunden! 🥕', hint: 'Ganz unten auf der Seite gibt es einen unsichtbaren Bereich. Fahr auf dem Computer mehrfach mit der Maus darüber oder halte ihn auf dem Handy 5 Sekunden lang gedrückt.', check: ctx => ctx.eggsFound.includes('jannik') },
       { id: 'egg_all', category: 'Easter Eggs', title: 'Osterhase', desc: 'Finde alle 10 versteckten Easter Eggs.', progress: ctx => [ctx.eggsFound.length, 10], check: ctx => ctx.eggsFound.length >= 10 },
       { id: 'combo_card_wish', category: 'Sonstiges', title: 'Vielseitig', desc: 'Reiche mindestens 1 Karte und 1 Kartenidee ein.', check: ctx => ctx.cardCount >= 1 && ctx.wishCount >= 1 },
       { id: 'night_owl', category: 'Sonstiges', title: 'Nachteule', desc: 'Besuche die Seite zwischen 0 und 5 Uhr nachts.', check: ctx => ctx.nightOwl },
@@ -2821,6 +2870,7 @@
       const name = bkmpGetMcName();
       const ctx = bkmpAchievementContextWithMeta();
       const unlockedCount = BKMP_ACHIEVEMENTS.filter(a => a.check(ctx)).length;
+      if (typeof bkmpCheckForNewAchievementUnlocks === 'function') bkmpCheckForNewAchievementUnlocks(ctx);
       badge.classList.remove('tier-1', 'tier-2', 'tier-3');
       bkmpApplyActiveCosmetic(badge, unlockedCount);
       if (!name) {
