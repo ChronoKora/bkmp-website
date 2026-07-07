@@ -59,6 +59,53 @@ a { color: inherit; text-decoration: none; }
   gap: 0.7rem;
 }
 
+.top-actions-left {
+  position: fixed;
+  top: 1.5rem;
+  left: 1.5rem;
+  z-index: 20;
+}
+.bonk-button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--paper-2);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.bonk-button:hover { transform: translateY(-2px) scale(1.05); border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); }
+.bonk-button:active { transform: scale(0.94); }
+.bonk-button img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; user-select: none; pointer-events: none; }
+.bonk-count {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: #111018;
+  font-size: 0.68rem;
+  font-weight: 800;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+.bonk-count.visible { display: flex; }
+@media (max-width: 640px) {
+  .top-actions-left { top: 1rem; left: 1rem; }
+  .bonk-button { width: 46px; height: 46px; }
+}
+
 .pill-btn {
   display: flex;
   align-items: center;
@@ -2962,7 +3009,9 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 }
 .cosmetic-swatch:not(.locked):hover { transform: translateY(-2px); }
 .cosmetic-swatch.active { border-color: var(--gold); box-shadow: 0 0 0 2px color-mix(in srgb, var(--gold) 35%, transparent); }
-.cosmetic-swatch.locked { opacity: 0.55; cursor: not-allowed; }
+.cosmetic-swatch.locked { cursor: not-allowed; background: color-mix(in srgb, var(--paper-2) 80%, transparent); }
+.cosmetic-swatch.locked .cosmetic-swatch-name,
+.cosmetic-swatch.locked .cosmetic-swatch-desc { color: color-mix(in srgb, var(--ink) 55%, transparent); }
 .cosmetic-swatch-name { font-weight: 700; font-size: 0.85rem; }
 .cosmetic-swatch-desc { font-size: 0.72rem; color: var(--muted); }
 
@@ -3059,11 +3108,69 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   0% { background-position: 100% 100%, 0% 50%; }
   100% { background-position: 100% 100%, 300% 50%; }
 }
+
+/* ---------- Bonk-Kosmetiken ---------- */
+.mc-cosmetic-bonk_bronze {
+  color: #cd7f32;
+  border-color: color-mix(in srgb, #cd7f32 55%, var(--line));
+  box-shadow: 0 0 10px color-mix(in srgb, #cd7f32 30%, transparent);
+}
+.mc-cosmetic-bonk_silver {
+  color: #d6d9dd;
+  border-color: color-mix(in srgb, #b7bcc4 55%, var(--line));
+  box-shadow: 0 0 12px color-mix(in srgb, #d6d9dd 30%, transparent);
+}
+.mc-cosmetic-bonk_gold {
+  color: #ffcf4d;
+  border-color: color-mix(in srgb, #ffcf4d 55%, var(--line));
+  box-shadow: 0 0 18px color-mix(in srgb, #ffcf4d 45%, transparent);
+  animation: bkmpTierGlow 2.4s ease infinite;
+}
+.mc-cosmetic-bonk_inferno {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box,
+              linear-gradient(120deg, #ff2d55, #ff7a1a, #ffce33) border-box;
+  border: 1px solid transparent;
+  box-shadow: 0 0 18px rgba(255, 60, 40, 0.45);
+}
+.mc-cosmetic-bonk_inferno #mcNameBadgeText,
+.mc-cosmetic-bonk_inferno .cosmetic-swatch-name,
+.mc-cosmetic-bonk_inferno .leaderboard-name-text {
+  background: linear-gradient(120deg, #ff2d55, #ff7a1a, #ffce33);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: bkmpTierGlow 2s ease infinite;
+}
+.mc-cosmetic-bonk_legend {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box,
+              linear-gradient(90deg, #ff2d55, #ffce33, #7c3aed, #ff2d55) border-box;
+  background-size: 100% 100%, 300% 100%;
+  border: 1px solid transparent;
+  box-shadow: 0 0 22px rgba(124, 58, 237, 0.4);
+  animation: bkmpRainbowBorder 3.5s linear infinite;
+}
+.mc-cosmetic-bonk_legend #mcNameBadgeText,
+.mc-cosmetic-bonk_legend .cosmetic-swatch-name,
+.mc-cosmetic-bonk_legend .leaderboard-name-text {
+  background: linear-gradient(90deg, #ff2d55, #ffce33, #7c3aed, #ff2d55);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: bkmpRainbowBorder 3.5s linear infinite;
+}
 @media (prefers-reduced-motion: reduce) {
   .mc-cosmetic-fire #mcNameBadgeText, .mc-cosmetic-fire .cosmetic-swatch-name, .mc-cosmetic-fire .leaderboard-name-text,
   .mc-cosmetic-aurora #mcNameBadgeText, .mc-cosmetic-aurora .cosmetic-swatch-name, .mc-cosmetic-aurora .leaderboard-name-text,
   .mc-cosmetic-rainbow,
-  .mc-cosmetic-rainbow #mcNameBadgeText, .mc-cosmetic-rainbow .cosmetic-swatch-name, .mc-cosmetic-rainbow .leaderboard-name-text { animation: none; }
+  .mc-cosmetic-rainbow #mcNameBadgeText, .mc-cosmetic-rainbow .cosmetic-swatch-name, .mc-cosmetic-rainbow .leaderboard-name-text,
+  .mc-cosmetic-bonk_gold,
+  .mc-cosmetic-bonk_inferno #mcNameBadgeText, .mc-cosmetic-bonk_inferno .cosmetic-swatch-name, .mc-cosmetic-bonk_inferno .leaderboard-name-text,
+  .mc-cosmetic-bonk_legend,
+  .mc-cosmetic-bonk_legend #mcNameBadgeText, .mc-cosmetic-bonk_legend .cosmetic-swatch-name, .mc-cosmetic-bonk_legend .leaderboard-name-text { animation: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

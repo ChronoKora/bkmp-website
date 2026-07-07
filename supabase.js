@@ -1959,11 +1959,12 @@ function bkmpMapPlayerStatsFromSupabase(row) {
     panelOpens: Number(row.panel_opens || 0),
     activeTitle: row.active_title || '',
     activeCosmetic: row.active_cosmetic || '',
+    bonkCount: Number(row.bonk_count || 0),
     updatedAt: row.updated_at ? Date.parse(row.updated_at) : 0
   };
 }
 
-const BKMP_PLAYER_STATS_COLUMNS = 'display_name, minutes_spent, achievements_unlocked, eggs_found, days_visited, flags, panel_opens, active_title, active_cosmetic, updated_at';
+const BKMP_PLAYER_STATS_COLUMNS = 'display_name, minutes_spent, achievements_unlocked, eggs_found, days_visited, flags, panel_opens, active_title, active_cosmetic, bonk_count, updated_at';
 
 async function loadLeaderboardStats() {
   const client = bkmpGetSupabaseClient();
@@ -2004,6 +2005,7 @@ async function upsertPlayerStats(displayName, stats) {
       panel_opens: Math.max(0, Math.round(stats.panelOpens || 0)),
       active_title: stats.activeTitle || '',
       active_cosmetic: stats.activeCosmetic || '',
+      bonk_count: Math.max(0, Math.round(stats.bonkCount || 0)),
       updated_at: new Date().toISOString()
     }, { onConflict: 'name_key' });
   if (error) throw error;

@@ -51,6 +51,7 @@ alter table public.player_stats add column if not exists flags jsonb not null de
 alter table public.player_stats add column if not exists panel_opens integer not null default 0;
 alter table public.player_stats add column if not exists active_title text not null default '';
 alter table public.player_stats add column if not exists active_cosmetic text not null default '';
+alter table public.player_stats add column if not exists bonk_count integer not null default 0;
 
 alter table public.player_stats drop constraint if exists player_stats_minutes_check;
 alter table public.player_stats add constraint player_stats_minutes_check check (minutes_spent >= 0 and minutes_spent <= 200000);

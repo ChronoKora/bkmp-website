@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260707-achpopup">
+<link rel="stylesheet" href="style.css?v=20260707-bonk">
 </head>
 <body>
 
@@ -47,6 +47,13 @@
         <button class="btn-nein" id="jokeNo" type="button">Verdrückt</button>
       </div>
     </div>
+  </div>
+
+  <div class="top-actions-left">
+    <button class="bonk-button" id="bkmpBonkButton" type="button" aria-label="Bonk!">
+      <img id="bkmpBonkImg" src="assets/bonk-idle.png" alt="" width="56" height="56" decoding="async">
+      <span class="bonk-count" id="bkmpBonkCount" aria-hidden="true"></span>
+    </button>
   </div>
 
   <div class="top-actions">
@@ -453,7 +460,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260707-leadercos"></script>
+  <script src="supabase.js?v=20260707-bonk"></script>
   <script src="app.js?v=20260707-purgeghost"></script>
   <script>
     bkmpInitTheme();
@@ -720,6 +727,55 @@
           triggerBkmpDiamondRain();
           if (typeof bkmpMarkEggFound === 'function') bkmpMarkEggFound('diamond');
         }
+      });
+    }
+
+    /* ---------------- Bonk-Button (oben links) ---------------- */
+    const BKMP_BONK_COUNT_KEY = 'bkmp-bonk-count';
+    function bkmpGetBonkCount() {
+      try { return Number(localStorage.getItem(BKMP_BONK_COUNT_KEY) || 0); } catch (e) { return 0; }
+    }
+    function bkmpSetBonkCount(n) {
+      try { localStorage.setItem(BKMP_BONK_COUNT_KEY, String(n)); } catch (e) {}
+    }
+    function bkmpPlayBonkSound() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(180, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(60, ctx.currentTime + 0.18);
+        gain.gain.setValueAtTime(0.4, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.22);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.24);
+        osc.onended = () => ctx.close();
+      } catch (e) {}
+    }
+    function bkmpUpdateBonkBadge(count) {
+      const label = document.getElementById('bkmpBonkCount');
+      if (!label) return;
+      label.textContent = count > 999 ? '999+' : String(count);
+      label.classList.toggle('visible', count > 0);
+    }
+    let bkmpBonkAnimTimer = null;
+    const bkmpBonkButton = document.getElementById('bkmpBonkButton');
+    const bkmpBonkImg = document.getElementById('bkmpBonkImg');
+    if (bkmpBonkButton && bkmpBonkImg) {
+      bkmpUpdateBonkBadge(bkmpGetBonkCount());
+      bkmpBonkButton.addEventListener('click', () => {
+        const newCount = bkmpGetBonkCount() + 1;
+        bkmpSetBonkCount(newCount);
+        bkmpUpdateBonkBadge(newCount);
+        bkmpPlayBonkSound();
+        bkmpBonkImg.removeAttribute('src');
+        void bkmpBonkImg.offsetWidth;
+        bkmpBonkImg.src = 'assets/bonk-animated.gif';
+        clearTimeout(bkmpBonkAnimTimer);
+        bkmpBonkAnimTimer = setTimeout(() => { bkmpBonkImg.src = 'assets/bonk-idle.png'; }, 3100);
+        if (typeof renderAchievementBadge === 'function') renderAchievementBadge();
       });
     }
 
@@ -2474,7 +2530,8 @@
         flags: bkmpGetFlags(),
         panelOpens: bkmpGetPanelOpens(),
         activeTitle: typeof bkmpGetActiveTitleName === 'function' ? bkmpGetActiveTitleName() : '',
-        activeCosmetic: bkmpGetActiveCosmetic()
+        activeCosmetic: bkmpGetActiveCosmetic(),
+        bonkCount: bkmpGetBonkCount()
       }).catch(e => console.warn('Konnte Erfolge/Zeit nicht mit dem Leaderboard synchronisieren.', e));
     }
 
@@ -2505,6 +2562,10 @@
 
         const mergedPanelOpens = Math.max(bkmpGetPanelOpens(), remote.panelOpens || 0);
         try { localStorage.setItem(BKMP_PANEL_OPENS_KEY, String(mergedPanelOpens)); } catch (e) {}
+
+        const mergedBonkCount = Math.max(bkmpGetBonkCount(), remote.bonkCount || 0);
+        bkmpSetBonkCount(mergedBonkCount);
+        if (typeof bkmpUpdateBonkBadge === 'function') bkmpUpdateBonkBadge(mergedBonkCount);
 
         if (!bkmpGetActiveTitle() && remote.activeTitle) {
           const remoteTitle = BKMP_TITLES.find(t => t.name === remote.activeTitle);
@@ -2570,7 +2631,8 @@
         earlyBird: Boolean(flags.earlyBird),
         weekendBoth: Boolean(flags.visitedSaturday && flags.visitedSunday),
         panelOpens: bkmpGetPanelOpens(),
-        derLiberFound: bkmpGetDerLiberFound().length
+        derLiberFound: bkmpGetDerLiberFound().length,
+        bonkCount: bkmpGetBonkCount()
       };
     }
 
@@ -2592,6 +2654,15 @@
       [125, 'Kartenwahnsinn'], [150, 'Anderthalbhundert'], [175, 'Fast am Ziel'], [200, 'Zweihundert'],
       [250, 'Viertel-Tausend'], [300, 'Dreihundert'], [350, '350er-Klub'], [400, 'Vierhundert'],
       [450, 'Fast 500'], [500, 'Kartengott']
+    ];
+    const BKMP_BONK_TIERS = [
+      [1, 'Erster Bonk'], [2, 'Zweiter Bonk'], [3, 'Dreifach-Bonk'], [5, 'Bonk-Fan'], [10, 'Bonk-Sammler'],
+      [15, 'Bonk-Kenner'], [20, 'Bonk-Profi'], [25, 'Viertelhundert Bonks'], [30, 'Bonk-Meister'], [40, 'Fleißiger Boxer'],
+      [50, 'Halbes Hundert Bonks'], [60, 'Unaufhaltsam'], [75, 'Dreiviertelhundert Bonks'], [100, 'Bonk-Legende'],
+      [125, 'Bonk-Wahnsinn'], [150, 'Anderthalbhundert Bonks'], [175, 'Fast am Ziel'], [200, 'Zweihundert Bonks'],
+      [250, 'Viertel-Tausend Bonks'], [300, 'Dreihundert Bonks'], [350, '350er-Bonk-Klub'], [400, 'Vierhundert Bonks'],
+      [450, 'Fast 500 Bonks'], [500, 'Bonk-Gott'], [600, 'Sechshundert Bonks'], [750, 'Dreiviertel-Tausend Bonks'],
+      [850, 'Fast am Limit'], [1000, 'Tausend Bonks'], [1500, 'Bonk-Titan'], [2000, 'Der ewige Bonker']
     ];
     const BKMP_WISH_TIERS = [
       [1, 'Erster Wunsch'], [2, 'Zweiter Wunsch'], [3, 'Dreifachwunsch'], [5, 'Wunschfan'], [10, 'Wunschsammler'],
@@ -2632,6 +2703,7 @@
       ...bkmpTieredAchievements('days', 'Zeit & Treue', 'daysVisited', BKMP_DAYS_TIERS, n => `Besuche die Seite an ${n} verschiedenen Tagen.`),
       ...bkmpTieredAchievements('diversity', 'Vielfalt', 'categoryDiversity', BKMP_DIVERSITY_TIERS, n => `Reiche Karten in ${n} verschiedenen Kategorien ein.`),
       ...bkmpTieredAchievements('meta', 'Meilensteine', 'baseUnlockedCount', BKMP_META_TIERS, n => `Schalte ${n} andere Erfolge frei.`),
+      ...bkmpTieredAchievements('bonk', 'Bonk', 'bonkCount', BKMP_BONK_TIERS, n => `Klicke ${n}x auf den Bonk-Button.`),
       { id: 'egg_bkmp', category: 'Easter Eggs', title: '???', revealName: 'BKMP-Flüsterer', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Manche Namen tippt man öfter, als man denkt.', check: ctx => ctx.eggsFound.includes('bkmp') },
       { id: 'egg_konami', category: 'Easter Eggs', title: '???', revealName: 'Konami-Veteran', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Hoch, hoch, runter, runter... eine uralte Cheat-Tradition.', check: ctx => ctx.eggsFound.includes('konami') },
       { id: 'egg_fire', category: 'Easter Eggs', title: '???', revealName: 'Drachenbändiger', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Was fürchten Dörfer und Ritter gleichermaßen? Tipp es einfach.', check: ctx => ctx.eggsFound.includes('drache') },
@@ -2670,7 +2742,12 @@
       { id: 'fire', name: 'Feuer-Rahmen', desc: 'Nur für Drachenjäger.', unlockEgg: 'drache' },
       { id: 'aurora', name: 'Aurora', desc: 'Wandernder Farbverlauf.', unlockAt: 60 },
       { id: 'royal', name: 'Königlich', desc: 'Violett & edel.', unlockAt: 100 },
-      { id: 'rainbow', name: 'Regenbogen', desc: 'Nur für Drehscheiben-Entdecker.', unlockEgg: 'rainbow' }
+      { id: 'rainbow', name: 'Regenbogen', desc: 'Nur für Drehscheiben-Entdecker.', unlockEgg: 'rainbow' },
+      { id: 'bonk_bronze', name: 'Bonk-Bronze', desc: 'Für treue Boxer.', unlockAchievement: 'bonk_10' },
+      { id: 'bonk_silver', name: 'Bonk-Silber', desc: 'Schon ordentlich geboxt.', unlockAchievement: 'bonk_50' },
+      { id: 'bonk_gold', name: 'Bonk-Gold', desc: 'Ein wahrer Boxchampion.', unlockAchievement: 'bonk_150' },
+      { id: 'bonk_inferno', name: 'Bonk-Inferno', desc: 'Nur für die Unaufhaltsamen.', unlockAchievement: 'bonk_500' },
+      { id: 'bonk_legend', name: 'Bonk-Legende', desc: 'Der ultimative Bonker.', unlockAchievement: 'bonk_1000' }
     ];
     function bkmpGetActiveCosmetic() {
       try { return localStorage.getItem(BKMP_ACTIVE_COSMETIC_KEY) || ''; } catch (e) { return ''; }
@@ -2679,33 +2756,36 @@
       try { localStorage.setItem(BKMP_ACTIVE_COSMETIC_KEY, id); } catch (e) {}
       renderAchievementBadge();
     }
-    function bkmpCosmeticUnlocked(cosmetic, unlockedCount, eggsFound) {
-      if (cosmetic.unlockEgg) return eggsFound.includes(cosmetic.unlockEgg);
+    function bkmpCosmeticUnlocked(cosmetic, unlockedCount, ctx) {
+      if (cosmetic.unlockEgg) return ctx.eggsFound.includes(cosmetic.unlockEgg);
+      if (cosmetic.unlockAchievement) {
+        const ach = BKMP_ACHIEVEMENTS.find(a => a.id === cosmetic.unlockAchievement);
+        return ach ? ach.check(ctx) : false;
+      }
       return unlockedCount >= (cosmetic.unlockAt || 0);
     }
-    function bkmpApplyActiveCosmetic(badge, unlockedCount) {
+    function bkmpApplyActiveCosmetic(badge, unlockedCount, ctx) {
       BKMP_COSMETICS.forEach(c => badge.classList.remove('mc-cosmetic-' + c.id));
       const active = bkmpGetActiveCosmetic();
       if (!active || active === 'default') return;
-      const eggsFound = bkmpGetEggsFound();
       const cosmetic = BKMP_COSMETICS.find(c => c.id === active);
-      if (cosmetic && bkmpCosmeticUnlocked(cosmetic, unlockedCount, eggsFound)) {
+      if (cosmetic && bkmpCosmeticUnlocked(cosmetic, unlockedCount, ctx)) {
         badge.classList.add('mc-cosmetic-' + cosmetic.id);
       }
     }
     function renderCosmeticsPanel() {
       const ctx = bkmpAchievementContextWithMeta();
       const unlockedCount = BKMP_ACHIEVEMENTS.filter(a => a.check(ctx)).length;
-      const eggsFound = ctx.eggsFound;
       const active = bkmpGetActiveCosmetic() || 'default';
       const el = document.getElementById('cosmeticsList');
       el.innerHTML = BKMP_COSMETICS.map(c => {
-        const unlocked = bkmpCosmeticUnlocked(c, unlockedCount, eggsFound);
+        const unlocked = bkmpCosmeticUnlocked(c, unlockedCount, ctx);
         const isActive = active === c.id;
+        const lockedHint = c.unlockEgg ? 'Finde das passende Easter Egg.' : (c.unlockAchievement ? 'Erst diesen Erfolg freischalten.' : `Ab ${c.unlockAt} Erfolgen`);
         return `
           <button type="button" class="cosmetic-swatch mc-cosmetic-${c.id} ${unlocked ? '' : 'locked'} ${isActive ? 'active' : ''}" data-cosmetic-id="${escapeHtml(c.id)}" ${unlocked ? '' : 'disabled'}>
             <span class="cosmetic-swatch-name">${unlocked ? escapeHtml(c.name) : '🔒'}</span>
-            <span class="cosmetic-swatch-desc">${unlocked ? escapeHtml(c.desc) : (c.unlockEgg ? 'Finde das passende Easter Egg.' : `Ab ${c.unlockAt} Erfolgen`)}</span>
+            <span class="cosmetic-swatch-desc">${unlocked ? escapeHtml(c.desc) : lockedHint}</span>
           </button>`;
       }).join('');
       el.querySelectorAll('.cosmetic-swatch:not(.locked)').forEach(btn => {
@@ -2728,7 +2808,12 @@
       { id: 'liberjaeger', name: 'Liber-Jäger', desc: 'Alle Strichmännchen gefunden.', unlockAchievement: 'egg_derliber' },
       { id: 'legende', name: 'BKMP-Legende', desc: 'Weit über dem Durchschnitt.', unlockAt: 60 },
       { id: 'unaufhaltsam', name: 'Unaufhaltsam', desc: 'Kaum zu stoppen.', unlockAt: 100 },
-      { id: 'allmaechtig', name: 'Der/Die Allmächtige', desc: 'Fast alles erreicht.', unlockAt: 120 }
+      { id: 'allmaechtig', name: 'Der/Die Allmächtige', desc: 'Fast alles erreicht.', unlockAt: 120 },
+      { id: 'bonker', name: 'Der Bonker', desc: 'Hat öfter zugeschlagen.', unlockAchievement: 'bonk_25' },
+      { id: 'boxchamp', name: 'Boxchampion', desc: 'Kaum zu bremsen.', unlockAchievement: 'bonk_100' },
+      { id: 'faustkoenig', name: 'Faustkönig', desc: 'Herrscher der Fäuste.', unlockAchievement: 'bonk_400' },
+      { id: 'bonkgott', name: 'Bonk-Gott', desc: 'Legendärer Status erreicht.', unlockAchievement: 'bonk_1000' },
+      { id: 'ewigerbonker', name: 'Der ewige Bonker', desc: 'Wird wohl nie aufhören.', unlockAchievement: 'bonk_2000' }
     ];
     function bkmpGetActiveTitle() {
       try { return localStorage.getItem(BKMP_ACTIVE_TITLE_KEY) || ''; } catch (e) { return ''; }
@@ -2872,7 +2957,7 @@
       const unlockedCount = BKMP_ACHIEVEMENTS.filter(a => a.check(ctx)).length;
       if (typeof bkmpCheckForNewAchievementUnlocks === 'function') bkmpCheckForNewAchievementUnlocks(ctx);
       badge.classList.remove('tier-1', 'tier-2', 'tier-3');
-      bkmpApplyActiveCosmetic(badge, unlockedCount);
+      bkmpApplyActiveCosmetic(badge, unlockedCount, ctx);
       if (!name) {
         badgeText.textContent = 'Wer bist du?';
         badge.title = '';
@@ -2889,7 +2974,7 @@
       if (typeof bkmpSyncPlayerStats === 'function') bkmpSyncPlayerStats(unlockedCount);
     }
 
-    const BKMP_ACHIEVEMENT_CATEGORY_ORDER = ['Karten', 'Kartenideen', 'Zeit & Treue', 'Vielfalt', 'Meilensteine', 'Easter Eggs', 'Sonstiges'];
+    const BKMP_ACHIEVEMENT_CATEGORY_ORDER = ['Karten', 'Kartenideen', 'Zeit & Treue', 'Vielfalt', 'Bonk', 'Meilensteine', 'Easter Eggs', 'Sonstiges'];
     const bkmpAchievementCategoryOpen = {};
 
     function renderAchievementsPanel() {
