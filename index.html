@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260707-plushies">
+<link rel="stylesheet" href="style.css?v=20260707-dailyevents">
 </head>
 <body>
 
@@ -472,8 +472,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260707-plushies"></script>
-  <script src="app.js?v=20260707-plushies"></script>
+  <script src="supabase.js?v=20260707-dailyevents"></script>
+  <script src="app.js?v=20260707-plushiesdb"></script>
   <script>
     bkmpInitTheme();
     window.addEventListener('load', () => document.body.classList.add('page-loaded'));
@@ -2648,8 +2648,18 @@
         panelOpens: bkmpGetPanelOpens(),
         derLiberFound: bkmpGetDerLiberFound().length,
         bonkCount: bkmpGetBonkCount(),
-        ownedPlushies: bkmpOwnedPlushies
+        ownedPlushies: bkmpOwnedPlushies,
+        dailyEventWins: bkmpGetDailyEventWins(),
+        wonGoldenHour: bkmpGetWonGoldenHour()
       };
+    }
+    /* Daily-Code-Event-Gewinne: lokal gecacht (wird bei Sieg gesetzt, siehe
+       Daily-Event-Abschnitt weiter unten), fuer Titel/Erfolge nutzbar. */
+    function bkmpGetDailyEventWins() {
+      try { return Number(localStorage.getItem('bkmp-daily-event-wins') || 0); } catch (e) { return 0; }
+    }
+    function bkmpGetWonGoldenHour() {
+      try { return localStorage.getItem('bkmp-won-golden-hour') === '1'; } catch (e) { return false; }
     }
 
     function bkmpTieredAchievements(idPrefix, category, metricKey, tiers, descFn) {
@@ -2710,7 +2720,8 @@
       [100, 'Hundert Erfolge'], [110, 'Hundertzehn Erfolge'], [120, 'Hundertzwanzig Erfolge'], [125, 'Fast alles']
     ];
 
-    const BKMP_ACHIEVEMENTS = [
+    function bkmpBuildAchievementsList() {
+    return [
       { id: 'name_set', category: 'Sonstiges', title: 'Angekommen', desc: 'Trag deinen Minecraft-Namen ein.', check: ctx => ctx.hasName },
       ...bkmpTieredAchievements('card', 'Karten', 'cardCount', BKMP_CARD_TIERS, n => `Reiche ${n} Karte${n === 1 ? '' : 'n'} in der Kartendatenbank ein.`),
       ...bkmpTieredAchievements('wish', 'Kartenideen', 'wishCount', BKMP_WISH_TIERS, n => `Reiche ${n} Kartenidee${n === 1 ? '' : 'n'} ein.`),
@@ -2745,8 +2756,14 @@
         desc: 'Schalte diesen Plüshie per Code frei.',
         check: ctx => ctx.ownedPlushies.includes(p.id)
       })),
-      { id: 'plushie_all', category: 'Plüshies', title: 'Besitze sie alle', desc: 'Schalte alle Plüshies frei.', progress: ctx => [ctx.ownedPlushies.length, BKMP_PLUSHIES.length], check: ctx => BKMP_PLUSHIES.every(p => ctx.ownedPlushies.includes(p.id)) }
+      { id: 'plushie_all', category: 'Plüshies', title: 'Besitze sie alle', desc: 'Schalte alle Plüshies frei.', progress: ctx => [ctx.ownedPlushies.length, BKMP_PLUSHIES.length], check: ctx => BKMP_PLUSHIES.length > 0 && BKMP_PLUSHIES.every(p => ctx.ownedPlushies.includes(p.id)) },
+      { id: 'daily_event_1', category: 'Plüshies', title: '???', revealName: 'Glücklicher Gewinner', desc: 'Gewinne ein Daily-Code-Event.', check: ctx => ctx.dailyEventWins >= 1 },
+      { id: 'daily_event_5', category: 'Plüshies', title: '???', revealName: 'Serien-Gewinner', desc: 'Gewinne 5 Daily-Code-Events.', progress: ctx => [ctx.dailyEventWins, 5], check: ctx => ctx.dailyEventWins >= 5 },
+      { id: 'daily_event_15', category: 'Plüshies', title: '???', revealName: 'Event-Champion', desc: 'Gewinne 15 Daily-Code-Events.', progress: ctx => [ctx.dailyEventWins, 15], check: ctx => ctx.dailyEventWins >= 15 },
+      { id: 'golden_hour_win', category: 'Plüshies', title: '???', revealName: 'Der Auserwählte', desc: 'Gewinne den Code der Golden Hour als Erster.', check: ctx => ctx.wonGoldenHour }
     ];
+    }
+    let BKMP_ACHIEVEMENTS = bkmpBuildAchievementsList();
 
     function bkmpAchievementContextWithMeta() {
       const ctx = bkmpBuildAchievementContext();
@@ -2822,7 +2839,8 @@
 
     /* ---------------- Titel ---------------- */
     const BKMP_ACTIVE_TITLE_KEY = 'bkmp-active-title';
-    const BKMP_TITLES = [
+    function bkmpBuildTitlesList() {
+    return [
       { id: 'none', name: 'Kein Titel', desc: 'Nur dein Name.', unlockAlways: true },
       { id: 'neuling', name: 'Neuling', desc: 'Erste Schritte gemacht.', unlockAt: 5 },
       { id: 'kartensammler', name: 'Kartensammler', desc: 'Für echte Kartenfans.', unlockAchievement: 'card_50' },
@@ -2837,8 +2855,62 @@
       { id: 'boxchamp', name: 'Boxchampion', desc: 'Kaum zu bremsen.', unlockAchievement: 'bonk_2500' },
       { id: 'faustkoenig', name: 'Faustkönig', desc: 'Herrscher der Fäuste.', unlockAchievement: 'bonk_50000' },
       { id: 'bonkgott', name: 'Bonk-Gott', desc: 'Legendärer Status erreicht.', unlockAchievement: 'bonk_500000' },
-      { id: 'ewigerbonker', name: 'Der ewige Bonker', desc: 'Wird wohl nie aufhören.', unlockAchievement: 'bonk_1000000' }
+      { id: 'ewigerbonker', name: 'Der ewige Bonker', desc: 'Wird wohl nie aufhören.', unlockAchievement: 'bonk_1000000' },
+      { id: 'stammgast', name: 'Stammgast', desc: 'Schaut regelmäßig vorbei.', unlockAchievement: 'time_10' },
+      { id: 'veteran', name: 'Veteran', desc: 'Schon einen Monat dabei.', unlockAchievement: 'days_30' },
+      { id: 'bkmp_veteran', name: 'BKMP Veteran', desc: 'Ein ganzes Quartal treu.', unlockAchievement: 'days_90' },
+      { id: 'chrono_legende', name: 'Chrono-Legende', desc: 'Legendärer Fortschritt.', unlockAt: 90 },
+      { id: 'titeljaeger', name: 'Titeljäger', desc: 'Sammelt Erfolge wie kein Zweiter.', unlockAchievement: 'meta_40' },
+      { id: 'achievement_hunter', name: 'Achievement Hunter', desc: 'Auf der Jagd nach Erfolgen.', unlockAchievement: 'meta_60' },
+      { id: 'achievement_meister', name: 'Achievement Meister', desc: 'Fast alle Erfolge im Griff.', unlockAchievement: 'meta_100' },
+      { id: 'sammler', name: 'Sammler', desc: 'Ordentliche Kartensammlung.', unlockAchievement: 'card_25' },
+      { id: 'supersammler', name: 'Supersammler', desc: 'Eine riesige Kartensammlung.', unlockAchievement: 'card_100' },
+      { id: 'plushie_sammler', name: 'Plüshie Sammler', desc: 'Hat schon einige Plüshies.', unlockCustom: ctx => ctx.ownedPlushies.length >= 3 },
+      { id: 'plushie_koenig', name: 'Plüshie König', desc: 'Fast die komplette Plüshie-Sammlung.', unlockCustom: ctx => BKMP_PLUSHIES.length > 1 && ctx.ownedPlushies.length >= BKMP_PLUSHIES.length - 1 },
+      { id: 'plushie_gott', name: 'Plüshie Gott', desc: 'Besitzt jedes einzelne Plüshie.', unlockAchievement: 'plushie_all' },
+      { id: 'fanboy', name: 'Fanboy', desc: 'Hat sein erstes Plüshie ergattert.', unlockCustom: ctx => ctx.ownedPlushies.length >= 1 },
+      { id: 'superfan', name: 'Superfan', desc: 'Gleich mehrere Plüshies gesammelt.', unlockCustom: ctx => ctx.ownedPlushies.length >= 2 },
+      { id: 'maximaler_fanboy', name: 'Maximaler Fanboy', desc: 'Absoluter Plüshie-Enthusiast.', unlockCustom: ctx => ctx.ownedPlushies.length >= 4 },
+      { id: 'creator_supporter', name: 'Creator Supporter', desc: 'Unterstützt die Creator aktiv.', unlockCustom: ctx => ctx.ownedPlushies.length >= 1 },
+      { id: 'creator_freund', name: 'Creator Freund', desc: 'Den Creators eng verbunden.', unlockCustom: ctx => ctx.ownedPlushies.length >= 3 },
+      { id: 'codejaeger', name: 'Codejäger', desc: 'Hat erfolgreich einen Code eingelöst.', unlockCustom: ctx => ctx.ownedPlushies.length >= 1 },
+      { id: 'code_ninja', name: 'Code Ninja', desc: 'Flink beim Code-Einlösen.', unlockCustom: ctx => ctx.ownedPlushies.length >= 3 },
+      { id: 'code_meister', name: 'Code Meister', desc: 'Kennt sich mit Codes bestens aus.', unlockCustom: ctx => ctx.ownedPlushies.length >= 5 },
+      { id: 'code_suechtig', name: 'Code Süchtig', desc: 'Kann nicht genug von Codes bekommen.', unlockCustom: ctx => ctx.ownedPlushies.length >= 2 },
+      { id: 'lucky_one', name: 'Lucky One', desc: 'Hat ein Daily-Code-Event gewonnen.', unlockCustom: ctx => ctx.dailyEventWins >= 1 },
+      { id: 'gluecksritter', name: 'Glücksritter', desc: 'Das Glück ist auf seiner Seite.', unlockCustom: ctx => ctx.dailyEventWins >= 3 },
+      { id: 'der_erste', name: 'Der Erste', desc: 'War als Erster am Code dran.', unlockCustom: ctx => ctx.dailyEventWins >= 1 },
+      { id: 'der_schnellste', name: 'Der Schnellste', desc: 'Schneller als alle anderen.', unlockCustom: ctx => ctx.dailyEventWins >= 5 },
+      { id: 'pixelmeister', name: 'Pixelmeister', desc: 'Ein Auge für schöne Karten.', unlockAchievement: 'card_10' },
+      { id: 'pixelmagier', name: 'Pixelmagier', desc: 'Zaubert Karten herbei.', unlockAchievement: 'card_60' },
+      { id: 'kartenfreund', name: 'Kartenfreund', desc: 'Mag Karten sehr.', unlockAchievement: 'card_3' },
+      { id: 'kartenjaeger', name: 'Kartenjäger', desc: 'Immer auf der Suche nach neuen Karten.', unlockAchievement: 'card_40' },
+      { id: 'mapart_genie', name: 'MapArt Genie', desc: 'Kreative Kartenideen am laufenden Band.', unlockAchievement: 'wish_25' },
+      { id: 'plot_koenig', name: 'Plot König', desc: 'Herrscher über die Kartenideen.', unlockAchievement: 'wish_100' },
+      { id: 'glow_traeger', name: 'Glow Träger', desc: 'Trägt ein leuchtendes Gold.', unlockAt: 25 },
+      { id: 'leuchtende_legende', name: 'Leuchtende Legende', desc: 'Strahlt heller als der Rest.', unlockAt: 60 },
+      { id: 'der_geduldige', name: 'Der Geduldige', desc: 'Wartet einfach mal ab.', unlockAchievement: 'egg_idle' },
+      { id: 'der_verlorene', name: 'Der Verlorene', desc: 'Hat sich fast verirrt.', unlockAchievement: 'egg_jannik' },
+      { id: 'der_zufaellige', name: 'Der Zufällige', desc: 'Verlässt sich gern auf den Zufall.', unlockAchievement: 'egg_rainbow' },
+      { id: 'wahnsinniger_sammler', name: 'Der Wahnsinnige Sammler', desc: 'Sammelt einfach alles.', unlockAt: 100 },
+      { id: 'collector_plus', name: 'Collector++', desc: 'Eine beachtliche Sammlung.', unlockAchievement: 'card_200' },
+      { id: 'collector_ultra', name: 'Collector Ultra', desc: 'Eine gewaltige Sammlung.', unlockAchievement: 'card_300' },
+      { id: 'collector_supreme', name: 'Collector Supreme', desc: 'Die ultimative Kartensammlung.', unlockAchievement: 'card_500' },
+      { id: 'bkmp_ultra', name: 'BKMP Ultra', desc: 'Fast am absoluten Limit.', unlockAt: 110 },
+      { id: 'bkmp_elite', name: 'BKMP Elite', desc: 'Gehört zur absoluten Elite.', unlockAt: 125 },
+      { id: 'geheimcode_finder', name: 'Geheimcode Finder', desc: 'Hat einen geheimen Code gefunden.', unlockCustom: ctx => ctx.ownedPlushies.length >= 1 },
+      { id: 'kuschelkoenig', name: 'Kuschelkönig', desc: 'Herrscher über alle Plüshies.', unlockAchievement: 'plushie_all' },
+      { id: 'kuschelmeister', name: 'Kuschelmeister', desc: 'Meister im Plüshie-Sammeln.', unlockCustom: ctx => ctx.ownedPlushies.length >= 4 },
+      { id: 'goldjaeger', name: 'Goldjäger', desc: 'Exklusiv für Golden-Hour-Gewinner.', unlockCustom: ctx => ctx.wonGoldenHour },
+      ...BKMP_PLUSHIES.map(p => ({
+        id: `plushie_fanboy_${p.id}`,
+        name: `Maximaler ${p.name.replace(/\s*Plüshie$/i, '')} Fanboy`,
+        desc: `Besitzt das ${p.name}.`,
+        unlockAchievement: `plushie_${p.id}`
+      }))
     ];
+    }
+    let BKMP_TITLES = bkmpBuildTitlesList();
     function bkmpGetActiveTitle() {
       try { return localStorage.getItem(BKMP_ACTIVE_TITLE_KEY) || ''; } catch (e) { return ''; }
     }
@@ -2848,6 +2920,7 @@
     }
     function bkmpTitleUnlocked(title, unlockedCount, ctx) {
       if (title.unlockAlways) return true;
+      if (title.unlockCustom) return Boolean(title.unlockCustom(ctx));
       if (title.unlockAchievement) {
         const ach = BKMP_ACHIEVEMENTS.find(a => a.id === title.unlockAchievement);
         return ach ? ach.check(ctx) : false;
@@ -2891,6 +2964,28 @@
     function bkmpSetActivePlushie(id) {
       try { localStorage.setItem(BKMP_ACTIVE_PLUSHIE_KEY, id); } catch (e) {}
       renderAchievementBadge();
+    }
+    /* Laedt die Pluschie-DEFINITIONEN (Name/Bild/Beschreibung) aus der
+       Datenbank statt der festen JS-Liste, damit neue, per Admin-Panel
+       gescannte Pluschies ohne Code-Aenderung auf der Seite auftauchen.
+       Erfolge und Titel werden danach neu gebaut, weil sie pro Pluschie
+       einen eigenen Eintrag erzeugen (siehe bkmpBuildAchievementsList /
+       bkmpBuildTitlesList weiter oben). */
+    async function bkmpRefreshPlushieDefinitions() {
+      if (typeof loadPlushies !== 'function' || !bkmpGetSupabaseClient()) return;
+      try {
+        const rows = await loadPlushies();
+        if (rows && rows.length > 0) {
+          BKMP_PLUSHIES = rows;
+          BKMP_ACHIEVEMENTS = bkmpBuildAchievementsList();
+          BKMP_TITLES = bkmpBuildTitlesList();
+          renderAchievementBadge();
+          const panel = document.getElementById('plushiesPanel');
+          if (panel && panel.style.display !== 'none') renderPlushiesPanel();
+        }
+      } catch (e) {
+        console.warn('Pluschie-Liste konnte nicht geladen werden.', e);
+      }
     }
     async function bkmpRefreshOwnedPlushies() {
       const name = bkmpGetMcName();
@@ -2972,6 +3067,190 @@
         plushieRedeemBtn.textContent = 'Einlösen';
       });
       plushieCodeInput.addEventListener('keydown', e => { if (e.key === 'Enter') plushieRedeemBtn.click(); });
+    }
+
+    /* ---------------- Daily Code Events + Golden Hour ---------------- */
+    let bkmpDailyEventPollTimer = null;
+    let bkmpDailyEventCountdownTimer = null;
+    let bkmpCurrentDailyEvent = null;
+
+    function bkmpStartDailyEventPolling() {
+      bkmpPollDailyEvent();
+      clearInterval(bkmpDailyEventPollTimer);
+      bkmpDailyEventPollTimer = setInterval(bkmpPollDailyEvent, 15000);
+    }
+
+    async function bkmpPollDailyEvent() {
+      try {
+        const res = await fetch('/api/active-daily-event');
+        if (!res.ok) return;
+        const body = await res.json();
+        if (body.active) {
+          bkmpHandleActiveDailyEvent(body.event);
+        } else {
+          bkmpCloseDailyEventPopup();
+        }
+      } catch (e) { /* still offline/unreachable - einfach beim naechsten Poll erneut versuchen */ }
+    }
+
+    function bkmpHandleActiveDailyEvent(event) {
+      const already = document.getElementById('bkmpDailyPopup');
+      if (already && bkmpCurrentDailyEvent && bkmpCurrentDailyEvent.id === event.id) {
+        bkmpCurrentDailyEvent = event;
+        bkmpUpdateDailyEventWinState(event);
+        return;
+      }
+      bkmpCurrentDailyEvent = event;
+      bkmpShowDailyEventPopup(event);
+    }
+
+    function bkmpCloseDailyEventPopup() {
+      const popup = document.getElementById('bkmpDailyPopup');
+      if (popup) popup.remove();
+      clearInterval(bkmpDailyEventCountdownTimer);
+      bkmpCurrentDailyEvent = null;
+    }
+
+    function bkmpShowDailyEventPopup(event) {
+      bkmpCloseDailyEventPopup();
+      bkmpCurrentDailyEvent = event;
+      const plushie = BKMP_PLUSHIES.find(p => p.id === event.plushieId);
+      const popup = document.createElement('div');
+      popup.id = 'bkmpDailyPopup';
+      popup.className = 'bkmp-daily-popup-backdrop';
+      popup.innerHTML = `
+        <div class="bkmp-daily-popup-card${event.isGoldenHour ? ' golden-hour' : ''}">
+          <div class="bkmp-daily-popup-particles"></div>
+          ${event.isGoldenHour ? '<div class="bkmp-daily-popup-ribbon">⭐ GOLDEN HOUR ⭐</div>' : ''}
+          <button type="button" class="bkmp-daily-popup-close" id="bkmpDailyPopupClose" aria-label="Schließen">&times;</button>
+          <div class="bkmp-daily-popup-icon">${event.isGoldenHour ? '👑' : '✨'}</div>
+          <h3>Ein geheimer Creator-Code wurde entdeckt!</h3>
+          <p class="bkmp-daily-popup-sub">Nur der ALLERERSTE Spieler erhält dieses Plüshie!</p>
+          ${plushie ? `<div class="bkmp-daily-popup-plushie"><img src="${escapeHtml(plushie.image)}" alt=""><span>${escapeHtml(plushie.name)}</span></div>` : ''}
+          <div class="bkmp-daily-popup-code">${escapeHtml(event.code)}</div>
+          <div class="bkmp-daily-popup-countdown">⏳ Noch <span id="bkmpDailyCountdown">03:00</span> verfügbar!</div>
+          <button type="button" class="bkmp-daily-popup-claim" id="bkmpDailyClaimBtn">Jetzt sichern!</button>
+          <p class="bkmp-daily-popup-msg" id="bkmpDailyPopupMsg"></p>
+        </div>
+      `;
+      document.body.appendChild(popup);
+      requestAnimationFrame(() => popup.classList.add('visible'));
+
+      const particles = popup.querySelector('.bkmp-daily-popup-particles');
+      if (particles) {
+        particles.innerHTML = Array.from({ length: 18 }, () => {
+          const left = Math.round(Math.random() * 100);
+          const delay = (Math.random() * 3).toFixed(2);
+          const duration = (2.4 + Math.random() * 2).toFixed(2);
+          return `<span style="left:${left}%; animation-delay:${delay}s; animation-duration:${duration}s;"></span>`;
+        }).join('');
+      }
+
+      document.getElementById('bkmpDailyPopupClose').addEventListener('click', bkmpCloseDailyEventPopup);
+      document.getElementById('bkmpDailyClaimBtn').addEventListener('click', bkmpClaimDailyEvent);
+
+      bkmpUpdateDailyEventWinState(event);
+      bkmpTickDailyEventCountdown();
+      clearInterval(bkmpDailyEventCountdownTimer);
+      bkmpDailyEventCountdownTimer = setInterval(bkmpTickDailyEventCountdown, 1000);
+    }
+
+    function bkmpTickDailyEventCountdown() {
+      if (!bkmpCurrentDailyEvent) return;
+      const remainingMs = new Date(bkmpCurrentDailyEvent.expiresAt).getTime() - Date.now();
+      const label = document.getElementById('bkmpDailyCountdown');
+      if (remainingMs <= 0) {
+        bkmpCloseDailyEventPopup();
+        return;
+      }
+      const totalSeconds = Math.ceil(remainingMs / 1000);
+      const mm = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+      const ss = String(totalSeconds % 60).padStart(2, '0');
+      if (label) label.textContent = `${mm}:${ss}`;
+    }
+
+    function bkmpUpdateDailyEventWinState(event) {
+      const claimBtn = document.getElementById('bkmpDailyClaimBtn');
+      const msg = document.getElementById('bkmpDailyPopupMsg');
+      if (!claimBtn || !msg) return;
+      if (event.won) {
+        claimBtn.style.display = 'none';
+        const isMe = bkmpGetMcName() && event.winnerDisplayName && bkmpGetMcName().trim().toLowerCase() === event.winnerDisplayName.trim().toLowerCase();
+        msg.textContent = isMe
+          ? 'Glückwunsch! Du warst der Erste und hast das Plüshie erhalten! 🎉'
+          : `Leider war jemand schneller. (${event.winnerDisplayName} hat gewonnen)`;
+        msg.classList.toggle('success', Boolean(isMe));
+        msg.classList.toggle('error', !isMe);
+      } else {
+        claimBtn.style.display = '';
+        msg.textContent = '';
+        msg.classList.remove('success', 'error');
+      }
+    }
+
+    async function bkmpClaimDailyEvent() {
+      if (!bkmpCurrentDailyEvent) return;
+      const name = bkmpGetMcName();
+      const msg = document.getElementById('bkmpDailyPopupMsg');
+      if (!name) {
+        if (msg) { msg.textContent = 'Bitte trag zuerst deinen Minecraft-Namen ein.'; msg.classList.add('error'); }
+        return;
+      }
+      const btn = document.getElementById('bkmpDailyClaimBtn');
+      btn.disabled = true;
+      btn.textContent = 'Wird gesichert...';
+      try {
+        const res = await fetch('/api/redeem-daily-event', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ eventId: bkmpCurrentDailyEvent.id, playerName: name })
+        });
+        const body = await res.json();
+        if (res.ok && body.ok) {
+          const wins = bkmpGetDailyEventWins() + 1;
+          try { localStorage.setItem('bkmp-daily-event-wins', String(wins)); } catch (e) {}
+          if (body.isGoldenHour) { try { localStorage.setItem('bkmp-won-golden-hour', '1'); } catch (e) {} }
+          await bkmpRefreshOwnedPlushies();
+          renderAchievementBadge();
+          bkmpCurrentDailyEvent.won = true;
+          bkmpCurrentDailyEvent.winnerDisplayName = name;
+          bkmpUpdateDailyEventWinState(bkmpCurrentDailyEvent);
+        } else if (body.error === 'already_won') {
+          bkmpCurrentDailyEvent.won = true;
+          bkmpCurrentDailyEvent.winnerDisplayName = body.winnerDisplayName || '???';
+          bkmpUpdateDailyEventWinState(bkmpCurrentDailyEvent);
+        } else if (body.error === 'expired') {
+          if (msg) { msg.textContent = 'Das Event ist leider schon abgelaufen.'; msg.classList.add('error'); }
+        } else {
+          if (msg) { msg.textContent = 'Etwas ist schiefgelaufen. Versuch es erneut.'; msg.classList.add('error'); }
+        }
+      } catch (e) {
+        if (msg) { msg.textContent = 'Verbindungsfehler. Versuch es erneut.'; msg.classList.add('error'); }
+      }
+      btn.disabled = false;
+      btn.textContent = 'Jetzt sichern!';
+    }
+
+    bkmpStartDailyEventPolling();
+
+    /* Test-Vorschau fuers Admin-Panel: /?testDailyPopup=1 oeffnet das Popup
+       mit Beispieldaten, ganz ohne echtes Event/DB-Zugriff. */
+    if (new URLSearchParams(window.location.search).get('testDailyPopup') === '1') {
+      const testPlushie = BKMP_PLUSHIES[0];
+      bkmpShowDailyEventPopup({
+        id: 'test-preview',
+        code: 'BKMP-TEST-DEMO',
+        plushieId: testPlushie ? testPlushie.id : '',
+        isGoldenHour: new URLSearchParams(window.location.search).get('golden') === '1',
+        expiresAt: new Date(Date.now() + 3 * 60000).toISOString(),
+        won: false
+      });
+      const claimBtn = document.getElementById('bkmpDailyClaimBtn');
+      if (claimBtn) claimBtn.addEventListener('click', e => {
+        e.stopImmediatePropagation();
+        const msg = document.getElementById('bkmpDailyPopupMsg');
+        if (msg) { msg.textContent = 'Das ist nur eine Vorschau – hier passiert nichts Echtes.'; }
+      }, true);
     }
 
     /* ---------------- Bestenliste ---------------- */
@@ -3238,7 +3517,7 @@
     }
 
     renderAchievementBadge();
-    bkmpRefreshOwnedPlushies();
+    bkmpRefreshPlushieDefinitions().then(() => bkmpRefreshOwnedPlushies());
   </script>
 
 </body>

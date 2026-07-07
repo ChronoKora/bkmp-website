@@ -129,15 +129,31 @@ a { color: inherit; text-decoration: none; }
   padding: 0.6rem 1.1rem;
 }
 
-#mcNameBadge { padding: 0.6rem 1.1rem 0.6rem 0.9rem; }
-.mc-name-badge-icon { font-size: 0.95rem; line-height: 1; }
+#mcNameBadge { padding: 0.5rem 1.15rem 0.5rem 0.5rem; gap: 0.65rem; }
+.mc-name-badge-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  font-size: 1.3rem;
+  line-height: 1;
+}
 .mc-name-badge-plushie {
   display: block;
-  width: 20px;
-  height: 20px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  object-fit: cover;
-  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--gold) 55%, var(--line));
+  object-fit: contain;
+  object-position: center;
+  background: color-mix(in srgb, var(--paper) 70%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--gold) 60%, var(--line)), 0 0 12px color-mix(in srgb, var(--gold) 35%, transparent);
+}
+@media (max-width: 640px) {
+  #mcNameBadge { padding: 0.4rem 0.9rem 0.4rem 0.4rem; gap: 0.5rem; }
+  .mc-name-badge-icon, .mc-name-badge-plushie { width: 32px; height: 32px; }
+  .mc-name-badge-icon { font-size: 1.1rem; }
 }
 #mcNameBadge.tier-1 { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); }
 #mcNameBadge.tier-2 {
@@ -3021,7 +3037,7 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 .cosmetic-swatch.locked { cursor: not-allowed; background: color-mix(in srgb, var(--paper-2) 80%, transparent); }
 .cosmetic-swatch.locked .cosmetic-swatch-name,
 .cosmetic-swatch.locked .cosmetic-swatch-desc { color: color-mix(in srgb, var(--ink) 55%, transparent); }
-.cosmetic-swatch-name { font-weight: 700; font-size: 0.85rem; }
+.cosmetic-swatch-name { font-weight: 700; font-size: 0.85rem; color: var(--gold); }
 .cosmetic-swatch-desc { font-size: 0.72rem; color: var(--muted); }
 
 /* ---------- Pluschies ---------- */
@@ -3281,3 +3297,184 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   outline: 2px solid var(--gold);
   outline-offset: 2px;
 }
+
+/* ---------- Daily Code Event / Golden Hour Popup ---------- */
+.bkmp-daily-popup-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(5, 4, 8, 0.72);
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+}
+.bkmp-daily-popup-backdrop.visible { opacity: 1; pointer-events: auto; }
+
+.bkmp-daily-popup-card {
+  position: relative;
+  width: min(400px, 100%);
+  padding: 1.8rem 1.6rem 1.6rem;
+  border-radius: 22px;
+  text-align: center;
+  overflow: hidden;
+  background: linear-gradient(160deg, #14101f, #0a0810 60%);
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  box-shadow: 0 0 0 1.5px rgba(167, 139, 250, 0.55), 0 30px 90px rgba(0, 0, 0, 0.55), 0 0 60px rgba(124, 58, 237, 0.45);
+  transform: scale(0.85) translateY(10px);
+  transition: transform 0.4s cubic-bezier(.2, 1.4, .4, 1);
+  animation: bkmpDailyPulse 2.6s ease-in-out infinite;
+}
+.bkmp-daily-popup-backdrop.visible .bkmp-daily-popup-card { transform: scale(1) translateY(0); }
+@keyframes bkmpDailyPulse {
+  0%, 100% { box-shadow: 0 0 0 1.5px rgba(167, 139, 250, 0.55), 0 30px 90px rgba(0, 0, 0, 0.55), 0 0 45px rgba(124, 58, 237, 0.35); }
+  50% { box-shadow: 0 0 0 1.5px rgba(167, 139, 250, 0.85), 0 30px 90px rgba(0, 0, 0, 0.55), 0 0 75px rgba(124, 58, 237, 0.65); }
+}
+
+.bkmp-daily-popup-card.golden-hour {
+  box-shadow: 0 0 0 1.5px rgba(255, 206, 51, 0.65), 0 30px 90px rgba(0, 0, 0, 0.55), 0 0 60px rgba(255, 190, 20, 0.5);
+  background: linear-gradient(160deg, #241a08, #120d05 60%);
+  animation: bkmpDailyPulseGold 2.2s ease-in-out infinite;
+}
+@keyframes bkmpDailyPulseGold {
+  0%, 100% { box-shadow: 0 0 0 1.5px rgba(255, 206, 51, 0.6), 0 30px 90px rgba(0, 0, 0, 0.55), 0 0 45px rgba(255, 190, 20, 0.4); }
+  50% { box-shadow: 0 0 0 1.5px rgba(255, 206, 51, 0.95), 0 30px 90px rgba(0, 0, 0, 0.55), 0 0 85px rgba(255, 190, 20, 0.75); }
+}
+
+.bkmp-daily-popup-ribbon {
+  display: inline-block;
+  margin-bottom: 0.6rem;
+  padding: 0.3rem 0.9rem;
+  border-radius: 999px;
+  background: linear-gradient(120deg, #ffce33, #ff9d1a);
+  color: #1a1206;
+  font-weight: 800;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  box-shadow: 0 0 18px rgba(255, 190, 20, 0.6);
+}
+
+.bkmp-daily-popup-particles { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.bkmp-daily-popup-particles span {
+  position: absolute;
+  bottom: -10px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #c4b5fd;
+  box-shadow: 0 0 8px 2px rgba(196, 181, 253, 0.8);
+  animation: bkmpDailyParticleRise linear infinite;
+}
+.golden-hour .bkmp-daily-popup-particles span { background: #ffd873; box-shadow: 0 0 8px 2px rgba(255, 216, 115, 0.85); }
+@keyframes bkmpDailyParticleRise {
+  0% { transform: translateY(0) scale(0.6); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: translateY(-380px) scale(1.1); opacity: 0; }
+}
+
+.bkmp-daily-popup-close {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.9rem;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.bkmp-daily-popup-close:hover { color: var(--ink); }
+
+.bkmp-daily-popup-icon { font-size: 2.4rem; margin-bottom: 0.3rem; filter: drop-shadow(0 0 12px rgba(167, 139, 250, 0.6)); }
+.golden-hour .bkmp-daily-popup-icon { filter: drop-shadow(0 0 14px rgba(255, 190, 20, 0.75)); }
+
+.bkmp-daily-popup-card h3 { font-family: 'Fraunces', serif; font-size: 1.25rem; margin: 0 0 0.4rem; color: var(--ink); }
+.bkmp-daily-popup-sub { font-size: 0.85rem; color: var(--muted); margin: 0 0 0.9rem; }
+
+.bkmp-daily-popup-plushie {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-bottom: 0.9rem;
+}
+.bkmp-daily-popup-plushie img {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--paper) 70%, transparent);
+  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--gold) 45%, transparent);
+}
+.bkmp-daily-popup-plushie span { font-weight: 700; font-size: 0.9rem; }
+
+.bkmp-daily-popup-code {
+  font-family: 'Fraunces', serif;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.6rem 1rem;
+  border-radius: 12px;
+  margin-bottom: 0.8rem;
+  background: linear-gradient(120deg, rgba(167, 139, 250, 0.18), rgba(124, 58, 237, 0.1));
+  border: 1px dashed rgba(167, 139, 250, 0.55);
+  color: #c4b5fd;
+  user-select: all;
+}
+.golden-hour .bkmp-daily-popup-code {
+  background: linear-gradient(120deg, rgba(255, 206, 51, 0.2), rgba(255, 157, 26, 0.12));
+  border-color: rgba(255, 206, 51, 0.6);
+  color: #ffd873;
+}
+
+.bkmp-daily-popup-countdown { font-size: 0.85rem; font-weight: 700; color: var(--gold); margin-bottom: 1rem; }
+
+.bkmp-daily-popup-claim {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #a78bfa, #7c3aed);
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.95rem;
+  cursor: pointer;
+  box-shadow: 0 12px 30px rgba(124, 58, 237, 0.45);
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+.bkmp-daily-popup-claim:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.bkmp-daily-popup-claim:active { transform: scale(0.97); }
+.golden-hour .bkmp-daily-popup-claim {
+  background: linear-gradient(135deg, #ffd873, #ff9d1a);
+  color: #1a1206;
+  box-shadow: 0 12px 30px rgba(255, 157, 26, 0.5);
+}
+
+.bkmp-daily-popup-msg { min-height: 1.4em; margin: 0.7rem 0 0; font-size: 0.85rem; font-weight: 700; white-space: pre-line; }
+.bkmp-daily-popup-msg.success { color: #4ade80; }
+.bkmp-daily-popup-msg.error { color: #f87171; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bkmp-daily-popup-card, .bkmp-daily-popup-card.golden-hour { animation: none; }
+  .bkmp-daily-popup-particles span { animation: none; opacity: 0; }
+}
+
+/* ---------- Admin: Daily-Events Statistik-Karten ---------- */
+.daily-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.7rem;
+}
+.daily-stat-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.7rem 0.9rem;
+  background: var(--paper-2);
+}
+.daily-stat-card .value { font-family: 'Fraunces', serif; font-size: 1.3rem; font-weight: 700; color: var(--gold); }
+.daily-stat-card .label { font-size: 0.72rem; color: var(--muted); margin-top: 0.15rem; }

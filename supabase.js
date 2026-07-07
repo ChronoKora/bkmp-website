@@ -2015,6 +2015,55 @@ async function upsertPlayerStats(displayName, stats) {
 }
 
 /* ---------------- Pluschies ---------------- */
+async function loadPlushies() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('plushies')
+    .select('id, name, image_url, description, rarity')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data || []).map(row => ({ id: row.id, name: row.name, image: row.image_url, desc: row.description || '', rarity: row.rarity || 'Episch' }));
+}
+
+async function createPlushies(rows) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { data, error } = await client
+    .from('plushies')
+    .insert(rows)
+    .select('id, name, image_url, description, rarity');
+  if (error) throw error;
+  return data || [];
+}
+
+/* ---------------- Daily Code Events (Admin) ---------------- */
+async function loadDailyEvents(eventDate) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  let query = client
+    .from('daily_code_events')
+    .select('id, event_date, scheduled_at, plushie_id, code, is_golden_hour, winner_name_key, winner_display_name, redeemed_at, created_at')
+    .order('scheduled_at', { ascending: true });
+  if (eventDate) query = query.eq('event_date', eventDate);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data || [];
+}
+
+async function updateDailyEvent(id, patch) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { data, error } = await client
+    .from('daily_code_events')
+    .update(patch)
+    .eq('id', id)
+    .select('id, scheduled_at, plushie_id, code, is_golden_hour, winner_display_name')
+    .limit(1);
+  if (error) throw error;
+  return Array.isArray(data) ? data[0] : null;
+}
+
 async function loadOwnedPlushies(name) {
   const client = bkmpGetSupabaseClient();
   if (!client || !name) return [];

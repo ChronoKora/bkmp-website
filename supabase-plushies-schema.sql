@@ -11,11 +11,35 @@
 -- player_stats-Tabelle). Die Pluschie-Tabellen folgen demselben Muster statt
 -- eines "user_id", damit es konsistent zum Rest der Seite bleibt.
 --
--- Die Pluschie-DEFINITIONEN (Name/Bild/Beschreibung) leben als einfaches
--- JS-Array im Code (BKMP_PLUSHIES in app.js) - genau wie Kosmetiken und
--- Titel auch schon als Code-Konstanten existieren, nicht als DB-Tabelle.
--- In der Datenbank liegt nur das, was wirklich "Zustand" ist: Codes und
--- wer welchen Pluschie bereits freigeschaltet hat.
+-- Die Pluschie-DEFINITIONEN liegen jetzt in dieser Tabelle (statt als reines
+-- JS-Array), damit neue Bilder im Ordner assets/plushies/ automatisch als
+-- neuer Pluschie erkannt werden koennen (siehe api/scan-plushie-folder.js
+-- und den "Ordner scannen"-Button im Admin-Panel).
+
+-- 0) Pluschie-Definitionen
+create table if not exists public.plushies (
+  id text primary key,
+  name text not null,
+  image_url text not null,
+  description text not null default '',
+  rarity text not null default 'Episch',
+  created_at timestamptz not null default now()
+);
+
+alter table public.plushies enable row level security;
+
+drop policy if exists "Public read plushies" on public.plushies;
+create policy "Public read plushies"
+on public.plushies for select
+to anon, authenticated
+using (true);
+
+-- Anlegen nur ueber die Scan-Funktion (Service-Role-Key) oder Admins direkt.
+drop policy if exists "Admins insert plushies" on public.plushies;
+create policy "Admins insert plushies"
+on public.plushies for insert
+to authenticated
+with check (public.is_active_admin());
 
 -- 1) Codes: von Admins erstellt, jeweils fuer genau einen Pluschie.
 create table if not exists public.plushie_codes (
