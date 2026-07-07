@@ -1742,7 +1742,14 @@
     }
     document.addEventListener('click', e => {
       const streamerLink = e.target.closest('[data-streamer-id]');
-      if (streamerLink) bkmpMarkStreamerClicked(streamerLink.dataset.streamerId);
+      if (!streamerLink) return;
+      // Zaehlt nur, wenn der Creator zum Klick-Zeitpunkt WIRKLICH live war.
+      // Die Twitch-Leisten-Pille bekommt die Klasse "is-live" nur bei
+      // echtem Live-Status (siehe applyStreamerLiveState); der Link im
+      // "Gerade live"-Popup unten existiert sowieso nur, waehrend jemand
+      // live ist.
+      const isLive = streamerLink.classList.contains('is-live') || Boolean(streamerLink.closest('#liveToast'));
+      if (isLive) bkmpMarkStreamerClicked(streamerLink.dataset.streamerId);
     });
     renderStreamers();
 
