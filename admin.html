@@ -2004,6 +2004,7 @@
             <span class="meta">${item.date ? escapeHtml(formatDate(item.date)) + ' · ' : ''}Like ${Number(item.likes || 0)} · Dislike ${Number(item.dislikes || 0)}</span>
           </div>
           <div class="entry-actions">
+            ${item.image ? `<a class="edit-btn" href="${item.image}" download="kartenwunsch-${escapeHtml(item.name || 'bkmp')}.${bkmpImageExtension(item.image)}">Download</a>` : ''}
             ${actionsHtml(item)}
             <button class="del-btn" type="button" aria-label="Kartenidee löschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>
           </div>

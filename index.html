@@ -421,7 +421,6 @@
           <span>Kartenwunsch</span>
           <strong id="wishDetailName"></strong>
         </div>
-        <a class="wish-download" id="wishDownload" href="#" download="kartenwunsch.png">Download</a>
       </div>
     </div>
   </div>
@@ -2244,7 +2243,6 @@
             <div class="wish-card-actions">
               <button type="button" class="wish-vote wish-like" data-action="like">Like <span>${Number(w.likes || 0)}</span></button>
               <button type="button" class="wish-vote wish-dislike" data-action="dislike">Dislike <span>${Number(w.dislikes || 0)}</span></button>
-              <a class="wish-mini-download" href="${w.image}" download="kartenwunsch-${escapeHtml(w.name || 'bkmp')}.${bkmpImageExtension(w.image)}">Download</a>
             </div>
           </div>
         </article>
@@ -2258,7 +2256,6 @@
     const wishDetailClose = document.getElementById('wishDetailClose');
     const wishDetailImage = document.getElementById('wishDetailImage');
     const wishDetailName = document.getElementById('wishDetailName');
-    const wishDownload = document.getElementById('wishDownload');
     const openWishForm = document.getElementById('openWishForm');
     const wishCancel = document.getElementById('wishCancel');
     const wishSubmit = document.getElementById('wishSubmit');
@@ -2290,8 +2287,6 @@
       wishDetailImage.src = wish.image;
       wishDetailImage.alt = 'Kartenidee von ' + wish.name;
       wishDetailName.textContent = wish.name;
-      wishDownload.href = wish.image;
-      wishDownload.download = 'kartenwunsch-' + (wish.name || 'bkmp') + '.' + bkmpImageExtension(wish.image);
       wishDetailOverlay.classList.add('visible');
     }
 
@@ -2904,7 +2899,7 @@
       { id: 'goldjaeger', name: 'Goldjäger', desc: 'Exklusiv für Golden-Hour-Gewinner.', unlockCustom: ctx => ctx.wonGoldenHour },
       ...BKMP_PLUSHIES.map(p => ({
         id: `plushie_fanboy_${p.id}`,
-        name: `Maximaler ${p.name.replace(/\s*Plüshie$/i, '')} Fanboy`,
+        name: `Maximaler ${p.name.replace(/\s*Plüshie$/i, '')} Fan`,
         desc: `Besitzt das ${p.name}.`,
         unlockAchievement: `plushie_${p.id}`
       }))
@@ -2941,10 +2936,11 @@
       el.innerHTML = BKMP_TITLES.map(t => {
         const unlocked = bkmpTitleUnlocked(t, unlockedCount, ctx);
         const isActive = active === t.id;
+        const lockedHint = t.unlockAchievement ? 'Erst diesen Erfolg freischalten.' : (t.unlockCustom ? 'Noch nicht freigeschaltet.' : `Ab ${t.unlockAt} Erfolgen`);
         return `
           <button type="button" class="cosmetic-swatch ${unlocked ? '' : 'locked'} ${isActive ? 'active' : ''}" data-title-id="${escapeHtml(t.id)}" ${unlocked ? '' : 'disabled'}>
             <span class="cosmetic-swatch-name">${unlocked ? escapeHtml(t.name) : '🔒'}</span>
-            <span class="cosmetic-swatch-desc">${unlocked ? escapeHtml(t.desc) : (t.unlockAchievement ? 'Erst diesen Erfolg freischalten.' : `Ab ${t.unlockAt} Erfolgen`)}</span>
+            <span class="cosmetic-swatch-desc">${unlocked ? escapeHtml(t.desc) : lockedHint}</span>
           </button>`;
       }).join('');
       el.querySelectorAll('.cosmetic-swatch:not(.locked)').forEach(btn => {
