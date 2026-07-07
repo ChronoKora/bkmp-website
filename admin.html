@@ -2770,7 +2770,12 @@
           const res = await fetch('/api/scan-plushie-folder');
           const body = await res.json();
           if (!res.ok || !body.ok) throw new Error(body.detail || body.error || 'Unbekannter Fehler');
-          const existingIds = new Set(BKMP_PLUSHIES.map(p => p.id));
+          // Immer frisch aus der Datenbank vergleichen (nicht gegen die
+          // moegliche Code-Fallback-Liste) - sonst werden Pluschies, die
+          // im Ordner liegen aber noch nie wirklich in der DB gelandet
+          // sind, faelschlich als "schon bekannt" uebersprungen.
+          const currentRows = (await loadPlushies()) || [];
+          const existingIds = new Set(currentRows.map(p => p.id));
           const newOnes = body.candidates.filter(c => !existingIds.has(c.id));
           if (newOnes.length === 0) {
             showAdminToast('Keine neuen Pluschie-Bilder gefunden.', 'success');
