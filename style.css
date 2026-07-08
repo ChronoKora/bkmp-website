@@ -3852,14 +3852,14 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 
 /* aspect-ratio = 0.8 * (Frame-Breite / Frame-Hoehe) je Sheet - siehe
    Kommentar oben, muss zum 80%-Ausschnitt passen, sonst Verzerrung. */
-.idle-sprite-feuerdrache { background-image: url('assets/dragons/feuerdrache.png?v=20260709-transparent'); aspect-ratio: 1373.6 / 229; }
-.idle-sprite-blitzdrache { background-image: url('assets/dragons/blitzdrache.png?v=20260709-transparent'); aspect-ratio: 1337.6 / 235.25; }
-.idle-sprite-erddrache { background-image: url('assets/dragons/erddrache.png?v=20260709-transparent'); aspect-ratio: 1337.6 / 235.25; }
-.idle-sprite-wasserdrache { background-image: url('assets/dragons/wasserdrache.png?v=20260709-transparent'); aspect-ratio: 1336.8 / 235.25; }
-.idle-sprite-yakshas-drache { background-image: url('assets/dragons/yakshas-drache.png?v=20260709-transparent'); aspect-ratio: 1228.8 / 256; }
-.idle-sprite-yaksha-boss { background-image: url('assets/dragons/yaksha-boss.png?v=20260709-transparent'); aspect-ratio: 1228.8 / 256; }
-.idle-sprite-schattendrache { background-image: url('assets/dragons/schattendrache.png?v=20260709-transparent'); aspect-ratio: 1228.8 / 256; }
-.idle-sprite-wuffdrache { background-image: url('assets/dragons/wuffdrache.png?v=20260709-transparent'); aspect-ratio: 1228.8 / 256; }
+.idle-sprite-feuerdrache { background-image: url('assets/dragons/feuerdrache.png?v=20260709-transparent2'); aspect-ratio: 1373.6 / 229; }
+.idle-sprite-blitzdrache { background-image: url('assets/dragons/blitzdrache.png?v=20260709-transparent2'); aspect-ratio: 1337.6 / 235.25; }
+.idle-sprite-erddrache { background-image: url('assets/dragons/erddrache.png?v=20260709-transparent2'); aspect-ratio: 1337.6 / 235.25; }
+.idle-sprite-wasserdrache { background-image: url('assets/dragons/wasserdrache.png?v=20260709-transparent2'); aspect-ratio: 1336.8 / 235.25; }
+.idle-sprite-yakshas-drache { background-image: url('assets/dragons/yakshas-drache.png?v=20260709-transparent2'); aspect-ratio: 1228.8 / 256; }
+.idle-sprite-yaksha-boss { background-image: url('assets/dragons/yaksha-boss.png?v=20260709-transparent2'); aspect-ratio: 1228.8 / 256; }
+.idle-sprite-schattendrache { background-image: url('assets/dragons/schattendrache.png?v=20260709-transparent2'); aspect-ratio: 1228.8 / 256; }
+.idle-sprite-wuffdrache { background-image: url('assets/dragons/wuffdrache.png?v=20260709-transparent2'); aspect-ratio: 1228.8 / 256; }
 
 .idle-dragon-name { margin-top: 0.3rem; font-size: 0.75rem; font-weight: 700; color: var(--muted); }
 .idle-dragon-boss .idle-dragon-name { color: #facc15; }
