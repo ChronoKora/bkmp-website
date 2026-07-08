@@ -549,10 +549,19 @@ function bkmpIdleRenderHud() {
   const xpCfg = bkmpIdleConfig.xp_curve || BKMP_IDLE_FALLBACK_CONFIG.xp_curve;
   const xpNeeded = bkmpIdleXpForLevel(bkmpIdleState.level, xpCfg);
   const xpPct = Math.max(0, Math.min(100, (bkmpIdleState.xp / xpNeeded) * 100));
+  const s = bkmpIdleEffectiveStats;
   hud.innerHTML = `
     <div class="idle-hud-level">Level ${bkmpIdleState.level} <span class="idle-hud-skillpoints">🔹 ${bkmpIdleState.skill_points_available} Skillpunkte</span></div>
     <div class="idle-xp-bar"><div class="idle-xp-fill" style="width:${xpPct}%"></div></div>
     <div class="idle-xp-label">${Math.floor(bkmpIdleState.xp)} / ${xpNeeded} XP</div>
+    ${s ? `
+    <div class="idle-hud-stats">
+      <span title="Angriff">⚔️ ${bkmpIdleFormatNumber(Math.round(s.attack))}</span>
+      <span title="Verteidigung">🛡️ ${bkmpIdleFormatNumber(Math.round(s.defense))}</span>
+      <span title="Maximale Leben">❤️ ${bkmpIdleFormatNumber(Math.round(s.hp))}</span>
+      <span title="Kritische-Treffer-Chance">🎯 ${s.critChance.toFixed(1)}%</span>
+      <span title="Kritischer Schaden">💥 ${Math.round(s.critDamage)}%</span>
+    </div>` : ''}
     <div class="idle-hud-resources">
       <span>💰 ${bkmpIdleFormatNumber(bkmpIdleState.gold)}</span>
       <span>🌳 ${bkmpIdleFormatNumber(bkmpIdleState.wood)}</span>

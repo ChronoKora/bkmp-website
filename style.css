@@ -3749,6 +3749,7 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 .idle-xp-bar { height: 8px; border-radius: 999px; background: var(--paper); overflow: hidden; border: 1px solid var(--line); }
 .idle-xp-fill { height: 100%; background: linear-gradient(90deg, #38bdf8, #818cf8); transition: width 0.3s ease; }
 .idle-xp-label { font-size: 0.72rem; color: var(--muted); margin: 0.2rem 0 0.6rem; }
+.idle-hud-stats { display: flex; flex-wrap: wrap; gap: 0.4rem 0.8rem; font-size: 0.78rem; font-weight: 600; color: var(--muted); margin-bottom: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--line); }
 .idle-hud-resources { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; }
 
 /* ---- Kampf ---- */
@@ -3851,14 +3852,14 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 
 /* aspect-ratio = 0.8 * (Frame-Breite / Frame-Hoehe) je Sheet - siehe
    Kommentar oben, muss zum 80%-Ausschnitt passen, sonst Verzerrung. */
-.idle-sprite-feuerdrache { background-image: url('assets/dragons/feuerdrache.png'); aspect-ratio: 1373.6 / 229; }
-.idle-sprite-blitzdrache { background-image: url('assets/dragons/blitzdrache.png'); aspect-ratio: 1337.6 / 235.25; }
-.idle-sprite-erddrache { background-image: url('assets/dragons/erddrache.png'); aspect-ratio: 1337.6 / 235.25; }
-.idle-sprite-wasserdrache { background-image: url('assets/dragons/wasserdrache.png'); aspect-ratio: 1336.8 / 235.25; }
-.idle-sprite-yakshas-drache { background-image: url('assets/dragons/yakshas-drache.png'); aspect-ratio: 1228.8 / 256; }
-.idle-sprite-yaksha-boss { background-image: url('assets/dragons/yaksha-boss.png'); aspect-ratio: 1228.8 / 256; }
-.idle-sprite-schattendrache { background-image: url('assets/dragons/schattendrache.png'); aspect-ratio: 1228.8 / 256; }
-.idle-sprite-wuffdrache { background-image: url('assets/dragons/wuffdrache.png'); aspect-ratio: 1228.8 / 256; }
+.idle-sprite-feuerdrache { background-image: url('assets/dragons/feuerdrache.png?v=20260709-transparent'); aspect-ratio: 1373.6 / 229; }
+.idle-sprite-blitzdrache { background-image: url('assets/dragons/blitzdrache.png?v=20260709-transparent'); aspect-ratio: 1337.6 / 235.25; }
+.idle-sprite-erddrache { background-image: url('assets/dragons/erddrache.png?v=20260709-transparent'); aspect-ratio: 1337.6 / 235.25; }
+.idle-sprite-wasserdrache { background-image: url('assets/dragons/wasserdrache.png?v=20260709-transparent'); aspect-ratio: 1336.8 / 235.25; }
+.idle-sprite-yakshas-drache { background-image: url('assets/dragons/yakshas-drache.png?v=20260709-transparent'); aspect-ratio: 1228.8 / 256; }
+.idle-sprite-yaksha-boss { background-image: url('assets/dragons/yaksha-boss.png?v=20260709-transparent'); aspect-ratio: 1228.8 / 256; }
+.idle-sprite-schattendrache { background-image: url('assets/dragons/schattendrache.png?v=20260709-transparent'); aspect-ratio: 1228.8 / 256; }
+.idle-sprite-wuffdrache { background-image: url('assets/dragons/wuffdrache.png?v=20260709-transparent'); aspect-ratio: 1228.8 / 256; }
 
 .idle-dragon-name { margin-top: 0.3rem; font-size: 0.75rem; font-weight: 700; color: var(--muted); }
 .idle-dragon-boss .idle-dragon-name { color: #facc15; }
@@ -3955,12 +3956,20 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 .idle-skillpoints-hint { margin-bottom: 0.9rem; font-size: 0.85rem; }
 .idle-skill-branch { margin-bottom: 1.1rem; }
 .idle-skill-branch-title { font-family: 'Fraunces', serif; font-size: 1.05rem; margin-bottom: 0.5rem; }
-.idle-skill-node-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0.7rem; }
-.idle-skill-node { border: 1px solid var(--line); border-radius: 12px; padding: 0.7rem; background: var(--paper); text-align: center; }
+/* min-width:0 auf den Grid-Items ist hier Pflicht, nicht Kosmetik: ohne das
+   verweigern Grid-Items per Spec ein Schrumpfen unter ihre "intrinsische"
+   Mindestbreite (das laengste unbrechbare Wort/Element im Kind). Bei
+   langen Namen wie "Angriffsgeschwindigkeit" reicht das auf manchen
+   Bildschirmbreiten aus, um die ganze Spalte (und damit das Fenster)
+   ueber die verfuegbare Breite hinaus zu druecken, obwohl der Text an
+   sich brechen koennte - sichtbar als abgeschnittene/nicht passende Karte
+   auf schmaleren Screens, obwohl es auf breiteren Screens gut aussieht. */
+.idle-skill-node-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)); gap: 0.7rem; }
+.idle-skill-node { min-width: 0; border: 1px solid var(--line); border-radius: 12px; padding: 0.7rem; background: var(--paper); text-align: center; }
 .idle-skill-node.ranked { border-color: color-mix(in srgb, var(--gold) 50%, var(--line)); box-shadow: 0 0 12px color-mix(in srgb, var(--gold) 20%, transparent); }
 .idle-skill-node-icon { font-size: 1.4rem; }
-.idle-skill-node-name { font-weight: 700; font-size: 0.8rem; margin-top: 0.2rem; }
-.idle-skill-node-desc { font-size: 0.68rem; color: var(--muted); margin: 0.25rem 0; min-height: 2.2em; }
+.idle-skill-node-name { font-weight: 700; font-size: 0.8rem; margin-top: 0.2rem; overflow-wrap: break-word; }
+.idle-skill-node-desc { font-size: 0.68rem; color: var(--muted); margin: 0.25rem 0; min-height: 2.2em; overflow-wrap: break-word; }
 .idle-skill-node-rank { font-size: 0.68rem; color: var(--muted); margin-bottom: 0.4rem; }
 .idle-skill-node-btn { width: 100%; padding: 0.35rem 0.5rem; font-size: 0.72rem; }
 .idle-skill-node-btn:disabled { opacity: 0.5; cursor: not-allowed; }
