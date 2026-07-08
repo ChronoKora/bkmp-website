@@ -119,7 +119,7 @@ function bkmpIdleUpgradeEffectTotals(purchases) {
   return totals;
 }
 function bkmpIdleResourceEmoji(resource) {
-  return { gold: '💰', wood: '🪵', stone: '🪨', crystals: '💎', essence: '🧪' }[resource] || '';
+  return { gold: '💰', wood: '🌳', stone: '🗿', crystals: '💎', essence: '🧪' }[resource] || '';
 }
 
 /* ---------------- Fallback-Daten (falls SQL-Migration noch nicht lief / Supabase nicht erreichbar) ---------------- */
@@ -453,8 +453,8 @@ function bkmpIdleRenderHud() {
     <div class="idle-xp-label">${Math.floor(bkmpIdleState.xp)} / ${xpNeeded} XP</div>
     <div class="idle-hud-resources">
       <span>💰 ${bkmpIdleFormatNumber(bkmpIdleState.gold)}</span>
-      <span>🪵 ${bkmpIdleFormatNumber(bkmpIdleState.wood)}</span>
-      <span>🪨 ${bkmpIdleFormatNumber(bkmpIdleState.stone)}</span>
+      <span>🌳 ${bkmpIdleFormatNumber(bkmpIdleState.wood)}</span>
+      <span>🗿 ${bkmpIdleFormatNumber(bkmpIdleState.stone)}</span>
       <span>💎 ${bkmpIdleFormatNumber(bkmpIdleState.crystals)}</span>
       <span>🧪 ${bkmpIdleFormatNumber(bkmpIdleState.essence)}</span>
       <span>🐉 ${bkmpIdleFormatNumber(bkmpIdleState.dragon_kills)} besiegt</span>
@@ -691,7 +691,7 @@ function bkmpIdleShowOfflineCard(result) {
     <strong>Während deiner Abwesenheit... (${mins} Min.)</strong>
     <div class="idle-offline-rewards">
       <span>💰 +${bkmpIdleFormatNumber(r.gold)}</span><span>✨ +${bkmpIdleFormatNumber(r.xp)}</span>
-      <span>🪵 +${bkmpIdleFormatNumber(r.wood)}</span><span>🪨 +${bkmpIdleFormatNumber(r.stone)}</span>
+      <span>🌳 +${bkmpIdleFormatNumber(r.wood)}</span><span>🗿 +${bkmpIdleFormatNumber(r.stone)}</span>
       <span>💎 +${bkmpIdleFormatNumber(r.crystals)}</span><span>🧪 +${bkmpIdleFormatNumber(r.essence)}</span>
       <span>🐉 ${bkmpIdleFormatNumber(r.dragonKills || 0)} besiegt</span>
       ${r.levelsGained ? `<span>⬆️ +${r.levelsGained} Level</span>` : ''}

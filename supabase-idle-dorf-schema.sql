@@ -201,8 +201,8 @@ insert into public.idle_skill_nodes (id, branch, name, description, icon, sort_o
   ('burg_wachen',          'burg', 'Torwachen',           'Zusätzliche Verteidigung durch aufmerksame Wachen.', '💂', 5, 6, 2, 'burg_reparatur', 3, 'defense_pct', 4),
   -- ⚒ Wirtschaft
   ('wirt_gold',            'wirtschaft', 'Goldproduktion', 'Erhöht das Gold, das du pro Drache erhältst.', '💰', 0, 10, 1, null, 1, 'gold_prod_pct', 4),
-  ('wirt_holz',            'wirtschaft', 'Holzproduktion', 'Erhöht die Holz-Ausbeute.', '🪵', 1, 8, 1, null, 1, 'wood_prod_pct', 4),
-  ('wirt_stein',           'wirtschaft', 'Steinproduktion', 'Erhöht die Stein-Ausbeute.', '🪨', 2, 8, 1, null, 1, 'stone_prod_pct', 4),
+  ('wirt_holz',            'wirtschaft', 'Holzproduktion', 'Erhöht die Holz-Ausbeute.', '🌳', 1, 8, 1, null, 1, 'wood_prod_pct', 4),
+  ('wirt_stein',           'wirtschaft', 'Steinproduktion', 'Erhöht die Stein-Ausbeute.', '🗿', 2, 8, 1, null, 1, 'stone_prod_pct', 4),
   ('wirt_offline',         'wirtschaft', 'Offline-Einnahmen', 'Erhöht die Effizienz deines Fortschritts während du weg bist.', '🌙', 3, 6, 2, 'wirt_gold', 4, 'offline_income_pct', 5),
   ('wirt_handel',          'wirtschaft', 'Handelsrouten',   'Weitere Steigerung der Goldproduktion.', '🚚', 4, 6, 2, 'wirt_holz', 3, 'gold_prod_pct', 3),
   ('wirt_lager',           'wirtschaft', 'Vorratslager',    'Weitere Steigerung der Rohstoffproduktion.', '📦', 5, 6, 2, 'wirt_stein', 3, 'wood_prod_pct', 3),
