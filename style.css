@@ -2965,7 +2965,7 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 }
 
 /* ---------- Erfolge-Panel ---------- */
-.achievements-card { max-width: 460px; text-align: left; border-radius: 22px; }
+.achievements-card { max-width: 760px; width: 92vw; max-height: 88vh; overflow-y: auto; text-align: left; border-radius: 22px; }
 .achievements-card h3 { font-family: 'Fraunces', serif; font-size: 1.25rem; margin-bottom: 0.5rem; text-align: center; }
 .achievements-summary { color: var(--muted); font-size: 0.85rem; text-align: center; margin-bottom: 1rem; }
 .achievements-list {
@@ -3283,7 +3283,19 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   color: #fb7185;
   border-color: color-mix(in srgb, #f43f5e 55%, var(--line));
   box-shadow: 0 0 16px rgba(244, 63, 94, 0.45);
-  animation: streamerHeartbeat 1.15s ease-in-out infinite;
+  animation: bkmpHeartbeatGlow 1.15s ease-in-out infinite;
+}
+/* Bewusst KEIN transform:scale() hier (anders als .streamer-herzschlag) -
+   innerhalb scrollbarer Listen (.cosmetics-list/.leaderboard-list) fuehrte
+   das in manchen Browsern zu ungewolltem Scroll-Springen. Reiner
+   Box-Shadow-Puls erzeugt denselben "Herzschlag"-Effekt ohne Layout-/
+   Scroll-Seiteneffekte. */
+@keyframes bkmpHeartbeatGlow {
+  0%, 100% { box-shadow: 0 0 16px rgba(244, 63, 94, 0.45); }
+  14% { box-shadow: 0 0 26px rgba(244, 63, 94, 0.8); }
+  28% { box-shadow: 0 0 16px rgba(244, 63, 94, 0.45); }
+  42% { box-shadow: 0 0 26px rgba(244, 63, 94, 0.8); }
+  70% { box-shadow: 0 0 16px rgba(244, 63, 94, 0.45); }
 }
 .mc-cosmetic-toxic {
   color: #a3e635;
