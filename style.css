@@ -3608,3 +3608,434 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   cursor: pointer;
 }
 .admin-checkbox-label input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--gold); cursor: pointer; }
+
+/* ============================================================
+   Idle Drachen Dorf
+   ============================================================ */
+.idle-dorf-btn { position: relative; }
+
+.idle-dorf-overlay .idle-dorf-card {
+  position: relative;
+  max-width: 1100px;
+  width: 94vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  text-align: left;
+  border-radius: 24px;
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box,
+              linear-gradient(120deg, var(--gold), rgba(56, 189, 248, 0.7), #a78bfa, var(--gold)) border-box;
+  border: 1.5px solid transparent;
+  background-size: 100% 100%, 260% 260%;
+  animation: bkmpTierGlow 6s ease infinite;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.5), 0 0 40px color-mix(in srgb, var(--gold) 25%, transparent);
+}
+.idle-dorf-card h3 { font-family: 'Fraunces', serif; font-size: 1.4rem; text-align: center; margin-bottom: 0.9rem; }
+
+.idle-dorf-close {
+  position: absolute;
+  top: 0.8rem;
+  right: 0.9rem;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--muted);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.idle-dorf-close:hover { color: var(--ink); border-color: var(--gold); }
+
+@media (max-width: 640px) {
+  .idle-dorf-overlay .idle-dorf-card {
+    width: 100vw;
+    height: 100vh;
+    max-height: 100vh;
+    max-width: 100vw;
+    border-radius: 0;
+    padding: 1.4rem 1rem 1rem;
+  }
+}
+
+.idle-dorf-offline-card {
+  margin-bottom: 1rem;
+  padding: 0.8rem 1rem;
+  border-radius: 14px;
+  background: linear-gradient(120deg, rgba(167, 139, 250, 0.16), rgba(56, 189, 248, 0.1));
+  border: 1px dashed color-mix(in srgb, var(--gold) 55%, var(--line));
+  font-size: 0.85rem;
+}
+.idle-dorf-offline-card strong { display: block; margin-bottom: 0.4rem; }
+.idle-offline-rewards { display: flex; flex-wrap: wrap; gap: 0.5rem 0.9rem; font-weight: 600; }
+
+.idle-dorf-tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1rem; }
+.idle-dorf-tab {
+  flex: 1;
+  min-width: 110px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 0.5rem 0.7rem;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.idle-dorf-tab.active {
+  background: linear-gradient(135deg, #f5d58a, var(--gold));
+  color: #0A0A0F;
+  border-color: transparent;
+}
+
+.idle-dorf-panel { min-height: 260px; }
+.idle-panel-hint { color: var(--muted); font-size: 0.85rem; margin-bottom: 0.8rem; }
+
+/* ---- HUD ---- */
+.idle-dorf-hud { margin-bottom: 1rem; }
+.idle-hud-level { display: flex; align-items: center; justify-content: space-between; font-weight: 700; margin-bottom: 0.35rem; }
+.idle-hud-skillpoints { font-size: 0.78rem; color: var(--gold); font-weight: 700; }
+.idle-xp-bar { height: 8px; border-radius: 999px; background: var(--paper); overflow: hidden; border: 1px solid var(--line); }
+.idle-xp-fill { height: 100%; background: linear-gradient(90deg, #38bdf8, #818cf8); transition: width 0.3s ease; }
+.idle-xp-label { font-size: 0.72rem; color: var(--muted); margin: 0.2rem 0 0.6rem; }
+.idle-hud-resources { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; }
+
+/* ---- Kampf ---- */
+.idle-battlefield {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.4rem 1.2rem;
+  border-radius: 18px;
+  background: radial-gradient(circle at 50% 20%, color-mix(in srgb, var(--gold) 8%, var(--paper)), var(--paper) 70%);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  min-height: 220px;
+}
+.idle-village, .idle-dragon { position: relative; text-align: center; width: 42%; }
+.idle-village-sprite { font-size: 3.6rem; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.3)); }
+.idle-dragon-sprite { font-size: 4.2rem; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35)); transition: transform 0.15s ease; }
+.idle-dragon-boss .idle-dragon-sprite { font-size: 4.8rem; }
+.idle-dragon-name { margin-top: 0.3rem; font-size: 0.75rem; font-weight: 700; color: var(--muted); }
+.idle-dragon-boss .idle-dragon-name { color: #facc15; }
+
+.idle-hp-bar { height: 10px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 12%, var(--paper)); overflow: hidden; border: 1px solid var(--line); margin-top: 0.5rem; }
+.idle-hp-fill { height: 100%; transition: width 0.25s ease; }
+.idle-hp-fill-village { background: linear-gradient(90deg, #4ade80, #22c55e); }
+.idle-hp-fill-dragon { background: linear-gradient(90deg, #f87171, #ef4444); }
+.idle-hp-label { font-size: 0.7rem; color: var(--muted); margin-top: 0.2rem; }
+
+.idle-hit-flash { animation: idleHitFlash 0.25s ease; }
+@keyframes idleHitFlash {
+  0% { filter: brightness(1); transform: scale(1); }
+  40% { filter: brightness(2) saturate(1.4); transform: scale(1.08); }
+  100% { filter: brightness(1); transform: scale(1); }
+}
+
+.idle-arrow {
+  position: absolute;
+  top: 45%;
+  left: 40%;
+  width: 26px;
+  height: 4px;
+  background: linear-gradient(90deg, transparent, #f5d58a, var(--gold));
+  border-radius: 2px;
+  animation: idleArrowFly 0.5s ease forwards;
+  pointer-events: none;
+}
+@keyframes idleArrowFly {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(220px); opacity: 0; }
+}
+.idle-fire-breath {
+  position: absolute;
+  top: 45%;
+  right: 40%;
+  width: 30px;
+  height: 14px;
+  background: radial-gradient(ellipse at right, #fde68a, #f97316 55%, transparent 80%);
+  border-radius: 50%;
+  animation: idleFireFly 0.5s ease forwards;
+  pointer-events: none;
+}
+@keyframes idleFireFly {
+  from { transform: translateX(0) scale(0.6); opacity: 1; }
+  to { transform: translateX(-220px) scale(1.3); opacity: 0; }
+}
+
+.idle-dmg-float {
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-weight: 800;
+  font-size: 0.85rem;
+  color: #f87171;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  animation: idleDmgFloat 0.8s ease forwards;
+  pointer-events: none;
+}
+.idle-dmg-crit { color: #facc15; font-size: 1.05rem; }
+@keyframes idleDmgFloat {
+  0% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -34px); }
+}
+
+.idle-dorf-log {
+  margin-top: 1rem;
+  max-height: 120px;
+  overflow-y: auto;
+  border-top: 1px solid var(--line);
+  padding-top: 0.6rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.idle-dorf-log-line { padding: 0.15rem 0; }
+
+/* ---- Upgrades ---- */
+.idle-upgrade-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.8rem; }
+.idle-upgrade-card { border: 1px solid var(--line); border-radius: 14px; padding: 0.9rem; background: var(--paper); text-align: center; }
+.idle-upgrade-icon { font-size: 1.6rem; margin-bottom: 0.3rem; }
+.idle-upgrade-name { font-weight: 700; font-size: 0.85rem; margin-bottom: 0.2rem; }
+.idle-upgrade-level { display: block; font-size: 0.68rem; color: var(--muted); font-weight: 500; }
+.idle-upgrade-desc { font-size: 0.72rem; color: var(--muted); margin-bottom: 0.6rem; min-height: 2em; }
+.idle-upgrade-buy { width: 100%; padding: 0.4rem 0.6rem; font-size: 0.78rem; }
+.idle-upgrade-buy:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ---- Skilltree ---- */
+.idle-skillpoints-hint { margin-bottom: 0.9rem; font-size: 0.85rem; }
+.idle-skill-branch { margin-bottom: 1.1rem; }
+.idle-skill-branch-title { font-family: 'Fraunces', serif; font-size: 1.05rem; margin-bottom: 0.5rem; }
+.idle-skill-node-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0.7rem; }
+.idle-skill-node { border: 1px solid var(--line); border-radius: 12px; padding: 0.7rem; background: var(--paper); text-align: center; }
+.idle-skill-node.ranked { border-color: color-mix(in srgb, var(--gold) 50%, var(--line)); box-shadow: 0 0 12px color-mix(in srgb, var(--gold) 20%, transparent); }
+.idle-skill-node-icon { font-size: 1.4rem; }
+.idle-skill-node-name { font-weight: 700; font-size: 0.8rem; margin-top: 0.2rem; }
+.idle-skill-node-desc { font-size: 0.68rem; color: var(--muted); margin: 0.25rem 0; min-height: 2.2em; }
+.idle-skill-node-rank { font-size: 0.68rem; color: var(--muted); margin-bottom: 0.4rem; }
+.idle-skill-node-btn { width: 100%; padding: 0.35rem 0.5rem; font-size: 0.72rem; }
+.idle-skill-node-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ---- Bestenliste ---- */
+.idle-dorf-leaderboard-tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.8rem; }
+.idle-dorf-leaderboard-tabs .idle-dorf-tab { flex: none; min-width: auto; padding: 0.4rem 0.8rem; }
+
+/* ---- Admin: Testkampf-Ausgabe ---- */
+.idle-admin-test-output {
+  margin-top: 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 12px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .idle-dorf-overlay .idle-dorf-card { animation: none; }
+  .idle-hit-flash, .idle-arrow, .idle-fire-breath, .idle-dmg-float { animation: none !important; }
+}
+
+/* ---- 18 neue Kosmetiken (Idle Dorf) ---- */
+.mc-cosmetic-rotgruen {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box, linear-gradient(120deg, #ef4444, #22c55e, #ef4444) border-box;
+  border: 1px solid transparent; background-size: 100% 100%, 220% 220%; animation: bkmpTierGlow 3s ease infinite;
+}
+.mc-cosmetic-rotgruen #mcNameBadgeText, .mc-cosmetic-rotgruen .cosmetic-swatch-name, .mc-cosmetic-rotgruen .leaderboard-name-text {
+  background: linear-gradient(120deg, #ef4444, #22c55e, #ef4444); background-size: 220% 220%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: bkmpTierGlow 3s ease infinite;
+}
+
+.mc-cosmetic-goldweiss {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box, linear-gradient(120deg, var(--gold), #fff, var(--gold)) border-box;
+  border: 1px solid transparent; background-size: 100% 100%, 220% 220%; animation: bkmpTierGlow 3s ease infinite;
+}
+.mc-cosmetic-goldweiss #mcNameBadgeText, .mc-cosmetic-goldweiss .cosmetic-swatch-name, .mc-cosmetic-goldweiss .leaderboard-name-text {
+  background: linear-gradient(120deg, var(--gold), #fff, var(--gold)); background-size: 220% 220%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: bkmpTierGlow 3s ease infinite;
+}
+
+.mc-cosmetic-lilapink {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box, linear-gradient(120deg, #a78bfa, #f472b6, #a78bfa) border-box;
+  border: 1px solid transparent; background-size: 100% 100%, 220% 220%; animation: bkmpTierGlow 3.2s ease infinite;
+}
+.mc-cosmetic-lilapink #mcNameBadgeText, .mc-cosmetic-lilapink .cosmetic-swatch-name, .mc-cosmetic-lilapink .leaderboard-name-text {
+  background: linear-gradient(120deg, #a78bfa, #f472b6, #a78bfa); background-size: 220% 220%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: bkmpTierGlow 3.2s ease infinite;
+}
+
+.mc-cosmetic-tuerkisblau {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box, linear-gradient(120deg, #2dd4bf, #38bdf8, #2dd4bf) border-box;
+  border: 1px solid transparent; background-size: 100% 100%, 220% 220%; animation: bkmpTierGlow 3.2s ease infinite;
+}
+.mc-cosmetic-tuerkisblau #mcNameBadgeText, .mc-cosmetic-tuerkisblau .cosmetic-swatch-name, .mc-cosmetic-tuerkisblau .leaderboard-name-text {
+  background: linear-gradient(120deg, #2dd4bf, #38bdf8, #2dd4bf); background-size: 220% 220%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: bkmpTierGlow 3.2s ease infinite;
+}
+
+.mc-cosmetic-orangerot {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box, linear-gradient(120deg, #f97316, #ef4444, #f97316) border-box;
+  border: 1px solid transparent; background-size: 100% 100%, 220% 220%; animation: bkmpTierGlow 2.8s ease infinite;
+  box-shadow: 0 0 14px rgba(249, 115, 22, 0.35);
+}
+.mc-cosmetic-orangerot #mcNameBadgeText, .mc-cosmetic-orangerot .cosmetic-swatch-name, .mc-cosmetic-orangerot .leaderboard-name-text {
+  background: linear-gradient(120deg, #f97316, #ef4444, #f97316); background-size: 220% 220%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: bkmpTierGlow 2.8s ease infinite;
+}
+
+.mc-cosmetic-regenbogen_idle {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box, linear-gradient(90deg, #ef4444, #f97316, #facc15, #22c55e, #38bdf8, #a78bfa, #ef4444) border-box;
+  border: 1px solid transparent; background-size: 100% 100%, 300% 100%; animation: streamerShimmer 5s linear infinite;
+}
+.mc-cosmetic-regenbogen_idle #mcNameBadgeText, .mc-cosmetic-regenbogen_idle .cosmetic-swatch-name, .mc-cosmetic-regenbogen_idle .leaderboard-name-text {
+  background: linear-gradient(90deg, #ef4444, #f97316, #facc15, #22c55e, #38bdf8, #a78bfa, #ef4444); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: streamerShimmer 5s linear infinite;
+}
+
+.mc-cosmetic-amethyst {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box, linear-gradient(120deg, #7c3aed, #c4b5fd, #7c3aed) border-box;
+  border: 1px solid transparent; background-size: 100% 100%, 220% 220%; animation: bkmpTierGlow 3.4s ease infinite;
+  box-shadow: 0 0 14px rgba(124, 58, 237, 0.35);
+}
+.mc-cosmetic-amethyst #mcNameBadgeText, .mc-cosmetic-amethyst .cosmetic-swatch-name, .mc-cosmetic-amethyst .leaderboard-name-text {
+  background: linear-gradient(120deg, #7c3aed, #c4b5fd, #7c3aed); background-size: 220% 220%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: bkmpTierGlow 3.4s ease infinite;
+}
+
+.mc-cosmetic-smaragd {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box, linear-gradient(120deg, #059669, #34d399, #059669) border-box;
+  border: 1px solid transparent; background-size: 100% 100%, 220% 220%; animation: bkmpTierGlow 3.4s ease infinite;
+}
+.mc-cosmetic-smaragd #mcNameBadgeText, .mc-cosmetic-smaragd .cosmetic-swatch-name, .mc-cosmetic-smaragd .leaderboard-name-text {
+  background: linear-gradient(120deg, #059669, #34d399, #059669); background-size: 220% 220%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: bkmpTierGlow 3.4s ease infinite;
+}
+
+.mc-cosmetic-kosmos {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box, linear-gradient(120deg, #1e1b4b, #4c1d95, #6d28d9, #1e1b4b) border-box;
+  border: 1px solid transparent; background-size: 100% 100%, 260% 260%; animation: bkmpTierGlow 5s ease infinite;
+  box-shadow: 0 0 16px rgba(109, 40, 217, 0.45);
+}
+.mc-cosmetic-kosmos #mcNameBadgeText, .mc-cosmetic-kosmos .cosmetic-swatch-name, .mc-cosmetic-kosmos .leaderboard-name-text {
+  background: linear-gradient(120deg, #a78bfa, #f472b6, #38bdf8, #a78bfa); background-size: 260% 260%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: bkmpTierGlow 5s ease infinite;
+}
+
+.mc-cosmetic-aurora_himmel {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box, linear-gradient(120deg, #34d399, #38bdf8, #a78bfa, #34d399) border-box;
+  border: 1px solid transparent; background-size: 100% 100%, 260% 260%; animation: bkmpTierGlow 3.6s ease infinite;
+  box-shadow: 0 0 18px rgba(56, 189, 248, 0.4);
+}
+.mc-cosmetic-aurora_himmel #mcNameBadgeText, .mc-cosmetic-aurora_himmel .cosmetic-swatch-name, .mc-cosmetic-aurora_himmel .leaderboard-name-text {
+  background: linear-gradient(120deg, #34d399, #38bdf8, #a78bfa, #34d399); background-size: 260% 260%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: bkmpTierGlow 3.6s ease infinite;
+}
+
+.mc-cosmetic-blutmond {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box, linear-gradient(120deg, #7f1d1d, #ef4444, #7f1d1d) border-box;
+  border: 1px solid transparent; background-size: 100% 100%, 220% 220%; animation: bkmpTierGlow 4s ease infinite;
+  box-shadow: 0 0 16px rgba(127, 29, 29, 0.5);
+}
+.mc-cosmetic-blutmond #mcNameBadgeText, .mc-cosmetic-blutmond .cosmetic-swatch-name, .mc-cosmetic-blutmond .leaderboard-name-text {
+  background: linear-gradient(120deg, #ef4444, #7f1d1d, #ef4444); background-size: 220% 220%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: bkmpTierGlow 4s ease infinite;
+}
+
+.mc-cosmetic-sonnenlicht {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box, linear-gradient(120deg, #fde68a, #facc15, #fde68a) border-box;
+  border: 1px solid transparent; background-size: 100% 100%, 220% 220%; animation: bkmpTierGlow 3s ease infinite;
+}
+.mc-cosmetic-sonnenlicht #mcNameBadgeText, .mc-cosmetic-sonnenlicht .cosmetic-swatch-name, .mc-cosmetic-sonnenlicht .leaderboard-name-text {
+  background: linear-gradient(120deg, #fde68a, #facc15, #fde68a); background-size: 220% 220%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: bkmpTierGlow 3s ease infinite;
+}
+
+.mc-cosmetic-galaxie_tiefe {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box, linear-gradient(120deg, #312e81, #7c3aed, #f472b6, #312e81) border-box;
+  border: 1px solid transparent; background-size: 100% 100%, 300% 100%; animation: streamerShimmer 6.5s linear infinite;
+  box-shadow: 0 0 16px rgba(49, 46, 129, 0.5);
+}
+.mc-cosmetic-galaxie_tiefe #mcNameBadgeText, .mc-cosmetic-galaxie_tiefe .cosmetic-swatch-name, .mc-cosmetic-galaxie_tiefe .leaderboard-name-text {
+  background: linear-gradient(120deg, #7c3aed, #f472b6, #38bdf8, #7c3aed); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: streamerShimmer 6.5s linear infinite;
+}
+
+.mc-cosmetic-mythisch {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box, linear-gradient(120deg, var(--gold), #a78bfa, #38bdf8, #f472b6, var(--gold)) border-box;
+  border: 1px solid transparent; background-size: 100% 100%, 320% 320%; animation: bkmpTierGlow 4.5s ease infinite;
+  box-shadow: 0 0 22px color-mix(in srgb, var(--gold) 40%, #a78bfa);
+}
+.mc-cosmetic-mythisch #mcNameBadgeText, .mc-cosmetic-mythisch .cosmetic-swatch-name, .mc-cosmetic-mythisch .leaderboard-name-text {
+  background: linear-gradient(120deg, var(--gold), #a78bfa, #38bdf8, #f472b6, var(--gold)); background-size: 320% 320%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: bkmpTierGlow 4.5s ease infinite;
+}
+
+.mc-cosmetic-leuchtendgold {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box, linear-gradient(120deg, var(--gold), #fff7cc, var(--gold)) border-box;
+  border: 1px solid transparent; background-size: 100% 100%, 220% 220%; animation: bkmpTierGlow 2.2s ease infinite;
+  box-shadow: 0 0 20px color-mix(in srgb, var(--gold) 55%, transparent);
+}
+.mc-cosmetic-leuchtendgold #mcNameBadgeText, .mc-cosmetic-leuchtendgold .cosmetic-swatch-name, .mc-cosmetic-leuchtendgold .leaderboard-name-text {
+  background: linear-gradient(120deg, var(--gold), #fff7cc, var(--gold)); background-size: 220% 220%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: bkmpTierGlow 2.2s ease infinite;
+}
+
+.mc-cosmetic-drachenfeuer {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box, linear-gradient(120deg, #7c2d12, #f97316, #facc15, #7c2d12) border-box;
+  border: 1px solid transparent; background-size: 100% 100%, 300% 100%; animation: streamerShimmer 4s linear infinite;
+  box-shadow: 0 0 20px rgba(249, 115, 22, 0.5);
+}
+.mc-cosmetic-drachenfeuer #mcNameBadgeText, .mc-cosmetic-drachenfeuer .cosmetic-swatch-name, .mc-cosmetic-drachenfeuer .leaderboard-name-text {
+  background: linear-gradient(120deg, #facc15, #f97316, #7c2d12, #f97316); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: streamerShimmer 4s linear infinite;
+}
+
+.mc-cosmetic-schatten_dunkel {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box, linear-gradient(120deg, #0a0a0f, #27272a, #0a0a0f) border-box;
+  border: 1px solid transparent; background-size: 100% 100%, 220% 220%; animation: bkmpTierGlow 4s ease infinite;
+  box-shadow: 0 0 14px rgba(0, 0, 0, 0.6);
+}
+.mc-cosmetic-schatten_dunkel #mcNameBadgeText, .mc-cosmetic-schatten_dunkel .cosmetic-swatch-name, .mc-cosmetic-schatten_dunkel .leaderboard-name-text {
+  background: linear-gradient(120deg, #71717a, #27272a, #71717a); background-size: 220% 220%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: bkmpTierGlow 4s ease infinite;
+}
+
+.mc-cosmetic-sternenstaub {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box, linear-gradient(120deg, #e0e7ff, #a78bfa, #38bdf8, #e0e7ff) border-box;
+  border: 1px solid transparent; background-size: 100% 100%, 300% 100%; animation: streamerShimmer 7s linear infinite;
+  box-shadow: 0 0 18px rgba(199, 210, 254, 0.5);
+}
+.mc-cosmetic-sternenstaub #mcNameBadgeText, .mc-cosmetic-sternenstaub .cosmetic-swatch-name, .mc-cosmetic-sternenstaub .leaderboard-name-text {
+  background: linear-gradient(120deg, #e0e7ff, #a78bfa, #38bdf8, #e0e7ff); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: streamerShimmer 7s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mc-cosmetic-rotgruen, .mc-cosmetic-rotgruen #mcNameBadgeText, .mc-cosmetic-rotgruen .cosmetic-swatch-name, .mc-cosmetic-rotgruen .leaderboard-name-text,
+  .mc-cosmetic-goldweiss, .mc-cosmetic-goldweiss #mcNameBadgeText, .mc-cosmetic-goldweiss .cosmetic-swatch-name, .mc-cosmetic-goldweiss .leaderboard-name-text,
+  .mc-cosmetic-lilapink, .mc-cosmetic-lilapink #mcNameBadgeText, .mc-cosmetic-lilapink .cosmetic-swatch-name, .mc-cosmetic-lilapink .leaderboard-name-text,
+  .mc-cosmetic-tuerkisblau, .mc-cosmetic-tuerkisblau #mcNameBadgeText, .mc-cosmetic-tuerkisblau .cosmetic-swatch-name, .mc-cosmetic-tuerkisblau .leaderboard-name-text,
+  .mc-cosmetic-orangerot, .mc-cosmetic-orangerot #mcNameBadgeText, .mc-cosmetic-orangerot .cosmetic-swatch-name, .mc-cosmetic-orangerot .leaderboard-name-text,
+  .mc-cosmetic-regenbogen_idle, .mc-cosmetic-regenbogen_idle #mcNameBadgeText, .mc-cosmetic-regenbogen_idle .cosmetic-swatch-name, .mc-cosmetic-regenbogen_idle .leaderboard-name-text,
+  .mc-cosmetic-amethyst, .mc-cosmetic-amethyst #mcNameBadgeText, .mc-cosmetic-amethyst .cosmetic-swatch-name, .mc-cosmetic-amethyst .leaderboard-name-text,
+  .mc-cosmetic-smaragd, .mc-cosmetic-smaragd #mcNameBadgeText, .mc-cosmetic-smaragd .cosmetic-swatch-name, .mc-cosmetic-smaragd .leaderboard-name-text,
+  .mc-cosmetic-kosmos, .mc-cosmetic-kosmos #mcNameBadgeText, .mc-cosmetic-kosmos .cosmetic-swatch-name, .mc-cosmetic-kosmos .leaderboard-name-text,
+  .mc-cosmetic-aurora_himmel, .mc-cosmetic-aurora_himmel #mcNameBadgeText, .mc-cosmetic-aurora_himmel .cosmetic-swatch-name, .mc-cosmetic-aurora_himmel .leaderboard-name-text,
+  .mc-cosmetic-blutmond, .mc-cosmetic-blutmond #mcNameBadgeText, .mc-cosmetic-blutmond .cosmetic-swatch-name, .mc-cosmetic-blutmond .leaderboard-name-text,
+  .mc-cosmetic-sonnenlicht, .mc-cosmetic-sonnenlicht #mcNameBadgeText, .mc-cosmetic-sonnenlicht .cosmetic-swatch-name, .mc-cosmetic-sonnenlicht .leaderboard-name-text,
+  .mc-cosmetic-galaxie_tiefe, .mc-cosmetic-galaxie_tiefe #mcNameBadgeText, .mc-cosmetic-galaxie_tiefe .cosmetic-swatch-name, .mc-cosmetic-galaxie_tiefe .leaderboard-name-text,
+  .mc-cosmetic-mythisch, .mc-cosmetic-mythisch #mcNameBadgeText, .mc-cosmetic-mythisch .cosmetic-swatch-name, .mc-cosmetic-mythisch .leaderboard-name-text,
+  .mc-cosmetic-leuchtendgold, .mc-cosmetic-leuchtendgold #mcNameBadgeText, .mc-cosmetic-leuchtendgold .cosmetic-swatch-name, .mc-cosmetic-leuchtendgold .leaderboard-name-text,
+  .mc-cosmetic-drachenfeuer, .mc-cosmetic-drachenfeuer #mcNameBadgeText, .mc-cosmetic-drachenfeuer .cosmetic-swatch-name, .mc-cosmetic-drachenfeuer .leaderboard-name-text,
+  .mc-cosmetic-schatten_dunkel, .mc-cosmetic-schatten_dunkel #mcNameBadgeText, .mc-cosmetic-schatten_dunkel .cosmetic-swatch-name, .mc-cosmetic-schatten_dunkel .leaderboard-name-text,
+  .mc-cosmetic-sternenstaub, .mc-cosmetic-sternenstaub #mcNameBadgeText, .mc-cosmetic-sternenstaub .cosmetic-swatch-name, .mc-cosmetic-sternenstaub .leaderboard-name-text { animation: none; }
+}

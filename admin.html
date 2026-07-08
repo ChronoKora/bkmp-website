@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260707-namecosmetics">
+<link rel="stylesheet" href="style.css?v=20260708-idledorf">
 </head>
 <body>
 
@@ -147,6 +147,10 @@
         <button class="admin-nav-btn" data-page="dailyevents">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
           Daily Events
+        </button>
+        <button class="admin-nav-btn" data-page="idledorf">
+          <svg viewBox="0 0 24 24"><path d="M4 21V10l8-6 8 6v11"/><path d="M9 21v-6h6v6"/></svg>
+          Idle Dorf
         </button>
         <button class="admin-nav-btn" data-page="access">
           <svg viewBox="0 0 24 24"><path d="M12 3a5 5 0 0 0-5 5v3H5v10h14V11h-2V8a5 5 0 0 0-5-5z"/><path d="M9 11V8a3 3 0 0 1 6 0v3"/></svg>
@@ -568,6 +572,121 @@
           </div>
         </section>
 
+        <!-- Idle Drachen Dorf -->
+        <section class="admin-page" id="page-idledorf">
+          <div class="admin-section">
+            <h2>&#127984; Idle Drachen Dorf</h2>
+            <p class="admin-help-text">Balance des Idle-Kampfspiels. &Auml;nderungen wirken sofort auf der Website, ohne Deploy &ndash; die Werte werden bei jedem &Ouml;ffnen des Idle-Dorfs frisch aus Supabase geladen.</p>
+
+            <div class="achievements-subtabs">
+              <button type="button" class="achievements-subtab active" id="idleAdminSubtabDragons">Drachen</button>
+              <button type="button" class="achievements-subtab" id="idleAdminSubtabSkills">Skilltree</button>
+              <button type="button" class="achievements-subtab" id="idleAdminSubtabBalance">Balance</button>
+              <button type="button" class="achievements-subtab" id="idleAdminSubtabTest">Testkampf</button>
+              <button type="button" class="achievements-subtab" id="idleAdminSubtabReset">Spieler-Reset</button>
+            </div>
+
+            <!-- Drachen -->
+            <div id="idleAdminPanelDragons">
+              <h3>Drachen <span class="cardcatalog-admin-count" id="idleDragonsCount"></span></h3>
+              <div class="entry-table-wrapper"><div class="entry-list" id="idleDragonsList"></div></div>
+              <button class="btn btn-primary" id="idleDragonAddNew" type="button" style="margin-top:0.8rem;">+ Neuer Drache</button>
+
+              <div id="idleDragonEditForm" style="display:none; margin-top:1.2rem;">
+                <h3 id="idleDragonEditTitle">Drache bearbeiten</h3>
+                <div class="form-grid form-grid-3">
+                  <div><label for="idleDragonId">ID (eindeutig, keine Leerzeichen)</label><input type="text" id="idleDragonId" placeholder="z. B. eisdrache"></div>
+                  <div><label for="idleDragonName">Name</label><input type="text" id="idleDragonName" placeholder="z. B. Eisdrache"></div>
+                  <div><label for="idleDragonEmoji">Emoji</label><input type="text" id="idleDragonEmoji" placeholder="🐉" maxlength="4"></div>
+                  <div><label for="idleDragonTier">Reihenfolge (tier_order)</label><input type="number" id="idleDragonTier" value="0"></div>
+                  <div><label for="idleDragonHp">Basis-HP</label><input type="number" id="idleDragonHp" value="100"></div>
+                  <div><label for="idleDragonAtk">Basis-Angriff</label><input type="number" id="idleDragonAtk" value="10"></div>
+                  <div><label for="idleDragonDef">Basis-Verteidigung</label><input type="number" id="idleDragonDef" value="0"></div>
+                  <div><label for="idleDragonGold">Gold-Belohnung</label><input type="number" id="idleDragonGold" value="5"></div>
+                  <div><label for="idleDragonXp">XP-Belohnung</label><input type="number" id="idleDragonXp" value="5"></div>
+                  <div><label for="idleDragonWood">Holz-Belohnung</label><input type="number" id="idleDragonWood" value="2"></div>
+                  <div><label for="idleDragonStone">Stein-Belohnung</label><input type="number" id="idleDragonStone" value="2"></div>
+                  <div><label for="idleDragonCrystal">Kristall-Belohnung</label><input type="number" id="idleDragonCrystal" value="0"></div>
+                  <div><label for="idleDragonEssence">Essenz-Belohnung</label><input type="number" id="idleDragonEssence" value="0"></div>
+                </div>
+                <label class="admin-checkbox-label"><input type="checkbox" id="idleDragonIsBoss"> Boss-Drache</label>
+                <label class="admin-checkbox-label"><input type="checkbox" id="idleDragonActive" checked> Aktiv (erscheint im Spiel)</label>
+                <div class="joke-buttons" style="justify-content:flex-start;">
+                  <button class="btn btn-primary" id="idleDragonSave" type="button">Speichern</button>
+                  <button class="btn" id="idleDragonCancel" type="button">Abbrechen</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Skilltree -->
+            <div id="idleAdminPanelSkills" style="display:none;">
+              <h3>Skilltree-Knoten <span class="cardcatalog-admin-count" id="idleSkillsCount"></span></h3>
+              <div class="entry-table-wrapper"><div class="entry-list" id="idleSkillsList"></div></div>
+              <button class="btn btn-primary" id="idleSkillAddNew" type="button" style="margin-top:0.8rem;">+ Neuer Skill-Knoten</button>
+
+              <div id="idleSkillEditForm" style="display:none; margin-top:1.2rem;">
+                <h3 id="idleSkillEditTitle">Skill-Knoten bearbeiten</h3>
+                <div class="form-grid form-grid-3">
+                  <div><label for="idleSkillId">ID (eindeutig)</label><input type="text" id="idleSkillId" placeholder="z. B. dorf_neu"></div>
+                  <div><label for="idleSkillBranch">Zweig</label>
+                    <select id="idleSkillBranch">
+                      <option value="dorf">🏹 Dorf</option>
+                      <option value="burg">🏰 Burg</option>
+                      <option value="wirtschaft">⚒ Wirtschaft</option>
+                      <option value="forschung">🐉 Forschung</option>
+                      <option value="magie">✨ Magie</option>
+                    </select>
+                  </div>
+                  <div><label for="idleSkillName">Name</label><input type="text" id="idleSkillName" placeholder="z. B. Pfeilschaden"></div>
+                  <div><label for="idleSkillIcon">Icon</label><input type="text" id="idleSkillIcon" placeholder="🏹" maxlength="4"></div>
+                  <div><label for="idleSkillSort">Reihenfolge</label><input type="number" id="idleSkillSort" value="0"></div>
+                  <div><label for="idleSkillMaxRank">Max. Rang</label><input type="number" id="idleSkillMaxRank" value="5" min="1"></div>
+                  <div><label for="idleSkillCost">Kosten pro Rang (Skillpunkte)</label><input type="number" id="idleSkillCost" value="1" min="1"></div>
+                  <div><label for="idleSkillRequires">Ben&ouml;tigt Knoten-ID (optional)</label><input type="text" id="idleSkillRequires" placeholder="z. B. dorf_pfeilschaden"></div>
+                  <div><label for="idleSkillRequiresRank">Ben&ouml;tigter Rang</label><input type="number" id="idleSkillRequiresRank" value="1" min="1"></div>
+                  <div><label for="idleSkillEffectType">Effekt-Typ</label><input type="text" id="idleSkillEffectType" placeholder="z. B. attack_pct"></div>
+                  <div><label for="idleSkillEffectValue">Effekt-Wert pro Rang</label><input type="number" id="idleSkillEffectValue" value="1" step="0.1"></div>
+                </div>
+                <div><label for="idleSkillDesc">Beschreibung</label><input type="text" id="idleSkillDesc" placeholder="Kurze Beschreibung"></div>
+                <label class="admin-checkbox-label"><input type="checkbox" id="idleSkillActive" checked> Aktiv</label>
+                <div class="joke-buttons" style="justify-content:flex-start;">
+                  <button class="btn btn-primary" id="idleSkillSave" type="button">Speichern</button>
+                  <button class="btn" id="idleSkillCancel" type="button">Abbrechen</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Balance -->
+            <div id="idleAdminPanelBalance" style="display:none;">
+              <p class="admin-help-text">Balance-Werte als JSON. Vorsichtig bearbeiten &ndash; ung&uuml;ltiges JSON wird nicht gespeichert.</p>
+              <div id="idleConfigEditors"></div>
+            </div>
+
+            <!-- Testkampf -->
+            <div id="idleAdminPanelTest" style="display:none;">
+              <p class="admin-help-text">Simuliert Kämpfe rein clientseitig mit den aktuell aus Supabase geladenen Drachen &amp; Balance-Werten &ndash; es wird nichts gespeichert.</p>
+              <div class="form-grid form-grid-3">
+                <div><label for="idleTestAttack">Angriff</label><input type="number" id="idleTestAttack" value="10"></div>
+                <div><label for="idleTestCrit">Krit-Chance %</label><input type="number" id="idleTestCrit" value="5"></div>
+                <div><label for="idleTestCritDmg">Krit-Schaden %</label><input type="number" id="idleTestCritDmg" value="150"></div>
+                <div><label for="idleTestKills">Anzahl simulierter K&auml;mpfe</label><input type="number" id="idleTestKills" value="20" min="1" max="500"></div>
+              </div>
+              <button class="btn btn-primary" id="idleTestRun" type="button">Simulation starten</button>
+              <pre id="idleTestOutput" class="idle-admin-test-output"></pre>
+            </div>
+
+            <!-- Spieler-Reset -->
+            <div id="idleAdminPanelReset" style="display:none;">
+              <p class="admin-help-text">Setzt den kompletten Idle-Dorf-Fortschritt eines Spielers zur&uuml;ck (l&ouml;scht die Zeile in <code>idle_player_state</code>). Nicht r&uuml;ckg&auml;ngig zu machen.</p>
+              <div class="form-grid form-grid-2">
+                <div><label for="idleResetName">Minecraft-Name</label><input type="text" id="idleResetName" placeholder="z. B. TestSpieler"></div>
+              </div>
+              <button class="btn" id="idleResetRun" type="button" style="border-color:#ef4444; color:#ef4444;">Fortschritt zur&uuml;cksetzen</button>
+              <p class="admin-help-text" id="idleResetStatus"></p>
+            </div>
+          </div>
+        </section>
+
         <!-- Zugaenge -->
         <section class="admin-page" id="page-access">
           <div class="admin-section">
@@ -621,8 +740,9 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260707-streamerach"></script>
+  <script src="supabase.js?v=20260708-idledorf"></script>
   <script src="app.js?v=20260707-plushiesdb"></script>
+  <script src="idledorf.js?v=20260708-idledorf"></script>
   <script>
     bkmpInitTheme();
 
@@ -772,6 +892,7 @@
         if (page === 'cardcatalog') refreshCardCatalogFromSupabase();
         if (page === 'plushies') { bkmpRefreshPlushieDefinitionsAdmin(); refreshPlushieCodesList(); }
         if (page === 'dailyevents') { bkmpRefreshPlushieDefinitionsAdmin(); refreshDailyEventsPage(); }
+        if (page === 'idledorf') refreshIdleDorfAdmin();
         if (page === 'access') refreshAdminAccessList();
       });
     });
@@ -3392,6 +3513,360 @@
         });
       } else {
         savePost([]);
+      }
+    });
+
+    /* ---------------- Idle Drachen Dorf (Admin) ---------------- */
+    let bkmpIdleAdminDragons = [];
+    let bkmpIdleAdminSkills = [];
+    let bkmpIdleAdminConfig = {};
+    let idleEditingDragonId = null;
+    let idleEditingSkillId = null;
+
+    const idleAdminSubtabs = [
+      { btn: 'idleAdminSubtabDragons', panel: 'idleAdminPanelDragons' },
+      { btn: 'idleAdminSubtabSkills', panel: 'idleAdminPanelSkills' },
+      { btn: 'idleAdminSubtabBalance', panel: 'idleAdminPanelBalance' },
+      { btn: 'idleAdminSubtabTest', panel: 'idleAdminPanelTest' },
+      { btn: 'idleAdminSubtabReset', panel: 'idleAdminPanelReset' }
+    ];
+    idleAdminSubtabs.forEach(({ btn, panel }) => {
+      const btnEl = document.getElementById(btn);
+      if (!btnEl) return;
+      btnEl.addEventListener('click', () => {
+        idleAdminSubtabs.forEach(other => {
+          document.getElementById(other.btn).classList.toggle('active', other.btn === btn);
+          document.getElementById(other.panel).style.display = other.btn === btn ? '' : 'none';
+        });
+      });
+    });
+
+    async function refreshIdleDorfAdmin() {
+      try {
+        const [dragons, skills, config] = await Promise.all([
+          typeof loadIdleDragonsAdmin === 'function' ? loadIdleDragonsAdmin() : null,
+          typeof loadIdleSkillNodesAdmin === 'function' ? loadIdleSkillNodesAdmin() : null,
+          typeof loadIdleGameConfig === 'function' ? loadIdleGameConfig() : null
+        ]);
+        bkmpIdleAdminDragons = dragons || [];
+        bkmpIdleAdminSkills = skills || [];
+        bkmpIdleAdminConfig = config || {};
+      } catch (e) {
+        showAdminToast('Idle-Dorf-Daten konnten nicht geladen werden: ' + supabaseErrorText(e), 'error');
+      }
+      renderIdleDragonsList();
+      renderIdleSkillsList();
+      renderIdleConfigEditors();
+    }
+
+    function renderIdleDragonsList() {
+      const el = document.getElementById('idleDragonsList');
+      const countEl = document.getElementById('idleDragonsCount');
+      if (!el) return;
+      if (countEl) countEl.textContent = `(${bkmpIdleAdminDragons.length})`;
+      if (!bkmpIdleAdminDragons.length) { el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Noch keine Drachen angelegt.</p>'; return; }
+      el.innerHTML = '';
+      [...bkmpIdleAdminDragons].sort((a, b) => (a.tier_order || 0) - (b.tier_order || 0)).forEach(d => {
+        const row = document.createElement('div');
+        row.className = 'entry-row';
+        row.innerHTML = `
+          <div class="desc">
+            <span class="name">${d.emoji || '🐉'} ${escapeHtml(d.name)} ${d.is_boss ? '<span class="investor-anonymous-badge">Boss</span>' : ''}${d.active === false ? ' <span class="investor-anonymous-badge">Inaktiv</span>' : ''}</span>
+            <span class="meta">#${d.tier_order} · HP ${d.base_hp} · ATK ${d.base_attack} · DEF ${d.base_defense} · 💰${d.gold_reward_base} ✨${d.xp_reward_base}</span>
+          </div>
+          <div class="entry-actions">
+            <button class="edit-btn" type="button">Bearbeiten</button>
+            <button class="del-btn" type="button" aria-label="Drache löschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>
+          </div>`;
+        row.querySelector('.edit-btn').addEventListener('click', () => startEditIdleDragon(d.id));
+        row.querySelector('.del-btn').addEventListener('click', async () => {
+          if (!window.confirm(`Drache "${d.name}" wirklich löschen?`)) return;
+          try {
+            await deleteIdleDragon(d.id);
+            bkmpIdleAdminDragons = bkmpIdleAdminDragons.filter(x => x.id !== d.id);
+            renderIdleDragonsList();
+            showAdminToast('Drache gelöscht.', 'success');
+          } catch (e) { showAdminToast('Konnte nicht gelöscht werden: ' + supabaseErrorText(e), 'error'); }
+        });
+        el.appendChild(row);
+      });
+    }
+
+    function clearIdleDragonForm() {
+      idleEditingDragonId = null;
+      document.getElementById('idleDragonEditTitle').textContent = 'Neuer Drache';
+      document.getElementById('idleDragonId').value = '';
+      document.getElementById('idleDragonId').disabled = false;
+      document.getElementById('idleDragonName').value = '';
+      document.getElementById('idleDragonEmoji').value = '🐉';
+      document.getElementById('idleDragonTier').value = bkmpIdleAdminDragons.length;
+      document.getElementById('idleDragonHp').value = 100;
+      document.getElementById('idleDragonAtk').value = 10;
+      document.getElementById('idleDragonDef').value = 0;
+      document.getElementById('idleDragonGold').value = 5;
+      document.getElementById('idleDragonXp').value = 5;
+      document.getElementById('idleDragonWood').value = 2;
+      document.getElementById('idleDragonStone').value = 2;
+      document.getElementById('idleDragonCrystal').value = 0;
+      document.getElementById('idleDragonEssence').value = 0;
+      document.getElementById('idleDragonIsBoss').checked = false;
+      document.getElementById('idleDragonActive').checked = true;
+    }
+
+    function startEditIdleDragon(id) {
+      const d = bkmpIdleAdminDragons.find(x => x.id === id);
+      if (!d) return;
+      idleEditingDragonId = id;
+      document.getElementById('idleDragonEditTitle').textContent = 'Drache bearbeiten: ' + d.name;
+      document.getElementById('idleDragonId').value = d.id;
+      document.getElementById('idleDragonId').disabled = true;
+      document.getElementById('idleDragonName').value = d.name || '';
+      document.getElementById('idleDragonEmoji').value = d.emoji || '🐉';
+      document.getElementById('idleDragonTier').value = d.tier_order || 0;
+      document.getElementById('idleDragonHp').value = d.base_hp || 100;
+      document.getElementById('idleDragonAtk').value = d.base_attack || 10;
+      document.getElementById('idleDragonDef').value = d.base_defense || 0;
+      document.getElementById('idleDragonGold').value = d.gold_reward_base || 0;
+      document.getElementById('idleDragonXp').value = d.xp_reward_base || 0;
+      document.getElementById('idleDragonWood').value = d.wood_reward_base || 0;
+      document.getElementById('idleDragonStone').value = d.stone_reward_base || 0;
+      document.getElementById('idleDragonCrystal').value = d.crystal_reward_base || 0;
+      document.getElementById('idleDragonEssence').value = d.essence_reward_base || 0;
+      document.getElementById('idleDragonIsBoss').checked = Boolean(d.is_boss);
+      document.getElementById('idleDragonActive').checked = d.active !== false;
+      document.getElementById('idleDragonEditForm').style.display = '';
+    }
+
+    const idleDragonAddNewBtn = document.getElementById('idleDragonAddNew');
+    if (idleDragonAddNewBtn) idleDragonAddNewBtn.addEventListener('click', () => { clearIdleDragonForm(); document.getElementById('idleDragonEditForm').style.display = ''; });
+    const idleDragonCancelBtn = document.getElementById('idleDragonCancel');
+    if (idleDragonCancelBtn) idleDragonCancelBtn.addEventListener('click', () => { document.getElementById('idleDragonEditForm').style.display = 'none'; });
+    const idleDragonSaveBtn = document.getElementById('idleDragonSave');
+    if (idleDragonSaveBtn) idleDragonSaveBtn.addEventListener('click', async () => {
+      const id = (idleEditingDragonId || document.getElementById('idleDragonId').value.trim()).toLowerCase().replace(/\s+/g, '_');
+      const name = document.getElementById('idleDragonName').value.trim();
+      if (!id || !name) { showAdminToast('Bitte ID und Name ausfüllen.', 'error'); return; }
+      const dragon = {
+        id, name,
+        emoji: document.getElementById('idleDragonEmoji').value.trim() || '🐉',
+        tier_order: Number(document.getElementById('idleDragonTier').value) || 0,
+        base_hp: Number(document.getElementById('idleDragonHp').value) || 1,
+        base_attack: Number(document.getElementById('idleDragonAtk').value) || 1,
+        base_defense: Number(document.getElementById('idleDragonDef').value) || 0,
+        gold_reward_base: Number(document.getElementById('idleDragonGold').value) || 0,
+        xp_reward_base: Number(document.getElementById('idleDragonXp').value) || 0,
+        wood_reward_base: Number(document.getElementById('idleDragonWood').value) || 0,
+        stone_reward_base: Number(document.getElementById('idleDragonStone').value) || 0,
+        crystal_reward_base: Number(document.getElementById('idleDragonCrystal').value) || 0,
+        essence_reward_base: Number(document.getElementById('idleDragonEssence').value) || 0,
+        is_boss: document.getElementById('idleDragonIsBoss').checked,
+        active: document.getElementById('idleDragonActive').checked
+      };
+      try {
+        const saved = await saveIdleDragon(dragon);
+        const idx = bkmpIdleAdminDragons.findIndex(x => x.id === id);
+        if (idx >= 0) bkmpIdleAdminDragons[idx] = saved || dragon; else bkmpIdleAdminDragons.push(saved || dragon);
+        renderIdleDragonsList();
+        document.getElementById('idleDragonEditForm').style.display = 'none';
+        showAdminToast('Drache gespeichert.', 'success');
+      } catch (e) { showAdminToast('Konnte nicht gespeichert werden: ' + supabaseErrorText(e), 'error'); }
+    });
+
+    const BKMP_IDLE_ADMIN_BRANCH_LABELS = { dorf: '🏹 Dorf', burg: '🏰 Burg', wirtschaft: '⚒ Wirtschaft', forschung: '🐉 Forschung', magie: '✨ Magie' };
+
+    function renderIdleSkillsList() {
+      const el = document.getElementById('idleSkillsList');
+      const countEl = document.getElementById('idleSkillsCount');
+      if (!el) return;
+      if (countEl) countEl.textContent = `(${bkmpIdleAdminSkills.length})`;
+      if (!bkmpIdleAdminSkills.length) { el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Noch keine Skill-Knoten angelegt.</p>'; return; }
+      el.innerHTML = '';
+      ['dorf', 'burg', 'wirtschaft', 'forschung', 'magie'].forEach(branch => {
+        const nodes = bkmpIdleAdminSkills.filter(s => s.branch === branch).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+        if (!nodes.length) return;
+        const heading = document.createElement('h4');
+        heading.style.margin = '0.8rem 0 0.3rem';
+        heading.textContent = BKMP_IDLE_ADMIN_BRANCH_LABELS[branch] || branch;
+        el.appendChild(heading);
+        nodes.forEach(s => {
+          const row = document.createElement('div');
+          row.className = 'entry-row';
+          row.innerHTML = `
+            <div class="desc">
+              <span class="name">${s.icon || '✨'} ${escapeHtml(s.name)}${s.active === false ? ' <span class="investor-anonymous-badge">Inaktiv</span>' : ''}</span>
+              <span class="meta">${escapeHtml(s.effect_type)} +${s.effect_value_per_rank}/Rang · max ${s.max_rank} · Kosten ${s.cost_per_rank}${s.requires_node_id ? ' · benötigt ' + escapeHtml(s.requires_node_id) : ''}</span>
+            </div>
+            <div class="entry-actions">
+              <button class="edit-btn" type="button">Bearbeiten</button>
+              <button class="del-btn" type="button" aria-label="Skill löschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>
+            </div>`;
+          row.querySelector('.edit-btn').addEventListener('click', () => startEditIdleSkill(s.id));
+          row.querySelector('.del-btn').addEventListener('click', async () => {
+            if (!window.confirm(`Skill-Knoten "${s.name}" wirklich löschen?`)) return;
+            try {
+              await deleteIdleSkillNode(s.id);
+              bkmpIdleAdminSkills = bkmpIdleAdminSkills.filter(x => x.id !== s.id);
+              renderIdleSkillsList();
+              showAdminToast('Skill-Knoten gelöscht.', 'success');
+            } catch (e) { showAdminToast('Konnte nicht gelöscht werden: ' + supabaseErrorText(e), 'error'); }
+          });
+          el.appendChild(row);
+        });
+      });
+    }
+
+    function clearIdleSkillForm() {
+      idleEditingSkillId = null;
+      document.getElementById('idleSkillEditTitle').textContent = 'Neuer Skill-Knoten';
+      document.getElementById('idleSkillId').value = '';
+      document.getElementById('idleSkillId').disabled = false;
+      document.getElementById('idleSkillBranch').value = 'dorf';
+      document.getElementById('idleSkillName').value = '';
+      document.getElementById('idleSkillIcon').value = '';
+      document.getElementById('idleSkillSort').value = 0;
+      document.getElementById('idleSkillMaxRank').value = 5;
+      document.getElementById('idleSkillCost').value = 1;
+      document.getElementById('idleSkillRequires').value = '';
+      document.getElementById('idleSkillRequiresRank').value = 1;
+      document.getElementById('idleSkillEffectType').value = '';
+      document.getElementById('idleSkillEffectValue').value = 1;
+      document.getElementById('idleSkillDesc').value = '';
+      document.getElementById('idleSkillActive').checked = true;
+    }
+
+    function startEditIdleSkill(id) {
+      const s = bkmpIdleAdminSkills.find(x => x.id === id);
+      if (!s) return;
+      idleEditingSkillId = id;
+      document.getElementById('idleSkillEditTitle').textContent = 'Skill-Knoten bearbeiten: ' + s.name;
+      document.getElementById('idleSkillId').value = s.id;
+      document.getElementById('idleSkillId').disabled = true;
+      document.getElementById('idleSkillBranch').value = s.branch;
+      document.getElementById('idleSkillName').value = s.name || '';
+      document.getElementById('idleSkillIcon').value = s.icon || '';
+      document.getElementById('idleSkillSort').value = s.sort_order || 0;
+      document.getElementById('idleSkillMaxRank').value = s.max_rank || 1;
+      document.getElementById('idleSkillCost').value = s.cost_per_rank || 1;
+      document.getElementById('idleSkillRequires').value = s.requires_node_id || '';
+      document.getElementById('idleSkillRequiresRank').value = s.requires_rank || 1;
+      document.getElementById('idleSkillEffectType').value = s.effect_type || '';
+      document.getElementById('idleSkillEffectValue').value = s.effect_value_per_rank || 0;
+      document.getElementById('idleSkillDesc').value = s.description || '';
+      document.getElementById('idleSkillActive').checked = s.active !== false;
+      document.getElementById('idleSkillEditForm').style.display = '';
+    }
+
+    const idleSkillAddNewBtn = document.getElementById('idleSkillAddNew');
+    if (idleSkillAddNewBtn) idleSkillAddNewBtn.addEventListener('click', () => { clearIdleSkillForm(); document.getElementById('idleSkillEditForm').style.display = ''; });
+    const idleSkillCancelBtn = document.getElementById('idleSkillCancel');
+    if (idleSkillCancelBtn) idleSkillCancelBtn.addEventListener('click', () => { document.getElementById('idleSkillEditForm').style.display = 'none'; });
+    const idleSkillSaveBtn = document.getElementById('idleSkillSave');
+    if (idleSkillSaveBtn) idleSkillSaveBtn.addEventListener('click', async () => {
+      const id = (idleEditingSkillId || document.getElementById('idleSkillId').value.trim()).toLowerCase().replace(/\s+/g, '_');
+      const name = document.getElementById('idleSkillName').value.trim();
+      const effectType = document.getElementById('idleSkillEffectType').value.trim();
+      if (!id || !name || !effectType) { showAdminToast('Bitte ID, Name und Effekt-Typ ausfüllen.', 'error'); return; }
+      const node = {
+        id,
+        branch: document.getElementById('idleSkillBranch').value,
+        name,
+        description: document.getElementById('idleSkillDesc').value.trim(),
+        icon: document.getElementById('idleSkillIcon').value.trim(),
+        sort_order: Number(document.getElementById('idleSkillSort').value) || 0,
+        max_rank: Math.max(1, Number(document.getElementById('idleSkillMaxRank').value) || 1),
+        cost_per_rank: Math.max(1, Number(document.getElementById('idleSkillCost').value) || 1),
+        requires_node_id: document.getElementById('idleSkillRequires').value.trim() || null,
+        requires_rank: Math.max(1, Number(document.getElementById('idleSkillRequiresRank').value) || 1),
+        effect_type: effectType,
+        effect_value_per_rank: Number(document.getElementById('idleSkillEffectValue').value) || 0,
+        active: document.getElementById('idleSkillActive').checked
+      };
+      try {
+        const saved = await saveIdleSkillNode(node);
+        const idx = bkmpIdleAdminSkills.findIndex(x => x.id === id);
+        if (idx >= 0) bkmpIdleAdminSkills[idx] = saved || node; else bkmpIdleAdminSkills.push(saved || node);
+        renderIdleSkillsList();
+        document.getElementById('idleSkillEditForm').style.display = 'none';
+        showAdminToast('Skill-Knoten gespeichert.', 'success');
+      } catch (e) { showAdminToast('Konnte nicht gespeichert werden: ' + supabaseErrorText(e), 'error'); }
+    });
+
+    const BKMP_IDLE_CONFIG_LABELS = {
+      xp_curve: 'XP-Kurve', dragon_scaling: 'Drachen-Skalierung', reward_scaling: 'Belohnungs-Skalierung',
+      offline_progress: 'Offline-Fortschritt', base_stats: 'Basis-Werte'
+    };
+    function renderIdleConfigEditors() {
+      const el = document.getElementById('idleConfigEditors');
+      if (!el) return;
+      const keys = Object.keys(BKMP_IDLE_CONFIG_LABELS);
+      el.innerHTML = keys.map(key => `
+        <div style="margin-bottom:1rem;">
+          <label for="idleConfig_${key}">${BKMP_IDLE_CONFIG_LABELS[key]} (<code>${key}</code>)</label>
+          <textarea id="idleConfig_${key}" rows="2" style="width:100%; font-family:monospace; font-size:0.8rem;">${escapeHtml(JSON.stringify(bkmpIdleAdminConfig[key] || {}, null, 0))}</textarea>
+          <button class="btn" type="button" data-config-key="${key}" style="margin-top:0.3rem;">Speichern</button>
+        </div>`).join('');
+      el.querySelectorAll('button[data-config-key]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const key = btn.dataset.configKey;
+          const textarea = document.getElementById('idleConfig_' + key);
+          let value;
+          try { value = JSON.parse(textarea.value); } catch (e) { showAdminToast('Ungültiges JSON bei ' + key + '.', 'error'); return; }
+          try {
+            await saveIdleGameConfig(key, value);
+            bkmpIdleAdminConfig[key] = value;
+            showAdminToast(BKMP_IDLE_CONFIG_LABELS[key] + ' gespeichert.', 'success');
+          } catch (e) { showAdminToast('Konnte nicht gespeichert werden: ' + supabaseErrorText(e), 'error'); }
+        });
+      });
+    }
+
+    const idleTestRunBtn = document.getElementById('idleTestRun');
+    if (idleTestRunBtn) idleTestRunBtn.addEventListener('click', () => {
+      const output = document.getElementById('idleTestOutput');
+      const dragons = bkmpIdleAdminDragons.length ? bkmpIdleAdminDragons : BKMP_IDLE_FALLBACK_DRAGONS;
+      const dragonScaling = bkmpIdleAdminConfig.dragon_scaling || BKMP_IDLE_FALLBACK_CONFIG.dragon_scaling;
+      const rewardScaling = bkmpIdleAdminConfig.reward_scaling || BKMP_IDLE_FALLBACK_CONFIG.reward_scaling;
+      const attack = Number(document.getElementById('idleTestAttack').value) || 10;
+      const critChance = Number(document.getElementById('idleTestCrit').value) || 0;
+      const critDamage = Number(document.getElementById('idleTestCritDmg').value) || 150;
+      const kills = Math.max(1, Math.min(500, Number(document.getElementById('idleTestKills').value) || 20));
+
+      let totalGold = 0, totalXp = 0, totalTicks = 0;
+      const lines = [];
+      for (let i = 0; i < kills; i++) {
+        const dragon = bkmpIdleDragonStatsAt(i, dragons, dragonScaling);
+        if (!dragon) break;
+        let hp = dragon.maxHp;
+        let ticks = 0;
+        while (hp > 0 && ticks < 10000) {
+          const roll = bkmpIdleDamageRoll(attack, critChance, critDamage, dragon.defense);
+          hp -= roll.amount;
+          ticks++;
+        }
+        const rewards = bkmpIdleRewardsAt(dragon, { goldBonus: 0, xpBonus: 0, lootBonus: 0 }, rewardScaling);
+        totalGold += rewards.gold;
+        totalXp += rewards.xp;
+        totalTicks += ticks;
+        if (i < 15 || dragon.isBoss) lines.push(`#${i + 1} ${dragon.name}${dragon.isBoss ? ' (BOSS)' : ''}: ${ticks} Treffer, HP ${dragon.maxHp}, +${rewards.gold}💰 +${rewards.xp}✨`);
+      }
+      lines.push('');
+      lines.push(`Gesamt: ${kills} Kämpfe, ${totalTicks} Treffer (~${Math.round(totalTicks * 0.9)}s bei 900ms/Tick), ${totalGold} Gold, ${totalXp} XP.`);
+      output.textContent = lines.join('\n');
+    });
+
+    const idleResetRunBtn = document.getElementById('idleResetRun');
+    if (idleResetRunBtn) idleResetRunBtn.addEventListener('click', async () => {
+      const name = document.getElementById('idleResetName').value.trim();
+      const status = document.getElementById('idleResetStatus');
+      if (!name) { status.textContent = 'Bitte einen Namen eingeben.'; return; }
+      if (!window.confirm(`Idle-Dorf-Fortschritt von "${name}" wirklich unwiderruflich zurücksetzen?`)) return;
+      try {
+        await resetIdlePlayerState(name);
+        status.textContent = `Fortschritt von "${name}" wurde zurückgesetzt.`;
+        showAdminToast('Fortschritt zurückgesetzt.', 'success');
+      } catch (e) {
+        status.textContent = 'Fehler: ' + supabaseErrorText(e);
+        showAdminToast('Konnte nicht zurückgesetzt werden: ' + supabaseErrorText(e), 'error');
       }
     });
   </script>

@@ -2111,6 +2111,147 @@ async function createPlushieCodes(rows) {
   return data || [];
 }
 
+/* ---------------- Idle Drachen Dorf ---------------- */
+
+const BKMP_IDLE_PLAYER_STATE_COLUMNS = `name_key, display_name, level, xp, gold, wood, stone, crystals, essence,
+  total_gold_earned, attack, defense, hp, crit_chance, crit_damage, gold_bonus, xp_bonus, loot_bonus,
+  skill_points_available, skill_points_spent, skill_allocations, upgrade_purchases, dragon_kills, boss_kills,
+  current_dragon_index, playtime_seconds, last_seen_at, last_offline_claim, updated_at`;
+
+async function loadIdleDragons() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('idle_dragons')
+    .select('*')
+    .eq('active', true)
+    .order('tier_order', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+async function loadIdleSkillNodes() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('idle_skill_nodes')
+    .select('*')
+    .eq('active', true)
+    .order('branch', { ascending: true })
+    .order('sort_order', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+async function loadIdleGameConfig() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client.from('idle_game_config').select('key, value');
+  if (error) throw error;
+  const config = {};
+  (data || []).forEach(row => { config[row.key] = row.value; });
+  return config;
+}
+
+async function loadIdlePlayerState(name) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !name) return null;
+  const { data, error } = await client
+    .from('idle_player_state')
+    .select(BKMP_IDLE_PLAYER_STATE_COLUMNS)
+    .eq('name_key', String(name).trim().toLowerCase())
+    .limit(1);
+  if (error) throw error;
+  return Array.isArray(data) && data[0] ? data[0] : null;
+}
+
+async function upsertIdlePlayerState(state) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !state || !state.name_key) return false;
+  const { error } = await client
+    .from('idle_player_state')
+    .upsert({ ...state, updated_at: new Date().toISOString() }, { onConflict: 'name_key' });
+  if (error) throw error;
+  return true;
+}
+
+async function loadIdleLeaderboardStats() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('idle_player_state')
+    .select('display_name, level, total_gold_earned, dragon_kills, playtime_seconds');
+  if (error) throw error;
+  return data || [];
+}
+
+/* Admin-only: Balance bearbeiten (RLS erlaubt Schreibzugriff nur eingeloggten Admins). */
+async function saveIdleDragon(dragon) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { data, error } = await client.from('idle_dragons').upsert(dragon, { onConflict: 'id' }).select('*');
+  if (error) throw error;
+  return Array.isArray(data) ? data[0] : null;
+}
+
+async function deleteIdleDragon(id) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { error } = await client.from('idle_dragons').delete().eq('id', id);
+  if (error) throw error;
+  return true;
+}
+
+async function loadIdleDragonsAdmin() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client.from('idle_dragons').select('*').order('tier_order', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+async function saveIdleSkillNode(node) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { data, error } = await client.from('idle_skill_nodes').upsert(node, { onConflict: 'id' }).select('*');
+  if (error) throw error;
+  return Array.isArray(data) ? data[0] : null;
+}
+
+async function deleteIdleSkillNode(id) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { error } = await client.from('idle_skill_nodes').delete().eq('id', id);
+  if (error) throw error;
+  return true;
+}
+
+async function loadIdleSkillNodesAdmin() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client.from('idle_skill_nodes').select('*').order('branch', { ascending: true }).order('sort_order', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+async function saveIdleGameConfig(key, value) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { error } = await client
+    .from('idle_game_config')
+    .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  if (error) throw error;
+  return true;
+}
+
+async function resetIdlePlayerState(nameKey) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { error } = await client.from('idle_player_state').delete().eq('name_key', String(nameKey).trim().toLowerCase());
+  if (error) throw error;
+  return true;
+}
+
 window.importLocalExpensesToSupabase = importLocalExpensesToSupabase;
 window.importLocalUpdatesToSupabase = importLocalUpdatesToSupabase;
 window.importLocalWishesToSupabase = importLocalWishesToSupabase;

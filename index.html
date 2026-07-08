@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260707-namecosmetics">
+<link rel="stylesheet" href="style.css?v=20260708-idledorf">
 </head>
 <body>
 
@@ -57,6 +57,10 @@
   </div>
 
   <div class="top-actions">
+    <button class="pill-btn idle-dorf-btn" id="idleDorfButton" type="button" aria-label="Idle Drachen Dorf öffnen">
+      <span aria-hidden="true">🏰</span> Idle Drachen Dorf
+    </button>
+
     <button class="pill-btn" id="themeToggle" type="button" aria-label="Zwischen Hell- und Dunkelmodus wechseln">
       <span class="toggle-icon">
         <svg class="icon-sun" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
@@ -128,6 +132,54 @@
       <div class="joke-buttons">
         <button class="btn-nein" id="achievementsChangeName" type="button">Namen &auml;ndern</button>
         <button class="btn-ja" id="achievementsClose" type="button">Schlie&szlig;en</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="joke-overlay idle-dorf-overlay" id="idleDorfOverlay">
+    <div class="joke-card idle-dorf-card">
+      <button type="button" class="idle-dorf-close" id="idleDorfCloseX" aria-label="Schlie&szlig;en">&times;</button>
+      <h3>🏰 Idle Drachen Dorf</h3>
+      <div class="idle-dorf-offline-card" id="idleDorfOfflineCard" style="display:none;"></div>
+
+      <div class="idle-dorf-tabs">
+        <button type="button" class="idle-dorf-tab active" id="idleTabBtnKampf">&#9876;&#65039; Kampf</button>
+        <button type="button" class="idle-dorf-tab" id="idleTabBtnUpgrades">&#11014;&#65039; Upgrades</button>
+        <button type="button" class="idle-dorf-tab" id="idleTabBtnSkilltree">&#127795; Skilltree</button>
+        <button type="button" class="idle-dorf-tab" id="idleTabBtnSammlung">&#127873; Sammlung</button>
+        <button type="button" class="idle-dorf-tab" id="idleTabBtnErfolge">&#127942; Erfolge</button>
+        <button type="button" class="idle-dorf-tab" id="idleTabBtnBestenliste">&#128202; Bestenliste</button>
+      </div>
+
+      <div class="idle-dorf-panel" id="idlePanelKampf">
+        <div class="idle-dorf-hud" id="idleDorfHud"></div>
+        <div class="idle-battlefield" id="idleBattlefield">
+          <div class="idle-village" id="idleVillage">
+            <div class="idle-village-sprite">&#127968;</div>
+            <div class="idle-hp-bar"><div class="idle-hp-fill idle-hp-fill-village" id="idleVillageHpFill" style="width:100%"></div></div>
+            <div class="idle-hp-label" id="idleVillageHpLabel"></div>
+          </div>
+          <div class="idle-dragon" id="idleDragon">
+            <div class="idle-dragon-sprite" id="idleDragonSprite">&#128009;</div>
+            <div class="idle-hp-bar"><div class="idle-hp-fill idle-hp-fill-dragon" id="idleDragonHpFill" style="width:100%"></div></div>
+            <div class="idle-hp-label" id="idleDragonHpLabel"></div>
+            <div class="idle-dragon-name" id="idleDragonName"></div>
+          </div>
+        </div>
+        <div class="idle-dorf-log" id="idleDorfLog"></div>
+      </div>
+
+      <div class="idle-dorf-panel" id="idlePanelUpgrades" style="display:none;"></div>
+      <div class="idle-dorf-panel" id="idlePanelSkilltree" style="display:none;"></div>
+      <div class="idle-dorf-panel" id="idlePanelSammlung" style="display:none;"></div>
+      <div class="idle-dorf-panel" id="idlePanelErfolge" style="display:none;"></div>
+      <div class="idle-dorf-panel" id="idlePanelBestenliste" style="display:none;">
+        <div class="idle-dorf-leaderboard-tabs" id="idleLeaderboardTabs"></div>
+        <div id="idleLeaderboardList"></div>
+      </div>
+
+      <div class="joke-buttons">
+        <button class="btn-ja" id="idleDorfClose" type="button">Schlie&szlig;en</button>
       </div>
     </div>
   </div>
@@ -472,8 +524,9 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260707-streamerach"></script>
+  <script src="supabase.js?v=20260708-idledorf"></script>
   <script src="app.js?v=20260707-plushiesdb"></script>
+  <script src="idledorf.js?v=20260708-idledorf"></script>
   <script>
     bkmpInitTheme();
     window.addEventListener('load', () => document.body.classList.add('page-loaded'));
@@ -2668,7 +2721,8 @@
         ownedPlushies: bkmpOwnedPlushies,
         dailyEventWins: bkmpGetDailyEventWins(),
         wonGoldenHour: bkmpGetWonGoldenHour(),
-        streamersClicked: bkmpGetStreamersClicked()
+        streamersClicked: bkmpGetStreamersClicked(),
+        ...(typeof bkmpIdleGetAchievementContextFields === 'function' ? bkmpIdleGetAchievementContextFields() : {})
       };
     }
     /* Daily-Code-Event-Gewinne: lokal gecacht (wird bei Sieg gesetzt, siehe
@@ -2804,7 +2858,12 @@
       { id: 'daily_event_1', category: 'Plüshies', title: '???', revealName: 'Glücklicher Gewinner', desc: 'Gewinne ein Daily-Code-Event.', check: ctx => ctx.dailyEventWins >= 1 },
       { id: 'daily_event_5', category: 'Plüshies', title: '???', revealName: 'Serien-Gewinner', desc: 'Gewinne 5 Daily-Code-Events.', progress: ctx => [ctx.dailyEventWins, 5], check: ctx => ctx.dailyEventWins >= 5 },
       { id: 'daily_event_15', category: 'Plüshies', title: '???', revealName: 'Event-Champion', desc: 'Gewinne 15 Daily-Code-Events.', progress: ctx => [ctx.dailyEventWins, 15], check: ctx => ctx.dailyEventWins >= 15 },
-      { id: 'golden_hour_win', category: 'Plüshies', title: '???', revealName: 'Der Auserwählte', desc: 'Gewinne den Code der Golden Hour als Erster.', check: ctx => ctx.wonGoldenHour }
+      { id: 'golden_hour_win', category: 'Plüshies', title: '???', revealName: 'Der Auserwählte', desc: 'Gewinne den Code der Golden Hour als Erster.', check: ctx => ctx.wonGoldenHour },
+      ...(Array.isArray(window.BKMP_IDLE_ACHIEVEMENTS_EXTRA) ? window.BKMP_IDLE_ACHIEVEMENTS_EXTRA : []),
+      ...(Array.isArray(window.BKMP_IDLE_DRAGON_KILL_TIERS) ? bkmpTieredAchievements('idledragon', 'Idle Dorf', 'idleDragonKills', window.BKMP_IDLE_DRAGON_KILL_TIERS, n => `Besiege ${n} Drache${n === 1 ? '' : 'n'} im Idle Dorf.`) : []),
+      ...(Array.isArray(window.BKMP_IDLE_LEVEL_TIERS) ? bkmpTieredAchievements('idlelevel', 'Idle Dorf', 'idleLevel', window.BKMP_IDLE_LEVEL_TIERS, n => `Erreiche Dorf-Level ${n} im Idle Dorf.`) : []),
+      ...(Array.isArray(window.BKMP_IDLE_GOLD_TIERS) ? bkmpTieredAchievements('idlegold', 'Idle Dorf', 'idleGoldEarned', window.BKMP_IDLE_GOLD_TIERS, n => `Sammle insgesamt ${n} Gold im Idle Dorf.`) : []),
+      ...(Array.isArray(window.BKMP_IDLE_SKILLPOINTS_TIERS) ? bkmpTieredAchievements('idleskill', 'Idle Dorf', 'idleSkillPointsSpent', window.BKMP_IDLE_SKILLPOINTS_TIERS, n => `Investiere ${n} Skillpunkte im Idle Dorf.`) : [])
     ];
     }
     let BKMP_ACHIEVEMENTS = bkmpBuildAchievementsList();
@@ -2839,7 +2898,8 @@
       { id: 'sonnenuntergang', name: 'Sonnenuntergang', desc: 'Orange, Pink und Violett.', unlockAt: 50 },
       { id: 'neonpink', name: 'Neon-Pink', desc: 'Leuchtendes Pink.', unlockAt: 70 },
       { id: 'galaxy', name: 'Galaxy', desc: 'Schimmernder Sternenverlauf.', unlockAt: 80 },
-      { id: 'mitternacht', name: 'Mitternacht', desc: 'Tiefes Nachtblau.', unlockAt: 90 }
+      { id: 'mitternacht', name: 'Mitternacht', desc: 'Tiefes Nachtblau.', unlockAt: 90 },
+      ...(Array.isArray(window.BKMP_IDLE_COSMETICS) ? window.BKMP_IDLE_COSMETICS : [])
     ];
     function bkmpGetActiveCosmetic() {
       try { return localStorage.getItem(BKMP_ACTIVE_COSMETIC_KEY) || ''; } catch (e) { return ''; }
@@ -2849,6 +2909,7 @@
       renderAchievementBadge();
     }
     function bkmpCosmeticUnlocked(cosmetic, unlockedCount, ctx) {
+      if (cosmetic.unlockCustom) return Boolean(cosmetic.unlockCustom(ctx));
       if (cosmetic.unlockEgg) return ctx.eggsFound.includes(cosmetic.unlockEgg);
       if (cosmetic.unlockAchievement) {
         const ach = BKMP_ACHIEVEMENTS.find(a => a.id === cosmetic.unlockAchievement);
@@ -2958,7 +3019,8 @@
         name: `Maximaler ${p.name.replace(/\s*Plüshie$/i, '')} Fan`,
         desc: `Besitzt das ${p.name}.`,
         unlockAchievement: `plushie_${p.id}`
-      }))
+      })),
+      ...(Array.isArray(window.BKMP_IDLE_TITLES) ? window.BKMP_IDLE_TITLES : [])
     ];
     }
     let BKMP_TITLES = bkmpBuildTitlesList();
@@ -3126,6 +3188,7 @@
     let bkmpDailyEventPollTimer = null;
     let bkmpDailyEventCountdownTimer = null;
     let bkmpCurrentDailyEvent = null;
+    let bkmpDismissedDailyEventId = null;
 
     function bkmpStartDailyEventPolling() {
       bkmpPollDailyEvent();
@@ -3153,6 +3216,7 @@
         bkmpUpdateDailyEventWinState(event);
         return;
       }
+      if (event.id === bkmpDismissedDailyEventId) return;
       bkmpCurrentDailyEvent = event;
       bkmpShowDailyEventPopup(event);
     }
@@ -3162,6 +3226,11 @@
       if (popup) popup.remove();
       clearInterval(bkmpDailyEventCountdownTimer);
       bkmpCurrentDailyEvent = null;
+    }
+
+    function bkmpDismissDailyEventPopup() {
+      if (bkmpCurrentDailyEvent) bkmpDismissedDailyEventId = bkmpCurrentDailyEvent.id;
+      bkmpCloseDailyEventPopup();
     }
 
     function bkmpShowDailyEventPopup(event) {
@@ -3199,7 +3268,7 @@
         }).join('');
       }
 
-      document.getElementById('bkmpDailyPopupClose').addEventListener('click', bkmpCloseDailyEventPopup);
+      document.getElementById('bkmpDailyPopupClose').addEventListener('click', bkmpDismissDailyEventPopup);
       document.getElementById('bkmpDailyClaimBtn').addEventListener('click', bkmpClaimDailyEvent);
 
       bkmpUpdateDailyEventWinState(event);
@@ -3435,7 +3504,7 @@
       if (typeof bkmpSyncPlayerStats === 'function') bkmpSyncPlayerStats(unlockedCount);
     }
 
-    const BKMP_ACHIEVEMENT_CATEGORY_ORDER = ['Karten', 'Kartenideen', 'Zeit & Treue', 'Vielfalt', 'Bonk', 'Plüshies', 'Meilensteine', 'Easter Eggs', 'Sonstiges'];
+    const BKMP_ACHIEVEMENT_CATEGORY_ORDER = ['Karten', 'Kartenideen', 'Zeit & Treue', 'Vielfalt', 'Bonk', 'Idle Dorf', 'Plüshies', 'Meilensteine', 'Easter Eggs', 'Sonstiges'];
     const bkmpAchievementCategoryOpen = {};
 
     function renderAchievementsPanel() {
