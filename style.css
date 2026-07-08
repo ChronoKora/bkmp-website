@@ -233,6 +233,18 @@ body.modal-open .bkmp-easter > span {
   transition: transform 0.15s ease, border-color 0.2s ease;
 }
 .joke-buttons button:hover { transform: translateY(-1px); }
+/* .btn-ja/.btn-nein selbststaendig stylen (nicht nur ueber den
+   .joke-buttons-Elternselektor), sonst faellt jeder Button dieser Klassen
+   ausserhalb von .joke-buttons (z. B. die Idle-Dorf-Stufenleiste) auf den
+   ungestylten Browser-Standard zurueck (grauer Kasten, harte Kanten,
+   outset-Rahmen) statt die Pill-Optik der restlichen Seite zu bekommen. */
+.btn-ja, .btn-nein {
+  font-family: 'Inter', sans-serif; font-size: 0.85rem; font-weight: 500;
+  padding: 0.55rem 1.2rem; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--paper); color: var(--ink);
+  transition: transform 0.15s ease, border-color 0.2s ease;
+}
+.btn-ja:hover, .btn-nein:hover { transform: translateY(-1px); }
 .btn-ja { border-color: var(--gold) !important; background: var(--gold) !important; color: #0A0A0F !important; }
 .btn-nein:hover { border-color: var(--gold); }
 
