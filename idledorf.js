@@ -26,54 +26,87 @@ function bkmpIdleFormatStage(index) {
   return `${Math.floor(i / 10)}-${i % 10}`;
 }
 
-function bkmpIdleDragonArchetypeAt(killIndex, dragons) {
-  const pool = (dragons || []).filter(d => d.active !== false).sort((a, b) => (a.tier_order || 0) - (b.tier_order || 0));
-  if (!pool.length) return null;
-  return pool[killIndex % pool.length];
+/* Spawn-Logik: waehlt die ART des naechsten Drachen anhand der Stufe
+   (killIndex+1 = wie oft insgesamt schon gekaempft wurde, 1-indiziert).
+   - alle 25 Stufen (25/50/75/...): der grosse Boss
+   - alle 10 Stufen (10/20/30/...), aber NICHT wenn schon Boss-Stufe: Miniboss
+   - sonst kleine Zufallschance auf einen seltenen Drachen (Schatten/Wuff)
+   - ansonsten einer der vier Standard-Elementardrachen, zufaellig */
+function bkmpIdleSelectDragonKindId(killIndex, dragons, rareChancePct) {
+  const stage = killIndex + 1;
+  const active = (dragons || []).filter(d => d.active !== false);
+  const byRule = rule => active.filter(d => d.spawn_rule === rule);
+  if (stage % 25 === 0) {
+    const pool = byRule('boss_25');
+    if (pool.length) return pool[Math.floor(Math.random() * pool.length)].id;
+  }
+  if (stage % 10 === 0) {
+    const pool = byRule('miniboss_10');
+    if (pool.length) return pool[Math.floor(Math.random() * pool.length)].id;
+  }
+  const rare = byRule('rare');
+  if (rare.length && Math.random() * 100 < (rareChancePct != null ? rareChancePct : 8)) {
+    return rare[Math.floor(Math.random() * rare.length)].id;
+  }
+  const standard = byRule('standard');
+  const pool = standard.length ? standard : active;
+  return pool.length ? pool[Math.floor(Math.random() * pool.length)].id : ((active[0] || {}).id || null);
 }
 
-function bkmpIdleDragonStatsAt(killIndex, dragons, dragonScalingCfg) {
-  const archetype = bkmpIdleDragonArchetypeAt(killIndex, dragons);
+function bkmpIdleDragonStatsAt(killIndex, dragons, cfg) {
+  const c = cfg || {};
+  const kindId = bkmpIdleSelectDragonKindId(killIndex, dragons, c.chancePct);
+  const archetype = (dragons || []).find(d => d.id === kindId);
   if (!archetype) return null;
-  const cfg = dragonScalingCfg || {};
-  const hpGrowth = Math.pow(1 + (cfg.hpGrowthPerKill || 0), killIndex);
-  const atkGrowth = Math.pow(1 + (cfg.atkGrowthPerKill || 0), killIndex);
-  const bossEvery = cfg.bossEvery || 10;
-  const isBoss = Boolean(archetype.is_boss) || ((killIndex + 1) % bossEvery === 0);
-  const bossMult = isBoss ? (cfg.bossMultiplier || 3) : 1;
+  const hpGrowth = Math.pow(1 + (c.hpGrowthPerKill || 0), killIndex);
+  const atkGrowth = Math.pow(1 + (c.atkGrowthPerKill || 0), killIndex);
+  let bossTier = null;
+  let hpMult = 1;
+  let atkMult = 1;
+  if (archetype.spawn_rule === 'boss_25') { bossTier = 'boss'; hpMult = c.bossHpMult || 3.2; atkMult = c.bossAtkMult || 1.7; }
+  else if (archetype.spawn_rule === 'miniboss_10') { bossTier = 'miniboss'; hpMult = c.minibossHpMult || 1.8; atkMult = c.minibossAtkMult || 1.3; }
   return {
     id: archetype.id,
     name: archetype.name,
     emoji: archetype.emoji || '🐉',
+    spriteKey: archetype.sprite_key || archetype.id,
     colorTheme: archetype.color_theme || '',
     killIndex,
-    isBoss,
-    maxHp: Math.max(1, Math.round((archetype.base_hp || 50) * hpGrowth * bossMult)),
-    attack: Math.max(1, (archetype.base_attack || 5) * atkGrowth * (isBoss ? Math.sqrt(bossMult) : 1)),
+    isBoss: Boolean(bossTier),
+    bossTier,
+    maxHp: Math.max(1, Math.round((archetype.base_hp || 50) * hpGrowth * hpMult)),
+    attack: Math.max(1, (archetype.base_attack || 5) * atkGrowth * atkMult),
     defense: archetype.base_defense || 0,
     archetype
   };
 }
 
-function bkmpIdleRewardsAt(dragon, playerBonuses, rewardScalingCfg) {
+function bkmpIdleRewardsAt(dragon, playerBonuses, cfg) {
   if (!dragon || !dragon.archetype) return { gold: 0, xp: 0, wood: 0, stone: 0, crystals: 0, essence: 0 };
   const archetype = dragon.archetype;
-  const cfg = rewardScalingCfg || {};
-  const goldGrowth = Math.pow(1 + (cfg.goldGrowthPerKill || 0), dragon.killIndex);
-  const xpGrowth = Math.pow(1 + (cfg.xpGrowthPerKill || 0), dragon.killIndex);
-  const bossMult = dragon.isBoss ? 2 : 1;
+  const c = cfg || {};
+  const goldGrowth = Math.pow(1 + (c.goldGrowthPerKill || 0), dragon.killIndex);
+  const xpGrowth = Math.pow(1 + (c.xpGrowthPerKill || 0), dragon.killIndex);
+  const rewardMult = dragon.bossTier === 'boss' ? (c.bossRewardMult || 4) : dragon.bossTier === 'miniboss' ? (c.minibossRewardMult || 2) : 1;
   const bonuses = playerBonuses || {};
   const goldMult = 1 + (bonuses.goldBonus || 0) / 100;
   const xpMult = 1 + (bonuses.xpBonus || 0) / 100;
   const lootMult = 1 + (bonuses.lootBonus || 0) / 100;
   return {
-    gold: Math.round((archetype.gold_reward_base || 0) * goldGrowth * bossMult * goldMult),
-    xp: Math.round((archetype.xp_reward_base || 0) * xpGrowth * bossMult * xpMult),
+    gold: Math.round((archetype.gold_reward_base || 0) * goldGrowth * rewardMult * goldMult),
+    xp: Math.round((archetype.xp_reward_base || 0) * xpGrowth * rewardMult * xpMult),
     wood: Math.round((archetype.wood_reward_base || 0) * lootMult),
     stone: Math.round((archetype.stone_reward_base || 0) * lootMult),
     crystals: Math.round((archetype.crystal_reward_base || 0) * lootMult),
     essence: Math.round((archetype.essence_reward_base || 0) * lootMult)
   };
+}
+
+function bkmpIdleGetMergedDragonScalingCfg() {
+  return { ...(bkmpIdleConfig.dragon_scaling || {}), ...(bkmpIdleConfig.boss_scaling || {}), ...(bkmpIdleConfig.rare_spawn || {}) };
+}
+function bkmpIdleGetMergedRewardScalingCfg() {
+  return { ...(bkmpIdleConfig.reward_scaling || {}), ...(bkmpIdleConfig.boss_scaling || {}) };
 }
 
 function bkmpIdleDamageRoll(attack, critChancePct, critDamagePct, defense) {
@@ -96,13 +129,18 @@ function bkmpIdleSkillEffectTotals(skillAllocations, skillDefs) {
 
 /* ---------------- Ressourcen-Upgrades (client-seitig, nicht DB-verwaltet) ---------------- */
 
+/* Feste Werte statt Prozent (auf Wunsch) - jede Stufe gibt einen klaren,
+   greifbaren Bonus (z. B. "+1 Angriff") statt eines abstrakten Prozentsatzes.
+   Produktions-Boni (Gold/Lootchance) bleiben bewusst prozentual, da sie
+   inhaltlich eine Rate/Chance beschreiben, kein absoluter Kampfwert sind. */
 const BKMP_IDLE_UPGRADES = [
-  { id: 'atk', name: 'Waffenschmiede', desc: '+2% Angriff pro Stufe.', icon: '⚔️', resource: 'gold', baseCost: 50, costGrowth: 1.16, effectType: 'attack_pct', effectPerLevel: 2, maxLevel: 40 },
-  { id: 'def', name: 'Rüstkammer', desc: '+2% Verteidigung pro Stufe.', icon: '🛡️', resource: 'gold', baseCost: 50, costGrowth: 1.16, effectType: 'defense_pct', effectPerLevel: 2, maxLevel: 40 },
-  { id: 'hp', name: 'Vorratshaus', desc: '+2% Leben pro Stufe.', icon: '❤️', resource: 'wood', baseCost: 40, costGrowth: 1.15, effectType: 'hp_pct', effectPerLevel: 2, maxLevel: 40 },
-  { id: 'walls', name: 'Steinmauern', desc: '+1,5% Verteidigung pro Stufe.', icon: '🧱', resource: 'stone', baseCost: 40, costGrowth: 1.15, effectType: 'defense_pct', effectPerLevel: 1.5, maxLevel: 40 },
-  { id: 'crystal_gold', name: 'Kristallschliff', desc: '+3% Gold-Ausbeute pro Stufe.', icon: '💎', resource: 'crystals', baseCost: 5, costGrowth: 1.22, effectType: 'gold_prod_pct', effectPerLevel: 3, maxLevel: 30 },
-  { id: 'essence_loot', name: 'Essenzbindung', desc: '+2% Lootchance pro Stufe.', icon: '🧪', resource: 'essence', baseCost: 4, costGrowth: 1.22, effectType: 'loot_chance_pct', effectPerLevel: 2, maxLevel: 30 }
+  { id: 'atk', name: 'Waffenschmiede', desc: '+1 Angriff pro Stufe.', icon: '⚔️', resource: 'gold', baseCost: 35, costGrowth: 1.13, effectType: 'attack_flat', effectPerLevel: 1, maxLevel: 50 },
+  { id: 'def', name: 'Rüstkammer', desc: '+1 Verteidigung pro Stufe.', icon: '🛡️', resource: 'gold', baseCost: 35, costGrowth: 1.13, effectType: 'defense_flat', effectPerLevel: 1, maxLevel: 50 },
+  { id: 'hp', name: 'Vorratshaus', desc: '+5 Leben pro Stufe.', icon: '❤️', resource: 'wood', baseCost: 25, costGrowth: 1.12, effectType: 'hp_flat', effectPerLevel: 5, maxLevel: 50 },
+  { id: 'walls', name: 'Steinmauern', desc: '+1 Verteidigung pro Stufe.', icon: '🧱', resource: 'stone', baseCost: 25, costGrowth: 1.12, effectType: 'defense_flat', effectPerLevel: 1, maxLevel: 50 },
+  { id: 'crit', name: 'Zielübung', desc: '+1 Krit-Chance pro Stufe.', icon: '🎯', resource: 'essence', baseCost: 6, costGrowth: 1.2, effectType: 'crit_chance_flat', effectPerLevel: 1, maxLevel: 25 },
+  { id: 'crystal_gold', name: 'Kristallschliff', desc: '+2% Gold-Ausbeute pro Stufe.', icon: '💎', resource: 'crystals', baseCost: 5, costGrowth: 1.2, effectType: 'gold_prod_pct', effectPerLevel: 2, maxLevel: 30 },
+  { id: 'essence_loot', name: 'Essenzbindung', desc: '+2% Lootchance pro Stufe.', icon: '🧪', resource: 'essence', baseCost: 4, costGrowth: 1.2, effectType: 'loot_chance_pct', effectPerLevel: 2, maxLevel: 30 }
 ];
 
 function bkmpIdleUpgradeCost(def, currentLevel) {
@@ -126,23 +164,30 @@ function bkmpIdleResourceEmoji(resource) {
 
 const BKMP_IDLE_FALLBACK_CONFIG = {
   xp_curve: { base: 40, growth: 1.42 },
-  dragon_scaling: { hpGrowthPerKill: 0.045, atkGrowthPerKill: 0.035, bossEvery: 10, bossMultiplier: 3 },
-  reward_scaling: { goldGrowthPerKill: 0.03, xpGrowthPerKill: 0.03 },
+  /* Deutlich gentler als vorher (war 0.045/0.035 - Kaempfe wurden ab
+     Stufe ~50 unspielbar lang). Bei 0.02/0.016 dauert Stufe 100 noch
+     einige Sekunden statt mehrerer Minuten. */
+  dragon_scaling: { hpGrowthPerKill: 0.02, atkGrowthPerKill: 0.016 },
+  reward_scaling: { goldGrowthPerKill: 0.022, xpGrowthPerKill: 0.022 },
+  boss_scaling: { minibossHpMult: 1.8, minibossAtkMult: 1.3, minibossRewardMult: 2, bossHpMult: 3.2, bossAtkMult: 1.7, bossRewardMult: 4 },
+  rare_spawn: { chancePct: 8 },
   offline_progress: { maxHours: 12, efficiencyPct: 50 },
   base_stats: { attack: 10, defense: 2, hp: 100, critChance: 5, critDamage: 150, goldBonus: 0, xpBonus: 0, lootBonus: 0 }
 };
 
+/* Echte Drachen-Arten (ersetzt die alte tier_order-Zyklus-Liste). Jede
+   Art hat eine spawn_rule, die bestimmt WANN sie erscheint (siehe
+   bkmpIdleSelectDragonKindId). sprite_key zeigt auf die zugehoerige
+   SpriteSheet-CSS-Klasse (assets/dragons/<sprite_key>.png). */
 const BKMP_IDLE_FALLBACK_DRAGONS = [
-  { id: 'wyrm_forest', name: 'Waldwyrm', emoji: '🐉', color_theme: '#4ade80', tier_order: 0, base_hp: 80, base_attack: 8, base_defense: 1, gold_reward_base: 5, xp_reward_base: 5, wood_reward_base: 3, stone_reward_base: 1, crystal_reward_base: 0, essence_reward_base: 0, is_boss: false, active: true },
-  { id: 'wyrm_stone', name: 'Steinwyrm', emoji: '🐲', color_theme: '#a8a29e', tier_order: 1, base_hp: 130, base_attack: 12, base_defense: 3, gold_reward_base: 7, xp_reward_base: 7, wood_reward_base: 2, stone_reward_base: 4, crystal_reward_base: 0, essence_reward_base: 0, is_boss: false, active: true },
-  { id: 'drake_flame', name: 'Flammendrache', emoji: '🔥', color_theme: '#f97316', tier_order: 2, base_hp: 200, base_attack: 18, base_defense: 2, gold_reward_base: 10, xp_reward_base: 10, wood_reward_base: 1, stone_reward_base: 1, crystal_reward_base: 1, essence_reward_base: 0, is_boss: false, active: true },
-  { id: 'drake_frost', name: 'Frostdrache', emoji: '❄️', color_theme: '#38bdf8', tier_order: 3, base_hp: 300, base_attack: 24, base_defense: 5, gold_reward_base: 14, xp_reward_base: 14, wood_reward_base: 1, stone_reward_base: 1, crystal_reward_base: 1, essence_reward_base: 0, is_boss: false, active: true },
-  { id: 'drake_storm', name: 'Sturmdrache', emoji: '⚡', color_theme: '#818cf8', tier_order: 4, base_hp: 420, base_attack: 32, base_defense: 4, gold_reward_base: 18, xp_reward_base: 18, wood_reward_base: 1, stone_reward_base: 1, crystal_reward_base: 2, essence_reward_base: 0, is_boss: false, active: true },
-  { id: 'boss_ancient', name: 'Uralter Wächter', emoji: '🐲', color_theme: '#facc15', tier_order: 5, base_hp: 900, base_attack: 45, base_defense: 10, gold_reward_base: 40, xp_reward_base: 40, wood_reward_base: 2, stone_reward_base: 2, crystal_reward_base: 5, essence_reward_base: 1, is_boss: true, active: true },
-  { id: 'drake_shadow', name: 'Schattendrache', emoji: '🌑', color_theme: '#6b21a8', tier_order: 6, base_hp: 560, base_attack: 40, base_defense: 6, gold_reward_base: 24, xp_reward_base: 24, wood_reward_base: 1, stone_reward_base: 1, crystal_reward_base: 3, essence_reward_base: 1, is_boss: false, active: true },
-  { id: 'drake_crystal', name: 'Kristalldrache', emoji: '💎', color_theme: '#67e8f9', tier_order: 7, base_hp: 700, base_attack: 48, base_defense: 8, gold_reward_base: 30, xp_reward_base: 30, wood_reward_base: 1, stone_reward_base: 1, crystal_reward_base: 4, essence_reward_base: 1, is_boss: false, active: true },
-  { id: 'drake_void', name: 'Leeredrache', emoji: '🌌', color_theme: '#4c1d95', tier_order: 8, base_hp: 860, base_attack: 56, base_defense: 10, gold_reward_base: 36, xp_reward_base: 36, wood_reward_base: 1, stone_reward_base: 1, crystal_reward_base: 4, essence_reward_base: 2, is_boss: false, active: true },
-  { id: 'boss_ruler', name: 'Herrscher der Lüfte', emoji: '👑', color_theme: '#ef4444', tier_order: 9, base_hp: 2000, base_attack: 90, base_defense: 18, gold_reward_base: 80, xp_reward_base: 80, wood_reward_base: 3, stone_reward_base: 3, crystal_reward_base: 8, essence_reward_base: 3, is_boss: true, active: true }
+  { id: 'feuerdrache', name: 'Feuerdrache', emoji: '🔥', sprite_key: 'feuerdrache', spawn_rule: 'standard', color_theme: '#f97316', tier_order: 0, base_hp: 60, base_attack: 7, base_defense: 1, gold_reward_base: 6, xp_reward_base: 6, wood_reward_base: 2, stone_reward_base: 1, crystal_reward_base: 0, essence_reward_base: 0, is_boss: false, active: true },
+  { id: 'blitzdrache', name: 'Blitzdrache', emoji: '⚡', sprite_key: 'blitzdrache', spawn_rule: 'standard', color_theme: '#facc15', tier_order: 1, base_hp: 55, base_attack: 8, base_defense: 1, gold_reward_base: 6, xp_reward_base: 6, wood_reward_base: 1, stone_reward_base: 2, crystal_reward_base: 0, essence_reward_base: 0, is_boss: false, active: true },
+  { id: 'erddrache', name: 'Erddrache', emoji: '🪨', sprite_key: 'erddrache', spawn_rule: 'standard', color_theme: '#84cc16', tier_order: 2, base_hp: 70, base_attack: 6, base_defense: 3, gold_reward_base: 6, xp_reward_base: 6, wood_reward_base: 1, stone_reward_base: 3, crystal_reward_base: 0, essence_reward_base: 0, is_boss: false, active: true },
+  { id: 'wasserdrache', name: 'Wasserdrache', emoji: '💧', sprite_key: 'wasserdrache', spawn_rule: 'standard', color_theme: '#38bdf8', tier_order: 3, base_hp: 65, base_attack: 6, base_defense: 2, gold_reward_base: 6, xp_reward_base: 6, wood_reward_base: 2, stone_reward_base: 2, crystal_reward_base: 0, essence_reward_base: 0, is_boss: false, active: true },
+  { id: 'yakshas-drache', name: 'Yakshas Drache', emoji: '🐲', sprite_key: 'yakshas-drache', spawn_rule: 'miniboss_10', color_theme: '#a78bfa', tier_order: 4, base_hp: 115, base_attack: 10, base_defense: 4, gold_reward_base: 14, xp_reward_base: 14, wood_reward_base: 3, stone_reward_base: 3, crystal_reward_base: 2, essence_reward_base: 1, is_boss: true, active: true },
+  { id: 'yaksha-boss', name: 'Yaksha der Drachenboss', emoji: '👑', sprite_key: 'yaksha-boss', spawn_rule: 'boss_25', color_theme: '#ef4444', tier_order: 5, base_hp: 220, base_attack: 16, base_defense: 8, gold_reward_base: 28, xp_reward_base: 28, wood_reward_base: 5, stone_reward_base: 5, crystal_reward_base: 5, essence_reward_base: 3, is_boss: true, active: true },
+  { id: 'schattendrache', name: 'Schattendrache', emoji: '🌑', sprite_key: 'schattendrache', spawn_rule: 'rare', color_theme: '#6b21a8', tier_order: 6, base_hp: 90, base_attack: 10, base_defense: 3, gold_reward_base: 12, xp_reward_base: 10, wood_reward_base: 2, stone_reward_base: 2, crystal_reward_base: 1, essence_reward_base: 1, is_boss: false, active: true },
+  { id: 'wuffdrache', name: 'Wuffdrache', emoji: '🐾', sprite_key: 'wuffdrache', spawn_rule: 'rare', color_theme: '#fbbf24', tier_order: 7, base_hp: 50, base_attack: 5, base_defense: 1, gold_reward_base: 10, xp_reward_base: 8, wood_reward_base: 1, stone_reward_base: 1, crystal_reward_base: 1, essence_reward_base: 1, is_boss: false, active: true }
 ];
 
 /* ---------------- State ---------------- */
@@ -211,17 +256,20 @@ function bkmpIdleRecomputeEffectiveStats() {
   const skillTotals = bkmpIdleSkillEffectTotals(bkmpIdleState.skill_allocations, bkmpIdleSkillDefs);
   const upgradeTotals = bkmpIdleUpgradeEffectTotals(bkmpIdleState.upgrade_purchases);
   const base = bkmpIdleConfig.base_stats || BKMP_IDLE_FALLBACK_CONFIG.base_stats;
-  const pct = key => (skillTotals[key] || 0) + (upgradeTotals[key] || 0);
+  /* t() summiert einen Effekttyp aus Skilltree UND Upgrades. Kampfwerte
+     nutzen jetzt "_flat" (feste Zahlen, addiert VOR dem Prozent-Multiplikator),
+     Produktionsraten (Gold/Loot) bleiben "_pct". */
+  const t = key => (skillTotals[key] || 0) + (upgradeTotals[key] || 0);
   const prevMaxHp = bkmpIdleEffectiveStats ? bkmpIdleEffectiveStats.hp : null;
   bkmpIdleEffectiveStats = {
-    attack: base.attack * (1 + pct('attack_pct') / 100),
-    defense: base.defense * (1 + pct('defense_pct') / 100),
-    hp: Math.round(base.hp * (1 + pct('hp_pct') / 100)),
-    critChance: Math.min(75, base.critChance + pct('crit_chance_pct')),
-    critDamage: base.critDamage + pct('crit_damage_pct'),
-    goldBonus: base.goldBonus + pct('gold_prod_pct') + pct('gold_find_pct'),
-    xpBonus: base.xpBonus + pct('xp_pct'),
-    lootBonus: base.lootBonus + pct('loot_chance_pct')
+    attack: (base.attack + t('attack_flat')) * (1 + t('attack_pct') / 100),
+    defense: (base.defense + t('defense_flat')) * (1 + t('defense_pct') / 100),
+    hp: Math.round((base.hp + t('hp_flat')) * (1 + t('hp_pct') / 100)),
+    critChance: Math.min(75, base.critChance + t('crit_chance_flat') + t('crit_chance_pct')),
+    critDamage: base.critDamage + t('crit_damage_flat') + t('crit_damage_pct'),
+    goldBonus: base.goldBonus + t('gold_prod_pct') + t('gold_find_pct'),
+    xpBonus: base.xpBonus + t('xp_pct'),
+    lootBonus: base.lootBonus + t('loot_chance_pct')
   };
   if (bkmpIdleVillageHp === null || bkmpIdleVillageHp === undefined) {
     bkmpIdleVillageHp = bkmpIdleEffectiveStats.hp;
@@ -286,16 +334,25 @@ function bkmpIdleGetAchievementContextFields() {
 
 /* ---------------- Kampf-Loop ---------------- */
 
+const BKMP_IDLE_SPRITE_CLASS_PREFIX = 'idle-sprite-';
+
 function bkmpIdleSpawnDragon() {
-  bkmpIdleCurrentDragon = bkmpIdleDragonStatsAt(bkmpIdleState.current_dragon_index, bkmpIdleDragonDefs, bkmpIdleConfig.dragon_scaling);
+  bkmpIdleCurrentDragon = bkmpIdleDragonStatsAt(bkmpIdleState.current_dragon_index, bkmpIdleDragonDefs, bkmpIdleGetMergedDragonScalingCfg());
   if (!bkmpIdleCurrentDragon) return;
   bkmpIdleCurrentDragon.hp = bkmpIdleCurrentDragon.maxHp;
   const nameEl = document.getElementById('idleDragonName');
   if (nameEl) nameEl.textContent = `${bkmpIdleCurrentDragon.isBoss ? '👑 BOSS: ' : ''}${bkmpIdleCurrentDragon.name} (Stufe ${bkmpIdleFormatStage(bkmpIdleCurrentDragon.killIndex)})`;
   const sprite = document.getElementById('idleDragonSprite');
-  if (sprite) sprite.textContent = bkmpIdleCurrentDragon.emoji;
+  if (sprite) {
+    [...sprite.classList].filter(c => c.startsWith(BKMP_IDLE_SPRITE_CLASS_PREFIX)).forEach(c => sprite.classList.remove(c));
+    sprite.classList.remove('idle-sprite-attacking');
+    sprite.classList.add(BKMP_IDLE_SPRITE_CLASS_PREFIX + bkmpIdleCurrentDragon.spriteKey);
+  }
   const dragonEl = document.getElementById('idleDragon');
-  if (dragonEl) dragonEl.classList.toggle('idle-dragon-boss', Boolean(bkmpIdleCurrentDragon.isBoss));
+  if (dragonEl) {
+    dragonEl.classList.toggle('idle-dragon-boss', bkmpIdleCurrentDragon.bossTier === 'boss');
+    dragonEl.classList.toggle('idle-dragon-miniboss', bkmpIdleCurrentDragon.bossTier === 'miniboss');
+  }
   bkmpIdleUpdateDragonHpBar();
   bkmpIdleRenderStageBar();
 }
@@ -321,7 +378,7 @@ function bkmpIdleAddXp(amount) {
 }
 
 function bkmpIdleHandleDragonDefeated() {
-  const rewards = bkmpIdleRewardsAt(bkmpIdleCurrentDragon, bkmpIdleEffectiveStats, bkmpIdleConfig.reward_scaling);
+  const rewards = bkmpIdleRewardsAt(bkmpIdleCurrentDragon, bkmpIdleEffectiveStats, bkmpIdleGetMergedRewardScalingCfg());
   bkmpIdleState.gold += rewards.gold;
   bkmpIdleState.total_gold_earned += rewards.gold;
   bkmpIdleState.wood += rewards.wood;
@@ -370,6 +427,7 @@ function bkmpIdleTick() {
   const dRoll = bkmpIdleDamageRoll(bkmpIdleCurrentDragon.attack, 5, 150, bkmpIdleEffectiveStats.defense);
   bkmpIdleVillageHp = Math.max(0, bkmpIdleVillageHp - dRoll.amount);
   bkmpIdleSpawnProjectile('fire', dRoll.amount, dRoll.isCrit);
+  bkmpIdlePlaySpriteAttack();
   bkmpIdleSpawnHitFlash('idleVillage');
   bkmpIdleUpdateVillageHpBar();
 
@@ -431,6 +489,17 @@ function bkmpIdleSpawnProjectile(kind, amount, isCrit) {
     target.appendChild(dmg);
     window.setTimeout(() => dmg.remove(), 800);
   }
+}
+
+/* Spielt den Angriffs-Frame-Zyklus des Drachensprites ab (Elementaratem).
+   Nutzt animationend statt eines festen Timeouts, damit ein neuer Angriff
+   die laufende Animation sauber neu startet, auch bei sehr kurzen Ticks. */
+function bkmpIdlePlaySpriteAttack() {
+  const sprite = document.getElementById('idleDragonSprite');
+  if (!sprite) return;
+  sprite.classList.remove('idle-sprite-attacking');
+  void sprite.offsetWidth;
+  sprite.classList.add('idle-sprite-attacking');
 }
 
 function bkmpIdleSpawnHitFlash(targetId) {

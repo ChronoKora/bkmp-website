@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260708-mapart8">
+<link rel="stylesheet" href="style.css?v=20260708-idlerework1">
 </head>
 <body>
 
@@ -660,6 +660,15 @@
                   <div><label for="idleDragonName">Name</label><input type="text" id="idleDragonName" placeholder="z. B. Eisdrache"></div>
                   <div><label for="idleDragonEmoji">Emoji</label><input type="text" id="idleDragonEmoji" placeholder="🐉" maxlength="4"></div>
                   <div><label for="idleDragonTier">Reihenfolge (tier_order)</label><input type="number" id="idleDragonTier" value="0"></div>
+                  <div><label for="idleDragonSpriteKey">Sprite-Key (assets/dragons/&lt;key&gt;.png)</label><input type="text" id="idleDragonSpriteKey" placeholder="z. B. eisdrache"></div>
+                  <div><label for="idleDragonSpawnRule">Spawn-Regel</label>
+                    <select id="idleDragonSpawnRule">
+                      <option value="standard">Standard (normale Ebenen)</option>
+                      <option value="miniboss_10">Miniboss (alle 10 Ebenen)</option>
+                      <option value="boss_25">Boss (alle 25 Ebenen)</option>
+                      <option value="rare">Selten (Zufallsbegegnung, nie auf Boss-/Miniboss-Ebenen)</option>
+                    </select>
+                  </div>
                   <div><label for="idleDragonHp">Basis-HP</label><input type="number" id="idleDragonHp" value="100"></div>
                   <div><label for="idleDragonAtk">Basis-Angriff</label><input type="number" id="idleDragonAtk" value="10"></div>
                   <div><label for="idleDragonDef">Basis-Verteidigung</label><input type="number" id="idleDragonDef" value="0"></div>
@@ -857,7 +866,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase.js?v=20260708-mapart8"></script>
   <script src="app.js?v=20260707-plushiesdb"></script>
-  <script src="idledorf.js?v=20260708-mapart8"></script>
+  <script src="idledorf.js?v=20260708-idlerework1"></script>
   <script src="mapart.js?v=20260708-mapart8"></script>
   <script>
     bkmpInitTheme();
@@ -3752,6 +3761,8 @@
       document.getElementById('idleDragonName').value = '';
       document.getElementById('idleDragonEmoji').value = '🐉';
       document.getElementById('idleDragonTier').value = bkmpIdleAdminDragons.length;
+      document.getElementById('idleDragonSpriteKey').value = '';
+      document.getElementById('idleDragonSpawnRule').value = 'standard';
       document.getElementById('idleDragonHp').value = 100;
       document.getElementById('idleDragonAtk').value = 10;
       document.getElementById('idleDragonDef').value = 0;
@@ -3775,6 +3786,8 @@
       document.getElementById('idleDragonName').value = d.name || '';
       document.getElementById('idleDragonEmoji').value = d.emoji || '🐉';
       document.getElementById('idleDragonTier').value = d.tier_order || 0;
+      document.getElementById('idleDragonSpriteKey').value = d.sprite_key || '';
+      document.getElementById('idleDragonSpawnRule').value = d.spawn_rule || 'standard';
       document.getElementById('idleDragonHp').value = d.base_hp || 100;
       document.getElementById('idleDragonAtk').value = d.base_attack || 10;
       document.getElementById('idleDragonDef').value = d.base_defense || 0;
@@ -3802,6 +3815,8 @@
         id, name,
         emoji: document.getElementById('idleDragonEmoji').value.trim() || '🐉',
         tier_order: Number(document.getElementById('idleDragonTier').value) || 0,
+        sprite_key: document.getElementById('idleDragonSpriteKey').value.trim() || null,
+        spawn_rule: document.getElementById('idleDragonSpawnRule').value || 'standard',
         base_hp: Number(document.getElementById('idleDragonHp').value) || 1,
         base_attack: Number(document.getElementById('idleDragonAtk').value) || 1,
         base_defense: Number(document.getElementById('idleDragonDef').value) || 0,
@@ -3945,6 +3960,7 @@
 
     const BKMP_IDLE_CONFIG_LABELS = {
       xp_curve: 'XP-Kurve', dragon_scaling: 'Drachen-Skalierung', reward_scaling: 'Belohnungs-Skalierung',
+      boss_scaling: 'Boss-/Miniboss-Multiplikatoren', rare_spawn: 'Seltene Drachen (Chance %)',
       offline_progress: 'Offline-Fortschritt', base_stats: 'Basis-Werte'
     };
     function renderIdleConfigEditors() {
@@ -3976,8 +3992,15 @@
     if (idleTestRunBtn) idleTestRunBtn.addEventListener('click', () => {
       const output = document.getElementById('idleTestOutput');
       const dragons = bkmpIdleAdminDragons.length ? bkmpIdleAdminDragons : BKMP_IDLE_FALLBACK_DRAGONS;
-      const dragonScaling = bkmpIdleAdminConfig.dragon_scaling || BKMP_IDLE_FALLBACK_CONFIG.dragon_scaling;
-      const rewardScaling = bkmpIdleAdminConfig.reward_scaling || BKMP_IDLE_FALLBACK_CONFIG.reward_scaling;
+      const dragonScaling = {
+        ...(bkmpIdleAdminConfig.dragon_scaling || BKMP_IDLE_FALLBACK_CONFIG.dragon_scaling),
+        ...(bkmpIdleAdminConfig.boss_scaling || BKMP_IDLE_FALLBACK_CONFIG.boss_scaling),
+        ...(bkmpIdleAdminConfig.rare_spawn || BKMP_IDLE_FALLBACK_CONFIG.rare_spawn)
+      };
+      const rewardScaling = {
+        ...(bkmpIdleAdminConfig.reward_scaling || BKMP_IDLE_FALLBACK_CONFIG.reward_scaling),
+        ...(bkmpIdleAdminConfig.boss_scaling || BKMP_IDLE_FALLBACK_CONFIG.boss_scaling)
+      };
       const attack = Number(document.getElementById('idleTestAttack').value) || 10;
       const critChance = Number(document.getElementById('idleTestCrit').value) || 0;
       const critDamage = Number(document.getElementById('idleTestCritDmg').value) || 150;

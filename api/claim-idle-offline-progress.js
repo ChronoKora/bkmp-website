@@ -49,18 +49,43 @@ async function sbFetch(serviceKey, path, options = {}) {
   });
 }
 
+/* Eigenstaendige, vereinfachte Kopie von bkmpIdleSelectDragonKindId +
+   bkmpIdleDragonStatsAt aus idledorf.js - siehe Hinweis oben im Datei-Kopf.
+   Rare-Chance wird hier bewusst deterministisch auf "nie" gesetzt statt
+   zufaellig gewuerfelt: Offline-Fortschritt ist ein Erwartungswert-Modell
+   (kein echter Tick-fuer-Tick-Kampf), da waere ein Zufalls-Rare-Spawn nur
+   Rauschen ohne echten Mehrwert fuer die Schaetzung. */
+function selectDragonKindId(killIndex, dragons) {
+  const stage = killIndex + 1;
+  const active = (dragons || []).filter(d => d.active !== false);
+  const byRule = rule => active.filter(d => d.spawn_rule === rule);
+  if (stage % 25 === 0) {
+    const pool = byRule('boss_25');
+    if (pool.length) return pool[stage % pool.length].id;
+  }
+  if (stage % 10 === 0) {
+    const pool = byRule('miniboss_10');
+    if (pool.length) return pool[stage % pool.length].id;
+  }
+  const standard = byRule('standard');
+  const pool = standard.length ? standard : active;
+  return pool.length ? pool[stage % pool.length].id : ((active[0] || {}).id || null);
+}
+
 function dragonStatsAt(killIndex, dragons, cfg) {
-  const pool = (dragons || []).filter(d => d.active !== false).sort((a, b) => (a.tier_order || 0) - (b.tier_order || 0));
-  if (!pool.length) return null;
-  const archetype = pool[killIndex % pool.length];
+  const kindId = selectDragonKindId(killIndex, dragons);
+  const archetype = (dragons || []).find(d => d.id === kindId);
+  if (!archetype) return null;
   const hpGrowth = Math.pow(1 + (cfg.hpGrowthPerKill || 0), killIndex);
-  const bossEvery = cfg.bossEvery || 10;
-  const isBoss = Boolean(archetype.is_boss) || ((killIndex + 1) % bossEvery === 0);
-  const bossMult = isBoss ? (cfg.bossMultiplier || 3) : 1;
+  let bossTier = null;
+  let hpMult = 1;
+  if (archetype.spawn_rule === 'boss_25') { bossTier = 'boss'; hpMult = cfg.bossHpMult || 3.2; }
+  else if (archetype.spawn_rule === 'miniboss_10') { bossTier = 'miniboss'; hpMult = cfg.minibossHpMult || 1.8; }
   return {
     archetype,
-    isBoss,
-    maxHp: Math.max(1, Math.round((archetype.base_hp || 50) * hpGrowth * bossMult))
+    isBoss: Boolean(bossTier),
+    bossTier,
+    maxHp: Math.max(1, Math.round((archetype.base_hp || 50) * hpGrowth * hpMult))
   };
 }
 
@@ -89,13 +114,14 @@ module.exports = async function handler(req, res) {
     const state = Array.isArray(stateRows) ? stateRows[0] : null;
     if (!state) return send(res, 200, { ok: true, elapsedSeconds: 0, rewards: null, newTotals: null });
 
-    const configRes = await sbFetch(serviceKey, `idle_game_config?key=in.(offline_progress,dragon_scaling,reward_scaling)&select=key,value`);
+    const configRes = await sbFetch(serviceKey, `idle_game_config?key=in.(offline_progress,dragon_scaling,reward_scaling,boss_scaling)&select=key,value`);
     const configRows = configRes.ok ? await configRes.json() : [];
     const config = {};
     (Array.isArray(configRows) ? configRows : []).forEach(row => { config[row.key] = row.value; });
     const offlineCfg = config.offline_progress || { maxHours: 12, efficiencyPct: 50 };
-    const dragonCfg = config.dragon_scaling || { hpGrowthPerKill: 0.045, atkGrowthPerKill: 0.035, bossEvery: 10, bossMultiplier: 3 };
-    const rewardCfg = config.reward_scaling || { goldGrowthPerKill: 0.03, xpGrowthPerKill: 0.03 };
+    const bossCfg = config.boss_scaling || { minibossHpMult: 1.8, minibossAtkMult: 1.3, minibossRewardMult: 2, bossHpMult: 3.2, bossAtkMult: 1.7, bossRewardMult: 4 };
+    const dragonCfg = { ...(config.dragon_scaling || { hpGrowthPerKill: 0.02, atkGrowthPerKill: 0.016 }), ...bossCfg };
+    const rewardCfg = { ...(config.reward_scaling || { goldGrowthPerKill: 0.022, xpGrowthPerKill: 0.022 }), ...bossCfg };
 
     const lastSeenIso = state.last_seen_at;
     const lastSeenMs = Date.parse(lastSeenIso);
@@ -145,9 +171,9 @@ module.exports = async function handler(req, res) {
 
       const goldGrowth = Math.pow(1 + (rewardCfg.goldGrowthPerKill || 0), killIndex);
       const xpGrowth = Math.pow(1 + (rewardCfg.xpGrowthPerKill || 0), killIndex);
-      const bossMult = dragon.isBoss ? 2 : 1;
-      goldGain += Math.round((dragon.archetype.gold_reward_base || 0) * goldGrowth * bossMult * (1 + goldBonus / 100));
-      xpGain += Math.round((dragon.archetype.xp_reward_base || 0) * xpGrowth * bossMult * (1 + xpBonus / 100));
+      const rewardMult = dragon.bossTier === 'boss' ? (rewardCfg.bossRewardMult || 4) : dragon.bossTier === 'miniboss' ? (rewardCfg.minibossRewardMult || 2) : 1;
+      goldGain += Math.round((dragon.archetype.gold_reward_base || 0) * goldGrowth * rewardMult * (1 + goldBonus / 100));
+      xpGain += Math.round((dragon.archetype.xp_reward_base || 0) * xpGrowth * rewardMult * (1 + xpBonus / 100));
       woodGain += Math.round((dragon.archetype.wood_reward_base || 0) * (1 + lootBonus / 100));
       stoneGain += Math.round((dragon.archetype.stone_reward_base || 0) * (1 + lootBonus / 100));
       crystalGain += Math.round((dragon.archetype.crystal_reward_base || 0) * (1 + lootBonus / 100));

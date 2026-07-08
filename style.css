@@ -3766,11 +3766,84 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   min-height: 220px;
 }
 .idle-village, .idle-dragon { position: relative; text-align: center; width: 42%; }
-.idle-village-sprite { font-size: 3.6rem; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.3)); }
-.idle-dragon-sprite { font-size: 4.2rem; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35)); transition: transform 0.15s ease; }
-.idle-dragon-boss .idle-dragon-sprite { font-size: 4.8rem; }
+
+/* ---- Sprite-Grafiken (echte SpriteSheets statt Emoji) ----
+   Jedes Sheet ist ein vertikaler Stapel aus 4 gleich hohen Frames
+   (Ruhepose / Attacke startet / volle Attacke / Abklingen). Statt die
+   Sheets serverseitig zu zerschneiden, uebernimmt der Browser das per
+   background-size:auto 400% + animierter background-position-y - eine
+   einzige Bilddatei pro Drachenart wird genau einmal geladen und vom
+   Browser gecacht, kein Canvas noetig. */
+.idle-village-sprite {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto;
+  aspect-ratio: 1983 / 198.25;
+  background-image: url('assets/dragons/dorf.png');
+  background-repeat: no-repeat;
+  background-size: 100% 400%;
+  background-position: 0% 0%;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.3));
+  border-radius: 6px;
+  overflow: hidden;
+  animation: idleVillageIdleLoop 7s steps(3) infinite;
+}
+/* Deckt die kleine "1./2./3./4."-Beschriftung der Referenzbilder ab. */
+.idle-village-sprite::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 7%;
+  height: 16%;
+  background: #4a90c9;
+  z-index: 1;
+}
+@keyframes idleVillageIdleLoop {
+  from { background-position-y: 0%; }
+  to { background-position-y: 100%; }
+}
+
+.idle-dragon-sprite {
+  position: relative;
+  width: 100%;
+  max-width: 210px;
+  height: 120px;
+  margin: 0 auto;
+  background-repeat: no-repeat;
+  background-size: auto 400%;
+  background-position-x: 100%;
+  background-position-y: 0%;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35));
+  transition: transform 0.15s ease;
+}
+.idle-dragon-boss .idle-dragon-sprite { max-width: 240px; height: 145px; }
+.idle-dragon-miniboss .idle-dragon-sprite { max-width: 225px; height: 132px; }
+
+@keyframes idleSpriteAttackFrames {
+  from { background-position-y: 0%; }
+  to { background-position-y: 100%; }
+}
+.idle-sprite-attacking { animation: idleSpriteAttackFrames 0.75s steps(3) 1 forwards; }
+
+.idle-sprite-feuerdrache { background-image: url('assets/dragons/feuerdrache.png'); }
+.idle-sprite-blitzdrache { background-image: url('assets/dragons/blitzdrache.png'); }
+.idle-sprite-erddrache { background-image: url('assets/dragons/erddrache.png'); }
+.idle-sprite-wasserdrache { background-image: url('assets/dragons/wasserdrache.png'); }
+.idle-sprite-yakshas-drache { background-image: url('assets/dragons/yakshas-drache.png'); }
+.idle-sprite-yaksha-boss { background-image: url('assets/dragons/yaksha-boss.png'); }
+.idle-sprite-schattendrache { background-image: url('assets/dragons/schattendrache.png'); }
+.idle-sprite-wuffdrache { background-image: url('assets/dragons/wuffdrache.png'); }
+
 .idle-dragon-name { margin-top: 0.3rem; font-size: 0.75rem; font-weight: 700; color: var(--muted); }
 .idle-dragon-boss .idle-dragon-name { color: #facc15; }
+.idle-dragon-miniboss .idle-dragon-name { color: #a78bfa; }
+
+@media (prefers-reduced-motion: reduce) {
+  .idle-village-sprite, .idle-sprite-attacking { animation: none; }
+}
 
 .idle-hp-bar { height: 10px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 12%, var(--paper)); overflow: hidden; border: 1px solid var(--line); margin-top: 0.5rem; }
 .idle-hp-fill { height: 100%; transition: width 0.25s ease; }
