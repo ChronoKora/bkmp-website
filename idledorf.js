@@ -688,6 +688,7 @@ function bkmpIdleShowOfflineCard(result) {
   const r = result.rewards;
   const mins = Math.round(result.elapsedSeconds / 60);
   card.innerHTML = `
+    <button type="button" class="idle-offline-close" id="idleOfflineCardClose" aria-label="Schließen">&times;</button>
     <strong>Während deiner Abwesenheit... (${mins} Min.)</strong>
     <div class="idle-offline-rewards">
       <span>💰 +${bkmpIdleFormatNumber(r.gold)}</span><span>✨ +${bkmpIdleFormatNumber(r.xp)}</span>
@@ -697,6 +698,8 @@ function bkmpIdleShowOfflineCard(result) {
       ${r.levelsGained ? `<span>⬆️ +${r.levelsGained} Level</span>` : ''}
     </div>`;
   card.style.display = '';
+  const closeBtn = document.getElementById('idleOfflineCardClose');
+  if (closeBtn) closeBtn.addEventListener('click', () => { card.style.display = 'none'; });
 }
 
 /* ---------------- Sync ---------------- */
