@@ -3766,22 +3766,22 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   overflow: hidden;
   min-height: 220px;
 }
-/* Gerahmtes Panel um Dorf-/Drachenbild: die SpriteSheets haben einen
-   fixen, dunklen Canvas-Hintergrund (#161819), der ohne Rahmen im
-   Hell-Modus als harte schwarze Box neben dem hellen Fenster-Hintergrund
-   auffaellt. Statt zu versuchen, das Bild selbst einzufaerben (wuerde die
-   Zeichnung mitverfaerben), bekommt es einen Rahmen im selben Farbschema
-   wie der Rest des Fensters (--paper-2/--line, wie z. B. .pill-btn/
-   .bonk-button), damit die dunkle Bildflaeche als bewusst gestaltetes
-   Portraitfeld wirkt statt als Bruch im Layout. */
+/* Gerahmtes Panel um Dorf-/Drachenbild: statt einer flachen --paper-2-Box
+   ein dezenter Gold-Verlaufsrahmen (gleiche Zweischicht-Technik wie
+   .idle-dorf-card: innen deckende Flaeche als padding-box, Verlauf als
+   border-box), passend zum "Fantasy-Buch"-Look der restlichen Seite -
+   ohne die Animation der grossen Modal-Karte, damit es waehrend des
+   Kampfes (staendige HP-Updates/Hit-Flashes) nicht unruhig wirkt. */
 .idle-village, .idle-dragon {
   position: relative;
   text-align: center;
   width: 42%;
-  background: var(--paper-2);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 0.75rem 0.5rem;
+  border-radius: 16px;
+  padding: 0.8rem 0.6rem;
+  border: 1.5px solid transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-3)) padding-box,
+              linear-gradient(135deg, var(--gold), color-mix(in srgb, var(--gold) 25%, transparent)) border-box;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
 }
 
 /* ---- Sprite-Grafiken (echte SpriteSheets statt Emoji) ----
@@ -3801,26 +3801,22 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
    links exakt der Beschriftungs-Bereich aus dem sichtbaren Fenster faellt.
    aspect-ratio je Sprite entspricht exakt diesem Ausschnitt, damit nichts
    gestaucht/gestreckt wird. */
+/* Dorf-Bild ist nur noch 1 Frame (kein Sheet mehr, keine Beschriftung
+   mehr im Bild) - deshalb einfache statische Darstellung ohne
+   background-position-Animation, volle Breite, kein Ausschnitt noetig. */
 .idle-village-sprite {
   position: relative;
   width: 100%;
   max-width: 420px;
   margin: 0 auto;
-  aspect-ratio: 1836.4 / 198.25;
-  background-image: url('assets/dragons/dorf.png');
+  aspect-ratio: 1164 / 199;
+  background-image: url('assets/dragons/dorf.png?v=20260709-singleframe');
   background-repeat: no-repeat;
-  background-size: 108% 400%;
-  background-position-x: 60%;
-  background-position-y: 0%;
+  background-size: 100% 100%;
   image-rendering: pixelated;
   filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.3));
-  border-radius: 6px;
+  border-radius: 10px;
   overflow: hidden;
-  animation: idleVillageIdleLoop 7s steps(3) infinite;
-}
-@keyframes idleVillageIdleLoop {
-  from { background-position-y: 0%; }
-  to { background-position-y: 100%; }
 }
 
 /* Gemeinsamer Ausschnitt fuer alle Drachen-Sprites: zeigt die mittleren
@@ -3866,7 +3862,7 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 .idle-dragon-miniboss .idle-dragon-name { color: #a78bfa; }
 
 @media (prefers-reduced-motion: reduce) {
-  .idle-village-sprite, .idle-sprite-attacking { animation: none; }
+  .idle-sprite-attacking { animation: none; }
 }
 
 .idle-hp-bar { height: 10px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 12%, var(--paper)); overflow: hidden; border: 1px solid var(--line); margin-top: 0.5rem; }
