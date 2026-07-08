@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260708-idledorf6">
+<link rel="stylesheet" href="style.css?v=20260708-mapart2">
 </head>
 <body>
 
@@ -136,6 +136,30 @@
     </div>
   </div>
 
+  <div class="joke-overlay" id="mapCodeOverlay">
+    <div class="joke-card">
+      <h3>Dein Zugangscode</h3>
+      <p>Speichere diesen Code gut &ndash; er ist dein Zugang zu deinen Aufträgen, falls du das Gerät oder den Browser wechselst. Es gibt kein Passwort, nur diesen Code.</p>
+      <p class="map-code-value" id="mapCodeValue"></p>
+      <div class="joke-buttons">
+        <button class="btn-ja" id="mapCodeOverlayClose" type="button">Gespeichert, weiter</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="joke-overlay" id="mapAccessCodeOverlay">
+    <div class="joke-card">
+      <h3>Zugangscode eingeben</h3>
+      <p>Trag deinen Zugangscode ein, um deine Aufträge auf diesem Gerät wiederherzustellen.</p>
+      <input type="text" id="mapAccessCodeInput" placeholder="XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false">
+      <p class="map-order-submit-msg" id="mapAccessCodeMsg"></p>
+      <div class="joke-buttons">
+        <button class="btn-nein" id="mapAccessCodeCancel" type="button">Abbrechen</button>
+        <button class="btn-ja" id="mapAccessCodeConfirm" type="button">Bestätigen</button>
+      </div>
+    </div>
+  </div>
+
   <div class="joke-overlay idle-dorf-overlay" id="idleDorfOverlay">
     <div class="joke-card idle-dorf-card">
       <button type="button" class="idle-dorf-close" id="idleDorfCloseX" aria-label="Schlie&szlig;en">&times;</button>
@@ -216,6 +240,7 @@
         <button class="tab-btn" data-index="6">Karten Verkaufen</button>
         <button class="tab-btn" data-index="7">Kartendatenbank</button>
         <button class="tab-btn" data-index="8">Bestenliste</button>
+        <button class="tab-btn" data-index="9">Kartenaufträge</button>
       </div>
       <button class="tab-arrow" id="nextTab" aria-label="Nächster Bereich">
         <svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
@@ -346,6 +371,97 @@
           <button type="button" class="leaderboard-tab" data-board="bonks">Die meisten Bonks</button>
         </div>
         <div class="leaderboard-list" id="leaderboardList"></div>
+      </section>
+
+      <!-- ================= Kartenaufträge ================= -->
+      <section class="panel" id="panel-orders">
+        <h2 class="panel-title">Kartenaufträge</h2>
+        <p class="leaderboard-intro">Auftrag veröffentlichen, offene Aufträge einsehen, eigene Aufträge verfolgen oder Kartenbaufirmen kennenlernen.</p>
+        <div class="orders-header-row">
+          <button type="button" class="btn-nein" id="mapAccessCodeOpenBtn">Zugangscode eingeben</button>
+        </div>
+        <div class="achievements-subtabs orders-subtabs">
+          <button type="button" class="achievements-subtab active" id="ordersSubtabCreate">Auftrag erstellen</button>
+          <button type="button" class="achievements-subtab" id="ordersSubtabOpen">Offene Aufträge</button>
+          <button type="button" class="achievements-subtab" id="ordersSubtabMine">Meine Aufträge</button>
+          <button type="button" class="achievements-subtab" id="ordersSubtabCompanies">Firmenprofile</button>
+        </div>
+
+        <!-- Auftrag erstellen -->
+        <div id="ordersSubtabCreatePanel">
+          <form id="mapOrderForm" class="map-order-form" onsubmit="return false;">
+            <div class="form-grid form-grid-2">
+              <div><label for="mapOrderMcName">Minecraft-Name</label><input type="text" id="mapOrderMcName" maxlength="32" required></div>
+              <div><label for="mapOrderDiscord">Discord-Name (optional)</label><input type="text" id="mapOrderDiscord" maxlength="40"></div>
+            </div>
+            <label for="mapOrderTitle">Titel</label>
+            <input type="text" id="mapOrderTitle" maxlength="80" required>
+            <label for="mapOrderDescription">Beschreibung</label>
+            <textarea id="mapOrderDescription" rows="4" required></textarea>
+
+            <label>Kategorie</label>
+            <div class="partner-filter" id="mapOrderCategoryFilter"></div>
+
+            <label>Kartengröße</label>
+            <div class="partner-filter">
+              <button type="button" class="active" id="mapOrderSizeKnownBtn">Größe bekannt</button>
+              <button type="button" id="mapOrderSizeUnsureBtn">Noch unsicher / Beratungsbedarf</button>
+            </div>
+            <div id="mapOrderSizeKnownFields" class="form-grid form-grid-3">
+              <div><label for="mapOrderWidth">Breite</label><input type="number" id="mapOrderWidth" min="1"></div>
+              <div><label for="mapOrderHeight">Höhe</label><input type="number" id="mapOrderHeight" min="1"></div>
+              <div><label for="mapOrderParts">Kartenteile</label><input type="number" id="mapOrderParts" min="1"></div>
+            </div>
+            <div id="mapOrderSizeUnsureFields" style="display:none;">
+              <label for="mapOrderSizeNotes">Was schwebt dir vor? (hilft der Firma bei der Beratung)</label>
+              <textarea id="mapOrderSizeNotes" rows="2"></textarea>
+            </div>
+
+            <label>Budget pro Kartenteil</label>
+            <div class="partner-filter" id="mapOrderBudgetFilter"></div>
+            <label class="admin-checkbox-label"><input type="checkbox" id="mapOrderBudgetCustomToggle"> Eigenes Budget innerhalb dieses Bereiches</label>
+            <input type="number" id="mapOrderBudgetCustomInput" min="250000" max="500000" step="1000" style="display:none;" placeholder="250.000 – 500.000">
+            <p class="map-order-total-preview" id="mapOrderTotalPreview"></p>
+
+            <div class="form-grid form-grid-2">
+              <div><label for="mapOrderDate">Gewünschtes Fertigstellungsdatum</label><input type="date" id="mapOrderDate"></div>
+              <div>
+                <label>Priorität</label>
+                <div class="partner-filter" id="mapOrderPriorityFilter"></div>
+              </div>
+            </div>
+
+            <label for="mapOrderReferenceImages">Referenzbilder (optional)</label>
+            <input type="file" id="mapOrderReferenceImages" accept="image/*" multiple>
+            <div class="map-ref-preview" id="mapOrderReferencePreview"></div>
+
+            <label for="mapOrderNotes">Zusätzliche Hinweise</label>
+            <textarea id="mapOrderNotes" rows="3"></textarea>
+
+            <label class="admin-checkbox-label"><input type="checkbox" id="mapOrderConsent"> Ich akzeptiere, dass Kartenbaufirmen meinen Auftrag prüfen und übernehmen können.</label>
+
+            <button type="button" class="btn-ja" id="mapOrderSubmitBtn">Auftrag veröffentlichen</button>
+            <p class="map-order-submit-msg" id="mapOrderSubmitMsg"></p>
+          </form>
+        </div>
+
+        <!-- Offene Aufträge -->
+        <div id="ordersSubtabOpenPanel" style="display:none;">
+          <div class="map-order-grid" id="mapOpenOrdersList"></div>
+        </div>
+
+        <!-- Meine Aufträge -->
+        <div id="ordersSubtabMinePanel" style="display:none;">
+          <div id="mapMyOrdersEmpty" class="empty-hint" style="display:none;">
+            Noch keine Aufträge auf diesem Gerät gefunden. <button type="button" class="btn-nein" id="mapMyOrdersEmptyCreateBtn">Auftrag erstellen</button>
+          </div>
+          <div class="map-order-grid" id="mapMyOrdersList"></div>
+        </div>
+
+        <!-- Firmenprofile -->
+        <div id="ordersSubtabCompaniesPanel" style="display:none;">
+          <div class="map-company-grid" id="mapCompaniesList"></div>
+        </div>
       </section>
 
     </div>
@@ -524,10 +640,12 @@
     </div>
   </div>
 
+  <script>window.BKMP_CLIENT_STORAGE_KEY = 'bkmp-customer-auth';</script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260708-idledorf6"></script>
+  <script src="supabase.js?v=20260708-mapart2"></script>
   <script src="app.js?v=20260707-plushiesdb"></script>
-  <script src="idledorf.js?v=20260708-idledorf6"></script>
+  <script src="idledorf.js?v=20260708-mapart2"></script>
+  <script src="mapart.js?v=20260708-mapart2"></script>
   <script>
     bkmpInitTheme();
     window.addEventListener('load', () => document.body.classList.add('page-loaded'));

@@ -4085,3 +4085,122 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   .mc-cosmetic-schatten_dunkel, .mc-cosmetic-schatten_dunkel #mcNameBadgeText, .mc-cosmetic-schatten_dunkel .cosmetic-swatch-name, .mc-cosmetic-schatten_dunkel .leaderboard-name-text,
   .mc-cosmetic-sternenstaub, .mc-cosmetic-sternenstaub #mcNameBadgeText, .mc-cosmetic-sternenstaub .cosmetic-swatch-name, .mc-cosmetic-sternenstaub .leaderboard-name-text { animation: none; }
 }
+
+/* ============================================================
+   MapArt Marketplace ("Kartenaufträge")
+   ============================================================ */
+.orders-header-row { display: flex; justify-content: flex-end; margin-bottom: 0.8rem; }
+.orders-subtabs { max-width: 640px; margin-left: auto; margin-right: auto; }
+
+.map-order-form label { display: block; margin: 0.9rem 0 0.35rem; font-size: 0.82rem; font-weight: 600; color: var(--muted); }
+.map-order-form input[type="text"],
+.map-order-form input[type="number"],
+.map-order-form input[type="date"],
+.map-order-form input[type="file"],
+.map-order-form textarea {
+  width: 100%;
+  padding: 0.6rem 0.8rem;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.88rem;
+}
+.map-order-form textarea { resize: vertical; }
+.map-order-form .admin-checkbox-label { margin-top: 1rem; }
+.map-order-form .btn-ja { margin-top: 1.2rem; width: 100%; }
+
+.map-order-total-preview { margin-top: 0.6rem; font-size: 0.85rem; color: var(--gold); font-weight: 700; }
+.map-order-submit-msg { margin-top: 0.6rem; font-size: 0.85rem; font-weight: 700; min-height: 1.2em; }
+.map-order-submit-msg.error { color: #f87171; }
+
+.map-ref-preview { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.6rem; }
+.map-ref-chip {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.3rem 0.6rem; border-radius: 999px;
+  background: var(--paper-2); border: 1px solid var(--line);
+  font-size: 0.76rem; color: var(--muted);
+}
+.map-ref-remove { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1rem; line-height: 1; }
+.map-ref-remove:hover { color: #f87171; }
+
+.map-order-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.9rem;
+  margin-top: 1rem;
+}
+.map-order-card {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 1rem 1.1rem;
+  background: var(--paper-2);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.map-order-card:hover { border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); transform: translateY(-2px); }
+.map-order-card-head { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.5rem; }
+.map-order-badge {
+  display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px;
+  font-size: 0.68rem; font-weight: 700; background: var(--paper); border: 1px solid var(--line); color: var(--muted);
+}
+.map-order-title { font-family: 'Fraunces', serif; font-size: 1.05rem; margin: 0.2rem 0 0.4rem; }
+.map-order-desc { font-size: 0.82rem; color: var(--muted); margin-bottom: 0.7rem; }
+.map-order-meta { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.76rem; color: var(--muted); }
+
+.map-order-status { padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.68rem; font-weight: 800; }
+.map-order-status.status-neu { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
+.map-order-status.status-offen { background: rgba(56, 189, 248, 0.2); color: #38bdf8; }
+.map-order-status.status-angenommen { background: rgba(167, 139, 250, 0.2); color: #a78bfa; }
+.map-order-status.status-in_bearbeitung { background: rgba(250, 204, 21, 0.2); color: #facc15; }
+.map-order-status.status-rueckfrage { background: rgba(251, 146, 60, 0.2); color: #fb923c; }
+.map-order-status.status-wartet_auf_kunde { background: rgba(251, 146, 60, 0.2); color: #fb923c; }
+.map-order-status.status-fertig { background: rgba(74, 222, 128, 0.2); color: #4ade80; }
+.map-order-status.status-abgeschlossen { background: rgba(34, 197, 94, 0.25); color: #22c55e; }
+.map-order-status.status-abgebrochen { background: rgba(248, 113, 113, 0.2); color: #f87171; }
+
+.map-company-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.9rem;
+  margin-top: 1rem;
+}
+.map-company-card {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 1rem 1.1rem;
+  background: var(--paper-2);
+  text-align: center;
+}
+.map-company-logo { width: 64px; height: 64px; object-fit: contain; border-radius: 50%; background: var(--paper); margin-bottom: 0.5rem; }
+.map-company-desc { font-size: 0.8rem; color: var(--muted); margin: 0.4rem 0; }
+.map-company-price { font-size: 0.8rem; color: var(--gold); font-weight: 700; }
+
+.map-code-value {
+  font-family: 'Fraunces', serif;
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.7rem 1rem;
+  border-radius: 12px;
+  margin: 0.8rem 0;
+  background: linear-gradient(120deg, rgba(255, 206, 51, 0.18), rgba(255, 157, 26, 0.1));
+  border: 1px dashed rgba(255, 206, 51, 0.55);
+  color: var(--gold);
+  user-select: all;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .orders-header-row { justify-content: center; }
+}
+
+/* Firmen-Rolle: reduzierte Admin-Nav. Nur eine optische Sperre - die echte
+   Absicherung passiert ueber RLS (is_active_admin() schliesst role='company'
+   explizit aus). */
+.admin-nav-btn[data-role="company"] { display: none; }
+body.admin-mode-company .admin-nav-btn:not([data-role="company"]) { display: none; }
+body.admin-mode-company .admin-nav-btn[data-role="company"] { display: flex; }
+
+.map-order-card .map-order-claim-btn { width: 100%; margin-top: 0.6rem; }

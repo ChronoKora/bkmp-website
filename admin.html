@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260708-idledorf6">
+<link rel="stylesheet" href="style.css?v=20260708-mapart2">
 </head>
 <body>
 
@@ -92,6 +92,10 @@
 
     <div class="admin-layout">
       <nav class="admin-sidebar" id="adminSidebar">
+        <button class="admin-nav-btn" data-page="companydashboard" data-role="company">
+          <svg viewBox="0 0 24 24"><path d="M4 21V10l8-6 8 6v11"/><path d="M9 21v-6h6v6"/></svg>
+          Firmen-Dashboard
+        </button>
         <button class="admin-nav-btn active" data-page="overview">
           <svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="5" rx="1.5"/><rect x="13" y="10" width="8" height="11" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/></svg>
           &Uuml;bersicht
@@ -166,6 +170,22 @@
 
         <!-- Einnahmen -->
         <!-- Uebersicht -->
+        <section class="admin-page" id="page-companydashboard">
+          <div class="admin-section">
+            <h2>Firmen-Dashboard</h2>
+            <p class="admin-help-text" id="companyDashboardName"></p>
+
+            <h3>Neue Aufträge <span class="cardcatalog-admin-count" id="companyNewOrdersCount"></span></h3>
+            <div class="map-order-grid" id="companyNewOrdersList"></div>
+
+            <h3 style="margin-top:1.4rem;">Laufende Aufträge <span class="cardcatalog-admin-count" id="companyRunningOrdersCount"></span></h3>
+            <div class="map-order-grid" id="companyRunningOrdersList"></div>
+
+            <h3 style="margin-top:1.4rem;">Abgeschlossene Aufträge <span class="cardcatalog-admin-count" id="companyDoneOrdersCount"></span></h3>
+            <div class="map-order-grid" id="companyDoneOrdersList"></div>
+          </div>
+        </section>
+
         <section class="admin-page active" id="page-overview">
           <div class="overview-grid" id="overviewGrid"></div>
           <div class="admin-section">
@@ -699,8 +719,13 @@
                 <select id="accessRole">
                   <option value="admin">Admin</option>
                   <option value="editor">Editor</option>
+                  <option value="company">Kartenbaufirma-Mitarbeiter</option>
                 </select>
               </div>
+            </div>
+            <div class="form-grid form-grid-2" id="accessCompanyRow" style="display:none;">
+              <div><label for="accessCompany">Firma</label><select id="accessCompany"></select></div>
+              <div><label class="admin-checkbox-label" style="margin-top:1.6rem;"><input type="checkbox" id="accessCanEditProfile"> Darf eigenes Firmenprofil bearbeiten</label></div>
             </div>
             <p class="admin-help-text">Zug&auml;nge werden &uuml;ber Supabase Auth erstellt. Der Name wird intern als Login-Adresse gespeichert.</p>
             <button class="btn btn-primary" id="addAccess">+ Zugang erstellen</button>
@@ -740,9 +765,10 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260708-idledorf6"></script>
+  <script src="supabase.js?v=20260708-mapart2"></script>
   <script src="app.js?v=20260707-plushiesdb"></script>
-  <script src="idledorf.js?v=20260708-idledorf6"></script>
+  <script src="idledorf.js?v=20260708-mapart2"></script>
+  <script src="mapart.js?v=20260708-mapart2"></script>
   <script>
     bkmpInitTheme();
 
@@ -803,9 +829,17 @@
       renderAll();
     }
 
-    function showAdmin() {
+    function showAdmin(profile) {
       loginCard.style.display = 'none';
       adminWrap.style.display = 'block';
+      const isCompany = Boolean(profile && profile.role === 'company');
+      document.body.classList.toggle('admin-mode-company', isCompany);
+      if (isCompany) {
+        document.querySelectorAll('.admin-nav-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.page === 'companydashboard'));
+        document.querySelectorAll('.admin-page').forEach(section => section.classList.toggle('active', section.id === 'page-companydashboard'));
+        if (typeof bkmpMapRenderCompanyDashboard === 'function') bkmpMapRenderCompanyDashboard(profile);
+        return;
+      }
       renderAll();
       refreshAdminDataFromSupabase();
       showPendingSummaryPopup();
@@ -849,8 +883,8 @@
       loginBtn.disabled = true;
       loginBtn.textContent = 'Einloggen...';
       try {
-        await bkmpLoginAdmin(loginName.value, loginPassword.value);
-        showAdmin();
+        const result = await bkmpLoginAdmin(loginName.value, loginPassword.value);
+        showAdmin(result ? result.profile : null);
       } catch (e) {
         console.warn('Admin-Login fehlgeschlagen:', e);
         loginError.style.display = 'block';
@@ -894,6 +928,7 @@
         if (page === 'dailyevents') { bkmpRefreshPlushieDefinitionsAdmin(); refreshDailyEventsPage(); }
         if (page === 'idledorf') refreshIdleDorfAdmin();
         if (page === 'access') refreshAdminAccessList();
+        if (page === 'companydashboard' && window.bkmpCurrentCompanyProfile) bkmpMapRenderCompanyDashboard(window.bkmpCurrentCompanyProfile);
       });
     });
 
@@ -2795,7 +2830,27 @@
     const accessNameInput = document.getElementById('accessName');
     const accessPasswordInput = document.getElementById('accessPassword');
     const accessRoleInput = document.getElementById('accessRole');
+    const accessCompanyRow = document.getElementById('accessCompanyRow');
+    const accessCompanySelect = document.getElementById('accessCompany');
+    const accessCanEditProfileInput = document.getElementById('accessCanEditProfile');
     let adminProfiles = [];
+    let accessCompaniesCache = [];
+
+    async function populateAccessCompanySelect() {
+      if (!accessCompanySelect) return;
+      try {
+        accessCompaniesCache = (typeof loadCompaniesAdmin === 'function' ? await loadCompaniesAdmin() : []) || [];
+      } catch (e) { accessCompaniesCache = []; }
+      accessCompanySelect.innerHTML = accessCompaniesCache.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('') || '<option value="">Keine Firmen angelegt</option>';
+    }
+
+    if (accessRoleInput && accessCompanyRow) {
+      accessRoleInput.addEventListener('change', () => {
+        const isCompany = accessRoleInput.value === 'company';
+        accessCompanyRow.style.display = isCompany ? '' : 'none';
+        if (isCompany) populateAccessCompanySelect();
+      });
+    }
 
     function renderAdminAccessList() {
       const el = document.getElementById('adminAccessList');
@@ -2808,10 +2863,11 @@
       adminProfiles.forEach(profile => {
         const row = document.createElement('div');
         row.className = 'entry-row';
+        const companyName = profile.role === 'company' ? (accessCompaniesCache.find(c => c.id === profile.company_id) || {}).name : '';
         row.innerHTML = `
           <div class="desc">
             <span class="name">${escapeHtml(profile.display_name || profile.login_name)}</span>
-            <span class="meta">${escapeHtml(profile.role || 'admin')} &middot; ${profile.active ? 'Aktiv' : 'Inaktiv'} &middot; ${escapeHtml(profile.login_name || '')}</span>
+            <span class="meta">${escapeHtml(profile.role || 'admin')}${companyName ? ' · ' + escapeHtml(companyName) : ''} &middot; ${profile.active ? 'Aktiv' : 'Inaktiv'} &middot; ${escapeHtml(profile.login_name || '')}</span>
           </div>
           <div class="entry-actions">
             <button class="edit-btn toggle-access" type="button">${profile.active ? 'Deaktivieren' : 'Aktivieren'}</button>
@@ -2837,7 +2893,7 @@
       const el = document.getElementById('adminAccessList');
       if (el) el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Zug&auml;nge werden geladen...</p>';
       try {
-        adminProfiles = await loadAdminProfiles();
+        [adminProfiles] = await Promise.all([loadAdminProfiles(), populateAccessCompanySelect()]);
       } catch (e) {
         console.warn('Admin-Zugaenge konnten nicht geladen werden.', e);
         adminProfiles = [];
@@ -2851,15 +2907,19 @@
       const name = accessNameInput.value.trim();
       const password = accessPasswordInput.value;
       const role = accessRoleInput.value || 'admin';
+      const companyId = role === 'company' ? (accessCompanySelect ? accessCompanySelect.value : '') : null;
+      const canEditProfile = accessCanEditProfileInput ? accessCanEditProfileInput.checked : false;
       if (!name) { accessNameInput.reportValidity(); return; }
       if (!password) { accessPasswordInput.reportValidity(); return; }
       addAccessBtn.disabled = true;
       addAccessBtn.textContent = 'Zugang wird erstellt...';
       try {
-        await createAdminAccess(name, password, role);
+        await createAdminAccess(name, password, role, companyId, canEditProfile);
         accessNameInput.value = '';
         accessPasswordInput.value = '';
         accessRoleInput.value = 'admin';
+        if (accessCompanyRow) accessCompanyRow.style.display = 'none';
+        if (accessCanEditProfileInput) accessCanEditProfileInput.checked = false;
         refreshAdminAccessList();
         showAdminToast('Zugang erstellt. Neue Zugänge müssen noch freigeschaltet werden.', 'success');
       } catch (e) {
@@ -3476,8 +3536,8 @@
     }
 
     /* News */
-    bkmpGetValidAdminSession().then(session => {
-      if (session) showAdmin();
+    bkmpGetValidAdminProfile().then(result => {
+      if (result) showAdmin(result.profile);
     });
 
     addNewsBtn.addEventListener('click', () => {
