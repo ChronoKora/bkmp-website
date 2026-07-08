@@ -2973,6 +2973,7 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   gap: 0.6rem;
   max-height: 50vh;
   overflow-y: auto;
+  overflow-anchor: none;
   margin-bottom: 0.4rem;
   padding-right: 0.2rem;
 }
@@ -3056,6 +3057,7 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   gap: 0.6rem;
   max-height: 50vh;
   overflow-y: auto;
+  overflow-anchor: none;
   margin-bottom: 0.4rem;
 }
 .cosmetic-swatch {
