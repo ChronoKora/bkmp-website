@@ -21,6 +21,11 @@ function bkmpIdleXpForLevel(level, xpCurveCfg) {
   return Math.max(1, Math.round(cfg.base * Math.pow(Math.max(1, level), cfg.growth)));
 }
 
+function bkmpIdleFormatStage(index) {
+  const i = Math.max(0, Math.floor(index || 0));
+  return `${Math.floor(i / 10)}-${i % 10}`;
+}
+
 function bkmpIdleDragonArchetypeAt(killIndex, dragons) {
   const pool = (dragons || []).filter(d => d.active !== false).sort((a, b) => (a.tier_order || 0) - (b.tier_order || 0));
   if (!pool.length) return null;
@@ -165,7 +170,7 @@ function bkmpIdleDefaultState(name) {
     gold_bonus: 0, xp_bonus: 0, loot_bonus: 0,
     skill_points_available: 0, skill_points_spent: 0,
     skill_allocations: {}, upgrade_purchases: {},
-    dragon_kills: 0, boss_kills: 0, current_dragon_index: 0,
+    dragon_kills: 0, boss_kills: 0, current_dragon_index: 0, highest_dragon_index: 0, auto_advance: true,
     playtime_seconds: 0,
     last_seen_at: new Date().toISOString(),
     last_offline_claim: {}
@@ -286,12 +291,13 @@ function bkmpIdleSpawnDragon() {
   if (!bkmpIdleCurrentDragon) return;
   bkmpIdleCurrentDragon.hp = bkmpIdleCurrentDragon.maxHp;
   const nameEl = document.getElementById('idleDragonName');
-  if (nameEl) nameEl.textContent = `${bkmpIdleCurrentDragon.isBoss ? '👑 BOSS: ' : ''}${bkmpIdleCurrentDragon.name} (#${bkmpIdleCurrentDragon.killIndex + 1})`;
+  if (nameEl) nameEl.textContent = `${bkmpIdleCurrentDragon.isBoss ? '👑 BOSS: ' : ''}${bkmpIdleCurrentDragon.name} (Stufe ${bkmpIdleFormatStage(bkmpIdleCurrentDragon.killIndex)})`;
   const sprite = document.getElementById('idleDragonSprite');
   if (sprite) sprite.textContent = bkmpIdleCurrentDragon.emoji;
   const dragonEl = document.getElementById('idleDragon');
   if (dragonEl) dragonEl.classList.toggle('idle-dragon-boss', Boolean(bkmpIdleCurrentDragon.isBoss));
   bkmpIdleUpdateDragonHpBar();
+  bkmpIdleRenderStageBar();
 }
 
 function bkmpIdleAddXp(amount) {
@@ -324,10 +330,22 @@ function bkmpIdleHandleDragonDefeated() {
   bkmpIdleState.essence += rewards.essence;
   bkmpIdleState.dragon_kills += 1;
   if (bkmpIdleCurrentDragon.isBoss) bkmpIdleState.boss_kills += 1;
-  bkmpIdleState.current_dragon_index += 1;
+  const autoAdvance = bkmpIdleState.auto_advance !== false;
+  if (autoAdvance) bkmpIdleState.current_dragon_index += 1;
+  bkmpIdleState.highest_dragon_index = Math.max(Number(bkmpIdleState.highest_dragon_index || 0), bkmpIdleState.current_dragon_index);
   bkmpIdleAddXp(rewards.xp);
-  bkmpIdleVillageHp = Math.min(bkmpIdleEffectiveStats.hp, bkmpIdleVillageHp + bkmpIdleEffectiveStats.hp * 0.2);
-  bkmpIdleLog(`${bkmpIdleCurrentDragon.emoji} ${bkmpIdleCurrentDragon.name} besiegt! +${rewards.gold}💰 +${rewards.xp}✨` + (bkmpIdleCurrentDragon.isBoss ? ' 👑 BOSS!' : ''));
+  bkmpIdleVillageHp = bkmpIdleEffectiveStats.hp;
+  bkmpIdleLog(`${bkmpIdleCurrentDragon.emoji} ${bkmpIdleCurrentDragon.name} besiegt! +${rewards.gold}💰 +${rewards.xp}✨` + (bkmpIdleCurrentDragon.isBoss ? ' 👑 BOSS!' : '') + (autoAdvance ? '' : ' (bleibt auf dieser Stufe)'));
+  bkmpIdleSpawnDragon();
+  bkmpIdleUpdateVillageHpBar();
+  bkmpIdleRenderHud();
+  bkmpIdleQueueSync();
+}
+
+function bkmpIdleHandleDefeat() {
+  bkmpIdleLog(`💀 Niederlage gegen ${bkmpIdleCurrentDragon.emoji} ${bkmpIdleCurrentDragon.name}! Du fällst eine Stufe zurück.`);
+  bkmpIdleState.current_dragon_index = Math.max(0, Number(bkmpIdleState.current_dragon_index || 0) - 1);
+  bkmpIdleVillageHp = bkmpIdleEffectiveStats.hp;
   bkmpIdleSpawnDragon();
   bkmpIdleUpdateVillageHpBar();
   bkmpIdleRenderHud();
@@ -350,10 +368,14 @@ function bkmpIdleTick() {
   }
 
   const dRoll = bkmpIdleDamageRoll(bkmpIdleCurrentDragon.attack, 5, 150, bkmpIdleEffectiveStats.defense);
-  bkmpIdleVillageHp = Math.max(1, bkmpIdleVillageHp - dRoll.amount);
+  bkmpIdleVillageHp = Math.max(0, bkmpIdleVillageHp - dRoll.amount);
   bkmpIdleSpawnProjectile('fire', dRoll.amount, dRoll.isCrit);
   bkmpIdleSpawnHitFlash('idleVillage');
   bkmpIdleUpdateVillageHpBar();
+
+  if (bkmpIdleVillageHp <= 0) {
+    bkmpIdleHandleDefeat();
+  }
 }
 
 function bkmpIdleStartLoop() {
@@ -437,6 +459,42 @@ function bkmpIdleRenderHud() {
       <span>🧪 ${bkmpIdleFormatNumber(bkmpIdleState.essence)}</span>
       <span>🐉 ${bkmpIdleFormatNumber(bkmpIdleState.dragon_kills)} besiegt</span>
     </div>`;
+}
+
+function bkmpIdleToggleAutoAdvance() {
+  if (!bkmpIdleState) return;
+  bkmpIdleState.auto_advance = !(bkmpIdleState.auto_advance !== false);
+  bkmpIdleRenderStageBar();
+  bkmpIdleQueueSync();
+}
+
+function bkmpIdleJumpToHighestStage() {
+  if (!bkmpIdleState) return;
+  const highest = Number(bkmpIdleState.highest_dragon_index || 0);
+  if (highest <= Number(bkmpIdleState.current_dragon_index || 0)) return;
+  bkmpIdleState.current_dragon_index = highest;
+  bkmpIdleVillageHp = bkmpIdleEffectiveStats ? bkmpIdleEffectiveStats.hp : bkmpIdleVillageHp;
+  bkmpIdleSpawnDragon();
+  bkmpIdleUpdateVillageHpBar();
+  bkmpIdleQueueSync();
+}
+
+function bkmpIdleRenderStageBar() {
+  const el = document.getElementById('idleStageBar');
+  if (!el || !bkmpIdleState) return;
+  const current = Number(bkmpIdleState.current_dragon_index || 0);
+  const highest = Number(bkmpIdleState.highest_dragon_index || 0);
+  const autoAdvance = bkmpIdleState.auto_advance !== false;
+  el.innerHTML = `
+    <span class="idle-stage-label">Stufe <strong>${bkmpIdleFormatStage(current)}</strong>${highest > current ? ` · Beste Stufe: <strong>${bkmpIdleFormatStage(highest)}</strong>` : ''}</span>
+    <div class="idle-stage-buttons">
+      <button type="button" class="btn-nein idle-stage-btn" id="idleStageAutoAdvanceBtn">${autoAdvance ? '⬆️ Steigt automatisch auf' : '📍 Bleibt auf dieser Stufe'}</button>
+      ${highest > current ? '<button type="button" class="btn-ja idle-stage-btn" id="idleStageJumpBtn">Zur besten Stufe springen</button>' : ''}
+    </div>`;
+  const autoBtn = document.getElementById('idleStageAutoAdvanceBtn');
+  if (autoBtn) autoBtn.addEventListener('click', bkmpIdleToggleAutoAdvance);
+  const jumpBtn = document.getElementById('idleStageJumpBtn');
+  if (jumpBtn) jumpBtn.addEventListener('click', bkmpIdleJumpToHighestStage);
 }
 
 function bkmpIdleLog(msg) {
@@ -720,6 +778,7 @@ async function bkmpIdleOpenModal() {
 
   if (!bkmpIdleCurrentDragon) bkmpIdleSpawnDragon();
   bkmpIdleRenderHud();
+  bkmpIdleRenderStageBar();
   bkmpIdleUpdateVillageHpBar();
   bkmpIdleUpdateDragonHpBar();
   bkmpIdleStartLoop();

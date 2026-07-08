@@ -110,6 +110,11 @@ module.exports = async function handler(req, res) {
     const dragonsRes = await sbFetch(serviceKey, `idle_dragons?active=eq.true&select=*&order=tier_order.asc`);
     const dragons = dragonsRes.ok ? await dragonsRes.json() : [];
 
+    // Vereinfachung: die Live-Version kann eine Stufe verlieren, wenn das
+    // Dorf auf 0 HP faellt. Offline wird das bewusst NICHT simuliert (kein
+    // Verlust-Risiko, nur der optimistische Sieges-Pfad) - sonst muesste
+    // hier ein komplettes Tick-fuer-Tick-HP-Modell nachgebaut werden, und
+    // Offline-Fortschritt ist ohnehin schon durch efficiencyPct gedeckelt.
     const efficiency = Math.max(0, Math.min(100, offlineCfg.efficiencyPct || 50)) / 100;
     const attack = Number(state.attack || 10);
     const critChance = Number(state.crit_chance || 5);
@@ -180,6 +185,7 @@ module.exports = async function handler(req, res) {
       dragon_kills: Number(state.dragon_kills || 0) + kills,
       boss_kills: Number(state.boss_kills || 0) + bossKills,
       current_dragon_index: killIndex,
+      highest_dragon_index: Math.max(Number(state.highest_dragon_index || 0), killIndex),
       last_seen_at: new Date().toISOString(),
       last_offline_claim: { elapsedSeconds, goldGain, xpGain, woodGain, stoneGain, crystalGain, essenceGain, dragonKills: kills, levelsGained, claimedAt: new Date().toISOString() }
     };

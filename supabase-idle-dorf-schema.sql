@@ -121,6 +121,8 @@ create table if not exists public.idle_player_state (
   dragon_kills bigint not null default 0,
   boss_kills bigint not null default 0,
   current_dragon_index bigint not null default 0,
+  highest_dragon_index bigint not null default 0,
+  auto_advance boolean not null default true,
   playtime_seconds bigint not null default 0,
   last_seen_at timestamptz not null default now(),
   last_offline_claim jsonb not null default '{}'::jsonb,
@@ -129,6 +131,8 @@ create table if not exists public.idle_player_state (
 alter table public.idle_player_state add column if not exists upgrade_purchases jsonb not null default '{}'::jsonb;
 alter table public.idle_player_state add column if not exists total_gold_earned bigint not null default 0;
 alter table public.idle_player_state add column if not exists boss_kills bigint not null default 0;
+alter table public.idle_player_state add column if not exists highest_dragon_index bigint not null default 0;
+alter table public.idle_player_state add column if not exists auto_advance boolean not null default true;
 
 create index if not exists idle_player_state_level_idx on public.idle_player_state (level desc);
 create index if not exists idle_player_state_gold_idx on public.idle_player_state (total_gold_earned desc);

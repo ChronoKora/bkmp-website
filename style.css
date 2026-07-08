@@ -3696,6 +3696,24 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 .idle-dorf-panel { min-height: 260px; }
 .idle-panel-hint { color: var(--muted); font-size: 0.85rem; margin-bottom: 0.8rem; }
 
+/* ---- Stufen-Leiste ---- */
+.idle-stage-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.9rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: 12px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  font-size: 0.82rem;
+}
+.idle-stage-label strong { color: var(--gold); }
+.idle-stage-buttons { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.idle-stage-btn { padding: 0.35rem 0.7rem; font-size: 0.75rem; white-space: nowrap; }
+
 /* ---- HUD ---- */
 .idle-dorf-hud { margin-bottom: 1rem; }
 .idle-hud-level { display: flex; align-items: center; justify-content: space-between; font-weight: 700; margin-bottom: 0.35rem; }
