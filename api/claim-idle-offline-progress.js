@@ -72,20 +72,30 @@ function selectDragonKindId(killIndex, dragons) {
   return pool.length ? pool[stage % pool.length].id : ((active[0] || {}).id || null);
 }
 
+/* Muss deckungsgleich mit bkmpIdleGrowthMult() in idledorf.js bleiben:
+   (1+rate*kill)^exponent statt reiner Exponential-Compoundierung, die bei
+   jeder Rate > 0 irgendwann astronomisch wird (siehe Kommentar dort). */
+function growthMult(ratePerKill, exponent, killIndex) {
+  return Math.pow(1 + (ratePerKill || 0) * killIndex, exponent || 1);
+}
+
 function dragonStatsAt(killIndex, dragons, cfg) {
   const kindId = selectDragonKindId(killIndex, dragons);
   const archetype = (dragons || []).find(d => d.id === kindId);
   if (!archetype) return null;
-  const hpGrowth = Math.pow(1 + (cfg.hpGrowthPerKill || 0), killIndex);
+  const hpGrowth = growthMult(cfg.hpGrowthPerKill, cfg.hpGrowthExponent, killIndex);
+  const atkGrowth = growthMult(cfg.atkGrowthPerKill, cfg.atkGrowthExponent, killIndex);
   let bossTier = null;
   let hpMult = 1;
-  if (archetype.spawn_rule === 'boss_25') { bossTier = 'boss'; hpMult = cfg.bossHpMult || 3.2; }
-  else if (archetype.spawn_rule === 'miniboss_10') { bossTier = 'miniboss'; hpMult = cfg.minibossHpMult || 1.8; }
+  let atkMult = 1;
+  if (archetype.spawn_rule === 'boss_25') { bossTier = 'boss'; hpMult = cfg.bossHpMult || 3.2; atkMult = cfg.bossAtkMult || 1.7; }
+  else if (archetype.spawn_rule === 'miniboss_10') { bossTier = 'miniboss'; hpMult = cfg.minibossHpMult || 1.8; atkMult = cfg.minibossAtkMult || 1.3; }
   return {
     archetype,
     isBoss: Boolean(bossTier),
     bossTier,
-    maxHp: Math.max(1, Math.round((archetype.base_hp || 50) * hpGrowth * hpMult))
+    maxHp: Math.max(1, Math.round((archetype.base_hp || 50) * hpGrowth * hpMult)),
+    attack: Math.max(1, (archetype.base_attack || 5) * atkGrowth * atkMult)
   };
 }
 
@@ -120,8 +130,8 @@ module.exports = async function handler(req, res) {
     (Array.isArray(configRows) ? configRows : []).forEach(row => { config[row.key] = row.value; });
     const offlineCfg = config.offline_progress || { maxHours: 12, efficiencyPct: 50 };
     const bossCfg = config.boss_scaling || { minibossHpMult: 1.8, minibossAtkMult: 1.3, minibossRewardMult: 2, bossHpMult: 3.2, bossAtkMult: 1.7, bossRewardMult: 4 };
-    const dragonCfg = { ...(config.dragon_scaling || { hpGrowthPerKill: 0.02, atkGrowthPerKill: 0.016 }), ...bossCfg };
-    const rewardCfg = { ...(config.reward_scaling || { goldGrowthPerKill: 0.022, xpGrowthPerKill: 0.022 }), ...bossCfg };
+    const dragonCfg = { ...(config.dragon_scaling || { hpGrowthPerKill: 0.05, hpGrowthExponent: 1.15, atkGrowthPerKill: 0.045, atkGrowthExponent: 1.1 }), ...bossCfg };
+    const rewardCfg = { ...(config.reward_scaling || { goldGrowthPerKill: 0.05, goldGrowthExponent: 1.2, xpGrowthPerKill: 0.05, xpGrowthExponent: 1.2 }), ...bossCfg };
 
     const lastSeenIso = state.last_seen_at;
     const lastSeenMs = Date.parse(lastSeenIso);
@@ -136,17 +146,30 @@ module.exports = async function handler(req, res) {
     const dragonsRes = await sbFetch(serviceKey, `idle_dragons?active=eq.true&select=*&order=tier_order.asc`);
     const dragons = dragonsRes.ok ? await dragonsRes.json() : [];
 
-    // Vereinfachung: die Live-Version kann eine Stufe verlieren, wenn das
-    // Dorf auf 0 HP faellt. Offline wird das bewusst NICHT simuliert (kein
-    // Verlust-Risiko, nur der optimistische Sieges-Pfad) - sonst muesste
-    // hier ein komplettes Tick-fuer-Tick-HP-Modell nachgebaut werden, und
-    // Offline-Fortschritt ist ohnehin schon durch efficiencyPct gedeckelt.
+    // Zwei-seitige Erwartungswert-Simulation: der Drache schlaegt bei jedem
+    // Treffer bis auf den letzten (der ihn toetet) zurueck, genau wie im
+    // Live-Tick (bkmpIdleTick: erst Spieler-Treffer, dann - falls der
+    // Drache noch lebt - Gegenschlag). Sobald ein Kampf das Dorf auf 0 HP
+    // bringen wuerde, wird NICHT mehr weiter aufgestiegen, exakt wie live
+    // (bkmpIdleHandleDefeat) - vorher wurde offline nur der optimistische
+    // Sieges-Pfad ohne jeden Schaden am Dorf simuliert, wodurch AFK-Spieler
+    // beliebig weit ueber ihre tatsaechliche Staerke hinaus aufsteigen
+    // konnten und nach der Rueckkehr sofort an zu starken Drachen scheiterten.
     const efficiency = Math.max(0, Math.min(100, offlineCfg.efficiencyPct || 50)) / 100;
     const attack = Number(state.attack || 10);
+    const defense = Number(state.defense || 2);
     const critChance = Number(state.crit_chance || 5);
     const critDamage = Number(state.crit_damage || 150);
     const expectedCritMult = 1 + (critChance / 100) * (Math.max(1, critDamage / 100) - 1);
+    // Der Drache greift live mit fixen 5% Krit / 150% Kritschaden an (siehe
+    // bkmpIdleTick: bkmpIdleDamageRoll(dragon.attack, 5, 150, defense)).
+    const dragonExpectedCritMult = 1 + 0.05 * (1.5 - 1);
     const secondsPerTick = 0.9;
+    // Village-HP startet bei jedem Oeffnen des Modals immer voll (siehe
+    // bkmpIdleOpenModal/bkmpIdleRecomputeEffectiveStats) - dieselbe Annahme
+    // gilt hier fuer den Start der Offline-Periode.
+    let villageHp = Number(state.hp || 100);
+    const villageMaxHp = villageHp;
 
     let killIndex = Number(state.current_dragon_index || 0);
     let simulatedSeconds = 0;
@@ -167,10 +190,24 @@ module.exports = async function handler(req, res) {
       const hitsNeeded = Math.max(1, Math.ceil(dragon.maxHp / dmgPerHit));
       const timeToKill = hitsNeeded * secondsPerTick;
       if (simulatedSeconds + timeToKill > budgetSeconds) break;
-      simulatedSeconds += timeToKill;
 
-      const goldGrowth = Math.pow(1 + (rewardCfg.goldGrowthPerKill || 0), killIndex);
-      const xpGrowth = Math.pow(1 + (rewardCfg.xpGrowthPerKill || 0), killIndex);
+      // Gegenschlaege: auf allen Treffern AUSSER dem letzten (der toetet),
+      // wie im Live-Tick.
+      const dragonDmgPerHit = Math.max(1, dragon.attack * dragonExpectedCritMult - defense * 0.5);
+      const villageHpLoss = Math.max(0, hitsNeeded - 1) * dragonDmgPerHit;
+      if (villageHpLoss >= villageHp) {
+        // Dieser Kampf wuerde das Dorf toeten - der Spieler ist (noch)
+        // nicht stark genug fuer diese Stufe. Fortschritt hier stoppen,
+        // statt optimistisch weiterzurechnen.
+        break;
+      }
+
+      simulatedSeconds += timeToKill;
+      villageHp -= villageHpLoss;
+      villageHp = Math.min(villageMaxHp, villageHp);
+
+      const goldGrowth = growthMult(rewardCfg.goldGrowthPerKill, rewardCfg.goldGrowthExponent, killIndex);
+      const xpGrowth = growthMult(rewardCfg.xpGrowthPerKill, rewardCfg.xpGrowthExponent, killIndex);
       const rewardMult = dragon.bossTier === 'boss' ? (rewardCfg.bossRewardMult || 4) : dragon.bossTier === 'miniboss' ? (rewardCfg.minibossRewardMult || 2) : 1;
       goldGain += Math.round((dragon.archetype.gold_reward_base || 0) * goldGrowth * rewardMult * (1 + goldBonus / 100));
       xpGain += Math.round((dragon.archetype.xp_reward_base || 0) * xpGrowth * rewardMult * (1 + xpBonus / 100));

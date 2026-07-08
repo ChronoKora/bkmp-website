@@ -53,13 +53,30 @@ function bkmpIdleSelectDragonKindId(killIndex, dragons, rareChancePct) {
   return pool.length ? pool[Math.floor(Math.random() * pool.length)].id : ((active[0] || {}).id || null);
 }
 
+/* Wachstumskurve fuer Drachen-HP/Angriff und Belohnungen: (1 + rate*kill)^exponent
+   statt reiner Exponential-Compoundierung (1+rate)^kill. Reine Exponential-
+   Compoundierung explodiert bei jeder Rate > 0 irgendwann ins Astronomische
+   (selbst bei nur 2%/Kill: kill 1000 = 398 Mio x, kill 2000 = 1.6*10^17 x) -
+   das macht das Spiel ab einem bestimmten Punkt IMMER unspielbar, ganz
+   unabhaengig davon wie klein die Rate gewaehlt wird. Das (1+rate*kill)^exp-
+   Modell waechst dagegen naeherungsweise polynomiell: mit den Standardwerten
+   (rate 0.05, exp 1.15) ist Drache #1000 "nur" ~92x staerker als Drache #1
+   (statt 400-Millionen-fach), bleibt aber weiterhin spuerbar schwerer -
+   frueh spuerbarer Zuwachs, spaet lang anhaltende, aber ueberwindbare
+   Herausforderung. Siehe bkmpIdleGetMergedDragonScalingCfg(). */
+function bkmpIdleGrowthMult(ratePerKill, exponent, killIndex) {
+  const rate = ratePerKill || 0;
+  const exp = exponent || 1;
+  return Math.pow(1 + rate * killIndex, exp);
+}
+
 function bkmpIdleDragonStatsAt(killIndex, dragons, cfg) {
   const c = cfg || {};
   const kindId = bkmpIdleSelectDragonKindId(killIndex, dragons, c.chancePct);
   const archetype = (dragons || []).find(d => d.id === kindId);
   if (!archetype) return null;
-  const hpGrowth = Math.pow(1 + (c.hpGrowthPerKill || 0), killIndex);
-  const atkGrowth = Math.pow(1 + (c.atkGrowthPerKill || 0), killIndex);
+  const hpGrowth = bkmpIdleGrowthMult(c.hpGrowthPerKill, c.hpGrowthExponent, killIndex);
+  const atkGrowth = bkmpIdleGrowthMult(c.atkGrowthPerKill, c.atkGrowthExponent, killIndex);
   let bossTier = null;
   let hpMult = 1;
   let atkMult = 1;
@@ -85,8 +102,8 @@ function bkmpIdleRewardsAt(dragon, playerBonuses, cfg) {
   if (!dragon || !dragon.archetype) return { gold: 0, xp: 0, wood: 0, stone: 0, crystals: 0, essence: 0 };
   const archetype = dragon.archetype;
   const c = cfg || {};
-  const goldGrowth = Math.pow(1 + (c.goldGrowthPerKill || 0), dragon.killIndex);
-  const xpGrowth = Math.pow(1 + (c.xpGrowthPerKill || 0), dragon.killIndex);
+  const goldGrowth = bkmpIdleGrowthMult(c.goldGrowthPerKill, c.goldGrowthExponent, dragon.killIndex);
+  const xpGrowth = bkmpIdleGrowthMult(c.xpGrowthPerKill, c.xpGrowthExponent, dragon.killIndex);
   const rewardMult = dragon.bossTier === 'boss' ? (c.bossRewardMult || 4) : dragon.bossTier === 'miniboss' ? (c.minibossRewardMult || 2) : 1;
   const bonuses = playerBonuses || {};
   const goldMult = 1 + (bonuses.goldBonus || 0) / 100;
@@ -164,11 +181,12 @@ function bkmpIdleResourceEmoji(resource) {
 
 const BKMP_IDLE_FALLBACK_CONFIG = {
   xp_curve: { base: 40, growth: 1.42 },
-  /* Deutlich gentler als vorher (war 0.045/0.035 - Kaempfe wurden ab
-     Stufe ~50 unspielbar lang). Bei 0.02/0.016 dauert Stufe 100 noch
-     einige Sekunden statt mehrerer Minuten. */
-  dragon_scaling: { hpGrowthPerKill: 0.02, atkGrowthPerKill: 0.016 },
-  reward_scaling: { goldGrowthPerKill: 0.022, xpGrowthPerKill: 0.022 },
+  /* Polynom-Wachstum (1+rate*kill)^exponent statt Exponential-Compoundierung
+     - siehe ausfuehrlichen Kommentar bei bkmpIdleGrowthMult(). Mit diesen
+     Werten: Drache #100 ~7.9x HP, #500 ~42x, #1000 ~92x (statt Millionen-
+     bis astronomisch-facher HP wie bei reiner Exponential-Compoundierung). */
+  dragon_scaling: { hpGrowthPerKill: 0.05, hpGrowthExponent: 1.15, atkGrowthPerKill: 0.045, atkGrowthExponent: 1.1 },
+  reward_scaling: { goldGrowthPerKill: 0.05, goldGrowthExponent: 1.2, xpGrowthPerKill: 0.05, xpGrowthExponent: 1.2 },
   boss_scaling: { minibossHpMult: 1.8, minibossAtkMult: 1.3, minibossRewardMult: 2, bossHpMult: 3.2, bossAtkMult: 1.7, bossRewardMult: 4 },
   rare_spawn: { chancePct: 8 },
   offline_progress: { maxHours: 12, efficiencyPct: 50 },
@@ -276,6 +294,21 @@ function bkmpIdleRecomputeEffectiveStats() {
   } else if (prevMaxHp !== null && bkmpIdleEffectiveStats.hp > prevMaxHp) {
     bkmpIdleVillageHp += (bkmpIdleEffectiveStats.hp - prevMaxHp);
   }
+  /* Die tatsaechlichen Kampfwerte auch in bkmpIdleState spiegeln, damit sie
+     mitsynchronisiert werden (upsertIdlePlayerState schreibt bkmpIdleState
+     1:1 in idle_player_state). Vorher blieben attack/defense/hp/crit_* in
+     der DB permanent auf den Default-Werten (10/2/100/5/150) stehen, egal
+     wie viel der Spieler investiert hatte - der Offline-Fortschritt-Server
+     (api/claim-idle-offline-progress.js) sah dadurch NIE die echte Staerke
+     des Spielers, nur immer den Anfangswert. */
+  bkmpIdleState.attack = bkmpIdleEffectiveStats.attack;
+  bkmpIdleState.defense = bkmpIdleEffectiveStats.defense;
+  bkmpIdleState.hp = bkmpIdleEffectiveStats.hp;
+  bkmpIdleState.crit_chance = bkmpIdleEffectiveStats.critChance;
+  bkmpIdleState.crit_damage = bkmpIdleEffectiveStats.critDamage;
+  bkmpIdleState.gold_bonus = bkmpIdleEffectiveStats.goldBonus;
+  bkmpIdleState.xp_bonus = bkmpIdleEffectiveStats.xpBonus;
+  bkmpIdleState.loot_bonus = bkmpIdleEffectiveStats.lootBonus;
 }
 
 /* ---------------- Skilltree ---------------- */

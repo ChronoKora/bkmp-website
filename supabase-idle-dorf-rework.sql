@@ -40,18 +40,44 @@ on conflict (id) do update set
   crystal_reward_base = excluded.crystal_reward_base, essence_reward_base = excluded.essence_reward_base, is_boss = excluded.is_boss;
 
 -- ============================================================
--- 3) Balance-Werte: HP/Schaden wachsen deutlich langsamer,
---    dafuer eigene Boss-/Miniboss-Multiplikatoren + Rare-Chance.
+-- 3) Balance-Werte: Polynom-Wachstum (1+rate*kill)^exponent statt
+--    reiner Exponential-Compoundierung (1+rate)^kill.
+--
+--    Reine Exponential-Compoundierung explodiert bei JEDER Rate > 0
+--    irgendwann astronomisch (selbst bei nur 2%/Kill: Drache #1000 waere
+--    ~400 Millionen x staerker als Drache #1, #2000 ~1.6*10^17 x) - das
+--    macht das Spiel ab einem bestimmten Punkt zwangslaeufig unspielbar,
+--    egal wie klein die Rate gewaehlt wird. Das Polynom-Modell waechst
+--    stattdessen naeherungsweise wie eine Potenzfunktion: Drache #100 ist
+--    ~7.9x staerker als #1, #500 ~42x, #1000 ~92x, #2000 ~202x - frueh
+--    spuerbarer Fortschritt, spaet weiterhin eine echte, aber ueberwindbare
+--    Herausforderung (siehe bkmpIdleGrowthMult() in idledorf.js fuer die
+--    genaue Formel und Beispielrechnung).
+--
+--    Belohnungen (Gold/XP) wachsen mit hoeherem Exponenten (1.2 statt 1.15)
+--    als die HP, damit das Grinden im Lategame nicht relativ unattraktiver
+--    wird als im Frühgame, obwohl die Gegner dort haerter sind.
 -- ============================================================
 insert into public.idle_game_config (key, value) values
-  ('dragon_scaling', '{"hpGrowthPerKill":0.02,"atkGrowthPerKill":0.016}'::jsonb),
-  ('reward_scaling', '{"goldGrowthPerKill":0.022,"xpGrowthPerKill":0.022}'::jsonb),
+  ('dragon_scaling', '{"hpGrowthPerKill":0.05,"hpGrowthExponent":1.15,"atkGrowthPerKill":0.045,"atkGrowthExponent":1.1}'::jsonb),
+  ('reward_scaling', '{"goldGrowthPerKill":0.05,"goldGrowthExponent":1.2,"xpGrowthPerKill":0.05,"xpGrowthExponent":1.2}'::jsonb),
   ('boss_scaling', '{"minibossHpMult":1.8,"minibossAtkMult":1.3,"minibossRewardMult":2,"bossHpMult":3.2,"bossAtkMult":1.7,"bossRewardMult":4}'::jsonb),
   ('rare_spawn', '{"chancePct":8}'::jsonb)
 on conflict (key) do update set value = excluded.value;
 
 -- ============================================================
--- 4) Skilltree: Endstufen-Knoten (Kapazitaets-Skills) etwas teurer,
---    damit "frueh guenstig -> spaet teuer" noch deutlicher wird.
+-- 4) Skilltree: einheitliche, sanft ansteigende Kostenkurve pro Zweig
+--    (1,1,2,2,3,4 SP je nach sort_order) statt der bisherigen, pro Zweig
+--    unterschiedlichen und teils sprunghaften Werte. Der Magie-Zweig z. B.
+--    hatte vorher 5 Knoten zu je 2 SP gefolgt von einem Sprung auf 3/4 SP -
+--    genau der "extreme Sprung", den saubere Kostenkurven vermeiden sollen.
+--    Jetzt: jeder Zweig kostet 1/1/2/2/3/4 SP fuer seine 6 Knoten (sort_order
+--    0-5), macht 13 SP fuer eine Einzel-Investition pro Rang und (je nach
+--    max_rank) 40-70 SP, um einen kompletten Zweig zu maxen.
 -- ============================================================
-update public.idle_skill_nodes set cost_per_rank = 4 where id in ('dorf_ballisten', 'forsch_kartografie', 'magie_meister');
+update public.idle_skill_nodes set cost_per_rank = 1 where sort_order = 0;
+update public.idle_skill_nodes set cost_per_rank = 1 where sort_order = 1;
+update public.idle_skill_nodes set cost_per_rank = 2 where sort_order = 2;
+update public.idle_skill_nodes set cost_per_rank = 2 where sort_order = 3;
+update public.idle_skill_nodes set cost_per_rank = 3 where sort_order = 4;
+update public.idle_skill_nodes set cost_per_rank = 4 where sort_order = 5;

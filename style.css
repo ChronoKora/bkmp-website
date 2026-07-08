@@ -3765,7 +3765,23 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   overflow: hidden;
   min-height: 220px;
 }
-.idle-village, .idle-dragon { position: relative; text-align: center; width: 42%; }
+/* Gerahmtes Panel um Dorf-/Drachenbild: die SpriteSheets haben einen
+   fixen, dunklen Canvas-Hintergrund (#161819), der ohne Rahmen im
+   Hell-Modus als harte schwarze Box neben dem hellen Fenster-Hintergrund
+   auffaellt. Statt zu versuchen, das Bild selbst einzufaerben (wuerde die
+   Zeichnung mitverfaerben), bekommt es einen Rahmen im selben Farbschema
+   wie der Rest des Fensters (--paper-2/--line, wie z. B. .pill-btn/
+   .bonk-button), damit die dunkle Bildflaeche als bewusst gestaltetes
+   Portraitfeld wirkt statt als Bruch im Layout. */
+.idle-village, .idle-dragon {
+  position: relative;
+  text-align: center;
+  width: 42%;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0.75rem 0.5rem;
+}
 
 /* ---- Sprite-Grafiken (echte SpriteSheets statt Emoji) ----
    Jedes Sheet ist ein vertikaler Stapel aus 4 gleich hohen Frames
@@ -3815,6 +3831,7 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   width: 100%;
   max-width: 260px;
   margin: 0 auto;
+  border-radius: 6px;
   background-repeat: no-repeat;
   background-size: 125% 400%;
   background-position-x: 25%;
