@@ -2424,6 +2424,16 @@ async function createMapOrder(order) {
   return Array.isArray(data) ? data[0] : null;
 }
 
+async function updateMapOrderStatus(orderId, status, completedAt) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const patch = { status };
+  if (completedAt !== undefined) patch.completed_at = completedAt;
+  const { error } = await client.from('map_orders').update(patch).eq('id', orderId);
+  if (error) throw error;
+  return true;
+}
+
 async function withdrawMapOrder(orderId) {
   const client = bkmpGetSupabaseClient();
   if (!client) throw new Error('Supabase ist nicht verbunden.');

@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260708-mapart2">
+<link rel="stylesheet" href="style.css?v=20260708-mapart8">
 </head>
 <body>
 
@@ -78,6 +78,36 @@
       <div class="joke-buttons">
         <button class="btn-ja" id="adminPendingPopupClose" type="button">Ansehen</button>
       </div>
+    </div>
+  </div>
+
+  <div class="joke-overlay idle-dorf-overlay" id="mapWorkspaceOverlay">
+    <div class="joke-card idle-dorf-card map-workspace-card">
+      <button type="button" class="idle-dorf-close" id="mapWorkspaceClose" aria-label="Schließen">&times;</button>
+      <h3 id="mapWorkspaceTitle">Auftrag</h3>
+      <div id="mapWorkspaceInfo" class="map-workspace-info"></div>
+      <div id="mapWorkspaceStatusRow" class="map-workspace-status-row" style="display:none;"></div>
+
+      <div class="map-chat">
+        <div class="map-chat-messages" id="mapChatMessages"></div>
+        <div class="map-chat-composer">
+          <textarea id="mapChatInput" rows="2" placeholder="Nachricht schreiben..."></textarea>
+          <div class="map-chat-composer-actions">
+            <label class="map-chat-attach-btn" for="mapChatFileInput">📎<input type="file" id="mapChatFileInput" style="display:none;"></label>
+            <span class="map-chat-file-name" id="mapChatFileName"></span>
+            <button type="button" class="btn-ja" id="mapChatSendBtn">Senden</button>
+          </div>
+        </div>
+      </div>
+
+      <details class="map-workspace-details">
+        <summary>Dateien</summary>
+        <div id="mapWorkspaceFilesList" class="map-workspace-files-list"></div>
+      </details>
+      <details class="map-workspace-details">
+        <summary>Verlauf</summary>
+        <div id="mapWorkspaceHistoryList" class="map-workspace-history-list"></div>
+      </details>
     </div>
   </div>
 
@@ -156,6 +186,14 @@
           <svg viewBox="0 0 24 24"><path d="M4 21V10l8-6 8 6v11"/><path d="M9 21v-6h6v6"/></svg>
           Idle Dorf
         </button>
+        <button class="admin-nav-btn" data-page="mapartcompanies">
+          <svg viewBox="0 0 24 24"><path d="M4 8h16v11H4z"/><path d="M7 8V5h10v3"/><path d="M8 13h8"/></svg>
+          Kartenfirmen
+        </button>
+        <button class="admin-nav-btn" data-page="mapartorders">
+          <svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>
+          Kartenaufträge
+        </button>
         <button class="admin-nav-btn" data-page="access">
           <svg viewBox="0 0 24 24"><path d="M12 3a5 5 0 0 0-5 5v3H5v10h14V11h-2V8a5 5 0 0 0-5-5z"/><path d="M9 11V8a3 3 0 0 1 6 0v3"/></svg>
           Zug&auml;nge
@@ -174,6 +212,9 @@
           <div class="admin-section">
             <h2>Firmen-Dashboard</h2>
             <p class="admin-help-text" id="companyDashboardName"></p>
+            <div class="map-search-row">
+              <input type="text" id="companyOrdersSearch" placeholder="Suche nach Titel, Kunde, Auftragsnummer...">
+            </div>
 
             <h3>Neue Aufträge <span class="cardcatalog-admin-count" id="companyNewOrdersCount"></span></h3>
             <div class="map-order-grid" id="companyNewOrdersList"></div>
@@ -707,6 +748,55 @@
           </div>
         </section>
 
+        <!-- Kartenfirmen -->
+        <section class="admin-page" id="page-mapartcompanies">
+          <div class="admin-section">
+            <h2>Kartenfirmen</h2>
+            <p class="admin-help-text">Firmen, die im &ouml;ffentlichen Firmenprofil-Verzeichnis erscheinen und Auftr&auml;ge &uuml;bernehmen d&uuml;rfen. Zugang f&uuml;r Mitarbeiter wird unter "Zug&auml;nge" vergeben.</p>
+            <div class="entry-table-wrapper"><div class="entry-list" id="mapartCompaniesList"></div></div>
+            <button class="btn btn-primary" id="mapartCompanyAddNew" type="button" style="margin-top:0.8rem;">+ Neue Firma</button>
+
+            <div id="mapartCompanyEditForm" style="display:none; margin-top:1.2rem;">
+              <h3 id="mapartCompanyEditTitle">Neue Firma</h3>
+              <div class="form-grid form-grid-2">
+                <div><label for="mapartCompanyName">Name</label><input type="text" id="mapartCompanyName" placeholder="z. B. PixelWerk"></div>
+                <div><label for="mapartCompanyContact">Ansprechpartner</label><input type="text" id="mapartCompanyContact" placeholder="z. B. Max"></div>
+                <div><label for="mapartCompanyLogo">Logo-URL</label><input type="text" id="mapartCompanyLogo" placeholder="https://..."></div>
+                <div><label for="mapartCompanyBanner">Banner-URL</label><input type="text" id="mapartCompanyBanner" placeholder="https://..."></div>
+                <div><label for="mapartCompanyDiscord">Discord-Link</label><input type="text" id="mapartCompanyDiscord" placeholder="https://discord.gg/..."></div>
+                <div><label for="mapartCompanyWebsite">Website</label><input type="text" id="mapartCompanyWebsite" placeholder="https://..."></div>
+                <div><label for="mapartCompanyPriceMin">Preisspanne von</label><input type="number" id="mapartCompanyPriceMin"></div>
+                <div><label for="mapartCompanyPriceMax">Preisspanne bis</label><input type="number" id="mapartCompanyPriceMax"></div>
+              </div>
+              <label for="mapartCompanyDescription">Beschreibung</label>
+              <textarea id="mapartCompanyDescription" rows="3"></textarea>
+              <label>Spezialisierungen</label>
+              <div class="partner-filter" id="mapartCompanySpecialtiesFilter"></div>
+              <label for="mapartCompanyShowcase">Showcase-Bilder (eine URL pro Zeile)</label>
+              <textarea id="mapartCompanyShowcase" rows="3" placeholder="https://.../bild1.png"></textarea>
+              <label class="admin-checkbox-label"><input type="checkbox" id="mapartCompanyActive" checked> Aktiv (im Verzeichnis sichtbar)</label>
+              <div class="joke-buttons" style="justify-content:flex-start;">
+                <button class="btn btn-primary" id="mapartCompanySave" type="button">Speichern</button>
+                <button class="btn" id="mapartCompanyCancel" type="button">Abbrechen</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Kartenaufträge Übersicht -->
+        <section class="admin-page" id="page-mapartorders">
+          <div class="admin-section">
+            <h2>Kartenaufträge</h2>
+            <p class="admin-help-text">Alle Aufträge, unabh&auml;ngig vom Status. Klick auf eine Karte &ouml;ffnet Chat/Dateien/Verlauf.</p>
+            <div class="map-search-row">
+              <input type="text" id="mapartOrdersSearch" placeholder="Suche nach Name, Titel, Auftragsnummer, Firma...">
+              <select id="mapartOrdersStatusFilter"></select>
+            </div>
+            <div class="partner-filter" id="mapartOrdersCategoryFilter"></div>
+            <div class="map-order-grid" id="mapartOrdersOverviewList"></div>
+          </div>
+        </section>
+
         <!-- Zugaenge -->
         <section class="admin-page" id="page-access">
           <div class="admin-section">
@@ -765,10 +855,10 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260708-mapart2"></script>
+  <script src="supabase.js?v=20260708-mapart8"></script>
   <script src="app.js?v=20260707-plushiesdb"></script>
-  <script src="idledorf.js?v=20260708-mapart2"></script>
-  <script src="mapart.js?v=20260708-mapart2"></script>
+  <script src="idledorf.js?v=20260708-mapart8"></script>
+  <script src="mapart.js?v=20260708-mapart8"></script>
   <script>
     bkmpInitTheme();
 
@@ -929,6 +1019,8 @@
         if (page === 'idledorf') refreshIdleDorfAdmin();
         if (page === 'access') refreshAdminAccessList();
         if (page === 'companydashboard' && window.bkmpCurrentCompanyProfile) bkmpMapRenderCompanyDashboard(window.bkmpCurrentCompanyProfile);
+        if (page === 'mapartcompanies') refreshMapartCompaniesAdmin();
+        if (page === 'mapartorders') refreshMapartOrdersOverview();
       });
     });
 

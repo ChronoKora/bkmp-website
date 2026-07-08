@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260708-mapart2">
+<link rel="stylesheet" href="style.css?v=20260708-mapart8">
 </head>
 <body>
 
@@ -144,6 +144,43 @@
       <div class="joke-buttons">
         <button class="btn-ja" id="mapCodeOverlayClose" type="button">Gespeichert, weiter</button>
       </div>
+    </div>
+  </div>
+
+  <div class="joke-overlay idle-dorf-overlay" id="mapWorkspaceOverlay">
+    <div class="joke-card idle-dorf-card map-workspace-card">
+      <button type="button" class="idle-dorf-close" id="mapWorkspaceClose" aria-label="Schließen">&times;</button>
+      <h3 id="mapWorkspaceTitle">Auftrag</h3>
+      <div id="mapWorkspaceInfo" class="map-workspace-info"></div>
+      <div id="mapWorkspaceStatusRow" class="map-workspace-status-row" style="display:none;"></div>
+
+      <div class="map-chat">
+        <div class="map-chat-messages" id="mapChatMessages"></div>
+        <div class="map-chat-composer">
+          <textarea id="mapChatInput" rows="2" placeholder="Nachricht schreiben..."></textarea>
+          <div class="map-chat-composer-actions">
+            <label class="map-chat-attach-btn" for="mapChatFileInput">📎<input type="file" id="mapChatFileInput" style="display:none;"></label>
+            <span class="map-chat-file-name" id="mapChatFileName"></span>
+            <button type="button" class="btn-ja" id="mapChatSendBtn">Senden</button>
+          </div>
+        </div>
+      </div>
+
+      <details class="map-workspace-details">
+        <summary>Dateien</summary>
+        <div id="mapWorkspaceFilesList" class="map-workspace-files-list"></div>
+      </details>
+      <details class="map-workspace-details">
+        <summary>Verlauf</summary>
+        <div id="mapWorkspaceHistoryList" class="map-workspace-history-list"></div>
+      </details>
+    </div>
+  </div>
+
+  <div class="joke-overlay idle-dorf-overlay" id="mapCompanyDetailOverlay">
+    <div class="joke-card idle-dorf-card map-workspace-card">
+      <button type="button" class="idle-dorf-close" id="mapCompanyDetailClose" aria-label="Schließen">&times;</button>
+      <div id="mapCompanyDetailContent"></div>
     </div>
   </div>
 
@@ -447,6 +484,10 @@
 
         <!-- Offene Aufträge -->
         <div id="ordersSubtabOpenPanel" style="display:none;">
+          <div class="map-search-row">
+            <input type="text" id="mapOpenOrdersSearch" placeholder="Suche nach Titel, Name, Auftragsnummer...">
+          </div>
+          <div class="partner-filter" id="mapOpenOrdersCategoryFilter"></div>
           <div class="map-order-grid" id="mapOpenOrdersList"></div>
         </div>
 
@@ -454,6 +495,9 @@
         <div id="ordersSubtabMinePanel" style="display:none;">
           <div id="mapMyOrdersEmpty" class="empty-hint" style="display:none;">
             Noch keine Aufträge auf diesem Gerät gefunden. <button type="button" class="btn-nein" id="mapMyOrdersEmptyCreateBtn">Auftrag erstellen</button>
+          </div>
+          <div class="map-search-row">
+            <input type="text" id="mapMyOrdersSearch" placeholder="Suche nach Titel, Auftragsnummer...">
           </div>
           <div class="map-order-grid" id="mapMyOrdersList"></div>
         </div>
@@ -642,10 +686,10 @@
 
   <script>window.BKMP_CLIENT_STORAGE_KEY = 'bkmp-customer-auth';</script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260708-mapart2"></script>
+  <script src="supabase.js?v=20260708-mapart8"></script>
   <script src="app.js?v=20260707-plushiesdb"></script>
-  <script src="idledorf.js?v=20260708-mapart2"></script>
-  <script src="mapart.js?v=20260708-mapart2"></script>
+  <script src="idledorf.js?v=20260708-mapart8"></script>
+  <script src="mapart.js?v=20260708-mapart8"></script>
   <script>
     bkmpInitTheme();
     window.addEventListener('load', () => document.body.classList.add('page-loaded'));
