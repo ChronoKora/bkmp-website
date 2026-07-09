@@ -956,6 +956,50 @@ function bkmpIdlePreloadStateIfNamed() {
     .catch(() => {});
 }
 
+/* ---------------- Drachen anklicken: Extraschaden + Autoklicker-Schutz ----------------
+   Gleitendes 1-Sekunden-Fenster der letzten Klick-Zeitpunkte: mehr als 10
+   Klicks/Sekunde => Extraschaden fuer ein paar Sekunden deaktiviert, ein
+   einmaliger Hinweis-Toast (bkmpShowJannikToast, aus index.html - siehe
+   Kommentar oben zur Skript-Reihenfolge), danach automatisch wieder normal. */
+let bkmpIdleClickTimestamps = [];
+let bkmpIdleClickLockedUntil = 0;
+
+function bkmpIdleSpawnClickDamage(amount) {
+  const target = document.getElementById('idleDragon');
+  if (!target) return;
+  const dmg = document.createElement('span');
+  dmg.className = 'idle-dmg-float idle-dmg-click';
+  dmg.textContent = '-' + Math.round(amount);
+  target.appendChild(dmg);
+  window.setTimeout(() => dmg.remove(), 800);
+}
+
+function bkmpIdleHandleDragonClick() {
+  if (!bkmpIdleModalOpen || !bkmpIdleState || !bkmpIdleCurrentDragon || !bkmpIdleEffectiveStats) return;
+
+  const now = Date.now();
+  bkmpIdleClickTimestamps.push(now);
+  bkmpIdleClickTimestamps = bkmpIdleClickTimestamps.filter(t => now - t <= 1000);
+  if (bkmpIdleClickTimestamps.length > 10) {
+    if (now > bkmpIdleClickLockedUntil) {
+      bkmpIdleClickLockedUntil = now + 4000;
+      if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Na wer will denn hier einen Autoklicker benutzen? 😉', 3200);
+    }
+    return;
+  }
+  if (now < bkmpIdleClickLockedUntil) return;
+
+  const clickDamage = Math.max(1, Math.round(bkmpIdleEffectiveStats.attack * 0.12));
+  bkmpIdleCurrentDragon.hp = Math.max(0, bkmpIdleCurrentDragon.hp - clickDamage);
+  bkmpIdleSpawnClickDamage(clickDamage);
+  bkmpIdleSpawnHitFlash('idleDragon');
+  bkmpIdleUpdateDragonHpBar();
+
+  if (bkmpIdleCurrentDragon.hp <= 0) {
+    bkmpIdleHandleDragonDefeated();
+  }
+}
+
 function bkmpIdleInit() {
   bkmpIdleInitTabs();
   const openBtn = document.getElementById('idleDorfButton');
@@ -964,6 +1008,8 @@ function bkmpIdleInit() {
   if (closeBtn) closeBtn.addEventListener('click', bkmpIdleCloseModal);
   const closeX = document.getElementById('idleDorfCloseX');
   if (closeX) closeX.addEventListener('click', bkmpIdleCloseModal);
+  const dragonEl = document.getElementById('idleDragon');
+  if (dragonEl) { dragonEl.classList.add('idle-dragon-clickable'); dragonEl.addEventListener('click', bkmpIdleHandleDragonClick); }
   window.addEventListener('beforeunload', () => { bkmpIdleQueueSync(); bkmpIdleFlushSync(); });
   document.addEventListener('visibilitychange', () => { if (document.hidden) { bkmpIdleQueueSync(); bkmpIdleFlushSync(); } });
   window.setTimeout(bkmpIdlePreloadStateIfNamed, 0);

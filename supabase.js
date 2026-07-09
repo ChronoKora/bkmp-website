@@ -413,16 +413,34 @@ function bkmpPlayerEmailFromName(name) {
    erst nach der Registrierung entstanden ist (z. B. durch aeltere,
    zwischengespeicherte Anfragen). Kein Fehler, wenn keine Zeile existiert
    oder schon geclaimt ist (0 betroffene Zeilen). */
+/* Laeuft ueber die SECURITY DEFINER-Funktion claim_player_row()
+   (supabase-player-accounts-v2.sql) statt ueber direkte Table-Updates -
+   robuster als der urspruengliche RLS-Ansatz (kein Abgleich gegen ein evtl.
+   noch nicht aktualisiertes JWT noetig, siehe Kommentar dort). */
 async function bkmpClaimPlayerNameKeyRows(client, nameKey) {
   try {
-    const { data: sessionData } = await client.auth.getSession();
-    const userId = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
-    if (!userId) return;
-    await client.from('player_stats').update({ auth_user_id: userId }).eq('name_key', nameKey).is('auth_user_id', null);
-    await client.from('idle_player_state').update({ auth_user_id: userId }).eq('name_key', nameKey).is('auth_user_id', null);
+    await client.rpc('claim_player_row', { p_name_key: nameKey });
   } catch (e) {
     console.warn('Bestehender Fortschritt konnte nicht automatisch uebernommen werden.', e);
   }
+}
+
+async function bkmpPlayerRename(newName) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const cleanName = String(newName || '').trim();
+  if (!cleanName) throw new Error('Bitte einen gueltigen Ingame-Namen eintragen.');
+  const { error } = await client.rpc('rename_player_account', { p_new_name: cleanName });
+  if (error) {
+    const code = String(error.message || '');
+    if (code.includes('cooldown_active')) throw new Error('Du kannst deinen Namen erst wieder 30 Tage nach der letzten Aenderung anpassen.');
+    if (code.includes('name_taken')) throw new Error('Dieser Ingame-Name ist bereits vergeben.');
+    if (code.includes('same_name')) throw new Error('Das ist bereits dein aktueller Name.');
+    if (code.includes('invalid_name')) throw new Error('Bitte einen gueltigen Ingame-Namen eintragen (max. 32 Zeichen).');
+    if (code.includes('no_account')) throw new Error('Es wurde kein Spieler-Konto gefunden. Bitte melde dich erneut an.');
+    throw new Error('Der Name konnte nicht geaendert werden. Bitte versuche es spaeter erneut.');
+  }
+  return cleanName;
 }
 
 async function bkmpPlayerRegister(name, password) {
@@ -2243,11 +2261,13 @@ function bkmpMapPlayerStatsFromSupabase(row) {
     activeCosmetic: row.active_cosmetic || '',
     bonkCount: Number(row.bonk_count || 0),
     activePlushie: row.active_plushie || '',
+    achievementUnlocks: row.achievement_unlocks && typeof row.achievement_unlocks === 'object' ? row.achievement_unlocks : {},
+    lastNameChangeAt: row.last_name_change_at ? Date.parse(row.last_name_change_at) : 0,
     updatedAt: row.updated_at ? Date.parse(row.updated_at) : 0
   };
 }
 
-const BKMP_PLAYER_STATS_COLUMNS = 'display_name, minutes_spent, achievements_unlocked, eggs_found, days_visited, flags, panel_opens, active_title, active_cosmetic, bonk_count, active_plushie, updated_at';
+const BKMP_PLAYER_STATS_COLUMNS = 'display_name, minutes_spent, achievements_unlocked, eggs_found, days_visited, flags, panel_opens, active_title, active_cosmetic, bonk_count, active_plushie, achievement_unlocks, last_name_change_at, updated_at';
 
 async function loadLeaderboardStats() {
   const client = bkmpGetSupabaseClient();
@@ -2294,6 +2314,7 @@ async function upsertPlayerStats(displayName, stats) {
       active_cosmetic: stats.activeCosmetic || '',
       bonk_count: Math.max(0, Math.round(stats.bonkCount || 0)),
       active_plushie: stats.activePlushie || '',
+      achievement_unlocks: stats.achievementUnlocks && typeof stats.achievementUnlocks === 'object' ? stats.achievementUnlocks : {},
       updated_at: new Date().toISOString()
     }, { onConflict: 'name_key' });
   if (error) throw error;
