@@ -543,12 +543,35 @@ async function bkmpRestorePlayerSession() {
      zuverlaessige, immer aktuelle Quelle). Faellt nur zurueck auf
      user_metadata, falls player_stats aus irgendeinem Grund noch keine
      Zeile fuer dieses Konto hat. */
+  const client = bkmpGetPlayerAuthClient();
   try {
-    const client = bkmpGetPlayerAuthClient();
     const { data, error } = await client.from('player_stats').select('display_name').eq('auth_user_id', session.user.id).limit(1);
     if (!error && Array.isArray(data) && data[0] && data[0].display_name) return data[0].display_name;
   } catch (e) { /* Fallback unten */ }
-  return (session.user.user_metadata && session.user.user_metadata.display_name) || '';
+
+  /* Keine player_stats-Zeile mit dieser auth_user_id gefunden - das kann
+     eine VERWAISTE Zeile bedeuten: name_key existiert bereits (aeltere
+     Zeile von vor dem Account-System oder ein claim_player_row()-Aufruf,
+     der frueher aus irgendeinem Grund fehlschlug), aber auth_user_id ist
+     dort noch null. bkmpClaimPlayerNameKeyRows() (die claim_player_row()
+     RPC) lief bisher NUR beim expliziten Login (bkmpPlayerLogin) - ein
+     Nutzer, der eingeloggt bleibt und die Seite einfach nur neu laedt
+     (bkmpRestorePlayerSession, kein neuer Login), hat die Verknuepfung nie
+     nachgeholt bekommen. Ergebnis: upsertPlayerStats/upsertIdlePlayerState
+     fanden per auth_user_id nie eine Zeile, das anschliessende Insert
+     schlug wegen des bereits vergebenen name_key dauerhaft fehl (still im
+     catch verschluckt) - die Bestenliste blieb fuer genau diese Konten
+     für immer auf dem alten Stand haengen, auch nach einem harten Reload.
+     Claim hier nachholen und die Abfrage einmal wiederholen. */
+  const fallbackName = (session.user.user_metadata && session.user.user_metadata.display_name) || '';
+  if (fallbackName) {
+    await bkmpClaimPlayerNameKeyRows(client, fallbackName.toLowerCase());
+    try {
+      const { data, error } = await client.from('player_stats').select('display_name').eq('auth_user_id', session.user.id).limit(1);
+      if (!error && Array.isArray(data) && data[0] && data[0].display_name) return data[0].display_name;
+    } catch (e) { /* Fallback unten */ }
+  }
+  return fallbackName;
 }
 
 function bkmpGetAuthCreateClient() {
@@ -2080,6 +2103,53 @@ async function deleteCardSaleRequest(id) {
   const client = bkmpGetSupabaseClient();
   if (!client) return false;
   const { error } = await client.from('card_sale_requests').delete().eq('id', id);
+  if (error) throw error;
+  return true;
+}
+
+/* ---------------- Feedback (Admin-only, siehe supabase-feedback-schema.sql) ---------------- */
+function bkmpMapFeedbackFromSupabase(row) {
+  return {
+    id: row.id,
+    name: row.name || '',
+    category: row.category || 'sonstiges',
+    message: row.message || '',
+    image: row.image_url || '',
+    isRead: Boolean(row.is_read),
+    isArchived: Boolean(row.is_archived),
+    createdAt: row.created_at ? Date.parse(row.created_at) : 0
+  };
+}
+
+async function loadFeedback() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('feedback')
+    .select('id, name, category, message, image_url, is_read, is_archived, created_at')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(bkmpMapFeedbackFromSupabase);
+}
+
+async function updateFeedbackFlags(id, patch) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('feedback')
+    .update(patch)
+    .eq('id', id)
+    .select('id, name, category, message, image_url, is_read, is_archived, created_at')
+    .limit(1);
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : null;
+  return row ? bkmpMapFeedbackFromSupabase(row) : null;
+}
+
+async function deleteFeedback(id) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return false;
+  const { error } = await client.from('feedback').delete().eq('id', id);
   if (error) throw error;
   return true;
 }

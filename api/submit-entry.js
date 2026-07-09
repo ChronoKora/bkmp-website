@@ -55,6 +55,16 @@ const TABLE_CONFIG = {
     requiredFields: ['minecraft_name'],
     allowedFields: ['minecraft_name', 'discord'],
     requireImage: true
+  },
+  feedback: {
+    table: 'feedback',
+    folder: 'feedback',
+    imageField: 'image_url',
+    requiredFields: ['message'],
+    allowedFields: ['name', 'category', 'message'],
+    requireImage: false,
+    hasStatus: false,
+    allowedValues: { category: ['lob', 'idee', 'kritik', 'sonstiges'] }
   }
 };
 
@@ -137,13 +147,16 @@ module.exports = async function handler(req, res) {
 
     const payload = {};
     config.allowedFields.forEach(field => {
-      const value = fields[field];
-      if (value === undefined || value === null) return;
+      let value = fields[field];
+      if (value === undefined || value === null || String(value).trim() === '') return;
+      value = String(value).slice(0, MAX_FIELD_LENGTH);
+      const allowed = config.allowedValues && config.allowedValues[field];
+      if (allowed && !allowed.includes(value)) return;
       const column = (config.fieldMap && config.fieldMap[field]) || field;
-      payload[column] = String(value).slice(0, MAX_FIELD_LENGTH);
+      payload[column] = value;
     });
     if (config.imageField) payload[config.imageField] = imageUrl;
-    payload.status = 'pending';
+    if (config.hasStatus !== false) payload.status = 'pending';
 
     const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/${config.table}`, {
       method: 'POST',

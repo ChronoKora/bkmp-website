@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260709-optpass8">
+<link rel="stylesheet" href="style.css?v=20260709-optpass9">
 </head>
 <body>
 
@@ -193,6 +193,11 @@
         <button class="admin-nav-btn" data-page="mapartorders">
           <svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>
           Kartenaufträge
+        </button>
+        <button class="admin-nav-btn" data-page="feedback">
+          <svg viewBox="0 0 24 24"><path d="M4 4h16v13H8l-4 4V4z"/></svg>
+          Feedback
+          <span class="admin-nav-badge" id="feedbackNavBadge"></span>
         </button>
         <button class="admin-nav-btn" data-page="access">
           <svg viewBox="0 0 24 24"><path d="M12 3a5 5 0 0 0-5 5v3H5v10h14V11h-2V8a5 5 0 0 0-5-5z"/><path d="M9 11V8a3 3 0 0 1 6 0v3"/></svg>
@@ -829,6 +834,19 @@
           </div>
         </section>
 
+        <!-- Feedback -->
+        <section class="admin-page" id="page-feedback">
+          <div class="admin-section">
+            <h2>Feedback <span class="cardcatalog-admin-count" id="feedbackCount"></span></h2>
+            <p class="admin-help-text">R&uuml;ckmeldungen von der Website. Neue Eintr&auml;ge sind hervorgehoben, bis sie als gelesen markiert werden.</p>
+            <label class="investor-request-visibility" style="margin-bottom:1rem;">
+              <input type="checkbox" id="feedbackShowArchived">
+              Archivierte Eintr&auml;ge mit anzeigen
+            </label>
+            <div class="feedback-list" id="feedbackList"></div>
+          </div>
+        </section>
+
         <!-- Zugaenge -->
         <section class="admin-page" id="page-access">
           <div class="admin-section">
@@ -887,7 +905,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260709-optpass5"></script>
+  <script src="supabase.js?v=20260709-optpass7"></script>
   <script src="app.js?v=20260709-optpass3"></script>
   <script src="idledorf.js?v=20260709-optpass7"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
@@ -937,7 +955,8 @@
         refreshCardSalesFromSupabase(),
         refreshInvestorRequestsFromSupabase(),
         refreshCardCatalogFromSupabase(),
-        refreshCardSaleRequestsFromSupabase()
+        refreshCardSaleRequestsFromSupabase(),
+        refreshFeedbackList()
       ]);
     }
 
@@ -982,7 +1001,8 @@
       const pendingWishes = (data.wishes || []).filter(item => item.status === 'pending').length;
       const pendingInvestorRequests = (data.investorRequests || []).filter(item => item.status === 'pending').length;
       const pendingCardSaleRequests = (data.cardSaleRequests || []).filter(item => item.status === 'pending').length;
-      const total = pendingCardCatalog + pendingWishes + pendingInvestorRequests + pendingCardSaleRequests;
+      const unreadFeedback = bkmpFeedbackCache.filter(f => !f.isRead && !f.isArchived).length;
+      const total = pendingCardCatalog + pendingWishes + pendingInvestorRequests + pendingCardSaleRequests + unreadFeedback;
       if (total === 0) return;
 
       const parts = [];
@@ -990,6 +1010,7 @@
       if (pendingWishes) parts.push(`${pendingWishes} Kartenidee${pendingWishes === 1 ? '' : 'n'}`);
       if (pendingInvestorRequests) parts.push(`${pendingInvestorRequests} Investoren-Anfrage${pendingInvestorRequests === 1 ? '' : 'n'}`);
       if (pendingCardSaleRequests) parts.push(`${pendingCardSaleRequests} Verkaufsanfrage${pendingCardSaleRequests === 1 ? '' : 'n'}`);
+      if (unreadFeedback) parts.push(`${unreadFeedback} Feedback-Eintrag${unreadFeedback === 1 ? '' : 'e'}`);
 
       const popup = document.getElementById('adminPendingPopup');
       document.getElementById('adminPendingPopupTitle').textContent = `Du hast ${total} neue Anfrage${total === 1 ? '' : 'n'}`;
@@ -1047,6 +1068,7 @@
         if (page === 'cardsales') refreshCardSalesFromSupabase();
         if (page === 'investorRequests') refreshInvestorRequestsFromSupabase();
         if (page === 'cardcatalog') refreshCardCatalogFromSupabase();
+        if (page === 'feedback') refreshFeedbackList();
         if (page === 'plushies') { bkmpRefreshPlushieDefinitionsAdmin(); refreshPlushieCodesList(); }
         if (page === 'dailyevents') { bkmpRefreshPlushieDefinitionsAdmin(); refreshDailyEventsPage(); }
         if (page === 'idledorf') refreshIdleDorfAdmin();
@@ -1663,6 +1685,125 @@
         el.appendChild(row);
       });
     }
+
+    /* ---------------- Feedback ----------------
+       Bewusst NICHT im data-Objekt/bkmpSaveData gespeichert (wie
+       card_sale_requests es macht) - Feedback ist per RLS admin-only und
+       soll nicht im selben lokalen Cache landen, den index.html/admin.html
+       als Offline-Fallback fuer OEFFENTLICHE Inhalte teilen. Gleiches Muster
+       wie bkmpMapAdminOrdersCache in mapart.js: eigene, seiteneigene Variable. */
+    let bkmpFeedbackCache = [];
+    const FEEDBACK_CATEGORY_LABELS = { lob: '❤️ Lob', idee: '💡 Idee', kritik: '⚠️ Kritik', sonstiges: '📌 Sonstiges' };
+
+    async function refreshFeedbackList() {
+      if (typeof loadFeedback !== 'function' || !bkmpGetSupabaseClient()) return;
+      try {
+        bkmpFeedbackCache = (await loadFeedback()) || [];
+      } catch (e) {
+        console.warn('Feedback konnte nicht geladen werden.', e);
+      }
+      renderFeedbackList();
+      updateFeedbackNavBadge();
+    }
+
+    function updateFeedbackNavBadge() {
+      const badge = document.getElementById('feedbackNavBadge');
+      if (!badge) return;
+      const unread = bkmpFeedbackCache.filter(f => !f.isRead && !f.isArchived).length;
+      badge.textContent = unread > 99 ? '99+' : String(unread);
+      badge.classList.toggle('visible', unread > 0);
+    }
+
+    async function markFeedbackRead(id) {
+      if (typeof updateFeedbackFlags !== 'function') return;
+      try {
+        const updated = await updateFeedbackFlags(id, { is_read: true });
+        bkmpFeedbackCache = bkmpFeedbackCache.map(f => f.id === id ? (updated || { ...f, isRead: true }) : f);
+        renderFeedbackList();
+        updateFeedbackNavBadge();
+      } catch (e) {
+        showAdminToast('Konnte nicht als gelesen markiert werden: ' + supabaseErrorText(e), 'error');
+      }
+    }
+
+    async function toggleFeedbackArchived(id, archived) {
+      if (typeof updateFeedbackFlags !== 'function') return;
+      try {
+        const patch = { is_archived: archived };
+        if (archived) patch.is_read = true;
+        const updated = await updateFeedbackFlags(id, patch);
+        bkmpFeedbackCache = bkmpFeedbackCache.map(f => f.id === id ? (updated || { ...f, isArchived: archived, isRead: archived ? true : f.isRead }) : f);
+        renderFeedbackList();
+        updateFeedbackNavBadge();
+        showAdminToast(archived ? 'Feedback archiviert.' : 'Feedback wiederhergestellt.', 'success');
+      } catch (e) {
+        showAdminToast('Konnte nicht geändert werden: ' + supabaseErrorText(e), 'error');
+      }
+    }
+
+    async function deleteFeedbackEntry(id) {
+      if (typeof deleteFeedback !== 'function') return;
+      try {
+        await deleteFeedback(id);
+        bkmpFeedbackCache = bkmpFeedbackCache.filter(f => f.id !== id);
+        renderFeedbackList();
+        updateFeedbackNavBadge();
+        showAdminToast('Feedback gelöscht.', 'success');
+      } catch (e) {
+        showAdminToast('Konnte nicht gelöscht werden: ' + supabaseErrorText(e), 'error');
+      }
+    }
+
+    function renderFeedbackList() {
+      const el = document.getElementById('feedbackList');
+      const countEl = document.getElementById('feedbackCount');
+      if (!el) return;
+      const showArchived = document.getElementById('feedbackShowArchived');
+      const items = bkmpFeedbackCache.filter(f => showArchived && showArchived.checked ? true : !f.isArchived);
+      if (countEl) {
+        const unread = bkmpFeedbackCache.filter(f => !f.isRead && !f.isArchived).length;
+        countEl.textContent = unread ? `(${unread} neu)` : '';
+      }
+      if (items.length === 0) {
+        el.innerHTML = '<p class="empty-hint">Noch kein Feedback.</p>';
+        return;
+      }
+      const sorted = [...items].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      el.innerHTML = sorted.map(f => `
+        <div class="feedback-card ${!f.isRead && !f.isArchived ? 'is-unread' : ''} ${f.isArchived ? 'is-archived' : ''}" data-feedback-id="${escapeHtml(String(f.id))}">
+          <div class="feedback-card-head">
+            ${!f.isRead && !f.isArchived ? '<span class="feedback-card-unread-dot" aria-hidden="true"></span>' : ''}
+            <span class="feedback-card-name">${f.name ? escapeHtml(f.name) : 'Anonym'}</span>
+            <span class="feedback-category-tag cat-${escapeHtml(f.category)}">${FEEDBACK_CATEGORY_LABELS[f.category] || f.category}</span>
+            <span class="feedback-card-date">${f.createdAt ? new Date(f.createdAt).toLocaleString('de-DE') : ''}</span>
+          </div>
+          <p class="feedback-card-message">${escapeHtml(f.message)}</p>
+          ${f.image ? `<img class="feedback-card-image" src="${escapeHtml(f.image)}" alt="Feedback-Bild von ${f.name ? escapeHtml(f.name) : 'Anonym'}" loading="lazy">` : ''}
+          <div class="feedback-card-actions">
+            ${!f.isRead ? '<button class="edit-btn read-btn" type="button">Als gelesen markieren</button>' : ''}
+            <button class="edit-btn archive-btn" type="button">${f.isArchived ? 'Wiederherstellen' : 'Archivieren'}</button>
+            <button class="del-btn" type="button" aria-label="Feedback löschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>
+          </div>
+        </div>
+      `).join('');
+      el.querySelectorAll('.feedback-card').forEach(card => {
+        const id = card.dataset.feedbackId;
+        const readBtn = card.querySelector('.read-btn');
+        if (readBtn) readBtn.addEventListener('click', () => markFeedbackRead(id));
+        card.querySelector('.archive-btn').addEventListener('click', () => {
+          const entry = bkmpFeedbackCache.find(f => String(f.id) === id);
+          toggleFeedbackArchived(id, entry ? !entry.isArchived : true);
+        });
+        card.querySelector('.del-btn').addEventListener('click', () => {
+          if (confirm('Dieses Feedback wirklich endgültig löschen?')) deleteFeedbackEntry(id);
+        });
+        const img = card.querySelector('.feedback-card-image');
+        if (img) img.addEventListener('click', () => window.open(img.src, '_blank', 'noopener'));
+      });
+    }
+
+    const feedbackShowArchivedCheckbox = document.getElementById('feedbackShowArchived');
+    if (feedbackShowArchivedCheckbox) feedbackShowArchivedCheckbox.addEventListener('change', renderFeedbackList);
 
     async function removeCardCatalogEntry(id) {
       if (typeof deleteCardCatalogEntry === 'function' && bkmpGetSupabaseClient()) {

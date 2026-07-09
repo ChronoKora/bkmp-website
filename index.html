@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260709-optpass8">
+<link rel="stylesheet" href="style.css?v=20260709-optpass9">
 </head>
 <body>
 
@@ -53,6 +53,9 @@
     <button class="bonk-button" id="bkmpBonkButton" type="button" aria-label="Bonk!">
       <img id="bkmpBonkImg" src="assets/bonk-idle.png" alt="" width="56" height="56" decoding="async">
       <span class="bonk-count" id="bkmpBonkCount" aria-hidden="true"></span>
+    </button>
+    <button class="pill-btn feedback-btn" id="feedbackButton" type="button" aria-label="Feedback geben">
+      <span aria-hidden="true">💬</span><span class="feedback-btn-label">Feedback</span>
     </button>
   </div>
 
@@ -633,6 +636,45 @@
     </div>
   </div>
 
+  <div class="joke-overlay feedback-overlay" id="feedbackOverlay">
+    <div class="joke-card">
+      <div id="feedbackFormView">
+        <h3>💬 Feedback</h3>
+        <div class="feedback-name-toggle" id="feedbackNameToggle">
+          <label class="feedback-radio">
+            <input type="radio" name="feedbackNameMode" id="feedbackNameModeName" checked>
+            <span>Eigenen Ingame-Namen verwenden</span>
+          </label>
+          <label class="feedback-radio">
+            <input type="radio" name="feedbackNameMode" id="feedbackNameModeAnon">
+            <span>Anonym senden</span>
+          </label>
+        </div>
+        <label for="feedbackCategory">Kategorie</label>
+        <select id="feedbackCategory">
+          <option value="lob">❤️ Lob</option>
+          <option value="idee" selected>💡 Idee</option>
+          <option value="kritik">⚠️ Kritik</option>
+          <option value="sonstiges">📌 Sonstiges</option>
+        </select>
+        <label for="feedbackMessage">Nachricht</label>
+        <textarea id="feedbackMessage" placeholder="Was möchtest du uns sagen?" rows="5" maxlength="2000"></textarea>
+        <label for="feedbackImageFile">Bild (optional)</label>
+        <input type="file" id="feedbackImageFile" accept="image/png,image/jpeg,image/webp">
+        <div class="joke-buttons">
+          <button class="btn-nein" id="feedbackCancel" type="button">Abbrechen</button>
+          <button class="btn-ja" id="feedbackSubmit" type="button">Absenden</button>
+        </div>
+      </div>
+      <div id="feedbackSuccessView" style="display:none; text-align:center;">
+        <h3>✅ Vielen Dank für dein Feedback!</h3>
+        <div class="joke-buttons">
+          <button class="btn-ja" id="feedbackSuccessClose" type="button">Schließen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="joke-overlay investor-request-overlay" id="investorRequestOverlay">
     <div class="joke-card" id="investorRequestCard">
       <div id="investorRequestFormView">
@@ -759,7 +801,7 @@
 
   <script>window.BKMP_CLIENT_STORAGE_KEY = 'bkmp-customer-auth';</script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260709-optpass5"></script>
+  <script src="supabase.js?v=20260709-optpass7"></script>
   <script src="app.js?v=20260709-optpass3"></script>
   <script src="idledorf.js?v=20260709-optpass7"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
@@ -2843,6 +2885,89 @@
         resetSubmitBtn();
         alert('Das Bild konnte nicht gelesen werden. Bitte versuche es mit einer anderen PNG-Datei erneut.');
       });
+    });
+
+    /* ---------------- Feedback ---------------- */
+    const feedbackButton = document.getElementById('feedbackButton');
+    const feedbackOverlay = document.getElementById('feedbackOverlay');
+    const feedbackFormView = document.getElementById('feedbackFormView');
+    const feedbackSuccessView = document.getElementById('feedbackSuccessView');
+    const feedbackNameToggle = document.getElementById('feedbackNameToggle');
+    const feedbackNameModeName = document.getElementById('feedbackNameModeName');
+    const feedbackNameModeAnon = document.getElementById('feedbackNameModeAnon');
+    const feedbackCategory = document.getElementById('feedbackCategory');
+    const feedbackMessage = document.getElementById('feedbackMessage');
+    const feedbackImageFile = document.getElementById('feedbackImageFile');
+    const feedbackCancel = document.getElementById('feedbackCancel');
+    const feedbackSubmit = document.getElementById('feedbackSubmit');
+    const feedbackSuccessClose = document.getElementById('feedbackSuccessClose');
+
+    function resetFeedbackForm() {
+      const accountName = typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : '';
+      /* Ohne Account ergibt "Eigenen Ingame-Namen verwenden" keinen Sinn -
+         dann bleibt nur Anonym, die Auswahl wird ausgeblendet statt einen
+         leeren Namen zu erlauben. */
+      if (feedbackNameToggle) feedbackNameToggle.style.display = accountName ? '' : 'none';
+      if (feedbackNameModeName) feedbackNameModeName.checked = Boolean(accountName);
+      if (feedbackNameModeAnon) feedbackNameModeAnon.checked = !accountName;
+      if (feedbackCategory) feedbackCategory.value = 'idee';
+      if (feedbackMessage) feedbackMessage.value = '';
+      if (feedbackImageFile) feedbackImageFile.value = '';
+      feedbackFormView.style.display = '';
+      feedbackSuccessView.style.display = 'none';
+    }
+
+    if (feedbackButton) feedbackButton.addEventListener('click', () => {
+      resetFeedbackForm();
+      feedbackOverlay.classList.add('visible');
+    });
+    if (feedbackCancel) feedbackCancel.addEventListener('click', () => feedbackOverlay.classList.remove('visible'));
+    if (feedbackSuccessClose) feedbackSuccessClose.addEventListener('click', () => feedbackOverlay.classList.remove('visible'));
+
+    if (feedbackSubmit) feedbackSubmit.addEventListener('click', () => {
+      const message = feedbackMessage.value.trim();
+      if (!message) {
+        alert('Bitte schreib uns eine Nachricht.');
+        return;
+      }
+      const cooldown = bkmpSubmitCooldownSecondsLeft('feedback');
+      if (cooldown > 0) { alert(`Bitte warte noch ${cooldown} Sekunde(n), bevor du erneut sendest.`); return; }
+
+      const accountName = typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : '';
+      const useOwnName = Boolean(feedbackNameModeName && feedbackNameModeName.checked && accountName);
+      const name = useOwnName ? accountName : '';
+      const category = feedbackCategory.value || 'sonstiges';
+      const file = feedbackImageFile.files && feedbackImageFile.files[0];
+
+      feedbackSubmit.disabled = true;
+      feedbackSubmit.textContent = 'Wird gesendet...';
+
+      function resetSubmitBtn() {
+        feedbackSubmit.disabled = false;
+        feedbackSubmit.textContent = 'Absenden';
+      }
+
+      function doSubmit(imageDataUrl) {
+        bkmpSubmitViaApi('feedback', { name, category, message }, imageDataUrl || null).then(() => {
+          bkmpStartSubmitCooldown('feedback');
+          resetSubmitBtn();
+          feedbackFormView.style.display = 'none';
+          feedbackSuccessView.style.display = '';
+        }).catch(e => {
+          console.error('Feedback konnte nicht gesendet werden.', e);
+          resetSubmitBtn();
+          alert('Dein Feedback konnte nicht gesendet werden: ' + (e && e.message || e) + '\n\nBitte versuche es erneut.');
+        });
+      }
+
+      if (file) {
+        bkmpCompressImageFile(file).then(doSubmit).catch(() => {
+          resetSubmitBtn();
+          alert('Das Bild konnte nicht gelesen werden. Bitte versuche es mit einer anderen Datei erneut.');
+        });
+      } else {
+        doSubmit(null);
+      }
     });
 
     /* ---------------- Investoren-Anfrage ---------------- */
