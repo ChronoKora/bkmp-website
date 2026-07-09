@@ -759,6 +759,23 @@
               </div>
               <button class="btn" id="idleResetRun" type="button" style="border-color:#ef4444; color:#ef4444;">Fortschritt zur&uuml;cksetzen</button>
               <p class="admin-help-text" id="idleResetStatus"></p>
+
+              <hr style="margin:1.4rem 0; border-color:var(--line);">
+
+              <h3>Passwort zur&uuml;cksetzen</h3>
+              <p class="admin-help-text">Spieler-Konten haben keine echte E-Mail dahinter, ein normaler "Passwort vergessen"-Link ist deshalb nicht m&ouml;glich. Hier kannst du stattdessen direkt ein neues Passwort setzen - funktioniert mit dem aktuellen Namen des Spielers <strong>oder</strong> jedem fr&uuml;heren Namen (falls er sich schon mal umbenannt hat).</p>
+              <div class="form-grid form-grid-2">
+                <div><label for="playerPwResetName">Ingame-Name (aktuell oder fr&uuml;her)</label><input type="text" id="playerPwResetName" placeholder="z. B. TestSpieler"></div>
+                <div>
+                  <label for="playerPwResetNew">Neues Passwort</label>
+                  <div class="auth-password-row">
+                    <input type="password" id="playerPwResetNew" placeholder="Mind. 6 Zeichen">
+                    <button type="button" class="auth-password-toggle" id="playerPwResetToggle" aria-label="Passwort anzeigen">&#128065;</button>
+                  </div>
+                </div>
+              </div>
+              <button class="btn" id="playerPwResetRun" type="button" style="border-color:#ef4444; color:#ef4444;">Passwort setzen</button>
+              <p class="admin-help-text" id="playerPwResetStatus"></p>
             </div>
           </div>
         </section>
@@ -4150,6 +4167,59 @@
       } catch (e) {
         status.textContent = 'Fehler: ' + supabaseErrorText(e);
         showAdminToast('Konnte nicht zurückgesetzt werden: ' + supabaseErrorText(e), 'error');
+      }
+    });
+
+    const playerPwResetToggleBtn = document.getElementById('playerPwResetToggle');
+    if (playerPwResetToggleBtn) {
+      playerPwResetToggleBtn.addEventListener('click', () => {
+        const input = document.getElementById('playerPwResetNew');
+        const show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        playerPwResetToggleBtn.innerHTML = show ? '&#128584;' : '&#128065;';
+      });
+    }
+    const playerPwResetRunBtn = document.getElementById('playerPwResetRun');
+    if (playerPwResetRunBtn) playerPwResetRunBtn.addEventListener('click', async () => {
+      const playerName = document.getElementById('playerPwResetName').value.trim();
+      const newPassword = document.getElementById('playerPwResetNew').value;
+      const status = document.getElementById('playerPwResetStatus');
+      if (!playerName) { status.textContent = 'Bitte einen Namen eingeben.'; return; }
+      if (!newPassword || newPassword.length < 6) { status.textContent = 'Das Passwort braucht mindestens 6 Zeichen.'; return; }
+      if (!window.confirm(`Neues Passwort für "${playerName}" wirklich setzen?`)) return;
+
+      const client = bkmpGetSupabaseClient();
+      const { data: sessionData } = await client.auth.getSession();
+      const token = sessionData && sessionData.session ? sessionData.session.access_token : null;
+      if (!token) { status.textContent = 'Keine gültige Sitzung.'; return; }
+
+      playerPwResetRunBtn.disabled = true;
+      status.textContent = 'Wird gesetzt...';
+      try {
+        const res = await fetch('/api/admin-reset-player-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+          body: JSON.stringify({ playerName, newPassword })
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok || !body.ok) {
+          const errorMap = {
+            not_admin: 'Nur Admins/Editoren dürfen Spieler-Passwörter zurücksetzen.',
+            player_not_found: `Kein Spieler-Konto mit dem Namen "${playerName}" gefunden (auch nicht als früherer Name).`,
+            invalid_password: 'Das Passwort braucht mindestens 6 Zeichen.'
+          };
+          status.textContent = errorMap[body.error] || ('Fehler: ' + (body.error || 'Unbekannter Fehler'));
+          showAdminToast(status.textContent, 'error');
+          return;
+        }
+        document.getElementById('playerPwResetNew').value = '';
+        status.textContent = `Neues Passwort für "${playerName}" wurde gesetzt.`;
+        showAdminToast('Passwort zurückgesetzt.', 'success');
+      } catch (e) {
+        status.textContent = 'Fehler: ' + supabaseErrorText(e);
+        showAdminToast('Konnte nicht gesetzt werden: ' + supabaseErrorText(e), 'error');
+      } finally {
+        playerPwResetRunBtn.disabled = false;
       }
     });
   </script>
