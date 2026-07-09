@@ -1248,6 +1248,14 @@ function bkmpRaidUpdateButtonState() {
   }
   const banner = document.getElementById('raidJoinBanner');
   if (banner) banner.style.display = 'none';
+  /* Nur EINMAL beim Phasenwechsel prep->fight in die Kampfansicht starten,
+     nicht bei jedem Sekunden-Tick erneut - bkmpRaidStartCombatView raeumt
+     ueber bkmpRaidStartLoops() die laufenden Intervalle (Boss-Poll 1.5s,
+     eigener Schaden-Tick 2.5s) ab und setzt sie neu. Ohne diese Sperre
+     wurden beide Intervalle jede Sekunde vor ihrer Faelligkeit wieder
+     geloescht und neu gestartet und sind dadurch NIE gefeuert - kompletter
+     Kampf-Stillstand trotz aktiver Teilnehmer. */
+  if (bkmpRaidLoopTimer) return;
   bkmpUnsubscribeFromRaidInstance();
   if (bkmpIdleModalOpen && bkmpRaidShouldShowCombatView()) {
     bkmpIdleStopLoop();
