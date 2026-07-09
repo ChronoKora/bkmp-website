@@ -354,16 +354,33 @@ function bkmpIdleCountMaxedBranches() {
 
 /* ---------------- Achievement-Kontext-Felder (fuer index.html) ---------------- */
 
+/* bkmpIdleState wird erst geladen, wenn das Idle-Dorf-Fenster geoeffnet
+   wird bzw. bkmpIdlePreloadStateIfNamed() im Hintergrund fertig ist (siehe
+   bkmpIdleInit weiter unten) - bis dahin lieferte diese Funktion ueberall
+   0 zurueck, wodurch alle Idle-Dorf-Erfolge kurzzeitig als "nicht
+   freigeschaltet" zaehlten und die Gesamtzahl in der Badge-Anzeige sprang,
+   sobald der echte Stand kurz danach nachgeladen wurde. Der zuletzt
+   bekannte Stand wird deshalb zusaetzlich lokal gecacht und als
+   Zwischenwert benutzt, bis der echte Ladevorgang durch ist. */
+const BKMP_IDLE_ACHIEVEMENT_CACHE_KEY = 'bkmp-idle-achievement-fields-cache';
+function bkmpIdleGetCachedAchievementFields() {
+  try { return JSON.parse(localStorage.getItem(BKMP_IDLE_ACHIEVEMENT_CACHE_KEY) || 'null'); } catch (e) { return null; }
+}
 function bkmpIdleGetAchievementContextFields() {
   const s = bkmpIdleState;
-  return {
-    idleDragonKills: s ? Number(s.dragon_kills || 0) : 0,
-    idleBossKills: s ? Number(s.boss_kills || 0) : 0,
-    idleLevel: s ? Number(s.level || 0) : 0,
-    idleGoldEarned: s ? Number(s.total_gold_earned || 0) : 0,
-    idleSkillPointsSpent: s ? Number(s.skill_points_spent || 0) : 0,
+  if (!s) {
+    return bkmpIdleGetCachedAchievementFields() || { idleDragonKills: 0, idleBossKills: 0, idleLevel: 0, idleGoldEarned: 0, idleSkillPointsSpent: 0, idleBranchesMaxed: 0 };
+  }
+  const fields = {
+    idleDragonKills: Number(s.dragon_kills || 0),
+    idleBossKills: Number(s.boss_kills || 0),
+    idleLevel: Number(s.level || 0),
+    idleGoldEarned: Number(s.total_gold_earned || 0),
+    idleSkillPointsSpent: Number(s.skill_points_spent || 0),
     idleBranchesMaxed: bkmpIdleCountMaxedBranches()
   };
+  try { localStorage.setItem(BKMP_IDLE_ACHIEVEMENT_CACHE_KEY, JSON.stringify(fields)); } catch (e) {}
+  return fields;
 }
 
 /* ---------------- Kampf-Loop ---------------- */

@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260709-optpass1">
+<link rel="stylesheet" href="style.css?v=20260709-optpass2">
 </head>
 <body>
 
@@ -758,9 +758,9 @@
 
   <script>window.BKMP_CLIENT_STORAGE_KEY = 'bkmp-customer-auth';</script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260709-optpass1"></script>
-  <script src="app.js?v=20260709-cardsale1"></script>
-  <script src="idledorf.js?v=20260709-optpass1"></script>
+  <script src="supabase.js?v=20260709-optpass2"></script>
+  <script src="app.js?v=20260709-optpass2"></script>
+  <script src="idledorf.js?v=20260709-optpass2"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
   <script>
     bkmpInitTheme();
@@ -3477,6 +3477,7 @@
         const rows = await loadPlushies();
         if (rows && rows.length > 0) {
           BKMP_PLUSHIES = rows;
+          try { localStorage.setItem('bkmp-plushies-cache', JSON.stringify(rows)); } catch (e) {}
           BKMP_ACHIEVEMENTS = bkmpBuildAchievementsList();
           BKMP_TITLES = bkmpBuildTitlesList();
           renderAchievementBadge();

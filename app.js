@@ -41,6 +41,17 @@ let BKMP_PLUSHIES = [
   { id: 'pekka14', name: 'Pekka14 Plüshie', image: 'assets/plushies/pekka14.png', desc: 'Der Pekka14-Plüschie fürs Regal.', rarity: 'Episch' },
   { id: 'roggberd', name: 'Roggberd Plüshie', image: 'assets/plushies/roggberd.png', desc: 'Ein Roggberd zum Knuddeln.', rarity: 'Episch' }
 ];
+/* Sobald die echte Liste aus der Datenbank geladen wurde (siehe
+   bkmpRefreshPlushieDefinitions in index.html), wird sie hier zusaetzlich
+   gecacht. Bei jedem weiteren Seitenaufruf startet BKMP_PLUSHIES dann sofort
+   mit dem zuletzt bekannten echten Stand statt mit der kleinen Fallback-
+   Liste oben - sonst zeigte die Erfolge-Anzahl (die pro Pluschie einen
+   eigenen Erfolg zaehlt) kurz nach jedem Laden einen falschen, zu kleinen
+   Gesamtwert, bis die Datenbank-Antwort da war. */
+try {
+  var __bkmpCachedPlushies = JSON.parse(localStorage.getItem('bkmp-plushies-cache') || 'null');
+  if (Array.isArray(__bkmpCachedPlushies) && __bkmpCachedPlushies.length > 0) BKMP_PLUSHIES = __bkmpCachedPlushies;
+} catch (e) {}
 
 function bkmpSubmitCooldownSecondsLeft(key) {
   let last = 0;
