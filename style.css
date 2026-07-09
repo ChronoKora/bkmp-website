@@ -268,6 +268,7 @@ body.modal-open .bkmp-easter > span {
 #mcAuthSubtitle { font-size: 0.92rem; color: var(--muted); text-align: center; }
 .auth-field { margin-bottom: 0; }
 .auth-field label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--muted); margin-bottom: 0.35rem; }
+.rename-hint { font-size: 0.78rem; color: var(--muted); margin-top: 0.5rem; }
 .auth-password-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.9rem; }
 .auth-password-row input { margin-bottom: 0; flex: 1; min-width: 0; }
 .auth-password-toggle {

@@ -481,10 +481,35 @@ async function bkmpPlayerLogin(name, password) {
   const email = bkmpPlayerEmailFromName(displayName);
   if (!email || !password) throw new Error('Ingame-Name oder Passwort ist falsch.');
 
-  const { data, error } = await client.auth.signInWithPassword({ email, password });
+  let { data, error } = await client.auth.signInWithPassword({ email, password });
+  if (error) {
+    /* Der eingegebene Name koennte ein FRUEHERER Name sein (nach einer
+       Namensaenderung bleibt die Login-Adresse bewusst am urspruenglich
+       registrierten Namen haengen, siehe supabase-player-accounts-v2.sql).
+       resolve_login_name() laeuft die Umbenennungs-Historie rueckwaerts bis
+       zum allerersten Namen durch - damit funktioniert Login mit JEDEM
+       Namen, den der Account je hatte, nicht nur dem aktuellsten. */
+    try {
+      const { data: resolvedName } = await client.rpc('resolve_login_name', { p_name: displayName });
+      if (resolvedName && resolvedName.toLowerCase() !== displayName.toLowerCase()) {
+        const resolvedEmail = bkmpPlayerEmailFromName(resolvedName);
+        const retry = await client.auth.signInWithPassword({ email: resolvedEmail, password });
+        if (!retry.error) { data = retry.data; error = null; }
+      }
+    } catch (e) { /* Aufloesung fehlgeschlagen - urspruenglicher Fehler bleibt bestehen */ }
+  }
   if (error) throw new Error('Ingame-Name oder Passwort ist falsch.');
 
-  const canonicalName = (data.user && data.user.user_metadata && data.user.user_metadata.display_name) || displayName;
+  /* Aktuellen Anzeigenamen aus player_stats lesen statt aus dem Login-
+     Token: nach einer Namensaenderung ist das zuverlaessiger als
+     user_metadata.display_name (das aeltere, vor v3 umbenannte Accounts
+     evtl. noch nicht aktualisiert haben). */
+  let canonicalName = (data.user && data.user.user_metadata && data.user.user_metadata.display_name) || displayName;
+  try {
+    const { data: rows } = await client.from('player_stats').select('display_name').eq('auth_user_id', data.user.id).limit(1);
+    if (Array.isArray(rows) && rows[0] && rows[0].display_name) canonicalName = rows[0].display_name;
+  } catch (e) { /* Fallback bleibt der Token-Name */ }
+
   await bkmpClaimPlayerNameKeyRows(client, canonicalName.toLowerCase());
   return { session: data.session, displayName: canonicalName };
 }
