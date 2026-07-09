@@ -4185,7 +4185,10 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 .idle-upgrade-buy:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ---- Skilltree ---- */
-.idle-skillpoints-hint { margin-bottom: 0.9rem; font-size: 0.85rem; }
+.idle-skillpoints-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 0.9rem; }
+.idle-skillpoints-hint { margin-bottom: 0; font-size: 0.85rem; }
+.idle-skilltree-reset-btn { padding: 0.4rem 0.8rem; font-size: 0.76rem; white-space: nowrap; }
+.idle-skilltree-reset-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .idle-skill-branch { margin-bottom: 1.1rem; }
 .idle-skill-branch-title { font-family: 'Fraunces', serif; font-size: 1.05rem; margin-bottom: 0.5rem; }
 /* min-width:0 auf den Grid-Items ist hier Pflicht, nicht Kosmetik: ohne das
@@ -4196,19 +4199,220 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
    ueber die verfuegbare Breite hinaus zu druecken, obwohl der Text an
    sich brechen koennte - sichtbar als abgeschnittene/nicht passende Karte
    auf schmaleren Screens, obwohl es auf breiteren Screens gut aussieht. */
-.idle-skill-node-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)); gap: 0.7rem; }
-.idle-skill-node { min-width: 0; border: 1px solid var(--line); border-radius: 12px; padding: 0.7rem; background: var(--paper); text-align: center; }
+/* Echter verbundener Baum statt flachem Grid: Reihen = Tiefe in der
+   Voraussetzungs-Kette (siehe bkmpIdleSkillNodeDepth), SVG-Overlay zeichnet
+   die Verbindungslinien zwischen Eltern-/Kind-Knoten nachtraeglich per
+   getBoundingClientRect() ein (siehe bkmpIdleDrawSkillTreeLines). */
+.idle-skilltree-tree { position: relative; }
+.idle-skilltree-lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; overflow: visible; }
+.idle-skilltree-line { stroke: var(--muted); stroke-width: 2; opacity: 0.55; }
+.idle-skilltree-line.unlocked { stroke: var(--gold); filter: drop-shadow(0 0 3px color-mix(in srgb, var(--gold) 60%, transparent)); }
+.idle-skilltree-row { position: relative; z-index: 1; display: flex; flex-wrap: wrap; justify-content: center; gap: 1.1rem; margin-bottom: 1.6rem; }
+.idle-skilltree-row:last-child { margin-bottom: 0; }
+
+.idle-skill-node { position: relative; z-index: 1; width: 150px; min-width: 0; border: 1px solid var(--line); border-radius: 12px; padding: 0.7rem; background: var(--paper); text-align: center; }
+.idle-skill-node.is-root { border-color: color-mix(in srgb, var(--gold) 35%, var(--line)); }
 .idle-skill-node.ranked { border-color: color-mix(in srgb, var(--gold) 50%, var(--line)); box-shadow: 0 0 12px color-mix(in srgb, var(--gold) 20%, transparent); }
 .idle-skill-node-icon { font-size: 1.4rem; }
 .idle-skill-node-name { font-weight: 700; font-size: 0.8rem; margin-top: 0.2rem; overflow-wrap: break-word; }
 .idle-skill-node-desc { font-size: 0.68rem; color: var(--muted); margin: 0.25rem 0; min-height: 2.2em; overflow-wrap: break-word; }
+.idle-skill-node-requires { font-size: 0.64rem; color: color-mix(in srgb, var(--gold) 65%, var(--muted)); margin-bottom: 0.3rem; overflow-wrap: break-word; }
 .idle-skill-node-rank { font-size: 0.68rem; color: var(--muted); margin-bottom: 0.4rem; }
 .idle-skill-node-btn { width: 100%; padding: 0.35rem 0.5rem; font-size: 0.72rem; }
 .idle-skill-node-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+@media (max-width: 640px) {
+  .idle-skill-node { width: 120px; }
+  .idle-skilltree-row { gap: 0.6rem; }
+}
+
 /* ---- Bestenliste ---- */
 .idle-dorf-leaderboard-tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.8rem; }
 .idle-dorf-leaderboard-tabs .idle-dorf-tab { flex: none; min-width: auto; padding: 0.4rem 0.8rem; }
+
+/* ============================================================
+   Weltboss/Raid-Event
+   ============================================================ */
+
+/* ---- Idle-Dorf-Button: Feuer/Glow waehrend der Vorbereitungsphase ---- */
+.idle-dorf-btn.raid-prep {
+  border-color: #f97316;
+  color: #fed7aa;
+  background: linear-gradient(135deg, #7c2d12, #431407);
+  animation: raidBtnPulse 1.4s ease-in-out infinite;
+}
+.idle-dorf-btn.raid-prep::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(249, 115, 22, 0.55), transparent 70%);
+  animation: raidBtnFlameGlow 1.2s ease-in-out infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+@keyframes raidBtnPulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(249, 115, 22, 0.5); }
+  50% { box-shadow: 0 0 22px rgba(249, 115, 22, 0.9), 0 0 40px rgba(239, 68, 68, 0.5); }
+}
+@keyframes raidBtnFlameGlow {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.15); }
+}
+.raid-btn-countdown { font-weight: 800; font-variant-numeric: tabular-nums; margin-left: 0.3rem; }
+
+/* ---- Beitritts-Banner im Idle-Dorf-Fenster ---- */
+.raid-join-banner {
+  position: relative;
+  margin-bottom: 1rem;
+  padding: 1rem 1.2rem;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #431407, #7c2d12 60%, #431407);
+  border: 1.5px solid #f97316;
+  box-shadow: 0 0 30px rgba(249, 115, 22, 0.35);
+  text-align: center;
+  color: #fed7aa;
+}
+.raid-join-banner-title { font-family: 'Fraunces', serif; font-size: 1.15rem; font-weight: 700; color: #fef3c7; margin-bottom: 0.4rem; }
+.raid-join-banner-countdown { font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; color: #fed7aa; margin: 0.3rem 0 0.7rem; }
+.raid-join-banner-btn { background: linear-gradient(135deg, #fbbf24, #ea580c); color: #1c0a00; border: none; font-weight: 800; padding: 0.6rem 1.4rem; }
+.raid-join-banner-joined { font-size: 0.85rem; color: #bbf7d0; font-weight: 700; }
+.raid-join-banner-participants { font-size: 0.78rem; color: #fed7aa; opacity: 0.85; margin-top: 0.5rem; }
+
+/* ---- Gemeinsame Raid-Kampfansicht ---- */
+.raid-combat-view { position: relative; }
+.raid-combat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.8rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #431407, #1c0a00);
+  border: 1px solid #f97316;
+  color: #fed7aa;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.raid-combat-header .raid-timer { font-variant-numeric: tabular-nums; color: #fbbf24; }
+
+.raid-battlefield {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.6rem 1.2rem;
+  border-radius: 20px;
+  background: radial-gradient(circle at 50% 15%, rgba(249, 115, 22, 0.18), var(--paper) 75%);
+  border: 2px solid #f97316;
+  box-shadow: inset 0 0 60px rgba(249, 115, 22, 0.15), 0 0 40px rgba(249, 115, 22, 0.25);
+  overflow: hidden;
+  min-height: 260px;
+}
+.raid-city, .raid-boss {
+  position: relative;
+  text-align: center;
+  width: 44%;
+  border-radius: 18px;
+  padding: 0.9rem 0.7rem;
+  border: 2px solid transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-3)) padding-box,
+              linear-gradient(135deg, #fbbf24, #ea580c) border-box;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35);
+}
+.raid-city-sprite {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  aspect-ratio: 1439 / 685;
+  background-image: url('assets/dragons/raid-stadt.png?v=20260710-raidcity1');
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.4));
+  border-radius: 10px;
+  overflow: hidden;
+}
+/* PLATZHALTER: nutzt bis auf Weiteres yaksha-boss.png (gleiche
+   Sheet-Technik wie normale Drachen). Sobald die echte Zerathor-
+   Sprite-Sheet + Stadt-Grafik in assets/dragons/ liegen: sprite_key in
+   raid_bosses (Supabase) auf 'zerathor' pruefen/anpassen, hier die
+   background-image-URL + aspect-ratio auf die echte Datei umstellen
+   (aspect-ratio = 0.8 * Frame-Breite/Frame-Hoehe, siehe Kommentar bei
+   .idle-dragon-sprite weiter oben) und ggf. Flood-Fill-Transparenz
+   anwenden, falls der Hintergrund nicht schon transparent ist. */
+.raid-boss-sprite {
+  position: relative;
+  width: 100%;
+  max-width: 380px;
+  margin: 0 auto;
+  border-radius: 8px;
+  background-repeat: no-repeat;
+  background-size: 125% 400%;
+  background-position-x: 25%;
+  background-position-y: 0%;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 10px 18px rgba(239, 68, 68, 0.4));
+  transition: transform 0.15s ease;
+}
+.raid-sprite-zerathor { background-image: url('assets/dragons/yaksha-boss.png?v=20260709-transparent2'); aspect-ratio: 1228.8 / 256; }
+.raid-boss-name { margin-top: 0.4rem; font-size: 0.9rem; font-weight: 800; color: #fbbf24; text-shadow: 0 0 10px rgba(251, 191, 36, 0.6); }
+.raid-boss-level { font-size: 0.7rem; color: var(--muted); }
+
+.raid-hp-bar { height: 14px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 14%, var(--paper)); overflow: hidden; border: 1px solid var(--line); margin-top: 0.6rem; }
+.raid-hp-fill { height: 100%; transition: width 0.3s ease; }
+.raid-hp-fill-city { background: linear-gradient(90deg, #4ade80, #22c55e); }
+.raid-hp-fill-boss { background: linear-gradient(90deg, #f87171, #b91c1c); }
+.raid-hp-label { font-size: 0.72rem; color: var(--muted); margin-top: 0.25rem; font-weight: 700; }
+
+.raid-clickable { cursor: pointer; }
+.raid-clickable:active .raid-boss-sprite { transform: scale(0.95); }
+
+/* ---- Epischere Kampf-Animationen ---- */
+.raid-fx { position: absolute; pointer-events: none; }
+.raid-fx-arrow { top: 45%; left: 42%; width: 30px; height: 4px; background: linear-gradient(90deg, transparent, #f5d58a, var(--gold)); border-radius: 2px; animation: raidArrowFly 0.45s ease forwards; }
+.raid-fx-fireball { top: 40%; left: 42%; width: 22px; height: 22px; border-radius: 50%; background: radial-gradient(circle, #fef3c7, #f97316 55%, transparent 80%); box-shadow: 0 0 18px #f97316; animation: raidFireballFly 0.5s ease forwards; }
+.raid-fx-lightning { top: 20%; left: 46%; width: 6px; height: 60%; background: linear-gradient(180deg, #fef9c3, #38bdf8); clip-path: polygon(50% 0%, 100% 10%, 60% 45%, 100% 50%, 20% 100%, 40% 55%, 0% 50%); animation: raidLightningStrike 0.35s ease forwards; }
+.raid-fx-magic { top: 45%; left: 42%; width: 20px; height: 20px; border-radius: 50%; background: radial-gradient(circle, #e9d5ff, #a78bfa 55%, transparent 80%); box-shadow: 0 0 16px #a78bfa; animation: raidFireballFly 0.55s ease forwards; }
+.raid-fx-boss-attack { bottom: 40%; right: 42%; width: 34px; height: 20px; border-radius: 50%; background: radial-gradient(ellipse, #fecaca, #dc2626 55%, transparent 80%); box-shadow: 0 0 24px #dc2626; animation: raidBossAttackFly 0.55s ease forwards; }
+
+@keyframes raidArrowFly { from { transform: translateX(0); opacity: 1; } to { transform: translateX(260px); opacity: 0; } }
+@keyframes raidFireballFly { from { transform: translateX(0) scale(0.5); opacity: 1; } to { transform: translateX(260px) scale(1.4); opacity: 0; } }
+@keyframes raidLightningStrike { 0% { opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes raidBossAttackFly { from { transform: translateX(0) scale(0.6); opacity: 1; } to { transform: translateX(-260px) scale(1.5); opacity: 0; } }
+
+.raid-dmg-float { position: absolute; top: -6px; left: 50%; transform: translateX(-50%); font-weight: 800; font-size: 0.95rem; color: #f87171; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6); animation: idleDmgFloat 0.9s ease forwards; pointer-events: none; }
+.raid-dmg-crit { color: #fbbf24; font-size: 1.3rem; text-shadow: 0 0 10px rgba(251, 191, 36, 0.8); }
+.raid-dmg-click { color: #7dd3fc; left: 65%; }
+.raid-hit-flash { animation: idleHitFlash 0.25s ease; }
+
+.raid-participants-list { margin-top: 0.9rem; font-size: 0.78rem; }
+.raid-participant-row { display: flex; justify-content: space-between; padding: 0.3rem 0; border-bottom: 1px solid var(--line); }
+.raid-participant-row.is-me { color: var(--gold); font-weight: 700; }
+
+/* ---- Ergebnis-Screen ---- */
+.raid-result-card { text-align: center; padding: 1rem; }
+.raid-result-title { font-family: 'Fraunces', serif; font-size: 1.5rem; margin-bottom: 0.6rem; }
+.raid-result-title.won { color: #4ade80; }
+.raid-result-title.lost { color: #f87171; }
+.raid-result-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.7rem; margin: 1rem 0; }
+.raid-result-stat { padding: 0.7rem; border-radius: 12px; background: var(--paper); border: 1px solid var(--line); }
+.raid-result-stat-label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.raid-result-stat-value { font-size: 1.1rem; font-weight: 800; margin-top: 0.2rem; }
+.raid-result-rewards { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.6rem 1rem; font-weight: 700; margin-top: 0.8rem; }
+
+@media (max-width: 640px) {
+  .raid-city, .raid-boss { width: 46%; }
+  .raid-battlefield { padding: 1rem 0.7rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .idle-dorf-btn.raid-prep, .idle-dorf-btn.raid-prep::before { animation: none; }
+  .raid-fx-arrow, .raid-fx-fireball, .raid-fx-lightning, .raid-fx-magic, .raid-fx-boss-attack, .raid-dmg-float, .raid-hit-flash { animation: none !important; }
+}
 
 /* ---- Admin: Testkampf-Ausgabe ---- */
 .idle-admin-test-output {

@@ -2587,7 +2587,7 @@ async function createPlushieCodes(rows) {
 const BKMP_IDLE_PLAYER_STATE_COLUMNS = `name_key, display_name, level, xp, gold, wood, stone, crystals, essence,
   total_gold_earned, attack, defense, hp, crit_chance, crit_damage, gold_bonus, xp_bonus, loot_bonus,
   skill_points_available, skill_points_spent, skill_allocations, upgrade_purchases, dragon_kills, boss_kills,
-  current_dragon_index, highest_dragon_index, auto_advance, playtime_seconds, last_seen_at, last_offline_claim, updated_at`;
+  current_dragon_index, highest_dragon_index, auto_advance, playtime_seconds, last_seen_at, last_offline_claim, last_skilltree_reset_at, updated_at`;
 
 async function loadIdleDragons() {
   const client = bkmpGetSupabaseClient();
@@ -2995,6 +2995,175 @@ async function adminReassignOrder(orderId, companyId) {
   const { error } = await client.rpc('admin_reassign_order', { p_order_id: orderId, p_company_id: companyId });
   if (error) throw error;
   return true;
+}
+
+/* ---------------- Weltboss/Raid-Event (siehe supabase-raid-boss-schema.sql) ----------------
+   Alle Schreibzugriffe laufen ausschliesslich ueber die dort definierten
+   RPCs (raid_join/raid_deal_damage/raid_boss_attack_tick) - die Tabellen
+   selbst sind fuer Clients nur lesbar, das verhindert gefaelschten Schaden
+   oder manipulierte Stadt-HP per direktem REST-Call. */
+
+function bkmpRaidCurrentId(date) {
+  const d = date || new Date();
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}${pad(d.getUTCHours())}`;
+}
+
+async function loadRaidState(raidId) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('raid_instances')
+    .select('id, boss_id, boss_max_hp, boss_hp, city_max_hp, city_hp, city_attack, city_defense, status, next_boss_attack_at, fight_starts_at, fight_ends_at, participant_count, total_damage, raid_bosses(name, sprite_key)')
+    .eq('id', raidId)
+    .limit(1);
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : null;
+  if (!row) return null;
+  return {
+    id: row.id,
+    bossId: row.boss_id,
+    bossName: row.raid_bosses ? row.raid_bosses.name : '',
+    spriteKey: row.raid_bosses ? row.raid_bosses.sprite_key : '',
+    bossMaxHp: Number(row.boss_max_hp || 0),
+    bossHp: Number(row.boss_hp || 0),
+    cityMaxHp: Number(row.city_max_hp || 0),
+    cityHp: Number(row.city_hp || 0),
+    cityAttack: Number(row.city_attack || 0),
+    cityDefense: Number(row.city_defense || 0),
+    status: row.status,
+    nextBossAttackAt: row.next_boss_attack_at ? Date.parse(row.next_boss_attack_at) : 0,
+    fightStartsAt: row.fight_starts_at ? Date.parse(row.fight_starts_at) : 0,
+    fightEndsAt: row.fight_ends_at ? Date.parse(row.fight_ends_at) : 0,
+    participantCount: Number(row.participant_count || 0),
+    totalDamage: Number(row.total_damage || 0)
+  };
+}
+
+async function loadRaidParticipants(raidId) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !raidId) return [];
+  const { data, error } = await client
+    .from('raid_participants')
+    .select('auth_user_id, display_name, damage_dealt, crits_landed, clicks_landed, joined_at')
+    .eq('raid_id', raidId)
+    .order('damage_dealt', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(row => ({
+    authUserId: row.auth_user_id,
+    displayName: row.display_name,
+    damageDealt: Number(row.damage_dealt || 0),
+    critsLanded: Number(row.crits_landed || 0),
+    clicksLanded: Number(row.clicks_landed || 0),
+    joinedAt: row.joined_at ? Date.parse(row.joined_at) : 0
+  }));
+}
+
+async function joinRaid(raidId) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Bitte melde dich an, um am Raid teilzunehmen.');
+  const { data, error } = await client.rpc('raid_join', { p_raid_id: raidId });
+  if (error) {
+    const msg = String(error.message || '');
+    if (msg.includes('not_in_prep_window')) throw new Error('Der Raid hat schon begonnen oder es ist gerade keine Vorbereitungsphase.');
+    if (msg.includes('no_idle_state')) throw new Error('Starte zuerst einmal einen normalen Kampf im Idle-Dorf, bevor du an einem Raid teilnimmst.');
+    if (msg.includes('not_authenticated')) throw new Error('Bitte melde dich an, um am Raid teilzunehmen.');
+    throw new Error('Beitritt zum Raid fehlgeschlagen. Bitte versuche es erneut.');
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return null;
+  return {
+    cityHp: Number(row.city_hp || 0),
+    cityMaxHp: Number(row.city_max_hp || 0),
+    bossHp: Number(row.boss_hp || 0),
+    bossMaxHp: Number(row.boss_max_hp || 0),
+    bossName: row.boss_name || '',
+    spriteKey: row.sprite_key || ''
+  };
+}
+
+async function submitRaidDamage(raidId, amount, isCrit, isClick) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return null;
+  const { data, error } = await client.rpc('raid_deal_damage', {
+    p_raid_id: raidId,
+    p_amount: Math.round(amount),
+    p_is_crit: Boolean(isCrit),
+    p_is_click: Boolean(isClick)
+  });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  return row ? { bossHp: Number(row.boss_hp || 0), status: row.status } : null;
+}
+
+async function tickRaidBossAttack(raidId) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return null;
+  const { data, error } = await client.rpc('raid_boss_attack_tick', { p_raid_id: raidId });
+  if (error) return null;
+  const row = Array.isArray(data) ? data[0] : data;
+  return row ? { cityHp: Number(row.city_hp || 0), bossHp: Number(row.boss_hp || 0), status: row.status } : null;
+}
+
+async function loadRaidLeaderboard() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from('raid_player_stats')
+    .select('auth_user_id, display_name, total_raids_joined, total_bosses_defeated, total_damage_dealt, total_mvp_count, total_flawless_wins, best_single_raid_damage');
+  if (error) throw error;
+  return (data || []).map(row => ({
+    authUserId: row.auth_user_id,
+    displayName: row.display_name,
+    totalRaidsJoined: Number(row.total_raids_joined || 0),
+    totalBossesDefeated: Number(row.total_bosses_defeated || 0),
+    totalDamageDealt: Number(row.total_damage_dealt || 0),
+    totalMvpCount: Number(row.total_mvp_count || 0),
+    totalFlawlessWins: Number(row.total_flawless_wins || 0),
+    bestSingleRaidDamage: Number(row.best_single_raid_damage || 0)
+  }));
+}
+
+async function loadRaidBossesAdmin() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from('raid_bosses')
+    .select('id, name, sprite_key, base_hp, base_attack, attack_interval_seconds, gold_reward, gem_reward, xp_reward, active')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+async function updateRaidBoss(id, patch) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { data, error } = await client
+    .from('raid_bosses')
+    .update(patch)
+    .eq('id', id)
+    .select('id, name, sprite_key, base_hp, base_attack, attack_interval_seconds, gold_reward, gem_reward, xp_reward, active')
+    .limit(1);
+  if (error) throw error;
+  return Array.isArray(data) ? data[0] : null;
+}
+
+let bkmpRaidChannel = null;
+function bkmpSubscribeToRaidInstance(raidId, onChange) {
+  bkmpUnsubscribeFromRaidInstance();
+  const client = bkmpGetSupabaseClient();
+  if (!client || !raidId) return;
+  bkmpRaidChannel = client.channel('raid-' + raidId)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'raid_instances', filter: `id=eq.${raidId}` }, payload => {
+      onChange({ type: 'instance', row: payload.new });
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'raid_participants', filter: `raid_id=eq.${raidId}` }, payload => {
+      onChange({ type: 'participants' });
+    })
+    .subscribe();
+}
+function bkmpUnsubscribeFromRaidInstance() {
+  if (bkmpRaidChannel) { bkmpRaidChannel.unsubscribe(); bkmpRaidChannel = null; }
 }
 
 window.importLocalExpensesToSupabase = importLocalExpensesToSupabase;

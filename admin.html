@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260709-optpass10">
+<link rel="stylesheet" href="style.css?v=20260710-raidcity1">
 </head>
 <body>
 
@@ -654,6 +654,7 @@
               <button type="button" class="achievements-subtab active" id="idleAdminSubtabDragons">Drachen</button>
               <button type="button" class="achievements-subtab" id="idleAdminSubtabSkills">Skilltree</button>
               <button type="button" class="achievements-subtab" id="idleAdminSubtabBalance">Balance</button>
+              <button type="button" class="achievements-subtab" id="idleAdminSubtabRaid">🐉 Weltboss</button>
               <button type="button" class="achievements-subtab" id="idleAdminSubtabTest">Testkampf</button>
               <button type="button" class="achievements-subtab" id="idleAdminSubtabReset">Spieler-Reset</button>
             </div>
@@ -741,6 +742,12 @@
             <div id="idleAdminPanelBalance" style="display:none;">
               <p class="admin-help-text">Balance-Werte als JSON. Vorsichtig bearbeiten &ndash; ung&uuml;ltiges JSON wird nicht gespeichert.</p>
               <div id="idleConfigEditors"></div>
+            </div>
+
+            <!-- Weltboss -->
+            <div id="idleAdminPanelRaid" style="display:none;">
+              <p class="admin-help-text">Stuendlicher Weltboss-Raid (Vorbereitung Minute 55-59, Kampf bis Minute 55 der naechsten Stunde). Aenderungen gelten ab dem naechsten Raid, nicht rueckwirkend fuer einen bereits laufenden.</p>
+              <div id="raidBossAdminList"></div>
             </div>
 
             <!-- Testkampf -->
@@ -905,9 +912,9 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260709-optpass9"></script>
+  <script src="supabase.js?v=20260710-raid2"></script>
   <script src="app.js?v=20260709-optpass3"></script>
-  <script src="idledorf.js?v=20260709-optpass7"></script>
+  <script src="idledorf.js?v=20260710-skilltree3"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
   <script>
     bkmpInitTheme();
@@ -3954,6 +3961,7 @@
       { btn: 'idleAdminSubtabDragons', panel: 'idleAdminPanelDragons' },
       { btn: 'idleAdminSubtabSkills', panel: 'idleAdminPanelSkills' },
       { btn: 'idleAdminSubtabBalance', panel: 'idleAdminPanelBalance' },
+      { btn: 'idleAdminSubtabRaid', panel: 'idleAdminPanelRaid' },
       { btn: 'idleAdminSubtabTest', panel: 'idleAdminPanelTest' },
       { btn: 'idleAdminSubtabReset', panel: 'idleAdminPanelReset' }
     ];
@@ -3968,22 +3976,72 @@
       });
     });
 
+    let bkmpRaidAdminBosses = [];
+
     async function refreshIdleDorfAdmin() {
       try {
-        const [dragons, skills, config] = await Promise.all([
+        const [dragons, skills, config, raidBosses] = await Promise.all([
           typeof loadIdleDragonsAdmin === 'function' ? loadIdleDragonsAdmin() : null,
           typeof loadIdleSkillNodesAdmin === 'function' ? loadIdleSkillNodesAdmin() : null,
-          typeof loadIdleGameConfig === 'function' ? loadIdleGameConfig() : null
+          typeof loadIdleGameConfig === 'function' ? loadIdleGameConfig() : null,
+          typeof loadRaidBossesAdmin === 'function' ? loadRaidBossesAdmin() : null
         ]);
         bkmpIdleAdminDragons = dragons || [];
         bkmpIdleAdminSkills = skills || [];
         bkmpIdleAdminConfig = config || {};
+        bkmpRaidAdminBosses = raidBosses || [];
       } catch (e) {
         showAdminToast('Idle-Dorf-Daten konnten nicht geladen werden: ' + supabaseErrorText(e), 'error');
       }
       renderIdleDragonsList();
       renderIdleSkillsList();
       renderIdleConfigEditors();
+      renderRaidBossAdminList();
+    }
+
+    function renderRaidBossAdminList() {
+      const el = document.getElementById('raidBossAdminList');
+      if (!el) return;
+      if (!bkmpRaidAdminBosses.length) { el.innerHTML = '<p class="empty-hint">Keine Weltboss-Konfiguration gefunden. Migration supabase-raid-boss-schema.sql ausgefuehrt?</p>'; return; }
+      el.innerHTML = bkmpRaidAdminBosses.map(boss => `
+        <div class="idle-upgrade-card" style="text-align:left; margin-bottom:0.8rem;" data-raid-boss-id="${escapeHtml(boss.id)}">
+          <div class="idle-upgrade-name">${escapeHtml(boss.name)} <span class="idle-upgrade-level">(${escapeHtml(boss.id)})</span></div>
+          <div class="form-grid form-grid-3" style="margin-top:0.6rem;">
+            <div><label>Boss-Leben</label><input type="number" min="1" class="raid-boss-field" data-field="base_hp" value="${boss.base_hp}"></div>
+            <div><label>Boss-Angriff</label><input type="number" min="1" class="raid-boss-field" data-field="base_attack" value="${boss.base_attack}"></div>
+            <div><label>Angriffs-Intervall (Sek.)</label><input type="number" min="1" class="raid-boss-field" data-field="attack_interval_seconds" value="${boss.attack_interval_seconds}"></div>
+            <div><label>Gold-Belohnung</label><input type="number" min="0" class="raid-boss-field" data-field="gold_reward" value="${boss.gold_reward}"></div>
+            <div><label>Edelstein-Belohnung</label><input type="number" min="0" class="raid-boss-field" data-field="gem_reward" value="${boss.gem_reward}"></div>
+            <div><label>XP-Belohnung</label><input type="number" min="0" class="raid-boss-field" data-field="xp_reward" value="${boss.xp_reward}"></div>
+          </div>
+          <label class="admin-checkbox-label"><input type="checkbox" class="raid-boss-field" data-field="active" ${boss.active ? 'checked' : ''}> Aktiv (wird fuer den naechsten Raid ausgewaehlt)</label>
+          <button type="button" class="btn btn-primary raid-boss-save-btn" style="margin-top:0.6rem;">Speichern</button>
+          <p class="admin-help-text raid-boss-save-status"></p>
+        </div>
+      `).join('');
+      el.querySelectorAll('.raid-boss-save-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const card = btn.closest('[data-raid-boss-id]');
+          const id = card.dataset.raidBossId;
+          const status = card.querySelector('.raid-boss-save-status');
+          const patch = {};
+          card.querySelectorAll('.raid-boss-field').forEach(input => {
+            const field = input.dataset.field;
+            patch[field] = input.type === 'checkbox' ? input.checked : Number(input.value);
+          });
+          btn.disabled = true;
+          try {
+            await updateRaidBoss(id, patch);
+            if (status) status.textContent = 'Gespeichert.';
+            showAdminToast('Weltboss aktualisiert.', 'success');
+          } catch (e) {
+            if (status) status.textContent = 'Fehler: ' + supabaseErrorText(e);
+            showAdminToast('Konnte nicht gespeichert werden: ' + supabaseErrorText(e), 'error');
+          } finally {
+            btn.disabled = false;
+          }
+        });
+      });
     }
 
     function renderIdleDragonsList() {

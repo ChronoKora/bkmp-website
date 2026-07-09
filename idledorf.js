@@ -149,19 +149,31 @@ function bkmpIdleSkillEffectTotals(skillAllocations, skillDefs) {
 /* Feste Werte statt Prozent (auf Wunsch) - jede Stufe gibt einen klaren,
    greifbaren Bonus (z. B. "+1 Angriff") statt eines abstrakten Prozentsatzes.
    Produktions-Boni (Gold/Lootchance) bleiben bewusst prozentual, da sie
-   inhaltlich eine Rate/Chance beschreiben, kein absoluter Kampfwert sind. */
+   inhaltlich eine Rate/Chance beschreiben, kein absoluter Kampfwert sind.
+
+   Max-Stufen deutlich angehoben (Spieler-Feedback: "viel mehr Level, Caps
+   nach oben"). Die Kosten-Kurve nutzt seit diesem Update dasselbe
+   polynomielle Modell wie die Drachen-Skalierung (bkmpIdleGrowthMult,
+   (1+rate*level)^exponent statt reiner Exponential-Compoundierung
+   costGrowth^level) - mit 10x mehr Stufen waere die alte Formel bei
+   Stufe 500 astronomisch (1.13^500 ist praktisch unendlich), aus genau
+   demselben Grund, der schon fuer die Drachen-Werte dokumentiert ist
+   (siehe Kommentar bei bkmpIdleGrowthMult). costRate/costExponent sind so
+   gewaehlt, dass Stufe 50 (alte Obergrenze) noch aehnlich viel kostet wie
+   vorher, die neue Obergrenze aber ein spuerbares Langzeitziel bleibt statt
+   unerreichbar zu sein. */
 const BKMP_IDLE_UPGRADES = [
-  { id: 'atk', name: 'Waffenschmiede', desc: '+1 Angriff pro Stufe.', icon: '⚔️', resource: 'gold', baseCost: 35, costGrowth: 1.13, effectType: 'attack_flat', effectPerLevel: 1, maxLevel: 50 },
-  { id: 'def', name: 'Rüstkammer', desc: '+1 Verteidigung pro Stufe.', icon: '🛡️', resource: 'gold', baseCost: 35, costGrowth: 1.13, effectType: 'defense_flat', effectPerLevel: 1, maxLevel: 50 },
-  { id: 'hp', name: 'Vorratshaus', desc: '+5 Leben pro Stufe.', icon: '❤️', resource: 'wood', baseCost: 25, costGrowth: 1.12, effectType: 'hp_flat', effectPerLevel: 5, maxLevel: 50 },
-  { id: 'walls', name: 'Steinmauern', desc: '+1 Verteidigung pro Stufe.', icon: '🧱', resource: 'stone', baseCost: 25, costGrowth: 1.12, effectType: 'defense_flat', effectPerLevel: 1, maxLevel: 50 },
-  { id: 'crit', name: 'Zielübung', desc: '+1 Krit-Chance pro Stufe.', icon: '🎯', resource: 'essence', baseCost: 6, costGrowth: 1.2, effectType: 'crit_chance_flat', effectPerLevel: 1, maxLevel: 25 },
-  { id: 'crystal_gold', name: 'Kristallschliff', desc: '+2% Gold-Ausbeute pro Stufe.', icon: '💎', resource: 'crystals', baseCost: 5, costGrowth: 1.2, effectType: 'gold_prod_pct', effectPerLevel: 2, maxLevel: 30 },
-  { id: 'essence_loot', name: 'Essenzbindung', desc: '+2% Lootchance pro Stufe.', icon: '🧪', resource: 'essence', baseCost: 4, costGrowth: 1.2, effectType: 'loot_chance_pct', effectPerLevel: 2, maxLevel: 30 }
+  { id: 'atk', name: 'Waffenschmiede', desc: '+1 Angriff pro Stufe.', icon: '⚔️', resource: 'gold', baseCost: 35, costRate: 0.25, costExponent: 2.3, effectType: 'attack_flat', effectPerLevel: 1, maxLevel: 500 },
+  { id: 'def', name: 'Rüstkammer', desc: '+1 Verteidigung pro Stufe.', icon: '🛡️', resource: 'gold', baseCost: 35, costRate: 0.25, costExponent: 2.3, effectType: 'defense_flat', effectPerLevel: 1, maxLevel: 500 },
+  { id: 'hp', name: 'Vorratshaus', desc: '+5 Leben pro Stufe.', icon: '❤️', resource: 'wood', baseCost: 25, costRate: 0.22, costExponent: 2.2, effectType: 'hp_flat', effectPerLevel: 5, maxLevel: 500 },
+  { id: 'walls', name: 'Steinmauern', desc: '+1 Verteidigung pro Stufe.', icon: '🧱', resource: 'stone', baseCost: 25, costRate: 0.22, costExponent: 2.2, effectType: 'defense_flat', effectPerLevel: 1, maxLevel: 500 },
+  { id: 'crit', name: 'Zielübung', desc: '+1 Krit-Chance pro Stufe.', icon: '🎯', resource: 'essence', baseCost: 6, costRate: 0.2, costExponent: 1.8, effectType: 'crit_chance_flat', effectPerLevel: 1, maxLevel: 100 },
+  { id: 'crystal_gold', name: 'Kristallschliff', desc: '+2% Gold-Ausbeute pro Stufe.', icon: '💎', resource: 'crystals', baseCost: 5, costRate: 0.22, costExponent: 2, effectType: 'gold_prod_pct', effectPerLevel: 2, maxLevel: 300 },
+  { id: 'essence_loot', name: 'Essenzbindung', desc: '+2% Lootchance pro Stufe.', icon: '🧪', resource: 'essence', baseCost: 4, costRate: 0.22, costExponent: 2, effectType: 'loot_chance_pct', effectPerLevel: 2, maxLevel: 300 }
 ];
 
 function bkmpIdleUpgradeCost(def, currentLevel) {
-  return Math.round(def.baseCost * Math.pow(def.costGrowth, currentLevel));
+  return Math.round(def.baseCost * bkmpIdleGrowthMult(def.costRate, def.costExponent, currentLevel));
 }
 function bkmpIdleUpgradeEffectTotals(purchases) {
   const totals = {};
@@ -236,7 +248,8 @@ function bkmpIdleDefaultState(name) {
     dragon_kills: 0, boss_kills: 0, current_dragon_index: 0, highest_dragon_index: 0, auto_advance: true,
     playtime_seconds: 0,
     last_seen_at: new Date().toISOString(),
-    last_offline_claim: {}
+    last_offline_claim: {},
+    last_skilltree_reset_at: null
   };
 }
 
@@ -337,6 +350,33 @@ function bkmpIdleAllocateSkill(nodeId) {
   alloc[nodeId] = Number(alloc[nodeId] || 0) + 1;
   bkmpIdleState.skill_points_available -= node.cost_per_rank;
   bkmpIdleState.skill_points_spent += node.cost_per_rank;
+  bkmpIdleRecomputeEffectiveStats();
+  bkmpIdleRenderSkilltreePanel();
+  bkmpIdleRenderHud();
+  bkmpIdleQueueSync();
+}
+
+const BKMP_SKILLTREE_RESET_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
+function bkmpIdleSkilltreeResetCooldownMsLeft() {
+  if (!bkmpIdleState || !bkmpIdleState.last_skilltree_reset_at) return 0;
+  const last = Date.parse(bkmpIdleState.last_skilltree_reset_at);
+  if (isNaN(last)) return 0;
+  return Math.max(0, BKMP_SKILLTREE_RESET_COOLDOWN_MS - (Date.now() - last));
+}
+
+/* Erstattet alle investierten Skillpunkte (skill_allocations komplett
+   geleert, skill_points_available bekommt skill_points_spent zurueck) -
+   kein permanenter Verlust, nur eine Umverteilungs-Moeglichkeit. Deshalb
+   reicht 1x/Tag als Limit, nicht als harte Strafe gedacht, sondern damit
+   nicht bei jedem Kampf hin- und hergeschaltet wird. */
+function bkmpIdleResetSkilltree() {
+  if (!bkmpIdleState || bkmpIdleSkilltreeResetCooldownMsLeft() > 0) return;
+  if (!confirm('Skilltree wirklich zurücksetzen? Alle investierten Skillpunkte werden erstattet und können neu verteilt werden.')) return;
+  bkmpIdleState.skill_points_available = Number(bkmpIdleState.skill_points_available || 0) + Number(bkmpIdleState.skill_points_spent || 0);
+  bkmpIdleState.skill_points_spent = 0;
+  bkmpIdleState.skill_allocations = {};
+  bkmpIdleState.last_skilltree_reset_at = new Date().toISOString();
   bkmpIdleRecomputeEffectiveStats();
   bkmpIdleRenderSkilltreePanel();
   bkmpIdleRenderHud();
@@ -686,38 +726,117 @@ function bkmpIdleRenderUpgradesPanel() {
 
 /* ---------------- Rendering: Skilltree-Tab ---------------- */
 
+/* Tiefe eines Knotens = Anzahl Voraussetzungs-Schritte bis zur Wurzel
+   (Knoten ohne requires_node_id). Bestimmt, in welcher Baum-Reihe der
+   Knoten gezeichnet wird - Wurzeln oben (Tiefe 0), tiefere Voraussetzungs-
+   Ketten darunter. Schutz gegen Ringverweise per seen-Set, falls
+   Admin-Daten versehentlich einen Zyklus enthalten. */
+function bkmpIdleSkillNodeDepth(node, allNodes) {
+  let depth = 0;
+  let current = node;
+  const seen = new Set();
+  while (current && current.requires_node_id && !seen.has(current.id)) {
+    seen.add(current.id);
+    const parent = allNodes.find(n => n.id === current.requires_node_id);
+    if (!parent) break;
+    depth += 1;
+    current = parent;
+  }
+  return depth;
+}
+
+/* Zeichnet Verbindungslinien zwischen Eltern-/Kind-Knoten als SVG-Overlay
+   ueber dem Baum - nachtraeglich per getBoundingClientRect(), weil die
+   Knoten-Positionen erst nach dem eigentlichen HTML-Rendering feststehen
+   (Zeilenumbrueche/Breite haengen vom tatsaechlichen Layout ab, nicht
+   vorher berechenbar). Linien werden "aktiv" (Gold) gezeichnet, sobald das
+   Kind mindestens 1 Rang hat - vorher dezent/grau. */
+function bkmpIdleDrawSkillTreeLines(treeEl) {
+  const svg = treeEl.querySelector('.idle-skilltree-lines');
+  if (!svg) return;
+  const containerRect = treeEl.getBoundingClientRect();
+  svg.setAttribute('width', containerRect.width);
+  svg.setAttribute('height', containerRect.height);
+  svg.innerHTML = '';
+  treeEl.querySelectorAll('[data-node-id]').forEach(nodeEl => {
+    const parentId = nodeEl.dataset.requiresNodeId;
+    if (!parentId) return;
+    const parentEl = treeEl.querySelector(`[data-node-id="${parentId}"]`);
+    if (!parentEl) return;
+    const childRect = nodeEl.getBoundingClientRect();
+    const parentRect = parentEl.getBoundingClientRect();
+    const x1 = parentRect.left - containerRect.left + parentRect.width / 2;
+    const y1 = parentRect.top - containerRect.top + parentRect.height;
+    const x2 = childRect.left - containerRect.left + childRect.width / 2;
+    const y2 = childRect.top - containerRect.top;
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', x1);
+    line.setAttribute('y1', y1);
+    line.setAttribute('x2', x2);
+    line.setAttribute('y2', y2);
+    line.setAttribute('class', 'idle-skilltree-line' + (nodeEl.classList.contains('ranked') ? ' unlocked' : ''));
+    svg.appendChild(line);
+  });
+}
+
 function bkmpIdleRenderSkilltreePanel() {
   const panel = document.getElementById('idlePanelSkilltree');
   if (!panel || !bkmpIdleState) return;
   if (!bkmpIdleSkillDefs.length) { panel.innerHTML = '<p class="empty-hint">Skilltree wird bald verfügbar sein.</p>'; return; }
   const alloc = bkmpIdleState.skill_allocations || {};
   panel.innerHTML = `
-    <p class="idle-skillpoints-hint">Verfügbare Skillpunkte: <strong>${bkmpIdleState.skill_points_available}</strong></p>
+    <div class="idle-skillpoints-row">
+      <p class="idle-skillpoints-hint">Verfügbare Skillpunkte: <strong>${bkmpIdleState.skill_points_available}</strong></p>
+      ${(() => {
+        const cooldownMs = bkmpIdleSkilltreeResetCooldownMsLeft();
+        if (cooldownMs > 0) {
+          const totalMinutes = Math.ceil(cooldownMs / 60000);
+          const h = Math.floor(totalMinutes / 60);
+          const m = totalMinutes % 60;
+          return `<button type="button" class="btn-nein idle-skilltree-reset-btn" disabled>🔄 Reset in ${h}h ${m}min</button>`;
+        }
+        return `<button type="button" class="btn-nein idle-skilltree-reset-btn" id="idleSkilltreeResetBtn">🔄 Zurücksetzen</button>`;
+      })()}
+    </div>
     ${BKMP_IDLE_BRANCH_ORDER.map(branch => {
       const nodes = bkmpIdleSkillDefs.filter(n => n.branch === branch).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
       if (!nodes.length) return '';
+      const withDepth = nodes.map(node => ({ node, depth: bkmpIdleSkillNodeDepth(node, nodes) }));
+      const maxDepth = Math.max(0, ...withDepth.map(n => n.depth));
+      const rows = [];
+      for (let d = 0; d <= maxDepth; d++) rows.push(withDepth.filter(n => n.depth === d).map(n => n.node));
+
       return `<div class="idle-skill-branch">
         <div class="idle-skill-branch-title">${BKMP_IDLE_BRANCH_LABELS[branch] || branch}</div>
-        <div class="idle-skill-node-grid">
-          ${nodes.map(node => {
-            const rank = Number(alloc[node.id] || 0);
-            const canAllocate = bkmpIdleCanAllocateSkill(node);
-            const maxed = rank >= node.max_rank;
-            return `
-              <div class="idle-skill-node ${rank > 0 ? 'ranked' : ''}">
-                <div class="idle-skill-node-icon">${node.icon || '✨'}</div>
-                <div class="idle-skill-node-name">${escapeHtml(node.name)}</div>
-                <div class="idle-skill-node-desc">${escapeHtml(node.description || '')}</div>
-                <div class="idle-skill-node-rank">Rang ${rank}/${node.max_rank}</div>
-                <button type="button" class="btn-ja idle-skill-node-btn" data-node-id="${node.id}" ${!canAllocate ? 'disabled' : ''}>
-                  ${maxed ? 'Max' : `+1 (${node.cost_per_rank} 🔹)`}
-                </button>
-              </div>`;
-          }).join('')}
+        <div class="idle-skilltree-tree">
+          <svg class="idle-skilltree-lines"></svg>
+          ${rows.map(rowNodes => `
+            <div class="idle-skilltree-row">
+              ${rowNodes.map(node => {
+                const rank = Number(alloc[node.id] || 0);
+                const canAllocate = bkmpIdleCanAllocateSkill(node);
+                const maxed = rank >= node.max_rank;
+                const parentNode = node.requires_node_id ? nodes.find(n => n.id === node.requires_node_id) : null;
+                return `
+                  <div class="idle-skill-node ${rank > 0 ? 'ranked' : ''} ${!node.requires_node_id ? 'is-root' : ''}" data-node-id="${node.id}" ${node.requires_node_id ? `data-requires-node-id="${node.requires_node_id}"` : ''}>
+                    <div class="idle-skill-node-icon">${node.icon || '✨'}</div>
+                    <div class="idle-skill-node-name">${escapeHtml(node.name)}</div>
+                    <div class="idle-skill-node-desc">${escapeHtml(node.description || '')}</div>
+                    ${parentNode ? `<div class="idle-skill-node-requires">Braucht ${escapeHtml(parentNode.name)} Rang ${node.requires_rank}</div>` : ''}
+                    <div class="idle-skill-node-rank">Rang ${rank}/${node.max_rank}</div>
+                    <button type="button" class="btn-ja idle-skill-node-btn" data-node-id="${node.id}" ${!canAllocate ? 'disabled' : ''}>
+                      ${maxed ? 'Max' : `+1 (${node.cost_per_rank} 🔹)`}
+                    </button>
+                  </div>`;
+              }).join('')}
+            </div>`).join('')}
         </div>
       </div>`;
     }).join('')}`;
   panel.querySelectorAll('.idle-skill-node-btn').forEach(btn => btn.addEventListener('click', () => bkmpIdleAllocateSkill(btn.dataset.nodeId)));
+  panel.querySelectorAll('.idle-skilltree-tree').forEach(treeEl => bkmpIdleDrawSkillTreeLines(treeEl));
+  const resetBtn = document.getElementById('idleSkilltreeResetBtn');
+  if (resetBtn) resetBtn.addEventListener('click', bkmpIdleResetSkilltree);
 }
 
 /* ---------------- Rendering: Sammlung- / Erfolge-Tab (Shortcuts ins bestehende System) ---------------- */
@@ -794,7 +913,11 @@ const BKMP_IDLE_LEADERBOARD_TABS = [
   { id: 'level', label: 'Top Level', field: 'level', format: v => `Level ${v}` },
   { id: 'gold', label: 'Top Gold', field: 'total_gold_earned', format: v => bkmpIdleFormatNumber(v) + ' 💰' },
   { id: 'dragons', label: 'Top Drachen', field: 'dragon_kills', format: v => bkmpIdleFormatNumber(v) + ' 🐉' },
-  { id: 'playtime', label: 'Top Spielzeit', field: 'playtime_seconds', format: v => Math.round(v / 60) + ' Min.' }
+  { id: 'playtime', label: 'Top Spielzeit', field: 'playtime_seconds', format: v => Math.round(v / 60) + ' Min.' },
+  { id: 'raid_damage', label: '🐉 Raid-Schaden', isRaid: true },
+  { id: 'raid_bosses', label: '🐉 Raid-Bosse', isRaid: true },
+  { id: 'raid_joined', label: '🐉 Raid-Teilnahmen', isRaid: true },
+  { id: 'raid_best', label: '🐉 Bester Raid', isRaid: true }
 ];
 let bkmpIdleActiveLeaderboardTab = 'level';
 let bkmpIdleLeaderboardStats = [];
@@ -823,6 +946,7 @@ function bkmpIdleRenderLeaderboardList() {
   const listEl = document.getElementById('idleLeaderboardList');
   if (!listEl) return;
   const tab = BKMP_IDLE_LEADERBOARD_TABS.find(t => t.id === bkmpIdleActiveLeaderboardTab) || BKMP_IDLE_LEADERBOARD_TABS[0];
+  if (tab.isRaid) { bkmpRaidRenderLeaderboard(); return; }
   const myName = (typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : '').trim().toLowerCase();
   const rows = [...bkmpIdleLeaderboardStats]
     .filter(s => Number(s[tab.field] || 0) > 0)
@@ -964,6 +1088,12 @@ async function bkmpIdleOpenModal() {
   bkmpIdleStartLoop();
   bkmpIdleRenderActiveTabContent();
   if (typeof renderAchievementBadge === 'function') renderAchievementBadge();
+
+  bkmpRaidRenderJoinBanner();
+  if (bkmpRaidShouldShowCombatView()) {
+    bkmpIdleStopLoop();
+    bkmpRaidStartCombatView(bkmpRaidGetPhaseInfo().raidId);
+  }
 }
 
 function bkmpIdleCloseModal() {
@@ -974,6 +1104,7 @@ function bkmpIdleCloseModal() {
   bkmpIdleStopLoop();
   bkmpIdleQueueSync();
   bkmpIdleFlushSync();
+  bkmpRaidStopCombatView();
 }
 
 function bkmpIdlePreloadStateIfNamed() {
@@ -982,6 +1113,7 @@ function bkmpIdlePreloadStateIfNamed() {
   bkmpIdleLoadOrInitState(name)
     .then(() => { if (typeof renderAchievementBadge === 'function') renderAchievementBadge(); })
     .catch(() => {});
+  bkmpRaidRefreshAchievementCache();
 }
 
 /* ---------------- Drachen anklicken: Extraschaden + Autoklicker-Schutz ----------------
@@ -1028,8 +1160,409 @@ function bkmpIdleHandleDragonClick() {
   }
 }
 
+/* ============================================================
+   Weltboss/Raid-Event (stuendlich, siehe supabase-raid-boss-schema.sql)
+
+   Zeitmodell: rein UTC-Uhrzeit-basiert, komplett ohne Server-Cron. Minute
+   55-59 jeder Stunde = Vorbereitungsphase fuer den Raid der NAECHSTEN vollen
+   Stunde, Minute 0-54 = laufender Kampf des AKTUELLEN Stunden-Raids (endet
+   spaetestens Minute 55, danach 'expired' falls Boss/Stadt bis dahin nicht
+   entschieden). bkmpRaidCurrentId() (supabase.js) liefert dieselbe
+   'YYYYMMDDHH24'-ID wie die SQL-Seite - jeder Client kommt unabhaengig auf
+   dieselbe Raid-ID, kein Abstimmen noetig. Boss-HP/Stadt-HP sind
+   serverseitig autoritativ (siehe RPCs) - hier wird nur zur Anzeige/fuer
+   sofortiges visuelles Feedback lokal simuliert, der tatsaechliche Zaehler
+   kommt immer aus der RPC-Antwort bzw. per Realtime von anderen Spielern. */
+
+const BKMP_RAID_JOINED_KEY_PREFIX = 'bkmp-raid-joined-';
+const BKMP_RAID_TICK_MS = 2500;
+const BKMP_RAID_BOSS_POLL_MS = 1500;
+
+let bkmpRaidState = null;
+let bkmpRaidParticipants = [];
+let bkmpRaidJoinedId = null;
+let bkmpRaidButtonTimer = null;
+let bkmpRaidLoopTimer = null;
+let bkmpRaidBossPollTimer = null;
+let bkmpRaidResultShown = false;
+let bkmpRaidClickTimestamps = [];
+let bkmpRaidClickLockedUntil = 0;
+
+function bkmpRaidGetPhaseInfo(now) {
+  const d = now || new Date();
+  const minute = d.getUTCMinutes();
+  if (minute >= 55) {
+    const fightStart = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours() + 1, 0, 0, 0));
+    return { phase: 'prep', raidId: bkmpRaidCurrentId(fightStart), fightStartsAt: fightStart.getTime(), msUntilFightStart: fightStart.getTime() - d.getTime() };
+  }
+  const fightStart = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours(), 0, 0, 0));
+  const fightEnd = fightStart.getTime() + 55 * 60000;
+  return { phase: 'fight', raidId: bkmpRaidCurrentId(fightStart), fightStartsAt: fightStart.getTime(), fightEndsAt: fightEnd, msUntilFightEnd: fightEnd - d.getTime() };
+}
+
+function bkmpRaidFormatCountdown(ms) {
+  const total = Math.max(0, Math.round(ms / 1000));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function bkmpRaidHasJoined(raidId) {
+  try { return localStorage.getItem(BKMP_RAID_JOINED_KEY_PREFIX + raidId) === '1'; } catch (e) { return false; }
+}
+function bkmpRaidMarkJoined(raidId) {
+  try { localStorage.setItem(BKMP_RAID_JOINED_KEY_PREFIX + raidId, '1'); } catch (e) {}
+  bkmpRaidJoinedId = raidId;
+}
+
+/* ---------------- Button-Feuer/Glow (laeuft immer, auch ohne offenes Fenster) ---------------- */
+function bkmpRaidUpdateButtonState() {
+  const btn = document.getElementById('idleDorfButton');
+  const countdownEl = document.getElementById('raidBtnCountdown');
+  if (!btn) return;
+  const info = bkmpRaidGetPhaseInfo();
+  if (info.phase === 'prep') {
+    btn.classList.add('raid-prep');
+    if (countdownEl) { countdownEl.style.display = ''; countdownEl.textContent = '🔥 ' + bkmpRaidFormatCountdown(info.msUntilFightStart); }
+  } else {
+    btn.classList.remove('raid-prep');
+    if (countdownEl) countdownEl.style.display = 'none';
+  }
+}
+
+/* ---------------- Beitritts-Banner (Idle-Dorf-Fenster, Vorbereitungsphase) ---------------- */
+async function bkmpRaidRenderJoinBanner() {
+  const banner = document.getElementById('raidJoinBanner');
+  if (!banner) return;
+  const info = bkmpRaidGetPhaseInfo();
+  if (info.phase !== 'prep') { banner.style.display = 'none'; return; }
+
+  const joined = bkmpRaidHasJoined(info.raidId);
+  banner.style.display = '';
+  banner.innerHTML = `
+    <div class="raid-join-banner-title">🐉 Ein mächtiger Raidboss erscheint in wenigen Minuten!</div>
+    <div class="raid-join-banner-countdown" id="raidBannerCountdown">${bkmpRaidFormatCountdown(info.msUntilFightStart)}</div>
+    ${joined
+      ? '<div class="raid-join-banner-joined">✅ Du bist angemeldet - der Kampf beginnt automatisch.</div>'
+      : '<button type="button" class="btn-ja raid-join-banner-btn" id="raidJoinBtn">Jetzt beitreten</button>'}
+    <div class="raid-join-banner-participants" id="raidBannerParticipants"></div>
+  `;
+  const joinBtn = document.getElementById('raidJoinBtn');
+  if (joinBtn) joinBtn.addEventListener('click', () => bkmpRaidJoin(info.raidId));
+
+  try {
+    const state = await loadRaidState(info.raidId);
+    const countEl = document.getElementById('raidBannerParticipants');
+    if (countEl && state) countEl.textContent = state.participantCount > 0 ? `${state.participantCount} Spieler bereits angemeldet` : 'Sei der/die Erste, die beitritt!';
+  } catch (e) { /* Raid existiert evtl. noch nicht - kein Problem, erster Beitritt legt sie an */ }
+}
+
+async function bkmpRaidJoin(raidId) {
+  const joinBtn = document.getElementById('raidJoinBtn');
+  if (joinBtn) { joinBtn.disabled = true; joinBtn.textContent = 'Wird beigetreten...'; }
+  try {
+    await joinRaid(raidId);
+    bkmpRaidMarkJoined(raidId);
+    bkmpRaidRenderJoinBanner();
+    bkmpRaidRefreshAchievementCache();
+  } catch (e) {
+    alert(e && e.message ? e.message : 'Beitritt fehlgeschlagen. Bitte versuche es erneut.');
+    if (joinBtn) { joinBtn.disabled = false; joinBtn.textContent = 'Jetzt beitreten'; }
+  }
+}
+
+/* ---------------- Gemeinsame Kampfansicht ---------------- */
+function bkmpRaidShouldShowCombatView() {
+  const info = bkmpRaidGetPhaseInfo();
+  return info.phase === 'fight' && bkmpRaidHasJoined(info.raidId) && bkmpRaidJoinedId !== 'ended-' + info.raidId;
+}
+
+function bkmpRaidToggleCombatView(show) {
+  const tabs = document.getElementById('idleDorfTabs');
+  const combatView = document.getElementById('raidCombatView');
+  const panels = document.querySelectorAll('#idleDorfOverlay .idle-dorf-panel:not(#raidCombatView)');
+  if (tabs) tabs.style.display = show ? 'none' : '';
+  if (combatView) combatView.style.display = show ? '' : 'none';
+  panels.forEach(p => { if (show) p.style.display = 'none'; });
+  if (!show) {
+    const activeTab = bkmpIdleTabs.find(t => t.id === bkmpIdleActiveTab);
+    const p = activeTab ? document.getElementById(activeTab.panel) : null;
+    if (p) p.style.display = '';
+  }
+}
+
+async function bkmpRaidStartCombatView(raidId) {
+  bkmpRaidResultShown = false;
+  const resultCard = document.getElementById('raidResultCard');
+  const battlefield = document.getElementById('raidBattlefield');
+  if (resultCard) resultCard.style.display = 'none';
+  if (battlefield) battlefield.style.display = '';
+  bkmpRaidToggleCombatView(true);
+  try {
+    bkmpRaidState = await loadRaidState(raidId);
+    bkmpRaidParticipants = await loadRaidParticipants(raidId);
+  } catch (e) {
+    console.warn('Raid: Zustand konnte nicht geladen werden.', e);
+  }
+  bkmpRaidRenderCombat();
+  bkmpSubscribeToRaidInstance(raidId, bkmpRaidHandleRealtimeChange);
+  bkmpRaidStartLoops(raidId);
+}
+
+function bkmpRaidStopCombatView() {
+  bkmpRaidToggleCombatView(false);
+  bkmpRaidStopLoops();
+  bkmpUnsubscribeFromRaidInstance();
+}
+
+function bkmpRaidHandleRealtimeChange(change) {
+  if (!bkmpRaidState) return;
+  if (change.type === 'instance' && change.row) {
+    bkmpRaidState.bossHp = Number(change.row.boss_hp || 0);
+    bkmpRaidState.cityHp = Number(change.row.city_hp || 0);
+    bkmpRaidState.status = change.row.status;
+    bkmpRaidState.participantCount = Number(change.row.participant_count || 0);
+    bkmpRaidRenderCombat();
+    bkmpRaidCheckOutcome();
+  } else if (change.type === 'participants' && bkmpRaidState) {
+    loadRaidParticipants(bkmpRaidState.id).then(rows => { bkmpRaidParticipants = rows; bkmpRaidRenderParticipants(); }).catch(() => {});
+  }
+}
+
+function bkmpRaidRenderCombat() {
+  if (!bkmpRaidState) return;
+  const nameEl = document.getElementById('raidBossName');
+  if (nameEl) nameEl.textContent = `👑 ${bkmpRaidState.bossName || 'Weltboss'}`;
+  const bossFill = document.getElementById('raidBossHpFill');
+  const bossLabel = document.getElementById('raidBossHpLabel');
+  if (bossFill) bossFill.style.width = Math.max(0, Math.min(100, (bkmpRaidState.bossHp / Math.max(1, bkmpRaidState.bossMaxHp)) * 100)) + '%';
+  if (bossLabel) bossLabel.textContent = `${bkmpIdleFormatNumber(bkmpRaidState.bossHp)} / ${bkmpIdleFormatNumber(bkmpRaidState.bossMaxHp)}`;
+  const cityFill = document.getElementById('raidCityHpFill');
+  const cityLabel = document.getElementById('raidCityHpLabel');
+  if (cityFill) cityFill.style.width = Math.max(0, Math.min(100, (bkmpRaidState.cityHp / Math.max(1, bkmpRaidState.cityMaxHp)) * 100)) + '%';
+  if (cityLabel) cityLabel.textContent = `${bkmpIdleFormatNumber(bkmpRaidState.cityHp)} / ${bkmpIdleFormatNumber(bkmpRaidState.cityMaxHp)}`;
+  const timerEl = document.getElementById('raidCombatTimer');
+  if (timerEl) {
+    const info = bkmpRaidGetPhaseInfo();
+    timerEl.textContent = info.phase === 'fight' ? '⏳ ' + bkmpRaidFormatCountdown(info.msUntilFightEnd) : '';
+  }
+  bkmpRaidRenderParticipants();
+}
+
+function bkmpRaidRenderParticipants() {
+  const list = document.getElementById('raidParticipantsList');
+  if (!list) return;
+  const myName = typeof bkmpGetMcName === 'function' ? bkmpGetMcName().trim().toLowerCase() : '';
+  list.innerHTML = bkmpRaidParticipants.slice(0, 20).map(p => `
+    <div class="raid-participant-row ${p.displayName.trim().toLowerCase() === myName ? 'is-me' : ''}">
+      <span>${escapeHtml(p.displayName)}</span>
+      <span>${bkmpIdleFormatNumber(p.damageDealt)} Schaden</span>
+    </div>`).join('');
+}
+
+function bkmpRaidSpawnFx(className, targetId, amount, isCrit) {
+  const field = document.getElementById('raidBattlefield');
+  if (!field) return;
+  const fx = document.createElement('span');
+  fx.className = 'raid-fx ' + className;
+  field.appendChild(fx);
+  window.setTimeout(() => fx.remove(), 700);
+  if (amount != null) {
+    const target = document.getElementById(targetId);
+    if (target) {
+      const dmg = document.createElement('span');
+      dmg.className = 'raid-dmg-float' + (isCrit ? ' raid-dmg-crit' : '');
+      dmg.textContent = '-' + bkmpIdleFormatNumber(amount) + (isCrit ? '!' : '');
+      target.appendChild(dmg);
+      window.setTimeout(() => dmg.remove(), 900);
+    }
+  }
+}
+function bkmpRaidHitFlash(targetId) {
+  const el = document.getElementById(targetId);
+  if (!el) return;
+  el.classList.remove('raid-hit-flash');
+  void el.offsetWidth;
+  el.classList.add('raid-hit-flash');
+}
+
+const BKMP_RAID_ATTACK_FX = ['raid-fx-arrow', 'raid-fx-fireball', 'raid-fx-lightning', 'raid-fx-magic'];
+
+async function bkmpRaidOwnTick() {
+  if (!bkmpRaidState || bkmpRaidState.status !== 'fighting' || !bkmpIdleEffectiveStats) return;
+  const roll = bkmpIdleDamageRoll(bkmpIdleEffectiveStats.attack, bkmpIdleEffectiveStats.critChance, bkmpIdleEffectiveStats.critDamage, 0);
+  const fx = BKMP_RAID_ATTACK_FX[Math.floor(Math.random() * BKMP_RAID_ATTACK_FX.length)];
+  bkmpRaidSpawnFx(fx, 'raidBoss', roll.amount, roll.isCrit);
+  bkmpRaidHitFlash('raidBoss');
+  try {
+    const result = await submitRaidDamage(bkmpRaidState.id, roll.amount, roll.isCrit, false);
+    if (result) { bkmpRaidState.bossHp = result.bossHp; bkmpRaidState.status = result.status; bkmpRaidRenderCombat(); bkmpRaidCheckOutcome(); }
+  } catch (e) { /* naechster Tick versucht es erneut */ }
+}
+
+async function bkmpRaidBossPoll() {
+  if (!bkmpRaidState) return;
+  try {
+    const result = await tickRaidBossAttack(bkmpRaidState.id);
+    if (result) {
+      bkmpRaidState.cityHp = result.cityHp;
+      bkmpRaidState.bossHp = result.bossHp;
+      const changed = bkmpRaidState.status !== result.status;
+      bkmpRaidState.status = result.status;
+      if (changed || result.cityHp < bkmpRaidState.cityMaxHp) {
+        bkmpRaidSpawnFx('raid-fx-boss-attack', 'raidCity', null, false);
+        bkmpRaidHitFlash('raidCity');
+      }
+      bkmpRaidRenderCombat();
+      bkmpRaidCheckOutcome();
+    }
+  } catch (e) { /* naechster Poll versucht es erneut */ }
+}
+
+function bkmpRaidHandleBossClick() {
+  if (!bkmpRaidState || bkmpRaidState.status !== 'fighting' || !bkmpIdleEffectiveStats) return;
+  const now = Date.now();
+  bkmpRaidClickTimestamps.push(now);
+  bkmpRaidClickTimestamps = bkmpRaidClickTimestamps.filter(t => now - t <= 1000);
+  if (bkmpRaidClickTimestamps.length > 10) {
+    if (now > bkmpRaidClickLockedUntil) {
+      bkmpRaidClickLockedUntil = now + 4000;
+      if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Na wer will denn hier einen Autoklicker benutzen? 😉', 3200);
+    }
+    return;
+  }
+  if (now < bkmpRaidClickLockedUntil) return;
+
+  const isCrit = Math.random() * 100 < bkmpIdleEffectiveStats.critChance;
+  const clickDamage = Math.max(1, Math.round(bkmpIdleEffectiveStats.attack * 0.12 * (isCrit ? Math.max(1, bkmpIdleEffectiveStats.critDamage / 100) : 1)));
+  bkmpRaidSpawnFx('raid-fx-magic', 'raidBoss', clickDamage, isCrit);
+  bkmpRaidHitFlash('raidBoss');
+  submitRaidDamage(bkmpRaidState.id, clickDamage, isCrit, true).then(result => {
+    if (result) { bkmpRaidState.bossHp = result.bossHp; bkmpRaidState.status = result.status; bkmpRaidRenderCombat(); bkmpRaidCheckOutcome(); }
+  }).catch(() => {});
+}
+
+function bkmpRaidStartLoops(raidId) {
+  bkmpRaidStopLoops();
+  bkmpRaidLoopTimer = window.setInterval(bkmpRaidOwnTick, BKMP_RAID_TICK_MS);
+  bkmpRaidBossPollTimer = window.setInterval(bkmpRaidBossPoll, BKMP_RAID_BOSS_POLL_MS);
+}
+function bkmpRaidStopLoops() {
+  if (bkmpRaidLoopTimer) { window.clearInterval(bkmpRaidLoopTimer); bkmpRaidLoopTimer = null; }
+  if (bkmpRaidBossPollTimer) { window.clearInterval(bkmpRaidBossPollTimer); bkmpRaidBossPollTimer = null; }
+}
+
+function bkmpRaidCheckOutcome() {
+  if (!bkmpRaidState || bkmpRaidResultShown) return;
+  if (bkmpRaidState.status === 'fighting' || bkmpRaidState.status === 'prep') return;
+  bkmpRaidResultShown = true;
+  bkmpRaidJoinedId = 'ended-' + bkmpRaidState.id;
+  bkmpRaidStopLoops();
+  bkmpUnsubscribeFromRaidInstance();
+  bkmpRaidShowResult();
+  bkmpRaidRefreshAchievementCache();
+}
+
+async function bkmpRaidShowResult() {
+  const resultCard = document.getElementById('raidResultCard');
+  const battlefield = document.getElementById('raidBattlefield');
+  const listEl = document.getElementById('raidParticipantsList');
+  if (!resultCard) return;
+  let participants = bkmpRaidParticipants;
+  try { participants = await loadRaidParticipants(bkmpRaidState.id); } catch (e) {}
+  const myName = (typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : '').trim().toLowerCase();
+  const mine = participants.find(p => p.displayName.trim().toLowerCase() === myName);
+  const won = bkmpRaidState.status === 'won';
+  const totalDamage = participants.reduce((sum, p) => sum + p.damageDealt, 0);
+  if (battlefield) battlefield.style.display = 'none';
+  if (listEl) listEl.style.display = 'none';
+  resultCard.style.display = '';
+  resultCard.innerHTML = `
+    <div class="raid-result-title ${won ? 'won' : 'lost'}">${won ? '🏆 Raid gewonnen!' : bkmpRaidState.status === 'expired' ? '⌛ Raid abgelaufen' : '💀 Raid verloren'}</div>
+    <div class="raid-result-stats">
+      <div class="raid-result-stat"><div class="raid-result-stat-label">Gesamtschaden</div><div class="raid-result-stat-value">${bkmpIdleFormatNumber(totalDamage)}</div></div>
+      <div class="raid-result-stat"><div class="raid-result-stat-label">Dein Schaden</div><div class="raid-result-stat-value">${bkmpIdleFormatNumber(mine ? mine.damageDealt : 0)}</div></div>
+      <div class="raid-result-stat"><div class="raid-result-stat-label">Deine Krits</div><div class="raid-result-stat-value">${mine ? mine.critsLanded : 0}</div></div>
+      <div class="raid-result-stat"><div class="raid-result-stat-label">Teilnehmer</div><div class="raid-result-stat-value">${participants.length}</div></div>
+    </div>
+    ${won ? `<div class="raid-result-rewards"><span>💰 +${bkmpIdleFormatNumber(5000)}</span><span>💎 +25</span><span>✨ +2000</span></div>` : ''}
+    <button type="button" class="btn-ja" id="raidResultCloseBtn">Schließen</button>
+  `;
+  const closeBtn = document.getElementById('raidResultCloseBtn');
+  if (closeBtn) closeBtn.addEventListener('click', () => {
+    bkmpRaidStopCombatView();
+    bkmpIdleRenderActiveTabContent();
+  });
+}
+
+/* ---------------- Raid-Bestenliste (in idle-dorf-Bestenliste-Tab eingehaengt) ---------------- */
+async function bkmpRaidRenderLeaderboard() {
+  const listEl = document.getElementById('idleLeaderboardList');
+  if (!listEl) return;
+  listEl.innerHTML = '<p class="empty-hint">Lädt...</p>';
+  let rows = [];
+  try { rows = await loadRaidLeaderboard(); } catch (e) { console.warn('Raid: Bestenliste konnte nicht geladen werden.', e); }
+  const field = bkmpIdleActiveLeaderboardTab.replace('raid_', '');
+  const fieldMap = { damage: 'totalDamageDealt', bosses: 'totalBossesDefeated', joined: 'totalRaidsJoined', best: 'bestSingleRaidDamage' };
+  const key = fieldMap[field] || 'totalDamageDealt';
+  const myName = (typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : '').trim().toLowerCase();
+  const sorted = rows.filter(r => r[key] > 0).sort((a, b) => b[key] - a[key]).slice(0, 100);
+  if (!sorted.length) { listEl.innerHTML = '<p class="empty-hint">Noch keine Raid-Daten vorhanden.</p>'; return; }
+  listEl.innerHTML = sorted.map((row, i) => {
+    const isMe = Boolean(myName) && row.displayName.trim().toLowerCase() === myName;
+    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
+    return `<div class="leaderboard-row ${isMe ? 'is-me' : ''}"><span class="leaderboard-rank">${medal}</span><span class="leaderboard-name"><span class="leaderboard-name-text">${escapeHtml(row.displayName)}</span></span><span class="leaderboard-value">${bkmpIdleFormatNumber(row[key])}</span></div>`;
+  }).join('');
+}
+
+/* ---------------- Achievement-Kontext (fuer index.html, gleiches
+   Cache-Muster wie bkmpIdleGetAchievementContextFields) ---------------- */
+const BKMP_RAID_ACHIEVEMENT_CACHE_KEY = 'bkmp-raid-achievement-fields-cache';
+function bkmpRaidGetAchievementContextFields() {
+  try {
+    return JSON.parse(localStorage.getItem(BKMP_RAID_ACHIEVEMENT_CACHE_KEY) || 'null') ||
+      { raidsJoined: 0, raidBossesDefeated: 0, raidTotalDamage: 0, raidMvpCount: 0, raidFlawlessWins: 0, raidBestDamage: 0 };
+  } catch (e) {
+    return { raidsJoined: 0, raidBossesDefeated: 0, raidTotalDamage: 0, raidMvpCount: 0, raidFlawlessWins: 0, raidBestDamage: 0 };
+  }
+}
+async function bkmpRaidRefreshAchievementCache() {
+  const client = typeof bkmpGetPlayerAuthClient === 'function' ? bkmpGetPlayerAuthClient() : null;
+  if (!client) return;
+  try {
+    const { data: sessionData } = await client.auth.getSession();
+    const userId = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
+    if (!userId) return;
+    const { data } = await client
+      .from('raid_player_stats')
+      .select('total_raids_joined, total_bosses_defeated, total_damage_dealt, total_mvp_count, total_flawless_wins, best_single_raid_damage')
+      .eq('auth_user_id', userId)
+      .limit(1);
+    const row = Array.isArray(data) && data[0] ? data[0] : null;
+    const fields = {
+      raidsJoined: Number(row ? row.total_raids_joined : 0),
+      raidBossesDefeated: Number(row ? row.total_bosses_defeated : 0),
+      raidTotalDamage: Number(row ? row.total_damage_dealt : 0),
+      raidMvpCount: Number(row ? row.total_mvp_count : 0),
+      raidFlawlessWins: Number(row ? row.total_flawless_wins : 0),
+      raidBestDamage: Number(row ? row.best_single_raid_damage : 0)
+    };
+    try { localStorage.setItem(BKMP_RAID_ACHIEVEMENT_CACHE_KEY, JSON.stringify(fields)); } catch (e) {}
+    if (typeof renderAchievementBadge === 'function') renderAchievementBadge();
+  } catch (e) { /* Cache bleibt auf altem Stand */ }
+}
+
+/* ---------------- Init ---------------- */
+function bkmpRaidInit() {
+  bkmpRaidUpdateButtonState();
+  window.setInterval(bkmpRaidUpdateButtonState, 1000);
+  const bossEl = document.getElementById('raidBoss');
+  if (bossEl) bossEl.addEventListener('click', bkmpRaidHandleBossClick);
+}
+
 function bkmpIdleInit() {
   bkmpIdleInitTabs();
+  bkmpRaidInit();
   const openBtn = document.getElementById('idleDorfButton');
   if (openBtn) openBtn.addEventListener('click', bkmpIdleOpenModal);
   const closeBtn = document.getElementById('idleDorfClose');
@@ -1151,4 +1684,18 @@ window.BKMP_IDLE_COSMETICS = [
   { id: 'drachenfeuer', name: 'Drachenfeuer', desc: 'Für echte Drachenbezwinger.', rarity: 'Legendär', unlockCustom: ctx => ctx.idleDragonKills >= 500 },
   { id: 'schatten_dunkel', name: 'Schatten-Dunkel', desc: 'Noch tiefere Schatten als zuvor.', rarity: 'Episch', unlockCustom: ctx => ctx.idleBossKills >= 15 },
   { id: 'sternenstaub', name: 'Sternenstaub', desc: 'Glitzernder Staub aus fernen Galaxien.', rarity: 'Mythisch', unlockCustom: ctx => ctx.idleBranchesMaxed >= 5 }
+];
+
+/* ---------------- Weltboss/Raid: Erfolge (window.BKMP_RAID_ACHIEVEMENTS_EXTRA) ----------------
+   Gleiches Einbinde-Muster wie BKMP_IDLE_ACHIEVEMENTS_EXTRA - wird per
+   Spread direkt in BKMP_ACHIEVEMENTS (index.html, bkmpBuildAchievementsList)
+   uebernommen und automatisch von Neu-Badge + Zeitstempel-System erfasst. */
+window.BKMP_RAID_ACHIEVEMENTS_EXTRA = [
+  { id: 'raid_first_join', category: 'Weltboss', title: 'Erster Raid', desc: 'Nimm an deinem ersten Weltboss-Raid teil.', check: ctx => ctx.raidsJoined >= 1 },
+  { id: 'raid_first_boss', category: 'Weltboss', title: 'Erster Boss besiegt', desc: 'Besiege deinen ersten Weltboss.', check: ctx => ctx.raidBossesDefeated >= 1 },
+  { id: 'raid_boss_10', category: 'Weltboss', title: 'Bossbezwinger', desc: 'Besiege 10 Weltbosse.', progress: ctx => [ctx.raidBossesDefeated, 10], check: ctx => ctx.raidBossesDefeated >= 10 },
+  { id: 'raid_boss_100', category: 'Weltboss', title: 'Legendärer Drachenjäger', desc: 'Besiege 100 Weltbosse.', progress: ctx => [ctx.raidBossesDefeated, 100], check: ctx => ctx.raidBossesDefeated >= 100 },
+  { id: 'raid_damage_1m', category: 'Weltboss', title: 'Ein Millionen Schaden', desc: 'Verursache insgesamt 1.000.000 Schaden in Weltboss-Raids.', progress: ctx => [ctx.raidTotalDamage, 1000000], check: ctx => ctx.raidTotalDamage >= 1000000 },
+  { id: 'raid_mvp', category: 'Weltboss', title: 'MVP', desc: 'Sei der Spieler mit dem meisten Schaden in einem Raid.', check: ctx => ctx.raidMvpCount >= 1 },
+  { id: 'raid_flawless', category: 'Weltboss', title: 'Ohne Niederlage gewonnen', desc: 'Gewinne einen Raid, ohne dass die Stadt Schaden nimmt.', check: ctx => ctx.raidFlawlessWins >= 1 }
 ];

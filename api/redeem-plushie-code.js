@@ -63,7 +63,7 @@ module.exports = async function handler(req, res) {
 
   try {
     // 1) Code nachschlagen
-    const lookupRes = await sbFetch(serviceKey, `plushie_codes?code=eq.${encodeURIComponent(rawCode)}&select=id,plushie_id,is_redeemed&limit=1`);
+    const lookupRes = await sbFetch(serviceKey, `plushie_codes?code=eq.${encodeURIComponent(rawCode)}&select=id,plushie_id,is_redeemed,is_reusable&limit=1`);
     if (!lookupRes.ok) {
       const detail = await lookupRes.text().catch(() => '');
       return send(res, 502, { error: 'lookup_failed', detail: detail.slice(0, 300) });
@@ -71,7 +71,8 @@ module.exports = async function handler(req, res) {
     const rows = await lookupRes.json();
     const codeRow = Array.isArray(rows) ? rows[0] : null;
     if (!codeRow) return send(res, 404, { error: 'invalid_code' });
-    if (codeRow.is_redeemed) return send(res, 409, { error: 'already_redeemed' });
+    const isReusable = Boolean(codeRow.is_reusable);
+    if (!isReusable && codeRow.is_redeemed) return send(res, 409, { error: 'already_redeemed' });
 
     const plushieId = codeRow.plushie_id;
 
@@ -84,25 +85,32 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // 3) Code atomar beanspruchen - schlaegt fehl (0 Zeilen), wenn ein
-    //    gleichzeitiger Versuch schneller war.
-    const claimRes = await sbFetch(serviceKey, `plushie_codes?id=eq.${encodeURIComponent(codeRow.id)}&is_redeemed=eq.false`, {
-      method: 'PATCH',
-      headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({
-        is_redeemed: true,
-        redeemed_by_name_key: nameKey,
-        redeemed_by_display_name: playerName,
-        redeemed_at: new Date().toISOString()
-      })
-    });
-    if (!claimRes.ok) {
-      const detail = await claimRes.text().catch(() => '');
-      return send(res, 502, { error: 'claim_failed', detail: detail.slice(0, 300) });
-    }
-    const claimedRows = await claimRes.json();
-    if (!Array.isArray(claimedRows) || claimedRows.length === 0) {
-      return send(res, 409, { error: 'already_redeemed' });
+    /* Wiederverwendbare Codes (z. B. Easter Eggs, die im UI sichtbar
+       stecken und von vielen Leuten gefunden werden koennen) ueberspringen
+       die Einmal-Sperre komplett - jeder Account darf einloesen, die
+       already_owned-Pruefung oben verhindert Mehrfach-Freischaltung pro
+       Account. Nur klassische Einmal-Codes durchlaufen noch das atomare
+       "Beanspruchen" (verhindert, dass zwei gleichzeitige Versuche mit
+       demselben Code beide durchgehen). */
+    if (!isReusable) {
+      const claimRes = await sbFetch(serviceKey, `plushie_codes?id=eq.${encodeURIComponent(codeRow.id)}&is_redeemed=eq.false`, {
+        method: 'PATCH',
+        headers: { Prefer: 'return=representation' },
+        body: JSON.stringify({
+          is_redeemed: true,
+          redeemed_by_name_key: nameKey,
+          redeemed_by_display_name: playerName,
+          redeemed_at: new Date().toISOString()
+        })
+      });
+      if (!claimRes.ok) {
+        const detail = await claimRes.text().catch(() => '');
+        return send(res, 502, { error: 'claim_failed', detail: detail.slice(0, 300) });
+      }
+      const claimedRows = await claimRes.json();
+      if (!Array.isArray(claimedRows) || claimedRows.length === 0) {
+        return send(res, 409, { error: 'already_redeemed' });
+      }
     }
 
     // 4) Freischaltung eintragen (on-conflict ignorieren fuer den seltenen
