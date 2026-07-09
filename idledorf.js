@@ -447,6 +447,14 @@ function bkmpIdleHandleDragonDefeated() {
   bkmpIdleSpawnDragon();
   bkmpIdleUpdateVillageHpBar();
   bkmpIdleRenderHud();
+  /* Haelt den Erfolge-Zwischenspeicher waehrend des Spielens laufend
+     aktuell (schreibt als Nebeneffekt in bkmp-idle-achievement-fields-
+     cache, siehe bkmpIdleGetAchievementContextFields) - sonst blieb der
+     Cache auf dem Stand vom letzten OEFFNEN des Fensters stehen, und ein
+     Neuladen der Seite nach einer laengeren Spielsitzung zeigte kurz
+     wieder die veralteten (niedrigeren) Zahlen, bis der echte Stand erneut
+     nachgeladen war. */
+  bkmpIdleGetAchievementContextFields();
   bkmpIdleQueueSync();
 }
 
