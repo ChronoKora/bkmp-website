@@ -28,6 +28,18 @@ html[data-theme="light"] {
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; }
 
+/* Duenne, themenfarbene Scrollbar site-weit statt der breiten nativen
+   Browser-Scrollbar mit Pfeil-Buttons (Windows-Standard) - die wirkte in
+   jedem scrollbaren Bereich (Idle-Dorf-Fenster, Listen, Seite selbst) wie
+   ein Fremdkoerper im sonst komplett durchgestylten Dark-/Light-Theme. Gilt
+   automatisch fuer JEDES scrollende Element, nicht nur einzelne Container. */
+* { scrollbar-width: thin; scrollbar-color: var(--gold) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--gold) 55%, transparent); border-radius: 8px; }
+*::-webkit-scrollbar-thumb:hover { background: var(--gold); }
+*::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+
 body {
   background: var(--paper);
   color: var(--ink);
@@ -1528,12 +1540,8 @@ label { display: block; font-size: 0.76rem; color: var(--muted); margin-bottom: 
 .entry-list { display: flex; flex-direction: column; margin-bottom: 1rem; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }
 .entry-table-wrapper {
   max-height: 460px; overflow-y: auto; margin-bottom: 0.2rem;
-  scrollbar-width: thin; scrollbar-color: var(--gold) transparent;
   border-radius: 10px;
 }
-.entry-table-wrapper::-webkit-scrollbar { width: 7px; }
-.entry-table-wrapper::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; }
-.entry-table-wrapper::-webkit-scrollbar-thumb:hover { background: var(--gold); }
 
 .entry-row {
   display: flex; align-items: center; justify-content: space-between; gap: 0.8rem;
