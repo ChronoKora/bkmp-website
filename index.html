@@ -761,7 +761,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase.js?v=20260709-optpass5"></script>
   <script src="app.js?v=20260709-optpass3"></script>
-  <script src="idledorf.js?v=20260709-optpass6"></script>
+  <script src="idledorf.js?v=20260709-optpass7"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
   <script>
     bkmpInitTheme();
@@ -3864,7 +3864,7 @@
         valueLabel = v => `${v} Kartenidee${v === 1 ? '' : 'n'}`;
       }
 
-      rows = rows.filter(r => r.value > 0).slice(0, 25);
+      rows = rows.filter(r => r.value > 0).slice(0, 100);
 
       if (rows.length === 0) {
         list.innerHTML = '<p class="empty-hint">Noch keine Daten für diese Bestenliste.</p>';

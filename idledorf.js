@@ -827,7 +827,7 @@ function bkmpIdleRenderLeaderboardList() {
   const rows = [...bkmpIdleLeaderboardStats]
     .filter(s => Number(s[tab.field] || 0) > 0)
     .sort((a, b) => Number(b[tab.field] || 0) - Number(a[tab.field] || 0))
-    .slice(0, 25);
+    .slice(0, 100);
   if (!rows.length) { listEl.innerHTML = '<p class="empty-hint">Noch keine Daten für diese Bestenliste.</p>'; return; }
   listEl.innerHTML = rows.map((row, i) => {
     const isMe = Boolean(myName) && (row.display_name || '').trim().toLowerCase() === myName;
