@@ -2013,6 +2013,7 @@ label {
   align-items: stretch;
 }
 .partner-card {
+  position: relative;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -3061,6 +3062,7 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   padding-right: 0.2rem;
 }
 .achievement-row {
+  position: relative;
   display: flex;
   align-items: flex-start;
   gap: 0.7rem;
@@ -3165,7 +3167,29 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   overflow-anchor: none;
   margin-bottom: 0.4rem;
 }
+/* "Neu"-Badge fuer frisch hinzugefuegte Titel/Erfolge/Pluschies/PartnerShops/
+   Idle-Dorf-Sammlung (siehe bkmpNewBadgeChecker in index.html) - klein,
+   gut sichtbar, aber ohne das Kartenlayout zu stoeren. */
+.new-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  background: linear-gradient(135deg, #f5d58a, var(--gold));
+  color: #0A0A0F;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.18rem 0.45rem;
+  border-radius: 999px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+}
+
 .cosmetic-swatch {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;

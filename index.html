@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260709-optpass4">
+<link rel="stylesheet" href="style.css?v=20260709-optpass7">
 </head>
 <body>
 
@@ -146,7 +146,7 @@
         <div class="plushie-redeem-box">
           <label for="plushieCodeInput">Code einl&ouml;sen</label>
           <div class="plushie-redeem-row">
-            <input type="text" id="plushieCodeInput" placeholder="z. B. YAKSHA-8F4K-2Q9M" autocomplete="off" spellcheck="false">
+            <input type="text" id="plushieCodeInput" placeholder="z. B. KORA-7F3X-9QLM" autocomplete="off" spellcheck="false">
             <button type="button" class="btn-ja" id="plushieRedeemBtn">Einl&ouml;sen</button>
           </div>
           <p class="plushie-redeem-msg" id="plushieRedeemMsg"></p>
@@ -759,9 +759,9 @@
 
   <script>window.BKMP_CLIENT_STORAGE_KEY = 'bkmp-customer-auth';</script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260709-optpass4"></script>
+  <script src="supabase.js?v=20260709-optpass5"></script>
   <script src="app.js?v=20260709-optpass3"></script>
-  <script src="idledorf.js?v=20260709-optpass3"></script>
+  <script src="idledorf.js?v=20260709-optpass6"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
   <script>
     bkmpInitTheme();
@@ -1146,6 +1146,36 @@
         toast.classList.remove('visible');
         setTimeout(() => toast.remove(), 450);
       }, ms);
+    }
+
+    /* ---------------- "Neu"-Badge fuer neue Inhalte (Titel/Erfolge/Pluschies/
+       PartnerShops/Idle-Dorf-Sammlung) ----------------
+       Generischer, pro Kategorie unabhaengiger "gesehen"-Speicher in
+       localStorage. Nutzung pro Render-Durchlauf einer Liste:
+         const newBadge = bkmpNewBadgeChecker('titles');   // 1x pro Render
+         ... newBadge(t.id) ...                            // pro Zeile
+         bkmpMarkAllSeen('titles', BKMP_TITLES.map(t => t.id));  // am Ende
+       bkmpNewBadgeChecker() liest den Stand einmalig (nicht pro Zeile) UND
+       erkennt den ALLERERSTEN Aufruf ueberhaupt (noch kein gespeicherter
+       Stand) - dann wird nichts als "neu" angezeigt, auch wenn noch nichts
+       "gesehen" war. Sonst wuerden bei einem brandneuen Besucher ploetzlich
+       ALLE bestehenden Titel/Erfolge/etc. faelschlich als neu aufleuchten.
+       Das anschliessende bkmpMarkAllSeen() erledigt in diesem Fall
+       automatisch das Bootstrapping (speichert erstmals den vollen Stand). */
+    const BKMP_SEEN_IDS_PREFIX = 'bkmp-seen-';
+    function bkmpGetSeenIds(type) {
+      try { return new Set(JSON.parse(localStorage.getItem(BKMP_SEEN_IDS_PREFIX + type) || '[]')); } catch (e) { return new Set(); }
+    }
+    function bkmpMarkAllSeen(type, ids) {
+      const seen = bkmpGetSeenIds(type);
+      let changed = false;
+      ids.forEach(id => { if (!seen.has(id)) { seen.add(id); changed = true; } });
+      if (changed) { try { localStorage.setItem(BKMP_SEEN_IDS_PREFIX + type, JSON.stringify([...seen])); } catch (e) {} }
+    }
+    function bkmpNewBadgeChecker(type) {
+      const isFirstEver = localStorage.getItem(BKMP_SEEN_IDS_PREFIX + type) === null;
+      const seen = bkmpGetSeenIds(type);
+      return id => (!isFirstEver && !seen.has(id)) ? '<span class="new-badge">Neu</span>' : '';
     }
 
     /* Generisches "Achievement freigeschaltet"-Popup fuer JEDEN Erfolg (nicht
@@ -2157,10 +2187,12 @@
         ? shops
         : shops.filter(shop => (shop.category || 'Sonstige') === activePartnerCategory);
 
+      const newShopBadge = bkmpNewBadgeChecker('partnershops');
       partnerGrid.innerHTML = visible.map(shop => {
         const href = shop.link ? (String(shop.link).startsWith('http') ? shop.link : 'https://' + shop.link) : '';
         return `
           <article class="partner-card">
+            ${newShopBadge(shop.id)}
             <div class="partner-image-frame" data-bkmp-image-wrap data-empty-label="Kein Bild">
               ${shop.image ? `<img data-bkmp-img src="${shop.image}" alt="${escapeHtml(shop.name)}" loading="eager" fetchpriority="low" decoding="async">` : '<div class="partner-image-empty">Kein Bild</div>'}
             </div>
@@ -2182,6 +2214,7 @@
           if (!img.complete && img.dataset.originalSrc) img.src = img.dataset.originalSrc;
         });
       });
+      bkmpMarkAllSeen('partnershops', shops.map(s => s.id));
     }
     renderPartnerShops();
     if (partnerFilter) {
@@ -3241,6 +3274,11 @@
         check: ctx => ctx.ownedPlushies.includes(p.id)
       })),
       { id: 'plushie_all', category: 'Plüshies', title: 'Besitze sie alle', desc: 'Schalte alle Plüshies frei.', progress: ctx => [ctx.ownedPlushies.length, BKMP_PLUSHIES.length], check: ctx => BKMP_PLUSHIES.length > 0 && BKMP_PLUSHIES.every(p => ctx.ownedPlushies.includes(p.id)) },
+      /* Easter Egg: der Platzhalter-Text im Code-Einloese-Feld
+         (#plushieCodeInput) ist kein Beispiel mehr, sondern ein echter,
+         gueltiger Code - wer genau hinschaut und ihn einloest, bekommt
+         diesen Erfolg extra (zusaetzlich zum normalen "plushie_kora"). */
+      { id: 'kora_finder', category: 'Plüshies', title: 'Du kannst mich austricksen..', desc: 'Wo man überall Plüshi-Codes findet, verrückt oder?', check: ctx => ctx.ownedPlushies.includes('kora') },
       { id: 'daily_event_1', category: 'Plüshies', title: '???', revealName: 'Glücklicher Gewinner', desc: 'Gewinne ein Daily-Code-Event.', check: ctx => ctx.dailyEventWins >= 1 },
       { id: 'daily_event_5', category: 'Plüshies', title: '???', revealName: 'Serien-Gewinner', desc: 'Gewinne 5 Daily-Code-Events.', progress: ctx => [ctx.dailyEventWins, 5], check: ctx => ctx.dailyEventWins >= 5 },
       { id: 'daily_event_15', category: 'Plüshies', title: '???', revealName: 'Event-Champion', desc: 'Gewinne 15 Daily-Code-Events.', progress: ctx => [ctx.dailyEventWins, 15], check: ctx => ctx.dailyEventWins >= 15 },
@@ -3366,6 +3404,7 @@
       { id: 'plushie_sammler', name: 'Plüshie Sammler', desc: 'Hat schon einige Plüshies.', unlockCustom: ctx => ctx.ownedPlushies.length >= 3 },
       { id: 'plushie_koenig', name: 'Plüshie König', desc: 'Fast die komplette Plüshie-Sammlung.', unlockCustom: ctx => BKMP_PLUSHIES.length > 1 && ctx.ownedPlushies.length >= BKMP_PLUSHIES.length - 1 },
       { id: 'plushie_gott', name: 'Plüshie Gott', desc: 'Besitzt jedes einzelne Plüshie.', unlockAchievement: 'plushie_all' },
+      { id: 'schlauer_finder', name: 'SchlauerFinder', desc: 'Für alle, die genau hinschauen.', unlockAchievement: 'kora_finder' },
       { id: 'fanboy', name: 'Fanboy', desc: 'Hat sein erstes Plüshie ergattert.', unlockCustom: ctx => ctx.ownedPlushies.length >= 1 },
       { id: 'superfan', name: 'Superfan', desc: 'Gleich mehrere Plüshies gesammelt.', unlockCustom: ctx => ctx.ownedPlushies.length >= 2 },
       { id: 'maximaler_fanboy', name: 'Maximaler Fanboy', desc: 'Absoluter Plüshie-Enthusiast.', unlockCustom: ctx => ctx.ownedPlushies.length >= 4 },
@@ -3438,12 +3477,14 @@
       const unlockedCount = BKMP_ACHIEVEMENTS.filter(a => a.check(ctx)).length;
       const active = bkmpGetActiveTitle() || 'none';
       const el = document.getElementById('titlesList');
+      const newBadge = bkmpNewBadgeChecker('titles');
       el.innerHTML = BKMP_TITLES.map(t => {
         const unlocked = bkmpTitleUnlocked(t, unlockedCount, ctx);
         const isActive = active === t.id;
         const lockedHint = t.unlockAchievement ? 'Erst diesen Erfolg freischalten.' : (t.unlockCustom ? 'Noch nicht freigeschaltet.' : `Ab ${t.unlockAt} Erfolgen`);
         return `
           <button type="button" class="cosmetic-swatch ${unlocked ? '' : 'locked'} ${isActive ? 'active' : ''}" data-title-id="${escapeHtml(t.id)}" ${unlocked ? '' : 'disabled'}>
+            ${newBadge(t.id)}
             <span class="cosmetic-swatch-name">${unlocked ? escapeHtml(t.name) : '🔒'}</span>
             <span class="cosmetic-swatch-desc">${unlocked ? escapeHtml(t.desc) : lockedHint}</span>
           </button>`;
@@ -3454,6 +3495,7 @@
           renderTitlesPanel();
         });
       });
+      bkmpMarkAllSeen('titles', BKMP_TITLES.map(t => t.id));
     }
 
     /* ---------------- Pluschies ---------------- */
@@ -3514,11 +3556,13 @@
       const el = document.getElementById('plushiesList');
       if (!el) return;
       const active = bkmpGetActivePlushie();
+      const newBadge = bkmpNewBadgeChecker('plushies');
       el.innerHTML = BKMP_PLUSHIES.map(p => {
         const unlocked = bkmpOwnedPlushies.includes(p.id);
         const isActive = active === p.id;
         return `
           <button type="button" class="cosmetic-swatch plushie-swatch ${unlocked ? '' : 'locked'} ${isActive ? 'active' : ''}" data-plushie-id="${escapeHtml(p.id)}" ${unlocked ? '' : 'disabled'}>
+            ${newBadge(p.id)}
             ${unlocked ? `<img class="plushie-swatch-img" src="${escapeHtml(p.image)}" alt="" loading="lazy">` : '<span class="plushie-swatch-lock">🔒</span>'}
             <span class="cosmetic-swatch-name">${unlocked ? escapeHtml(p.name) : '???'}</span>
             <span class="cosmetic-swatch-desc">${unlocked ? escapeHtml(p.desc) : 'Nur per Code freischaltbar.'}</span>
@@ -3531,6 +3575,7 @@
           renderPlushiesPanel();
         });
       });
+      bkmpMarkAllSeen('plushies', BKMP_PLUSHIES.map(p => p.id));
     }
     const plushieRedeemBtn = document.getElementById('plushieRedeemBtn');
     const plushieCodeInput = document.getElementById('plushieCodeInput');
@@ -3926,6 +3971,7 @@
       const latestSuffix = latestUnlockIso ? ` Zuletzt freigeschaltet: ${bkmpFormatRelativeTime(latestUnlockIso)}.` : '';
       document.getElementById('achievementsSummary').textContent = `${unlockedCount} von ${BKMP_ACHIEVEMENTS.length} Erfolgen freigeschaltet.${latestSuffix}`;
 
+      const newAchievementBadge = bkmpNewBadgeChecker('achievements');
       list.innerHTML = BKMP_ACHIEVEMENT_CATEGORY_ORDER.map(category => {
         const items = BKMP_ACHIEVEMENTS.filter(a => a.category === category);
         if (items.length === 0) return '';
@@ -3941,6 +3987,7 @@
           const unlockedAtLabel = unlocked ? (bkmpFormatAchievementUnlockedAt(a.id) || 'Datum unbekannt') : '';
           return `
             <div class="achievement-row ${unlocked ? 'unlocked' : 'locked'}">
+              ${newAchievementBadge(a.id)}
               <span class="achievement-icon">${unlocked ? '✅' : '🔒'}</span>
               <div class="achievement-body">
                 <div class="achievement-title">${escapeHtml(displayTitle)}</div>
@@ -3968,6 +4015,7 @@
           renderAchievementsPanel();
         });
       });
+      bkmpMarkAllSeen('achievements', BKMP_ACHIEVEMENTS.map(a => a.id));
     }
 
     const mcNameOverlay = document.getElementById('mcNameOverlay');

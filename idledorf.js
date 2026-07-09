@@ -745,10 +745,12 @@ function bkmpIdleRenderSammlungPanel() {
   const ctx = bkmpIdleGetAchievementContextFields();
   const bonusTitles = window.BKMP_IDLE_TITLES.filter(t => t.effectType);
   const unlockedCount = bonusTitles.filter(t => t.unlockCustom(ctx)).length;
+  const newBadge = typeof bkmpNewBadgeChecker === 'function' ? bkmpNewBadgeChecker('idletitles') : () => '';
   const rows = bonusTitles.map(title => {
     const unlocked = title.unlockCustom(ctx);
     return `
       <div class="achievement-row ${unlocked ? 'unlocked' : 'locked'}">
+        ${newBadge(title.id)}
         <span class="achievement-icon">${unlocked ? '✅' : '🔒'}</span>
         <div class="achievement-body">
           <div class="achievement-title">${escapeHtml(title.name)}</div>
@@ -757,6 +759,7 @@ function bkmpIdleRenderSammlungPanel() {
         <span class="idle-title-bonus ${unlocked ? '' : 'idle-title-bonus-hidden'}">${unlocked ? escapeHtml(bkmpIdleFormatTitleBonus(title)) : '???'}</span>
       </div>`;
   }).join('');
+  if (typeof bkmpMarkAllSeen === 'function') bkmpMarkAllSeen('idletitles', bonusTitles.map(t => t.id));
   panel.innerHTML = `
     <p class="idle-panel-hint">Deine 18 Idle-Dorf-Kosmetiken schaltest du durch Fortschritt frei und findest sie in deinem Erfolge-Fenster unter „Kosmetik".</p>
     <button type="button" class="btn-ja" id="idleOpenCosmeticsBtn">Kosmetik öffnen</button>
