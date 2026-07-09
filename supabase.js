@@ -535,6 +535,19 @@ async function bkmpGetPlayerSession() {
 async function bkmpRestorePlayerSession() {
   const session = await bkmpGetPlayerSession();
   if (!session || !session.user) return '';
+  /* NICHT user_metadata.display_name vertrauen: das steckt im JWT und wird
+     nach einer Namensaenderung (rename_player_account) erst beim naechsten
+     ECHTEN Token-Refresh aktuell - bis dahin wuerde hier wieder der alte
+     Name zurueckgegeben, obwohl player_stats laengst den neuen Namen hat.
+     Stattdessen player_stats direkt per auth_user_id abfragen (die
+     zuverlaessige, immer aktuelle Quelle). Faellt nur zurueck auf
+     user_metadata, falls player_stats aus irgendeinem Grund noch keine
+     Zeile fuer dieses Konto hat. */
+  try {
+    const client = bkmpGetPlayerAuthClient();
+    const { data, error } = await client.from('player_stats').select('display_name').eq('auth_user_id', session.user.id).limit(1);
+    if (!error && Array.isArray(data) && data[0] && data[0].display_name) return data[0].display_name;
+  } catch (e) { /* Fallback unten */ }
   return (session.user.user_metadata && session.user.user_metadata.display_name) || '';
 }
 
@@ -2323,26 +2336,51 @@ async function upsertPlayerStats(displayName, stats) {
   const { data: sessionData } = await client.auth.getSession();
   const userId = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
   if (!userId) return false;
-  const { error } = await client
+  const statsPayload = {
+    minutes_spent: Math.max(0, Math.round(stats.minutesSpent || 0)),
+    achievements_unlocked: Math.max(0, Math.round(stats.achievementsUnlocked || 0)),
+    eggs_found: Array.isArray(stats.eggsFound) ? stats.eggsFound : [],
+    days_visited: Array.isArray(stats.daysVisited) ? stats.daysVisited : [],
+    flags: stats.flags && typeof stats.flags === 'object' ? stats.flags : {},
+    panel_opens: Math.max(0, Math.round(stats.panelOpens || 0)),
+    active_title: stats.activeTitle || '',
+    active_cosmetic: stats.activeCosmetic || '',
+    bonk_count: Math.max(0, Math.round(stats.bonkCount || 0)),
+    active_plushie: stats.activePlushie || '',
+    achievement_unlocks: stats.achievementUnlocks && typeof stats.achievementUnlocks === 'object' ? stats.achievementUnlocks : {},
+    updated_at: new Date().toISOString()
+  };
+  /* WICHTIG: nicht per upsert(onConflict:'name_key') schreiben, UND
+     name_key/display_name hier bewusst NICHT mit-updaten. Die eigentliche,
+     stabile Identitaet der Zeile ist auth_user_id (eindeutig erzwungen
+     ueber player_stats_auth_user_id_idx) - name_key aendert sich nur ueber
+     rename_player_account() (eigene RPC), nicht ueber diesen periodischen
+     Stats-Sync. Wuerde man hier trotzdem per upsert(onConflict:'name_key')
+     schreiben und der lokal zwischengespeicherte Name waere (z. B. kurz
+     nach einer Umbenennung auf einem anderen Geraet) veraltet, wuerde
+     Postgres faelschlich eine ZWEITE Zeile mit dem GLEICHEN auth_user_id
+     einfuegen wollen -> Verstoss gegen den unique index, der komplette
+     Schreibzugriff schlug dadurch fehl (nur still im console.warn
+     verschluckt) - die Bestenliste blieb dauerhaft auf dem letzten
+     erfolgreichen Stand haengen. Stattdessen zuerst per auth_user_id
+     updaten (trifft immer die richtige Zeile, unabhaengig vom Namen) und
+     nur wenn dabei wirklich noch keine Zeile existierte (brandneues Konto),
+     neu einfuegen - dort MUSS name_key/display_name dabei sein. */
+  const { data: updated, error: updateError } = await client
     .from('player_stats')
-    .upsert({
+    .update(statsPayload)
+    .eq('auth_user_id', userId)
+    .select('auth_user_id');
+  if (updateError) throw updateError;
+  if (!Array.isArray(updated) || updated.length === 0) {
+    const { error: insertError } = await client.from('player_stats').insert({
+      ...statsPayload,
       name_key: String(displayName).trim().toLowerCase(),
       display_name: displayName,
-      auth_user_id: userId,
-      minutes_spent: Math.max(0, Math.round(stats.minutesSpent || 0)),
-      achievements_unlocked: Math.max(0, Math.round(stats.achievementsUnlocked || 0)),
-      eggs_found: Array.isArray(stats.eggsFound) ? stats.eggsFound : [],
-      days_visited: Array.isArray(stats.daysVisited) ? stats.daysVisited : [],
-      flags: stats.flags && typeof stats.flags === 'object' ? stats.flags : {},
-      panel_opens: Math.max(0, Math.round(stats.panelOpens || 0)),
-      active_title: stats.activeTitle || '',
-      active_cosmetic: stats.activeCosmetic || '',
-      bonk_count: Math.max(0, Math.round(stats.bonkCount || 0)),
-      active_plushie: stats.activePlushie || '',
-      achievement_unlocks: stats.achievementUnlocks && typeof stats.achievementUnlocks === 'object' ? stats.achievementUnlocks : {},
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'name_key' });
-  if (error) throw error;
+      auth_user_id: userId
+    });
+    if (insertError) throw insertError;
+  }
   return true;
 }
 
@@ -2501,10 +2539,32 @@ async function upsertIdlePlayerState(state) {
   const { data: sessionData } = await client.auth.getSession();
   const userId = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
   if (!userId) return false;
-  const { error } = await client
+  /* Gleicher Grund/gleiches Muster wie in upsertPlayerStats: name_key im
+     mitgegebenen state-Objekt kann ein Snapshot von VOR einer Umbenennung
+     sein (bkmpIdleState wird nicht bei jeder Namensaenderung sofort neu
+     geladen) - ein upsert(onConflict:'name_key') damit wuerde bei
+     Namensabweichung eine zweite Zeile mit dem gleichen auth_user_id
+     einfuegen wollen und am idle_player_state_auth_user_id_idx scheitern.
+     Erst per auth_user_id updaten (name_key/display_name bewusst NICHT mit
+     im Update-Payload - die aendert nur rename_player_account()), nur bei
+     wirklich neuem Konto einfuegen. */
+  const { name_key, display_name, ...stateWithoutIdentity } = state;
+  const statsPayload = { ...stateWithoutIdentity, updated_at: new Date().toISOString() };
+  const { data: updated, error: updateError } = await client
     .from('idle_player_state')
-    .upsert({ ...state, auth_user_id: userId, updated_at: new Date().toISOString() }, { onConflict: 'name_key' });
-  if (error) throw error;
+    .update(statsPayload)
+    .eq('auth_user_id', userId)
+    .select('auth_user_id');
+  if (updateError) throw updateError;
+  if (!Array.isArray(updated) || updated.length === 0) {
+    const { error: insertError } = await client.from('idle_player_state').insert({
+      ...statsPayload,
+      name_key,
+      display_name,
+      auth_user_id: userId
+    });
+    if (insertError) throw insertError;
+  }
   return true;
 }
 

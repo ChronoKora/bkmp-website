@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260709-optpass7">
+<link rel="stylesheet" href="style.css?v=20260709-optpass8">
 </head>
 <body>
 
@@ -2380,7 +2380,10 @@
       cardCatalogShopInput.value = '';
       cardCatalogCbInput.value = '';
       cardCatalogSizeInput.value = '';
-      cardCatalogWhoInput.value = '';
+      /* Vorausgefuellt mit dem eingeloggten Namen (siehe gleicher Kommentar
+         bei resetWishForm) - sonst zaehlten "Kartensammler"-Erfolge nie mit,
+         wenn hier ein anderer Name als beim Login eingetippt wurde. */
+      cardCatalogWhoInput.value = typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : '';
       cardCatalogDescriptionInput.value = '';
       cardCatalogImageFileInput.value = '';
       if (cardCatalogConfirmPreviewUrl) {
@@ -2746,7 +2749,12 @@
     const wishSuccessClose = document.getElementById('wishSuccessClose');
 
     function resetWishForm() {
-      wishName.value = '';
+      /* Vorausgefuellt mit dem eingeloggten Namen statt leer - vorher war
+         dieses Feld reiner Freitext ohne Bezug zum Account, wodurch ein
+         Tippfehler/anderer Name als beim Login die "Wunschfan"-Erfolge
+         (die per exaktem Namensvergleich zaehlen) stillschweigend nie
+         mitgezaehlt hat, selbst nach Admin-Bestaetigung. */
+      wishName.value = typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : '';
       wishImageFile.value = '';
       wishFormView.style.display = '';
       wishSuccessView.style.display = 'none';
