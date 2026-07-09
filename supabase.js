@@ -1960,6 +1960,7 @@ function bkmpMapCardCatalogFromSupabase(row) {
     category: row.category || '',
     shopName: row.shop_name || '',
     cb: row.cb || '',
+    size: row.size || '',
     submittedBy: row.submitted_by || '',
     description: row.description || '',
     image: row.image_url || '',
@@ -1975,6 +1976,7 @@ function bkmpMapCardCatalogToSupabase(item) {
     category: item.category || '',
     shop_name: item.shopName || '',
     cb: item.cb || '',
+    size: item.size || '',
     submitted_by: item.submittedBy || '',
     description: item.description || '',
     image_url: item.image || ''
@@ -1988,7 +1990,7 @@ async function loadCardCatalog() {
   if (!client) return null;
   const { data, error } = await client
     .from('card_catalog')
-    .select('id, name, category, shop_name, cb, submitted_by, description, image_url, status, created_at')
+    .select('id, name, category, shop_name, cb, size, submitted_by, description, image_url, status, created_at')
     .order('created_at', { ascending: false });
   if (error) throw error;
   return (data || []).map(bkmpMapCardCatalogFromSupabase);
@@ -2001,7 +2003,7 @@ async function updateCardCatalogStatus(id, status) {
     .from('card_catalog')
     .update({ status })
     .eq('id', id)
-    .select('id, name, category, shop_name, cb, submitted_by, description, image_url, status, created_at')
+    .select('id, name, category, shop_name, cb, size, submitted_by, description, image_url, status, created_at')
     .limit(1);
   if (error) throw error;
   const row = Array.isArray(data) ? data[0] : null;
@@ -2019,13 +2021,13 @@ async function saveCardCatalogEntry(item) {
       .from('card_catalog')
       .update(payload)
       .eq('id', item.id)
-      .select('id, name, category, shop_name, cb, submitted_by, description, image_url, status, created_at')
+      .select('id, name, category, shop_name, cb, size, submitted_by, description, image_url, status, created_at')
       .limit(1);
   } else {
     query = client
       .from('card_catalog')
       .insert(payload)
-      .select('id, name, category, shop_name, cb, submitted_by, description, image_url, status, created_at')
+      .select('id, name, category, shop_name, cb, size, submitted_by, description, image_url, status, created_at')
       .limit(1);
   }
   const { data, error } = await query;

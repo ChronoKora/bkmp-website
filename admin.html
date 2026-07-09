@@ -23,7 +23,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260709-mapartpolish1">
+<link rel="stylesheet" href="style.css?v=20260709-cardsize1">
 </head>
 <body>
 
@@ -530,10 +530,11 @@
               <div class="form-grid form-grid-3">
                 <div><label for="cardCatalogEditName">Name</label><input type="text" id="cardCatalogEditName"></div>
                 <div><label for="cardCatalogEditCategory">Kategorie</label><input type="text" id="cardCatalogEditCategory"></div>
-                <div><label for="cardCatalogEditShop">Shop</label><input type="text" id="cardCatalogEditShop"></div>
+                <div><label for="cardCatalogEditShop">Welcher SW? (ShopName)</label><input type="text" id="cardCatalogEditShop" placeholder="/sw Anime"></div>
               </div>
-              <div class="form-grid form-grid-2">
+              <div class="form-grid form-grid-3">
                 <div><label for="cardCatalogEditCb">CB</label><input type="text" id="cardCatalogEditCb"></div>
+                <div><label for="cardCatalogEditSize">Wie groß ist die Karte?</label><input type="text" id="cardCatalogEditSize" placeholder="z. B. 15er"></div>
                 <div><label for="cardCatalogEditWho">Eingetragen von</label><input type="text" id="cardCatalogEditWho"></div>
               </div>
               <label for="cardCatalogEditDescription">Beschreibung</label>
@@ -869,10 +870,10 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260708-mapart8"></script>
-  <script src="app.js?v=20260707-plushiesdb"></script>
-  <script src="idledorf.js?v=20260709-titlebonus1"></script>
-  <script src="mapart.js?v=20260709-mapartpolish1"></script>
+  <script src="supabase.js?v=20260709-cardsize1"></script>
+  <script src="app.js?v=20260709-cardsale1"></script>
+  <script src="idledorf.js?v=20260709-cardsale1"></script>
+  <script src="mapart.js?v=20260709-cardsale1"></script>
   <script>
     bkmpInitTheme();
 
@@ -918,7 +919,8 @@
         refreshPartnerShopsFromSupabase(),
         refreshCardSalesFromSupabase(),
         refreshInvestorRequestsFromSupabase(),
-        refreshCardCatalogFromSupabase()
+        refreshCardCatalogFromSupabase(),
+        refreshCardSaleRequestsFromSupabase()
       ]);
     }
 
@@ -962,13 +964,15 @@
       const pendingCardCatalog = (data.cardCatalog || []).filter(item => item.status === 'pending').length;
       const pendingWishes = (data.wishes || []).filter(item => item.status === 'pending').length;
       const pendingInvestorRequests = (data.investorRequests || []).filter(item => item.status === 'pending').length;
-      const total = pendingCardCatalog + pendingWishes + pendingInvestorRequests;
+      const pendingCardSaleRequests = (data.cardSaleRequests || []).filter(item => item.status === 'pending').length;
+      const total = pendingCardCatalog + pendingWishes + pendingInvestorRequests + pendingCardSaleRequests;
       if (total === 0) return;
 
       const parts = [];
       if (pendingCardCatalog) parts.push(`${pendingCardCatalog} Karte${pendingCardCatalog === 1 ? '' : 'n'}`);
       if (pendingWishes) parts.push(`${pendingWishes} Kartenidee${pendingWishes === 1 ? '' : 'n'}`);
       if (pendingInvestorRequests) parts.push(`${pendingInvestorRequests} Investoren-Anfrage${pendingInvestorRequests === 1 ? '' : 'n'}`);
+      if (pendingCardSaleRequests) parts.push(`${pendingCardSaleRequests} Verkaufsanfrage${pendingCardSaleRequests === 1 ? '' : 'n'}`);
 
       const popup = document.getElementById('adminPendingPopup');
       document.getElementById('adminPendingPopupTitle').textContent = `Du hast ${total} neue Anfrage${total === 1 ? '' : 'n'}`;
@@ -1689,6 +1693,7 @@
     const cardCatalogEditCategory = document.getElementById('cardCatalogEditCategory');
     const cardCatalogEditShop = document.getElementById('cardCatalogEditShop');
     const cardCatalogEditCb = document.getElementById('cardCatalogEditCb');
+    const cardCatalogEditSize = document.getElementById('cardCatalogEditSize');
     const cardCatalogEditWho = document.getElementById('cardCatalogEditWho');
     const cardCatalogEditDescription = document.getElementById('cardCatalogEditDescription');
 
@@ -1700,6 +1705,7 @@
       cardCatalogEditCategory.value = item.category || '';
       cardCatalogEditShop.value = item.shopName || '';
       cardCatalogEditCb.value = item.cb || '';
+      cardCatalogEditSize.value = item.size || '';
       cardCatalogEditWho.value = item.submittedBy || '';
       cardCatalogEditDescription.value = item.description || '';
       cardCatalogEditForm.style.display = '';
@@ -1725,6 +1731,7 @@
           category: cardCatalogEditCategory.value.trim(),
           shopName: cardCatalogEditShop.value.trim().toUpperCase(),
           cb: cardCatalogEditCb.value.trim(),
+          size: cardCatalogEditSize.value.trim(),
           submittedBy: cardCatalogEditWho.value.trim(),
           description: cardCatalogEditDescription.value.trim()
         };
@@ -1771,7 +1778,7 @@
           ${item.image ? `<span class="partner-admin-thumb-wrap" data-bkmp-image-wrap data-empty-label="Karte"><img data-bkmp-img class="partner-admin-thumb" src="${item.image}" alt="" loading="lazy" decoding="async"></span>` : '<div class="partner-admin-thumb partner-admin-thumb-empty">Karte</div>'}
           <div class="desc">
             <span class="name">${escapeHtml(item.name)}</span>
-            <span class="meta">${item.category ? escapeHtml(item.category) + ' · ' : ''}${item.shopName ? escapeHtml(item.shopName.toUpperCase()) + ' · ' : ''}${item.cb ? escapeHtml(item.cb) + ' · ' : ''}${item.submittedBy ? 'von ' + escapeHtml(item.submittedBy) : ''}</span>
+            <span class="meta">${item.category ? escapeHtml(item.category) + ' · ' : ''}${item.shopName ? escapeHtml(item.shopName.toUpperCase()) + ' · ' : ''}${item.cb ? escapeHtml(item.cb) + ' · ' : ''}${item.size ? escapeHtml(item.size) + ' · ' : ''}${item.submittedBy ? 'von ' + escapeHtml(item.submittedBy) : ''}</span>
           </div>
           <div class="entry-actions">
             ${actionsHtml(item)}
@@ -1986,7 +1993,8 @@
         partnerShops: raw.partnerShops || [],
         cardSales: raw.cardSales || [],
         investorRequests: raw.investorRequests || [],
-        cardCatalog: raw.cardCatalog || []
+        cardCatalog: raw.cardCatalog || [],
+        cardSaleRequests: raw.cardSaleRequests || []
       };
     }
 
@@ -2017,6 +2025,7 @@
       renderPartnerShopList();
       renderCardSaleList();
       renderInvestorRequestList();
+      renderCardSaleRequestList();
       renderCardCatalogList();
       if (window.bkmpEnhanceImages) window.bkmpEnhanceImages(document);
     }

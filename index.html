@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260709-mapartpolish1">
+<link rel="stylesheet" href="style.css?v=20260709-cardsize1">
 </head>
 <body>
 
@@ -648,12 +648,14 @@
         <input type="text" id="cardCatalogName" placeholder="z. B. Naruto" required>
         <div class="form-grid form-grid-2">
           <div><label for="cardCatalogCategory">Kategorie</label><input type="text" id="cardCatalogCategory" placeholder="z. B. Anime"></div>
-          <div><label for="cardCatalogShop">Shop-Name</label><input type="text" id="cardCatalogShop" placeholder="z. B. Karten-Paradies"></div>
+          <div><label for="cardCatalogShop">Welcher SW? (ShopName)</label><input type="text" id="cardCatalogShop" placeholder="/sw Anime"></div>
         </div>
         <div class="form-grid form-grid-2">
           <div><label for="cardCatalogCb">Welcher CB?</label><input type="text" id="cardCatalogCb" placeholder="z. B. CB1"></div>
-          <div><label for="cardCatalogWho">Wer trägt ein?</label><input type="text" id="cardCatalogWho" placeholder="Dein Name"></div>
+          <div><label for="cardCatalogSize">Wie groß ist die Karte?</label><input type="text" id="cardCatalogSize" placeholder="z. B. 15er"></div>
         </div>
+        <label for="cardCatalogWho">Wer trägt ein?</label>
+        <input type="text" id="cardCatalogWho" placeholder="Dein Name">
         <label for="cardCatalogDescription">Was ist das? (optional)</label>
         <textarea id="cardCatalogDescription" placeholder="Kurze Beschreibung"></textarea>
         <label for="cardCatalogImageFile">Bild (Pflicht)</label>
@@ -713,10 +715,10 @@
 
   <script>window.BKMP_CLIENT_STORAGE_KEY = 'bkmp-customer-auth';</script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260708-mapart8"></script>
-  <script src="app.js?v=20260707-plushiesdb"></script>
-  <script src="idledorf.js?v=20260709-titlebonus1"></script>
-  <script src="mapart.js?v=20260709-mapartpolish1"></script>
+  <script src="supabase.js?v=20260709-cardsize1"></script>
+  <script src="app.js?v=20260709-cardsale1"></script>
+  <script src="idledorf.js?v=20260709-cardsale1"></script>
+  <script src="mapart.js?v=20260709-cardsale1"></script>
   <script>
     bkmpInitTheme();
     window.addEventListener('load', () => document.body.classList.add('page-loaded'));
@@ -2208,7 +2210,10 @@
           <div class="cardcatalog-body">
             ${item.category ? `<span class="cardcatalog-category">${escapeHtml(item.category)}</span>` : ''}
             <h3>${escapeHtml(item.name)}</h3>
-            ${item.shopName ? `<div class="cardcatalog-shop">${escapeHtml(item.shopName.toUpperCase())}${item.cb ? ' · ' + escapeHtml(item.cb) : ''}</div>` : (item.cb ? `<div class="cardcatalog-shop">${escapeHtml(item.cb)}</div>` : '')}
+            ${(() => {
+              const parts = [item.shopName ? item.shopName.toUpperCase() : '', item.cb || '', item.size || ''].filter(Boolean);
+              return parts.length ? `<div class="cardcatalog-shop">${parts.map(escapeHtml).join(' · ')}</div>` : '';
+            })()}
             ${item.description ? `<p>${escapeHtml(item.description)}</p>` : ''}
             ${item.submittedBy ? `<div class="cardcatalog-submitter">Eingetragen von ${escapeHtml(item.submittedBy)}</div>` : ''}
           </div>
@@ -2246,6 +2251,7 @@
     const cardCatalogCategoryInput = document.getElementById('cardCatalogCategory');
     const cardCatalogShopInput = document.getElementById('cardCatalogShop');
     const cardCatalogCbInput = document.getElementById('cardCatalogCb');
+    const cardCatalogSizeInput = document.getElementById('cardCatalogSize');
     const cardCatalogWhoInput = document.getElementById('cardCatalogWho');
     const cardCatalogDescriptionInput = document.getElementById('cardCatalogDescription');
     const cardCatalogImageFileInput = document.getElementById('cardCatalogImageFile');
@@ -2270,6 +2276,7 @@
       cardCatalogCategoryInput.value = '';
       cardCatalogShopInput.value = '';
       cardCatalogCbInput.value = '';
+      cardCatalogSizeInput.value = '';
       cardCatalogWhoInput.value = '';
       cardCatalogDescriptionInput.value = '';
       cardCatalogImageFileInput.value = '';
@@ -2299,9 +2306,10 @@
         const category = cardCatalogCategoryInput.value.trim();
         const shopName = cardCatalogShopInput.value.trim().toUpperCase();
         const cb = cardCatalogCbInput.value.trim();
+        const size = cardCatalogSizeInput.value.trim();
         const submittedBy = cardCatalogWhoInput.value.trim();
         const description = cardCatalogDescriptionInput.value.trim();
-        cardCatalogPendingEntry = { name, category, shopName, cb, submittedBy, description, file };
+        cardCatalogPendingEntry = { name, category, shopName, cb, size, submittedBy, description, file };
 
         if (cardCatalogConfirmPreviewUrl) URL.revokeObjectURL(cardCatalogConfirmPreviewUrl);
         cardCatalogConfirmPreviewUrl = URL.createObjectURL(file);
@@ -2310,6 +2318,7 @@
           ['Kategorie', category],
           ['Shop', shopName],
           ['CB', cb],
+          ['Größe', size],
           ['Wer trägt ein', submittedBy],
           ['Beschreibung', description]
         ].filter(([, value]) => value);
@@ -2330,7 +2339,7 @@
         if (!cardCatalogPendingEntry) return;
         const cooldown = bkmpSubmitCooldownSecondsLeft('cardcatalog');
         if (cooldown > 0) { alert(`Bitte warte noch ${cooldown} Sekunde(n), bevor du erneut einreichst.`); return; }
-        const { name, category, shopName, cb, submittedBy, description, file } = cardCatalogPendingEntry;
+        const { name, category, shopName, cb, size, submittedBy, description, file } = cardCatalogPendingEntry;
 
         cardCatalogConfirmYes.disabled = true;
         cardCatalogConfirmYes.textContent = 'Wird gespeichert...';
@@ -2341,7 +2350,7 @@
         }
 
         bkmpCompressImageFile(file).then(image => {
-          bkmpSubmitViaApi('card_catalog', { name, category, shop_name: shopName, cb, submitted_by: submittedBy, description }, image).then(() => {
+          bkmpSubmitViaApi('card_catalog', { name, category, shop_name: shopName, cb, size, submitted_by: submittedBy, description }, image).then(() => {
             bkmpStartSubmitCooldown('cardcatalog');
             resetBtn();
             clearCardCatalogForm();

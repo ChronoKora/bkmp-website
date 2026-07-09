@@ -28,7 +28,7 @@ const TABLE_CONFIG = {
     folder: 'card-catalog',
     imageField: 'image_url',
     requiredFields: ['name'],
-    allowedFields: ['name', 'category', 'shop_name', 'cb', 'submitted_by', 'description'],
+    allowedFields: ['name', 'category', 'shop_name', 'cb', 'size', 'submitted_by', 'description'],
     requireImage: true
   },
   wishes: {

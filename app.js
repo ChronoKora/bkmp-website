@@ -137,7 +137,8 @@ const BKMP_DEFAULT_DATA = {
   partnerShops: [],
   cardSales: [],
   investorRequests: [],
-  cardCatalog: []
+  cardCatalog: [],
+  cardSaleRequests: []
 };
 
 /* Vor der Server-API (api/submit-entry.js) speicherte das Formular bei
@@ -170,7 +171,8 @@ function bkmpLoadData() {
       partnerShops: parsed.partnerShops || [],
       cardSales: parsed.cardSales || [],
       investorRequests: parsed.investorRequests || [],
-      cardCatalog: bkmpPurgeOrphanedLocalEntries(parsed.cardCatalog, 'cardcat-')
+      cardCatalog: bkmpPurgeOrphanedLocalEntries(parsed.cardCatalog, 'cardcat-'),
+      cardSaleRequests: parsed.cardSaleRequests || []
     };
   } catch (e) {
     console.error('Fehler beim Laden der Daten:', e);
