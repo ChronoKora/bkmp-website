@@ -3129,7 +3129,7 @@ async function loadRaidBossesAdmin() {
   if (!client) return [];
   const { data, error } = await client
     .from('raid_bosses')
-    .select('id, name, sprite_key, base_hp, base_attack, attack_interval_seconds, gold_reward, gem_reward, xp_reward, active')
+    .select('id, name, sprite_key, base_hp, base_attack, attack_interval_seconds, gold_reward, gem_reward, xp_reward, active, hp_scale_per_attack')
     .order('created_at', { ascending: true });
   if (error) throw error;
   return data || [];
@@ -3142,7 +3142,7 @@ async function updateRaidBoss(id, patch) {
     .from('raid_bosses')
     .update(patch)
     .eq('id', id)
-    .select('id, name, sprite_key, base_hp, base_attack, attack_interval_seconds, gold_reward, gem_reward, xp_reward, active')
+    .select('id, name, sprite_key, base_hp, base_attack, attack_interval_seconds, gold_reward, gem_reward, xp_reward, active, hp_scale_per_attack')
     .limit(1);
   if (error) throw error;
   return Array.isArray(data) ? data[0] : null;

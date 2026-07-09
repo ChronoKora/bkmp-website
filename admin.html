@@ -912,7 +912,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260710-raid2"></script>
+  <script src="supabase.js?v=20260710-bossscale1"></script>
   <script src="app.js?v=20260709-optpass3"></script>
   <script src="idledorf.js?v=20260710-raidresult1"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
@@ -4007,13 +4007,15 @@
         <div class="idle-upgrade-card" style="text-align:left; margin-bottom:0.8rem;" data-raid-boss-id="${escapeHtml(boss.id)}">
           <div class="idle-upgrade-name">${escapeHtml(boss.name)} <span class="idle-upgrade-level">(${escapeHtml(boss.id)})</span></div>
           <div class="form-grid form-grid-3" style="margin-top:0.6rem;">
-            <div><label>Boss-Leben</label><input type="number" min="1" class="raid-boss-field" data-field="base_hp" value="${boss.base_hp}"></div>
+            <div><label>Boss-Leben (Untergrenze)</label><input type="number" min="1" class="raid-boss-field" data-field="base_hp" value="${boss.base_hp}"></div>
             <div><label>Boss-Angriff</label><input type="number" min="1" class="raid-boss-field" data-field="base_attack" value="${boss.base_attack}"></div>
             <div><label>Angriffs-Intervall (Sek.)</label><input type="number" min="1" class="raid-boss-field" data-field="attack_interval_seconds" value="${boss.attack_interval_seconds}"></div>
             <div><label>Gold-Belohnung</label><input type="number" min="0" class="raid-boss-field" data-field="gold_reward" value="${boss.gold_reward}"></div>
             <div><label>Edelstein-Belohnung</label><input type="number" min="0" class="raid-boss-field" data-field="gem_reward" value="${boss.gem_reward}"></div>
             <div><label>XP-Belohnung</label><input type="number" min="0" class="raid-boss-field" data-field="xp_reward" value="${boss.xp_reward}"></div>
+            <div><label>HP-Skalierung pro Angriffskraft</label><input type="number" min="0" step="1" class="raid-boss-field" data-field="hp_scale_per_attack" value="${boss.hp_scale_per_attack}"></div>
           </div>
+          <p class="admin-help-text">Boss-Leben = max(Boss-Leben-Untergrenze, Summe der Angriffskraft aller Teilnehmer × HP-Skalierung). Wird bei jedem Beitritt waehrend der Vorbereitungsphase neu berechnet - mehr/staerkere Spieler ergeben automatisch einen zaeheren Boss.</p>
           <label class="admin-checkbox-label"><input type="checkbox" class="raid-boss-field" data-field="active" ${boss.active ? 'checked' : ''}> Aktiv (wird fuer den naechsten Raid ausgewaehlt)</label>
           <button type="button" class="btn btn-primary raid-boss-save-btn" style="margin-top:0.6rem;">Speichern</button>
           <p class="admin-help-text raid-boss-save-status"></p>

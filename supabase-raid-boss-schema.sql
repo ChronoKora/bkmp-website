@@ -36,12 +36,25 @@ create table if not exists public.raid_bosses (
   gem_reward bigint not null default 25,
   xp_reward bigint not null default 2000,
   active boolean not null default true,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  hp_scale_per_attack numeric not null default 150
 );
+
+-- Nachtraeglich hinzugefuegtes Skalierungs-Feld - falls raid_bosses schon
+-- vor diesem Update existierte, hier separat ergaenzen.
+alter table public.raid_bosses add column if not exists hp_scale_per_attack numeric not null default 150;
 
 insert into public.raid_bosses (id, name, sprite_key, base_hp, base_attack, attack_interval_seconds, gold_reward, gem_reward, xp_reward)
 values ('zerathor', 'Zerathor, Zorn der Verdammnis', 'zerathor', 500000, 400, 4, 5000, 25, 2000)
 on conflict (id) do nothing;
+
+-- Entschaerfung: der erste Testraid hat gezeigt, dass 400 Angriff alle 4s
+-- eine durchschnittliche Stadt in ~25 Sekunden aktiven Kampfes wipet - viel
+-- zu hart. Nur greifen, wenn der Wert noch beim alten Ausgangswert steht,
+-- damit spaetere manuelle Anpassungen im Admin-Panel hier nicht ueberschrieben
+-- werden.
+update public.raid_bosses set base_attack = 90, attack_interval_seconds = 6
+where id = 'zerathor' and base_attack = 400 and attack_interval_seconds = 4;
 
 alter table public.raid_bosses enable row level security;
 grant usage on schema public to anon, authenticated;
@@ -239,17 +252,25 @@ begin
   on conflict (raid_id, auth_user_id) do update
   set attack = excluded.attack, defense = excluded.defense, hp = excluded.hp, display_name = excluded.display_name;
 
+  -- Boss-HP skaliert mit der gemeinsamen Angriffskraft aller Angemeldeten
+  -- (analog zur Stadt, die schon immer aus der Summe der Teilnehmer-Werte
+  -- berechnet wird) - je mehr/staerkere Spieler beitreten, desto zaeher der
+  -- Boss. base_hp bleibt als Untergrenze fuer sehr kleine Gruppen erhalten.
+  -- Findet nur waehrend der Vorbereitungsphase statt (Boss noch unbeschadet),
+  -- daher ist boss_hp = boss_max_hp hier immer korrekt.
   update public.raid_instances ri set
     city_max_hp = sub.total_hp,
     city_hp = sub.total_hp,
     city_attack = sub.total_attack,
     city_defense = sub.total_defense,
-    participant_count = sub.cnt
+    participant_count = sub.cnt,
+    boss_max_hp = greatest(rb.base_hp, round(sub.total_attack * rb.hp_scale_per_attack)),
+    boss_hp = greatest(rb.base_hp, round(sub.total_attack * rb.hp_scale_per_attack))
   from (
     select sum(hp) total_hp, sum(attack) total_attack, sum(defense) total_defense, count(*) cnt
     from public.raid_participants where raid_id = p_raid_id
-  ) sub
-  where ri.id = p_raid_id and ri.status = 'prep';
+  ) sub, public.raid_bosses rb
+  where ri.id = p_raid_id and ri.status = 'prep' and rb.id = ri.boss_id;
 
   update public.raid_player_stats
   set total_raids_joined = total_raids_joined + 1, display_name = v_display_name, updated_at = now()
@@ -364,7 +385,14 @@ begin
   end if;
 
   if v_status = 'fighting' then
-    select round(rb.base_attack) into v_dmg
+    -- Stadt-Verteidigung mindert den Bossangriff, wie schon beim normalen
+    -- Kampf gegen Drachen ueblich (bkmpIdleDamageRoll: Schaden - Verteidigung
+    -- * 0.5). Damit das bei vielen Teilnehmern nicht die Stadt praktisch
+    -- unverwundbar macht, wird mit der DURCHSCHNITTLICHEN Verteidigung pro
+    -- Teilnehmer gerechnet, nicht mit der Summe aller - eine grosse Gruppe
+    -- ist so nicht automatisch "sicherer" als eine kleine mit gleich guter
+    -- Ausruestung pro Kopf.
+    select greatest(1, round(rb.base_attack - (ri.city_defense / greatest(1, ri.participant_count)) * 0.5)) into v_dmg
     from public.raid_bosses rb join public.raid_instances ri on ri.boss_id = rb.id
     where ri.id = p_raid_id;
 
