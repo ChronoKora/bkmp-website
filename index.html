@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260709-optpass2">
+<link rel="stylesheet" href="style.css?v=20260709-optpass3">
 </head>
 <body>
 
@@ -758,8 +758,8 @@
 
   <script>window.BKMP_CLIENT_STORAGE_KEY = 'bkmp-customer-auth';</script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260709-optpass2"></script>
-  <script src="app.js?v=20260709-optpass2"></script>
+  <script src="supabase.js?v=20260709-optpass3"></script>
+  <script src="app.js?v=20260709-optpass3"></script>
   <script src="idledorf.js?v=20260709-optpass3"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
   <script>
@@ -3457,7 +3457,15 @@
 
     /* ---------------- Pluschies ---------------- */
     const BKMP_ACTIVE_PLUSHIE_KEY = 'bkmp-active-plushie';
-    let bkmpOwnedPlushies = [];
+    const BKMP_OWNED_PLUSHIES_CACHE_KEY = 'bkmp-owned-plushies-cache';
+    /* Startet NICHT mehr leer, sondern mit dem zuletzt bekannten Besitz-
+       Stand: bkmpRefreshOwnedPlushies() laedt den echten Stand erst async
+       nach - bis dahin zaehlten alle Pluschie-Erfolge faelschlich als nicht
+       freigeschaltet, wodurch die Erfolge-Zahl bei jedem Seitenaufruf kurz
+       niedriger war und dann sprunghaft nachzog. */
+    let bkmpOwnedPlushies = (() => {
+      try { const cached = JSON.parse(localStorage.getItem(BKMP_OWNED_PLUSHIES_CACHE_KEY) || 'null'); return Array.isArray(cached) ? cached : []; } catch (e) { return []; }
+    })();
     function bkmpGetActivePlushie() {
       try { return localStorage.getItem(BKMP_ACTIVE_PLUSHIE_KEY) || ''; } catch (e) { return ''; }
     }
@@ -3493,6 +3501,7 @@
       if (!name || typeof loadOwnedPlushies !== 'function' || !bkmpGetSupabaseClient()) return;
       try {
         bkmpOwnedPlushies = await loadOwnedPlushies(name);
+        try { localStorage.setItem(BKMP_OWNED_PLUSHIES_CACHE_KEY, JSON.stringify(bkmpOwnedPlushies)); } catch (e) {}
         renderAchievementBadge();
         const panel = document.getElementById('plushiesPanel');
         if (panel && panel.style.display !== 'none') renderPlushiesPanel();
@@ -4126,6 +4135,9 @@
         achievementsChangeNameBtn.disabled = true;
         try { await bkmpPlayerLogout(); } catch (e) { console.warn('Ausloggen fehlgeschlagen.', e); }
         bkmpSetMcName('');
+        bkmpOwnedPlushies = [];
+        try { localStorage.removeItem(BKMP_OWNED_PLUSHIES_CACHE_KEY); } catch (e) {}
+        try { localStorage.removeItem('bkmp-idle-achievement-fields-cache'); } catch (e) {}
         achievementsChangeNameBtn.disabled = false;
         achievementsOverlay.classList.remove('visible');
         renderAchievementBadge();
