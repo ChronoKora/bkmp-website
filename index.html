@@ -158,6 +158,8 @@
       </div>
       <p class="auth-switch">
         <button type="button" class="auth-switch-link" id="achievementsRenameBtn">Namen &auml;ndern</button>
+        &middot;
+        <button type="button" class="auth-switch-link" id="achievementsChangePasswordBtn">Passwort &auml;ndern</button>
       </p>
       <div class="joke-buttons">
         <button class="btn-nein" id="achievementsChangeName" type="button">Ausloggen</button>
@@ -179,6 +181,31 @@
       <div class="joke-buttons">
         <button class="btn-nein" id="renameCancel" type="button">Abbrechen</button>
         <button class="btn-ja" id="renameSubmit" type="button">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="joke-overlay" id="passwordChangeOverlay">
+    <div class="joke-card">
+      <h3>Passwort &auml;ndern</h3>
+      <div class="auth-field">
+        <label for="passwordChangeNew">Neues Passwort</label>
+        <div class="auth-password-row">
+          <input type="password" id="passwordChangeNew" placeholder="Mind. 6 Zeichen" autocomplete="new-password">
+          <button type="button" class="auth-password-toggle" id="passwordChangeNewToggle" aria-label="Passwort anzeigen">&#128065;</button>
+        </div>
+      </div>
+      <div class="auth-field">
+        <label for="passwordChangeRepeat">Passwort wiederholen</label>
+        <div class="auth-password-row">
+          <input type="password" id="passwordChangeRepeat" placeholder="Passwort wiederholen" autocomplete="new-password">
+          <button type="button" class="auth-password-toggle" id="passwordChangeRepeatToggle" aria-label="Passwort anzeigen">&#128065;</button>
+        </div>
+      </div>
+      <p class="auth-error" id="passwordChangeError" style="display:none;"></p>
+      <div class="joke-buttons">
+        <button class="btn-nein" id="passwordChangeCancel" type="button">Abbrechen</button>
+        <button class="btn-ja" id="passwordChangeSubmit" type="button">Speichern</button>
       </div>
     </div>
   </div>
@@ -801,7 +828,7 @@
 
   <script>window.BKMP_CLIENT_STORAGE_KEY = 'bkmp-customer-auth';</script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260709-optpass7"></script>
+  <script src="supabase.js?v=20260709-optpass8"></script>
   <script src="app.js?v=20260709-optpass3"></script>
   <script src="idledorf.js?v=20260709-optpass7"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
@@ -4390,6 +4417,56 @@
       });
     }
     if (renameNewName) renameNewName.addEventListener('keydown', e => { if (e.key === 'Enter') renameSubmitBtn.click(); });
+
+    /* ---------------- Passwort aendern (waehrend eingeloggt) ---------------- */
+    const passwordChangeOverlay = document.getElementById('passwordChangeOverlay');
+    const passwordChangeNew = document.getElementById('passwordChangeNew');
+    const passwordChangeRepeat = document.getElementById('passwordChangeRepeat');
+    const passwordChangeError = document.getElementById('passwordChangeError');
+    const passwordChangeSubmitBtn = document.getElementById('passwordChangeSubmit');
+    const passwordChangeCancelBtn = document.getElementById('passwordChangeCancel');
+    mcAuthSetupPasswordToggle('passwordChangeNew', 'passwordChangeNewToggle');
+    mcAuthSetupPasswordToggle('passwordChangeRepeat', 'passwordChangeRepeatToggle');
+
+    function passwordChangeShowError(message) {
+      passwordChangeError.textContent = message || '';
+      passwordChangeError.style.display = message ? '' : 'none';
+    }
+
+    const achievementsChangePasswordBtn = document.getElementById('achievementsChangePasswordBtn');
+    if (achievementsChangePasswordBtn) {
+      achievementsChangePasswordBtn.addEventListener('click', () => {
+        passwordChangeShowError('');
+        passwordChangeNew.value = '';
+        passwordChangeRepeat.value = '';
+        achievementsOverlay.classList.remove('visible');
+        passwordChangeOverlay.classList.add('visible');
+      });
+    }
+    if (passwordChangeCancelBtn) passwordChangeCancelBtn.addEventListener('click', () => passwordChangeOverlay.classList.remove('visible'));
+    if (passwordChangeSubmitBtn) {
+      passwordChangeSubmitBtn.addEventListener('click', async () => {
+        const newPassword = passwordChangeNew.value;
+        const repeatPassword = passwordChangeRepeat.value;
+        if (!newPassword || newPassword.length < 6) { passwordChangeShowError('Das Passwort braucht mindestens 6 Zeichen.'); passwordChangeNew.focus(); return; }
+        if (newPassword !== repeatPassword) { passwordChangeShowError('Die Passwörter stimmen nicht überein.'); passwordChangeRepeat.focus(); return; }
+        passwordChangeShowError('');
+        passwordChangeSubmitBtn.disabled = true;
+        const originalLabel = passwordChangeSubmitBtn.textContent;
+        passwordChangeSubmitBtn.textContent = 'Wird gespeichert...';
+        try {
+          await bkmpPlayerChangePassword(newPassword);
+          passwordChangeOverlay.classList.remove('visible');
+          alert('Dein Passwort wurde geändert.');
+        } catch (e) {
+          passwordChangeShowError(e && e.message ? e.message : 'Das Passwort konnte nicht geändert werden.');
+        } finally {
+          passwordChangeSubmitBtn.disabled = false;
+          passwordChangeSubmitBtn.textContent = originalLabel;
+        }
+      });
+    }
+    if (passwordChangeRepeat) passwordChangeRepeat.addEventListener('keydown', e => { if (e.key === 'Enter') passwordChangeSubmitBtn.click(); });
 
     renderAchievementBadge();
     bkmpRefreshPlushieDefinitions().then(() => bkmpRefreshOwnedPlushies());

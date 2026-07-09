@@ -443,6 +443,14 @@ async function bkmpPlayerRename(newName) {
   return cleanName;
 }
 
+async function bkmpPlayerChangePassword(newPassword) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  if (!newPassword || newPassword.length < 6) throw new Error('Das Passwort braucht mindestens 6 Zeichen.');
+  const { error } = await client.auth.updateUser({ password: newPassword });
+  if (error) throw new Error('Das Passwort konnte nicht geaendert werden. Bitte versuche es spaeter erneut.');
+}
+
 async function bkmpPlayerRegister(name, password) {
   const client = bkmpGetPlayerAuthClient();
   if (!client) throw new Error('Supabase ist nicht verbunden.');
