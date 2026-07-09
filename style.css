@@ -4478,6 +4478,8 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 .raid-result-stat-label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
 .raid-result-stat-value { font-size: 1.1rem; font-weight: 800; margin-top: 0.2rem; }
 .raid-result-rewards { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.6rem 1rem; font-weight: 700; margin-top: 0.8rem; }
+.raid-result-flawless { color: #facc15; font-weight: 700; font-size: 0.9rem; margin-bottom: 0.6rem; }
+.raid-result-mvp { color: var(--gold); font-size: 0.95rem; }
 
 @media (max-width: 640px) {
   .raid-city, .raid-boss { width: 46%; }

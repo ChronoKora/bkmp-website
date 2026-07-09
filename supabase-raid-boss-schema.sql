@@ -292,14 +292,14 @@ begin
     raise exception 'not_a_participant';
   end if;
 
-  select status into v_status from public.raid_instances where id = p_raid_id for update;
+  select ri.status into v_status from public.raid_instances ri where ri.id = p_raid_id for update;
   if v_status is null then raise exception 'raid_not_found'; end if;
   if v_status <> 'fighting' then raise exception 'raid_not_active'; end if;
 
-  update public.raid_instances
-  set boss_hp = greatest(0, boss_hp - v_amount), total_damage = total_damage + v_amount
-  where id = p_raid_id
-  returning boss_hp into v_new_hp;
+  update public.raid_instances ri
+  set boss_hp = greatest(0, ri.boss_hp - v_amount), total_damage = ri.total_damage + v_amount
+  where ri.id = p_raid_id
+  returning ri.boss_hp into v_new_hp;
 
   update public.raid_participants
   set damage_dealt = damage_dealt + v_amount,
@@ -347,13 +347,13 @@ begin
     raise exception 'not_a_participant';
   end if;
 
-  select status, fight_starts_at, fight_ends_at into v_status, v_fight_starts, v_fight_ends
-  from public.raid_instances where id = p_raid_id;
+  select ri.status, ri.fight_starts_at, ri.fight_ends_at into v_status, v_fight_starts, v_fight_ends
+  from public.raid_instances ri where ri.id = p_raid_id;
   if v_status is null then raise exception 'raid_not_found'; end if;
 
   if v_status = 'prep' and now() >= v_fight_starts then
-    update public.raid_instances set status = 'fighting', started_fight_at = now()
-    where id = p_raid_id and status = 'prep';
+    update public.raid_instances ri set status = 'fighting', started_fight_at = now()
+    where ri.id = p_raid_id and ri.status = 'prep';
     v_status := 'fighting';
   end if;
 

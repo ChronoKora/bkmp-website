@@ -1516,18 +1516,26 @@ async function bkmpRaidShowResult() {
   try { participants = await loadRaidParticipants(bkmpRaidState.id); } catch (e) {}
   const myName = (typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : '').trim().toLowerCase();
   const mine = participants.find(p => p.displayName.trim().toLowerCase() === myName);
+  const myRank = mine ? participants.findIndex(p => p === mine) + 1 : 0;
+  const mvp = participants[0];
   const won = bkmpRaidState.status === 'won';
+  const flawless = won && bkmpRaidState.cityMaxHp > 0 && bkmpRaidState.cityHp >= bkmpRaidState.cityMaxHp;
   const totalDamage = participants.reduce((sum, p) => sum + p.damageDealt, 0);
   if (battlefield) battlefield.style.display = 'none';
   if (listEl) listEl.style.display = 'none';
   resultCard.style.display = '';
   resultCard.innerHTML = `
     <div class="raid-result-title ${won ? 'won' : 'lost'}">${won ? '🏆 Raid gewonnen!' : bkmpRaidState.status === 'expired' ? '⌛ Raid abgelaufen' : '💀 Raid verloren'}</div>
+    ${flawless ? '<div class="raid-result-flawless">🛡️ Perfekt! Die Stadt blieb unbeschadet.</div>' : ''}
     <div class="raid-result-stats">
       <div class="raid-result-stat"><div class="raid-result-stat-label">Gesamtschaden</div><div class="raid-result-stat-value">${bkmpIdleFormatNumber(totalDamage)}</div></div>
       <div class="raid-result-stat"><div class="raid-result-stat-label">Dein Schaden</div><div class="raid-result-stat-value">${bkmpIdleFormatNumber(mine ? mine.damageDealt : 0)}</div></div>
+      <div class="raid-result-stat"><div class="raid-result-stat-label">Dein Rang</div><div class="raid-result-stat-value">${myRank ? '#' + myRank : '-'}</div></div>
       <div class="raid-result-stat"><div class="raid-result-stat-label">Deine Krits</div><div class="raid-result-stat-value">${mine ? mine.critsLanded : 0}</div></div>
+      <div class="raid-result-stat"><div class="raid-result-stat-label">Deine Klicks</div><div class="raid-result-stat-value">${mine ? mine.clicksLanded : 0}</div></div>
       <div class="raid-result-stat"><div class="raid-result-stat-label">Teilnehmer</div><div class="raid-result-stat-value">${participants.length}</div></div>
+      <div class="raid-result-stat"><div class="raid-result-stat-label">MVP</div><div class="raid-result-stat-value raid-result-mvp">${mvp ? escapeHtml(mvp.displayName) : '-'}</div></div>
+      <div class="raid-result-stat"><div class="raid-result-stat-label">${won ? 'Stadt-HP übrig' : 'Boss-HP übrig'}</div><div class="raid-result-stat-value">${bkmpIdleFormatNumber(won ? bkmpRaidState.cityHp : bkmpRaidState.bossHp)}</div></div>
     </div>
     ${won ? `<div class="raid-result-rewards"><span>💰 +${bkmpIdleFormatNumber(5000)}</span><span>💎 +25</span><span>✨ +2000</span></div>` : ''}
     <button type="button" class="btn-ja" id="raidResultCloseBtn">Schließen</button>
