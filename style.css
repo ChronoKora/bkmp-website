@@ -1,3 +1,70 @@
+/* Lokal gehostete Schriften (vorher Google Fonts CDN) - DSGVO: kein
+   externer Font-Request mehr, der die Besucher-IP an Google sendet. */
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('assets/fonts/fraunces-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('assets/fonts/fraunces-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('assets/fonts/fraunces-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('assets/fonts/fraunces-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('assets/fonts/inter-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('assets/fonts/inter-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('assets/fonts/inter-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('assets/fonts/inter-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
 :root {
   /* Dunkel-Modus (Standard) */
   --ink: #F4F2F5;
@@ -1477,6 +1544,33 @@ body.page-loaded .streamer-marquee-track {
 
 /* ---------- Admin-Panel (admin.html) ---------- */
 .admin-wrap { max-width: 1040px; margin: 0 auto; padding: 6vh 1.5rem 6rem; position: relative; z-index: 1; }
+
+/* ---------- Impressum / Datenschutz ---------- */
+.legal-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  max-width: 780px; margin: 0 auto; padding: 1.4rem 1.2rem 0;
+}
+.legal-back { color: var(--muted); font-size: 0.85rem; transition: color 0.2s ease; }
+.legal-back:hover, .legal-back:focus-visible { color: var(--gold); }
+.legal-wrap { max-width: 780px; margin: 0 auto; padding: 1.6rem 1.2rem 5rem; position: relative; z-index: 1; }
+.legal-card {
+  background: var(--paper-2); border: 1px solid var(--line); border-radius: 18px;
+  padding: 2.2rem 2rem; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+}
+.legal-card h1 { font-family: 'Fraunces', serif; font-size: 1.8rem; margin-bottom: 0.3rem; }
+.legal-card .legal-updated { color: var(--muted); font-size: 0.8rem; margin-bottom: 1.8rem; }
+.legal-card h2 { font-family: 'Fraunces', serif; font-size: 1.15rem; margin: 1.8rem 0 0.6rem; }
+.legal-card h2:first-of-type { margin-top: 0; }
+.legal-card h3 { font-size: 0.95rem; margin: 1.1rem 0 0.4rem; color: var(--ink); }
+.legal-card p { margin: 0 0 0.7rem; line-height: 1.65; color: var(--ink); font-size: 0.92rem; }
+.legal-card ul { margin: 0 0 0.9rem; padding-left: 1.3rem; line-height: 1.65; font-size: 0.92rem; }
+.legal-card li { margin-bottom: 0.3rem; }
+.legal-card a { color: var(--gold); text-decoration: underline; text-underline-offset: 2px; }
+.legal-card strong { color: var(--ink); }
+.legal-card .legal-muted { color: var(--muted); font-size: 0.85rem; }
+.legal-card table { width: 100%; border-collapse: collapse; margin: 0.6rem 0 1rem; font-size: 0.88rem; }
+.legal-card table th, .legal-card table td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+.legal-card table th { color: var(--muted); font-weight: 500; }
 .admin-title { font-family: 'Fraunces', serif; font-size: 2rem; font-weight: 600; margin-bottom: 0.4rem; text-align: center; }
 .admin-sub { text-align: center; color: var(--muted); font-size: 0.9rem; margin-bottom: 2.5rem; }
 
@@ -2958,6 +3052,32 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   color: var(--muted);
   font-size: 0.78rem;
   letter-spacing: 0.03em;
+}
+
+/* Dezente Impressum/Datenschutz-Links, an eine untere Ecke des Footers
+   gesetzt statt zentriert - sollen auffindbar, aber nicht dominant sein. */
+.bkmp-footer-legal {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  max-width: 1760px;
+  margin: 0.9rem auto 0;
+  padding: 0 0.6rem;
+}
+.bkmp-footer-legal a {
+  color: var(--muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  opacity: 0.75;
+  transition: opacity 0.2s ease, color 0.2s ease;
+}
+.bkmp-footer-legal a:hover,
+.bkmp-footer-legal a:focus-visible {
+  opacity: 1;
+  color: var(--gold);
+}
+@media (max-width: 560px) {
+  .bkmp-footer-legal { justify-content: center; }
 }
 .bkmp-secret-zone {
   display: block;

@@ -30,12 +30,11 @@
 <meta name="twitter:description" content="Transparente Einblicke in Einnahmen, Investoren, News, Kartenideen und PartnerShops rund um den Bkmp Minecraft-Server.">
 <meta name="twitter:image" content="https://bkinvestment.de/assets/top-banner.png">
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260710-raidresult1">
+<link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
+<link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
+<link rel="stylesheet" href="style.css?v=20260710-localfonts1">
 </head>
 <body>
 
@@ -613,6 +612,7 @@
     <p class="bkmp-footer-text">BKMP &middot; Danke, dass du hier vorbeischaust.</p>
     <div class="bkmp-secret-zone" id="bkmpSecretZone" aria-hidden="true"></div>
     <button type="button" class="bkmp-secret-hint" id="bkmpSecretHint">Psst... Jannik war hier 🐰</button>
+    <div class="bkmp-footer-legal"><a href="impressum.html">Impressum</a><a href="datenschutz.html">Datenschutz</a></div>
   </footer>
 
   <div class="live-toast" id="liveToast" aria-live="polite" aria-hidden="true"></div>
@@ -850,7 +850,7 @@
   </div>
 
   <script>window.BKMP_CLIENT_STORAGE_KEY = 'bkmp-customer-auth';</script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/vendor/supabase-js.min.js"></script>
   <script src="supabase.js?v=20260710-bossscale1"></script>
   <script src="app.js?v=20260709-optpass3"></script>
   <script src="idledorf.js?v=20260710-raidresult1"></script>
