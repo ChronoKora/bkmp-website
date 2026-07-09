@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260709-optpass9">
+<link rel="stylesheet" href="style.css?v=20260709-optpass10">
 </head>
 <body>
 
@@ -828,7 +828,7 @@
 
   <script>window.BKMP_CLIENT_STORAGE_KEY = 'bkmp-customer-auth';</script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260709-optpass8"></script>
+  <script src="supabase.js?v=20260709-optpass9"></script>
   <script src="app.js?v=20260709-optpass3"></script>
   <script src="idledorf.js?v=20260709-optpass7"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
@@ -2779,13 +2779,26 @@
 
     /* Kartenideen */
     const wishGrid = document.getElementById('wishGrid');
+    /* Merkt sich die eigene Stimme (wishId -> 'like'/'dislike') des
+       eingeloggten Accounts, geladen ueber loadMyWishVotes(). Bestimmt, ob
+       die Like/Dislike-Buttons pro Kartenidee gesperrt gerendert werden -
+       die eigentliche Durchsetzung des 1x-Limits passiert serverseitig
+       (Unique-Constraint), das hier ist nur die passende Anzeige dazu. */
+    let bkmpMyWishVotes = {};
+    async function bkmpRefreshMyWishVotes() {
+      bkmpMyWishVotes = typeof loadMyWishVotes === 'function' ? await loadMyWishVotes().catch(() => ({})) : {};
+      renderWishes();
+    }
     function renderWishes() {
       const approvedWishes = (Array.isArray(data.wishes) ? data.wishes : []).filter(w => !w.status || w.status === 'approved');
       if (approvedWishes.length === 0) {
         wishGrid.innerHTML = '<p class="empty-hint">Noch keine Kartenideen eingereicht — sei der/die Erste!</p>';
         return;
       }
-      wishGrid.innerHTML = [...approvedWishes].reverse().map(w => `
+      wishGrid.innerHTML = [...approvedWishes].reverse().map(w => {
+        const myVote = bkmpMyWishVotes[w.id] || '';
+        const voted = Boolean(myVote);
+        return `
         <article class="wish-card" data-wish-id="${w.id}">
           <button class="wish-image-btn" type="button" data-action="open" data-bkmp-image-wrap data-empty-label="Kein Bild" aria-label="Kartenidee von ${escapeHtml(w.name)} gross ansehen">
             ${w.image ? `<img data-bkmp-img src="${w.image}" alt="Kartenidee von ${escapeHtml(w.name)}" loading="lazy" decoding="async">` : '<span class="wish-image-empty">Kein Bild</span>'}
@@ -2793,12 +2806,13 @@
           <div class="wish-card-body">
             <div class="wish-name">${escapeHtml(w.name)}</div>
             <div class="wish-card-actions">
-              <button type="button" class="wish-vote wish-like" data-action="like">Like <span>${Number(w.likes || 0)}</span></button>
-              <button type="button" class="wish-vote wish-dislike" data-action="dislike">Dislike <span>${Number(w.dislikes || 0)}</span></button>
+              <button type="button" class="wish-vote wish-like ${myVote === 'like' ? 'is-voted' : ''}" data-action="like" ${voted ? 'disabled' : ''}>Like <span>${Number(w.likes || 0)}</span></button>
+              <button type="button" class="wish-vote wish-dislike ${myVote === 'dislike' ? 'is-voted' : ''}" data-action="dislike" ${voted ? 'disabled' : ''}>Dislike <span>${Number(w.dislikes || 0)}</span></button>
             </div>
           </div>
         </article>
-      `).join('');
+      `;
+      }).join('');
       if (window.bkmpEnhanceImages) window.bkmpEnhanceImages(wishGrid);
     }
     renderWishes();
@@ -2868,13 +2882,36 @@
       }
 
       if (action === 'like' || action === 'dislike') {
+        /* Abstimmen braucht einen echten Account (wish_votes ist per
+           auth_user_id begrenzt, siehe supabase-wish-votes-schema.sql) -
+           ohne Login gibt's nichts zum Verknuepfen, stattdessen oeffnet
+           sich das Login/Registrieren-Fenster. */
+        if (!bkmpGetMcName()) {
+          mcAuthResetForm();
+          mcNameOverlay.classList.add('visible');
+          return;
+        }
+        if (bkmpMyWishVotes[wish.id] || String(wish.id).startsWith('wish-')) return;
+
         const column = action === 'dislike' ? 'dislikes' : 'likes';
         const localWish = { ...wish, [column]: Number(wish[column] || 0) + 1 };
+        bkmpMyWishVotes = { ...bkmpMyWishVotes, [wish.id]: action };
         updateWishLocal(localWish);
-        if (typeof voteWish === 'function' && bkmpGetSupabaseClient() && !String(wish.id).startsWith('wish-')) {
-          voteWish(wish.id, action, wish[column]).then(updated => {
+
+        if (typeof voteWish === 'function') {
+          voteWish(wish.id, action).then(updated => {
             if (updated) updateWishLocal(updated);
-          }).catch(err => console.warn('Supabase konnte Bewertung nicht speichern.', err));
+          }).catch(err => {
+            if (err && err.message === 'already_voted') {
+              bkmpRefreshMyWishVotes();
+              return;
+            }
+            console.warn('Supabase konnte Bewertung nicht speichern.', err);
+            const revertedVotes = { ...bkmpMyWishVotes };
+            delete revertedVotes[wish.id];
+            bkmpMyWishVotes = revertedVotes;
+            updateWishLocal(wish);
+          });
         }
       }
     });
@@ -4077,10 +4114,27 @@
       const badgeIcon = document.getElementById('mcNameBadgeIcon');
       if (!badge || !badgeText) return;
       const name = bkmpGetMcName();
+      badge.classList.remove('tier-1', 'tier-2', 'tier-3');
+      /* Ohne eingeloggten Account werden Erfolge bewusst NICHT berechnet,
+         benachrichtigt oder als Kosmetik angewendet - Fortschritt (Zeit,
+         Bonks, Ostereier etc.) sammelt sich zwar weiter lokal, "freigeschaltet"
+         wird aber erst sichtbar, sobald ein echter Account existiert. Sobald
+         eingeloggt wird, zaehlt der bisher gesammelte lokale Fortschritt
+         sofort mit (nichts geht verloren) - nur die Anzeige/Benachrichtigung
+         war vorher gesperrt. */
+      if (!name) {
+        badgeText.textContent = 'Wer bist du?';
+        badge.title = '';
+        if (badgeIcon) badgeIcon.innerHTML = '⛏️';
+        /* Kosmetik-Klasse von einer vorherigen (eingeloggten) Session
+           entfernen - sonst bliebe z. B. ein Erfolgs-Glow nach dem
+           Ausloggen sichtbar, obwohl gerade kein Account aktiv ist. */
+        [...badge.classList].filter(c => c.startsWith('mc-cosmetic-')).forEach(c => badge.classList.remove(c));
+        return;
+      }
       const ctx = bkmpAchievementContextWithMeta();
       const unlockedCount = BKMP_ACHIEVEMENTS.filter(a => a.check(ctx)).length;
       if (typeof bkmpCheckForNewAchievementUnlocks === 'function') bkmpCheckForNewAchievementUnlocks(ctx);
-      badge.classList.remove('tier-1', 'tier-2', 'tier-3');
       bkmpApplyActiveCosmetic(badge, unlockedCount, ctx);
       const activePlushieId = typeof bkmpGetActivePlushie === 'function' ? bkmpGetActivePlushie() : '';
       const activePlushie = activePlushieId && ctx.ownedPlushies.includes(activePlushieId) ? BKMP_PLUSHIES.find(p => p.id === activePlushieId) : null;
@@ -4088,11 +4142,6 @@
         badgeIcon.innerHTML = activePlushie
           ? `<img src="${escapeHtml(activePlushie.image)}" alt="" class="mc-name-badge-plushie">`
           : '⛏️';
-      }
-      if (!name) {
-        badgeText.textContent = 'Wer bist du?';
-        badge.title = '';
-        return;
       }
       const activeTitleName = typeof bkmpGetActiveTitleName === 'function' ? bkmpGetActiveTitleName() : '';
       badgeText.textContent = `${name}${activeTitleName ? ' — ' + activeTitleName : ''} · ${unlockedCount}/${BKMP_ACHIEVEMENTS.length}`;
@@ -4271,6 +4320,7 @@
         mcNameOverlay.classList.remove('visible');
         renderAchievementBadge();
         bkmpRefreshOwnedPlushies();
+        bkmpRefreshMyWishVotes();
       } catch (e) {
         mcAuthShowError(e && e.message ? e.message : 'Das hat leider nicht geklappt. Bitte versuche es erneut.');
       } finally {
@@ -4347,6 +4397,8 @@
         bkmpOwnedPlushies = [];
         try { localStorage.removeItem(BKMP_OWNED_PLUSHIES_CACHE_KEY); } catch (e) {}
         try { localStorage.removeItem('bkmp-idle-achievement-fields-cache'); } catch (e) {}
+        bkmpMyWishVotes = {};
+        renderWishes();
         achievementsChangeNameBtn.disabled = false;
         achievementsOverlay.classList.remove('visible');
         renderAchievementBadge();
@@ -4489,6 +4541,7 @@
       } finally {
         renderAchievementBadge();
         bkmpRefreshOwnedPlushies();
+        bkmpRefreshMyWishVotes();
         if (!bkmpGetMcName()) {
           mcAuthResetForm();
           mcNameOverlay.classList.add('visible');

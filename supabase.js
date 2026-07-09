@@ -1323,22 +1323,47 @@ async function updateWishStatus(id, status) {
   return row ? bkmpMapWishFromSupabase(row) : null;
 }
 
-async function voteWish(id, type, currentValue) {
-  const client = bkmpGetSupabaseClient();
-  if (!client) return null;
+/* Stimme ist ueber wish_votes (siehe supabase-wish-votes-schema.sql) auf
+   1x pro Account und Kartenidee begrenzt - ein zweiter Insert-Versuch
+   schlaegt am Unique-Constraint (wish_id, auth_user_id) fehl, unabhaengig
+   vom Client. Direktes Hochzaehlen von likes/dislikes ist serverseitig
+   gesperrt; die Spalten werden nur noch per Trigger nachgefuehrt. */
+async function voteWish(wishId, type) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { data: sessionData } = await client.auth.getSession();
+  const userId = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
+  if (!userId) throw new Error('not_authenticated');
 
-  const column = type === 'dislike' ? 'dislikes' : 'likes';
-  const nextValue = Number(currentValue || 0) + 1;
+  const { error: insertError } = await client
+    .from('wish_votes')
+    .insert({ wish_id: wishId, auth_user_id: userId, vote_type: type === 'dislike' ? 'dislike' : 'like' });
+  if (insertError) {
+    if (insertError.code === '23505') throw new Error('already_voted');
+    throw insertError;
+  }
+
   const { data, error } = await client
     .from('wishes')
-    .update({ [column]: nextValue })
-    .eq('id', id)
     .select('id, name, image_url, likes, dislikes, status, created_at')
+    .eq('id', wishId)
     .limit(1);
-
   if (error) throw error;
   const updated = Array.isArray(data) ? data[0] : null;
   return updated ? bkmpMapWishFromSupabase(updated) : null;
+}
+
+async function loadMyWishVotes() {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return {};
+  const { data: sessionData } = await client.auth.getSession();
+  const userId = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
+  if (!userId) return {};
+  const { data, error } = await client.from('wish_votes').select('wish_id, vote_type').eq('auth_user_id', userId);
+  if (error) return {};
+  const map = {};
+  (data || []).forEach(row => { map[row.wish_id] = row.vote_type; });
+  return map;
 }
 
 async function deleteWish(id) {

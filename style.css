@@ -1075,6 +1075,9 @@ body.page-loaded .streamer-marquee-track {
 .wish-like { color: var(--pos); }
 .wish-dislike { color: var(--neg); }
 .wish-mini-download:hover, .wish-vote:hover, .wish-download:hover { border-color: var(--gold); color: var(--gold); }
+.wish-vote:disabled { cursor: default; opacity: 0.55; }
+.wish-vote:disabled:hover { border-color: var(--line); }
+.wish-vote.is-voted { opacity: 1; border-color: currentColor; background: color-mix(in srgb, currentColor 12%, var(--paper)); }
 
 .wish-overlay .joke-card { max-width: 460px; text-align: left; border-radius: 22px; }
 .wish-overlay .joke-card h3 { font-family: 'Fraunces', serif; font-size: 1.25rem; margin-bottom: 1.2rem; text-align: center; }
