@@ -1860,6 +1860,73 @@ async function syncInvestorRequestsFromSupabase(targetData, onSynced, options = 
   }
 }
 
+/* ---------------- Kartenverkaufs-Anfragen (analog zu Investoren-Anfragen) ---------------- */
+
+function bkmpMapCardSaleRequestFromSupabase(row) {
+  return {
+    id: row.id,
+    minecraftName: row.minecraft_name || '',
+    discord: row.discord || '',
+    image: row.image_url || '',
+    status: row.status || 'pending',
+    createdAt: row.created_at ? Date.parse(row.created_at) : 0,
+    source: 'supabase'
+  };
+}
+
+async function loadCardSaleRequests() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('card_sale_requests')
+    .select('id, minecraft_name, discord, image_url, status, created_at')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(bkmpMapCardSaleRequestFromSupabase);
+}
+
+async function updateCardSaleRequestStatus(id, status) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('card_sale_requests')
+    .update({ status })
+    .eq('id', id)
+    .select('id, minecraft_name, discord, image_url, status, created_at')
+    .limit(1);
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : null;
+  return row ? bkmpMapCardSaleRequestFromSupabase(row) : null;
+}
+
+async function deleteCardSaleRequest(id) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return false;
+  const { error } = await client.from('card_sale_requests').delete().eq('id', id);
+  if (error) throw error;
+  return true;
+}
+
+async function syncCardSaleRequestsFromSupabase(targetData, onSynced, options = {}) {
+  if (typeof loadCardSaleRequests !== 'function' || !bkmpGetSupabaseClient()) return false;
+  try {
+    const items = await loadCardSaleRequests();
+    if (!items) return false;
+    const localCount = Array.isArray(targetData.cardSaleRequests) ? targetData.cardSaleRequests.length : 0;
+    if (localCount > 0 && items.length === 0) {
+      console.warn('Supabase enthaelt keine Kartenverkaufs-Anfragen. Lokale Daten bleiben erhalten.');
+      return false;
+    }
+    targetData.cardSaleRequests = items;
+    bkmpSaveData(targetData);
+    if (typeof onSynced === 'function') onSynced(targetData);
+    return true;
+  } catch (e) {
+    console.warn('Supabase konnte Kartenverkaufs-Anfragen nicht laden.', e);
+    return false;
+  }
+}
+
 async function importLocalInvestorRequestsToSupabase() {
   const client = bkmpGetSupabaseClient();
   if (!client) return { imported: 0, skipped: 0, total: 0 };

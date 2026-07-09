@@ -2091,6 +2091,7 @@ label {
 .cardsale-banner strong { display: block; font-family: 'Fraunces', serif; font-size: clamp(1.5rem, 3vw, 2.1rem); margin-bottom: 0.55rem; }
 .cardsale-banner p { color: rgba(17, 16, 24, 0.82); font-size: 0.94rem; font-weight: 600; line-height: 1.55; max-width: 60ch; margin: 0 auto; }
 .cardsale-banner p b { font-weight: 900; }
+.cardsale-request-cta { margin-top: 1.1rem; }
 
 .cardsale-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1.1rem; }
 .cardsale-card {

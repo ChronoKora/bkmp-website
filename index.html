@@ -366,6 +366,7 @@
           <span class="cardsale-banner-kicker">Verkaufsservice</span>
           <strong>Verkaufe deine 15er-Karte über uns</strong>
           <p>Du bekommst <b>135.000 €</b> pro verkaufter Karte, wir behalten nur <b>15.000 €</b> Provision (bei einem Kartenpreis von 150.000 €). Gib uns 10 Bundles mit Kopien deiner Karte — dafür bekommst du Shop-Trust und kannst jederzeit selbst nachschauen, ob noch alles da ist.</p>
+          <button class="btn-ja cardsale-request-cta" id="openCardSaleRequestForm" type="button">Verkaufsanfrage stellen</button>
         </div>
         <div class="cardsale-grid" id="cardsaleGrid"></div>
       </section>
@@ -679,6 +680,32 @@
         <p>Deine Karte wurde eingereicht und erscheint hier, sobald ein Admin sie gepr&uuml;ft hat.</p>
         <div class="joke-buttons">
           <button class="btn-ja" id="cardCatalogSuccessClose" type="button">Schlie&szlig;en</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="joke-overlay" id="cardSaleRequestOverlay">
+    <div class="joke-card" id="cardSaleRequestCard">
+      <div id="cardSaleRequestFormView">
+        <h3>Verkaufsanfrage stellen</h3>
+        <label for="cardSaleRequestName">Minecraft-Name</label>
+        <input type="text" id="cardSaleRequestName" placeholder="Dein Minecraft-Name" maxlength="32" required>
+        <label for="cardSaleRequestDiscord">Discord-Name (optional)</label>
+        <input type="text" id="cardSaleRequestDiscord" placeholder="z. B. name#0001" maxlength="40">
+        <label for="cardSaleRequestImageFile">Bild deiner Karte (Pflicht)</label>
+        <input type="file" id="cardSaleRequestImageFile" accept="image/*" required>
+        <label class="admin-checkbox-label"><input type="checkbox" id="cardSaleRequestInfoRead" required> Ich habe die Infos oben (Ablauf, Auszahlung, 10 Bundles) gelesen und verstanden.</label>
+        <div class="joke-buttons">
+          <button class="btn-nein" id="cardSaleRequestCancel" type="button">Abbrechen</button>
+          <button class="btn-ja" id="cardSaleRequestSubmit" type="button">Anfrage senden</button>
+        </div>
+      </div>
+      <div id="cardSaleRequestSuccessView" style="display:none; text-align:center;">
+        <h3>Danke!</h3>
+        <p>Deine Verkaufsanfrage ist eingegangen. Ein Admin meldet sich, sobald sie gepr&uuml;ft wurde.</p>
+        <div class="joke-buttons">
+          <button class="btn-ja" id="cardSaleRequestSuccessClose" type="button">Schlie&szlig;en</button>
         </div>
       </div>
     </div>
@@ -1394,30 +1421,49 @@
       refreshDeferredPanels();
     }
 
+    /* Egress-Fix: frueher loeste JEDE Aenderung an IRGENDEINER der 10
+       live-ueberwachten Tabellen ein volles Neuladen ALLER 10 Tabellen aus
+       (refreshVisibleData -> refreshDeferredPanels). Bei z. B. einer neuen
+       Wunschkarte wurden dadurch auch Einnahmen/Investoren/Ausgaben/News/
+       Twitch-Links/PartnerShops/Kartenverkaeufe/Kartenkatalog komplett neu
+       geladen, obwohl sich nur "wishes" geaendert hatte. Jetzt wird pro
+       Realtime-Ereignis nur die tatsaechlich betroffene Tabelle neu
+       geladen; mehrere Aenderungen innerhalb des 350ms-Fensters werden
+       zu einem einzigen Batch-Refresh der betroffenen Tabellen gebuendelt. */
+    const BKMP_LIVE_TABLE_HANDLERS = {
+      incomes: () => syncIncomesFromSupabase(data, null).then(c => { if (c && typeof renderFinancialSections === 'function') renderFinancialSections(); }),
+      expenses: () => syncExpensesFromSupabase(data, null).then(c => { if (c && typeof renderFinancialSections === 'function') renderFinancialSections(); }),
+      investors: () => syncInvestorsFromSupabase(data, null).then(c => { if (c && typeof renderFinancialSections === 'function') renderFinancialSections(); }),
+      updates: () => syncUpdatesFromSupabase(data, null).then(() => { if (typeof renderNews === 'function') renderNews(); }),
+      wishes: () => syncWishesFromSupabase(data, null).then(() => { if (typeof renderWishes === 'function') renderWishes(); }),
+      streamer_links: () => syncStreamersFromSupabase(data, null).then(() => renderStreamers()),
+      about_blocks: () => syncAboutBlocksFromSupabase(data, null).then(() => { if (typeof renderAboutBlocks === 'function') renderAboutBlocks(); }),
+      partner_shops: () => syncPartnerShopsFromSupabase(data, null).then(() => { if (typeof renderPartnerShops === 'function') renderPartnerShops(); }),
+      card_sales: () => syncCardSalesFromSupabase(data, null).then(() => { if (typeof renderCardSales === 'function') renderCardSales(); }),
+      card_catalog: () => syncCardCatalogFromSupabase(data, null).then(() => { if (typeof renderCardCatalog === 'function') renderCardCatalog(); })
+    };
+
     let liveRefreshTimer = null;
-    function scheduleLiveDataRefresh() {
+    const bkmpPendingLiveTables = new Set();
+    function scheduleLiveDataRefresh(table) {
+      bkmpPendingLiveTables.add(table);
       window.clearTimeout(liveRefreshTimer);
-      liveRefreshTimer = window.setTimeout(refreshVisibleData, 350);
+      liveRefreshTimer = window.setTimeout(() => {
+        const tables = [...bkmpPendingLiveTables];
+        bkmpPendingLiveTables.clear();
+        Promise.all(tables.map(t => (BKMP_LIVE_TABLE_HANDLERS[t] || (() => Promise.resolve()))())).then(() => {
+          if (typeof renderAchievementBadge === 'function') renderAchievementBadge();
+          if (typeof renderLeaderboard === 'function') renderLeaderboard();
+        });
+      }, 350);
     }
 
     function initSupabaseRealtime() {
       const client = typeof bkmpGetSupabaseClient === 'function' ? bkmpGetSupabaseClient() : null;
       if (!client || typeof client.channel !== 'function' || window.__bkmpRealtimeChannel) return;
-      const tables = [
-        'incomes',
-        'expenses',
-        'investors',
-        'updates',
-        'wishes',
-        'streamer_links',
-        'about_blocks',
-        'partner_shops',
-        'card_sales',
-        'card_catalog'
-      ];
       const channel = client.channel('bkmp-live-dashboard');
-      tables.forEach(table => {
-        channel.on('postgres_changes', { event: '*', schema: 'public', table }, scheduleLiveDataRefresh);
+      Object.keys(BKMP_LIVE_TABLE_HANDLERS).forEach(table => {
+        channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => scheduleLiveDataRefresh(table));
       });
       channel.subscribe();
       window.__bkmpRealtimeChannel = channel;
@@ -1448,12 +1494,29 @@
       if (typeof refreshLeaderboardData === 'function') refreshLeaderboardData();
     });
 
-    // Realtime-Channel deckt sofortige Updates ab; das Polling ist nur ein Fallback fuer verpasste Events.
-    window.setInterval(refreshVisibleData, 90000);
-    window.addEventListener('focus', refreshVisibleData);
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) refreshVisibleData();
-    });
+    // Realtime-Channel deckt sofortige Updates ab (jetzt table-spezifisch,
+    // siehe scheduleLiveDataRefresh) - das hier ist wirklich nur noch ein
+    // seltener Fallback, falls der Realtime-Channel z. B. nach Schlaf-
+    // modus/Netzwerkwechsel still haengen bleibt. 90s war fuer einen reinen
+    // Fallback deutlich zu aggressiv (voller Reload ALLER 10 Tabellen bei
+    // jedem einzelnen Intervall-Tick, auch ohne jede Aenderung).
+    window.setInterval(refreshVisibleData, 600000); // alle 10 Minuten
+
+    // window focus UND document visibilitychange feuern beim Zurueckwechseln
+    // in den Tab praktisch immer gemeinsam - vorher loeste das zwei volle
+    // 10-Tabellen-Reloads pro Tab-Wechsel aus. Jetzt ein gemeinsamer Handler
+    // mit Cooldown, damit haeufiges Hin-und-Herwechseln (Alt-Tab) nicht bei
+    // jedem einzelnen Wechsel neu laedt.
+    let bkmpLastVisibleRefreshAt = 0;
+    function bkmpRefreshVisibleDataThrottled() {
+      if (document.hidden) return;
+      const now = Date.now();
+      if (now - bkmpLastVisibleRefreshAt < 120000) return; // max. alle 2 Min.
+      bkmpLastVisibleRefreshAt = now;
+      refreshVisibleData();
+    }
+    window.addEventListener('focus', bkmpRefreshVisibleDataThrottled);
+    document.addEventListener('visibilitychange', bkmpRefreshVisibleDataThrottled);
 
     function renderFinancialSections() {
     const totalIncome = bkmpSum(data.income);
@@ -2297,6 +2360,73 @@
 
     if (cardCatalogSuccessClose) {
       cardCatalogSuccessClose.addEventListener('click', () => cardCatalogOverlay.classList.remove('visible'));
+    }
+
+    /* ---------------- Kartenverkaufs-Anfrage ---------------- */
+    const cardSaleRequestOverlay = document.getElementById('cardSaleRequestOverlay');
+    const openCardSaleRequestForm = document.getElementById('openCardSaleRequestForm');
+    const cardSaleRequestCancel = document.getElementById('cardSaleRequestCancel');
+    const cardSaleRequestSubmit = document.getElementById('cardSaleRequestSubmit');
+    const cardSaleRequestNameInput = document.getElementById('cardSaleRequestName');
+    const cardSaleRequestDiscordInput = document.getElementById('cardSaleRequestDiscord');
+    const cardSaleRequestImageFileInput = document.getElementById('cardSaleRequestImageFile');
+    const cardSaleRequestInfoRead = document.getElementById('cardSaleRequestInfoRead');
+    const cardSaleRequestFormView = document.getElementById('cardSaleRequestFormView');
+    const cardSaleRequestSuccessView = document.getElementById('cardSaleRequestSuccessView');
+    const cardSaleRequestSuccessClose = document.getElementById('cardSaleRequestSuccessClose');
+
+    function clearCardSaleRequestForm() {
+      cardSaleRequestNameInput.value = typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : '';
+      cardSaleRequestDiscordInput.value = '';
+      cardSaleRequestImageFileInput.value = '';
+      cardSaleRequestInfoRead.checked = false;
+      if (cardSaleRequestFormView) cardSaleRequestFormView.style.display = '';
+      if (cardSaleRequestSuccessView) cardSaleRequestSuccessView.style.display = 'none';
+    }
+
+    if (openCardSaleRequestForm) {
+      openCardSaleRequestForm.addEventListener('click', () => {
+        clearCardSaleRequestForm();
+        cardSaleRequestOverlay.classList.add('visible');
+      });
+    }
+    if (cardSaleRequestCancel) cardSaleRequestCancel.addEventListener('click', () => cardSaleRequestOverlay.classList.remove('visible'));
+    if (cardSaleRequestSuccessClose) cardSaleRequestSuccessClose.addEventListener('click', () => cardSaleRequestOverlay.classList.remove('visible'));
+
+    if (cardSaleRequestSubmit) {
+      cardSaleRequestSubmit.addEventListener('click', () => {
+        const name = cardSaleRequestNameInput.value.trim();
+        if (!name) { cardSaleRequestNameInput.reportValidity(); return; }
+        const file = cardSaleRequestImageFileInput.files && cardSaleRequestImageFileInput.files[0];
+        if (!file) { cardSaleRequestImageFileInput.reportValidity(); return; }
+        if (!cardSaleRequestInfoRead.checked) { cardSaleRequestInfoRead.reportValidity(); return; }
+        const cooldown = bkmpSubmitCooldownSecondsLeft('cardsalerequest');
+        if (cooldown > 0) { alert(`Bitte warte noch ${cooldown} Sekunde(n), bevor du erneut einreichst.`); return; }
+        const discord = cardSaleRequestDiscordInput.value.trim();
+
+        cardSaleRequestSubmit.disabled = true;
+        cardSaleRequestSubmit.textContent = 'Wird gesendet...';
+        function resetBtn() {
+          cardSaleRequestSubmit.disabled = false;
+          cardSaleRequestSubmit.textContent = 'Anfrage senden';
+        }
+
+        bkmpCompressImageFile(file).then(image => {
+          bkmpSubmitViaApi('card_sale_requests', { minecraft_name: name, discord }, image).then(() => {
+            bkmpStartSubmitCooldown('cardsalerequest');
+            resetBtn();
+            if (cardSaleRequestFormView) cardSaleRequestFormView.style.display = 'none';
+            if (cardSaleRequestSuccessView) cardSaleRequestSuccessView.style.display = '';
+          }).catch(e => {
+            console.error('Verkaufsanfrage konnte nicht gespeichert werden.', e);
+            resetBtn();
+            alert('Die Anfrage konnte nicht gesendet werden: ' + (e && e.message || e) + '\n\nBitte versuche es erneut oder mit einem anderen Bild.');
+          });
+        }).catch(() => {
+          resetBtn();
+          alert('Das Bild konnte nicht gelesen werden. Bitte versuche es mit einer anderen Datei erneut.');
+        });
+      });
     }
 
     /* ---------------- PartnerShop-Einreichung ---------------- */

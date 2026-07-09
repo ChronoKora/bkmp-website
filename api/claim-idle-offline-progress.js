@@ -196,10 +196,19 @@ module.exports = async function handler(req, res) {
       const dragonDmgPerHit = Math.max(1, dragon.attack * dragonExpectedCritMult - defense * 0.5);
       const villageHpLoss = Math.max(0, hitsNeeded - 1) * dragonDmgPerHit;
       if (villageHpLoss >= villageHp) {
-        // Dieser Kampf wuerde das Dorf toeten - der Spieler ist (noch)
-        // nicht stark genug fuer diese Stufe. Fortschritt hier stoppen,
-        // statt optimistisch weiterzurechnen.
-        break;
+        // Dieser Kampf wuerde das Dorf toeten - genau wie live
+        // (bkmpIdleHandleDefeat): NICHT komplett aufgeben, sondern eine
+        // Stufe zurueckfallen, Dorf-HP zuruecksetzen und dort weitergrinden.
+        // Vorher wurde hier hart abgebrochen, was bei einer einzigen zu
+        // starken Stufe die GESAMTE Offline-Zeit auf 0 Belohnung setzte,
+        // obwohl man im Livespiel einfach eine Stufe tiefer weiterfarmt.
+        const ticksUntilDefeat = Math.max(1, Math.ceil(villageHp / dragonDmgPerHit));
+        const timeLost = ticksUntilDefeat * secondsPerTick;
+        if (simulatedSeconds + timeLost > budgetSeconds) break;
+        simulatedSeconds += timeLost;
+        killIndex = Math.max(0, killIndex - 1);
+        villageHp = villageMaxHp;
+        continue;
       }
 
       simulatedSeconds += timeToKill;

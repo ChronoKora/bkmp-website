@@ -47,6 +47,14 @@ const TABLE_CONFIG = {
     allowedFields: ['name', 'location', 'category', 'description', 'link', 'contact'],
     requireImage: false,
     fieldMap: { name: 'shop_name' }
+  },
+  card_sale_requests: {
+    table: 'card_sale_requests',
+    folder: 'card-sale-requests',
+    imageField: 'image_url',
+    requiredFields: ['minecraft_name'],
+    allowedFields: ['minecraft_name', 'discord'],
+    requireImage: true
   }
 };
 

@@ -497,6 +497,11 @@
         <!-- Karten Verkaufen -->
         <section class="admin-page" id="page-cardsales">
           <div class="admin-section">
+            <h2>Verkaufsanfragen <span class="cardcatalog-admin-count" id="cardSaleRequestCount"></span></h2>
+            <p class="admin-help-text">Anfragen von der Website. Best&auml;tigen legt automatisch einen Verk&auml;ufer-Eintrag (0 verkauft) mit dem eingereichten Bild an.</p>
+            <div class="entry-table-wrapper"><div class="entry-list investor-request-list" id="cardSaleRequestList"></div></div>
+          </div>
+          <div class="admin-section">
             <h2>Karten Verkaufen</h2>
             <p class="admin-help-text">135.000 &euro; gehen an den Spieler, 15.000 &euro; Provision bei uns (Kartenpreis 150.000 &euro;). Verkaufszahl hier bei jedem Verkauf hochz&auml;hlen.</p>
             <div class="entry-table-wrapper"><div class="entry-list cardsale-admin-list" id="cardSaleList"></div></div>
@@ -897,18 +902,24 @@
     const loginPassword = document.getElementById('loginPassword');
     const loginError = document.getElementById('loginError');
 
-    function refreshAdminDataFromSupabase() {
-      refreshIncomesFromSupabase();
-      refreshInvestorsFromSupabase();
-      refreshExpensesFromSupabase();
-      refreshUpdatesFromSupabase();
-      refreshWishesFromSupabase();
-      refreshStreamersFromSupabase();
-      refreshAboutBlocksFromSupabase();
-      refreshPartnerShopsFromSupabase();
-      refreshCardSalesFromSupabase();
-      refreshInvestorRequestsFromSupabase();
-      refreshCardCatalogFromSupabase();
+/* Async + gibt ein Promise zurueck (vorher fire-and-forget), damit
+   showAdmin() darauf warten kann, statt dass showPendingSummaryPopup()
+   dieselben 3 Tabellen (card_catalog/wishes/investor_requests) Sekunden
+   spaeter nochmal komplett neu laedt. */
+    async function refreshAdminDataFromSupabase() {
+      return Promise.all([
+        refreshIncomesFromSupabase(),
+        refreshInvestorsFromSupabase(),
+        refreshExpensesFromSupabase(),
+        refreshUpdatesFromSupabase(),
+        refreshWishesFromSupabase(),
+        refreshStreamersFromSupabase(),
+        refreshAboutBlocksFromSupabase(),
+        refreshPartnerShopsFromSupabase(),
+        refreshCardSalesFromSupabase(),
+        refreshInvestorRequestsFromSupabase(),
+        refreshCardCatalogFromSupabase()
+      ]);
     }
 
     async function refreshBackupDataFromSupabase() {
@@ -940,22 +951,14 @@
         return;
       }
       renderAll();
-      refreshAdminDataFromSupabase();
-      showPendingSummaryPopup();
+      refreshAdminDataFromSupabase().then(showPendingSummaryPopup);
     }
 
-    async function showPendingSummaryPopup() {
-      try {
-        await Promise.all([
-          syncCardCatalogFromSupabase(data, null, { force: true }),
-          syncWishesFromSupabase(data, null, { force: true }),
-          syncInvestorRequestsFromSupabase(data, null, { force: true })
-        ]);
-      } catch (e) {
-        console.warn('Konnte offene Anfragen nicht laden.', e);
-      }
-      renderAll();
-
+    /* Liest absichtlich NUR aus dem bereits von refreshAdminDataFromSupabase()
+       geladenen data-Objekt - card_catalog/wishes/investor_requests wurden
+       gerade erst frisch geladen, ein erneuter Fetch hier waere reine
+       Verdopplung derselben 3 Tabellen. */
+    function showPendingSummaryPopup() {
       const pendingCardCatalog = (data.cardCatalog || []).filter(item => item.status === 'pending').length;
       const pendingWishes = (data.wishes || []).filter(item => item.status === 'pending').length;
       const pendingInvestorRequests = (data.investorRequests || []).filter(item => item.status === 'pending').length;
@@ -1139,6 +1142,10 @@
 
     async function refreshInvestorRequestsFromSupabase() {
       await syncInvestorRequestsFromSupabase(data, function () { renderAll(); }, { force: true });
+    }
+
+    async function refreshCardSaleRequestsFromSupabase() {
+      await syncCardSaleRequestsFromSupabase(data, function () { renderAll(); }, { force: true });
     }
 
     async function persistExpense(expense) {
@@ -1540,6 +1547,98 @@
           row.querySelector('.reject-btn').addEventListener('click', () => rejectInvestorRequest(req.id));
         }
         row.querySelector('.del-btn').addEventListener('click', () => deleteInvestorRequestEntry(req.id));
+        el.appendChild(row);
+      });
+    }
+
+    /* ---------------- Kartenverkaufs-Anfragen (analog zu Investoren-Anfragen) ---------------- */
+
+    async function confirmCardSaleRequest(id) {
+      const req = data.cardSaleRequests.find(r => r.id === id);
+      if (!req) return;
+      const created = await persistCardSale({ playerName: req.minecraftName, image: req.image, soldCount: 0 });
+      if (!created) {
+        showAdminToast('Verkäufer konnte nicht angelegt werden — Anfrage bleibt offen.', 'error');
+        return;
+      }
+      if (typeof updateCardSaleRequestStatus === 'function' && bkmpGetSupabaseClient()) {
+        try {
+          const updated = await updateCardSaleRequestStatus(id, 'confirmed');
+          data.cardSaleRequests = data.cardSaleRequests.map(r => r.id === id ? (updated || { ...r, status: 'confirmed' }) : r);
+          bkmpSaveData(data);
+          renderAll();
+          showAdminToast('Anfrage bestätigt — Verkäufer wurde angelegt.', 'success');
+        } catch (e) {
+          console.error('Status konnte nicht aktualisiert werden.', e);
+          showAdminToast('Verkäufer wurde erstellt, Status der Anfrage konnte aber nicht aktualisiert werden: ' + supabaseErrorText(e), 'error');
+        }
+      }
+    }
+
+    async function rejectCardSaleRequest(id) {
+      if (typeof updateCardSaleRequestStatus !== 'function' || !bkmpGetSupabaseClient()) return;
+      try {
+        const updated = await updateCardSaleRequestStatus(id, 'rejected');
+        data.cardSaleRequests = data.cardSaleRequests.map(r => r.id === id ? (updated || { ...r, status: 'rejected' }) : r);
+        bkmpSaveData(data);
+        renderAll();
+        showAdminToast('Anfrage abgelehnt.', 'success');
+      } catch (e) {
+        showAdminToast('Konnte nicht abgelehnt werden: ' + supabaseErrorText(e), 'error');
+      }
+    }
+
+    async function deleteCardSaleRequestEntry(id) {
+      if (typeof deleteCardSaleRequest === 'function' && bkmpGetSupabaseClient()) {
+        try {
+          await deleteCardSaleRequest(id);
+        } catch (e) {
+          showAdminToast('Konnte nicht gelöscht werden: ' + supabaseErrorText(e), 'error');
+          return;
+        }
+      }
+      data.cardSaleRequests = data.cardSaleRequests.filter(r => String(r.id) !== String(id));
+      bkmpSaveData(data);
+      renderAll();
+    }
+
+    function renderCardSaleRequestList() {
+      const el = document.getElementById('cardSaleRequestList');
+      const countEl = document.getElementById('cardSaleRequestCount');
+      if (!el) return;
+      const items = data.cardSaleRequests || [];
+      if (countEl) {
+        const pendingCount = items.filter(r => r.status === 'pending').length;
+        countEl.textContent = pendingCount ? `(${pendingCount} offen)` : '';
+      }
+      if (items.length === 0) {
+        el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Noch keine Verkaufsanfragen.</p>';
+        return;
+      }
+      el.innerHTML = '';
+      const sorted = [...items].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      sorted.forEach(req => {
+        const row = document.createElement('div');
+        row.className = 'entry-row investor-request-row';
+        row.innerHTML = `
+          <div class="desc">
+            <span class="name">${escapeHtml(req.minecraftName)}</span>
+            <span class="meta">${req.discord ? escapeHtml(req.discord) + ' · ' : ''}${req.image ? '<a href="' + escapeHtml(req.image) + '" target="_blank" rel="noopener">Bild ansehen</a>' : 'Kein Bild'}</span>
+          </div>
+          <span class="investor-request-status status-${req.status}">${investorRequestStatusLabel(req.status)}</span>
+          <div class="entry-actions">
+            ${req.status === 'pending' ? `
+              <button class="edit-btn confirm-btn" type="button">Bestätigen</button>
+              <button class="edit-btn reject-btn" type="button">Ablehnen</button>
+            ` : ''}
+            <button class="del-btn" type="button" aria-label="Anfrage löschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>
+          </div>
+        `;
+        if (req.status === 'pending') {
+          row.querySelector('.confirm-btn').addEventListener('click', () => confirmCardSaleRequest(req.id));
+          row.querySelector('.reject-btn').addEventListener('click', () => rejectCardSaleRequest(req.id));
+        }
+        row.querySelector('.del-btn').addEventListener('click', () => deleteCardSaleRequestEntry(req.id));
         el.appendChild(row);
       });
     }
