@@ -3278,7 +3278,7 @@
          (#plushieCodeInput) ist kein Beispiel mehr, sondern ein echter,
          gueltiger Code - wer genau hinschaut und ihn einloest, bekommt
          diesen Erfolg extra (zusaetzlich zum normalen "plushie_kora"). */
-      { id: 'kora_finder', category: 'Plüshies', title: 'Du kannst mich austricksen..', desc: 'Wo man überall Plüshi-Codes findet, verrückt oder?', check: ctx => ctx.ownedPlushies.includes('kora') },
+      { id: 'kora_finder', category: 'Easter Eggs', title: 'Du kannst mich austricksen..', desc: 'Wo man überall Plüshi-Codes findet, verrückt oder?', check: ctx => ctx.ownedPlushies.includes('kora') },
       { id: 'daily_event_1', category: 'Plüshies', title: '???', revealName: 'Glücklicher Gewinner', desc: 'Gewinne ein Daily-Code-Event.', check: ctx => ctx.dailyEventWins >= 1 },
       { id: 'daily_event_5', category: 'Plüshies', title: '???', revealName: 'Serien-Gewinner', desc: 'Gewinne 5 Daily-Code-Events.', progress: ctx => [ctx.dailyEventWins, 5], check: ctx => ctx.dailyEventWins >= 5 },
       { id: 'daily_event_15', category: 'Plüshies', title: '???', revealName: 'Event-Champion', desc: 'Gewinne 15 Daily-Code-Events.', progress: ctx => [ctx.dailyEventWins, 15], check: ctx => ctx.dailyEventWins >= 15 },
