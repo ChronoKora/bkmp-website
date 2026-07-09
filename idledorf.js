@@ -273,11 +273,12 @@ function bkmpIdleRecomputeEffectiveStats() {
   if (!bkmpIdleState) return;
   const skillTotals = bkmpIdleSkillEffectTotals(bkmpIdleState.skill_allocations, bkmpIdleSkillDefs);
   const upgradeTotals = bkmpIdleUpgradeEffectTotals(bkmpIdleState.upgrade_purchases);
+  const titleTotals = bkmpIdleTitleEffectTotals(bkmpIdleGetAchievementContextFields());
   const base = bkmpIdleConfig.base_stats || BKMP_IDLE_FALLBACK_CONFIG.base_stats;
-  /* t() summiert einen Effekttyp aus Skilltree UND Upgrades. Kampfwerte
-     nutzen jetzt "_flat" (feste Zahlen, addiert VOR dem Prozent-Multiplikator),
-     Produktionsraten (Gold/Loot) bleiben "_pct". */
-  const t = key => (skillTotals[key] || 0) + (upgradeTotals[key] || 0);
+  /* t() summiert einen Effekttyp aus Skilltree, Upgrades UND freigeschalteten
+     Sammlung-Titeln. Kampfwerte nutzen "_flat" (feste Zahlen, addiert VOR dem
+     Prozent-Multiplikator), Produktionsraten (Gold/Loot) bleiben "_pct". */
+  const t = key => (skillTotals[key] || 0) + (upgradeTotals[key] || 0) + (titleTotals[key] || 0);
   const prevMaxHp = bkmpIdleEffectiveStats ? bkmpIdleEffectiveStats.hp : null;
   bkmpIdleEffectiveStats = {
     attack: (base.attack + t('attack_flat')) * (1 + t('attack_pct') / 100),
@@ -696,10 +697,48 @@ function bkmpIdleRenderSkilltreePanel() {
 
 /* ---------------- Rendering: Sammlung- / Erfolge-Tab (Shortcuts ins bestehende System) ---------------- */
 
+/* Menschenlesbare Beschriftung fuer einen Titel-Bonus. Nur hier im
+   Sammlung-Tab gebraucht - im allgemeinen Kosmetik-/Erfolge-Profil bleiben
+   Titel absichtlich ohne Zahlenangabe. */
+const BKMP_IDLE_EFFECT_LABELS = {
+  attack_flat: v => `+${v} Angriff`,
+  defense_flat: v => `+${v} Verteidigung`,
+  hp_flat: v => `+${v} Leben`,
+  crit_chance_flat: v => `+${v}% Krit-Chance`,
+  gold_prod_pct: v => `+${v}% Gold`,
+  xp_pct: v => `+${v}% XP`,
+  loot_chance_pct: v => `+${v}% Lootchance`
+};
+function bkmpIdleFormatTitleBonus(title) {
+  const fmt = BKMP_IDLE_EFFECT_LABELS[title.effectType];
+  return fmt ? fmt(title.effectValue) : '';
+}
+
 function bkmpIdleRenderSammlungPanel() {
   const panel = document.getElementById('idlePanelSammlung');
   if (!panel) return;
-  panel.innerHTML = '<p class="idle-panel-hint">Deine 18 Idle-Dorf-Kosmetiken schaltest du durch Fortschritt frei und findest sie in deinem Erfolge-Fenster unter „Kosmetik".</p><button type="button" class="btn-ja" id="idleOpenCosmeticsBtn">Kosmetik öffnen</button>';
+  const ctx = bkmpIdleGetAchievementContextFields();
+  const bonusTitles = window.BKMP_IDLE_TITLES.filter(t => t.effectType);
+  const unlockedCount = bonusTitles.filter(t => t.unlockCustom(ctx)).length;
+  const rows = bonusTitles.map(title => {
+    const unlocked = title.unlockCustom(ctx);
+    return `
+      <div class="achievement-row ${unlocked ? 'unlocked' : 'locked'}">
+        <span class="achievement-icon">${unlocked ? '✅' : '🔒'}</span>
+        <div class="achievement-body">
+          <div class="achievement-title">${escapeHtml(title.name)}</div>
+          <div class="achievement-desc">${escapeHtml(title.desc)}</div>
+        </div>
+        <span class="idle-title-bonus ${unlocked ? '' : 'idle-title-bonus-hidden'}">${unlocked ? escapeHtml(bkmpIdleFormatTitleBonus(title)) : '???'}</span>
+      </div>`;
+  }).join('');
+  panel.innerHTML = `
+    <p class="idle-panel-hint">Deine 18 Idle-Dorf-Kosmetiken schaltest du durch Fortschritt frei und findest sie in deinem Erfolge-Fenster unter „Kosmetik".</p>
+    <button type="button" class="btn-ja" id="idleOpenCosmeticsBtn">Kosmetik öffnen</button>
+    <h4 class="idle-sammlung-subheading">🏅 Titel-Boni <span class="idle-sammlung-count">${unlockedCount}/${bonusTitles.length}</span></h4>
+    <p class="idle-panel-hint">Jeder freigeschaltete Titel gibt einen dauerhaften Bonus - egal, welchen Titel du gerade als Namenszusatz trägst. Freigeschaltet bleibt freigeschaltet.</p>
+    <div class="idle-title-bonus-list">${rows}</div>
+  `;
   const btn = document.getElementById('idleOpenCosmeticsBtn');
   if (btn) btn.addEventListener('click', () => {
     bkmpIdleCloseModal();
@@ -971,19 +1010,54 @@ window.BKMP_IDLE_ACHIEVEMENTS_EXTRA = [
   { id: 'idle_branch_all', category: 'Idle Dorf', title: 'Skilltree-Meister', desc: 'Maximiere alle 5 Skilltree-Zweige.', progress: ctx => [ctx.idleBranchesMaxed, 5], check: ctx => ctx.idleBranchesMaxed >= 5 }
 ];
 
+/* Frueher zeigten alle Tier-Titel auf "unlockAchievement"-IDs (z. B.
+   "idledragon_5"), fuer die es nie ein passendes Achievement-Objekt gab -
+   dadurch waren sie technisch unerreichbar/dauerhaft gesperrt. Jetzt
+   direkt per unlockCustom gegen den Kontext geprueft (funktioniert genauso
+   wie bei den Kosmetiken weiter unten) UND mit einem echten Kampf-/
+   Produktionsbonus versehen (effectType/effectValue) - siehe
+   bkmpIdleTitleEffectTotals(). Diese Boni gelten PERMANENT sobald der
+   Titel freigeschaltet ist (Sammlung, nicht "aktiv getragen"), werden aber
+   nur in der Sammlung-Ansicht angezeigt, nicht im allgemeinen Kosmetik-/
+   Erfolge-Profil (dort bleiben Titel rein kosmetisch). */
 window.BKMP_IDLE_TITLES = [
-  ...window.BKMP_IDLE_DRAGON_KILL_TIERS.map(([n, label]) => ({ id: `idletitle_dragon_${n}`, name: label, desc: `Für ${n} besiegte Drachen im Idle Dorf.`, unlockAchievement: `idledragon_${n}` })),
-  ...window.BKMP_IDLE_LEVEL_TIERS.map(([n, label]) => ({ id: `idletitle_level_${n}`, name: label, desc: `Erreiche Dorf-Level ${n}.`, unlockAchievement: `idlelevel_${n}` })),
-  ...window.BKMP_IDLE_GOLD_TIERS.map(([n, label]) => ({ id: `idletitle_gold_${n}`, name: label, desc: `Sammle ${n} Gold im Idle Dorf.`, unlockAchievement: `idlegold_${n}` })),
-  ...window.BKMP_IDLE_SKILLPOINTS_TIERS.map(([n, label]) => ({ id: `idletitle_skill_${n}`, name: label, desc: `Investiere ${n} Skillpunkte.`, unlockAchievement: `idleskill_${n}` })),
-  { id: 'idletitle_founder', name: 'Dorfgründer', desc: 'Das Idle Dorf gegründet.', unlockAchievement: 'idle_started' },
-  { id: 'idletitle_boss1', name: 'Bosskämpfer', desc: 'Besiegt den ersten Boss.', unlockAchievement: 'idle_first_boss' },
-  { id: 'idletitle_boss10', name: 'Bossjäger', desc: 'Besiegt 10 Bosse.', unlockAchievement: 'idle_boss_10' },
-  { id: 'idletitle_boss50', name: 'Boss-Vernichter', desc: 'Besiegt 50 Bosse.', unlockAchievement: 'idle_boss_50' },
-  { id: 'idletitle_branch1', name: 'Spezialist', desc: 'Ein Skilltree-Zweig maximiert.', unlockAchievement: 'idle_branch_one' },
-  { id: 'idletitle_branch3', name: 'Vielseitiger Anführer', desc: 'Drei Skilltree-Zweige maximiert.', unlockAchievement: 'idle_branch_three' },
-  { id: 'idletitle_branchall', name: 'Skilltree-Meister', desc: 'Alle Skilltree-Zweige maximiert.', unlockAchievement: 'idle_branch_all' }
+  ...window.BKMP_IDLE_DRAGON_KILL_TIERS.map(([n, label], i) => ({
+    id: `idletitle_dragon_${n}`, name: label, desc: `Für ${n} besiegte Drachen im Idle Dorf.`,
+    unlockCustom: ctx => ctx.idleDragonKills >= n, effectType: 'gold_prod_pct', effectValue: i + 1
+  })),
+  ...window.BKMP_IDLE_LEVEL_TIERS.map(([n, label], i) => ({
+    id: `idletitle_level_${n}`, name: label, desc: `Erreiche Dorf-Level ${n}.`,
+    unlockCustom: ctx => ctx.idleLevel >= n, effectType: 'xp_pct', effectValue: i + 1
+  })),
+  ...window.BKMP_IDLE_GOLD_TIERS.map(([n, label], i) => ({
+    id: `idletitle_gold_${n}`, name: label, desc: `Sammle ${n} Gold im Idle Dorf.`,
+    unlockCustom: ctx => ctx.idleGoldEarned >= n, effectType: 'loot_chance_pct', effectValue: i + 1
+  })),
+  ...window.BKMP_IDLE_SKILLPOINTS_TIERS.map(([n, label], i) => ({
+    id: `idletitle_skill_${n}`, name: label, desc: `Investiere ${n} Skillpunkte.`,
+    unlockCustom: ctx => ctx.idleSkillPointsSpent >= n, effectType: 'attack_flat', effectValue: i + 1
+  })),
+  { id: 'idletitle_founder', name: 'Dorfgründer', desc: 'Das Idle Dorf gegründet.', unlockCustom: ctx => ctx.idleLevel >= 1 },
+  { id: 'idletitle_boss1', name: 'Bosskämpfer', desc: 'Besiegt den ersten Boss.', unlockCustom: ctx => ctx.idleBossKills >= 1, effectType: 'crit_chance_flat', effectValue: 1 },
+  { id: 'idletitle_boss10', name: 'Bossjäger', desc: 'Besiegt 10 Bosse.', unlockCustom: ctx => ctx.idleBossKills >= 10, effectType: 'crit_chance_flat', effectValue: 2 },
+  { id: 'idletitle_boss50', name: 'Boss-Vernichter', desc: 'Besiegt 50 Bosse.', unlockCustom: ctx => ctx.idleBossKills >= 50, effectType: 'crit_chance_flat', effectValue: 3 },
+  { id: 'idletitle_branch1', name: 'Spezialist', desc: 'Ein Skilltree-Zweig maximiert.', unlockCustom: ctx => ctx.idleBranchesMaxed >= 1, effectType: 'defense_flat', effectValue: 2 },
+  { id: 'idletitle_branch3', name: 'Vielseitiger Anführer', desc: 'Drei Skilltree-Zweige maximiert.', unlockCustom: ctx => ctx.idleBranchesMaxed >= 3, effectType: 'defense_flat', effectValue: 5 },
+  { id: 'idletitle_branchall', name: 'Skilltree-Meister', desc: 'Alle Skilltree-Zweige maximiert.', unlockCustom: ctx => ctx.idleBranchesMaxed >= 5, effectType: 'hp_flat', effectValue: 20 }
 ];
+
+/* Summiert die Boni aller FREIGESCHALTETEN (nicht nur des aktiv
+   getragenen) Idle-Dorf-Titel - Sammlung-Prinzip: was du erreicht hast,
+   bleibt dauerhaft wirksam, unabhaengig davon welchen Titel du gerade als
+   Namenszusatz zeigst. */
+function bkmpIdleTitleEffectTotals(ctx) {
+  const totals = {};
+  window.BKMP_IDLE_TITLES.forEach(title => {
+    if (!title.effectType || !title.unlockCustom || !title.unlockCustom(ctx)) return;
+    totals[title.effectType] = (totals[title.effectType] || 0) + (title.effectValue || 0);
+  });
+  return totals;
+}
 
 window.BKMP_IDLE_COSMETICS = [
   { id: 'rotgruen', name: 'Rot → Grün', desc: 'Wandelt sich von Rot zu Grün.', rarity: 'Selten', unlockCustom: ctx => ctx.idleDragonKills >= 20 },

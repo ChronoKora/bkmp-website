@@ -17,8 +17,8 @@
 <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
 <link rel="manifest" href="site.webmanifest">
-<title>Bkmp – Minecraft Server Investment Dashboard</title>
-<meta name="description" content="Transparente Einblicke in Einnahmen, Investoren, News, Kartenideen und PartnerShops rund um den Bkmp Minecraft-Server.">
+<title>BKMP – Minecraft Server Investment Dashboard</title>
+<meta name="description" content="Transparente Einblicke in Einnahmen, Investoren, News, Kartenideen und PartnerShops rund um den BKMP Minecraft-Server.">
 <link rel="canonical" href="https://bkinvestment.de/">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://bkinvestment.de/">
@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260709-idlerework7">
+<link rel="stylesheet" href="style.css?v=20260709-mapartpolish1">
 </head>
 <body>
 
@@ -427,10 +427,13 @@
         <!-- Auftrag erstellen -->
         <div id="ordersSubtabCreatePanel">
           <form id="mapOrderForm" class="map-order-form" onsubmit="return false;">
+            <h3 class="map-form-section-title">👤 Deine Angaben</h3>
             <div class="form-grid form-grid-2">
               <div><label for="mapOrderMcName">Minecraft-Name</label><input type="text" id="mapOrderMcName" maxlength="32" required></div>
               <div><label for="mapOrderDiscord">Discord-Name (optional)</label><input type="text" id="mapOrderDiscord" maxlength="40"></div>
             </div>
+
+            <h3 class="map-form-section-title">🗺️ Auftragsdetails</h3>
             <label for="mapOrderTitle">Titel</label>
             <input type="text" id="mapOrderTitle" maxlength="80" required>
             <label for="mapOrderDescription">Beschreibung</label>
@@ -439,7 +442,7 @@
             <label>Kategorie</label>
             <div class="partner-filter" id="mapOrderCategoryFilter"></div>
 
-            <label>Kartengröße</label>
+            <h3 class="map-form-section-title">📐 Kartengröße</h3>
             <div class="partner-filter">
               <button type="button" class="active" id="mapOrderSizeKnownBtn">Größe bekannt</button>
               <button type="button" id="mapOrderSizeUnsureBtn">Noch unsicher / Beratungsbedarf</button>
@@ -454,20 +457,17 @@
               <textarea id="mapOrderSizeNotes" rows="2"></textarea>
             </div>
 
+            <h3 class="map-form-section-title">💰 Budget &amp; Priorität</h3>
             <label>Budget pro Kartenteil</label>
             <div class="partner-filter" id="mapOrderBudgetFilter"></div>
             <label class="admin-checkbox-label"><input type="checkbox" id="mapOrderBudgetCustomToggle"> Eigenes Budget innerhalb dieses Bereiches</label>
             <input type="number" id="mapOrderBudgetCustomInput" min="250000" max="500000" step="1000" style="display:none;" placeholder="250.000 – 500.000">
             <p class="map-order-total-preview" id="mapOrderTotalPreview"></p>
 
-            <div class="form-grid form-grid-2">
-              <div><label for="mapOrderDate">Gewünschtes Fertigstellungsdatum</label><input type="date" id="mapOrderDate"></div>
-              <div>
-                <label>Priorität</label>
-                <div class="partner-filter" id="mapOrderPriorityFilter"></div>
-              </div>
-            </div>
+            <label>Priorität</label>
+            <div class="partner-filter" id="mapOrderPriorityFilter"></div>
 
+            <h3 class="map-form-section-title">📎 Referenzen &amp; Hinweise</h3>
             <label for="mapOrderReferenceImages">Referenzbilder (optional)</label>
             <input type="file" id="mapOrderReferenceImages" accept="image/*" multiple>
             <div class="map-ref-preview" id="mapOrderReferencePreview"></div>
@@ -688,8 +688,8 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabase.js?v=20260708-mapart8"></script>
   <script src="app.js?v=20260707-plushiesdb"></script>
-  <script src="idledorf.js?v=20260709-idlerework4"></script>
-  <script src="mapart.js?v=20260708-mapart8"></script>
+  <script src="idledorf.js?v=20260709-titlebonus1"></script>
+  <script src="mapart.js?v=20260709-mapartpolish1"></script>
   <script>
     bkmpInitTheme();
     window.addEventListener('load', () => document.body.classList.add('page-loaded'));
@@ -1983,7 +1983,7 @@
       aboutPage.innerHTML = blocks.map(block => {
         const title = block.title ? `<h3>${escapeHtml(block.title)}</h3>` : '';
         const text = block.content ? `<p>${escapeHtml(block.content).replace(/\n/g, '<br>')}</p>` : '';
-        const image = block.image ? `<img data-bkmp-img src="${block.image}" alt="${escapeHtml(block.title || 'BKMP Bild')}" loading="lazy" decoding="async">` : '';
+        const image = block.image ? `<img data-bkmp-img src="${escapeHtml(block.image)}" alt="${escapeHtml(block.title || 'BKMP Bild')}" loading="lazy" decoding="async">` : '';
         const widthCls = block.width === 'half' ? ' about-block-half' : '';
         if (block.type === 'heading') return `<section class="about-block about-heading${widthCls}">${title}${text}</section>`;
         if (block.type === 'image') return `<section class="about-block about-image${widthCls}">${image}${title}</section>`;
@@ -1991,7 +1991,7 @@
         if (block.type === 'team') return `<section class="about-block about-team-card${widthCls}">${image}<div>${title}${text}</div></section>`;
         if (block.type === 'gallery') {
           const images = (block.images && block.images.length ? block.images : (block.image ? [block.image] : []));
-          return `<section class="about-block about-gallery${widthCls}">${title}<div>${images.map(src => `<img data-bkmp-img src="${src}" alt="" loading="lazy" decoding="async">`).join('')}</div>${text}</section>`;
+          return `<section class="about-block about-gallery${widthCls}">${title}<div>${images.map(src => `<img data-bkmp-img src="${escapeHtml(src)}" alt="" loading="lazy" decoding="async">`).join('')}</div>${text}</section>`;
         }
         return `<section class="about-block about-text${widthCls}">${title}${text}</section>`;
       }).join('');

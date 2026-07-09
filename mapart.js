@@ -11,12 +11,10 @@
    ============================================================ */
 
 const BKMP_MAP_CATEGORIES = [
-  { id: 'pixelart', label: 'PixelArt' },
-  { id: 'teppich', label: 'Teppich' },
-  { id: 'wolle', label: 'Wolle' },
-  { id: 'allblock', label: 'Allblock' },
-  { id: '3d', label: '3D' },
-  { id: 'sonstiges', label: 'Sonstiges' }
+  { id: '2d_teppich', label: '2D Teppich' },
+  { id: '2d_allblock', label: '2D All Block' },
+  { id: '3d_wolle', label: '3D Wolle' },
+  { id: '3d_allblock', label: '3D All Block' }
 ];
 const BKMP_MAP_PRIORITIES = [
   { id: 'normal', label: 'Normal' },
@@ -178,7 +176,6 @@ async function bkmpMapSubmitOrder() {
   const height = Number((document.getElementById('mapOrderHeight') || {}).value) || null;
   const parts = Number((document.getElementById('mapOrderParts') || {}).value) || null;
   const sizeNotes = (document.getElementById('mapOrderSizeNotes') || {}).value || '';
-  const date = (document.getElementById('mapOrderDate') || {}).value || null;
   const notes = (document.getElementById('mapOrderNotes') || {}).value || '';
   const consent = (document.getElementById('mapOrderConsent') || {}).checked;
 
@@ -215,7 +212,6 @@ async function bkmpMapSubmitOrder() {
       budget_per_part: bkmpMapOrderState.budgetPerPart,
       budget_is_custom: bkmpMapOrderState.budgetCustom,
       budget_total: total,
-      desired_completion_date: date || null,
       priority: bkmpMapOrderState.priority,
       additional_notes: notes.trim() || null,
       status: 'offen'

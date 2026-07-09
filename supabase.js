@@ -1101,31 +1101,6 @@ async function loadWishes() {
   return (data || []).map(bkmpMapWishFromSupabase);
 }
 
-async function saveWish(wish) {
-  const client = bkmpGetSupabaseClient();
-  if (!client) return null;
-  const payload = bkmpMapWishToSupabase(wish);
-  payload.image_url = await bkmpStoreImageIfNeeded(payload.image_url, 'wishes');
-  let { data, error } = await client
-    .from('wishes')
-    .insert(payload)
-    .select('id, name, image_url, likes, dislikes, status, created_at')
-    .single();
-
-  if (error && (String(error.message || '').includes('likes') || String(error.message || '').includes('dislikes'))) {
-    const fallback = await client
-      .from('wishes')
-      .insert(payload)
-      .select('id, name, image_url, created_at')
-      .single();
-    data = fallback.data;
-    error = fallback.error;
-  }
-
-  if (error) throw error;
-  return bkmpMapWishFromSupabase(data);
-}
-
 async function updateWishStatus(id, status) {
   const client = bkmpGetSupabaseClient();
   if (!client) return null;
