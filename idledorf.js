@@ -1216,21 +1216,52 @@ function bkmpRaidMarkJoined(raidId) {
 }
 
 /* ---------------- Button-Feuer/Glow (laeuft immer, auch ohne offenes Fenster) ---------------- */
+function bkmpRaidFormatParticipantCount(count) {
+  return count > 0 ? `${count} Spieler bereits angemeldet` : 'Sei der/die Erste, die beitritt!';
+}
+
+/* Laeuft 1x/Sekunde global (auch ohne offenes Idle-Dorf-Fenster) - zwei
+   Aufgaben: 1) Button-Feuer/Countdown immer aktuell halten, 2) falls das
+   Beitritts-Banner gerade offen ist, dessen Countdown live weiterzaehlen
+   und automatisch in die Kampfansicht wechseln, sobald die
+   Vorbereitungsphase endet - vorher blieb der Countdown bei laenger
+   geoeffnetem Fenster einfach auf dem Stand beim Oeffnen stehen. */
 function bkmpRaidUpdateButtonState() {
   const btn = document.getElementById('idleDorfButton');
   const countdownEl = document.getElementById('raidBtnCountdown');
-  if (!btn) return;
   const info = bkmpRaidGetPhaseInfo();
+  if (btn) {
+    if (info.phase === 'prep') {
+      btn.classList.add('raid-prep');
+      if (countdownEl) { countdownEl.style.display = ''; countdownEl.textContent = '🔥 ' + bkmpRaidFormatCountdown(info.msUntilFightStart); }
+    } else {
+      btn.classList.remove('raid-prep');
+      if (countdownEl) countdownEl.style.display = 'none';
+    }
+  }
+
+  const bannerCountdownEl = document.getElementById('raidBannerCountdown');
+  if (!bannerCountdownEl) return;
   if (info.phase === 'prep') {
-    btn.classList.add('raid-prep');
-    if (countdownEl) { countdownEl.style.display = ''; countdownEl.textContent = '🔥 ' + bkmpRaidFormatCountdown(info.msUntilFightStart); }
-  } else {
-    btn.classList.remove('raid-prep');
-    if (countdownEl) countdownEl.style.display = 'none';
+    bannerCountdownEl.textContent = bkmpRaidFormatCountdown(info.msUntilFightStart);
+    return;
+  }
+  const banner = document.getElementById('raidJoinBanner');
+  if (banner) banner.style.display = 'none';
+  bkmpUnsubscribeFromRaidInstance();
+  if (bkmpIdleModalOpen && bkmpRaidShouldShowCombatView()) {
+    bkmpIdleStopLoop();
+    bkmpRaidStartCombatView(info.raidId);
   }
 }
 
 /* ---------------- Beitritts-Banner (Idle-Dorf-Fenster, Vorbereitungsphase) ---------------- */
+function bkmpRaidHandlePrepRealtimeChange(change) {
+  if (change.type !== 'instance' || !change.row) return;
+  const countEl = document.getElementById('raidBannerParticipants');
+  if (countEl) countEl.textContent = bkmpRaidFormatParticipantCount(Number(change.row.participant_count || 0));
+}
+
 async function bkmpRaidRenderJoinBanner() {
   const banner = document.getElementById('raidJoinBanner');
   if (!banner) return;
@@ -1250,10 +1281,15 @@ async function bkmpRaidRenderJoinBanner() {
   const joinBtn = document.getElementById('raidJoinBtn');
   if (joinBtn) joinBtn.addEventListener('click', () => bkmpRaidJoin(info.raidId));
 
+  /* Live-Updates fuer die Teilnehmerzahl waehrend das Banner offen bleibt -
+     vorher wurde die Zahl nur EINMAL beim Oeffnen geladen und blieb dann
+     stehen, waehrend in Wirklichkeit laufend weitere Spieler beitraten. */
+  bkmpSubscribeToRaidInstance(info.raidId, bkmpRaidHandlePrepRealtimeChange);
+
   try {
     const state = await loadRaidState(info.raidId);
     const countEl = document.getElementById('raidBannerParticipants');
-    if (countEl && state) countEl.textContent = state.participantCount > 0 ? `${state.participantCount} Spieler bereits angemeldet` : 'Sei der/die Erste, die beitritt!';
+    if (countEl && state) countEl.textContent = bkmpRaidFormatParticipantCount(state.participantCount);
   } catch (e) { /* Raid existiert evtl. noch nicht - kein Problem, erster Beitritt legt sie an */ }
 }
 
