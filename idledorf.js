@@ -818,7 +818,7 @@ function bkmpIdleRenderSkilltreePanel() {
                 const maxed = rank >= node.max_rank;
                 const parentNode = node.requires_node_id ? nodes.find(n => n.id === node.requires_node_id) : null;
                 return `
-                  <div class="idle-skill-node ${rank > 0 ? 'ranked' : ''} ${!node.requires_node_id ? 'is-root' : ''}" data-node-id="${node.id}" ${node.requires_node_id ? `data-requires-node-id="${node.requires_node_id}"` : ''}>
+                  <div class="idle-skill-node ${rank > 0 ? 'ranked' : ''} ${maxed ? 'maxed' : ''} ${canAllocate && rank === 0 ? 'can-allocate' : ''} ${!node.requires_node_id ? 'is-root' : ''}" data-node-id="${node.id}" ${node.requires_node_id ? `data-requires-node-id="${node.requires_node_id}"` : ''}>
                     <div class="idle-skill-node-icon">${node.icon || '✨'}</div>
                     <div class="idle-skill-node-name">${escapeHtml(node.name)}</div>
                     <div class="idle-skill-node-desc">${escapeHtml(node.description || '')}</div>

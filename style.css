@@ -4189,8 +4189,22 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 .idle-skillpoints-hint { margin-bottom: 0; font-size: 0.85rem; }
 .idle-skilltree-reset-btn { padding: 0.4rem 0.8rem; font-size: 0.76rem; white-space: nowrap; }
 .idle-skilltree-reset-btn:disabled { opacity: 0.55; cursor: not-allowed; }
-.idle-skill-branch { margin-bottom: 1.1rem; }
-.idle-skill-branch-title { font-family: 'Fraunces', serif; font-size: 1.05rem; margin-bottom: 0.5rem; }
+.idle-skill-branch { margin-bottom: 1.8rem; }
+.idle-skill-branch-title {
+  font-family: 'Fraunces', serif;
+  font-size: 1.15rem;
+  margin-bottom: 0.7rem;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+.idle-skill-branch-title::before, .idle-skill-branch-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--gold) 45%, var(--line)), transparent);
+}
 /* min-width:0 auf den Grid-Items ist hier Pflicht, nicht Kosmetik: ohne das
    verweigern Grid-Items per Spec ein Schrumpfen unter ihre "intrinsische"
    Mindestbreite (das laengste unbrechbare Wort/Element im Kind). Bei
@@ -4202,28 +4216,81 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 /* Echter verbundener Baum statt flachem Grid: Reihen = Tiefe in der
    Voraussetzungs-Kette (siehe bkmpIdleSkillNodeDepth), SVG-Overlay zeichnet
    die Verbindungslinien zwischen Eltern-/Kind-Knoten nachtraeglich per
-   getBoundingClientRect() ein (siehe bkmpIdleDrawSkillTreeLines). */
-.idle-skilltree-tree { position: relative; }
+   getBoundingClientRect() ein (siehe bkmpIdleDrawSkillTreeLines).
+
+   Gerahmter "Baum-Kasten" statt frei schwebender Karten - gleiche
+   Zweischicht-Verlaufsrahmen-Technik wie .idle-battlefield/.raid-battlefield
+   (dezenter Radial-Verlauf + Gold-Rahmen), damit jeder Zweig wie ein
+   eigenstaendiges Element wirkt statt in der breiten Modal-Flaeche zu
+   "schwimmen". max-width + margin:auto haelt die Karten auch bei sehr
+   breiten Fenstern kompakt beieinander statt ueber die volle Breite verteilt. */
+.idle-skilltree-tree {
+  position: relative;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 1.3rem 1rem 1.1rem;
+  border-radius: 18px;
+  background: radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--gold) 7%, var(--paper)), var(--paper) 75%);
+  border: 1px solid var(--line);
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.12);
+}
 .idle-skilltree-lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; overflow: visible; }
-.idle-skilltree-line { stroke: var(--muted); stroke-width: 2; opacity: 0.55; }
-.idle-skilltree-line.unlocked { stroke: var(--gold); filter: drop-shadow(0 0 3px color-mix(in srgb, var(--gold) 60%, transparent)); }
-.idle-skilltree-row { position: relative; z-index: 1; display: flex; flex-wrap: wrap; justify-content: center; gap: 1.1rem; margin-bottom: 1.6rem; }
+.idle-skilltree-line { stroke: color-mix(in srgb, var(--muted) 70%, transparent); stroke-width: 2.5; stroke-linecap: round; }
+.idle-skilltree-line.unlocked { stroke: var(--gold); stroke-width: 3; filter: drop-shadow(0 0 4px color-mix(in srgb, var(--gold) 70%, transparent)); }
+.idle-skilltree-row { position: relative; z-index: 1; display: flex; flex-wrap: wrap; justify-content: center; gap: 1.3rem; margin-bottom: 1.9rem; }
 .idle-skilltree-row:last-child { margin-bottom: 0; }
 
-.idle-skill-node { position: relative; z-index: 1; width: 150px; min-width: 0; border: 1px solid var(--line); border-radius: 12px; padding: 0.7rem; background: var(--paper); text-align: center; }
-.idle-skill-node.is-root { border-color: color-mix(in srgb, var(--gold) 35%, var(--line)); }
-.idle-skill-node.ranked { border-color: color-mix(in srgb, var(--gold) 50%, var(--line)); box-shadow: 0 0 12px color-mix(in srgb, var(--gold) 20%, transparent); }
-.idle-skill-node-icon { font-size: 1.4rem; }
-.idle-skill-node-name { font-weight: 700; font-size: 0.8rem; margin-top: 0.2rem; overflow-wrap: break-word; }
-.idle-skill-node-desc { font-size: 0.68rem; color: var(--muted); margin: 0.25rem 0; min-height: 2.2em; overflow-wrap: break-word; }
-.idle-skill-node-requires { font-size: 0.64rem; color: color-mix(in srgb, var(--gold) 65%, var(--muted)); margin-bottom: 0.3rem; overflow-wrap: break-word; }
-.idle-skill-node-rank { font-size: 0.68rem; color: var(--muted); margin-bottom: 0.4rem; }
-.idle-skill-node-btn { width: 100%; padding: 0.35rem 0.5rem; font-size: 0.72rem; }
+.idle-skill-node {
+  position: relative;
+  z-index: 1;
+  width: 152px;
+  min-width: 0;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  padding: 0.8rem 0.7rem 0.7rem;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper));
+  text-align: center;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+  opacity: 0.72;
+}
+.idle-skill-node.is-root { opacity: 1; }
+.idle-skill-node.can-allocate { opacity: 1; border-color: color-mix(in srgb, var(--gold) 55%, var(--line)); box-shadow: 0 0 14px color-mix(in srgb, var(--gold) 25%, transparent), 0 4px 10px rgba(0, 0, 0, 0.12); }
+.idle-skill-node.ranked {
+  opacity: 1;
+  border-color: var(--gold);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--gold) 10%, var(--paper-2)), var(--paper));
+  box-shadow: 0 0 16px color-mix(in srgb, var(--gold) 35%, transparent), 0 4px 10px rgba(0, 0, 0, 0.12);
+}
+.idle-skill-node.maxed { border-color: var(--gold); background: linear-gradient(180deg, color-mix(in srgb, var(--gold) 20%, var(--paper-2)), var(--paper)); }
+.idle-skill-node:hover { transform: translateY(-2px); }
+
+.idle-skill-node-icon {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 0.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--gold) 12%, var(--paper-2));
+  border: 1px solid color-mix(in srgb, var(--gold) 30%, var(--line));
+}
+.idle-skill-node.ranked .idle-skill-node-icon { background: color-mix(in srgb, var(--gold) 28%, var(--paper-2)); border-color: var(--gold); }
+.idle-skill-node-name { font-weight: 700; font-size: 0.82rem; margin-top: 0.1rem; overflow-wrap: break-word; }
+.idle-skill-node-desc { font-size: 0.68rem; color: var(--muted); margin: 0.3rem 0; min-height: 2.2em; overflow-wrap: break-word; }
+.idle-skill-node-requires { font-size: 0.64rem; color: color-mix(in srgb, var(--gold) 65%, var(--muted)); margin-bottom: 0.35rem; overflow-wrap: break-word; }
+.idle-skill-node-rank { font-size: 0.7rem; font-weight: 600; color: var(--muted); margin-bottom: 0.45rem; }
+.idle-skill-node.ranked .idle-skill-node-rank { color: var(--gold); }
+.idle-skill-node-btn { width: 100%; padding: 0.4rem 0.5rem; font-size: 0.72rem; }
 .idle-skill-node-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 @media (max-width: 640px) {
-  .idle-skill-node { width: 120px; }
-  .idle-skilltree-row { gap: 0.6rem; }
+  .idle-skilltree-tree { padding: 1rem 0.5rem 0.9rem; }
+  .idle-skill-node { width: 122px; padding: 0.6rem 0.5rem 0.55rem; }
+  .idle-skilltree-row { gap: 0.7rem; }
+  .idle-skill-node-icon { width: 34px; height: 34px; font-size: 1.15rem; }
 }
 
 /* ---- Bestenliste ---- */
