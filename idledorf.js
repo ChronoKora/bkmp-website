@@ -909,9 +909,8 @@ function bkmpIdleInitTabs() {
 async function bkmpIdleOpenModal() {
   const name = typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : '';
   if (!name) {
-    const mcNameOverlay = document.getElementById('mcNameOverlay');
-    const mcNameInput = document.getElementById('mcNameInput');
-    if (mcNameOverlay && mcNameInput) { mcNameInput.value = ''; mcNameOverlay.classList.add('visible'); mcNameInput.focus(); }
+    const mcNameBadge = document.getElementById('mcNameBadge');
+    if (mcNameBadge) mcNameBadge.click();
     return;
   }
   const overlay = document.getElementById('idleDorfOverlay');

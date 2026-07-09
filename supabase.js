@@ -374,6 +374,127 @@ async function bkmpGetCustomerProfile() {
   return Array.isArray(data) && data[0] ? data[0] : null;
 }
 
+/* ---------------- Spieler-Konto (Name + Passwort, "Wer bist du?") ----------------
+   Echtes Login fuer Achievements/Idle-Dorf/Bestenliste/Bonk/Pluschies -
+   ersetzt den alten reinen Freitext-Namen. Gleiche Fake-E-Mail-Technik wie
+   bkmpAdminEmailFromName/bkmpCustomerEmailFromCode, aber mit einem
+   selbstgewaehlten Passwort statt eines generierten Codes. Laeuft ueber
+   einen EIGENEN, isolierten Client (eigener storageKey) - so kollidiert die
+   Spieler-Session auf index.html nicht mit einer gleichzeitig aktiven
+   MapArt-Kunden-Session (die den default-Client mit storageKey
+   'bkmp-customer-auth' nutzt, siehe bkmpGetSupabaseClient). Siehe
+   supabase-player-accounts.sql fuer die zugehoerige RLS: jede
+   player_stats/idle_player_state-Zeile ist fest an auth.uid() UND den in
+   der JWT hinterlegten display_name gebunden. */
+let bkmpPlayerAuthClient = null;
+function bkmpGetPlayerAuthClient() {
+  if (!bkmpIsSupabaseConfigured() || !window.supabase) return null;
+  if (!bkmpPlayerAuthClient) {
+    bkmpPlayerAuthClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { storageKey: 'bkmp-player-auth' }
+    });
+  }
+  return bkmpPlayerAuthClient;
+}
+
+function bkmpPlayerEmailFromName(name) {
+  const clean = String(name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, '');
+  return clean ? clean + '@bkmp-player-accounts.com' : '';
+}
+
+/* Bestehende, vor diesem Umbau angelegte player_stats/idle_player_state-
+   Zeilen haben auth_user_id = null ("verwaist"). Beim ersten echten
+   Login/Registrieren mit demselben Namen wird die Zeile hier "geclaimt" -
+   bestehender Fortschritt geht nicht verloren. Laeuft bewusst mehrfach
+   idempotent (bei Register UND bei jedem Login), falls eine verwaiste Zeile
+   erst nach der Registrierung entstanden ist (z. B. durch aeltere,
+   zwischengespeicherte Anfragen). Kein Fehler, wenn keine Zeile existiert
+   oder schon geclaimt ist (0 betroffene Zeilen). */
+async function bkmpClaimPlayerNameKeyRows(client, nameKey) {
+  try {
+    const { data: sessionData } = await client.auth.getSession();
+    const userId = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
+    if (!userId) return;
+    await client.from('player_stats').update({ auth_user_id: userId }).eq('name_key', nameKey).is('auth_user_id', null);
+    await client.from('idle_player_state').update({ auth_user_id: userId }).eq('name_key', nameKey).is('auth_user_id', null);
+  } catch (e) {
+    console.warn('Bestehender Fortschritt konnte nicht automatisch uebernommen werden.', e);
+  }
+}
+
+async function bkmpPlayerRegister(name, password) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const displayName = String(name || '').trim();
+  const email = bkmpPlayerEmailFromName(displayName);
+  if (!email) throw new Error('Bitte einen gueltigen Ingame-Namen eintragen.');
+  if (!password || password.length < 6) throw new Error('Das Passwort braucht mindestens 6 Zeichen.');
+
+  const { data, error } = await client.auth.signUp({
+    email,
+    password,
+    options: { data: { display_name: displayName } }
+  });
+  if (error) {
+    if (/already registered|already exists|user_already_exists/i.test(error.message || '')) {
+      throw new Error('Dieser Ingame-Name ist bereits registriert. Bitte melde dich an.');
+    }
+    throw error;
+  }
+  /* Supabase gibt bei bereits existierender, aber unbestaetigter Adresse
+     manchmal keinen Fehler, sondern ein "leeres" Identities-Array zurueck -
+     das ist bei diesem Projekt (Confirm-Email aus) nicht der Fall, aber zur
+     Sicherheit trotzdem geprueft. */
+  if (data && data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+    throw new Error('Dieser Ingame-Name ist bereits registriert. Bitte melde dich an.');
+  }
+
+  await bkmpClaimPlayerNameKeyRows(client, displayName.toLowerCase());
+  return { session: data.session, displayName };
+}
+
+async function bkmpPlayerLogin(name, password) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const displayName = String(name || '').trim();
+  const email = bkmpPlayerEmailFromName(displayName);
+  if (!email || !password) throw new Error('Ingame-Name oder Passwort ist falsch.');
+
+  const { data, error } = await client.auth.signInWithPassword({ email, password });
+  if (error) throw new Error('Ingame-Name oder Passwort ist falsch.');
+
+  const canonicalName = (data.user && data.user.user_metadata && data.user.user_metadata.display_name) || displayName;
+  await bkmpClaimPlayerNameKeyRows(client, canonicalName.toLowerCase());
+  return { session: data.session, displayName: canonicalName };
+}
+
+async function bkmpPlayerLogout() {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return;
+  await client.auth.signOut();
+}
+
+async function bkmpGetPlayerSession() {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return null;
+  const { data, error } = await client.auth.getSession();
+  if (error) return null;
+  return data && data.session ? data.session : null;
+}
+
+/* Beim Seitenload aufgerufen: stellt eine bestehende Spieler-Session wieder
+   her (Supabase persistiert sie automatisch in localStorage) und liefert
+   den kanonischen Anzeigenamen zurueck, oder '' wenn niemand eingeloggt
+   ist. */
+async function bkmpRestorePlayerSession() {
+  const session = await bkmpGetPlayerSession();
+  if (!session || !session.user) return '';
+  return (session.user.user_metadata && session.user.user_metadata.display_name) || '';
+}
+
 function bkmpGetAuthCreateClient() {
   if (!bkmpIsSupabaseConfigured() || !window.supabase) return null;
   return window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -2152,13 +2273,17 @@ async function loadPlayerStatsByName(name) {
 }
 
 async function upsertPlayerStats(displayName, stats) {
-  const client = bkmpGetSupabaseClient();
+  const client = bkmpGetPlayerAuthClient();
   if (!client || !displayName) return false;
+  const { data: sessionData } = await client.auth.getSession();
+  const userId = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
+  if (!userId) return false;
   const { error } = await client
     .from('player_stats')
     .upsert({
       name_key: String(displayName).trim().toLowerCase(),
       display_name: displayName,
+      auth_user_id: userId,
       minutes_spent: Math.max(0, Math.round(stats.minutesSpent || 0)),
       achievements_unlocked: Math.max(0, Math.round(stats.achievementsUnlocked || 0)),
       eggs_found: Array.isArray(stats.eggsFound) ? stats.eggsFound : [],
@@ -2325,11 +2450,14 @@ async function loadIdlePlayerState(name) {
 }
 
 async function upsertIdlePlayerState(state) {
-  const client = bkmpGetSupabaseClient();
+  const client = bkmpGetPlayerAuthClient();
   if (!client || !state || !state.name_key) return false;
+  const { data: sessionData } = await client.auth.getSession();
+  const userId = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
+  if (!userId) return false;
   const { error } = await client
     .from('idle_player_state')
-    .upsert({ ...state, updated_at: new Date().toISOString() }, { onConflict: 'name_key' });
+    .upsert({ ...state, auth_user_id: userId, updated_at: new Date().toISOString() }, { onConflict: 'name_key' });
   if (error) throw error;
   return true;
 }

@@ -35,7 +35,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20260709-cardsize1">
+<link rel="stylesheet" href="style.css?v=20260709-playeraccounts1">
 </head>
 <body>
 
@@ -94,14 +94,38 @@
   </button>
 
   <div class="joke-overlay" id="mcNameOverlay">
-    <div class="joke-card">
-      <h3>Wie hei&szlig;t du in Minecraft?</h3>
-      <p>Kein Passwort, keine Anmeldung &ndash; nur dein Name, damit wir deine Karten &amp; Kartenideen dir zuordnen und deine Erfolge freischalten k&ouml;nnen.</p>
-      <input type="text" id="mcNameInput" placeholder="Dein Minecraft-Name" maxlength="32">
+    <div class="joke-card auth-card">
+      <h3 id="mcAuthTitle">Wer bist du?</h3>
+      <p id="mcAuthSubtitle">Erstelle einen Account, damit dein Fortschritt (Erfolge, Idle-Dorf, Pl&uuml;schies) auf Handy, Laptop und PC gleich bleibt.</p>
+
+      <div class="auth-field">
+        <label for="mcAuthName">Ingame-Name</label>
+        <input type="text" id="mcAuthName" placeholder="Dein Minecraft-Name" maxlength="32" autocomplete="username">
+      </div>
+      <div class="auth-field">
+        <label for="mcAuthPassword" id="mcAuthPasswordLabel">Passwort erstellen</label>
+        <div class="auth-password-row">
+          <input type="password" id="mcAuthPassword" placeholder="Passwort" autocomplete="new-password">
+          <button type="button" class="auth-password-toggle" id="mcAuthPasswordToggle" aria-label="Passwort anzeigen">&#128065;</button>
+        </div>
+      </div>
+      <div class="auth-field" id="mcAuthPasswordRepeatField">
+        <label for="mcAuthPasswordRepeat">Passwort wiederholen</label>
+        <div class="auth-password-row">
+          <input type="password" id="mcAuthPasswordRepeat" placeholder="Passwort wiederholen" autocomplete="new-password">
+          <button type="button" class="auth-password-toggle" id="mcAuthPasswordRepeatToggle" aria-label="Passwort anzeigen">&#128065;</button>
+        </div>
+      </div>
+
+      <p class="auth-error" id="mcAuthError" style="display:none;"></p>
+
       <div class="joke-buttons">
         <button class="btn-nein" id="mcNameSkip" type="button">Sp&auml;ter</button>
-        <button class="btn-ja" id="mcNameSave" type="button">Speichern</button>
+        <button class="btn-ja" id="mcAuthSubmit" type="button">Account erstellen</button>
       </div>
+      <p class="auth-switch">
+        <button type="button" class="auth-switch-link" id="mcAuthSwitchBtn">Du hast dich schon registriert? Hier anmelden</button>
+      </p>
     </div>
   </div>
 
@@ -130,7 +154,7 @@
         <div class="cosmetics-list" id="plushiesList"></div>
       </div>
       <div class="joke-buttons">
-        <button class="btn-nein" id="achievementsChangeName" type="button">Namen &auml;ndern</button>
+        <button class="btn-nein" id="achievementsChangeName" type="button">Ausloggen</button>
         <button class="btn-ja" id="achievementsClose" type="button">Schlie&szlig;en</button>
       </div>
     </div>
@@ -715,9 +739,9 @@
 
   <script>window.BKMP_CLIENT_STORAGE_KEY = 'bkmp-customer-auth';</script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js?v=20260709-cardsize1"></script>
+  <script src="supabase.js?v=20260709-playeraccounts1"></script>
   <script src="app.js?v=20260709-cardsale1"></script>
-  <script src="idledorf.js?v=20260709-cardsale1"></script>
+  <script src="idledorf.js?v=20260709-playeraccounts1"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
   <script>
     bkmpInitTheme();
@@ -3858,9 +3882,110 @@
     }
 
     const mcNameOverlay = document.getElementById('mcNameOverlay');
-    const mcNameInput = document.getElementById('mcNameInput');
     const mcNameBadge = document.getElementById('mcNameBadge');
     const achievementsOverlay = document.getElementById('achievementsOverlay');
+
+    /* ---------------- Login/Registrieren ("Wer bist du?") ---------------- */
+    const mcAuthTitle = document.getElementById('mcAuthTitle');
+    const mcAuthSubtitle = document.getElementById('mcAuthSubtitle');
+    const mcAuthName = document.getElementById('mcAuthName');
+    const mcAuthPassword = document.getElementById('mcAuthPassword');
+    const mcAuthPasswordLabel = document.getElementById('mcAuthPasswordLabel');
+    const mcAuthPasswordRepeatField = document.getElementById('mcAuthPasswordRepeatField');
+    const mcAuthPasswordRepeat = document.getElementById('mcAuthPasswordRepeat');
+    const mcAuthError = document.getElementById('mcAuthError');
+    const mcAuthSubmit = document.getElementById('mcAuthSubmit');
+    const mcAuthSwitchBtn = document.getElementById('mcAuthSwitchBtn');
+    let mcAuthMode = 'register';
+
+    function mcAuthShowError(message) {
+      mcAuthError.textContent = message || '';
+      mcAuthError.style.display = message ? '' : 'none';
+    }
+
+    function mcAuthApplyMode() {
+      mcAuthShowError('');
+      if (mcAuthMode === 'register') {
+        mcAuthTitle.textContent = 'Wer bist du?';
+        mcAuthSubtitle.textContent = 'Erstelle einen Account, damit dein Fortschritt (Erfolge, Idle-Dorf, Plüschies) auf Handy, Laptop und PC gleich bleibt.';
+        mcAuthPasswordLabel.textContent = 'Passwort erstellen';
+        mcAuthPasswordRepeatField.style.display = '';
+        mcAuthSubmit.textContent = 'Account erstellen';
+        mcAuthSwitchBtn.textContent = 'Du hast dich schon registriert? Hier anmelden';
+      } else {
+        mcAuthTitle.textContent = 'Anmelden';
+        mcAuthSubtitle.textContent = 'Melde dich mit deinem Ingame-Namen und Passwort an.';
+        mcAuthPasswordLabel.textContent = 'Passwort';
+        mcAuthPasswordRepeatField.style.display = 'none';
+        mcAuthSubmit.textContent = 'Anmelden';
+        mcAuthSwitchBtn.textContent = 'Noch keinen Account? Registrieren';
+      }
+    }
+
+    function mcAuthResetForm() {
+      mcAuthMode = 'register';
+      mcAuthName.value = '';
+      mcAuthPassword.value = '';
+      mcAuthPasswordRepeat.value = '';
+      mcAuthApplyMode();
+    }
+
+    if (mcAuthSwitchBtn) {
+      mcAuthSwitchBtn.addEventListener('click', () => {
+        mcAuthMode = mcAuthMode === 'register' ? 'login' : 'register';
+        mcAuthApplyMode();
+      });
+    }
+
+    function mcAuthSetupPasswordToggle(inputId, btnId) {
+      const input = document.getElementById(inputId);
+      const btn = document.getElementById(btnId);
+      if (!input || !btn) return;
+      btn.addEventListener('click', () => {
+        const show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        btn.innerHTML = show ? '&#128584;' : '&#128065;';
+        btn.setAttribute('aria-label', show ? 'Passwort verbergen' : 'Passwort anzeigen');
+      });
+    }
+    mcAuthSetupPasswordToggle('mcAuthPassword', 'mcAuthPasswordToggle');
+    mcAuthSetupPasswordToggle('mcAuthPasswordRepeat', 'mcAuthPasswordRepeatToggle');
+
+    async function mcAuthSubmitHandler() {
+      const name = mcAuthName.value.trim();
+      const password = mcAuthPassword.value;
+      if (!name) { mcAuthShowError('Bitte deinen Ingame-Namen eintragen.'); mcAuthName.focus(); return; }
+      if (!password) { mcAuthShowError('Bitte ein Passwort eintragen.'); mcAuthPassword.focus(); return; }
+      if (mcAuthMode === 'register' && password !== mcAuthPasswordRepeat.value) {
+        mcAuthShowError('Die Passwörter stimmen nicht überein.');
+        mcAuthPasswordRepeat.focus();
+        return;
+      }
+      mcAuthShowError('');
+      mcAuthSubmit.disabled = true;
+      const originalLabel = mcAuthSubmit.textContent;
+      mcAuthSubmit.textContent = 'Wird geladen...';
+      try {
+        const result = mcAuthMode === 'register'
+          ? await bkmpPlayerRegister(name, password)
+          : await bkmpPlayerLogin(name, password);
+        const canonicalName = await bkmpMergeRemoteStatsIntoLocal(result.displayName);
+        bkmpSetMcName(canonicalName);
+        mcNameOverlay.classList.remove('visible');
+        renderAchievementBadge();
+        bkmpRefreshOwnedPlushies();
+      } catch (e) {
+        mcAuthShowError(e && e.message ? e.message : 'Das hat leider nicht geklappt. Bitte versuche es erneut.');
+      } finally {
+        mcAuthSubmit.disabled = false;
+        mcAuthSubmit.textContent = originalLabel;
+      }
+    }
+
+    if (mcAuthSubmit) mcAuthSubmit.addEventListener('click', mcAuthSubmitHandler);
+    [mcAuthName, mcAuthPassword, mcAuthPasswordRepeat].forEach(input => {
+      if (input) input.addEventListener('keydown', e => { if (e.key === 'Enter') mcAuthSubmitHandler(); });
+    });
 
     if (mcNameBadge) {
       mcNameBadge.addEventListener('click', () => {
@@ -3877,31 +4002,14 @@
           renderAchievementsPanel();
           achievementsOverlay.classList.add('visible');
         } else {
-          mcNameInput.value = '';
+          mcAuthResetForm();
           mcNameOverlay.classList.add('visible');
-          mcNameInput.focus();
+          mcAuthName.focus();
         }
       });
     }
     const mcNameSkipBtn = document.getElementById('mcNameSkip');
     if (mcNameSkipBtn) mcNameSkipBtn.addEventListener('click', () => mcNameOverlay.classList.remove('visible'));
-    const mcNameSaveBtn = document.getElementById('mcNameSave');
-    if (mcNameSaveBtn) {
-      mcNameSaveBtn.addEventListener('click', async () => {
-        const name = mcNameInput.value.trim();
-        if (!name) { mcNameInput.focus(); return; }
-        mcNameSaveBtn.disabled = true;
-        mcNameSaveBtn.textContent = 'Wird geladen...';
-        const canonicalName = await bkmpMergeRemoteStatsIntoLocal(name);
-        bkmpSetMcName(canonicalName);
-        mcNameSaveBtn.disabled = false;
-        mcNameSaveBtn.textContent = 'Speichern';
-        mcNameOverlay.classList.remove('visible');
-        renderAchievementBadge();
-        bkmpRefreshOwnedPlushies();
-      });
-    }
-    if (mcNameInput) mcNameInput.addEventListener('keydown', e => { if (e.key === 'Enter') mcNameSaveBtn.click(); });
 
     const secretHintBtn = document.getElementById('secretHintBtn');
     if (secretHintBtn) secretHintBtn.addEventListener('click', () => mcNameBadge.click());
@@ -3935,16 +4043,43 @@
     if (achievementsCloseBtn) achievementsCloseBtn.addEventListener('click', () => achievementsOverlay.classList.remove('visible'));
     const achievementsChangeNameBtn = document.getElementById('achievementsChangeName');
     if (achievementsChangeNameBtn) {
-      achievementsChangeNameBtn.addEventListener('click', () => {
+      achievementsChangeNameBtn.addEventListener('click', async () => {
+        achievementsChangeNameBtn.disabled = true;
+        try { await bkmpPlayerLogout(); } catch (e) { console.warn('Ausloggen fehlgeschlagen.', e); }
+        bkmpSetMcName('');
+        achievementsChangeNameBtn.disabled = false;
         achievementsOverlay.classList.remove('visible');
-        mcNameInput.value = bkmpGetMcName();
-        mcNameOverlay.classList.add('visible');
-        mcNameInput.focus();
+        renderAchievementBadge();
       });
     }
 
     renderAchievementBadge();
     bkmpRefreshPlushieDefinitions().then(() => bkmpRefreshOwnedPlushies());
+
+    /* Beim Laden eine bestehende Spieler-Session wiederherstellen (Supabase
+       persistiert sie automatisch). Kein Treffer -> alten, nur optimistisch
+       zwischengespeicherten Namen verwerfen und das Login/Registrieren-
+       Fenster automatisch oeffnen (ausser der Nutzer ist eingeloggt). */
+    (async function bkmpInitPlayerAuth() {
+      try {
+        const restoredName = typeof bkmpRestorePlayerSession === 'function' ? await bkmpRestorePlayerSession() : '';
+        if (restoredName) {
+          const canonicalName = await bkmpMergeRemoteStatsIntoLocal(restoredName);
+          bkmpSetMcName(canonicalName);
+        } else if (bkmpGetMcName()) {
+          bkmpSetMcName('');
+        }
+      } catch (e) {
+        console.warn('Spieler-Session konnte nicht wiederhergestellt werden.', e);
+      } finally {
+        renderAchievementBadge();
+        bkmpRefreshOwnedPlushies();
+        if (!bkmpGetMcName()) {
+          mcAuthResetForm();
+          mcNameOverlay.classList.add('visible');
+        }
+      }
+    })();
   </script>
 
 </body>

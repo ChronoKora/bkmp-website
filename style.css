@@ -266,6 +266,30 @@ body.modal-open .bkmp-easter > span {
 .btn-ja { border-color: var(--gold) !important; background: var(--gold) !important; color: #0A0A0F !important; }
 .btn-nein:hover { border-color: var(--gold); }
 
+/* ---------- "Wer bist du?" Login/Registrieren ---------- */
+.auth-card { max-width: 380px; text-align: left; }
+.auth-card h3 { text-align: center; }
+#mcAuthSubtitle { font-size: 0.92rem; color: var(--muted); text-align: center; }
+.auth-field { margin-bottom: 0; }
+.auth-field label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--muted); margin-bottom: 0.35rem; }
+.auth-password-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.9rem; }
+.auth-password-row input { margin-bottom: 0; flex: 1; min-width: 0; }
+.auth-password-toggle {
+  flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--paper); color: var(--ink); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; font-size: 1.05rem; line-height: 1;
+  transition: border-color 0.2s ease, transform 0.15s ease;
+}
+.auth-password-toggle:hover { border-color: var(--gold); transform: translateY(-1px); }
+#mcAuthError { color: #ff6b6b; font-size: 0.85rem; text-align: center; margin: 0 0 0.9rem; }
+.auth-switch { text-align: center; margin: 0.9rem 0 0; }
+.auth-switch-link {
+  background: none; border: none; padding: 0; color: var(--gold); cursor: pointer;
+  font-family: 'Inter', sans-serif; font-size: 0.85rem; text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.auth-switch-link:hover { opacity: 0.85; }
+
 /* ---------- Hero ---------- */
 .hero {
   display: flex; flex-direction: column; align-items: center;
