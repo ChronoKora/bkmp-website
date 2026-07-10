@@ -378,6 +378,7 @@ const BKMP_IDLE_FALLBACK_DRAGONS = [
 let bkmpIdleState = null;
 let bkmpIdleLoadFailed = false;
 let bkmpPrestigeState = null;
+let bkmpPrestigeLoadFailed = false;
 let bkmpPrestigeSaving = false;
 let bkmpIdleDragonDefs = [];
 let bkmpIdleSkillDefs = [];
@@ -461,14 +462,21 @@ async function bkmpIdleLoadOrInitState(name) {
   bkmpIdleCurrentDragon = null;
   /* Komplett eigenstaendiger Ladevorgang (eigene Tabelle, eigenes
      try/catch) - schlaegt die Migration noch nicht an, bleibt der normale
-     Spielstand oben trotzdem vollstaendig nutzbar. */
+     Spielstand oben trotzdem vollstaendig nutzbar. WICHTIG: ein echter
+     Ladefehler (Netzwerk) darf NICHT wie "noch nie prestiged" behandelt
+     werden - bkmpIdlePerformPrestige() wuerde sonst prestige_level/-punkte/
+     -allocations mit einem frischen Nullstand ueberschreiben und damit
+     laengst erspielten, dauerhaften Prestige-Fortschritt komplett loeschen
+     (gleiche Ursache/Fix wie bei bkmpIdleState oben). */
   bkmpPrestigeState = null;
+  bkmpPrestigeLoadFailed = false;
   try {
     const remotePrestige = typeof loadIdlePrestigeState === 'function' ? await loadIdlePrestigeState(name) : null;
     bkmpPrestigeState = remotePrestige || { name_key: key, display_name: name, prestige_level: 0, prestige_points: 0, prestige_points_spent: 0, prestige_allocations: {} };
   } catch (e) {
-    console.warn('Idle Dorf: Prestige-Fortschritt konnte nicht geladen werden (Migration evtl. noch nicht ausgefuehrt).', e);
-    bkmpPrestigeState = { name_key: key, display_name: name, prestige_level: 0, prestige_points: 0, prestige_points_spent: 0, prestige_allocations: {} };
+    console.warn('Idle Dorf: Prestige-Fortschritt konnte nicht geladen werden (Netzwerkfehler oder Migration noch nicht ausgefuehrt).', e);
+    bkmpPrestigeState = null;
+    bkmpPrestigeLoadFailed = true;
   }
   bkmpIdleEventDragonState = null;
   try {
@@ -1602,6 +1610,11 @@ function bkmpPrestigeEffectTotals(allocations) {
 
 function bkmpPrestigeEligible() {
   if (!bkmpIdleState) return false;
+  /* Bei fehlgeschlagenem Laden NICHT wie "prestige_level 0" behandeln -
+     das wuerde die Mindeststufe zu niedrig ansetzen und den Button
+     freischalten, obwohl der echte (aber gerade nicht geladene) Stand
+     schon viel weiter ist. */
+  if (bkmpPrestigeLoadFailed) return false;
   const level = bkmpPrestigeState ? Number(bkmpPrestigeState.prestige_level || 0) : 0;
   return Number(bkmpIdleState.highest_dragon_index || 0) >= bkmpPrestigeRequiredStage(level);
 }
@@ -1643,6 +1656,18 @@ function bkmpPrestigeQueueSave() {
 }
 
 async function bkmpIdlePerformPrestige() {
+  /* Fehlte bisher: waehrend ein Event-Drache (Shenloss/Liber) auf
+     Bestaetigung wartet, war der Aufsteigen-Button trotzdem ganz normal
+     klickbar - ein Aufstieg setzt current_dragon_index/highest_dragon_index
+     sofort auf 0 zurueck und spawnt einen neuen Drachen, wodurch der noch
+     nicht bekaempfte Event-Drache faktisch spurlos verschwand, OHNE dass er
+     je gegen ihn gekaempft hat (siehe idle_event_dragon_state: kein Eintrag
+     = nie als besiegt gezaehlt). Genau die gleiche Sperre wie bei
+     Stufensprung/-Auswahl (bkmpIdleJumpToStage) noetig. */
+  if (bkmpIdleEventPauseActive) {
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Erst den Event-Drachen bestätigen/bekämpfen, dann kannst du aufsteigen.', 4000);
+    return;
+  }
   if (!bkmpPrestigeEligible() || bkmpPrestigeSaving) return;
   const stage = Number(bkmpIdleState.highest_dragon_index || 0);
   const bonusPct = bkmpPrestigeState ? (bkmpPrestigeEffectTotals(bkmpPrestigeState.prestige_allocations).prestige_point_bonus_pct || 0) : 0;
@@ -1715,6 +1740,10 @@ async function bkmpIdleFlushSyncNow() {
 function bkmpIdleRenderPrestigePanel() {
   const panel = document.getElementById('idlePanelPrestige');
   if (!panel || !bkmpIdleState) return;
+  if (bkmpPrestigeLoadFailed) {
+    panel.innerHTML = `<p class="idle-prestige-hint">⚠️ Dein Prestige-Fortschritt konnte gerade nicht geladen werden (Verbindungsproblem). Aufsteigen ist deshalb momentan gesperrt, damit nichts überschrieben wird - versuch es gleich nochmal (z.B. Fenster schließen &amp; neu öffnen).</p>`;
+    return;
+  }
   const stage = Number(bkmpIdleState.highest_dragon_index || 0);
   const level = bkmpPrestigeState ? Number(bkmpPrestigeState.prestige_level || 0) : 0;
   const requiredStage = bkmpPrestigeRequiredStage(level);
@@ -1736,7 +1765,7 @@ function bkmpIdleRenderPrestigePanel() {
       <div class="idle-prestige-progress-label">Drachen-Stufe ${bkmpIdleFormatStage(stage)} / ${bkmpIdleFormatStage(requiredStage)} zum Aufsteigen <span class="idle-prestige-progress-hint">(nicht dein Level – die höchste erreichte Drachen-Stufe)</span></div>
       <div class="idle-hp-bar"><div class="idle-hp-fill idle-hp-fill-village" style="width:${progressPct}%"></div></div>
       ${eligible
-        ? `<button type="button" class="btn-ja idle-prestige-btn" id="idlePrestigeBtn">🌌 Jetzt aufsteigen (+${bkmpIdleFormatNumber(previewGain)} Punkte)</button>`
+        ? `<button type="button" class="btn-ja idle-prestige-btn" id="idlePrestigeBtn" ${bkmpIdleEventPauseActive ? 'disabled title="Erst nach Bestätigung des Event-Drachen möglich"' : ''}>🌌 Jetzt aufsteigen (+${bkmpIdleFormatNumber(previewGain)} Punkte)</button>`
         : `<p class="idle-prestige-hint">Erreiche Drachen-Stufe ${bkmpIdleFormatStage(requiredStage)}, um dauerhaft aufsteigen zu können.</p>`}
     </div>
     <div class="idle-upgrade-grid">${BKMP_PRESTIGE_UPGRADES.map(def => {

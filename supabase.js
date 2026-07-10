@@ -2500,6 +2500,40 @@ async function upsertPlayerStats(displayName, stats) {
   return true;
 }
 
+/* ---------------- Ein-Geraet-gleichzeitig (siehe supabase-single-session.sql) ----------------
+   claimActiveSession schreibt eine frische, zufaellige Kennung fuer DIESES
+   Geraet/diesen Tab; checkActiveSessionToken liest den aktuellen Stand zum
+   Vergleich (siehe bkmpClaimAndWatchSession in index.html). "Neuestes
+   Login gewinnt": schreibt einfach das juengste beanspruchte Geraet. */
+async function claimActiveSession(displayName) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client || !displayName) return null;
+  const { data: sessionData } = await client.auth.getSession();
+  const userId = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
+  if (!userId) return null;
+  const token = (window.crypto && typeof window.crypto.randomUUID === 'function')
+    ? window.crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const { error } = await client
+    .from('player_stats')
+    .update({ active_session_token: token, active_session_started_at: new Date().toISOString() })
+    .eq('auth_user_id', userId);
+  if (error) throw error;
+  return token;
+}
+
+async function checkActiveSessionToken(name) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !name) return null;
+  const { data, error } = await client
+    .from('player_stats')
+    .select('active_session_token')
+    .eq('name_key', String(name).trim().toLowerCase())
+    .limit(1);
+  if (error) throw error;
+  return Array.isArray(data) && data[0] ? data[0].active_session_token : null;
+}
+
 /* ---------------- Pluschies ---------------- */
 async function loadPlushies() {
   const client = bkmpGetSupabaseClient();

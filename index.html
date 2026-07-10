@@ -891,9 +891,9 @@
 
   <script>window.BKMP_CLIENT_STORAGE_KEY = 'bkmp-customer-auth';</script>
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260710-maintenance2"></script>
+  <script src="supabase.js?v=20260711-singlesession1"></script>
   <script src="app.js?v=20260709-optpass3"></script>
-  <script src="idledorf.js?v=20260710-maintenance2"></script>
+  <script src="idledorf.js?v=20260711-prestigesyncfix1"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
   <script>
     bkmpInitTheme();
@@ -3363,6 +3363,45 @@
       }
     }
 
+    /* ---------------- Nur ein aktives Geraet gleichzeitig (siehe
+       supabase-single-session.sql) ----------------
+       Bei jedem Login/Session-Wiederherstellen beansprucht dieses Geraet
+       eine frische, zufaellige Kennung (player_stats.active_session_token).
+       Alle 20s wird geprueft, ob diese Kennung noch die aktuelle ist - falls
+       inzwischen anderswo eingeloggt wurde, hat der Server eine NEUE
+       Kennung, dieses Geraet erkennt den Unterschied und loggt sich selbst
+       aus ("neuestes Login gewinnt", kein Blockieren des neuen Geraets). */
+    let bkmpMySessionToken = null;
+    let bkmpSessionWatchInterval = null;
+    function bkmpStopSessionWatch() {
+      if (bkmpSessionWatchInterval) { window.clearInterval(bkmpSessionWatchInterval); bkmpSessionWatchInterval = null; }
+      bkmpMySessionToken = null;
+    }
+    async function bkmpClaimAndWatchSession(name) {
+      if (!name || typeof claimActiveSession !== 'function') return;
+      try {
+        bkmpMySessionToken = await claimActiveSession(name);
+      } catch (e) {
+        console.warn('Sitzungs-Kennung konnte nicht gesetzt werden (Migration evtl. noch nicht ausgefuehrt).', e);
+        return;
+      }
+      if (!bkmpMySessionToken) return;
+      if (bkmpSessionWatchInterval) window.clearInterval(bkmpSessionWatchInterval);
+      bkmpSessionWatchInterval = window.setInterval(async () => {
+        if (!bkmpMySessionToken || typeof checkActiveSessionToken !== 'function') return;
+        try {
+          const currentToken = await checkActiveSessionToken(name);
+          if (currentToken && currentToken !== bkmpMySessionToken) {
+            bkmpStopSessionWatch();
+            alert('Du wurdest auf einem anderen Gerät angemeldet. Diese Sitzung wird jetzt beendet.');
+            try { await bkmpPlayerLogout(); } catch (e2) {}
+            bkmpSetMcName('');
+            window.location.reload();
+          }
+        } catch (e) { /* Netzwerkfehler beim Pruefen - naechster Versuch in 20s */ }
+      }, 20000);
+    }
+
     bkmpTrackDayVisited();
     bkmpTrackTimeBasedFlags();
 
@@ -4397,6 +4436,7 @@
           : await bkmpPlayerLogin(name, password);
         const canonicalName = await bkmpMergeRemoteStatsIntoLocal(result.displayName);
         bkmpSetMcName(canonicalName);
+        bkmpClaimAndWatchSession(canonicalName);
         mcNameOverlay.classList.remove('visible');
         renderAchievementBadge();
         bkmpRefreshOwnedPlushies();
@@ -4473,6 +4513,7 @@
     if (achievementsChangeNameBtn) {
       achievementsChangeNameBtn.addEventListener('click', async () => {
         achievementsChangeNameBtn.disabled = true;
+        if (typeof bkmpStopSessionWatch === 'function') bkmpStopSessionWatch();
         try { await bkmpPlayerLogout(); } catch (e) { console.warn('Ausloggen fehlgeschlagen.', e); }
         bkmpSetMcName('');
         bkmpOwnedPlushies = [];
@@ -4614,6 +4655,7 @@
         if (restoredName) {
           const canonicalName = await bkmpMergeRemoteStatsIntoLocal(restoredName);
           bkmpSetMcName(canonicalName);
+          bkmpClaimAndWatchSession(canonicalName);
         } else if (bkmpGetMcName()) {
           bkmpSetMcName('');
         }
