@@ -306,6 +306,7 @@ const BKMP_IDLE_FALLBACK_DRAGONS = [
 /* ---------------- State ---------------- */
 
 let bkmpIdleState = null;
+let bkmpIdleLoadFailed = false;
 let bkmpPrestigeState = null;
 let bkmpPrestigeSaving = false;
 let bkmpIdleDragonDefs = [];
@@ -370,7 +371,21 @@ async function bkmpIdleLoadOrInitState(name) {
   const key = String(name).trim().toLowerCase();
   if (bkmpIdleState && bkmpIdleState.name_key === key) return;
   let remote = null;
-  try { remote = typeof loadIdlePlayerState === 'function' ? await loadIdlePlayerState(name) : null; } catch (e) { console.warn('Idle Dorf: Fortschritt konnte nicht geladen werden.', e); }
+  let loadThrew = false;
+  try { remote = typeof loadIdlePlayerState === 'function' ? await loadIdlePlayerState(name) : null; } catch (e) { console.warn('Idle Dorf: Fortschritt konnte nicht geladen werden.', e); loadThrew = true; }
+  /* Bei einem echten Ladefehler (Netzwerk/Server, z.B. wackliges Mobilfunknetz)
+     NICHT wie bei "noch keine Zeile vorhanden" auf einen leeren Spielstand
+     zurueckfallen - sonst wuerde der naechste Autosave (bkmpIdleFlushSync,
+     4s nach jeder Aktion oder beim Schliessen/Tab-Wechsel) den echten,
+     bereits erspielten Fortschritt mit Nullen ueberschreiben. Stattdessen
+     bkmpIdleState explizit leer lassen; bkmpIdleOpenModal() bricht dann mit
+     einer Fehlermeldung ab statt mit einem frischen Spielstand weiterzumachen. */
+  if (loadThrew) {
+    bkmpIdleState = null;
+    bkmpIdleLoadFailed = true;
+    return;
+  }
+  bkmpIdleLoadFailed = false;
   bkmpIdleState = remote || bkmpIdleDefaultState(name);
   bkmpIdleVillageHp = null;
   bkmpIdleCurrentDragon = null;
@@ -1725,6 +1740,18 @@ async function bkmpIdleOpenModal() {
 
   await bkmpIdleEnsureConfigLoaded();
   await bkmpIdleLoadOrInitState(name);
+  if (!bkmpIdleState) {
+    /* Echter Ladefehler (siehe bkmpIdleLoadOrInitState) - auf keinen Fall mit
+       leerem/kaputtem Spielstand weitermachen, sonst droht ein Autosave mit
+       Nullen. Fenster wieder schliessen und zum Neuversuch auffordern. */
+    overlay.classList.remove('visible');
+    document.body.classList.remove('modal-open');
+    bkmpIdleModalOpen = false;
+    if (typeof bkmpShowJannikToast === 'function') {
+      bkmpShowJannikToast('Dein Spielstand konnte nicht geladen werden (Verbindungsproblem). Bitte versuche es gleich nochmal, damit nichts überschrieben wird.', 6000);
+    }
+    return;
+  }
   bkmpIdleRecomputeEffectiveStats();
 
   const offlineResult = await bkmpIdleClaimOfflineProgress(name);
