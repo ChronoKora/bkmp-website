@@ -1357,6 +1357,15 @@ function bkmpRaidStopCombatView() {
   bkmpRaidToggleCombatView(false);
   bkmpRaidStopLoops();
   bkmpUnsubscribeFromRaidInstance();
+  /* Der normale Auto-Kampf-Loop wurde beim Betreten der Raid-Ansicht
+     gestoppt (bkmpIdleStopLoop, siehe bkmpIdleOpenModal/bkmpRaidUpdateButtonState)
+     und muss beim Verlassen wieder anlaufen, sonst bleiben automatische
+     Angriffe/Animationen fuer den Rest der Sitzung tot (nur manuelle Klicks
+     funktionieren noch, da die eigenstaendig sind) - nur, wenn das
+     Idle-Dorf-Fenster ueberhaupt noch offen ist (bkmpIdleCloseModal setzt
+     bkmpIdleModalOpen VOR diesem Aufruf bereits auf false und stoppt den
+     Loop selbst schon explizit). */
+  if (bkmpIdleModalOpen) bkmpIdleStartLoop();
 }
 
 function bkmpRaidHandleRealtimeChange(change) {
