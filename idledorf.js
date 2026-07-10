@@ -14,6 +14,76 @@
    werden.
    ============================================================ */
 
+/* ---------------- Wartungsmodus ----------------
+   Notschalter bei akuten Problemen: Schalter liegt in Supabase
+   (site_flags.idle_maintenance, siehe supabase-site-maintenance-flag.sql)
+   und ist im Admin-Panel jederzeit ohne Deploy umschaltbar. bkmpIdleState
+   des Wartungsmodus wird per Polling (alle 20s) aktuell gehalten; ist ein
+   Tab GERADE OFFEN und der Schalter springt von aus auf an, wird der Tab
+   automatisch neu geladen, damit auch schon aktive Spieler sofort die
+   Wartungsmeldung sehen (nicht erst beim naechsten eigenen Klick). Fail
+   closed: bis die erste DB-Antwort da ist bzw. falls die Abfrage fehlschlaegt,
+   gilt das Idle-Dorf als gesperrt - ein Netzwerkfehler soll nie versehentlich
+   ein kaputtes Spiel freigeben. */
+const BKMP_IDLE_MAINTENANCE_FALLBACK_MESSAGE = 'Das Idle Drachen Dorf ist gerade kurz für Wartungsarbeiten pausiert. Es geht bald weiter, bitte versuch es später nochmal.';
+let bkmpIdleMaintenanceKnown = false;
+let bkmpIdleMaintenanceActive = true;
+let bkmpIdleMaintenanceMessage = BKMP_IDLE_MAINTENANCE_FALLBACK_MESSAGE;
+
+async function bkmpIdleRefreshMaintenanceFlag() {
+  try {
+    const flags = typeof loadSiteFlags === 'function' ? await loadSiteFlags() : null;
+    if (flags) {
+      bkmpIdleMaintenanceActive = !!flags.idle_maintenance;
+      bkmpIdleMaintenanceMessage = flags.idle_maintenance_message || BKMP_IDLE_MAINTENANCE_FALLBACK_MESSAGE;
+    } else {
+      bkmpIdleMaintenanceActive = false;
+    }
+    bkmpIdleMaintenanceKnown = true;
+  } catch (e) {
+    console.warn('Idle Dorf: Wartungsmodus-Status konnte nicht geladen werden.', e);
+    if (!bkmpIdleMaintenanceKnown) bkmpIdleMaintenanceActive = true;
+  }
+  bkmpIdleApplyMaintenanceButtonVisual();
+  return bkmpIdleMaintenanceActive;
+}
+
+function bkmpIdleApplyMaintenanceButtonVisual() {
+  const btn = document.getElementById('idleDorfButton');
+  if (!btn) return;
+  const label = btn.querySelector('.idle-dorf-btn-label');
+  if (bkmpIdleMaintenanceActive) {
+    btn.classList.add('idle-dorf-maintenance');
+    btn.title = bkmpIdleMaintenanceMessage;
+    if (label) label.textContent = ' Wartungsarbeiten';
+  } else {
+    btn.classList.remove('idle-dorf-maintenance');
+    btn.removeAttribute('title');
+    if (label) label.textContent = ' Idle Drachen Dorf';
+  }
+}
+
+/* bkmpIdleMaintenanceBaseline haelt den Stand fest, den DIESER Tab beim
+   allerersten Check dieser Seite gesehen hat (egal ob an oder aus - ein
+   frisch geladener Tab zeigt den aktuellen Stand ja bereits korrekt an,
+   braucht also KEIN Reload). Reload wird nur ausgeloest, wenn ein SPAETERER
+   Poll eine echte Aenderung gegenueber der Baseline erkennt (aus -> an) -
+   sonst wuerde jeder frische Seitenaufruf waehrend eines laufenden
+   Wartungsmodus sich selbst sofort neu laden, was nur unnoetig flackert. */
+let bkmpIdleMaintenanceBaseline = null;
+function bkmpIdleMaintenancePoll() {
+  bkmpIdleRefreshMaintenanceFlag().then(active => {
+    if (bkmpIdleMaintenanceBaseline === null) {
+      bkmpIdleMaintenanceBaseline = active;
+      return;
+    }
+    if (active && !bkmpIdleMaintenanceBaseline) {
+      window.location.reload();
+    }
+    bkmpIdleMaintenanceBaseline = active;
+  });
+}
+
 /* ---------------- Reine Mathe-Funktionen (kein DOM) ---------------- */
 
 function bkmpIdleXpForLevel(level, xpCurveCfg) {
@@ -1726,6 +1796,17 @@ function bkmpIdleInitTabs() {
 }
 
 async function bkmpIdleOpenModal() {
+  /* Immer frisch pruefen statt auf den zuletzt gepollten Stand zu
+     vertrauen - so entscheidet exakt der Stand im Moment des Klicks,
+     nicht ein bis zu 20s alter Cache. */
+  await bkmpIdleRefreshMaintenanceFlag();
+  if (bkmpIdleMaintenanceActive) {
+    const maintOverlay = document.getElementById('idleMaintenanceOverlay');
+    const maintMsg = document.getElementById('idleMaintenanceMessage');
+    if (maintMsg) maintMsg.textContent = bkmpIdleMaintenanceMessage;
+    if (maintOverlay) maintOverlay.classList.add('visible');
+    return;
+  }
   const name = typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : '';
   if (!name) {
     const mcNameBadge = document.getElementById('mcNameBadge');
@@ -1956,6 +2037,7 @@ function bkmpRaidFormatParticipantCount(count) {
    Vorbereitungsphase endet - vorher blieb der Countdown bei laenger
    geoeffnetem Fenster einfach auf dem Stand beim Oeffnen stehen. */
 function bkmpRaidUpdateButtonState() {
+  if (bkmpIdleMaintenanceActive) return;
   const btn = document.getElementById('idleDorfButton');
   const countdownEl = document.getElementById('raidBtnCountdown');
   const info = bkmpRaidGetPhaseInfo();
@@ -2480,6 +2562,13 @@ function bkmpIdleInit() {
   bkmpRaidInit();
   const openBtn = document.getElementById('idleDorfButton');
   if (openBtn) openBtn.addEventListener('click', bkmpIdleOpenModal);
+  bkmpIdleMaintenancePoll();
+  window.setInterval(bkmpIdleMaintenancePoll, 20000);
+  const maintClose = document.getElementById('idleMaintenanceClose');
+  if (maintClose) maintClose.addEventListener('click', () => {
+    const el = document.getElementById('idleMaintenanceOverlay');
+    if (el) el.classList.remove('visible');
+  });
   const closeBtn = document.getElementById('idleDorfClose');
   if (closeBtn) closeBtn.addEventListener('click', bkmpIdleCloseModal);
   const closeX = document.getElementById('idleDorfCloseX');

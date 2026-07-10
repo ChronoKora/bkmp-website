@@ -4021,6 +4021,7 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
    Idle Drachen Dorf
    ============================================================ */
 .idle-dorf-btn { position: relative; }
+.idle-dorf-btn.idle-dorf-maintenance { opacity: 0.55; filter: grayscale(0.6); }
 
 .idle-dorf-overlay .idle-dorf-card {
   position: relative;

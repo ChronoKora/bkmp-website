@@ -34,7 +34,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260711-review1">
+<link rel="stylesheet" href="style.css?v=20260710-maintenance1">
 </head>
 <body>
 
@@ -266,6 +266,16 @@
       <div class="joke-buttons">
         <button class="btn-nein" id="mapAccessCodeCancel" type="button">Abbrechen</button>
         <button class="btn-ja" id="mapAccessCodeConfirm" type="button">Bestätigen</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="joke-overlay" id="idleMaintenanceOverlay">
+    <div class="joke-card">
+      <h3>🔧 Wartungsarbeiten</h3>
+      <p id="idleMaintenanceMessage">Das Idle Drachen Dorf ist gerade kurz für Wartungsarbeiten pausiert. Es geht bald weiter, bitte versuch es später nochmal.</p>
+      <div class="joke-buttons">
+        <button class="btn-ja" id="idleMaintenanceClose" type="button">Verstanden</button>
       </div>
     </div>
   </div>
@@ -881,9 +891,9 @@
 
   <script>window.BKMP_CLIENT_STORAGE_KEY = 'bkmp-customer-auth';</script>
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260710-hotfix2"></script>
+  <script src="supabase.js?v=20260710-maintenance2"></script>
   <script src="app.js?v=20260709-optpass3"></script>
-  <script src="idledorf.js?v=20260710-syncfix1"></script>
+  <script src="idledorf.js?v=20260710-maintenance2"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
   <script>
     bkmpInitTheme();

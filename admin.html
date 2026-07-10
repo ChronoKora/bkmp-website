@@ -20,7 +20,7 @@
 <title>BKMP — Admin</title>
 
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
-<link rel="stylesheet" href="style.css?v=20260711-review1">
+<link rel="stylesheet" href="style.css?v=20260710-maintenance1">
 </head>
 <body>
 
@@ -647,6 +647,21 @@
             <h2>&#127984; Idle Drachen Dorf</h2>
             <p class="admin-help-text">Balance des Idle-Kampfspiels. &Auml;nderungen wirken sofort auf der Website, ohne Deploy &ndash; die Werte werden bei jedem &Ouml;ffnen des Idle-Dorfs frisch aus Supabase geladen.</p>
 
+            <div class="admin-section" style="border:1px solid var(--gold); border-radius:12px; padding:1rem 1.2rem; margin-bottom:1.4rem;">
+              <h3 style="margin-top:0;">&#128295; Wartungsmodus</h3>
+              <p class="admin-help-text">Sperrt das komplette Idle Drachen Dorf (inkl. Raids) sofort f&uuml;r alle Spieler. Bereits ge&ouml;ffnete Tabs laden sich innerhalb von ca. 20 Sekunden automatisch neu, sobald du das hier einschaltest.</p>
+              <label class="admin-checkbox-label" style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.7rem;">
+                <input type="checkbox" id="idleMaintenanceToggle">
+                <span>Wartungsmodus aktiv</span>
+              </label>
+              <div style="margin-bottom:0.7rem;">
+                <label for="idleMaintenanceMessageInput">Meldungstext f&uuml;r Spieler</label>
+                <textarea id="idleMaintenanceMessageInput" rows="2" style="width:100%; resize:vertical;"></textarea>
+              </div>
+              <button class="btn btn-primary" id="idleMaintenanceSave" type="button">Speichern</button>
+              <span id="idleMaintenanceStatus" style="margin-left:0.8rem; font-size:0.9rem;"></span>
+            </div>
+
             <div class="achievements-subtabs">
               <button type="button" class="achievements-subtab active" id="idleAdminSubtabDragons">Drachen</button>
               <button type="button" class="achievements-subtab" id="idleAdminSubtabSkills">Skilltree</button>
@@ -909,9 +924,9 @@
   </div>
 
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260710-hotfix2"></script>
+  <script src="supabase.js?v=20260710-maintenance2"></script>
   <script src="app.js?v=20260709-optpass3"></script>
-  <script src="idledorf.js?v=20260710-syncfix1"></script>
+  <script src="idledorf.js?v=20260710-maintenance2"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
   <script>
     bkmpInitTheme();
@@ -3977,16 +3992,23 @@
 
     async function refreshIdleDorfAdmin() {
       try {
-        const [dragons, skills, config, raidBosses] = await Promise.all([
+        const [dragons, skills, config, raidBosses, siteFlags] = await Promise.all([
           typeof loadIdleDragonsAdmin === 'function' ? loadIdleDragonsAdmin() : null,
           typeof loadIdleSkillNodesAdmin === 'function' ? loadIdleSkillNodesAdmin() : null,
           typeof loadIdleGameConfig === 'function' ? loadIdleGameConfig() : null,
-          typeof loadRaidBossesAdmin === 'function' ? loadRaidBossesAdmin() : null
+          typeof loadRaidBossesAdmin === 'function' ? loadRaidBossesAdmin() : null,
+          typeof loadSiteFlags === 'function' ? loadSiteFlags() : null
         ]);
         bkmpIdleAdminDragons = dragons || [];
         bkmpIdleAdminSkills = skills || [];
         bkmpIdleAdminConfig = config || {};
         bkmpRaidAdminBosses = raidBosses || [];
+        const maintToggle = document.getElementById('idleMaintenanceToggle');
+        const maintMsg = document.getElementById('idleMaintenanceMessageInput');
+        if (siteFlags && maintToggle && maintMsg) {
+          maintToggle.checked = !!siteFlags.idle_maintenance;
+          maintMsg.value = siteFlags.idle_maintenance_message || '';
+        }
       } catch (e) {
         showAdminToast('Idle-Dorf-Daten konnten nicht geladen werden: ' + supabaseErrorText(e), 'error');
       }
@@ -3995,6 +4017,25 @@
       renderIdleConfigEditors();
       renderRaidBossAdminList();
     }
+
+    const idleMaintenanceSaveBtn = document.getElementById('idleMaintenanceSave');
+    if (idleMaintenanceSaveBtn) idleMaintenanceSaveBtn.addEventListener('click', async () => {
+      const toggle = document.getElementById('idleMaintenanceToggle');
+      const msgInput = document.getElementById('idleMaintenanceMessageInput');
+      const statusEl = document.getElementById('idleMaintenanceStatus');
+      idleMaintenanceSaveBtn.disabled = true;
+      if (statusEl) statusEl.textContent = 'Speichere...';
+      try {
+        await setIdleMaintenanceFlag(toggle.checked, msgInput.value);
+        if (statusEl) statusEl.textContent = toggle.checked ? '✅ Wartungsmodus ist jetzt AKTIV.' : '✅ Wartungsmodus ist jetzt AUS.';
+        showAdminToast('Wartungsmodus gespeichert.', 'success');
+      } catch (e) {
+        if (statusEl) statusEl.textContent = '';
+        showAdminToast('Wartungsmodus konnte nicht gespeichert werden: ' + supabaseErrorText(e), 'error');
+      } finally {
+        idleMaintenanceSaveBtn.disabled = false;
+      }
+    });
 
     function renderRaidBossAdminList() {
       const el = document.getElementById('raidBossAdminList');

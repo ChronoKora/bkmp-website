@@ -3247,6 +3247,37 @@ async function updateRaidBoss(id, patch) {
   return Array.isArray(data) ? data[0] : null;
 }
 
+/* ---------------- Wartungsmodus (site_flags, Singleton-Zeile) ----------------
+   Oeffentlich lesbar (fuer den Polling-Check in idledorf.js auf jeder
+   Seite), nur per is_active_admin() beschreibbar (siehe
+   supabase-site-maintenance-flag.sql). */
+async function loadSiteFlags() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('site_flags')
+    .select('idle_maintenance, idle_maintenance_message')
+    .eq('id', true)
+    .limit(1);
+  if (error) throw error;
+  return Array.isArray(data) && data[0] ? data[0] : null;
+}
+
+async function setIdleMaintenanceFlag(enabled, message) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const patch = { idle_maintenance: !!enabled, updated_at: new Date().toISOString() };
+  if (typeof message === 'string' && message.trim()) patch.idle_maintenance_message = message.trim();
+  const { data, error } = await client
+    .from('site_flags')
+    .update(patch)
+    .eq('id', true)
+    .select('idle_maintenance, idle_maintenance_message')
+    .limit(1);
+  if (error) throw error;
+  return Array.isArray(data) ? data[0] : null;
+}
+
 let bkmpRaidChannel = null;
 function bkmpSubscribeToRaidInstance(raidId, onChange) {
   bkmpUnsubscribeFromRaidInstance();
