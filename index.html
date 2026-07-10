@@ -1533,6 +1533,21 @@
       return fig;
     }
     function bkmpSpawnDerLiberFigures() {
+      /* bkmp-derliber-found ist NUR lokal (pro Geraet, nie synchronisiert) -
+         merkt sich waehrend der laufenden Jagd, welche der 10 Figuren auf
+         DIESEM Geraet schon angeklickt wurden. eggsFound (Teil von
+         player_stats, geraeteuebergreifend gemerged) ist die eigentliche
+         Abschluss-Markierung. Ohne diesen Check wuerden auf einem Geraet,
+         auf dem die Jagd nie einzeln durchgespielt wurde (z.B. Erfolg kam
+         vom PC), die Figuren dort immer wieder neu auftauchen, obwohl das
+         Easter Egg laut Erfolgen laengst komplett ist. Entfernt zusaetzlich
+         bereits gespawnte Figuren wieder, falls eggsFound erst NACH dem
+         initialen Aufruf (z.B. durch den Cross-Device-Merge beim Login)
+         "derliber" bekommen hat. */
+      if (bkmpGetEggsFound().includes('derliber')) {
+        document.querySelectorAll('.bkmp-derliber').forEach(el => el.remove());
+        return;
+      }
       const found = bkmpGetDerLiberFound();
       BKMP_DERLIBER_SPOTS.forEach(panelId => {
         if (found.includes(panelId)) return;
@@ -4376,6 +4391,7 @@
         renderAchievementBadge();
         bkmpRefreshOwnedPlushies();
         bkmpRefreshMyWishVotes();
+        if (typeof bkmpSpawnDerLiberFigures === 'function') bkmpSpawnDerLiberFigures();
       } catch (e) {
         mcAuthShowError(e && e.message ? e.message : 'Das hat leider nicht geklappt. Bitte versuche es erneut.');
       } finally {
@@ -4597,6 +4613,7 @@
         renderAchievementBadge();
         bkmpRefreshOwnedPlushies();
         bkmpRefreshMyWishVotes();
+        if (typeof bkmpSpawnDerLiberFigures === 'function') bkmpSpawnDerLiberFigures();
         if (!bkmpGetMcName()) {
           mcAuthResetForm();
           mcNameOverlay.classList.add('visible');
