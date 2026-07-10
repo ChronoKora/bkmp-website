@@ -4103,6 +4103,50 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 .idle-stage-buttons { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .idle-stage-btn { padding: 0.35rem 0.7rem; font-size: 0.75rem; white-space: nowrap; }
 
+/* ---- Stufenwahl-Popup ---- */
+.idle-stage-picker-overlay { z-index: 60; }
+.idle-stage-picker-card {
+  max-width: 640px;
+  width: 92vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  border-radius: 22px;
+}
+.idle-stage-picker-hint { font-size: 0.82rem; color: var(--muted); margin: -0.4rem 0 1rem; text-align: left; }
+.idle-stage-picker-body {
+  overflow-y: auto;
+  max-height: 55vh;
+  padding-right: 0.3rem;
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+.idle-stagepicker-act-title { font-family: 'Fraunces', serif; font-size: 0.95rem; color: var(--gold); margin-bottom: 0.5rem; }
+.idle-stagepicker-act.is-locked .idle-stagepicker-act-title { color: var(--muted); }
+.idle-stagepicker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 0.45rem; }
+.idle-stagepicker-stage {
+  padding: 0.4rem 0.3rem;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: center;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.2s ease;
+}
+.idle-stagepicker-stage:hover { transform: translateY(-1px); border-color: var(--gold); }
+.idle-stagepicker-stage.is-current { background: var(--gold); color: #1a1408; border-color: var(--gold); }
+.idle-stagepicker-stage.is-highest:not(.is-current) { border-color: var(--gold); color: var(--gold); }
+@media (max-width: 640px) {
+  .idle-stage-picker-card { width: 100vw; max-height: 100vh; height: 100vh; border-radius: 0; padding: 1.4rem 1rem 1rem; }
+  .idle-stage-picker-body { max-height: 65vh; }
+}
+
 /* ---- HUD ---- */
 .idle-dorf-hud { margin-bottom: 1rem; }
 .idle-hud-level { display: flex; align-items: center; justify-content: space-between; font-weight: 700; margin-bottom: 0.35rem; }

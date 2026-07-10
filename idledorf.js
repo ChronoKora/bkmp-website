@@ -785,15 +785,26 @@ function bkmpIdleToggleAutoAdvance() {
   bkmpIdleQueueSync();
 }
 
-function bkmpIdleJumpToHighestStage() {
+/* Springt auf jede beliebige, bereits erreichte Stufe (0 <= targetIndex <=
+   highest_dragon_index). Aendert NIE highest_dragon_index - das bleibt der
+   dauerhafte Bestwert. Wird sowohl vom "Zur besten Stufe springen"-Button
+   als auch vom Stufenwahl-Popup genutzt, damit es nur einen Sprung-Code-
+   pfad gibt. */
+function bkmpIdleJumpToStage(targetIndex) {
   if (!bkmpIdleState) return;
   const highest = Number(bkmpIdleState.highest_dragon_index || 0);
-  if (highest <= Number(bkmpIdleState.current_dragon_index || 0)) return;
-  bkmpIdleState.current_dragon_index = highest;
+  const target = Math.max(0, Math.min(highest, Math.floor(Number(targetIndex) || 0)));
+  if (target === Number(bkmpIdleState.current_dragon_index || 0)) return;
+  bkmpIdleState.current_dragon_index = target;
   bkmpIdleVillageHp = bkmpIdleEffectiveStats ? bkmpIdleEffectiveStats.hp : bkmpIdleVillageHp;
   bkmpIdleSpawnDragon();
   bkmpIdleUpdateVillageHpBar();
   bkmpIdleQueueSync();
+}
+
+function bkmpIdleJumpToHighestStage() {
+  if (!bkmpIdleState) return;
+  bkmpIdleJumpToStage(Number(bkmpIdleState.highest_dragon_index || 0));
 }
 
 function bkmpIdleRenderStageBar() {
@@ -807,11 +818,80 @@ function bkmpIdleRenderStageBar() {
     <div class="idle-stage-buttons">
       <button type="button" class="btn-nein idle-stage-btn" id="idleStageAutoAdvanceBtn">${autoAdvance ? '⬆️ Steigt automatisch auf' : '📍 Bleibt auf dieser Stufe'}</button>
       ${highest > current ? '<button type="button" class="btn-ja idle-stage-btn" id="idleStageJumpBtn">Zur besten Stufe springen</button>' : ''}
+      <button type="button" class="btn-nein idle-stage-btn" id="idleStagePickerBtn">🗺️ Zu bestimmter Stufe wechseln</button>
     </div>`;
   const autoBtn = document.getElementById('idleStageAutoAdvanceBtn');
   if (autoBtn) autoBtn.addEventListener('click', bkmpIdleToggleAutoAdvance);
   const jumpBtn = document.getElementById('idleStageJumpBtn');
   if (jumpBtn) jumpBtn.addEventListener('click', bkmpIdleJumpToHighestStage);
+  const pickerBtn = document.getElementById('idleStagePickerBtn');
+  if (pickerBtn) pickerBtn.addEventListener('click', bkmpIdleOpenStagePicker);
+}
+
+/* ---------------- Stufenwahl-Popup ---------------- */
+
+function bkmpIdleRenderStagePickerBody() {
+  const body = document.getElementById('idleStagePickerBody');
+  if (!body || !bkmpIdleState) return;
+  const current = Number(bkmpIdleState.current_dragon_index || 0);
+  const highest = Number(bkmpIdleState.highest_dragon_index || 0);
+  const highestAct = Math.floor(highest / 10);
+  let html = '';
+  for (let act = 0; act <= highestAct + 1; act++) {
+    const locked = act > highestAct;
+    html += `<div class="idle-stagepicker-act${locked ? ' is-locked' : ''}">`;
+    html += `<div class="idle-stagepicker-act-title">${locked ? '🔒 ' : ''}Akt ${act + 1}</div>`;
+    if (!locked) {
+      html += '<div class="idle-stagepicker-grid">';
+      const maxLocalStage = act === highestAct ? (highest % 10) : 9;
+      for (let s = 0; s <= maxLocalStage; s++) {
+        const idx = act * 10 + s;
+        const isCurrent = idx === current;
+        const isHighest = idx === highest;
+        const cls = ['idle-stagepicker-stage'];
+        if (isCurrent) cls.push('is-current');
+        if (isHighest) cls.push('is-highest');
+        html += `<button type="button" class="${cls.join(' ')}" data-stage-index="${idx}" title="Stufe ${bkmpIdleFormatStage(idx)}${isHighest ? ' (Beste Stufe)' : ''}">${bkmpIdleFormatStage(idx)}${isHighest ? ' ⭐' : ''}</button>`;
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+  body.innerHTML = html;
+}
+
+function bkmpIdleOpenStagePicker() {
+  if (!bkmpIdleState) return;
+  bkmpIdleRenderStagePickerBody();
+  const overlay = document.getElementById('idleStagePickerOverlay');
+  if (overlay) overlay.classList.add('visible');
+}
+
+function bkmpIdleCloseStagePicker() {
+  const overlay = document.getElementById('idleStagePickerOverlay');
+  if (overlay) overlay.classList.remove('visible');
+}
+
+function bkmpIdleWireStagePicker() {
+  const body = document.getElementById('idleStagePickerBody');
+  if (body) {
+    body.addEventListener('click', e => {
+      const btn = e.target.closest('[data-stage-index]');
+      if (!btn) return;
+      bkmpIdleJumpToStage(Number(btn.dataset.stageIndex));
+      bkmpIdleCloseStagePicker();
+    });
+  }
+  const overlay = document.getElementById('idleStagePickerOverlay');
+  if (overlay) {
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay) bkmpIdleCloseStagePicker();
+    });
+  }
+  const closeX = document.getElementById('idleStagePickerCloseX');
+  if (closeX) closeX.addEventListener('click', bkmpIdleCloseStagePicker);
+  const closeBtn = document.getElementById('idleStagePickerCloseBtn');
+  if (closeBtn) closeBtn.addEventListener('click', bkmpIdleCloseStagePicker);
 }
 
 function bkmpIdleLog(msg) {
@@ -1176,13 +1256,21 @@ async function bkmpIdleFlushSync() {
 
 const BKMP_PRESTIGE_REQUIRED_STAGE = 100;
 
+/* Werte bewusst hoeher als eine erste Fassung (3-5%/Rang): bei den Kosten
+   1,2,3...N Punkte pro Rang kostet ein voll ausgebauter 10-Rang-Knoten 55
+   Punkte, ein erster Aufstieg (Mindest-Drachenstufe 100) bringt aber nur
+   ~6 Punkte - bei niedrigen %-Werten fuehlte sich der erste, fuer den
+   kompletten Reset des Fortschritts erkaufte Aufstieg viel zu mickrig an.
+   portal_meisterschaft bleibt bei 8% statt hoeher, weil er sich selbst
+   verstaerkt (mehr Punkte -> schneller mehr Punkte) und sonst zu schnell
+   explodiert. */
 const BKMP_PRESTIGE_UPGRADES = [
-  { id: 'ewiges_feuer', name: 'Ewiges Feuer', desc: '+3% Angriff pro Rang - dauerhaft, übersteht jeden Aufstieg.', icon: '🔥', effectType: 'attack_pct', effectPerRank: 3, maxRank: 10 },
-  { id: 'drachenblut', name: 'Drachenblut', desc: '+4% Leben pro Rang - dauerhaft.', icon: '🩸', effectType: 'hp_pct', effectPerRank: 4, maxRank: 10 },
-  { id: 'goldene_ranken', name: 'Goldene Ranken', desc: '+4% Gold-Ausbeute pro Rang - dauerhaft.', icon: '🌿', effectType: 'gold_prod_pct', effectPerRank: 4, maxRank: 10 },
-  { id: 'zeitraffer', name: 'Zeitraffer', desc: '+4% XP pro Rang - dauerhaft.', icon: '⏳', effectType: 'xp_pct', effectPerRank: 4, maxRank: 10 },
-  { id: 'kristallkern', name: 'Kristallkern', desc: '+5% Kritischer Schaden pro Rang - dauerhaft.', icon: '💠', effectType: 'crit_damage_pct', effectPerRank: 5, maxRank: 8 },
-  { id: 'portal_meisterschaft', name: 'Portal-Meisterschaft', desc: '+5% mehr Prestige-Punkte bei jedem künftigen Aufstieg pro Rang.', icon: '🌌', effectType: 'prestige_point_bonus_pct', effectPerRank: 5, maxRank: 5 }
+  { id: 'ewiges_feuer', name: 'Ewiges Feuer', desc: '+8% Angriff pro Rang - dauerhaft, übersteht jeden Aufstieg.', icon: '🔥', effectType: 'attack_pct', effectPerRank: 8, maxRank: 10 },
+  { id: 'drachenblut', name: 'Drachenblut', desc: '+8% Leben pro Rang - dauerhaft.', icon: '🩸', effectType: 'hp_pct', effectPerRank: 8, maxRank: 10 },
+  { id: 'goldene_ranken', name: 'Goldene Ranken', desc: '+8% Gold-Ausbeute pro Rang - dauerhaft.', icon: '🌿', effectType: 'gold_prod_pct', effectPerRank: 8, maxRank: 10 },
+  { id: 'zeitraffer', name: 'Zeitraffer', desc: '+8% XP pro Rang - dauerhaft.', icon: '⏳', effectType: 'xp_pct', effectPerRank: 8, maxRank: 10 },
+  { id: 'kristallkern', name: 'Kristallkern', desc: '+10% Kritischer Schaden pro Rang - dauerhaft.', icon: '💠', effectType: 'crit_damage_pct', effectPerRank: 10, maxRank: 8 },
+  { id: 'portal_meisterschaft', name: 'Portal-Meisterschaft', desc: '+8% mehr Prestige-Punkte bei jedem künftigen Aufstieg pro Rang.', icon: '🌌', effectType: 'prestige_point_bonus_pct', effectPerRank: 8, maxRank: 5 }
 ];
 
 function bkmpPrestigeUpgradeCost(rankBeingBought) {
@@ -2051,6 +2139,7 @@ function bkmpIdleInit() {
   if (closeX) closeX.addEventListener('click', bkmpIdleCloseModal);
   const dragonEl = document.getElementById('idleDragon');
   if (dragonEl) { dragonEl.classList.add('idle-dragon-clickable'); dragonEl.addEventListener('click', bkmpIdleHandleDragonClick); }
+  bkmpIdleWireStagePicker();
   /* Leertaste als Alternative zum Maus-Klick auf den Drachen/Weltboss -
      Autoklicker-Schutz greift ueber dieselben Handler-Funktionen genauso,
      da hier nur der jeweilige Klick-Handler aufgerufen wird, keine eigene
