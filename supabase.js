@@ -2597,10 +2597,19 @@ async function createPlushieCodes(rows) {
 
 /* ---------------- Idle Drachen Dorf ---------------- */
 
+/* NOTFALL-HINWEIS 2026-07-10: prestige_stage_offset bewusst NICHT in
+   dieser Spaltenliste, solange supabase-idle-prestige-lifetime-stage.sql
+   noch nicht ausgefuehrt wurde - die Spalte existierte kurzzeitig live nur
+   im Code, nicht in der DB, wodurch JEDER Speicher-/Ladevorgang mit
+   "column does not exist" fehlschlug (siehe upsertIdlePlayerState unten,
+   das die Spalte ebenfalls explizit aus dem Payload entfernt). Nach dem
+   Ausfuehren der Migration hier wieder ", prestige_stage_offset" nach
+   highest_dragon_index einfuegen UND den Strip in upsertIdlePlayerState
+   entfernen. */
 const BKMP_IDLE_PLAYER_STATE_COLUMNS = `name_key, display_name, level, xp, gold, wood, stone, crystals, essence,
   total_gold_earned, attack, defense, hp, crit_chance, crit_damage, gold_bonus, xp_bonus, loot_bonus,
   skill_points_available, skill_points_spent, skill_allocations, upgrade_purchases, dragon_kills, boss_kills,
-  current_dragon_index, highest_dragon_index, prestige_stage_offset, auto_advance, playtime_seconds, last_seen_at, last_offline_claim, last_skilltree_reset_at, updated_at`;
+  current_dragon_index, highest_dragon_index, auto_advance, playtime_seconds, last_seen_at, last_offline_claim, last_skilltree_reset_at, updated_at`;
 
 async function loadIdleDragons() {
   const client = bkmpGetSupabaseClient();
@@ -2746,7 +2755,12 @@ async function upsertIdlePlayerState(state) {
      Erst per auth_user_id updaten (name_key/display_name bewusst NICHT mit
      im Update-Payload - die aendert nur rename_player_account()), nur bei
      wirklich neuem Konto einfuegen. */
-  const { name_key, display_name, ...stateWithoutIdentity } = state;
+  /* prestige_stage_offset explizit ausgeschlossen, bis
+     supabase-idle-prestige-lifetime-stage.sql ausgefuehrt wurde - siehe
+     Notfall-Hinweis bei BKMP_IDLE_PLAYER_STATE_COLUMNS oben. Ohne diesen
+     Strip wuerde JEDES Speichern mit "column does not exist" fehlschlagen,
+     solange die Spalte in der DB fehlt. */
+  const { name_key, display_name, prestige_stage_offset, ...stateWithoutIdentity } = state;
   const statsPayload = { ...stateWithoutIdentity, updated_at: new Date().toISOString() };
   const { data: updated, error: updateError } = await client
     .from('idle_player_state')
