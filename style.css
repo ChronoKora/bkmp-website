@@ -193,9 +193,9 @@ a { color: inherit; text-decoration: none; }
      links, ohne Breitenbegrenzung - bei 4 Buttons mit Textlabel (~470px
      Inhalt) reichte auf Telefonbreiten (<640px, ~375px verfuegbar) der
      Platz nicht, die linken Buttons wurden dadurch bisher unsichtbar/
-     unklickbar aus dem Bildschirm gedrueckt. Jetzt bricht die Leiste bei
-     Bedarf rechtsbuendig in eine zweite Zeile um, bleibt aber komplett
-     innerhalb des sichtbaren Bereichs. */
+     unklickbar aus dem Bildschirm gedrueckt. flex-wrap bleibt als
+     Sicherheitsnetz stehen, greift aber dank der Textlabel-Kuerzung unten
+     im Normalfall nicht mehr. */
   .top-actions {
     top: 1rem; right: 1rem;
     max-width: calc(100vw - 2rem);
@@ -203,6 +203,28 @@ a { color: inherit; text-decoration: none; }
     justify-content: flex-end;
     gap: 0.5rem;
   }
+  /* Nur-Icon-Darstellung fuer Idle-Dorf-Button + Hell/Dunkel-Umschalter:
+     mit ausgeschriebenem Text plus dem (variabel langen: Name + Titel +
+     Erfolgszahl) Profil-Badge passten alle drei Pillen auf schmalen
+     Handybreiten nicht in eine Zeile, .top-actions brach dadurch in eine
+     zweite Zeile um - die aber nicht genug zusaetzliche Kopfbereich-Hoehe
+     eingeplant bekam und dadurch sichtbar in die Twitch-Creator-Leiste
+     darunter hineinragte. Icon-only haelt hier zuverlaessig eine Zeile. */
+  .idle-dorf-btn-label, #themeLabel { display: none; }
+  .idle-dorf-btn, #themeToggle { padding: 0.5rem; border-radius: 50%; }
+  /* Das Profil-Badge (Name + aktiver Titel + Erfolgszahl) ist die einzige
+     Pille mit wirklich variabler, potenziell langer Textlaenge - hart
+     begrenzen + abschneiden statt umbrechen zu lassen, aus demselben Grund. */
+  #mcNameBadgeText { max-width: 34vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+/* Sehr schmale Handybreiten (320-360px): reicht der Platz selbst im
+   Icon-only-Modus knapp nicht, sobald zusaetzlich der Raid-Countdown
+   ("🔥 4:29") neben dem Idle-Dorf-Icon eingeblendet ist - enger fassen
+   statt umbrechen zu lassen. */
+@media (max-width: 380px) {
+  .top-actions { gap: 0.35rem; }
+  .raid-btn-countdown { font-size: 0.7rem; margin-left: 0.2rem; }
+  #mcNameBadgeText { max-width: 20vw; }
 }
 
 .pill-btn {
@@ -621,6 +643,15 @@ body.page-loaded .streamer-marquee-track {
 .hero-banner {
   display: block;
   width: min(1760px, calc(100vw - 1.8rem));
+  /* WICHTIG: height:auto explizit noetig - das <img> traegt zusaetzlich
+     width="1983" height="527" als HTML-Attribute (fuer CLS/Ladeverhalten
+     vor dem CSS-Laden gedacht). Ohne dieses height:auto gewinnt das
+     height="527"-Attribut als "gesetzte" (nicht-auto) Boxhoehe gegen
+     aspect-ratio, wodurch der Banner auf schmalen Bildschirmen viel zu
+     schmal skaliert, aber die volle Pixelhoehe (527px) behaelt - er wirkt
+     dadurch riesig eingezoomt und der Text im Bild wird beidseitig
+     abgeschnitten, statt als schlanker breiter Streifen zu erscheinen. */
+  height: auto;
   aspect-ratio: 1983 / 527;
   object-fit: cover;
   border-radius: 14px;
@@ -630,11 +661,20 @@ body.page-loaded .streamer-marquee-track {
   -webkit-user-select: none;
 }
 @media (max-width: 720px) {
-  .hero-banner-wrap { padding: 5rem 0.7rem 1.8rem; }
+  /* Etwas mehr Puffer als die reine Kopfzeilen-Hoehe (~46-56px bei
+     top:1rem) - schuetzt gegen knappe Randfaelle, auch wenn .top-actions
+     dank der Icon-only-Regeln oben im Normalfall einzeilig bleibt. */
+  .hero-banner-wrap { padding: 5.6rem 0.7rem 1.8rem; }
   .hero-banner { width: calc(100vw - 1.4rem); border-radius: 10px; box-shadow: 0 16px 42px rgba(0, 0, 0, 0.3); }
   .streamer-strip { width: calc(100vw - 1.4rem); gap: 0.45rem; min-height: 38px; }
   .streamer-strip-title { padding: 0 0.62rem; font-size: 0.66rem; }
   .streamer-pill { font-size: 0.76rem; }
+  /* Live-Toast ("Gerade live auf Twitch"): rechts-fixiert wie auf Desktop,
+     aber schmaler und mit mehr Abstand nach unten - auf Handybreiten
+     reichte der Platz nicht, ohne die unten LINKS fixierten Ecken-Links
+     (Admin-Login, Geheimnisse-Hinweis) zu ueberdecken (beide ragten unter
+     der vorher zu breiten/zu tief sitzenden Karte hervor). */
+  .live-toast { right: 0.7rem; bottom: 5.2rem; width: min(240px, calc(100vw - 3.4rem)); padding: 0.85rem 0.95rem; }
 }
 
 
@@ -4147,6 +4187,23 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   .idle-stage-picker-body { max-height: 65vh; }
 }
 
+/* ---- Event-Drachen-Vorbereitungs-Popup (Shenloss/Ganz Liber Drache) ---- */
+.idle-event-dragon-overlay { z-index: 70; }
+.idle-event-dragon-card {
+  max-width: 380px;
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box,
+              linear-gradient(135deg, #facc15, #a78bfa, #facc15) border-box;
+  border: 2px solid transparent;
+  background-size: 100% 100%, 220% 220%;
+  animation: bkmpTierGlow 3.5s ease infinite;
+}
+.idle-event-dragon-card h3 { font-family: 'Fraunces', serif; font-size: 1.3rem; margin-bottom: 0.7rem; color: var(--gold); }
+.idle-event-dragon-card p { font-size: 1rem; }
+/* Dezenter goldener Rahmen um den Drachen selbst, waehrend der Kampf
+   laeuft - macht die Seltenheit auch nach Bestaetigung des Popups sichtbar. */
+.idle-dragon-event .idle-dragon-sprite { filter: drop-shadow(0 0 14px rgba(250, 204, 21, 0.65)); }
+
 /* ---- HUD ---- */
 .idle-dorf-hud { margin-bottom: 1rem; }
 .idle-hud-level { display: flex; align-items: center; justify-content: space-between; font-weight: 700; margin-bottom: 0.35rem; }
@@ -4261,6 +4318,21 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 .idle-sprite-yaksha-boss { background-image: url('assets/dragons/yaksha-boss.png?v=20260709-transparent2'); aspect-ratio: 1228.8 / 256; }
 .idle-sprite-schattendrache { background-image: url('assets/dragons/schattendrache.png?v=20260709-transparent2'); aspect-ratio: 1228.8 / 256; }
 .idle-sprite-wuffdrache { background-image: url('assets/dragons/wuffdrache.png?v=20260709-transparent2'); aspect-ratio: 1228.8 / 256; }
+
+/* Die beiden seltenen Event-Drachen (Shenloss/Ganz Liber Drache) sind
+   FRISCH aus sauber getrennten Einzelframes zusammengesetzt (siehe
+   assets/dragons/shenloss.png bzw. liber.png) - anders als bei den 9
+   Sheets oben gibt es hier KEINE Beschriftung im Frame, die weggeschnitten
+   werden muesste. Deshalb eigene background-size/-position OHNE den 125%/
+   25%-Kropf-Trick der anderen Sprites (sonst wuerde hier faelschlich ein
+   Teil des Drachen abgeschnitten). aspect-ratio = exakte Frame-Breite/
+   -Hoehe des jeweiligen Sheets. */
+.idle-sprite-shenloss, .idle-sprite-liber {
+  background-size: 100% 400%;
+  background-position-x: 0%;
+}
+.idle-sprite-shenloss { background-image: url('assets/dragons/shenloss.png?v=20260710-eventdragons1'); aspect-ratio: 473 / 372; }
+.idle-sprite-liber { background-image: url('assets/dragons/liber.png?v=20260710-eventdragons1'); aspect-ratio: 422 / 245; }
 
 .idle-dragon-name { margin-top: 0.3rem; font-size: 0.75rem; font-weight: 700; color: var(--muted); }
 .idle-dragon-boss .idle-dragon-name { color: #facc15; }
@@ -4698,6 +4770,31 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 .raid-result-rewards { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.6rem 1rem; font-weight: 700; margin-top: 0.8rem; }
 .raid-result-flawless { color: #facc15; font-weight: 700; font-size: 0.9rem; margin-bottom: 0.6rem; }
 .raid-result-mvp { color: var(--gold); font-size: 0.95rem; }
+
+.raid-result-zerator-code {
+  margin-top: 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 14px;
+  border: 2px solid transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box,
+              linear-gradient(135deg, #facc15, #a78bfa, #facc15) border-box;
+  background-size: 100% 100%, 220% 220%;
+  animation: bkmpTierGlow 3.5s ease infinite;
+}
+.raid-result-zerator-title { font-weight: 800; color: var(--gold); margin-bottom: 0.5rem; }
+.raid-result-zerator-code-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.6rem; }
+.raid-result-zerator-code-value {
+  font-family: 'Courier New', monospace;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 0.4rem 0.7rem;
+  border-radius: 8px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  user-select: all;
+}
+.raid-result-zerator-hint { font-size: 0.75rem; color: var(--muted); margin-top: 0.5rem; }
 
 @media (max-width: 640px) {
   .raid-city, .raid-boss { width: 46%; }

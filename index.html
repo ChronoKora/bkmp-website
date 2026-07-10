@@ -34,7 +34,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260710-stagepicker1">
+<link rel="stylesheet" href="style.css?v=20260710-mobilefix1">
 </head>
 <body>
 
@@ -60,7 +60,7 @@
 
   <div class="top-actions">
     <button class="pill-btn idle-dorf-btn" id="idleDorfButton" type="button" aria-label="Idle Drachen Dorf öffnen">
-      <span aria-hidden="true">🏰</span> Idle Drachen Dorf<span class="raid-btn-countdown" id="raidBtnCountdown" style="display:none;"></span>
+      <span aria-hidden="true">🏰</span><span class="idle-dorf-btn-label"> Idle Drachen Dorf</span><span class="raid-btn-countdown" id="raidBtnCountdown" style="display:none;"></span>
     </button>
 
     <button class="pill-btn" id="themeToggle" type="button" aria-label="Zwischen Hell- und Dunkelmodus wechseln">
@@ -353,6 +353,21 @@
       <div class="idle-stage-picker-body" id="idleStagePickerBody"></div>
       <div class="joke-buttons">
         <button class="btn-nein" id="idleStagePickerCloseBtn" type="button">Schlie&szlig;en</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vorbereitungs-Popup fuer seltene Event-Drachen (Shenloss/Ganz Liber
+       Drache). Bewusst KEIN Close-X, KEIN Klick-Ausserhalb-Schliessen und
+       KEIN Eintrag im ESC-BKMP_OVERLAY_CLOSERS-Sweep, der es tatsaechlich
+       schliesst (siehe unten, no-op-Eintrag) - dieses Popup darf nur ueber
+       den "Ich bin bereit"-Button verlassen werden. -->
+  <div class="joke-overlay idle-event-dragon-overlay" id="idleEventDragonOverlay">
+    <div class="joke-card idle-event-dragon-card">
+      <h3 id="idleEventDragonTitle"></h3>
+      <p id="idleEventDragonMessage"></p>
+      <div class="joke-buttons">
+        <button class="btn-ja" id="idleEventDragonReadyBtn" type="button"></button>
       </div>
     </div>
   </div>
@@ -868,7 +883,7 @@
   <script src="assets/vendor/supabase-js.min.js"></script>
   <script src="supabase.js?v=20260710-raidsync1"></script>
   <script src="app.js?v=20260709-optpass3"></script>
-  <script src="idledorf.js?v=20260710-raidprepfix1"></script>
+  <script src="idledorf.js?v=20260710-eventdragons1"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
   <script>
     bkmpInitTheme();
@@ -4601,6 +4616,13 @@
     const BKMP_OVERLAY_CLOSERS = {
       idleDorfOverlay: () => { if (typeof bkmpIdleCloseModal === 'function') bkmpIdleCloseModal(); },
       idleStagePickerOverlay: () => { if (typeof bkmpIdleCloseStagePicker === 'function') bkmpIdleCloseStagePicker(); },
+      /* Bewusst ein No-op: das Event-Drachen-Vorbereitungs-Popup darf NUR
+         ueber den "Ich bin bereit"-Button verlassen werden, nicht per ESC -
+         siehe Auftrag Abschnitt 3 ("Das Popup darf erst geschlossen werden,
+         wenn der vorgesehene Button gedrueckt wurde"). Ohne diesen Eintrag
+         wuerde der generische Sweep unten die "visible"-Klasse einfach
+         entfernen. */
+      idleEventDragonOverlay: () => {},
       mapWorkspaceOverlay: () => { if (typeof bkmpMapCloseWorkspace === 'function') bkmpMapCloseWorkspace(); },
       mapCompanyDetailOverlay: () => { if (typeof bkmpMapCloseCompanyDetail === 'function') bkmpMapCloseCompanyDetail(); }
     };

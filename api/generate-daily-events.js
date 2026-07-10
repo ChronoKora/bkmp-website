@@ -70,7 +70,17 @@ module.exports = async function handler(req, res) {
       const detail = await plushiesRes.text().catch(() => '');
       return send(res, 502, { error: 'plushies_load_failed', detail: detail.slice(0, 300) });
     }
-    const plushies = await plushiesRes.json();
+    /* 'kora' hat ein eigenes, dediziertes Easter Egg (versteckter Code im
+       Platzhalter-Text) und soll NUR darueber erhaeltlich sein.
+       'zerathor_zorn_der_verdammnis' soll NUR ueber die 5%-Raidboss-
+       Belohnung (siehe raid_finish() in supabase-idle-event-dragons.sql)
+       erhaeltlich sein. Beide muessen deshalb aus diesem taeglichen
+       Zufallspool ausgeschlossen bleiben, sonst koennte der taegliche
+       Cron-Job versehentlich einen zweiten, "normalen" Code fuer
+       dieselben Pluschies erzeugen. */
+    const EXCLUDED_FROM_DAILY_POOL = new Set(['kora', 'zerathor_zorn_der_verdammnis']);
+    const plushiesAll = await plushiesRes.json();
+    const plushies = (Array.isArray(plushiesAll) ? plushiesAll : []).filter(p => !EXCLUDED_FROM_DAILY_POOL.has(p.id));
     if (!Array.isArray(plushies) || plushies.length === 0) {
       return send(res, 200, { ok: true, skipped: true, reason: 'no_plushies_defined' });
     }

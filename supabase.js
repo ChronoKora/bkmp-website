@@ -2670,6 +2670,55 @@ async function saveIdlePrestigeState(state) {
   return true;
 }
 
+/* ---------------- Seltene Event-Drachen (Shenloss / Ganz Liber Drache) ----------------
+   Sieg-Status liegt in einer eigenen, fuer anon/authenticated NUR lesbaren
+   Tabelle (siehe supabase-idle-event-dragons.sql) - Schreiben geht
+   ausschliesslich ueber die SECURITY DEFINER-Funktion
+   idle_claim_event_dragon_victory(), damit ein einmaliger Sieg (und der
+   daraus folgende Titel) nicht per direktem Table-Update faelschbar ist. */
+async function loadIdleEventDragonState(name) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !name) return null;
+  const { data, error } = await client
+    .from('idle_event_dragon_state')
+    .select('name_key, shenloss_defeated, shenloss_defeated_at, liber_defeated, liber_defeated_at')
+    .eq('name_key', String(name).trim().toLowerCase())
+    .limit(1);
+  if (error) throw error;
+  return Array.isArray(data) && data[0] ? data[0] : null;
+}
+
+async function idleClaimEventDragonVictory(name, dragonKey) {
+  const client = bkmpGetPlayerAuthClient() || bkmpGetSupabaseClient();
+  if (!client || !name) return null;
+  const { data, error } = await client.rpc('idle_claim_event_dragon_victory', {
+    p_name_key: String(name).trim().toLowerCase(),
+    p_display_name: name,
+    p_dragon_key: dragonKey
+  });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  return row || { already_defeated: false, newly_defeated: false };
+}
+
+/* Persoenlicher Zerator-Belohnungscode nach einem gewonnenen Raid (siehe
+   raid_finish() in supabase-idle-event-dragons.sql) - reine Abfrage, der
+   Code wird ausschliesslich serverseitig erzeugt. Gibt null zurueck, wenn
+   dieser Spieler bei diesem Raid keinen Code bekommen hat (kein Treffer
+   bei der 5%-Chance bzw. Pluschie schon im Besitz). */
+async function loadRaidRewardCode(raidId, name) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !raidId || !name) return null;
+  const { data, error } = await client
+    .from('raid_reward_codes')
+    .select('code, plushie_id, created_at')
+    .eq('raid_id', raidId)
+    .eq('name_key', String(name).trim().toLowerCase())
+    .limit(1);
+  if (error) throw error;
+  return Array.isArray(data) && data[0] ? data[0] : null;
+}
+
 async function loadIdlePlayerState(name) {
   const client = bkmpGetSupabaseClient();
   if (!client || !name) return null;

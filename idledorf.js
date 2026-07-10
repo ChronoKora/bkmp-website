@@ -26,13 +26,38 @@ function bkmpIdleFormatStage(index) {
   return `${Math.floor(i / 10)}-${i % 10}`;
 }
 
+/* Deterministischer [0,1)-Wert aus einem Text-Seed (FNV-1a 32-bit Hash,
+   normiert). Bewusst KEIN Math.random(): derselbe Seed liefert IMMER
+   dasselbe Ergebnis. Wird fuer den Event-Drachen-Spawnwurf verwendet, damit
+   ein erneutes Laden/Oeffnen des Idle-Dorf-Fensters (ohne dass sich die
+   Stufe aendert) niemals einen neuen Wurf ausloest - siehe
+   bkmpIdleSelectDragonKindId(). Nicht kryptographisch sicher, muss es hier
+   auch nicht sein: das Ziel ist ausschliesslich, den trivialen
+   "Reload = neu wuerfeln"-Exploit zu verhindern, nicht, den Wurf gegen
+   gezielte Analyse durch den Spieler selbst abzusichern. */
+function bkmpIdleSeededRoll01(seed) {
+  let h = 2166136261;
+  const s = String(seed || '');
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  h >>>= 0;
+  return h / 4294967296;
+}
+
 /* Spawn-Logik: waehlt die ART des naechsten Drachen anhand der Stufe
    (killIndex+1 = wie oft insgesamt schon gekaempft wurde, 1-indiziert).
    - alle 25 Stufen (25/50/75/...): der grosse Boss
    - alle 10 Stufen (10/20/30/...), aber NICHT wenn schon Boss-Stufe: Miniboss
+   - sonst seltene Event-Easter-Egg-Drachen (0,1% je Drache, deterministisch,
+     nur wenn noch nicht besiegt) - siehe bkmpIdleSeededRoll01
    - sonst kleine Zufallschance auf einen seltenen Drachen (Schatten/Wuff)
-   - ansonsten einer der vier Standard-Elementardrachen, zufaellig */
-function bkmpIdleSelectDragonKindId(killIndex, dragons, rareChancePct) {
+   - ansonsten einer der vier Standard-Elementardrachen, zufaellig
+   seedName = Spielername (name_key), fuer den deterministischen
+   Event-Drachen-Wurf. excludedEventIds = Event-Drachen, die dieser
+   Spieler schon besiegt hat (spawnen dauerhaft nie wieder). */
+function bkmpIdleSelectDragonKindId(killIndex, dragons, rareChancePct, seedName, excludedEventIds) {
   const stage = killIndex + 1;
   const active = (dragons || []).filter(d => d.active !== false);
   const byRule = rule => active.filter(d => d.spawn_rule === rule);
@@ -43,6 +68,11 @@ function bkmpIdleSelectDragonKindId(killIndex, dragons, rareChancePct) {
   if (stage % 10 === 0) {
     const pool = byRule('miniboss_10');
     if (pool.length) return pool[Math.floor(Math.random() * pool.length)].id;
+  }
+  const eventPool = byRule('event_easter').filter(d => !(excludedEventIds || []).includes(d.id));
+  for (const d of eventPool) {
+    const seed = `${seedName || 'guest'}|${killIndex}|${d.id}`;
+    if (bkmpIdleSeededRoll01(seed) < 0.001) return d.id;
   }
   const rare = byRule('rare');
   if (rare.length && Math.random() * 100 < (rareChancePct != null ? rareChancePct : 8)) {
@@ -70,11 +100,50 @@ function bkmpIdleGrowthMult(ratePerKill, exponent, killIndex) {
   return Math.pow(1 + rate * killIndex, exp);
 }
 
-function bkmpIdleDragonStatsAt(killIndex, dragons, cfg) {
+/* Eigene Skalierung fuer die seltenen Event-Drachen (Shenloss/Ganz Liber
+   Drache) - "wie ein Raidboss, aber eigene Formel" (siehe Auftrag). Ziel:
+   - rein passiver Schaden (Auto-Tick, kein Klick) reicht NICHT zuverlaessig
+   - mit aktivem Klicken ist der Kampf in einer ueberschaubaren Zeitspanne
+     (Groessenordnung 45s aktiver Einsatz) machbar
+   - skaliert mit den TATSAECHLICHEN aktuellen Werten des Spielers
+     (Angriff inkl. aller Skilltree-/Upgrade-/Titel-/Prestige-Boni,
+     Krit-Chance/-Schaden, Klickschaden-Bonus, Tick-Geschwindigkeit) statt
+     mit der Stufe/killIndex - ein schwacher und ein starker Spieler
+     bekommen dadurch automatisch eine jeweils angemessene Huerde.
+   Der Angriffswert des Event-Drachen selbst orientiert sich an der
+   bereits ausbalancierten Boss-Kurve (gleiche Bedrohlichkeit wie ein
+   reguleaerer 25er-Boss dieser Spielphase), NICHT an einer neuen,
+   ungetesteten Zahl. */
+function bkmpIdleEventDragonScaledStats(killIndex, cfg, effectiveStats) {
   const c = cfg || {};
-  const kindId = bkmpIdleSelectDragonKindId(killIndex, dragons, c.chancePct);
+  const atkGrowth = bkmpIdleGrowthMult(c.atkGrowthPerKill, c.atkGrowthExponent, killIndex);
+  const attack = Math.max(8, 7 * atkGrowth * (c.bossAtkMult || 1.7));
+
+  const stats = effectiveStats || { attack: 10, critChance: 5, critDamage: 150, clickDamagePct: 0, tickIntervalMs: 900 };
+  const tickSeconds = Math.max(0.3, (stats.tickIntervalMs || 900) / 1000);
+  const critChance = Math.max(0, Math.min(100, stats.critChance || 0)) / 100;
+  const critFactor = 1 + critChance * (Math.max(100, stats.critDamage || 150) / 100 - 1);
+  const passiveDps = Math.max(1, (stats.attack || 10) * critFactor) / tickSeconds;
+  const clickDamage = Math.max(1, (stats.attack || 10) * (0.12 + (stats.clickDamagePct || 0) / 100));
+  const ASSUMED_ACTIVE_CLICKS_PER_SECOND = 4; // realistisches menschliches Tempo, kein Autoklicker-Tempo
+  const clickDps = clickDamage * ASSUMED_ACTIVE_CLICKS_PER_SECOND;
+
+  const TARGET_ACTIVE_SECONDS = 45; // mit aktivem Klicken soll der Kampf ungefaehr in dieser Groessenordnung liegen
+  const PASSIVE_ONLY_FACTOR = 4; // rein passiv soll es spuerbar/unattraktiv laenger dauern (kein zuverlaessiges AFK)
+
+  const hpFromActiveTarget = (passiveDps + clickDps) * TARGET_ACTIVE_SECONDS;
+  const hpFloorFromPassive = passiveDps * TARGET_ACTIVE_SECONDS * PASSIVE_ONLY_FACTOR;
+  const maxHp = Math.max(500, Math.round(Math.max(hpFromActiveTarget, hpFloorFromPassive)));
+
+  return { attack, maxHp };
+}
+
+function bkmpIdleDragonStatsAt(killIndex, dragons, cfg, seedName, excludedEventIds, effectiveStats) {
+  const c = cfg || {};
+  const kindId = bkmpIdleSelectDragonKindId(killIndex, dragons, c.chancePct, seedName, excludedEventIds);
   const archetype = (dragons || []).find(d => d.id === kindId);
   if (!archetype) return null;
+  const isEventDragon = archetype.spawn_rule === 'event_easter';
   const hpGrowth = bkmpIdleGrowthMult(c.hpGrowthPerKill, c.hpGrowthExponent, killIndex);
   const atkGrowth = bkmpIdleGrowthMult(c.atkGrowthPerKill, c.atkGrowthExponent, killIndex);
   let bossTier = null;
@@ -82,6 +151,7 @@ function bkmpIdleDragonStatsAt(killIndex, dragons, cfg) {
   let atkMult = 1;
   if (archetype.spawn_rule === 'boss_25') { bossTier = 'boss'; hpMult = c.bossHpMult || 3.2; atkMult = c.bossAtkMult || 1.7; }
   else if (archetype.spawn_rule === 'miniboss_10') { bossTier = 'miniboss'; hpMult = c.minibossHpMult || 1.8; atkMult = c.minibossAtkMult || 1.3; }
+  const eventStats = isEventDragon ? bkmpIdleEventDragonScaledStats(killIndex, c, effectiveStats) : null;
   return {
     id: archetype.id,
     name: archetype.name,
@@ -91,8 +161,10 @@ function bkmpIdleDragonStatsAt(killIndex, dragons, cfg) {
     killIndex,
     isBoss: Boolean(bossTier),
     bossTier,
-    maxHp: Math.max(1, Math.round((archetype.base_hp || 50) * hpGrowth * hpMult)),
-    attack: Math.max(1, (archetype.base_attack || 5) * atkGrowth * atkMult),
+    isEventDragon,
+    eventDragonKey: isEventDragon ? archetype.id : null,
+    maxHp: eventStats ? eventStats.maxHp : Math.max(1, Math.round((archetype.base_hp || 50) * hpGrowth * hpMult)),
+    attack: eventStats ? eventStats.attack : Math.max(1, (archetype.base_attack || 5) * atkGrowth * atkMult),
     defense: archetype.base_defense || 0,
     archetype
   };
@@ -221,7 +293,14 @@ const BKMP_IDLE_FALLBACK_DRAGONS = [
   { id: 'yakshas-drache', name: 'Yakshas Drache', emoji: '🐲', sprite_key: 'yakshas-drache', spawn_rule: 'miniboss_10', color_theme: '#a78bfa', tier_order: 4, base_hp: 115, base_attack: 10, base_defense: 4, gold_reward_base: 14, xp_reward_base: 14, wood_reward_base: 3, stone_reward_base: 3, crystal_reward_base: 2, essence_reward_base: 1, is_boss: true, active: true },
   { id: 'yaksha-boss', name: 'Yaksha der Drachenboss', emoji: '👑', sprite_key: 'yaksha-boss', spawn_rule: 'boss_25', color_theme: '#ef4444', tier_order: 5, base_hp: 220, base_attack: 16, base_defense: 8, gold_reward_base: 28, xp_reward_base: 28, wood_reward_base: 5, stone_reward_base: 5, crystal_reward_base: 5, essence_reward_base: 3, is_boss: true, active: true },
   { id: 'schattendrache', name: 'Schattendrache', emoji: '🌑', sprite_key: 'schattendrache', spawn_rule: 'rare', color_theme: '#6b21a8', tier_order: 6, base_hp: 90, base_attack: 10, base_defense: 3, gold_reward_base: 12, xp_reward_base: 10, wood_reward_base: 2, stone_reward_base: 2, crystal_reward_base: 1, essence_reward_base: 1, is_boss: false, active: true },
-  { id: 'wuffdrache', name: 'Wuffdrache', emoji: '🐾', sprite_key: 'wuffdrache', spawn_rule: 'rare', color_theme: '#fbbf24', tier_order: 7, base_hp: 50, base_attack: 5, base_defense: 1, gold_reward_base: 10, xp_reward_base: 8, wood_reward_base: 1, stone_reward_base: 1, crystal_reward_base: 1, essence_reward_base: 1, is_boss: false, active: true }
+  { id: 'wuffdrache', name: 'Wuffdrache', emoji: '🐾', sprite_key: 'wuffdrache', spawn_rule: 'rare', color_theme: '#fbbf24', tier_order: 7, base_hp: 50, base_attack: 5, base_defense: 1, gold_reward_base: 10, xp_reward_base: 8, wood_reward_base: 1, stone_reward_base: 1, crystal_reward_base: 1, essence_reward_base: 1, is_boss: false, active: true },
+  /* Seltene Event-Easter-Egg-Drachen (0,1% je Drache, siehe
+     bkmpIdleSelectDragonKindId) - base_hp/base_attack werden fuer diese
+     spawn_rule ('event_easter') komplett ignoriert (siehe
+     bkmpIdleEventDragonScaledStats), die Belohnungsbasis (gold/xp/...) gilt
+     aber normal weiter. */
+  { id: 'shenloss', name: 'Shenloss', emoji: '🐲', sprite_key: 'shenloss', spawn_rule: 'event_easter', color_theme: '#22c55e', tier_order: 8, base_hp: 1, base_attack: 1, base_defense: 2, gold_reward_base: 250, xp_reward_base: 250, wood_reward_base: 10, stone_reward_base: 10, crystal_reward_base: 20, essence_reward_base: 15, is_boss: false, active: true },
+  { id: 'liber', name: 'Ganz Liber Drache', emoji: '🐉', sprite_key: 'liber', spawn_rule: 'event_easter', color_theme: '#e5e7eb', tier_order: 9, base_hp: 1, base_attack: 1, base_defense: 2, gold_reward_base: 250, xp_reward_base: 250, wood_reward_base: 10, stone_reward_base: 10, crystal_reward_base: 20, essence_reward_base: 15, is_boss: false, active: true }
 ];
 
 /* ---------------- State ---------------- */
@@ -241,6 +320,14 @@ let bkmpIdleModalOpen = false;
 let bkmpIdleSyncPending = false;
 let bkmpIdleSyncTimer = null;
 let bkmpIdleConfigLoaded = false;
+/* Sieg-Status der seltenen Event-Drachen (siehe supabase-idle-event-
+   dragons.sql), unabhaengig von bkmpIdleState geladen (eigene Tabelle,
+   eigenes try/catch - gleiches Vorsichtsprinzip wie beim Prestige-Stand).
+   bkmpIdleEventPauseActive haelt den KOMPLETTEN Kampf an, solange das
+   Vorbereitungs-Popup noch nicht bestaetigt wurde (siehe
+   bkmpIdleMaybeShowEventDragonPopup). */
+let bkmpIdleEventDragonState = null;
+let bkmpIdleEventPauseActive = false;
 
 function bkmpIdleDefaultState(name) {
   return {
@@ -298,6 +385,22 @@ async function bkmpIdleLoadOrInitState(name) {
     console.warn('Idle Dorf: Prestige-Fortschritt konnte nicht geladen werden (Migration evtl. noch nicht ausgefuehrt).', e);
     bkmpPrestigeState = { name_key: key, display_name: name, prestige_level: 0, prestige_points: 0, prestige_points_spent: 0, prestige_allocations: {} };
   }
+  bkmpIdleEventDragonState = null;
+  try {
+    const remoteEventDragons = typeof loadIdleEventDragonState === 'function' ? await loadIdleEventDragonState(name) : null;
+    bkmpIdleEventDragonState = remoteEventDragons || { shenloss_defeated: false, liber_defeated: false };
+  } catch (e) {
+    console.warn('Idle Dorf: Event-Drachen-Status konnte nicht geladen werden (Migration evtl. noch nicht ausgefuehrt).', e);
+    bkmpIdleEventDragonState = { shenloss_defeated: false, liber_defeated: false };
+  }
+}
+
+function bkmpIdleEventDragonExcludedIds() {
+  const s = bkmpIdleEventDragonState;
+  const excluded = [];
+  if (s && s.shenloss_defeated) excluded.push('shenloss');
+  if (s && s.liber_defeated) excluded.push('liber');
+  return excluded;
 }
 
 function bkmpIdleRecomputeEffectiveStats() {
@@ -461,7 +564,7 @@ function bkmpIdleGetCachedAchievementFields() {
 function bkmpIdleGetAchievementContextFields() {
   const s = bkmpIdleState;
   if (!s) {
-    return bkmpIdleGetCachedAchievementFields() || { idleDragonKills: 0, idleBossKills: 0, idleLevel: 0, idleGoldEarned: 0, idleSkillPointsSpent: 0, idleBranchesMaxed: 0 };
+    return bkmpIdleGetCachedAchievementFields() || { idleDragonKills: 0, idleBossKills: 0, idleLevel: 0, idleGoldEarned: 0, idleSkillPointsSpent: 0, idleBranchesMaxed: 0, shenlossDefeated: false, liberDefeated: false };
   }
   const fields = {
     idleDragonKills: Number(s.dragon_kills || 0),
@@ -469,7 +572,9 @@ function bkmpIdleGetAchievementContextFields() {
     idleLevel: Number(s.level || 0),
     idleGoldEarned: Number(s.total_gold_earned || 0),
     idleSkillPointsSpent: Number(s.skill_points_spent || 0),
-    idleBranchesMaxed: bkmpIdleCountMaxedBranches()
+    idleBranchesMaxed: bkmpIdleCountMaxedBranches(),
+    shenlossDefeated: Boolean(bkmpIdleEventDragonState && bkmpIdleEventDragonState.shenloss_defeated),
+    liberDefeated: Boolean(bkmpIdleEventDragonState && bkmpIdleEventDragonState.liber_defeated)
   };
   try { localStorage.setItem(BKMP_IDLE_ACHIEVEMENT_CACHE_KEY, JSON.stringify(fields)); } catch (e) {}
   return fields;
@@ -480,11 +585,18 @@ function bkmpIdleGetAchievementContextFields() {
 const BKMP_IDLE_SPRITE_CLASS_PREFIX = 'idle-sprite-';
 
 function bkmpIdleSpawnDragon() {
-  bkmpIdleCurrentDragon = bkmpIdleDragonStatsAt(bkmpIdleState.current_dragon_index, bkmpIdleDragonDefs, bkmpIdleGetMergedDragonScalingCfg());
+  bkmpIdleCurrentDragon = bkmpIdleDragonStatsAt(
+    bkmpIdleState.current_dragon_index,
+    bkmpIdleDragonDefs,
+    bkmpIdleGetMergedDragonScalingCfg(),
+    bkmpIdleState.name_key,
+    bkmpIdleEventDragonExcludedIds(),
+    bkmpIdleEffectiveStats
+  );
   if (!bkmpIdleCurrentDragon) return;
   bkmpIdleCurrentDragon.hp = bkmpIdleCurrentDragon.maxHp;
   const nameEl = document.getElementById('idleDragonName');
-  if (nameEl) nameEl.textContent = `${bkmpIdleCurrentDragon.isBoss ? '👑 BOSS: ' : ''}${bkmpIdleCurrentDragon.name} (Stufe ${bkmpIdleFormatStage(bkmpIdleCurrentDragon.killIndex)})`;
+  if (nameEl) nameEl.textContent = `${bkmpIdleCurrentDragon.isBoss ? '👑 BOSS: ' : ''}${bkmpIdleCurrentDragon.isEventDragon ? '✨ ' : ''}${bkmpIdleCurrentDragon.name} (Stufe ${bkmpIdleFormatStage(bkmpIdleCurrentDragon.killIndex)})`;
   const sprite = document.getElementById('idleDragonSprite');
   if (sprite) {
     [...sprite.classList].filter(c => c.startsWith(BKMP_IDLE_SPRITE_CLASS_PREFIX)).forEach(c => sprite.classList.remove(c));
@@ -495,9 +607,55 @@ function bkmpIdleSpawnDragon() {
   if (dragonEl) {
     dragonEl.classList.toggle('idle-dragon-boss', bkmpIdleCurrentDragon.bossTier === 'boss');
     dragonEl.classList.toggle('idle-dragon-miniboss', bkmpIdleCurrentDragon.bossTier === 'miniboss');
+    dragonEl.classList.toggle('idle-dragon-event', Boolean(bkmpIdleCurrentDragon.isEventDragon));
   }
   bkmpIdleUpdateDragonHpBar();
   bkmpIdleRenderStageBar();
+  bkmpIdleMaybeShowEventDragonPopup();
+}
+
+/* ---------------- Vorbereitungs-Popup: seltene Event-Drachen ----------------
+   Erscheint bei JEDEM Auftauchen eines noch nicht besiegten Event-Drachen
+   (nicht nur beim ersten Mal - siehe bkmpIdleSpawnDragon, das diese
+   Funktion nach jedem Spawn aufruft). Solange bkmpIdleEventPauseActive
+   true ist, wird der komplette Kampf angehalten: der Tick-Loop wird
+   gestoppt (bkmpIdleStartLoop() selbst weigert sich ausserdem, waehrend
+   der Pause einen neuen Loop zu starten - zentrale Sperre gegen jeden
+   Aufrufer, auch bkmpRaidStopCombatView()), Klicks auf den Drachen werden
+   ignoriert (bkmpIdleHandleDragonClick) und ein Stufenwechsel ist
+   gesperrt (bkmpIdleJumpToStage). */
+const BKMP_IDLE_EVENT_DRAGON_POPUPS = {
+  shenloss: { title: 'Shenloss erscheint!', message: 'Ehm Kaledoss? Bist du das?', button: 'Ich bin bereit! Angriff!' },
+  liber: { title: 'Ganz Liber Drache erscheint!', message: 'Ehm Liber, hast du jetzt eine Drachen Form?', button: 'Ich bin bereit! Angriff!' }
+};
+
+function bkmpIdleMaybeShowEventDragonPopup() {
+  const d = bkmpIdleCurrentDragon;
+  const overlay = document.getElementById('idleEventDragonOverlay');
+  if (!d || !d.isEventDragon || bkmpIdleEventDragonExcludedIds().includes(d.eventDragonKey)) {
+    bkmpIdleEventPauseActive = false;
+    if (overlay) overlay.classList.remove('visible');
+    return;
+  }
+  const cfg = BKMP_IDLE_EVENT_DRAGON_POPUPS[d.eventDragonKey];
+  if (!cfg) { bkmpIdleEventPauseActive = false; return; }
+  bkmpIdleEventPauseActive = true;
+  bkmpIdleStopLoop();
+  const titleEl = document.getElementById('idleEventDragonTitle');
+  const msgEl = document.getElementById('idleEventDragonMessage');
+  const btnEl = document.getElementById('idleEventDragonReadyBtn');
+  if (titleEl) titleEl.textContent = cfg.title;
+  if (msgEl) msgEl.textContent = cfg.message;
+  if (btnEl) btnEl.textContent = cfg.button;
+  if (overlay) overlay.classList.add('visible');
+}
+
+function bkmpIdleConfirmEventDragonReady() {
+  if (!bkmpIdleEventPauseActive) return;
+  bkmpIdleEventPauseActive = false;
+  const overlay = document.getElementById('idleEventDragonOverlay');
+  if (overlay) overlay.classList.remove('visible');
+  if (bkmpIdleModalOpen) bkmpIdleStartLoop();
 }
 
 function bkmpIdleAddXp(amount) {
@@ -520,7 +678,34 @@ function bkmpIdleAddXp(amount) {
   if (leveled) bkmpIdleRecomputeEffectiveStats();
 }
 
+/* Meldet einen Sieg gegen einen Event-Drachen serverseitig (siehe
+   idle_claim_event_dragon_victory() in supabase-idle-event-dragons.sql) -
+   einziger Weg, shenloss_defeated/liber_defeated dauerhaft zu setzen.
+   Aktualisiert bei Erfolg sofort den lokalen Cache, damit der Titel ohne
+   Neuladen sichtbar wird und der Drache ab sofort nie wieder spawnt. */
+async function bkmpIdleClaimEventDragonVictory(defeatedDragon) {
+  if (!defeatedDragon || !defeatedDragon.isEventDragon) return;
+  const key = defeatedDragon.eventDragonKey;
+  try {
+    const result = typeof idleClaimEventDragonVictory === 'function'
+      ? await idleClaimEventDragonVictory(bkmpIdleState.name_key, key)
+      : null;
+    if (!result || !result.newly_defeated) return;
+    if (!bkmpIdleEventDragonState) bkmpIdleEventDragonState = { shenloss_defeated: false, liber_defeated: false };
+    if (key === 'shenloss') bkmpIdleEventDragonState.shenloss_defeated = true;
+    else if (key === 'liber') bkmpIdleEventDragonState.liber_defeated = true;
+    bkmpIdleGetAchievementContextFields();
+    const titleName = key === 'shenloss' ? 'DragonBall Herrscher' : 'Du hast ihn besiegt.';
+    bkmpIdleLog(`🏆 ${defeatedDragon.name} besiegt! Titel „${titleName}" dauerhaft freigeschaltet!`);
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`🎉 ${defeatedDragon.name} besiegt! Neuer Titel: „${titleName}"`, 4500);
+    if (typeof renderAchievementBadge === 'function') renderAchievementBadge();
+  } catch (e) {
+    console.warn('Idle Dorf: Sieg gegen Event-Drache konnte nicht gespeichert werden.', e);
+  }
+}
+
 function bkmpIdleHandleDragonDefeated() {
+  const defeatedEventDragon = bkmpIdleCurrentDragon && bkmpIdleCurrentDragon.isEventDragon ? bkmpIdleCurrentDragon : null;
   const rewards = bkmpIdleRewardsAt(bkmpIdleCurrentDragon, bkmpIdleEffectiveStats, bkmpIdleGetMergedRewardScalingCfg());
   bkmpIdleState.gold += rewards.gold;
   bkmpIdleState.total_gold_earned += rewards.gold;
@@ -548,6 +733,7 @@ function bkmpIdleHandleDragonDefeated() {
      nachgeladen war. */
   bkmpIdleGetAchievementContextFields();
   bkmpIdleQueueSync();
+  if (defeatedEventDragon) bkmpIdleClaimEventDragonVictory(defeatedEventDragon);
 }
 
 function bkmpIdleHandleDefeat() {
@@ -665,6 +851,11 @@ function bkmpIdleSpawnIceBlock() {
 }
 
 function bkmpIdleStartLoop() {
+  /* Zentrale Sperre: solange das Vorbereitungs-Popup eines Event-Drachen
+     noch nicht bestaetigt wurde, darf der Kampf-Loop unter KEINEN
+     Umstaenden laufen - auch nicht ueber Umwege wie
+     bkmpRaidStopCombatView()'s "Auto-Loop wieder anschalten"-Logik. */
+  if (bkmpIdleEventPauseActive) return;
   bkmpIdleStopLoop();
   const ms = (bkmpIdleEffectiveStats && bkmpIdleEffectiveStats.tickIntervalMs) || 900;
   bkmpIdleLoopTimer = window.setInterval(bkmpIdleTick, ms);
@@ -792,6 +983,9 @@ function bkmpIdleToggleAutoAdvance() {
    pfad gibt. */
 function bkmpIdleJumpToStage(targetIndex) {
   if (!bkmpIdleState) return;
+  /* Kein Stufenwechsel/Ueberspringen waehrend das Vorbereitungs-Popup
+     eines Event-Drachen auf Bestaetigung wartet. */
+  if (bkmpIdleEventPauseActive) return;
   const highest = Number(bkmpIdleState.highest_dragon_index || 0);
   const target = Math.max(0, Math.min(highest, Math.floor(Number(targetIndex) || 0)));
   if (target === Number(bkmpIdleState.current_dragon_index || 0)) return;
@@ -1495,6 +1689,12 @@ async function bkmpIdleOpenModal() {
   bkmpIdleRecomputeEffectiveStats();
 
   if (!bkmpIdleCurrentDragon) bkmpIdleSpawnDragon();
+  /* Auch wenn der Drache schon im Speicher war (Fenster nur geschlossen,
+     nicht neu geladen) - erneut pruefen, ob es sich um einen noch nicht
+     bestaetigten Event-Drachen handelt. Das Popup MUSS bei jedem
+     Wiedereroeffnen des Fensters erneut erscheinen, solange der Kampf noch
+     nicht mit dem Bereit-Button gestartet wurde (siehe Auftrag Abschnitt 3). */
+  bkmpIdleMaybeShowEventDragonPopup();
   bkmpIdleRenderHud();
   bkmpIdleRenderStageBar();
   bkmpIdleUpdateVillageHpBar();
@@ -1530,11 +1730,45 @@ function bkmpIdlePreloadStateIfNamed() {
   bkmpRaidRefreshAchievementCache();
 }
 
-/* ---------------- Drachen anklicken: Extraschaden + Autoklicker-Schutz ----------------
-   Gleitendes 1-Sekunden-Fenster der letzten Klick-Zeitpunkte: mehr als 10
-   Klicks/Sekunde => Extraschaden fuer ein paar Sekunden deaktiviert, ein
-   einmaliger Hinweis-Toast (bkmpShowJannikToast, aus index.html - siehe
-   Kommentar oben zur Skript-Reihenfolge), danach automatisch wieder normal. */
+/* ---------------- Autoklicker-Erkennung: Muster statt reiner Frequenz ----------------
+   Vorher: feste Grenze "mehr als 10 Klicks/Sekunde = Autoklicker" - hat
+   schnelle, aber echte Spieler faelschlich blockiert (Menschen KOENNEN
+   kurzzeitig >10 Klicks/s erreichen). Jetzt: bewertet stattdessen, wie
+   GLEICHMAESSIG die Abstaende zwischen den letzten Klicks sind
+   (Variationskoeffizient = Standardabweichung / Mittelwert der Intervalle).
+   Ein Mensch klickt auch beim schnellen, konzentrierten Klicken nie ueber
+   laengere Zeit in nahezu identischen Millisekunden-Abstaenden - ein
+   Autoklicker/Makro dagegen schon (meist Abweichungen im niedrigen
+   Prozentbereich statt der natuerlichen ~20-40%+ eines Menschen).
+   Reagiert erst, wenn (a) genug Datenpunkte gesammelt wurden (kein
+   Fehlalarm durch einen einzelnen auffaelligen Abstand), UND (b) die
+   Klicks auch schnell genug sind (langsames, zufaellig gleichmaessiges
+   Klicken ist weder verdaechtig noch spielerisch ausnutzbar) - erst wenn
+   BEIDE Indikatoren gemeinsam zutreffen, gilt es als Autoklicker-Muster.
+   Reaktion bleibt wie zuvor: kurzzeitige Sperre + Hinweis-Toast, danach
+   automatisch wieder frei - keine dauerhafte Sperre. Gemeinsam genutzt von
+   Idle-Dorf-Klicks (bkmpIdleHandleDragonClick) UND Raid-Klicks
+   (bkmpRaidHandleBossClick), damit beide Stellen exakt dasselbe,
+   einmal getestete Muster nutzen. */
+const BKMP_AUTOCLICK_WINDOW = 14;
+const BKMP_AUTOCLICK_MIN_SAMPLES = 10;
+const BKMP_AUTOCLICK_MAX_AVG_INTERVAL_MS = 260;
+const BKMP_AUTOCLICK_CV_THRESHOLD = 0.12;
+const BKMP_AUTOCLICK_LOCK_MS = 4000;
+const BKMP_AUTOCLICK_TOAST = 'Deine Klicks wirken verdächtig gleichmäßig – kurze Pause fürs Handgelenk 😉';
+
+function bkmpIdleDetectAutoclickPattern(timestamps) {
+  if (!timestamps || timestamps.length < BKMP_AUTOCLICK_MIN_SAMPLES) return false;
+  const recent = timestamps.slice(-BKMP_AUTOCLICK_WINDOW);
+  const intervals = [];
+  for (let i = 1; i < recent.length; i++) intervals.push(recent[i] - recent[i - 1]);
+  const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+  if (!(mean > 0) || mean > BKMP_AUTOCLICK_MAX_AVG_INTERVAL_MS) return false;
+  const variance = intervals.reduce((sum, v) => sum + (v - mean) * (v - mean), 0) / intervals.length;
+  const coefficientOfVariation = Math.sqrt(variance) / mean;
+  return coefficientOfVariation < BKMP_AUTOCLICK_CV_THRESHOLD;
+}
+
 let bkmpIdleClickTimestamps = [];
 let bkmpIdleClickLockedUntil = 0;
 
@@ -1550,18 +1784,20 @@ function bkmpIdleSpawnClickDamage(amount) {
 
 function bkmpIdleHandleDragonClick() {
   if (!bkmpIdleModalOpen || !bkmpIdleState || !bkmpIdleCurrentDragon || !bkmpIdleEffectiveStats) return;
+  /* Kein Klickschaden, solange das Vorbereitungs-Popup eines Event-
+     Drachen noch nicht bestaetigt wurde. */
+  if (bkmpIdleEventPauseActive) return;
 
   const now = Date.now();
+  if (now < bkmpIdleClickLockedUntil) return;
   bkmpIdleClickTimestamps.push(now);
-  bkmpIdleClickTimestamps = bkmpIdleClickTimestamps.filter(t => now - t <= 1000);
-  if (bkmpIdleClickTimestamps.length > 10) {
-    if (now > bkmpIdleClickLockedUntil) {
-      bkmpIdleClickLockedUntil = now + 4000;
-      if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Na wer will denn hier einen Autoklicker benutzen? 😉', 3200);
-    }
+  bkmpIdleClickTimestamps = bkmpIdleClickTimestamps.filter(t => now - t <= 8000).slice(-BKMP_AUTOCLICK_WINDOW);
+  if (bkmpIdleDetectAutoclickPattern(bkmpIdleClickTimestamps)) {
+    bkmpIdleClickLockedUntil = now + BKMP_AUTOCLICK_LOCK_MS;
+    bkmpIdleClickTimestamps = [];
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(BKMP_AUTOCLICK_TOAST, 3200);
     return;
   }
-  if (now < bkmpIdleClickLockedUntil) return;
 
   const clickDamage = Math.max(1, Math.round(bkmpIdleEffectiveStats.attack * (0.12 + (bkmpIdleEffectiveStats.clickDamagePct || 0) / 100)));
   bkmpIdleCurrentDragon.hp = Math.max(0, bkmpIdleCurrentDragon.hp - clickDamage);
@@ -1964,16 +2200,15 @@ async function bkmpRaidBossPoll() {
 function bkmpRaidHandleBossClick() {
   if (!bkmpRaidState || bkmpRaidState.status !== 'fighting' || !bkmpIdleEffectiveStats) return;
   const now = Date.now();
+  if (now < bkmpRaidClickLockedUntil) return;
   bkmpRaidClickTimestamps.push(now);
-  bkmpRaidClickTimestamps = bkmpRaidClickTimestamps.filter(t => now - t <= 1000);
-  if (bkmpRaidClickTimestamps.length > 10) {
-    if (now > bkmpRaidClickLockedUntil) {
-      bkmpRaidClickLockedUntil = now + 4000;
-      if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Na wer will denn hier einen Autoklicker benutzen? 😉', 3200);
-    }
+  bkmpRaidClickTimestamps = bkmpRaidClickTimestamps.filter(t => now - t <= 8000).slice(-BKMP_AUTOCLICK_WINDOW);
+  if (bkmpIdleDetectAutoclickPattern(bkmpRaidClickTimestamps)) {
+    bkmpRaidClickLockedUntil = now + BKMP_AUTOCLICK_LOCK_MS;
+    bkmpRaidClickTimestamps = [];
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(BKMP_AUTOCLICK_TOAST, 3200);
     return;
   }
-  if (now < bkmpRaidClickLockedUntil) return;
 
   const isCrit = Math.random() * 100 < bkmpIdleEffectiveStats.critChance;
   const clickDamage = Math.max(1, Math.round(bkmpIdleEffectiveStats.attack * (0.12 + (bkmpIdleEffectiveStats.clickDamagePct || 0) / 100) * (isCrit ? Math.max(1, bkmpIdleEffectiveStats.critDamage / 100) : 1)));
@@ -2044,6 +2279,16 @@ async function bkmpRaidShowResult() {
   const won = bkmpRaidState.status === 'won';
   const flawless = won && bkmpRaidState.cityMaxHp > 0 && bkmpRaidState.cityHp >= bkmpRaidState.cityMaxHp;
   const totalDamage = participants.reduce((sum, p) => sum + p.damageDealt, 0);
+  /* Persoenlicher Zerator-Belohnungscode: reine Abfrage einer serverseitig
+     (raid_finish(), 5%-Wurf NUR bei echtem Sieg) bereits fertig erzeugten
+     Zeile - der Client erzeugt hier nichts selbst, ein erneutes Aufrufen
+     dieser Funktion (z.B. durch Neuladen der Seite waehrend das
+     Ergebnis-Fenster noch offen ist) liefert daher zuverlaessig denselben
+     Code statt einen neuen zu erzeugen. */
+  let rewardCode = null;
+  if (won && myName) {
+    try { rewardCode = await loadRaidRewardCode(bkmpRaidState.id, myName); } catch (e) { console.warn('Raid: Belohnungscode konnte nicht geladen werden.', e); }
+  }
   if (battlefield) battlefield.style.display = 'none';
   if (listEl) listEl.style.display = 'none';
   resultCard.style.display = '';
@@ -2061,8 +2306,24 @@ async function bkmpRaidShowResult() {
       <div class="raid-result-stat"><div class="raid-result-stat-label">${won ? 'Stadt-HP übrig' : 'Boss-HP übrig'}</div><div class="raid-result-stat-value">${bkmpIdleFormatNumber(won ? bkmpRaidState.cityHp : bkmpRaidState.bossHp)}</div></div>
     </div>
     ${won ? `<div class="raid-result-rewards"><span>💰 +${bkmpIdleFormatNumber(5000)}</span><span>💎 +25</span><span>✨ +2000</span></div>` : ''}
+    ${rewardCode ? `
+    <div class="raid-result-zerator-code">
+      <div class="raid-result-zerator-title">🎁 Plushie! Hier ist dein Code:</div>
+      <div class="raid-result-zerator-code-row">
+        <span class="raid-result-zerator-code-value" id="raidZeratorCodeValue">${escapeHtml(rewardCode.code)}</span>
+        <button type="button" class="btn-nein" id="raidZeratorCodeCopyBtn">Kopieren</button>
+      </div>
+      <p class="raid-result-zerator-hint">Dieser Code kann nur einmal eingelöst werden – am besten gleich sichern.</p>
+    </div>` : ''}
     <button type="button" class="btn-ja" id="raidResultCloseBtn">Schließen</button>
   `;
+  const copyBtn = document.getElementById('raidZeratorCodeCopyBtn');
+  if (copyBtn) copyBtn.addEventListener('click', () => {
+    const text = rewardCode ? rewardCode.code : '';
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => { copyBtn.textContent = 'Kopiert!'; window.setTimeout(() => { copyBtn.textContent = 'Kopieren'; }, 1800); }).catch(() => {});
+    }
+  });
   const closeBtn = document.getElementById('raidResultCloseBtn');
   if (closeBtn) closeBtn.addEventListener('click', () => {
     bkmpRaidStopCombatView();
@@ -2147,6 +2408,8 @@ function bkmpIdleInit() {
   const dragonEl = document.getElementById('idleDragon');
   if (dragonEl) { dragonEl.classList.add('idle-dragon-clickable'); dragonEl.addEventListener('click', bkmpIdleHandleDragonClick); }
   bkmpIdleWireStagePicker();
+  const eventDragonReadyBtn = document.getElementById('idleEventDragonReadyBtn');
+  if (eventDragonReadyBtn) eventDragonReadyBtn.addEventListener('click', bkmpIdleConfirmEventDragonReady);
   /* Leertaste als Alternative zum Maus-Klick auf den Drachen/Weltboss -
      Autoklicker-Schutz greift ueber dieselben Handler-Funktionen genauso,
      da hier nur der jeweilige Klick-Handler aufgerufen wird, keine eigene
@@ -2243,7 +2506,16 @@ window.BKMP_IDLE_TITLES = [
   { id: 'idletitle_boss50', name: 'Boss-Vernichter', desc: 'Besiegt 50 Bosse.', unlockCustom: ctx => ctx.idleBossKills >= 50, effectType: 'crit_chance_flat', effectValue: 3 },
   { id: 'idletitle_branch1', name: 'Spezialist', desc: 'Ein Skilltree-Zweig maximiert.', unlockCustom: ctx => ctx.idleBranchesMaxed >= 1, effectType: 'defense_flat', effectValue: 2 },
   { id: 'idletitle_branch3', name: 'Vielseitiger Anführer', desc: 'Drei Skilltree-Zweige maximiert.', unlockCustom: ctx => ctx.idleBranchesMaxed >= 3, effectType: 'defense_flat', effectValue: 5 },
-  { id: 'idletitle_branchall', name: 'Skilltree-Meister', desc: 'Alle Skilltree-Zweige maximiert.', unlockCustom: ctx => ctx.idleBranchesMaxed >= 5, effectType: 'hp_flat', effectValue: 20 }
+  { id: 'idletitle_branchall', name: 'Skilltree-Meister', desc: 'Alle Skilltree-Zweige maximiert.', unlockCustom: ctx => ctx.idleBranchesMaxed >= 5, effectType: 'hp_flat', effectValue: 20 },
+  /* Seltene Event-Drachen (siehe bkmpIdleMaybeShowEventDragonPopup) - der
+     Sieg-Status kommt aus der server-seitig abgesicherten
+     idle_event_dragon_state-Tabelle (shenlossDefeated/liberDefeated,
+     siehe bkmpIdleGetAchievementContextFields), nicht aus einem lokal
+     faelschbaren Flag. Bewusst ohne effectType - reine Sammlungs-/
+     Auszeichnungs-Titel fuer diese beiden Easter-Egg-Kaempfe, kein
+     zusaetzlicher Kampfbonus. */
+  { id: 'idletitle_shenloss', name: 'DragonBall Herrscher', desc: 'Shenloss im Kampf besiegt.', unlockCustom: ctx => ctx.shenlossDefeated },
+  { id: 'idletitle_liber', name: 'Du hast ihn besiegt.', desc: 'Den Ganz Liber Drache im Kampf besiegt.', unlockCustom: ctx => ctx.liberDefeated }
 ];
 
 /* Summiert die Boni aller FREIGESCHALTETEN (nicht nur des aktiv
