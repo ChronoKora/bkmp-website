@@ -2600,7 +2600,7 @@ async function createPlushieCodes(rows) {
 const BKMP_IDLE_PLAYER_STATE_COLUMNS = `name_key, display_name, level, xp, gold, wood, stone, crystals, essence,
   total_gold_earned, attack, defense, hp, crit_chance, crit_damage, gold_bonus, xp_bonus, loot_bonus,
   skill_points_available, skill_points_spent, skill_allocations, upgrade_purchases, dragon_kills, boss_kills,
-  current_dragon_index, highest_dragon_index, auto_advance, playtime_seconds, last_seen_at, last_offline_claim, last_skilltree_reset_at, updated_at`;
+  current_dragon_index, highest_dragon_index, prestige_stage_offset, auto_advance, playtime_seconds, last_seen_at, last_offline_claim, last_skilltree_reset_at, updated_at`;
 
 async function loadIdleDragons() {
   const client = bkmpGetSupabaseClient();

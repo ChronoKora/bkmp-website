@@ -339,7 +339,7 @@ function bkmpIdleDefaultState(name) {
     gold_bonus: 0, xp_bonus: 0, loot_bonus: 0,
     skill_points_available: 0, skill_points_spent: 0,
     skill_allocations: {}, upgrade_purchases: {},
-    dragon_kills: 0, boss_kills: 0, current_dragon_index: 0, highest_dragon_index: 0, auto_advance: true,
+    dragon_kills: 0, boss_kills: 0, current_dragon_index: 0, highest_dragon_index: 0, prestige_stage_offset: 0, auto_advance: true,
     playtime_seconds: 0,
     last_seen_at: new Date().toISOString(),
     last_offline_claim: {},
@@ -1001,18 +1001,35 @@ function bkmpIdleJumpToHighestStage() {
   bkmpIdleJumpToStage(Number(bkmpIdleState.highest_dragon_index || 0));
 }
 
+/* Lebenszeit-Gesamtzahl erreichter Stufen ueber alle Prestige-Auffstiege
+   hinweg: Summe aller vor frueheren Auffstiegen erreichten Hoechststufen
+   (prestige_stage_offset, siehe bkmpIdlePerformPrestige) plus die im
+   aktuellen Lauf erreichte Hoechststufe. Als reine Zahl (nicht im "Akt-
+   Stufe"-Format), da genau das gewuenscht war: z.B. Aufstieg bei Stufe
+   10-0 (=100) + spaeter im neuen Lauf Stufe 1-0 (=10) erreicht ergibt hier
+   110, nicht "11-0". */
+function bkmpIdleLifetimeStageCount() {
+  if (!bkmpIdleState) return 0;
+  return Number(bkmpIdleState.prestige_stage_offset || 0) + Number(bkmpIdleState.highest_dragon_index || 0);
+}
+
 function bkmpIdleRenderStageBar() {
   const el = document.getElementById('idleStageBar');
   if (!el || !bkmpIdleState) return;
   const current = Number(bkmpIdleState.current_dragon_index || 0);
   const highest = Number(bkmpIdleState.highest_dragon_index || 0);
   const autoAdvance = bkmpIdleState.auto_advance !== false;
+  /* Waehrend das Vorbereitungs-Popup eines Event-Drachen offen ist, duerfen
+     Stufensprung-Buttons nicht nur wirkungslos sein (siehe
+     bkmpIdleJumpToStage/bkmpIdleOpenStagePicker), sondern sollen das auch
+     sichtbar zeigen statt wie normale, aktive Buttons auszusehen. */
+  const jumpDisabled = bkmpIdleEventPauseActive ? 'disabled title="Erst nach Bestätigung des Kampfes möglich"' : '';
   el.innerHTML = `
-    <span class="idle-stage-label">Stufe <strong>${bkmpIdleFormatStage(current)}</strong>${highest > current ? ` · Beste Stufe: <strong>${bkmpIdleFormatStage(highest)}</strong>` : ''}</span>
+    <span class="idle-stage-label">Stufe <strong>${bkmpIdleFormatStage(current)}</strong> · Insgesamt erreichte Stufen: <strong>${bkmpIdleFormatNumber(bkmpIdleLifetimeStageCount())}</strong></span>
     <div class="idle-stage-buttons">
       <button type="button" class="btn-nein idle-stage-btn" id="idleStageAutoAdvanceBtn">${autoAdvance ? '⬆️ Steigt automatisch auf' : '📍 Bleibt auf dieser Stufe'}</button>
-      ${highest > current ? '<button type="button" class="btn-ja idle-stage-btn" id="idleStageJumpBtn">Zur besten Stufe springen</button>' : ''}
-      <button type="button" class="btn-nein idle-stage-btn" id="idleStagePickerBtn">🗺️ Zu bestimmter Stufe wechseln</button>
+      ${highest > current ? `<button type="button" class="btn-ja idle-stage-btn" id="idleStageJumpBtn" ${jumpDisabled}>Zur besten Stufe springen</button>` : ''}
+      <button type="button" class="btn-nein idle-stage-btn" id="idleStagePickerBtn" ${jumpDisabled}>🗺️ Zu bestimmter Stufe wechseln</button>
     </div>`;
   const autoBtn = document.getElementById('idleStageAutoAdvanceBtn');
   if (autoBtn) autoBtn.addEventListener('click', bkmpIdleToggleAutoAdvance);
@@ -1056,6 +1073,11 @@ function bkmpIdleRenderStagePickerBody() {
 
 function bkmpIdleOpenStagePicker() {
   if (!bkmpIdleState) return;
+  /* Kein Stufenwechsel waehrend das Vorbereitungs-Popup eines Event-
+     Drachen auf Bestaetigung wartet - siehe bkmpIdleJumpToStage(). Das
+     Popup selbst gar nicht erst oeffnen, statt es beim Klick auf eine
+     Stufe einfach wirkungslos wieder zu schliessen (verwirrend). */
+  if (bkmpIdleEventPauseActive) return;
   bkmpIdleRenderStagePickerBody();
   const overlay = document.getElementById('idleStagePickerOverlay');
   if (overlay) overlay.classList.add('visible');
@@ -1439,8 +1461,9 @@ async function bkmpIdleFlushSync() {
 }
 
 /* ============================================================
-   Prestige: dauerhafter Aufstieg, sobald Stufe BKMP_PRESTIGE_REQUIRED_STAGE
-   erreicht ist. Setzt den laufenden Durchgang zurueck (Level/Gold/Rohstoffe/
+   Prestige: dauerhafter Aufstieg, sobald die per bkmpPrestigeRequiredStage()
+   berechnete Ziel-Stufe erreicht ist (steigt mit jeder Prestige-Stufe:
+   100/150/200/... - siehe dort). Setzt den laufenden Durchgang zurueck (Level/Gold/Rohstoffe/
    Skilltree/Upgrades/Drachen-Fortschritt), vergibt dafuer Prestige-Punkte
    fuer einen KLEINEN, DAUERHAFTEN Bonusbaum (idle_prestige_state, siehe
    supabase-idle-prestige.sql) sowie einen sofortigen, festen Bonus pro
@@ -1448,7 +1471,17 @@ async function bkmpIdleFlushSync() {
    (Spielzeit, Gesamt-Gold-verdient, Erfolge/Titel/Kosmetiken) bleiben
    unangetastet - nur der aktuelle "Lauf" wird zurueckgesetzt. */
 
-const BKMP_PRESTIGE_REQUIRED_STAGE = 100;
+/* Die noetige Stufe steigt mit jedem Aufstieg um 50 (Stufe 100/"10-0" fuer
+   den ersten Aufstieg, 150/"15-0" fuer den zweiten, 200/"20-0" fuer den
+   dritten, ...) - vorher war die Schwelle immer fix bei 100, wodurch jeder
+   weitere Aufstieg dank der bereits erspielten dauerhaften Boni (Prestige-
+   Baum + feste +5%/Stufe) spuerbar SCHNELLER wurde statt wie in den
+   meisten Idle-Games mit jeder Stufe ein eigener, groesserer Meilenstein
+   zu bleiben. prestigeLevel = bereits abgeschlossene Aufstiege (0 vor dem
+   ersten). */
+function bkmpPrestigeRequiredStage(prestigeLevel) {
+  return 100 + Math.max(0, Math.floor(Number(prestigeLevel) || 0)) * 50;
+}
 
 /* Werte bewusst hoeher als eine erste Fassung (3-5%/Rang): bei den Kosten
    1,2,3...N Punkte pro Rang kostet ein voll ausgebauter 10-Rang-Knoten 55
@@ -1483,7 +1516,9 @@ function bkmpPrestigeEffectTotals(allocations) {
 }
 
 function bkmpPrestigeEligible() {
-  return Boolean(bkmpIdleState) && Number(bkmpIdleState.highest_dragon_index || 0) >= BKMP_PRESTIGE_REQUIRED_STAGE;
+  if (!bkmpIdleState) return false;
+  const level = bkmpPrestigeState ? Number(bkmpPrestigeState.prestige_level || 0) : 0;
+  return Number(bkmpIdleState.highest_dragon_index || 0) >= bkmpPrestigeRequiredStage(level);
 }
 
 /* Faustformel: (Stufe/20)^1.15, abgerundet - Stufe 100 -> 6 Punkte,
@@ -1528,9 +1563,9 @@ async function bkmpIdlePerformPrestige() {
   const bonusPct = bkmpPrestigeState ? (bkmpPrestigeEffectTotals(bkmpPrestigeState.prestige_allocations).prestige_point_bonus_pct || 0) : 0;
   const pointsGained = Math.max(1, Math.round(bkmpPrestigePointsForStage(stage) * (1 + bonusPct / 100)));
   const confirmed = window.confirm(
-    `Jetzt aufsteigen? Level, Gold, Rohstoffe, Skilltree, Upgrades und Drachen-Fortschritt werden zurückgesetzt.\n\n` +
+    `Jetzt aufsteigen? Level, Gold, Rohstoffe, Skilltree, Upgrades und deine aktuelle Stufen-Position werden zurückgesetzt.\n\n` +
     `Du erhältst dafür ${pointsGained} Prestige-Punkte (dauerhaft, für den permanenten Bonusbaum) ` +
-    `und einen dauerhaften +5%-Bonus auf Angriff/Leben/Gold/XP.\n\nErfolge, Titel und Kosmetiken bleiben erhalten.`
+    `und einen dauerhaften +5%-Bonus auf Angriff/Leben/Gold/XP.\n\nErfolge, Titel, Kosmetiken, deine Gesamtzahl besiegter Drachen/Bosse und deine insgesamt erreichten Stufen bleiben erhalten.`
   );
   if (!confirmed) return;
 
@@ -1547,8 +1582,16 @@ async function bkmpIdlePerformPrestige() {
     bkmpIdleState.skill_points_spent = 0;
     bkmpIdleState.skill_allocations = {};
     bkmpIdleState.upgrade_purchases = {};
-    bkmpIdleState.dragon_kills = 0;
-    bkmpIdleState.boss_kills = 0;
+    /* dragon_kills/boss_kills bleiben ab sofort ueber Prestige-Auffstiege
+       hinweg erhalten (nicht mehr zurueckgesetzt) - vorher liess das die
+       Bestenliste (loadIdleLeaderboardStats liest dragon_kills direkt)
+       nach jedem Aufstieg faelschlich wieder bei 0 anfangen, obwohl der
+       Spieler laengst viel mehr Drachen insgesamt besiegt hatte. */
+    /* Die aktuelle Lauf-Stufe VOR dem Reset in den dauerhaften Lebenszeit-
+       Zaehler einrechnen, damit "insgesamt erreichte Stufen" (siehe
+       bkmpIdleRenderStageBar) ueber Auffstiege hinweg weiterzaehlt statt
+       auch auf 0 zurueckzufallen. */
+    bkmpIdleState.prestige_stage_offset = Number(bkmpIdleState.prestige_stage_offset || 0) + Number(bkmpIdleState.highest_dragon_index || 0);
     bkmpIdleState.current_dragon_index = 0;
     bkmpIdleState.highest_dragon_index = 0;
     bkmpIdleState.auto_advance = true;
@@ -1588,9 +1631,10 @@ function bkmpIdleRenderPrestigePanel() {
   const panel = document.getElementById('idlePanelPrestige');
   if (!panel || !bkmpIdleState) return;
   const stage = Number(bkmpIdleState.highest_dragon_index || 0);
-  const eligible = bkmpPrestigeEligible();
-  const progressPct = Math.max(0, Math.min(100, (stage / BKMP_PRESTIGE_REQUIRED_STAGE) * 100));
   const level = bkmpPrestigeState ? Number(bkmpPrestigeState.prestige_level || 0) : 0;
+  const requiredStage = bkmpPrestigeRequiredStage(level);
+  const eligible = bkmpPrestigeEligible();
+  const progressPct = Math.max(0, Math.min(100, (stage / requiredStage) * 100));
   const totalPoints = bkmpPrestigeState ? Number(bkmpPrestigeState.prestige_points || 0) : 0;
   const spentPoints = bkmpPrestigeState ? Number(bkmpPrestigeState.prestige_points_spent || 0) : 0;
   const available = Math.max(0, totalPoints - spentPoints);
@@ -1604,11 +1648,11 @@ function bkmpIdleRenderPrestigePanel() {
       ${level > 0 ? `<div class="idle-prestige-bonus-note">Dauerhafter Bonus: +${level * 5}% Angriff/Leben/Gold/XP</div>` : ''}
     </div>
     <div class="idle-prestige-progress-card">
-      <div class="idle-prestige-progress-label">Drachen-Stufe ${stage} / ${BKMP_PRESTIGE_REQUIRED_STAGE} zum Aufsteigen <span class="idle-prestige-progress-hint">(nicht dein Level – die höchste erreichte Drachen-Stufe)</span></div>
+      <div class="idle-prestige-progress-label">Drachen-Stufe ${bkmpIdleFormatStage(stage)} / ${bkmpIdleFormatStage(requiredStage)} zum Aufsteigen <span class="idle-prestige-progress-hint">(nicht dein Level – die höchste erreichte Drachen-Stufe)</span></div>
       <div class="idle-hp-bar"><div class="idle-hp-fill idle-hp-fill-village" style="width:${progressPct}%"></div></div>
       ${eligible
         ? `<button type="button" class="btn-ja idle-prestige-btn" id="idlePrestigeBtn">🌌 Jetzt aufsteigen (+${bkmpIdleFormatNumber(previewGain)} Punkte)</button>`
-        : `<p class="idle-prestige-hint">Erreiche Drachen-Stufe ${BKMP_PRESTIGE_REQUIRED_STAGE}, um dauerhaft aufsteigen zu können.</p>`}
+        : `<p class="idle-prestige-hint">Erreiche Drachen-Stufe ${bkmpIdleFormatStage(requiredStage)}, um dauerhaft aufsteigen zu können.</p>`}
     </div>
     <div class="idle-upgrade-grid">${BKMP_PRESTIGE_UPGRADES.map(def => {
       const rank = Number(alloc[def.id] || 0);

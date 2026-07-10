@@ -4164,6 +4164,7 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 .idle-stage-label strong { color: var(--gold); }
 .idle-stage-buttons { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .idle-stage-btn { padding: 0.35rem 0.7rem; font-size: 0.75rem; white-space: nowrap; }
+.idle-stage-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none !important; }
 
 /* ---- Stufenwahl-Popup ---- */
 .idle-stage-picker-overlay { z-index: 60; }
