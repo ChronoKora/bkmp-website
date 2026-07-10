@@ -240,12 +240,26 @@ async function bkmpLoginAdmin(name, password) {
     email = legacyEmail;
   }
   const userId = data && data.user ? data.user.id : '';
-  const { data: profiles, error: profileError } = await client
+  /* Nur die EIGENE Zeile abfragen (RLS erlaubt seit supabase-admin-profiles-
+     select-fix.sql ohnehin nur noch das) statt frueher ALLE admin_profiles
+     ungefiltert zu holen und client-seitig zu durchsuchen. Die Frage "ist
+     die Tabelle wirklich komplett leer?" (Bootstrap-Fall: allererster Admin
+     ueberhaupt) laesst sich unter RLS nicht mehr aus dieser gefilterten
+     Liste beantworten - dafuer die separate RLS-unabhaengige Zaehlfunktion. */
+  const { data: ownRows, error: ownError } = await client
     .from('admin_profiles')
     .select('id, login_name, role, company_id, can_edit_profile, active')
-    .order('created_at', { ascending: true });
-  if (profileError) throw profileError;
-  if (!profiles || profiles.length === 0) {
+    .eq('auth_user_id', userId)
+    .limit(1);
+  if (ownError) throw ownError;
+  const ownProfile = Array.isArray(ownRows) ? ownRows[0] : null;
+  if (!ownProfile) {
+    const { data: totalCount, error: countError } = await client.rpc('admin_profiles_count');
+    if (countError) throw countError;
+    if (Number(totalCount) > 0) {
+      await client.auth.signOut();
+      throw new Error('Dieser Admin-Zugang ist nicht aktiv.');
+    }
     const { error: insertError } = await client.from('admin_profiles').insert({
       auth_user_id: userId,
       display_name: String(name || '').trim(),
@@ -256,8 +270,7 @@ async function bkmpLoginAdmin(name, password) {
     if (insertError) throw insertError;
     return { session: data, profile: { role: 'admin', active: true } };
   }
-  const ownProfile = profiles.find(profile => profile.login_name === email);
-  if (!ownProfile || !ownProfile.active) {
+  if (!ownProfile.active) {
     await client.auth.signOut();
     throw new Error('Dieser Admin-Zugang ist nicht aktiv.');
   }

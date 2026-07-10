@@ -1467,18 +1467,32 @@ async function bkmpRaidOwnTick() {
   } catch (e) { /* naechster Tick versucht es erneut */ }
 }
 
+function bkmpRaidPlayBossAttackSprite() {
+  const el = document.getElementById('raidBoss');
+  if (!el) return;
+  el.classList.remove('raid-boss-attacking');
+  void el.offsetWidth;
+  el.classList.add('raid-boss-attacking');
+}
+
 async function bkmpRaidBossPoll() {
   if (!bkmpRaidState) return;
   try {
     const result = await tickRaidBossAttack(bkmpRaidState.id);
     if (result) {
+      /* Gegen den vorherigen Stand vergleichen, nicht gegen cityMaxHp -
+         sonst wuerde die Angriffs-FX/-Animation auf JEDEM Poll erneut
+         feuern, sobald die Stadt einmal Schaden hat, statt nur bei einem
+         tatsaechlich NEUEN Treffer in diesem Tick. */
+      const prevCityHp = bkmpRaidState.cityHp;
       bkmpRaidState.cityHp = result.cityHp;
       bkmpRaidState.bossHp = result.bossHp;
       const changed = bkmpRaidState.status !== result.status;
       bkmpRaidState.status = result.status;
-      if (changed || result.cityHp < bkmpRaidState.cityMaxHp) {
+      if (changed || result.cityHp < prevCityHp) {
         bkmpRaidSpawnFx('raid-fx-boss-attack', 'raidCity', null, false);
         bkmpRaidHitFlash('raidCity');
+        bkmpRaidPlayBossAttackSprite();
       }
       bkmpRaidRenderCombat();
       bkmpRaidCheckOutcome();

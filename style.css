@@ -4531,14 +4531,6 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   border-radius: 10px;
   overflow: hidden;
 }
-/* PLATZHALTER: nutzt bis auf Weiteres yaksha-boss.png (gleiche
-   Sheet-Technik wie normale Drachen). Sobald die echte Zerathor-
-   Sprite-Sheet + Stadt-Grafik in assets/dragons/ liegen: sprite_key in
-   raid_bosses (Supabase) auf 'zerathor' pruefen/anpassen, hier die
-   background-image-URL + aspect-ratio auf die echte Datei umstellen
-   (aspect-ratio = 0.8 * Frame-Breite/Frame-Hoehe, siehe Kommentar bei
-   .idle-dragon-sprite weiter oben) und ggf. Flood-Fill-Transparenz
-   anwenden, falls der Hintergrund nicht schon transparent ist. */
 .raid-boss-sprite {
   position: relative;
   width: 100%;
@@ -4553,7 +4545,24 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   filter: drop-shadow(0 10px 18px rgba(239, 68, 68, 0.4));
   transition: transform 0.15s ease;
 }
-.raid-sprite-zerathor { background-image: url('assets/dragons/yaksha-boss.png?v=20260709-transparent2'); aspect-ratio: 1228.8 / 256; }
+/* Eigenes 4-Frame-Sheet (Ruhepose/Atem-startet/voller Atem/Abklingen,
+   gleiche Reihenfolge wie bei den normalen Drachen), aber OHNE die
+   "1./2./3./4."-Beschriftung der anderen Sheets - deshalb volle
+   Frame-Breite statt des 125%/25%-Ausschnitts der Basisklasse. */
+.raid-sprite-zerathor {
+  background-image: url('assets/dragons/zerathor.png?v=20260710-zerathor1');
+  aspect-ratio: 542 / 325;
+  background-size: 100% 400%;
+  background-position-x: 0%;
+}
+@keyframes raidBossSpriteAttackFrames {
+  from { background-position-y: 0%; }
+  to { background-position-y: 100%; }
+}
+.raid-boss-attacking .raid-boss-sprite { animation: raidBossSpriteAttackFrames 0.75s steps(3) 1 forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .raid-boss-attacking .raid-boss-sprite { animation: none; }
+}
 .raid-boss-name { margin-top: 0.4rem; font-size: 0.9rem; font-weight: 800; color: #fbbf24; text-shadow: 0 0 10px rgba(251, 191, 36, 0.6); }
 .raid-boss-level { font-size: 0.7rem; color: var(--muted); }
 
