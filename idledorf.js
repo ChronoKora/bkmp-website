@@ -1740,26 +1740,34 @@ function bkmpIdlePreloadStateIfNamed() {
    laengere Zeit in nahezu identischen Millisekunden-Abstaenden - ein
    Autoklicker/Makro dagegen schon (meist Abweichungen im niedrigen
    Prozentbereich statt der natuerlichen ~20-40%+ eines Menschen).
-   Reagiert erst, wenn (a) genug Datenpunkte gesammelt wurden (kein
-   Fehlalarm durch einen einzelnen auffaelligen Abstand), UND (b) die
-   Klicks auch schnell genug sind (langsames, zufaellig gleichmaessiges
-   Klicken ist weder verdaechtig noch spielerisch ausnutzbar) - erst wenn
-   BEIDE Indikatoren gemeinsam zutreffen, gilt es als Autoklicker-Muster.
+   Reagiert erst, wenn (a) genug Datenpunkte gesammelt wurden UND das
+   gleichmaessige Muster durchgehend mindestens BKMP_AUTOCLICK_MIN_SPAN_MS
+   (30 Sekunden) angehalten hat (kein Fehlalarm durch einen kurzen
+   zufaelligen gleichmaessigen Abschnitt), UND (b) die Klicks auch schnell
+   genug sind (langsames, zufaellig gleichmaessiges Klicken ist weder
+   verdaechtig noch spielerisch ausnutzbar) - erst wenn ALLE Indikatoren
+   gemeinsam zutreffen, gilt es als Autoklicker-Muster.
    Reaktion bleibt wie zuvor: kurzzeitige Sperre + Hinweis-Toast, danach
    automatisch wieder frei - keine dauerhafte Sperre. Gemeinsam genutzt von
    Idle-Dorf-Klicks (bkmpIdleHandleDragonClick) UND Raid-Klicks
    (bkmpRaidHandleBossClick), damit beide Stellen exakt dasselbe,
    einmal getestete Muster nutzen. */
-const BKMP_AUTOCLICK_WINDOW = 14;
-const BKMP_AUTOCLICK_MIN_SAMPLES = 10;
+const BKMP_AUTOCLICK_WINDOW = 300;
+const BKMP_AUTOCLICK_MIN_SAMPLES = 15;
+const BKMP_AUTOCLICK_MIN_SPAN_MS = 30000;
 const BKMP_AUTOCLICK_MAX_AVG_INTERVAL_MS = 260;
 const BKMP_AUTOCLICK_CV_THRESHOLD = 0.12;
 const BKMP_AUTOCLICK_LOCK_MS = 4000;
+const BKMP_AUTOCLICK_HISTORY_MS = 32000; // etwas mehr als MIN_SPAN_MS, sonst wuerden aeltere, fuer die 30s-Pruefung noetige Zeitstempel schon vorher weggefiltert
 const BKMP_AUTOCLICK_TOAST = 'Deine Klicks wirken verdächtig gleichmäßig – kurze Pause fürs Handgelenk 😉';
 
 function bkmpIdleDetectAutoclickPattern(timestamps) {
   if (!timestamps || timestamps.length < BKMP_AUTOCLICK_MIN_SAMPLES) return false;
   const recent = timestamps.slice(-BKMP_AUTOCLICK_WINDOW);
+  /* Muss ueber mindestens 30 Sekunden hinweg angehalten haben - ein kurzer,
+     zufaellig gleichmaessiger Klick-Ausbruch (z.B. 1-2s) reicht bewusst
+     nicht aus, egal wie niedrig dessen Variationskoeffizient ausfaellt. */
+  if (recent[recent.length - 1] - recent[0] < BKMP_AUTOCLICK_MIN_SPAN_MS) return false;
   const intervals = [];
   for (let i = 1; i < recent.length; i++) intervals.push(recent[i] - recent[i - 1]);
   const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
@@ -1791,7 +1799,7 @@ function bkmpIdleHandleDragonClick() {
   const now = Date.now();
   if (now < bkmpIdleClickLockedUntil) return;
   bkmpIdleClickTimestamps.push(now);
-  bkmpIdleClickTimestamps = bkmpIdleClickTimestamps.filter(t => now - t <= 8000).slice(-BKMP_AUTOCLICK_WINDOW);
+  bkmpIdleClickTimestamps = bkmpIdleClickTimestamps.filter(t => now - t <= BKMP_AUTOCLICK_HISTORY_MS).slice(-BKMP_AUTOCLICK_WINDOW);
   if (bkmpIdleDetectAutoclickPattern(bkmpIdleClickTimestamps)) {
     bkmpIdleClickLockedUntil = now + BKMP_AUTOCLICK_LOCK_MS;
     bkmpIdleClickTimestamps = [];
@@ -2202,7 +2210,7 @@ function bkmpRaidHandleBossClick() {
   const now = Date.now();
   if (now < bkmpRaidClickLockedUntil) return;
   bkmpRaidClickTimestamps.push(now);
-  bkmpRaidClickTimestamps = bkmpRaidClickTimestamps.filter(t => now - t <= 8000).slice(-BKMP_AUTOCLICK_WINDOW);
+  bkmpRaidClickTimestamps = bkmpRaidClickTimestamps.filter(t => now - t <= BKMP_AUTOCLICK_HISTORY_MS).slice(-BKMP_AUTOCLICK_WINDOW);
   if (bkmpIdleDetectAutoclickPattern(bkmpRaidClickTimestamps)) {
     bkmpRaidClickLockedUntil = now + BKMP_AUTOCLICK_LOCK_MS;
     bkmpRaidClickTimestamps = [];

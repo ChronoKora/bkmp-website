@@ -4125,6 +4125,28 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 .idle-dorf-panel { height: min(58vh, 560px); overflow-y: auto; overflow-x: hidden; }
 .idle-panel-hint { color: var(--muted); font-size: 0.85rem; margin-bottom: 0.8rem; }
 
+/* Kampf-Tab: Stufenleiste + Schlachtfeld (Dorf/Drache) sollen NIE
+   mitscrollen - nur der Kampf-Log/Belohnungsverlauf unten soll bei
+   Bedarf scrollbar sein. Das generische .idle-dorf-panel-Scrollverhalten
+   oben (fuer alle anderen Tabs weiterhin richtig) wird hier per
+   ID-Selektor gezielt fuer #idlePanelKampf ueberschrieben: das Panel
+   selbst scrollt nicht mehr, stattdessen sind Stufenleiste/Schlachtfeld
+   fix (flex-shrink:0) und nur .idle-dorf-log waechst/scrollt im
+   verbleibenden Platz. */
+#idlePanelKampf {
+  display: flex;
+  flex-direction: column;
+  overflow-y: hidden;
+}
+#idlePanelKampf .idle-stage-bar,
+#idlePanelKampf .idle-battlefield {
+  flex-shrink: 0;
+}
+#idlePanelKampf .idle-dorf-log {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 /* ---- Stufen-Leiste ---- */
 .idle-stage-bar {
   display: flex;
