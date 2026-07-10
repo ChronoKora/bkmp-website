@@ -1496,7 +1496,31 @@ function bkmpRaidStopLoops() {
   if (bkmpRaidBossPollTimer) { window.clearInterval(bkmpRaidBossPollTimer); bkmpRaidBossPollTimer = null; }
 }
 
-function bkmpRaidCheckOutcome() {
+/* raid_finish() vergibt Gold/Kristalle/XP serverseitig atomar direkt in
+   idle_player_state - der lokale bkmpIdleState weiss davon nichts. Der
+   normale Autosave (bkmpIdleQueueSync -> upsertIdlePlayerState) schreibt den
+   KOMPLETTEN lokalen Stand zurueck (kein atomares Increment), und feuert
+   frueher oder spaeter sowieso wieder (naechster Drachenkill, Tab-Wechsel,
+   Fenster schliessen). Ohne diesen Abgleich wuerde dieser naechste Autosave
+   den serverseitig gutgeschriebenen Betrag mit dem veralteten lokalen Stand
+   ueberschreiben - die Belohnung waere dann zwar kurz in der DB, aber sofort
+   wieder weg, ohne dass irgendwo ein Fehler auftritt. */
+async function bkmpRaidSyncIdleStateAfterFinish() {
+  if (!bkmpIdleState) return;
+  const name = typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : '';
+  if (!name) return;
+  try {
+    const remote = typeof loadIdlePlayerState === 'function' ? await loadIdlePlayerState(name) : null;
+    if (!remote) return;
+    bkmpIdleState.gold = remote.gold;
+    bkmpIdleState.total_gold_earned = remote.total_gold_earned;
+    bkmpIdleState.crystals = remote.crystals;
+    bkmpIdleState.xp = remote.xp;
+    bkmpIdleRenderHud();
+  } catch (e) { console.warn('Raid: Spielstand nach Raid-Ende nicht abgeglichen.', e); }
+}
+
+async function bkmpRaidCheckOutcome() {
   if (!bkmpRaidState || bkmpRaidResultShown) return;
   if (bkmpRaidState.status === 'fighting' || bkmpRaidState.status === 'prep') return;
   bkmpRaidResultShown = true;
@@ -1505,6 +1529,7 @@ function bkmpRaidCheckOutcome() {
   bkmpUnsubscribeFromRaidInstance();
   bkmpRaidShowResult();
   bkmpRaidRefreshAchievementCache();
+  await bkmpRaidSyncIdleStateAfterFinish();
 }
 
 async function bkmpRaidShowResult() {

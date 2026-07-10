@@ -9,7 +9,9 @@ declare
     'wishes',
     'streamer_links',
     'about_blocks',
-    'partner_shops'
+    'partner_shops',
+    'raid_instances',
+    'raid_participants'
   ];
 begin
   foreach table_name in array tables loop
