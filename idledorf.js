@@ -1348,6 +1348,20 @@ async function bkmpRaidStartCombatView(raidId) {
   } catch (e) {
     console.warn('Raid: Zustand konnte nicht geladen werden.', e);
   }
+  /* Der Raid kann laengst zuende sein, ohne dass dieser Client das live
+     mitbekommen hat (Fenster war zu, als der Sieg/die Niederlage passiert
+     ist - bkmpRaidJoinedId wird nur bei einem live beobachteten Ende auf
+     'ended-...' gesetzt, siehe bkmpRaidCheckOutcome). bkmpRaidShouldShowCombatView()
+     kennt nur die reine Uhrzeit-Phase, nicht den echten Serverstatus, und
+     haette uns sonst bei JEDEM Oeffnen des Fensters innerhalb derselben
+     Stunde erneut kurz in den (toten) Kampf springen lassen. Sobald wir den
+     echten Status vom Server sehen, sofort sauber abbrechen statt das
+     Schlachtfeld ueberhaupt erst zu zeigen. */
+  if (bkmpRaidState && bkmpRaidState.status !== 'fighting') {
+    bkmpRaidJoinedId = 'ended-' + raidId;
+    bkmpRaidToggleCombatView(false);
+    return;
+  }
   bkmpRaidRenderCombat();
   bkmpSubscribeToRaidInstance(raidId, bkmpRaidHandleRealtimeChange);
   bkmpRaidStartLoops(raidId);
