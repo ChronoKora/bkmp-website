@@ -109,11 +109,15 @@ function bkmpIdleRewardsAt(dragon, playerBonuses, cfg) {
   const goldMult = 1 + (bonuses.goldBonus || 0) / 100;
   const xpMult = 1 + (bonuses.xpBonus || 0) / 100;
   const lootMult = 1 + (bonuses.lootBonus || 0) / 100;
+  /* Holz-/Steinproduktion (Wirtschaft): vorher wirkungslos, effect_type
+     wurde nie ausgewertet - wirkt zusaetzlich zur allgemeinen Lootchance. */
+  const woodMult = lootMult * (1 + (bonuses.woodBonus || 0) / 100);
+  const stoneMult = lootMult * (1 + (bonuses.stoneBonus || 0) / 100);
   return {
     gold: Math.round((archetype.gold_reward_base || 0) * goldGrowth * rewardMult * goldMult),
     xp: Math.round((archetype.xp_reward_base || 0) * xpGrowth * rewardMult * xpMult),
-    wood: Math.round((archetype.wood_reward_base || 0) * lootMult),
-    stone: Math.round((archetype.stone_reward_base || 0) * lootMult),
+    wood: Math.round((archetype.wood_reward_base || 0) * woodMult),
+    stone: Math.round((archetype.stone_reward_base || 0) * stoneMult),
     crystals: Math.round((archetype.crystal_reward_base || 0) * lootMult),
     essence: Math.round((archetype.essence_reward_base || 0) * lootMult)
   };
@@ -223,6 +227,8 @@ const BKMP_IDLE_FALLBACK_DRAGONS = [
 /* ---------------- State ---------------- */
 
 let bkmpIdleState = null;
+let bkmpPrestigeState = null;
+let bkmpPrestigeSaving = false;
 let bkmpIdleDragonDefs = [];
 let bkmpIdleSkillDefs = [];
 let bkmpIdleConfig = {};
@@ -230,6 +236,7 @@ let bkmpIdleCurrentDragon = null;
 let bkmpIdleVillageHp = null;
 let bkmpIdleEffectiveStats = null;
 let bkmpIdleLoopTimer = null;
+let bkmpIdleLoopTimerMs = 900;
 let bkmpIdleModalOpen = false;
 let bkmpIdleSyncPending = false;
 let bkmpIdleSyncTimer = null;
@@ -280,6 +287,17 @@ async function bkmpIdleLoadOrInitState(name) {
   bkmpIdleState = remote || bkmpIdleDefaultState(name);
   bkmpIdleVillageHp = null;
   bkmpIdleCurrentDragon = null;
+  /* Komplett eigenstaendiger Ladevorgang (eigene Tabelle, eigenes
+     try/catch) - schlaegt die Migration noch nicht an, bleibt der normale
+     Spielstand oben trotzdem vollstaendig nutzbar. */
+  bkmpPrestigeState = null;
+  try {
+    const remotePrestige = typeof loadIdlePrestigeState === 'function' ? await loadIdlePrestigeState(name) : null;
+    bkmpPrestigeState = remotePrestige || { name_key: key, display_name: name, prestige_level: 0, prestige_points: 0, prestige_points_spent: 0, prestige_allocations: {} };
+  } catch (e) {
+    console.warn('Idle Dorf: Prestige-Fortschritt konnte nicht geladen werden (Migration evtl. noch nicht ausgefuehrt).', e);
+    bkmpPrestigeState = { name_key: key, display_name: name, prestige_level: 0, prestige_points: 0, prestige_points_spent: 0, prestige_allocations: {} };
+  }
 }
 
 function bkmpIdleRecomputeEffectiveStats() {
@@ -291,17 +309,50 @@ function bkmpIdleRecomputeEffectiveStats() {
   /* t() summiert einen Effekttyp aus Skilltree, Upgrades UND freigeschalteten
      Sammlung-Titeln. Kampfwerte nutzen "_flat" (feste Zahlen, addiert VOR dem
      Prozent-Multiplikator), Produktionsraten (Gold/Loot) bleiben "_pct". */
-  const t = key => (skillTotals[key] || 0) + (upgradeTotals[key] || 0) + (titleTotals[key] || 0);
+  const prestigeTotals = bkmpPrestigeEffectTotals(bkmpPrestigeState ? bkmpPrestigeState.prestige_allocations : null);
+  const t = key => (skillTotals[key] || 0) + (upgradeTotals[key] || 0) + (titleTotals[key] || 0) + (prestigeTotals[key] || 0);
   const prevMaxHp = bkmpIdleEffectiveStats ? bkmpIdleEffectiveStats.hp : null;
+  const prevTickMs = bkmpIdleEffectiveStats ? bkmpIdleEffectiveStats.tickIntervalMs : null;
+  /* extra_archer (Dorf) und ballista_unlock (Dorf) hatten vorher gar keinen
+     Effekt (effect_type wurde nirgends konsumiert) - extra_archer wirkt wie
+     weitere Prozent-Angriffsstaerke, ballista_unlock wie feste zusaetzliche
+     Angriffskraft (Belagerungswaffe feuert bei jeder Salve mit). Zusaetzlich
+     ein fixer Bonus pro Prestige-Stufe (dauerhaft, uebersteht jeden
+     Aufstieg) als direkter, sofort spuerbarer Anreiz zu prestigen. */
+  const prestigeLevel = bkmpPrestigeState ? Number(bkmpPrestigeState.prestige_level || 0) : 0;
+  const prestigeLevelBonusPct = prestigeLevel * 5;
+  const attackPctTotal = t('attack_pct') + t('extra_archer') * 6 + prestigeLevelBonusPct;
+  const attackFlatTotal = t('attack_flat') + t('ballista_unlock') * 8;
   bkmpIdleEffectiveStats = {
-    attack: (base.attack + t('attack_flat')) * (1 + t('attack_pct') / 100),
+    attack: (base.attack + attackFlatTotal) * (1 + attackPctTotal / 100),
     defense: (base.defense + t('defense_flat')) * (1 + t('defense_pct') / 100),
-    hp: Math.round((base.hp + t('hp_flat')) * (1 + t('hp_pct') / 100)),
+    hp: Math.round((base.hp + t('hp_flat')) * (1 + (t('hp_pct') + prestigeLevelBonusPct) / 100)),
     critChance: Math.min(75, base.critChance + t('crit_chance_flat') + t('crit_chance_pct')),
     critDamage: base.critDamage + t('crit_damage_flat') + t('crit_damage_pct'),
-    goldBonus: base.goldBonus + t('gold_prod_pct') + t('gold_find_pct'),
-    xpBonus: base.xpBonus + t('xp_pct'),
-    lootBonus: base.lootBonus + t('loot_chance_pct')
+    goldBonus: base.goldBonus + t('gold_prod_pct') + t('gold_find_pct') + prestigeLevelBonusPct,
+    xpBonus: base.xpBonus + t('xp_pct') + prestigeLevelBonusPct,
+    lootBonus: base.lootBonus + t('loot_chance_pct'),
+    /* Ab hier: Effekte, die vorher komplett wirkungslos im Skilltree lagen
+       (kompletter Magie-Zweig + Teile von Burg/Wirtschaft). */
+    woodBonus: t('wood_prod_pct'),
+    stoneBonus: t('stone_prod_pct'),
+    offlineBonus: t('offline_income_pct'),
+    /* Angriffsgeschwindigkeit: schnellerer Auto-Tick statt eines weiteren
+       reinen Schadens-Multiplikators - fuehlt sich im UI tatsaechlich nach
+       "schneller" an. Untergrenze 400ms gegen zu viele DOM-Updates/Sekunde. */
+    tickIntervalMs: Math.max(400, Math.round(900 / (1 + t('attack_speed_pct') / 100))),
+    /* Heilung (magie_heilung) fliesst hier mit ein statt als separater
+       "Heilung bei Kill"-Bonus: die Stadt wird nach jedem besiegten Drachen
+       ohnehin schon voll geheilt (siehe bkmpIdleHandleDragonDefeated),
+       ein Kill-Bonus waere also wirkungslos gewesen. Als zusaetzliche
+       Tick-Regeneration macht der Knoten dagegen bei laengeren Kaempfen
+       (Bosse, hohe Stufen) einen echten Unterschied. */
+    villageRegenPct: t('shield_regen') * 0.4 + t('repair_speed_pct') * 0.3 + t('heal_pct') * 0.3,
+    magicResistPct: Math.min(75, t('magic_resist_pct')),
+    fireChancePct: Math.min(60, t('elem_fire')),
+    iceChancePct: Math.min(60, t('elem_ice')),
+    lightningChancePct: Math.min(60, t('elem_lightning')),
+    clickDamagePct: t('click_damage_pct')
   };
   if (bkmpIdleVillageHp === null || bkmpIdleVillageHp === undefined) {
     bkmpIdleVillageHp = bkmpIdleEffectiveStats.hp;
@@ -323,6 +374,7 @@ function bkmpIdleRecomputeEffectiveStats() {
   bkmpIdleState.gold_bonus = bkmpIdleEffectiveStats.goldBonus;
   bkmpIdleState.xp_bonus = bkmpIdleEffectiveStats.xpBonus;
   bkmpIdleState.loot_bonus = bkmpIdleEffectiveStats.lootBonus;
+  if (prevTickMs !== null && prevTickMs !== bkmpIdleEffectiveStats.tickIntervalMs) bkmpIdleSyncLoopInterval();
 }
 
 /* ---------------- Skilltree ---------------- */
@@ -510,37 +562,125 @@ function bkmpIdleHandleDefeat() {
 
 function bkmpIdleTick() {
   if (!bkmpIdleState || !bkmpIdleCurrentDragon || !bkmpIdleEffectiveStats) return;
-  bkmpIdleState.playtime_seconds = Number(bkmpIdleState.playtime_seconds || 0) + 0.9;
+  const stats = bkmpIdleEffectiveStats;
+  bkmpIdleState.playtime_seconds = Number(bkmpIdleState.playtime_seconds || 0) + (stats.tickIntervalMs || 900) / 1000;
 
-  const vRoll = bkmpIdleDamageRoll(bkmpIdleEffectiveStats.attack, bkmpIdleEffectiveStats.critChance, bkmpIdleEffectiveStats.critDamage, bkmpIdleCurrentDragon.defense);
+  /* Schildgenerator/Reparaturtempo (Burg): passive Regeneration der
+     Stadt-Lebenspunkte - vorher wirkungslos, effect_type wurde nie
+     ausgewertet. */
+  if (stats.villageRegenPct > 0 && bkmpIdleVillageHp < stats.hp) {
+    bkmpIdleVillageHp = Math.min(stats.hp, bkmpIdleVillageHp + stats.hp * (stats.villageRegenPct / 100));
+  }
+
+  const vRoll = bkmpIdleDamageRoll(stats.attack, stats.critChance, stats.critDamage, bkmpIdleCurrentDragon.defense);
   bkmpIdleCurrentDragon.hp = Math.max(0, bkmpIdleCurrentDragon.hp - vRoll.amount);
   bkmpIdleSpawnProjectile('arrow', vRoll.amount, vRoll.isCrit);
   bkmpIdleSpawnHitFlash('idleDragon');
   bkmpIdleUpdateDragonHpBar();
+
+  /* Feuer (magie_feuer/magie_meister): Chance, einen Brand aufzufrischen,
+     der eigenstaendig weiter tickt - genau der "Burn-Damage-Tick", der
+     vorher trotz Beschreibung ("Brandpfeile"/"Feuer") gar nicht existierte. */
+  if (stats.fireChancePct > 0 && Math.random() * 100 < stats.fireChancePct) {
+    bkmpIdleCurrentDragon.burnDamagePerTick = Math.max(1, Math.round(stats.attack * 0.18));
+    bkmpIdleCurrentDragon.burnTicksLeft = 4;
+  }
+  if (bkmpIdleCurrentDragon.hp > 0 && bkmpIdleCurrentDragon.burnTicksLeft > 0) {
+    const burnDmg = Math.min(bkmpIdleCurrentDragon.hp, bkmpIdleCurrentDragon.burnDamagePerTick);
+    bkmpIdleCurrentDragon.hp = Math.max(0, bkmpIdleCurrentDragon.hp - burnDmg);
+    bkmpIdleCurrentDragon.burnTicksLeft -= 1;
+    bkmpIdleSpawnBurnTick(burnDmg);
+    bkmpIdleUpdateDragonHpBar();
+  }
+
+  /* Blitzschlag (magie_blitz): seltener Bonus-Schlag oben drauf. */
+  if (bkmpIdleCurrentDragon.hp > 0 && stats.lightningChancePct > 0 && Math.random() * 100 < stats.lightningChancePct) {
+    const boltDmg = Math.max(1, Math.round(stats.attack * 0.6));
+    bkmpIdleCurrentDragon.hp = Math.max(0, bkmpIdleCurrentDragon.hp - boltDmg);
+    bkmpIdleSpawnLightningBolt(boltDmg);
+    bkmpIdleUpdateDragonHpBar();
+  }
 
   if (bkmpIdleCurrentDragon.hp <= 0) {
     bkmpIdleHandleDragonDefeated();
     return;
   }
 
-  const dRoll = bkmpIdleDamageRoll(bkmpIdleCurrentDragon.attack, 5, 150, bkmpIdleEffectiveStats.defense);
-  bkmpIdleVillageHp = Math.max(0, bkmpIdleVillageHp - dRoll.amount);
-  bkmpIdleSpawnProjectile('fire', dRoll.amount, dRoll.isCrit);
-  bkmpIdlePlaySpriteAttack();
-  bkmpIdleSpawnHitFlash('idleVillage');
-  bkmpIdleUpdateVillageHpBar();
+  /* Eis (magie_eis): Chance, den Gegenangriff komplett auszusetzen. */
+  const frozen = stats.iceChancePct > 0 && Math.random() * 100 < stats.iceChancePct;
+  if (frozen) {
+    bkmpIdleSpawnIceBlock();
+  } else {
+    const dRoll = bkmpIdleDamageRoll(bkmpIdleCurrentDragon.attack, 5, 150, stats.defense);
+    /* Magieresistenz (magie_resistenz): mindert erlittenen Schaden zusaetzlich. */
+    const finalDmg = Math.round(dRoll.amount * (1 - (stats.magicResistPct || 0) / 100));
+    bkmpIdleVillageHp = Math.max(0, bkmpIdleVillageHp - finalDmg);
+    bkmpIdleSpawnProjectile('fire', finalDmg, dRoll.isCrit);
+    bkmpIdlePlaySpriteAttack();
+    bkmpIdleSpawnHitFlash('idleVillage');
+    bkmpIdleUpdateVillageHpBar();
+  }
 
   if (bkmpIdleVillageHp <= 0) {
     bkmpIdleHandleDefeat();
   }
 }
 
+function bkmpIdleSpawnBurnTick(amount) {
+  const target = document.getElementById('idleDragon');
+  if (!target) return;
+  const dmg = document.createElement('span');
+  dmg.className = 'idle-dmg-float idle-dmg-burn';
+  dmg.textContent = '🔥-' + Math.round(amount);
+  target.appendChild(dmg);
+  window.setTimeout(() => dmg.remove(), 800);
+}
+
+function bkmpIdleSpawnLightningBolt(amount) {
+  const field = document.getElementById('idleBattlefield');
+  if (field) {
+    const el = document.createElement('span');
+    el.className = 'idle-lightning-bolt';
+    field.appendChild(el);
+    window.setTimeout(() => el.remove(), 350);
+  }
+  const target = document.getElementById('idleDragon');
+  if (target) {
+    const dmg = document.createElement('span');
+    dmg.className = 'idle-dmg-float idle-dmg-lightning';
+    dmg.textContent = '⚡-' + Math.round(amount);
+    target.appendChild(dmg);
+    window.setTimeout(() => dmg.remove(), 800);
+  }
+}
+
+function bkmpIdleSpawnIceBlock() {
+  const target = document.getElementById('idleVillage');
+  if (!target) return;
+  const el = document.createElement('span');
+  el.className = 'idle-ice-block';
+  el.textContent = '❄️ Eingefroren!';
+  target.appendChild(el);
+  window.setTimeout(() => el.remove(), 800);
+}
+
 function bkmpIdleStartLoop() {
   bkmpIdleStopLoop();
-  bkmpIdleLoopTimer = window.setInterval(bkmpIdleTick, 900);
+  const ms = (bkmpIdleEffectiveStats && bkmpIdleEffectiveStats.tickIntervalMs) || 900;
+  bkmpIdleLoopTimer = window.setInterval(bkmpIdleTick, ms);
+  bkmpIdleLoopTimerMs = ms;
 }
 function bkmpIdleStopLoop() {
   if (bkmpIdleLoopTimer) { window.clearInterval(bkmpIdleLoopTimer); bkmpIdleLoopTimer = null; }
+}
+/* Angriffsgeschwindigkeit (Dorf): kann sich zur Laufzeit aendern (neuer
+   Skillpunkt investiert). Restartet den laufenden Loop nur, wenn sich das
+   Intervall wirklich geaendert hat - verhindert unnoetige Neustarts bei
+   jedem Stat-Rebuild (z. B. nach jedem Kill). */
+function bkmpIdleSyncLoopInterval() {
+  if (!bkmpIdleLoopTimer || !bkmpIdleEffectiveStats) return;
+  const ms = bkmpIdleEffectiveStats.tickIntervalMs || 900;
+  if (ms !== bkmpIdleLoopTimerMs) bkmpIdleStartLoop();
 }
 
 /* ---------------- Rendering: Kampf-Tab ---------------- */
@@ -1024,6 +1164,191 @@ async function bkmpIdleFlushSync() {
   }
 }
 
+/* ============================================================
+   Prestige: dauerhafter Aufstieg, sobald Stufe BKMP_PRESTIGE_REQUIRED_STAGE
+   erreicht ist. Setzt den laufenden Durchgang zurueck (Level/Gold/Rohstoffe/
+   Skilltree/Upgrades/Drachen-Fortschritt), vergibt dafuer Prestige-Punkte
+   fuer einen KLEINEN, DAUERHAFTEN Bonusbaum (idle_prestige_state, siehe
+   supabase-idle-prestige.sql) sowie einen sofortigen, festen Bonus pro
+   Prestige-Stufe (siehe bkmpIdleRecomputeEffectiveStats). Lebenszeit-Werte
+   (Spielzeit, Gesamt-Gold-verdient, Erfolge/Titel/Kosmetiken) bleiben
+   unangetastet - nur der aktuelle "Lauf" wird zurueckgesetzt. */
+
+const BKMP_PRESTIGE_REQUIRED_STAGE = 100;
+
+const BKMP_PRESTIGE_UPGRADES = [
+  { id: 'ewiges_feuer', name: 'Ewiges Feuer', desc: '+3% Angriff pro Rang - dauerhaft, übersteht jeden Aufstieg.', icon: '🔥', effectType: 'attack_pct', effectPerRank: 3, maxRank: 10 },
+  { id: 'drachenblut', name: 'Drachenblut', desc: '+4% Leben pro Rang - dauerhaft.', icon: '🩸', effectType: 'hp_pct', effectPerRank: 4, maxRank: 10 },
+  { id: 'goldene_ranken', name: 'Goldene Ranken', desc: '+4% Gold-Ausbeute pro Rang - dauerhaft.', icon: '🌿', effectType: 'gold_prod_pct', effectPerRank: 4, maxRank: 10 },
+  { id: 'zeitraffer', name: 'Zeitraffer', desc: '+4% XP pro Rang - dauerhaft.', icon: '⏳', effectType: 'xp_pct', effectPerRank: 4, maxRank: 10 },
+  { id: 'kristallkern', name: 'Kristallkern', desc: '+5% Kritischer Schaden pro Rang - dauerhaft.', icon: '💠', effectType: 'crit_damage_pct', effectPerRank: 5, maxRank: 8 },
+  { id: 'portal_meisterschaft', name: 'Portal-Meisterschaft', desc: '+5% mehr Prestige-Punkte bei jedem künftigen Aufstieg pro Rang.', icon: '🌌', effectType: 'prestige_point_bonus_pct', effectPerRank: 5, maxRank: 5 }
+];
+
+function bkmpPrestigeUpgradeCost(rankBeingBought) {
+  return Math.max(1, Math.round(rankBeingBought));
+}
+
+function bkmpPrestigeEffectTotals(allocations) {
+  const totals = {};
+  const alloc = allocations || {};
+  BKMP_PRESTIGE_UPGRADES.forEach(def => {
+    const rank = Number(alloc[def.id] || 0);
+    if (rank <= 0) return;
+    totals[def.effectType] = (totals[def.effectType] || 0) + rank * def.effectPerRank;
+  });
+  return totals;
+}
+
+function bkmpPrestigeEligible() {
+  return Boolean(bkmpIdleState) && Number(bkmpIdleState.highest_dragon_index || 0) >= BKMP_PRESTIGE_REQUIRED_STAGE;
+}
+
+/* Faustformel: (Stufe/20)^1.15, abgerundet - Stufe 100 -> 6 Punkte,
+   Stufe 200 -> 14, Stufe 500 -> 41. Bewusst kein reines Geschenk: ein
+   Aufstieg lohnt sich erst, wenn man deutlich ueber die Mindeststufe
+   hinausgekommen ist. */
+function bkmpPrestigePointsForStage(stage) {
+  return Math.max(0, Math.floor(Math.pow(Math.max(0, stage) / 20, 1.15)));
+}
+
+function bkmpPrestigeBuyUpgrade(id) {
+  const def = BKMP_PRESTIGE_UPGRADES.find(u => u.id === id);
+  if (!def || !bkmpPrestigeState) return;
+  const alloc = bkmpPrestigeState.prestige_allocations || (bkmpPrestigeState.prestige_allocations = {});
+  const rank = Number(alloc[id] || 0);
+  if (rank >= def.maxRank) return;
+  const cost = bkmpPrestigeUpgradeCost(rank + 1);
+  const available = Number(bkmpPrestigeState.prestige_points || 0) - Number(bkmpPrestigeState.prestige_points_spent || 0);
+  if (available < cost) return;
+  alloc[id] = rank + 1;
+  bkmpPrestigeState.prestige_points_spent = Number(bkmpPrestigeState.prestige_points_spent || 0) + cost;
+  bkmpIdleRecomputeEffectiveStats();
+  bkmpIdleRenderPrestigePanel();
+  bkmpIdleRenderHud();
+  bkmpPrestigeQueueSave();
+}
+
+let bkmpPrestigeSaveTimer = null;
+function bkmpPrestigeQueueSave() {
+  if (bkmpPrestigeSaveTimer) return;
+  bkmpPrestigeSaveTimer = window.setTimeout(async () => {
+    bkmpPrestigeSaveTimer = null;
+    if (!bkmpPrestigeState) return;
+    try { if (typeof saveIdlePrestigeState === 'function') await saveIdlePrestigeState(bkmpPrestigeState); }
+    catch (e) { console.warn('Prestige: Speichern fehlgeschlagen (Migration ausgefuehrt?).', e); }
+  }, 1500);
+}
+
+async function bkmpIdlePerformPrestige() {
+  if (!bkmpPrestigeEligible() || bkmpPrestigeSaving) return;
+  const stage = Number(bkmpIdleState.highest_dragon_index || 0);
+  const bonusPct = bkmpPrestigeState ? (bkmpPrestigeEffectTotals(bkmpPrestigeState.prestige_allocations).prestige_point_bonus_pct || 0) : 0;
+  const pointsGained = Math.max(1, Math.round(bkmpPrestigePointsForStage(stage) * (1 + bonusPct / 100)));
+  const confirmed = window.confirm(
+    `Jetzt aufsteigen? Level, Gold, Rohstoffe, Skilltree, Upgrades und Drachen-Fortschritt werden zurückgesetzt.\n\n` +
+    `Du erhältst dafür ${pointsGained} Prestige-Punkte (dauerhaft, für den permanenten Bonusbaum) ` +
+    `und einen dauerhaften +5%-Bonus auf Angriff/Leben/Gold/XP.\n\nErfolge, Titel und Kosmetiken bleiben erhalten.`
+  );
+  if (!confirmed) return;
+
+  bkmpPrestigeSaving = true;
+  try {
+    bkmpIdleState.level = 1;
+    bkmpIdleState.xp = 0;
+    bkmpIdleState.gold = 0;
+    bkmpIdleState.wood = 0;
+    bkmpIdleState.stone = 0;
+    bkmpIdleState.crystals = 0;
+    bkmpIdleState.essence = 0;
+    bkmpIdleState.skill_points_available = 0;
+    bkmpIdleState.skill_points_spent = 0;
+    bkmpIdleState.skill_allocations = {};
+    bkmpIdleState.upgrade_purchases = {};
+    bkmpIdleState.dragon_kills = 0;
+    bkmpIdleState.boss_kills = 0;
+    bkmpIdleState.current_dragon_index = 0;
+    bkmpIdleState.highest_dragon_index = 0;
+    bkmpIdleState.auto_advance = true;
+
+    if (!bkmpPrestigeState) bkmpPrestigeState = { name_key: bkmpIdleState.name_key, display_name: bkmpIdleState.display_name, prestige_level: 0, prestige_points: 0, prestige_points_spent: 0, prestige_allocations: {} };
+    bkmpPrestigeState.prestige_level = Number(bkmpPrestigeState.prestige_level || 0) + 1;
+    bkmpPrestigeState.prestige_points = Number(bkmpPrestigeState.prestige_points || 0) + pointsGained;
+
+    bkmpIdleRecomputeEffectiveStats();
+    bkmpIdleVillageHp = bkmpIdleEffectiveStats.hp;
+    bkmpIdleSpawnDragon();
+    bkmpIdleRenderStageBar();
+    bkmpIdleUpdateVillageHpBar();
+    bkmpIdleRenderHud();
+    bkmpIdleLog(`🌌 Aufstieg #${bkmpPrestigeState.prestige_level}! +${pointsGained} Prestige-Punkte, dauerhafter +5%-Bonus.`);
+
+    await bkmpIdleFlushSyncNow();
+    try { if (typeof saveIdlePrestigeState === 'function') await saveIdlePrestigeState(bkmpPrestigeState); }
+    catch (e) { console.warn('Prestige: Speichern fehlgeschlagen (Migration ausgefuehrt?).', e); }
+
+    bkmpIdleRenderActiveTabContent();
+  } finally {
+    bkmpPrestigeSaving = false;
+  }
+}
+
+/* Erzwingt ein sofortiges Speichern statt auf den 4s-Debounce zu warten -
+   nach einem Aufstieg soll der zurueckgesetzte Stand nicht verloren gehen,
+   falls direkt danach das Fenster/der Tab geschlossen wird. */
+async function bkmpIdleFlushSyncNow() {
+  bkmpIdleSyncPending = true;
+  if (bkmpIdleSyncTimer) { window.clearTimeout(bkmpIdleSyncTimer); bkmpIdleSyncTimer = null; }
+  await bkmpIdleFlushSync();
+}
+
+function bkmpIdleRenderPrestigePanel() {
+  const panel = document.getElementById('idlePanelPrestige');
+  if (!panel || !bkmpIdleState) return;
+  const stage = Number(bkmpIdleState.highest_dragon_index || 0);
+  const eligible = bkmpPrestigeEligible();
+  const progressPct = Math.max(0, Math.min(100, (stage / BKMP_PRESTIGE_REQUIRED_STAGE) * 100));
+  const level = bkmpPrestigeState ? Number(bkmpPrestigeState.prestige_level || 0) : 0;
+  const totalPoints = bkmpPrestigeState ? Number(bkmpPrestigeState.prestige_points || 0) : 0;
+  const spentPoints = bkmpPrestigeState ? Number(bkmpPrestigeState.prestige_points_spent || 0) : 0;
+  const available = Math.max(0, totalPoints - spentPoints);
+  const previewGain = bkmpPrestigePointsForStage(stage);
+  const alloc = bkmpPrestigeState ? bkmpPrestigeState.prestige_allocations || {} : {};
+
+  panel.innerHTML = `
+    <div class="idle-prestige-summary">
+      <div class="idle-prestige-level">🌌 Prestige-Stufe ${level}</div>
+      <div class="idle-prestige-points">${bkmpIdleFormatNumber(available)} / ${bkmpIdleFormatNumber(totalPoints)} Punkte verfügbar</div>
+      ${level > 0 ? `<div class="idle-prestige-bonus-note">Dauerhafter Bonus: +${level * 5}% Angriff/Leben/Gold/XP</div>` : ''}
+    </div>
+    <div class="idle-prestige-progress-card">
+      <div class="idle-prestige-progress-label">Stufe ${stage} / ${BKMP_PRESTIGE_REQUIRED_STAGE} zum Aufsteigen</div>
+      <div class="idle-hp-bar"><div class="idle-hp-fill idle-hp-fill-village" style="width:${progressPct}%"></div></div>
+      ${eligible
+        ? `<button type="button" class="btn-ja idle-prestige-btn" id="idlePrestigeBtn">🌌 Jetzt aufsteigen (+${bkmpIdleFormatNumber(previewGain)} Punkte)</button>`
+        : `<p class="idle-prestige-hint">Erreiche Stufe ${BKMP_PRESTIGE_REQUIRED_STAGE}, um dauerhaft aufsteigen zu können.</p>`}
+    </div>
+    <div class="idle-upgrade-grid">${BKMP_PRESTIGE_UPGRADES.map(def => {
+      const rank = Number(alloc[def.id] || 0);
+      const maxed = rank >= def.maxRank;
+      const cost = maxed ? 0 : bkmpPrestigeUpgradeCost(rank + 1);
+      const affordable = !maxed && available >= cost;
+      return `
+        <div class="idle-upgrade-card">
+          <div class="idle-upgrade-icon">${def.icon}</div>
+          <div class="idle-upgrade-name">${escapeHtml(def.name)} <span class="idle-upgrade-level">Rang ${rank}${maxed ? ' (Max)' : '/' + def.maxRank}</span></div>
+          <div class="idle-upgrade-desc">${escapeHtml(def.desc)}</div>
+          <button type="button" class="btn-ja idle-prestige-buy" data-prestige-id="${def.id}" ${maxed || !affordable ? 'disabled' : ''}>
+            ${maxed ? 'Maximal' : `🌌 ${bkmpIdleFormatNumber(cost)}`}
+          </button>
+        </div>`;
+    }).join('')}</div>
+  `;
+  const prestigeBtn = document.getElementById('idlePrestigeBtn');
+  if (prestigeBtn) prestigeBtn.addEventListener('click', bkmpIdlePerformPrestige);
+  panel.querySelectorAll('.idle-prestige-buy').forEach(btn => btn.addEventListener('click', () => bkmpPrestigeBuyUpgrade(btn.dataset.prestigeId)));
+}
+
 /* ---------------- Tabs & Modal ---------------- */
 
 const bkmpIdleTabs = [
@@ -1032,7 +1357,8 @@ const bkmpIdleTabs = [
   { id: 'skilltree', btn: 'idleTabBtnSkilltree', panel: 'idlePanelSkilltree', render: bkmpIdleRenderSkilltreePanel },
   { id: 'sammlung', btn: 'idleTabBtnSammlung', panel: 'idlePanelSammlung', render: bkmpIdleRenderSammlungPanel },
   { id: 'erfolge', btn: 'idleTabBtnErfolge', panel: 'idlePanelErfolge', render: bkmpIdleRenderErfolgePanel },
-  { id: 'bestenliste', btn: 'idleTabBtnBestenliste', panel: 'idlePanelBestenliste', render: bkmpIdleRenderBestenlistePanel }
+  { id: 'bestenliste', btn: 'idleTabBtnBestenliste', panel: 'idlePanelBestenliste', render: bkmpIdleRenderBestenlistePanel },
+  { id: 'prestige', btn: 'idleTabBtnPrestige', panel: 'idlePanelPrestige', render: bkmpIdleRenderPrestigePanel }
 ];
 let bkmpIdleActiveTab = 'kampf';
 
@@ -1149,7 +1475,7 @@ function bkmpIdleHandleDragonClick() {
   }
   if (now < bkmpIdleClickLockedUntil) return;
 
-  const clickDamage = Math.max(1, Math.round(bkmpIdleEffectiveStats.attack * 0.12));
+  const clickDamage = Math.max(1, Math.round(bkmpIdleEffectiveStats.attack * (0.12 + (bkmpIdleEffectiveStats.clickDamagePct || 0) / 100)));
   bkmpIdleCurrentDragon.hp = Math.max(0, bkmpIdleCurrentDragon.hp - clickDamage);
   bkmpIdleSpawnClickDamage(clickDamage);
   bkmpIdleSpawnHitFlash('idleDragon');
@@ -1387,12 +1713,36 @@ function bkmpRaidHandleRealtimeChange(change) {
   if (change.type === 'instance' && change.row) {
     bkmpRaidState.bossHp = Number(change.row.boss_hp || 0);
     bkmpRaidState.cityHp = Number(change.row.city_hp || 0);
+    bkmpRaidState.cityAttack = Number(change.row.city_attack || bkmpRaidState.cityAttack || 0);
+    bkmpRaidState.cityDefense = Number(change.row.city_defense || bkmpRaidState.cityDefense || 0);
     bkmpRaidState.status = change.row.status;
     bkmpRaidState.participantCount = Number(change.row.participant_count || 0);
     bkmpRaidRenderCombat();
     bkmpRaidCheckOutcome();
   } else if (change.type === 'participants' && bkmpRaidState) {
-    loadRaidParticipants(bkmpRaidState.id).then(rows => { bkmpRaidParticipants = rows; bkmpRaidRenderParticipants(); }).catch(() => {});
+    /* Eingehende Zeile direkt einsortieren statt bei JEDEM Tick JEDES
+       Mitspielers die komplette Liste neu von der DB zu laden - vermeidet
+       die Ruckler/kurzen Rueckspruenge auf veraltete Werte, die durch
+       ueberholende parallele Refetches entstanden sind. Nur bei
+       unerwartetem Payload-Format (z. B. DELETE ohne "new"-Zeile) auf
+       einen echten Refetch zurueckfallen. */
+    const row = change.row;
+    if (row && row.auth_user_id) {
+      const mapped = {
+        authUserId: row.auth_user_id,
+        displayName: row.display_name,
+        damageDealt: Number(row.damage_dealt || 0),
+        critsLanded: Number(row.crits_landed || 0),
+        clicksLanded: Number(row.clicks_landed || 0),
+        joinedAt: row.joined_at ? Date.parse(row.joined_at) : 0
+      };
+      const idx = bkmpRaidParticipants.findIndex(p => p.authUserId === mapped.authUserId);
+      if (idx >= 0) bkmpRaidParticipants[idx] = mapped; else bkmpRaidParticipants.push(mapped);
+      bkmpRaidParticipants.sort((a, b) => b.damageDealt - a.damageDealt);
+      bkmpRaidRequestParticipantsRender();
+    } else {
+      loadRaidParticipants(bkmpRaidState.id).then(rows => { bkmpRaidParticipants = rows; bkmpRaidRequestParticipantsRender(); }).catch(() => {});
+    }
   }
 }
 
@@ -1408,12 +1758,28 @@ function bkmpRaidRenderCombat() {
   const cityLabel = document.getElementById('raidCityHpLabel');
   if (cityFill) cityFill.style.width = Math.max(0, Math.min(100, (bkmpRaidState.cityHp / Math.max(1, bkmpRaidState.cityMaxHp)) * 100)) + '%';
   if (cityLabel) cityLabel.textContent = `${bkmpIdleFormatNumber(bkmpRaidState.cityHp)} / ${bkmpIdleFormatNumber(bkmpRaidState.cityMaxHp)}`;
+  const cityStatsEl = document.getElementById('raidCityStats');
+  if (cityStatsEl) cityStatsEl.textContent = `⚔️ ${bkmpIdleFormatNumber(bkmpRaidState.cityAttack || 0)} · 🛡️ ${bkmpIdleFormatNumber(bkmpRaidState.cityDefense || 0)}`;
   const timerEl = document.getElementById('raidCombatTimer');
   if (timerEl) {
     const info = bkmpRaidGetPhaseInfo();
     timerEl.textContent = info.phase === 'fight' ? '⏳ ' + bkmpRaidFormatCountdown(info.msUntilFightEnd) : '';
   }
-  bkmpRaidRenderParticipants();
+  /* Ueber den Throttle statt direkt - bkmpRaidRenderCombat wird bei jedem
+     eigenen Tick (2.5s), jedem Boss-Poll (1.5s) UND jedem Realtime-Update
+     von ANDEREN Mitspielern aufgerufen. Ohne Throttle wurde die komplette
+     Teilnehmerliste (innerHTML) dabei mehrfach pro Sekunde neu gebaut -
+     sichtbare kurze Ruckler/Sprünge in der Schadensanzeige. */
+  bkmpRaidRequestParticipantsRender();
+}
+
+let bkmpRaidParticipantsRenderTimer = null;
+function bkmpRaidRequestParticipantsRender() {
+  if (bkmpRaidParticipantsRenderTimer) return;
+  bkmpRaidParticipantsRenderTimer = window.setTimeout(() => {
+    bkmpRaidParticipantsRenderTimer = null;
+    bkmpRaidRenderParticipants();
+  }, 400);
 }
 
 function bkmpRaidRenderParticipants() {
@@ -1515,7 +1881,7 @@ function bkmpRaidHandleBossClick() {
   if (now < bkmpRaidClickLockedUntil) return;
 
   const isCrit = Math.random() * 100 < bkmpIdleEffectiveStats.critChance;
-  const clickDamage = Math.max(1, Math.round(bkmpIdleEffectiveStats.attack * 0.12 * (isCrit ? Math.max(1, bkmpIdleEffectiveStats.critDamage / 100) : 1)));
+  const clickDamage = Math.max(1, Math.round(bkmpIdleEffectiveStats.attack * (0.12 + (bkmpIdleEffectiveStats.clickDamagePct || 0) / 100) * (isCrit ? Math.max(1, bkmpIdleEffectiveStats.critDamage / 100) : 1)));
   bkmpRaidSpawnFx('raid-fx-magic', 'raidBoss', clickDamage, isCrit);
   bkmpRaidHitFlash('raidBoss');
   submitRaidDamage(bkmpRaidState.id, clickDamage, isCrit, true).then(result => {
@@ -1685,6 +2051,24 @@ function bkmpIdleInit() {
   if (closeX) closeX.addEventListener('click', bkmpIdleCloseModal);
   const dragonEl = document.getElementById('idleDragon');
   if (dragonEl) { dragonEl.classList.add('idle-dragon-clickable'); dragonEl.addEventListener('click', bkmpIdleHandleDragonClick); }
+  /* Leertaste als Alternative zum Maus-Klick auf den Drachen/Weltboss -
+     Autoklicker-Schutz greift ueber dieselben Handler-Funktionen genauso,
+     da hier nur der jeweilige Klick-Handler aufgerufen wird, keine eigene
+     Schaden-Logik. Ignoriert, solange irgendwo getippt wird (Formulare,
+     Feedback usw.), damit ein Leerzeichen dort nicht ausversehen einen
+     Angriff ausloest. */
+  document.addEventListener('keydown', e => {
+    if (e.code !== 'Space' || e.repeat) return;
+    const active = document.activeElement;
+    const tag = active ? active.tagName : '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || (active && active.isContentEditable)) return;
+    if (!bkmpIdleModalOpen) return;
+    const combatView = document.getElementById('raidCombatView');
+    const raidActive = combatView && combatView.style.display !== 'none';
+    e.preventDefault();
+    if (raidActive) bkmpRaidHandleBossClick();
+    else bkmpIdleHandleDragonClick();
+  });
   window.addEventListener('beforeunload', () => { bkmpIdleQueueSync(); bkmpIdleFlushSync(); });
   document.addEventListener('visibilitychange', () => { if (document.hidden) { bkmpIdleQueueSync(); bkmpIdleFlushSync(); } });
   window.setTimeout(bkmpIdlePreloadStateIfNamed, 0);

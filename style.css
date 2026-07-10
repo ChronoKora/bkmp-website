@@ -4284,11 +4284,31 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 }
 .idle-dmg-crit { color: #facc15; font-size: 1.05rem; }
 .idle-dmg-click { color: #7dd3fc; left: 65%; }
+.idle-dmg-burn { color: #fb923c; left: 35%; text-shadow: 0 0 8px rgba(251, 146, 60, 0.7); }
+.idle-dmg-lightning { color: #fef08a; left: 60%; text-shadow: 0 0 8px rgba(250, 204, 21, 0.8); }
 .idle-dragon-clickable { cursor: pointer; }
 .idle-dragon-clickable:active .idle-dragon-sprite { transform: scale(0.96); }
 @keyframes idleDmgFloat {
   0% { opacity: 1; transform: translate(-50%, 0); }
   100% { opacity: 0; transform: translate(-50%, -34px); }
+}
+
+.idle-lightning-bolt {
+  position: absolute; top: 10%; left: 55%; width: 5px; height: 55%;
+  background: linear-gradient(180deg, #fef9c3, #facc15);
+  clip-path: polygon(50% 0%, 100% 10%, 60% 45%, 100% 50%, 20% 100%, 40% 55%, 0% 50%);
+  filter: drop-shadow(0 0 6px #facc15);
+  animation: idleLightningStrike 0.35s ease forwards;
+  pointer-events: none;
+}
+@keyframes idleLightningStrike { 0% { opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; } }
+
+.idle-ice-block {
+  position: absolute; top: 30%; left: 50%; transform: translateX(-50%);
+  font-weight: 700; font-size: 0.8rem; color: #7dd3fc;
+  text-shadow: 0 0 8px rgba(125, 211, 252, 0.7);
+  animation: idleDmgFloat 0.8s ease forwards;
+  pointer-events: none; white-space: nowrap;
 }
 
 .idle-dorf-log {
@@ -4311,6 +4331,29 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 .idle-upgrade-desc { font-size: 0.72rem; color: var(--muted); margin-bottom: 0.6rem; min-height: 2em; }
 .idle-upgrade-buy { width: 100%; padding: 0.4rem 0.6rem; font-size: 0.78rem; }
 .idle-upgrade-buy:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ---- Prestige ---- */
+.idle-prestige-summary {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.6rem 1rem;
+  padding: 0.8rem 1rem; margin-bottom: 0.9rem; border-radius: 14px;
+  background: linear-gradient(135deg, color-mix(in srgb, #a78bfa 18%, var(--paper)), var(--paper));
+  border: 1px solid color-mix(in srgb, #a78bfa 35%, var(--line));
+}
+.idle-prestige-level { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.05rem; color: #c4b5fd; }
+.idle-prestige-points { font-size: 0.85rem; color: var(--muted); }
+.idle-prestige-bonus-note { flex-basis: 100%; font-size: 0.78rem; color: #a78bfa; font-weight: 600; }
+.idle-prestige-progress-card {
+  border: 1px solid var(--line); border-radius: 14px; padding: 1rem;
+  background: var(--paper); margin-bottom: 1rem; text-align: center;
+}
+.idle-prestige-progress-label { font-size: 0.82rem; color: var(--muted); margin-bottom: 0.5rem; }
+.idle-prestige-btn {
+  margin-top: 0.8rem; background: linear-gradient(135deg, #a78bfa, #7c3aed);
+  border: none; font-weight: 700; box-shadow: 0 0 18px rgba(167, 139, 250, 0.4);
+}
+.idle-prestige-hint { margin: 0.6rem 0 0; font-size: 0.8rem; color: var(--muted); }
+.idle-prestige-buy { background: linear-gradient(135deg, #a78bfa, #7c3aed); border: none; color: #fff; }
+.idle-prestige-buy:disabled { background: var(--paper-3); color: var(--muted); }
 
 /* ---- Skilltree ---- */
 .idle-skillpoints-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 0.9rem; }
@@ -4571,6 +4614,7 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 .raid-hp-fill-city { background: linear-gradient(90deg, #4ade80, #22c55e); }
 .raid-hp-fill-boss { background: linear-gradient(90deg, #f87171, #b91c1c); }
 .raid-hp-label { font-size: 0.72rem; color: var(--muted); margin-top: 0.25rem; font-weight: 700; }
+.raid-city-stats { font-size: 0.7rem; color: var(--muted); margin-top: 0.15rem; }
 
 .raid-clickable { cursor: pointer; }
 .raid-clickable:active .raid-boss-sprite { transform: scale(0.95); }
@@ -4635,7 +4679,7 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 
 @media (prefers-reduced-motion: reduce) {
   .idle-dorf-overlay .idle-dorf-card { animation: none; }
-  .idle-hit-flash, .idle-arrow, .idle-fire-breath, .idle-dmg-float { animation: none !important; }
+  .idle-hit-flash, .idle-arrow, .idle-fire-breath, .idle-dmg-float, .idle-lightning-bolt { animation: none !important; }
 }
 
 /* ---- 18 neue Kosmetiken (Idle Dorf) ---- */

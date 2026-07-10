@@ -2637,6 +2637,39 @@ async function loadIdleGameConfig() {
   return config;
 }
 
+/* Bewusst eine EIGENE Tabelle + eigene Lade-/Speicherfunktion statt Spalten
+   auf idle_player_state: eine noch nicht ausgefuehrte Migration kann so
+   niemals den normalen Spielstand (Gold/Level/Skills) blockieren, siehe
+   Kommentar in supabase-idle-prestige.sql. */
+async function loadIdlePrestigeState(name) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !name) return null;
+  const { data, error } = await client
+    .from('idle_prestige_state')
+    .select('name_key, display_name, prestige_level, prestige_points, prestige_points_spent, prestige_allocations, updated_at')
+    .eq('name_key', String(name).trim().toLowerCase())
+    .limit(1);
+  if (error) throw error;
+  return Array.isArray(data) && data[0] ? data[0] : null;
+}
+
+async function saveIdlePrestigeState(state) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client || !state || !state.name_key) return false;
+  const payload = {
+    name_key: state.name_key,
+    display_name: state.display_name,
+    prestige_level: Math.max(0, Math.round(state.prestige_level || 0)),
+    prestige_points: Math.max(0, Math.round(state.prestige_points || 0)),
+    prestige_points_spent: Math.max(0, Math.round(state.prestige_points_spent || 0)),
+    prestige_allocations: state.prestige_allocations && typeof state.prestige_allocations === 'object' ? state.prestige_allocations : {},
+    updated_at: new Date().toISOString()
+  };
+  const { error } = await client.from('idle_prestige_state').upsert(payload, { onConflict: 'name_key' });
+  if (error) throw error;
+  return true;
+}
+
 async function loadIdlePlayerState(name) {
   const client = bkmpGetSupabaseClient();
   if (!client || !name) return null;
@@ -3171,7 +3204,15 @@ function bkmpSubscribeToRaidInstance(raidId, onChange) {
       onChange({ type: 'instance', row: payload.new });
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'raid_participants', filter: `raid_id=eq.${raidId}` }, payload => {
-      onChange({ type: 'participants' });
+      /* payload.new (der geaenderte/neue Teilnehmer-Datensatz) direkt
+         durchreichen statt nur ein Signal zu senden - der Aufrufer kann
+         damit die eigene Teilnehmerliste im Speicher aktualisieren statt
+         bei JEDEM Tick JEDES Mitspielers die komplette Liste neu von der
+         DB zu laden (bei 7-10 aktiven Spielern, die alle 1.5-2.5s ticken,
+         kamen so mehrere volle Refetches pro Sekunde zusammen, die sich
+         gegenseitig ueberholen konnten - sichtbare kurze "Ruckler"/
+         veraltete Zwischenstaende in der Schaden-Anzeige). */
+      onChange({ type: 'participants', row: payload.new, eventType: payload.eventType });
     })
     .subscribe();
 }

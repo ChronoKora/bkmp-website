@@ -155,7 +155,16 @@ module.exports = async function handler(req, res) {
     // Sieges-Pfad ohne jeden Schaden am Dorf simuliert, wodurch AFK-Spieler
     // beliebig weit ueber ihre tatsaechliche Staerke hinaus aufsteigen
     // konnten und nach der Rueckkehr sofort an zu starken Drachen scheiterten.
-    const efficiency = Math.max(0, Math.min(100, offlineCfg.efficiencyPct || 50)) / 100;
+    /* Offline-Einnahmen (Wirtschaft-Skilltree, Knoten "wirt_offline"): erhoeht
+       die Effizienz zusaetzlich zum Basiswert. Rang direkt aus
+       skill_allocations gelesen (ist Teil des ohnehin schon per "*"
+       geladenen Zeilen-Objekts) statt einer eigenen DB-Spalte - vermeidet
+       eine weitere Migration mit Deploy-Reihenfolge-Risiko wie zuletzt bei
+       last_skilltree_reset_at. effect_value_per_rank=5, max_rank=6 (siehe
+       supabase-idle-dorf-schema.sql). */
+    const wirtOfflineRank = Number((state.skill_allocations && state.skill_allocations.wirt_offline) || 0);
+    const offlineBonusPct = Math.max(0, Math.min(6, wirtOfflineRank)) * 5;
+    const efficiency = Math.max(0, Math.min(95, (offlineCfg.efficiencyPct || 50) + offlineBonusPct)) / 100;
     const attack = Number(state.attack || 10);
     const defense = Number(state.defense || 2);
     const critChance = Number(state.crit_chance || 5);
