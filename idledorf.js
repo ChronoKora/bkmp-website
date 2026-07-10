@@ -1322,11 +1322,11 @@ function bkmpIdleRenderPrestigePanel() {
       ${level > 0 ? `<div class="idle-prestige-bonus-note">Dauerhafter Bonus: +${level * 5}% Angriff/Leben/Gold/XP</div>` : ''}
     </div>
     <div class="idle-prestige-progress-card">
-      <div class="idle-prestige-progress-label">Stufe ${stage} / ${BKMP_PRESTIGE_REQUIRED_STAGE} zum Aufsteigen</div>
+      <div class="idle-prestige-progress-label">Drachen-Stufe ${stage} / ${BKMP_PRESTIGE_REQUIRED_STAGE} zum Aufsteigen <span class="idle-prestige-progress-hint">(nicht dein Level – die höchste erreichte Drachen-Stufe)</span></div>
       <div class="idle-hp-bar"><div class="idle-hp-fill idle-hp-fill-village" style="width:${progressPct}%"></div></div>
       ${eligible
         ? `<button type="button" class="btn-ja idle-prestige-btn" id="idlePrestigeBtn">🌌 Jetzt aufsteigen (+${bkmpIdleFormatNumber(previewGain)} Punkte)</button>`
-        : `<p class="idle-prestige-hint">Erreiche Stufe ${BKMP_PRESTIGE_REQUIRED_STAGE}, um dauerhaft aufsteigen zu können.</p>`}
+        : `<p class="idle-prestige-hint">Erreiche Drachen-Stufe ${BKMP_PRESTIGE_REQUIRED_STAGE}, um dauerhaft aufsteigen zu können.</p>`}
     </div>
     <div class="idle-upgrade-grid">${BKMP_PRESTIGE_UPGRADES.map(def => {
       const rank = Number(alloc[def.id] || 0);

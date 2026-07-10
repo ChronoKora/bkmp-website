@@ -4347,6 +4347,7 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   background: var(--paper); margin-bottom: 1rem; text-align: center;
 }
 .idle-prestige-progress-label { font-size: 0.82rem; color: var(--muted); margin-bottom: 0.5rem; }
+.idle-prestige-progress-hint { display: block; font-size: 0.72rem; opacity: 0.75; margin-top: 0.15rem; }
 .idle-prestige-btn {
   margin-top: 0.8rem; background: linear-gradient(135deg, #a78bfa, #7c3aed);
   border: none; font-weight: 700; box-shadow: 0 0 18px rgba(167, 139, 250, 0.4);
