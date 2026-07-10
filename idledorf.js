@@ -1765,13 +1765,20 @@ async function bkmpRaidStartCombatView(raidId) {
   /* Der Raid kann laengst zuende sein, ohne dass dieser Client das live
      mitbekommen hat (Fenster war zu, als der Sieg/die Niederlage passiert
      ist - bkmpRaidJoinedId wird nur bei einem live beobachteten Ende auf
-     'ended-...' gesetzt, siehe bkmpRaidCheckOutcome). bkmpRaidShouldShowCombatView()
-     kennt nur die reine Uhrzeit-Phase, nicht den echten Serverstatus, und
-     haette uns sonst bei JEDEM Oeffnen des Fensters innerhalb derselben
-     Stunde erneut kurz in den (toten) Kampf springen lassen. Sobald wir den
-     echten Status vom Server sehen, sofort sauber abbrechen statt das
-     Schlachtfeld ueberhaupt erst zu zeigen. */
-  if (bkmpRaidState && bkmpRaidState.status !== 'fighting') {
+     'ended-...' gesetzt, siehe bkmpRaidCheckOutcome). Nur ein WIRKLICH
+     abgeschlossener Status (won/lost/expired) zaehlt hier als "vorbei" -
+     'prep' NICHT, denn der Serverwechsel prep->fighting passiert erst beim
+     ERSTEN Aufruf von raid_boss_attack_tick() (siehe bkmpRaidBossPoll,
+     gestartet unten via bkmpRaidStartLoops). Genau am Stundenwechsel steht
+     die DB-Zeile fuer die ersten paar hundert Millisekunden also noch auf
+     'prep', obwohl die Kampfzeit laut Uhr laengst begonnen hat. Wuerde
+     dieser Fall hier faelschlich als "schon vorbei" gewertet, bricht der
+     JEWEILS ERSTE Client sofort ab, bevor er ueberhaupt raid_boss_attack_tick
+     aufrufen konnte - der Statuswechsel passiert dann NIE, und der Raid
+     haengt fuer alle Spieler dauerhaft in 'prep' fest (genau das Symptom
+     "Kampf beginnt und schliesst sich direkt wieder"). */
+  const raidTerminalStatus = bkmpRaidState && (bkmpRaidState.status === 'won' || bkmpRaidState.status === 'lost' || bkmpRaidState.status === 'expired');
+  if (raidTerminalStatus) {
     bkmpRaidJoinedId = 'ended-' + raidId;
     bkmpRaidToggleCombatView(false);
     return;
