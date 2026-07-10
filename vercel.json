@@ -1,4 +1,5 @@
 {
+  "cleanUrls": true,
   "functions": {
     "api/scan-plushie-folder.js": {
       "includeFiles": "assets/plushies/**"
@@ -22,6 +23,15 @@
     },
     {
       "source": "/(.*).html",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/(admin|impressum|datenschutz)",
       "headers": [
         {
           "key": "Cache-Control",
