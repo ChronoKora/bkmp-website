@@ -2484,6 +2484,17 @@ async function bkmpRaidCheckOutcome() {
   bkmpRaidShowResult();
   bkmpRaidRefreshAchievementCache();
   await bkmpRaidSyncIdleStateAfterFinish();
+  /* Der normale Idle-Dorf-Kampf-Loop wurde beim Betreten des Raids gestoppt
+     (siehe bkmpRaidUpdateButtonState) und wird bisher NUR wieder gestartet,
+     wenn der Spieler die Kampfansicht manuell verlaesst (bkmpRaidStopCombatView).
+     Endet ein Raid aber von selbst (gewonnen/verloren/abgelaufen), waehrend
+     das Ergebnis-Fenster noch offen ist, lief dieser Pfad nie - der
+     automatische Tick (und damit jeder Gegenschlag der Drachen) blieb fuer
+     den Rest der Sitzung tot, nur Klicks funktionierten noch weiter (die
+     ueberspringen den Gegenschlag grundsaetzlich, siehe bkmpIdleHandleDragonClick)
+     - im Ergebnis liess sich jeder Drache nach einem Raid ohne jedes Risiko
+     wegklicken, bis die Seite neu geladen wurde. Live von Spielern bestaetigt. */
+  if (bkmpIdleModalOpen) bkmpIdleStartLoop();
 }
 
 async function bkmpRaidShowResult() {
