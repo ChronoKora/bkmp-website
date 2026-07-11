@@ -4201,24 +4201,31 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   min-height: 0;
 }
 
-/* Easter Egg "AD-Free": bewusst wie ein typischer Werbung-entfernen-Button
-   gestylt (dezent, unscheinbar, kein Hinweis dass es ein Scherz ist) - an
-   einer freien Stelle unterhalb des Schlachtfelds. */
+/* Easter Egg "AD-Free": soll wie ein echter, glaubwuerdiger "Werbung
+   entfernen"-Button aus einem Mobile-Game aussehen (deshalb dasselbe
+   Gold-Verlauf-Muster wie die anderen "Premium"-Buttons der Seite, z. B.
+   .wish-download) - unauffaellig ist nur der PLATZ dafuer, nicht der
+   Button selbst. */
 .idle-adfree-btn {
   align-self: flex-start;
-  margin: 0.3rem 0 0.5rem;
-  padding: 0.3rem 0.7rem;
-  border: 1px solid var(--line);
+  margin: 0.5rem 0;
+  padding: 0.55rem 1.1rem;
+  border: 0;
   border-radius: 999px;
-  background: var(--paper-2);
-  color: var(--muted);
+  background: linear-gradient(135deg, #f5d58a, var(--gold));
+  color: #111018;
   font-family: 'Inter', sans-serif;
-  font-size: 0.72rem;
+  font-weight: 700;
+  font-size: 0.82rem;
   cursor: pointer;
-  opacity: 0.6;
-  transition: opacity 0.2s ease, color 0.2s ease;
+  box-shadow: 0 8px 22px rgba(201, 165, 106, 0.35);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
-.idle-adfree-btn:hover { opacity: 1; color: var(--gold); }
+.idle-adfree-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(201, 165, 106, 0.45);
+}
+.idle-adfree-btn:active { transform: translateY(0); }
 
 /* ---- Stufen-Leiste ---- */
 .idle-stage-bar {
