@@ -2586,7 +2586,7 @@ async function bkmpRaidRefreshAchievementCache() {
       raidBestDamage: Number(row ? row.best_single_raid_damage : 0)
     };
     try { localStorage.setItem(BKMP_RAID_ACHIEVEMENT_CACHE_KEY, JSON.stringify(fields)); } catch (e) {}
-    if (typeof renderAchievementBadge === 'function') renderAchievementBadge();
+    if (typeof renderAchievementBadge === 'function') renderAchievementBadge(true);
   } catch (e) { /* Cache bleibt auf altem Stand */ }
 }
 

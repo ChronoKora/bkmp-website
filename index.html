@@ -893,7 +893,7 @@
   <script src="assets/vendor/supabase-js.min.js"></script>
   <script src="supabase.js?v=20260711-achfreshcheck1"></script>
   <script src="app.js?v=20260709-optpass3"></script>
-  <script src="idledorf.js?v=20260711-forcesync1"></script>
+  <script src="idledorf.js?v=20260711-raidforcesync1"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
   <script>
     bkmpInitTheme();
@@ -3275,31 +3275,34 @@
     }
 
     let bkmpLastStatsSyncAt = 0;
-    /* Vor JEDEM Hochladen wird der aktuelle Server-Stand frisch abgefragt
-       (loadPlayerAchievementsUnlockedByName) und der hochgeladene Zaehler nie
-       darunter gedrueckt. Bewusst NICHT auf einen beim Login gemerkten Wert
-       verlassen (das war fragil: eine frisch geladene Seite/Tab startet
-       diesen Merker immer bei 0, und falls der Login-Merge aus irgendeinem
-       Grund nicht rechtzeitig durch war, griff die Sperre nicht) - die
-       frische Serverabfrage ist immer korrekt, unabhaengig vom Seiten-
-       Ladezustand. Kostet einen zusaetzlichen kleinen Request pro Sync,
-       der aber durch den 45s-Throttle ohnehin selten ist. Live beobachtet:
-       mehrere frische Logins/Inkognito-Tabs haben trotz der vorherigen,
-       merker-basierten Sperre einen bereits erreichten, hoeheren Server-
-       Stand (115) schrittweise auf 111 -> 80 -> 76 heruntergeschrieben. */
+    /* Architektur-Entscheidung (nach mehreren Einzelfall-Fixes, die immer
+       wieder an NEUEN Aufrufstellen erneut auftraten): der 45s-Throttle
+       gilt ab sofort NUR NOCH fuer "nichts Neues zu berichten"-Aufrufe
+       (kleine Nebenfelder wie minutesSpent/panelOpens/bonkCount auffrischen).
+       Sobald der frisch beim Server abgefragte Erfolge-Stand NIEDRIGER ist
+       als das, was dieses Geraet gerade berechnet hat, wird SOFORT
+       hochgeladen, egal wie lange der letzte Sync her ist - eine echte
+       Korrektur/Verbesserung darf nie durch Throttling verzoegert werden.
+       Vorher musste jede der drei Hintergrund-Ladequellen (Pluschies,
+       Idle-Dorf, Raid-Statistiken) einzeln daran denken, ihren
+       renderAchievementBadge()-Aufruf mit force=true zu markieren - das ist
+       dreimal unabhaengig voneinander vergessen worden. Jetzt entscheidet
+       die Funktion selbst anhand der Zahlen, nicht die Aufrufer. */
     async function bkmpSyncPlayerStats(unlockedCount, force) {
       const name = bkmpGetMcName();
       if (!name || typeof upsertPlayerStats !== 'function' || !bkmpGetSupabaseClient()) return null;
-      const now = Date.now();
-      if (!force && now - bkmpLastStatsSyncAt < 45000) return null;
-      bkmpLastStatsSyncAt = now;
       let safeUnlockedCount = unlockedCount;
+      let isRealImprovement = false;
       try {
         if (typeof loadPlayerAchievementsUnlockedByName === 'function') {
           const currentRemote = await loadPlayerAchievementsUnlockedByName(name);
           safeUnlockedCount = Math.max(unlockedCount, currentRemote);
+          isRealImprovement = unlockedCount > currentRemote;
         }
-      } catch (e) { /* Frisch-Check fehlgeschlagen - mit dem lokalen Wert weitermachen */ }
+      } catch (e) { /* Frisch-Check fehlgeschlagen - mit dem lokalen Wert weitermachen, normalem Throttle unterwerfen */ }
+      const now = Date.now();
+      if (!force && !isRealImprovement && now - bkmpLastStatsSyncAt < 45000) return null;
+      bkmpLastStatsSyncAt = now;
       return upsertPlayerStats(name, {
         minutesSpent: bkmpGetTimeSpentMinutes(),
         achievementsUnlocked: safeUnlockedCount,
