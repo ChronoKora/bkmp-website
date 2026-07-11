@@ -885,6 +885,20 @@ function bkmpIdleTick() {
     return;
   }
 
+  bkmpIdleDragonCounterAttack(stats);
+}
+
+/* Gegenschlag des Drachen - eigene Funktion, damit Tick UND Klick
+   (bkmpIdleHandleDragonClick) exakt dieselbe Logik nutzen. Vorher hatte
+   NUR der Tick einen Gegenschlag; ein Klick, der den Drachen nicht sofort
+   toetete, machte Schaden OHNE dass der Drache je zurueckschlug. Sobald
+   ausschliesslich geklickt wurde (z.B. weil der Auto-Tick gerade tot war,
+   siehe der Raid-Bug oben, oder einfach weil man schnell durchklickt statt
+   zu warten), bekam das Dorf dadurch NIE Schaden - komplettes Nullrisiko.
+   Aufgerufen wird sie nur, wenn der Drache den Treffer ueberlebt hat - beim
+   toedlichen letzten Treffer bleibt der Gegenschlag weiterhin bewusst aus
+   (kein Rachehieb von einem toten Drachen), egal ob per Tick oder Klick. */
+function bkmpIdleDragonCounterAttack(stats) {
   /* Eis (magie_eis): Chance, den Gegenangriff komplett auszusetzen. */
   const frozen = stats.iceChancePct > 0 && Math.random() * 100 < stats.iceChancePct;
   if (frozen) {
@@ -2027,6 +2041,11 @@ function bkmpIdleHandleDragonClick() {
 
   if (bkmpIdleCurrentDragon.hp <= 0) {
     bkmpIdleHandleDragonDefeated();
+  } else {
+    /* Ueberlebt der Drache den Klick, schlaegt er jetzt genau wie beim Tick
+       zurueck - siehe bkmpIdleDragonCounterAttack. Nur der wirklich
+       toedliche Treffer (oben) bleibt weiterhin gegenschlagfrei. */
+    bkmpIdleDragonCounterAttack(bkmpIdleEffectiveStats);
   }
 }
 
