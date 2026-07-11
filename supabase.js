@@ -2446,6 +2446,26 @@ async function loadPlayerStatsByName(name) {
   return row ? bkmpMapPlayerStatsFromSupabase(row) : null;
 }
 
+/* Schlanke Einzelfeld-Abfrage fuer den Erfolge-Zaehler - genutzt von
+   bkmpSyncPlayerStats (index.html) als Frisch-Check direkt vor dem
+   Hochladen, damit ein Geraet mit noch unvollstaendig geladenem lokalem
+   Kontext niemals einen bereits erreichten, hoeheren Server-Stand nach
+   unten ueberschreibt. Bewusst eine eigene, schlanke Abfrage statt
+   loadPlayerStatsByName (laedt sonst die komplette Zeile fuer ein einzelnes
+   Feld). */
+async function loadPlayerAchievementsUnlockedByName(name) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !name) return 0;
+  const { data, error } = await client
+    .from('player_stats')
+    .select('achievements_unlocked')
+    .eq('name_key', String(name).trim().toLowerCase())
+    .limit(1);
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : null;
+  return row ? Number(row.achievements_unlocked || 0) : 0;
+}
+
 async function upsertPlayerStats(displayName, stats) {
   const client = bkmpGetPlayerAuthClient();
   if (!client || !displayName) return false;

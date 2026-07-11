@@ -891,7 +891,7 @@
 
   <script>window.BKMP_CLIENT_STORAGE_KEY = 'bkmp-customer-auth';</script>
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260711-singlesession1"></script>
+  <script src="supabase.js?v=20260711-achfreshcheck1"></script>
   <script src="app.js?v=20260709-optpass3"></script>
   <script src="idledorf.js?v=20260711-forcesync1"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
@@ -3275,24 +3275,31 @@
     }
 
     let bkmpLastStatsSyncAt = 0;
-    /* Zuletzt vom Server bekannter Erfolge-Zaehler (siehe
-       bkmpMergeRemoteStatsIntoLocal) - der live auf DIESEM Geraet berechnete
-       Zaehler wird beim Hochladen nie darunter gedrueckt. Noetig, weil der
-       Zaehler bei jedem Geraet frisch aus dem lokalen Kontext berechnet wird
-       (Plueschies/Idle-Dorf-Felder/etc. koennen auf einem Geraet kurzzeitig
-       unvollstaendig geladen sein) - ohne diese Sperre kann ein Geraet mit
-       noch nicht ganz geladenem Kontext einen bereits erreichten, hoeheren
-       Stand eines anderen Geraets ueberschreiben (live beobachtet: Handy hat
-       nach einem Reload kurzzeitig 111 statt 115 berechnet und das an den
-       Server zurueckgeschrieben, obwohl der Server schon 115 hatte). */
-    let bkmpLastKnownRemoteAchievementCount = 0;
-    function bkmpSyncPlayerStats(unlockedCount, force) {
+    /* Vor JEDEM Hochladen wird der aktuelle Server-Stand frisch abgefragt
+       (loadPlayerAchievementsUnlockedByName) und der hochgeladene Zaehler nie
+       darunter gedrueckt. Bewusst NICHT auf einen beim Login gemerkten Wert
+       verlassen (das war fragil: eine frisch geladene Seite/Tab startet
+       diesen Merker immer bei 0, und falls der Login-Merge aus irgendeinem
+       Grund nicht rechtzeitig durch war, griff die Sperre nicht) - die
+       frische Serverabfrage ist immer korrekt, unabhaengig vom Seiten-
+       Ladezustand. Kostet einen zusaetzlichen kleinen Request pro Sync,
+       der aber durch den 45s-Throttle ohnehin selten ist. Live beobachtet:
+       mehrere frische Logins/Inkognito-Tabs haben trotz der vorherigen,
+       merker-basierten Sperre einen bereits erreichten, hoeheren Server-
+       Stand (115) schrittweise auf 111 -> 80 -> 76 heruntergeschrieben. */
+    async function bkmpSyncPlayerStats(unlockedCount, force) {
       const name = bkmpGetMcName();
       if (!name || typeof upsertPlayerStats !== 'function' || !bkmpGetSupabaseClient()) return null;
       const now = Date.now();
       if (!force && now - bkmpLastStatsSyncAt < 45000) return null;
       bkmpLastStatsSyncAt = now;
-      const safeUnlockedCount = Math.max(unlockedCount, bkmpLastKnownRemoteAchievementCount);
+      let safeUnlockedCount = unlockedCount;
+      try {
+        if (typeof loadPlayerAchievementsUnlockedByName === 'function') {
+          const currentRemote = await loadPlayerAchievementsUnlockedByName(name);
+          safeUnlockedCount = Math.max(unlockedCount, currentRemote);
+        }
+      } catch (e) { /* Frisch-Check fehlgeschlagen - mit dem lokalen Wert weitermachen */ }
       return upsertPlayerStats(name, {
         minutesSpent: bkmpGetTimeSpentMinutes(),
         achievementsUnlocked: safeUnlockedCount,
@@ -3311,10 +3318,10 @@
        gebraucht vom Single-Session-Rauswurf, damit z.B. ein gerade erst
        gewaehlter Titel/Kosmetik nicht verloren geht, nur weil der letzte
        normale Sync noch keine 45s her ist. */
-    function bkmpSyncPlayerStatsNow() {
+    async function bkmpSyncPlayerStatsNow() {
       const ctx = typeof bkmpAchievementContextWithMeta === 'function' ? bkmpAchievementContextWithMeta() : null;
       const unlockedCount = ctx ? BKMP_ACHIEVEMENTS.filter(a => a.check(ctx)).length : 0;
-      return bkmpSyncPlayerStats(unlockedCount, true) || Promise.resolve();
+      return (await bkmpSyncPlayerStats(unlockedCount, true)) || Promise.resolve();
     }
 
     /* Beim Namen-Eintragen: bestehenden Fortschritt fuer diesen Namen von
@@ -3325,8 +3332,6 @@
       try {
         const remote = await loadPlayerStatsByName(name);
         if (!remote) return name;
-
-        bkmpLastKnownRemoteAchievementCount = Math.max(bkmpLastKnownRemoteAchievementCount, Number(remote.achievementsUnlocked || 0));
 
         const localMinutes = bkmpGetTimeSpentMinutes();
         const mergedMinutes = Math.max(localMinutes, remote.minutesSpent || 0);
