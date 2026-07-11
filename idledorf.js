@@ -1994,24 +1994,33 @@ function bkmpIdlePreloadStateIfNamed() {
 /* BKMP_AUTOCLICK_WINDOW ist bewusst ein reiner NOTBREMSE-Deckel gegen
    unbegrenztes Array-Wachstum, NICHT Teil der eigentlichen Erkennungslogik -
    das war vorher ein echter Bug: bei 300 Eintraegen gedeckelt UND
-   gleichzeitig muss die Zeitspanne mindestens 30s (MIN_SPAN_MS) betragen.
-   Bei jedem Klick-Tempo schneller als 30000/300 = 100ms/Klick wurde das
-   Array schon durch das Mengenlimit auf z.B. nur 24s Spanne gestutzt, BEVOR
-   die 30s ueberhaupt erreicht werden konnten - die Pruefung "muss 30s
-   angehalten haben" war dadurch bei schnellen (z.B. 80ms-)Autoklickern
+   gleichzeitig muss die Zeitspanne mindestens MIN_SPAN_MS betragen. Bei
+   jedem Klick-Tempo schneller als MIN_SPAN_MS/WINDOW wurde das Array schon
+   durch das Mengenlimit gestutzt, BEVOR die Zeitspanne ueberhaupt erreicht
+   werden konnte - die Pruefung war dadurch bei schnellen Autoklickern
    NIEMALS erfuellbar, egal wie lange gewartet wurde (live durch einen
    Community-Test bestaetigt: 80ms-Autoklicker 60s laufen lassen -> nie
-   ausgeloest). Jetzt hoch genug (8000 Eintraege = volle 32s Verlauf noch bei
-   4ms/Klick, weit unterhalb jeder realistischen Klick-Rate) angesetzt, damit
-   der Zeit-Filter (HISTORY_MS) allein die Begrenzung uebernimmt und nie
-   vorzeitig eingreift. */
-const BKMP_AUTOCLICK_WINDOW = 8000;
+   ausgeloest, spaeter sogar bei 1ms/Klick 30s am Stueck reproduziert). Hoch
+   genug angesetzt (65000 Eintraege = volle HISTORY_MS-Spanne noch bei
+   1ms/Klick, extremer als jeder reale Autoklicker), damit der Zeit-Filter
+   (HISTORY_MS) allein die Begrenzung uebernimmt und nie vorzeitig eingreift.
+
+   Absichtliche Design-Entscheidung (nach Spieler-Feedback): kurze, intensive
+   Klick-Ausbrueche (z.B. 30-60s "Hass-Klicken" beim Raidboss oder
+   Event-Drachen) sollen NIEMALS ausgeloest werden, egal wie schnell/
+   gleichmaessig - nur wer wirklich DAUERHAFT/AFK mit einem Autoklicker
+   spielt, soll erwischt werden. Deshalb MIN_SPAN_MS auf 60s angehoben (unter
+   60s Dauerklicken triggert nie) UND die Sperre bei echtem Auftreten von
+   frueher nur 4s auf 10 Minuten verlaengert - eine 4s-Sperre war praktisch
+   kostenlos umgehbar (alle 30s kurz pausieren, sofort weiterklicken), 10
+   Minuten machen dauerhaftes Autoklicken tatsaechlich unattraktiv. */
+const BKMP_AUTOCLICK_WINDOW = 65000;
 const BKMP_AUTOCLICK_MIN_SAMPLES = 15;
-const BKMP_AUTOCLICK_MIN_SPAN_MS = 30000;
+const BKMP_AUTOCLICK_MIN_SPAN_MS = 60000;
 const BKMP_AUTOCLICK_MAX_AVG_INTERVAL_MS = 260;
 const BKMP_AUTOCLICK_CV_THRESHOLD = 0.12;
-const BKMP_AUTOCLICK_LOCK_MS = 4000;
-const BKMP_AUTOCLICK_HISTORY_MS = 32000; // etwas mehr als MIN_SPAN_MS, sonst wuerden aeltere, fuer die 30s-Pruefung noetige Zeitstempel schon vorher weggefiltert
+const BKMP_AUTOCLICK_LOCK_MS = 10 * 60 * 1000;
+const BKMP_AUTOCLICK_HISTORY_MS = 62000; // etwas mehr als MIN_SPAN_MS, sonst wuerden aeltere, fuer die 60s-Pruefung noetige Zeitstempel schon vorher weggefiltert
 const BKMP_AUTOCLICK_TOAST = 'Deine Klicks wirken verdächtig gleichmäßig – kurze Pause fürs Handgelenk 😉';
 
 function bkmpIdleDetectAutoclickPattern(timestamps) {
@@ -2036,20 +2045,6 @@ function bkmpIdleDetectAutoclickPattern(timestamps) {
 let bkmpIdleClickTimestamps = [];
 let bkmpIdleClickLockedUntil = 0;
 
-/* Harte Rate-Begrenzung pro Klick (unabhaengig von der Muster-Erkennung
-   oben): ohne das lohnte sich Autoklicken trotzdem noch, weil die
-   Muster-Erkennung erst nach 30s greift und danach nur 4s sperrt - macht
-   effektiv >85% der Zeit ungebremstes Autoklicken moeglich (live gemeldet
-   und nachgemessen: 30s voll klicken, 5s Sperre, wieder 30s usw.). Ein
-   Cooldown von 250ms deckt sich mit der bereits an anderer Stelle
-   verwendeten Annahme realistischen menschlichen Klicktempos (siehe
-   ASSUMED_ACTIVE_CLICKS_PER_SECOND = 4 bei den Event-Drachen) - schnellere
-   Klicks kommen einfach ohne Effekt an, kein Schaden, kein Gegenangriff,
-   keine Bestrafung noetig, weil Autoklicken so schlicht keinen Vorteil
-   mehr bringt. */
-const BKMP_CLICK_DAMAGE_COOLDOWN_MS = 250;
-let bkmpIdleLastClickDamageAt = 0;
-
 function bkmpIdleSpawnClickDamage(amount) {
   const target = document.getElementById('idleDragon');
   if (!target) return;
@@ -2067,7 +2062,6 @@ function bkmpIdleHandleDragonClick() {
   if (bkmpIdleEventPauseActive) return;
 
   const now = Date.now();
-  if (now - bkmpIdleLastClickDamageAt < BKMP_CLICK_DAMAGE_COOLDOWN_MS) return;
   if (now < bkmpIdleClickLockedUntil) return;
   bkmpIdleClickTimestamps.push(now);
   bkmpIdleClickTimestamps = bkmpIdleClickTimestamps.filter(t => now - t <= BKMP_AUTOCLICK_HISTORY_MS).slice(-BKMP_AUTOCLICK_WINDOW);
@@ -2078,7 +2072,6 @@ function bkmpIdleHandleDragonClick() {
     return;
   }
 
-  bkmpIdleLastClickDamageAt = now;
   const clickDamage = Math.max(1, Math.round(bkmpIdleEffectiveStats.attack * (0.12 + (bkmpIdleEffectiveStats.clickDamagePct || 0) / 100)));
   bkmpIdleCurrentDragon.hp = Math.max(0, bkmpIdleCurrentDragon.hp - clickDamage);
   bkmpIdleSpawnClickDamage(clickDamage);
