@@ -1918,7 +1918,7 @@ function bkmpIdlePreloadStateIfNamed() {
   const name = typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : '';
   if (!name) return;
   bkmpIdleLoadOrInitState(name)
-    .then(() => { if (typeof renderAchievementBadge === 'function') renderAchievementBadge(); })
+    .then(() => { if (typeof renderAchievementBadge === 'function') renderAchievementBadge(true); })
     .catch(() => {});
   bkmpRaidRefreshAchievementCache();
 }

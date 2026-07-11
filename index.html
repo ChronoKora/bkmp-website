@@ -893,7 +893,7 @@
   <script src="assets/vendor/supabase-js.min.js"></script>
   <script src="supabase.js?v=20260711-singlesession1"></script>
   <script src="app.js?v=20260709-optpass3"></script>
-  <script src="idledorf.js?v=20260711-flushonkick1"></script>
+  <script src="idledorf.js?v=20260711-forcesync1"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
   <script>
     bkmpInitTheme();
@@ -3902,7 +3902,7 @@
       try {
         bkmpOwnedPlushies = await loadOwnedPlushies(name);
         try { localStorage.setItem(BKMP_OWNED_PLUSHIES_CACHE_KEY, JSON.stringify(bkmpOwnedPlushies)); } catch (e) {}
-        renderAchievementBadge();
+        renderAchievementBadge(true);
         const panel = document.getElementById('plushiesPanel');
         if (panel && panel.style.display !== 'none') renderPlushiesPanel();
       } catch (e) {
@@ -4268,7 +4268,7 @@
       return 0;
     }
 
-    function renderAchievementBadge() {
+    function renderAchievementBadge(force) {
       const badge = document.getElementById('mcNameBadge');
       const badgeText = document.getElementById('mcNameBadgeText');
       const badgeIcon = document.getElementById('mcNameBadgeIcon');
@@ -4311,7 +4311,16 @@
         const tier = bkmpNameTier(unlockedCount);
         if (tier > 0) badge.classList.add('tier-' + tier);
       }
-      if (typeof bkmpSyncPlayerStats === 'function') bkmpSyncPlayerStats(unlockedCount);
+      /* force=true fuer die Selbstkorrektur-Aufrufe, NACHDEM Pluschies/
+         Idle-Dorf-Felder im Hintergrund fertig nachgeladen sind (siehe
+         bkmpRefreshOwnedPlushies/bkmpIdlePreloadStateIfNamed) - sonst wuerde
+         der davor schon (mit dem noch unvollstaendigen, zu niedrigen
+         Zaehler) erfolgte Login-Sync den 45s-Throttle auf den naechsten
+         Sync legen und genau den korrigierten, richtigen Wert verschlucken.
+         Live beobachtet: frischer/inkognito Login zeigte kurz einen viel zu
+         niedrigen Erfolge-Zaehler an, der ohne dieses Erzwingen dauerhaft in
+         der Datenbank haengen geblieben waere. */
+      if (typeof bkmpSyncPlayerStats === 'function') bkmpSyncPlayerStats(unlockedCount, force);
     }
 
     const BKMP_ACHIEVEMENT_CATEGORY_ORDER = ['Karten', 'Kartenideen', 'Zeit & Treue', 'Vielfalt', 'Bonk', 'Idle Dorf', 'Weltboss', 'Plüshies', 'Meilensteine', 'Easter Eggs', 'Sonstiges'];
