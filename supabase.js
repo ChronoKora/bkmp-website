@@ -2829,9 +2829,28 @@ async function loadIdleLeaderboardStats() {
   if (!client) return null;
   const { data, error } = await client
     .from('idle_player_state')
-    .select('display_name, level, total_gold_earned, dragon_kills, playtime_seconds');
+    .select('name_key, display_name, level, total_gold_earned, dragon_kills, playtime_seconds, highest_dragon_index, prestige_stage_offset');
   if (error) throw error;
-  return data || [];
+  const rows = data || [];
+  /* prestige_level lebt in einer eigenen Tabelle (idle_prestige_state) -
+     separat laden und per name_key zusammenfuehren, statt einen Join zu
+     brauchen (gleiches Muster wie schon an anderen Stellen im Idle-Dorf-
+     Code). "Top Insgesamte Stufen" ist kein eigenes DB-Feld, sondern die
+     gleiche Summe wie in bkmpIdleLifetimeStageCount() (idledorf.js):
+     prestige_stage_offset + highest_dragon_index. */
+  let prestigeByName = {};
+  try {
+    const { data: prestigeRows, error: prestigeError } = await client
+      .from('idle_prestige_state')
+      .select('name_key, prestige_level');
+    if (prestigeError) throw prestigeError;
+    (prestigeRows || []).forEach(p => { prestigeByName[p.name_key] = Number(p.prestige_level || 0); });
+  } catch (e) { /* Migration evtl. noch nicht ausgefuehrt - Bestenliste bleibt ohne Prestige-Werte nutzbar */ }
+  rows.forEach(row => {
+    row.prestige_level = prestigeByName[row.name_key] || 0;
+    row.lifetime_stages = Number(row.prestige_stage_offset || 0) + Number(row.highest_dragon_index || 0);
+  });
+  return rows;
 }
 
 /* Admin-only: Balance bearbeiten (RLS erlaubt Schreibzugriff nur eingeloggten Admins). */

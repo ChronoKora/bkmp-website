@@ -1443,6 +1443,8 @@ const BKMP_IDLE_LEADERBOARD_TABS = [
   { id: 'gold', label: 'Top Gold', field: 'total_gold_earned', format: v => bkmpIdleFormatNumber(v) + ' 💰' },
   { id: 'dragons', label: 'Top Drachen', field: 'dragon_kills', format: v => bkmpIdleFormatNumber(v) + ' 🐉' },
   { id: 'playtime', label: 'Top Spielzeit', field: 'playtime_seconds', format: v => Math.round(v / 60) + ' Min.' },
+  { id: 'lifetime_stages', label: 'Top Insgesamte Stufen', field: 'lifetime_stages', format: v => bkmpIdleFormatNumber(v) + ' Stufen' },
+  { id: 'prestige', label: 'Top Prestige', field: 'prestige_level', format: v => '🌌 Prestige-Stufe ' + v },
   { id: 'raid_damage', label: '🐉 Raid-Schaden', isRaid: true },
   { id: 'raid_bosses', label: '🐉 Raid-Bosse', isRaid: true },
   { id: 'raid_joined', label: '🐉 Raid-Teilnahmen', isRaid: true },
