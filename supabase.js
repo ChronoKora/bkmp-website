@@ -1410,6 +1410,114 @@ async function loadMyWishVotes() {
   return map;
 }
 
+/* ---------------- Umfragen (siehe supabase-polls-schema.sql) ----------------
+   Gleiches Muster wie wish_votes: die serverseitige 1x-Sperre kommt vom
+   Unique-Constraint (poll_id, auth_user_id), nicht von einer reinen
+   Frontend-Pruefung. */
+async function loadActivePoll() {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('polls')
+    .select('id, question, status, yes_votes, no_votes')
+    .eq('status', 'active')
+    .limit(1);
+  if (error) return null;
+  return Array.isArray(data) && data.length ? data[0] : null;
+}
+
+async function loadMyPollVote(pollId) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return null;
+  const { data: sessionData } = await client.auth.getSession();
+  const userId = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
+  if (!userId) return null;
+  const { data, error } = await client
+    .from('poll_votes')
+    .select('answer')
+    .eq('poll_id', pollId)
+    .limit(1);
+  if (error) return null;
+  return Array.isArray(data) && data.length ? data[0].answer : null;
+}
+
+async function submitPollVote(pollId, answer) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { data: sessionData } = await client.auth.getSession();
+  const userId = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
+  if (!userId) throw new Error('not_authenticated');
+
+  const { error: insertError } = await client
+    .from('poll_votes')
+    .insert({ poll_id: pollId, auth_user_id: userId, answer: answer === 'no' ? 'no' : 'yes' });
+  if (insertError) {
+    if (insertError.code === '23505') throw new Error('already_voted');
+    throw insertError;
+  }
+
+  const { data, error } = await client
+    .from('polls')
+    .select('id, question, status, yes_votes, no_votes')
+    .eq('id', pollId)
+    .limit(1);
+  if (error) throw error;
+  return Array.isArray(data) && data.length ? data[0] : null;
+}
+
+/* Admin-only ab hier: Anlegen/Aktivieren/Deaktivieren/Archivieren laufen
+   ueber den admin.html-Client, per RLS auf is_active_admin() begrenzt. */
+async function loadAllPolls() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from('polls')
+    .select('id, question, status, created_at, activated_at, deactivated_at, yes_votes, no_votes')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+async function createPoll(question) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { data, error } = await client
+    .from('polls')
+    .insert({ question: String(question || '').trim() })
+    .select('id, question, status, created_at, activated_at, deactivated_at, yes_votes, no_votes')
+    .limit(1);
+  if (error) throw error;
+  return Array.isArray(data) && data.length ? data[0] : null;
+}
+
+async function activatePoll(id) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { error } = await client.rpc('activate_poll', { p_poll_id: id });
+  if (error) throw error;
+}
+
+async function deactivatePoll(id) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { error } = await client
+    .from('polls')
+    .update({ status: 'ended', deactivated_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('status', 'active');
+  if (error) throw error;
+}
+
+async function archivePoll(id) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { error } = await client
+    .from('polls')
+    .update({ status: 'archived' })
+    .eq('id', id);
+  if (error) throw error;
+}
+
 async function deleteWish(id) {
   const client = bkmpGetSupabaseClient();
   if (!client) return false;

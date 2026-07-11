@@ -34,9 +34,19 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260711-adfreezfix1">
+<link rel="stylesheet" href="style.css?v=20260711-polls1">
 </head>
 <body>
+
+  <div class="poll-banner" id="pollBanner" style="display:none;">
+    <button type="button" class="poll-banner-close" id="pollBannerCloseBtn" aria-label="Schließen">&times;</button>
+    <p class="poll-banner-question" id="pollBannerQuestion"></p>
+    <div class="poll-banner-actions" id="pollBannerActions">
+      <button type="button" class="poll-banner-btn poll-banner-btn-yes" id="pollBannerYesBtn">👍 Ja</button>
+      <button type="button" class="poll-banner-btn poll-banner-btn-no" id="pollBannerNoBtn">👎 Nein</button>
+    </div>
+    <div class="poll-banner-results" id="pollBannerResults" style="display:none;"></div>
+  </div>
 
   <div class="joke-overlay" id="jokeOverlay">
     <div class="joke-card">
@@ -945,7 +955,7 @@
 
   <script>window.BKMP_CLIENT_STORAGE_KEY = 'bkmp-customer-auth';</script>
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260711-deleteaccount1"></script>
+  <script src="supabase.js?v=20260711-polls1"></script>
   <script src="app.js?v=20260709-optpass3"></script>
   <script src="idledorf.js?v=20260711-ratecap10ps1"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
@@ -4783,6 +4793,103 @@
       bkmpAdFreeGrantReward();
     });
     bkmpAdFreeSyncButton();
+
+    /* ---------------- Umfrage-Banner (oben mittig) ----------------
+       Stimme ist ueber poll_votes (siehe supabase-polls-schema.sql) auf 1x
+       pro Account und Umfrage begrenzt - serverseitig per
+       Unique-Constraint (poll_id, auth_user_id), nicht nur hier im Client.
+       "Schliessen" merkt sich das nur fuer diese Browser-Session
+       (sessionStorage) - beim naechsten Seitenaufruf erscheint eine noch
+       nicht beantwortete Umfrage wieder, genau wie gefordert. */
+    const BKMP_POLL_DISMISSED_PREFIX = 'bkmp-poll-dismissed-';
+    function bkmpPollDismissedThisSession(pollId) {
+      try { return sessionStorage.getItem(BKMP_POLL_DISMISSED_PREFIX + pollId) === '1'; } catch (e) { return false; }
+    }
+    function bkmpMarkPollDismissed(pollId) {
+      try { sessionStorage.setItem(BKMP_POLL_DISMISSED_PREFIX + pollId, '1'); } catch (e) {}
+    }
+    const pollBanner = document.getElementById('pollBanner');
+    const pollBannerQuestion = document.getElementById('pollBannerQuestion');
+    const pollBannerActions = document.getElementById('pollBannerActions');
+    const pollBannerResults = document.getElementById('pollBannerResults');
+    const pollBannerYesBtn = document.getElementById('pollBannerYesBtn');
+    const pollBannerNoBtn = document.getElementById('pollBannerNoBtn');
+    const pollBannerCloseBtn = document.getElementById('pollBannerCloseBtn');
+    let bkmpCurrentPoll = null;
+
+    function bkmpRenderPollResults(poll) {
+      const total = Number(poll.yes_votes || 0) + Number(poll.no_votes || 0);
+      const yesPct = total > 0 ? Math.round((poll.yes_votes / total) * 100) : 0;
+      const noPct = total > 0 ? 100 - yesPct : 0;
+      pollBannerResults.innerHTML = `
+        <div class="poll-banner-result-row"><span>👍</span><div class="poll-banner-result-bar"><div class="poll-banner-result-fill poll-banner-result-fill-yes" style="width:${yesPct}%"></div></div><span>${yesPct}%</span></div>
+        <div class="poll-banner-result-row"><span>👎</span><div class="poll-banner-result-bar"><div class="poll-banner-result-fill poll-banner-result-fill-no" style="width:${noPct}%"></div></div><span>${noPct}%</span></div>
+      `;
+      pollBannerResults.style.display = '';
+      pollBannerActions.style.display = 'none';
+    }
+    function bkmpShowPollVoted(poll, myAnswer) {
+      pollBanner.classList.add('poll-banner-voted');
+      bkmpRenderPollResults(poll);
+      pollBannerYesBtn.classList.toggle('poll-banner-btn-selected', myAnswer === 'yes');
+      pollBannerNoBtn.classList.toggle('poll-banner-btn-selected', myAnswer === 'no');
+    }
+    async function bkmpInitPollBanner() {
+      if (typeof loadActivePoll !== 'function') return;
+      const poll = await loadActivePoll().catch(() => null);
+      if (!poll) { pollBanner.style.display = 'none'; bkmpCurrentPoll = null; return; }
+      bkmpCurrentPoll = poll;
+      pollBannerQuestion.textContent = poll.question;
+      pollBannerYesBtn.disabled = false;
+      pollBannerNoBtn.disabled = false;
+      pollBannerYesBtn.classList.remove('poll-banner-btn-selected');
+      pollBannerNoBtn.classList.remove('poll-banner-btn-selected');
+      pollBanner.classList.remove('poll-banner-voted');
+      pollBannerResults.style.display = 'none';
+      pollBannerActions.style.display = '';
+
+      const myVote = typeof loadMyPollVote === 'function' ? await loadMyPollVote(poll.id).catch(() => null) : null;
+      if (myVote) {
+        pollBannerYesBtn.disabled = true;
+        pollBannerNoBtn.disabled = true;
+        bkmpShowPollVoted(poll, myVote);
+        pollBanner.style.display = '';
+        return;
+      }
+      pollBanner.style.display = bkmpPollDismissedThisSession(poll.id) ? 'none' : '';
+    }
+    async function bkmpHandlePollVote(answer) {
+      if (!bkmpCurrentPoll) return;
+      pollBannerYesBtn.disabled = true;
+      pollBannerNoBtn.disabled = true;
+      try {
+        const updated = await submitPollVote(bkmpCurrentPoll.id, answer);
+        if (updated) bkmpCurrentPoll = updated;
+        bkmpShowPollVoted(bkmpCurrentPoll, answer);
+        window.setTimeout(() => { pollBanner.style.display = 'none'; }, 2400);
+      } catch (e) {
+        if (e && e.message === 'already_voted') {
+          const myVote = await loadMyPollVote(bkmpCurrentPoll.id).catch(() => answer);
+          bkmpShowPollVoted(bkmpCurrentPoll, myVote || answer);
+        } else if (e && e.message === 'not_authenticated') {
+          pollBannerYesBtn.disabled = false;
+          pollBannerNoBtn.disabled = false;
+          mcAuthResetForm();
+          mcNameOverlay.classList.add('visible');
+          mcAuthName.focus();
+        } else {
+          pollBannerYesBtn.disabled = false;
+          pollBannerNoBtn.disabled = false;
+        }
+      }
+    }
+    if (pollBannerYesBtn) pollBannerYesBtn.addEventListener('click', () => bkmpHandlePollVote('yes'));
+    if (pollBannerNoBtn) pollBannerNoBtn.addEventListener('click', () => bkmpHandlePollVote('no'));
+    if (pollBannerCloseBtn) pollBannerCloseBtn.addEventListener('click', () => {
+      if (bkmpCurrentPoll) bkmpMarkPollDismissed(bkmpCurrentPoll.id);
+      pollBanner.style.display = 'none';
+    });
+    bkmpInitPollBanner();
 
     const achievementsSubtabAchievements = document.getElementById('achievementsSubtabAchievements');
     const achievementsSubtabCosmetics = document.getElementById('achievementsSubtabCosmetics');

@@ -20,7 +20,7 @@
 <title>BKMP — Admin</title>
 
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
-<link rel="stylesheet" href="style.css?v=20260711-achscroll1">
+<link rel="stylesheet" href="style.css?v=20260711-polls1">
 </head>
 <body>
 
@@ -178,6 +178,10 @@
         <button class="admin-nav-btn" data-page="dailyevents">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
           Daily Events
+        </button>
+        <button class="admin-nav-btn" data-page="polls">
+          <svg viewBox="0 0 24 24"><path d="M7 20V10M12 20V4M17 20v-7"/></svg>
+          Umfragen
         </button>
         <button class="admin-nav-btn" data-page="idledorf">
           <svg viewBox="0 0 24 24"><path d="M4 21V10l8-6 8 6v11"/><path d="M9 21v-6h6v6"/></svg>
@@ -641,6 +645,23 @@
           </div>
         </section>
 
+        <!-- Umfragen -->
+        <section class="admin-page" id="page-polls">
+          <div class="admin-section">
+            <h2>📊 Umfragen</h2>
+            <p class="admin-help-text">Es kann immer nur eine Umfrage gleichzeitig aktiv sein &ndash; beim Aktivieren einer neuen wird eine evtl. schon laufende automatisch beendet. Ergebnisse werden ausschlie&szlig;lich aus den echten Stimmen berechnet und k&ouml;nnen hier nicht manuell ge&auml;ndert werden.</p>
+
+            <div class="form-grid">
+              <div><label for="pollNewQuestion">Neue Umfrage &ndash; Frage</label><textarea id="pollNewQuestion" rows="2" placeholder="z. B. Sollen die Raid-Boss-Zeiten auf nur noch drei Termine pro Tag ge&auml;ndert werden?"></textarea></div>
+            </div>
+            <button class="btn btn-primary" id="pollCreateBtn" type="button" style="margin-top:0.6rem;">+ Umfrage anlegen</button>
+            <p class="auth-error" id="pollCreateError" style="display:none; margin-top:0.5rem;"></p>
+
+            <h3 style="margin-top:1.4rem;">Alle Umfragen <span class="cardcatalog-admin-count" id="pollsCount"></span></h3>
+            <div class="entry-table-wrapper"><div class="entry-list" id="pollsList"></div></div>
+          </div>
+        </section>
+
         <!-- Idle Drachen Dorf -->
         <section class="admin-page" id="page-idledorf">
           <div class="admin-section">
@@ -924,7 +945,7 @@
   </div>
 
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260711-raidrewarddisplay1"></script>
+  <script src="supabase.js?v=20260711-polls1"></script>
   <script src="app.js?v=20260709-optpass3"></script>
   <script src="idledorf.js?v=20260711-prestigecap1"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
@@ -1092,6 +1113,7 @@
         if (page === 'feedback') refreshFeedbackList();
         if (page === 'plushies') { bkmpRefreshPlushieDefinitionsAdmin(); refreshPlushieCodesList(); }
         if (page === 'dailyevents') { bkmpRefreshPlushieDefinitionsAdmin(); refreshDailyEventsPage(); }
+        if (page === 'polls') refreshPollsAdmin();
         if (page === 'idledorf') refreshIdleDorfAdmin();
         if (page === 'access') refreshAdminAccessList();
         if (page === 'companydashboard' && window.bkmpCurrentCompanyProfile) bkmpMapRenderCompanyDashboard(window.bkmpCurrentCompanyProfile);
@@ -3652,6 +3674,97 @@
         list.appendChild(div);
       });
     }
+
+    /* ---------------- Umfragen ---------------- */
+    let pollsCache = [];
+    async function refreshPollsAdmin() {
+      const list = document.getElementById('pollsList');
+      if (list) list.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Umfragen werden geladen...</p>';
+      try {
+        pollsCache = await loadAllPolls();
+      } catch (e) {
+        console.warn('Umfragen konnten nicht geladen werden.', e);
+        pollsCache = [];
+        if (list) list.innerHTML = '<p style="color:var(--neg); font-size:0.85rem;">Umfragen konnten nicht geladen werden. Bitte SQL ausf&uuml;hren.</p>';
+        return;
+      }
+      renderPollsList();
+    }
+    function bkmpPollStatusLabel(status) {
+      return { draft: 'Entwurf', active: 'Aktiv', ended: 'Beendet', archived: 'Archiviert' }[status] || status;
+    }
+    function renderPollsList() {
+      const list = document.getElementById('pollsList');
+      const countEl = document.getElementById('pollsCount');
+      if (!list) return;
+      if (countEl) countEl.textContent = `(${pollsCache.length})`;
+      if (pollsCache.length === 0) {
+        list.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Noch keine Umfragen angelegt.</p>';
+        return;
+      }
+      list.innerHTML = '';
+      pollsCache.forEach(poll => {
+        const total = Number(poll.yes_votes || 0) + Number(poll.no_votes || 0);
+        const yesPct = total > 0 ? Math.round((poll.yes_votes / total) * 100) : 0;
+        const noPct = total > 0 ? 100 - yesPct : 0;
+        const meta = [
+          bkmpPollStatusLabel(poll.status),
+          `${total} Stimme${total === 1 ? '' : 'n'}`,
+          total > 0 ? `👍 ${yesPct}% · 👎 ${noPct}%` : '',
+          `Erstellt: ${new Date(poll.created_at).toLocaleDateString('de-DE')}`,
+          poll.activated_at ? `Aktiviert: ${new Date(poll.activated_at).toLocaleDateString('de-DE')}` : '',
+          poll.deactivated_at ? `Deaktiviert: ${new Date(poll.deactivated_at).toLocaleDateString('de-DE')}` : ''
+        ].filter(Boolean).join(' · ');
+        const div = document.createElement('div');
+        div.className = 'entry-row';
+        const actions = [];
+        if (poll.status === 'draft' || poll.status === 'ended') actions.push('<button class="edit-btn poll-activate-btn" type="button">Aktivieren</button>');
+        if (poll.status === 'active') actions.push('<button class="edit-btn poll-deactivate-btn" type="button">Deaktivieren</button>');
+        if (poll.status === 'ended') actions.push('<button class="edit-btn poll-archive-btn" type="button">Archivieren</button>');
+        div.innerHTML = `
+          <div class="desc"><span class="name">${escapeHtml(poll.question)}</span><span class="meta">${escapeHtml(meta)}</span></div>
+          <div class="entry-actions">${actions.join('')}</div>
+        `;
+        const activateBtn = div.querySelector('.poll-activate-btn');
+        if (activateBtn) activateBtn.addEventListener('click', async () => {
+          activateBtn.disabled = true;
+          try { await activatePoll(poll.id); await refreshPollsAdmin(); } catch (e) { alert('Konnte Umfrage nicht aktivieren.'); activateBtn.disabled = false; }
+        });
+        const deactivateBtn = div.querySelector('.poll-deactivate-btn');
+        if (deactivateBtn) deactivateBtn.addEventListener('click', async () => {
+          deactivateBtn.disabled = true;
+          try { await deactivatePoll(poll.id); await refreshPollsAdmin(); } catch (e) { alert('Konnte Umfrage nicht deaktivieren.'); deactivateBtn.disabled = false; }
+        });
+        const archiveBtn = div.querySelector('.poll-archive-btn');
+        if (archiveBtn) archiveBtn.addEventListener('click', async () => {
+          archiveBtn.disabled = true;
+          try { await archivePoll(poll.id); await refreshPollsAdmin(); } catch (e) { alert('Konnte Umfrage nicht archivieren.'); archiveBtn.disabled = false; }
+        });
+        list.appendChild(div);
+      });
+    }
+    const pollCreateBtn = document.getElementById('pollCreateBtn');
+    const pollNewQuestion = document.getElementById('pollNewQuestion');
+    const pollCreateError = document.getElementById('pollCreateError');
+    if (pollCreateBtn) pollCreateBtn.addEventListener('click', async () => {
+      const question = pollNewQuestion.value.trim();
+      if (!question) {
+        pollCreateError.textContent = 'Bitte eine Frage eintragen.';
+        pollCreateError.style.display = '';
+        return;
+      }
+      pollCreateError.style.display = 'none';
+      pollCreateBtn.disabled = true;
+      try {
+        await createPoll(question);
+        pollNewQuestion.value = '';
+        await refreshPollsAdmin();
+      } catch (e) {
+        pollCreateError.textContent = 'Umfrage konnte nicht angelegt werden.';
+        pollCreateError.style.display = '';
+      }
+      pollCreateBtn.disabled = false;
+    });
 
     async function renderDailyStats() {
       const todayRedeemed = dailyEventsCache.filter(e => e.redeemed_at);
