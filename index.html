@@ -34,7 +34,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260711-achtoastlight1">
+<link rel="stylesheet" href="style.css?v=20260711-adfreeegg1">
 </head>
 <body>
 
@@ -241,6 +241,37 @@
     </div>
   </div>
 
+  <div class="joke-overlay" id="adFreePopup1">
+    <div class="joke-card">
+      <h3>🎉 Überraschung!</h3>
+      <p>Die Seite ist komplett kostenlos und enthält keinerlei Werbung.<br>Genieß sie einfach. ❤️</p>
+      <div class="joke-buttons">
+        <button class="btn-nein" id="adFreeThanksBtn" type="button">Danke!</button>
+        <button class="btn-ja" id="adFreeWantCarBtn" type="button">Ich will aber was kostenlos haben! Zum Beispiel ein Auto! 🚗</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="joke-overlay" id="adFreePopupSure">
+    <div class="joke-card">
+      <h3>Wirklich sicher? 🤔</h3>
+      <p>Bist du dir wirklich sicher?<br>So ein modernes, kostenloses Auto möchtest du wirklich nicht haben?</p>
+      <div class="joke-buttons">
+        <button class="btn-ja" id="adFreeSureBtn" type="button">Hast Recht. 😄</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="joke-overlay" id="adFreePopupCar">
+    <div class="joke-card">
+      <h3>Na gut... 😅</h3>
+      <p>Du wolltest unbedingt etwas kostenlos haben...<br>Dann bekommst du eben ein Auto!<br><em>(Zumindest als Plüshie. Mehr Budget war leider nicht drin.)</em></p>
+      <div class="joke-buttons">
+        <button class="btn-ja" id="adFreeCarConfirmBtn" type="button">JAAAA!</button>
+      </div>
+    </div>
+  </div>
+
   <div class="joke-overlay idle-dorf-overlay" id="mapWorkspaceOverlay">
     <div class="joke-card idle-dorf-card map-workspace-card">
       <button type="button" class="idle-dorf-close" id="mapWorkspaceClose" aria-label="Schließen">&times;</button>
@@ -357,6 +388,7 @@
             <div class="idle-dragon-name" id="idleDragonName"></div>
           </div>
         </div>
+        <button type="button" class="idle-adfree-btn" id="idleAdFreeBtn" style="display:none;">AD-Free &ndash; nur 99$</button>
         <div class="idle-dorf-log" id="idleDorfLog"></div>
       </div>
 
@@ -3735,7 +3767,8 @@
       { id: 'egg_rainbow', category: 'Easter Eggs', title: '???', revealName: 'Regenbogen-Dreher', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Du wirst suchen müssen... oder drücken? Irgendwas Rundes auf der Seite dreht sich vielleicht gerne.', check: ctx => ctx.eggsFound.includes('rainbow') },
       { id: 'egg_derliber', category: 'Easter Eggs', title: '???', revealName: 'Liber-Jäger', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Suche 10 kleine Liber-Strichmännchen, versteckt auf der ganzen Website.', progress: ctx => [ctx.derLiberFound, 10], check: ctx => ctx.eggsFound.includes('derliber') },
       { id: 'egg_jannik', category: 'Easter Eggs', title: '???', revealName: 'Jannik der Hase', desc: 'Finde ein verstecktes Easter Egg.', revealDesc: 'Man sagt, irgendwo auf dieser Website hoppelt ein kleiner Hase herum. Herzlichen Glückwunsch – du hast ihn gefunden! 🥕', hint: 'Es heißt, irgendwo hoppelt ein kleiner Jannik Hase herum... Aber niemand weiß genau, wo.', check: ctx => ctx.eggsFound.includes('jannik') },
-      { id: 'egg_all', category: 'Easter Eggs', title: 'Osterhase', desc: 'Finde alle 10 versteckten Easter Eggs.', progress: ctx => [ctx.eggsFound.length, 10], check: ctx => ctx.eggsFound.length >= 10 },
+      { id: 'egg_adfree', category: 'Easter Eggs', title: 'Hab kein Geld', desc: '99 Dollar gespart. Bester Deal überhaupt.', check: ctx => ctx.eggsFound.includes('adfree') },
+      { id: 'egg_all', category: 'Easter Eggs', title: 'Osterhase', desc: 'Finde alle 11 versteckten Easter Eggs.', progress: ctx => [ctx.eggsFound.length, 11], check: ctx => ctx.eggsFound.length >= 11 },
       { id: 'combo_card_wish', category: 'Sonstiges', title: 'Vielseitig', desc: 'Reiche mindestens 1 Karte und 1 Kartenidee ein.', check: ctx => ctx.cardCount >= 1 && ctx.wishCount >= 1 },
       { id: 'night_owl', category: 'Sonstiges', title: 'Nachteule', desc: 'Besuche die Seite zwischen 0 und 5 Uhr nachts.', check: ctx => ctx.nightOwl },
       { id: 'early_bird', category: 'Sonstiges', title: 'Frühaufsteher', desc: 'Besuche die Seite zwischen 5 und 7 Uhr morgens.', check: ctx => ctx.earlyBird },
@@ -3797,6 +3830,7 @@
       { id: 'glow', name: 'Gold-Glühen', desc: 'Gold mit Leuchten.', unlockAt: 25 },
       { id: 'matrix', name: 'Matrix-Grün', desc: 'Digitales Grün.', unlockAt: 40 },
       { id: 'fire', name: 'Feuer-Rahmen', desc: 'Nur für Drachenjäger.', unlockEgg: 'drache' },
+      { id: 'dollar_prefix', name: 'Geld-Rahmen', desc: '💵 Für alle, die kein Geld haben.', unlockEgg: 'adfree' },
       { id: 'aurora', name: 'Aurora', desc: 'Wandernder Farbverlauf.', unlockAt: 60 },
       { id: 'royal', name: 'Königlich', desc: 'Violett & edel.', unlockAt: 100 },
       { id: 'rainbow', name: 'Regenbogen', desc: 'Nur für Drehscheiben-Entdecker.', unlockEgg: 'rainbow' },
@@ -3872,6 +3906,7 @@
       { id: 'wunschdenker', name: 'Wunschdenker', desc: 'Für fleißige Wünscher.', unlockAchievement: 'wish_50' },
       { id: 'nachtschwaermer', name: 'Nachtschwärmer', desc: 'Für die, die nachts nicht schlafen.', unlockAchievement: 'night_owl' },
       { id: 'ostereier', name: 'Der EasterEggHunter', desc: 'Alle Easter Eggs gefunden.', unlockAchievement: 'egg_all' },
+      { id: 'habkeingeld', name: 'Hab kein Geld', desc: '99 Dollar gespart. Bester Deal überhaupt.', unlockAchievement: 'egg_adfree' },
       { id: 'liberjaeger', name: 'Liber-Jäger', desc: 'Alle Strichmännchen gefunden.', unlockAchievement: 'egg_derliber' },
       { id: 'legende', name: 'BKMP-Legende', desc: 'Weit über dem Durchschnitt.', unlockAt: 60 },
       { id: 'unaufhaltsam', name: 'Unaufhaltsam', desc: 'Kaum zu stoppen.', unlockAt: 100 },
@@ -4697,6 +4732,57 @@
     }
     const mcNameSkipBtn = document.getElementById('mcNameSkip');
     if (mcNameSkipBtn) mcNameSkipBtn.addEventListener('click', () => mcNameOverlay.classList.remove('visible'));
+
+    /* ---------------- Easter Egg: "AD-Free" (Idle-Dorf) ----------------
+       Sieht aus wie ein typischer Werbung-entfernen-Button, ist aber reiner
+       Spass - die Seite hat nie Werbung. Egal welchen der beiden Wege der
+       Spieler waehlt (direkt "Auto wollen" ODER erst "Danke!" -> "Wirklich
+       sicher?" -> "Hast Recht"), landet er am Ende immer beim selben
+       Auto-Pluschie-Popup. BKMP_ADFREE_CODE wird NIE angezeigt, sondern nur
+       im Hintergrund automatisch eingeloest (siehe redeemPlushieCode) -
+       reuse desselben faelschungssicheren Codes-Systems wie Koras
+       Easter-Egg-Pluschie, is_reusable=true erlaubt jedem Account genau
+       eine Einloesung (siehe supabase-adfree-easter-egg.sql). */
+    const BKMP_ADFREE_CODE = 'ADFREE-RANDOMAUTO-EGG';
+    const idleAdFreeBtn = document.getElementById('idleAdFreeBtn');
+    const adFreePopup1 = document.getElementById('adFreePopup1');
+    const adFreePopupSure = document.getElementById('adFreePopupSure');
+    const adFreePopupCar = document.getElementById('adFreePopupCar');
+    function bkmpAdFreeSyncButton() {
+      if (!idleAdFreeBtn) return;
+      idleAdFreeBtn.style.display = bkmpGetEggsFound().includes('adfree') ? 'none' : '';
+    }
+    async function bkmpAdFreeGrantReward() {
+      if (typeof bkmpMarkEggFound === 'function') bkmpMarkEggFound('adfree');
+      bkmpAdFreeSyncButton();
+      const name = bkmpGetMcName();
+      if (name && typeof redeemPlushieCode === 'function') {
+        try { await redeemPlushieCode(BKMP_ADFREE_CODE, name); } catch (e) {}
+      }
+      if (typeof renderAchievementBadge === 'function') renderAchievementBadge(true);
+    }
+    if (idleAdFreeBtn) idleAdFreeBtn.addEventListener('click', () => adFreePopup1.classList.add('visible'));
+    const adFreeThanksBtn = document.getElementById('adFreeThanksBtn');
+    if (adFreeThanksBtn) adFreeThanksBtn.addEventListener('click', () => {
+      adFreePopup1.classList.remove('visible');
+      adFreePopupSure.classList.add('visible');
+    });
+    const adFreeWantCarBtn = document.getElementById('adFreeWantCarBtn');
+    if (adFreeWantCarBtn) adFreeWantCarBtn.addEventListener('click', () => {
+      adFreePopup1.classList.remove('visible');
+      adFreePopupCar.classList.add('visible');
+    });
+    const adFreeSureBtn = document.getElementById('adFreeSureBtn');
+    if (adFreeSureBtn) adFreeSureBtn.addEventListener('click', () => {
+      adFreePopupSure.classList.remove('visible');
+      adFreePopupCar.classList.add('visible');
+    });
+    const adFreeCarConfirmBtn = document.getElementById('adFreeCarConfirmBtn');
+    if (adFreeCarConfirmBtn) adFreeCarConfirmBtn.addEventListener('click', () => {
+      adFreePopupCar.classList.remove('visible');
+      bkmpAdFreeGrantReward();
+    });
+    bkmpAdFreeSyncButton();
 
     const achievementsSubtabAchievements = document.getElementById('achievementsSubtabAchievements');
     const achievementsSubtabCosmetics = document.getElementById('achievementsSubtabCosmetics');

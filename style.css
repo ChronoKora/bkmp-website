@@ -3599,6 +3599,23 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   color: transparent;
   animation: bkmpTierGlow 2.2s ease infinite;
 }
+/* "Geld-Rahmen" (AD-Free-Easter-Egg): gruener Verlauf + Dollar-Emoji als
+   dekorativer Rahmen links/rechts vom Namen, via ::before/::after statt
+   echtem Text - so bleibt der eigentliche Name unveraendert (z. B. fuer
+   Namensvergleiche/Suche) und die Deko verschwindet mit dem Cosmetic. */
+.mc-cosmetic-dollar_prefix {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box,
+              linear-gradient(120deg, #16a34a, #4ade80, #16a34a) border-box;
+  border: 1px solid transparent;
+  box-shadow: 0 0 14px rgba(34, 197, 94, 0.4);
+}
+.mc-cosmetic-dollar_prefix #mcNameBadgeText::before,
+.mc-cosmetic-dollar_prefix .cosmetic-swatch-name::before,
+.mc-cosmetic-dollar_prefix .leaderboard-name-text::before { content: '💵 '; }
+.mc-cosmetic-dollar_prefix #mcNameBadgeText::after,
+.mc-cosmetic-dollar_prefix .cosmetic-swatch-name::after,
+.mc-cosmetic-dollar_prefix .leaderboard-name-text::after { content: ' 💵'; }
 .mc-cosmetic-aurora {
   border-color: transparent;
   background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box,
@@ -4175,13 +4192,33 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   overflow-y: hidden;
 }
 #idlePanelKampf .idle-stage-bar,
-#idlePanelKampf .idle-battlefield {
+#idlePanelKampf .idle-battlefield,
+#idlePanelKampf .idle-adfree-btn {
   flex-shrink: 0;
 }
 #idlePanelKampf .idle-dorf-log {
   flex: 1 1 auto;
   min-height: 0;
 }
+
+/* Easter Egg "AD-Free": bewusst wie ein typischer Werbung-entfernen-Button
+   gestylt (dezent, unscheinbar, kein Hinweis dass es ein Scherz ist) - an
+   einer freien Stelle unterhalb des Schlachtfelds. */
+.idle-adfree-btn {
+  align-self: flex-start;
+  margin: 0.3rem 0 0.5rem;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper-2);
+  color: var(--muted);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.72rem;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s ease, color 0.2s ease;
+}
+.idle-adfree-btn:hover { opacity: 1; color: var(--gold); }
 
 /* ---- Stufen-Leiste ---- */
 .idle-stage-bar {
