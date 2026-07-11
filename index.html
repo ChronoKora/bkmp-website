@@ -4575,7 +4575,7 @@
     const mcAuthError = document.getElementById('mcAuthError');
     const mcAuthSubmit = document.getElementById('mcAuthSubmit');
     const mcAuthSwitchBtn = document.getElementById('mcAuthSwitchBtn');
-    let mcAuthMode = 'register';
+    let mcAuthMode = 'login';
 
     function mcAuthShowError(message) {
       mcAuthError.textContent = message || '';
@@ -4602,7 +4602,7 @@
     }
 
     function mcAuthResetForm() {
-      mcAuthMode = 'register';
+      mcAuthMode = 'login';
       mcAuthName.value = '';
       mcAuthPassword.value = '';
       mcAuthPasswordRepeat.value = '';
