@@ -1363,7 +1363,24 @@
        queued neue Freischaltungen nacheinander. Beim allerersten Aufruf
        (localStorage noch leer) werden bereits erreichte Erfolge nur
        gespeichert, nicht angezeigt - sonst wuerden bei Bestandsspielern
-       ploetzlich dutzende Popups auf einmal aufploppen. */
+       ploetzlich dutzende Popups auf einmal aufploppen.
+
+       bkmpAchievementNotifyReady: derselbe "Zaehler war beim Login kurz zu
+       niedrig"-Effekt, der schon fuer den DB-Sync (siehe force-Parameter bei
+       bkmpSyncPlayerStats weiter unten) beobachtet und gefixt wurde, betraf
+       bisher NICHT die Popup-Benachrichtigung hier: renderAchievementBadge()
+       lief schon MEHRFACH mit einem noch unvollstaendigen Kontext (Pluschies/
+       Idle-Dorf/Raid-Felder noch nicht nachgeladen), BEVOR die echten Werte
+       ankamen - jeder dieser fruehen Aufrufe hat den "gesehen"-Stand mit dem
+       jeweils niedrigen Zwischenwert ueberschrieben, sodass der naechste
+       (korrekte, hoehere) Aufruf die Differenz faelschlich als "gerade neu
+       freigeschaltet" wertete und ALLE fehlenden Erfolge als Popup-Welle
+       zeigte - bei jedem Login neu, weil sich das Muster jedes Mal wiederholt.
+       Fix: die Benachrichtigungs-Pruefung (nicht die reine Zaehler-Anzeige!)
+       erst ausfuehren, sobald bkmpInitPlayerAuth() den bekannten Hintergrund-
+       Ladevorgaengen (Pluschies/Idle-Dorf/Raid) Zeit zum Fertigwerden gegeben
+       hat. */
+    let bkmpAchievementNotifyReady = false;
     const BKMP_ACHIEVEMENTS_NOTIFIED_KEY = 'bkmp-achievements-notified';
     function bkmpGetNotifiedAchievements() {
       try { return JSON.parse(localStorage.getItem(BKMP_ACHIEVEMENTS_NOTIFIED_KEY) || 'null'); } catch (e) { return null; }
@@ -3078,6 +3095,25 @@
     });
 
     /* ---------------- Feedback ---------------- */
+    /* Eigene Zaehler pro Kategorie, fuer die Feedback-Erfolge/-Titel unten -
+       gleiches Muster wie bkmpGetBonkCount: rein lokal auf diesem Geraet,
+       NICHT aus der feedback-Tabelle gelesen (die ist per RLS admin-only,
+       ein Spieler kann seine eigenen Eintraege dort gar nicht abfragen).
+       Wird direkt beim erfolgreichen Absenden hochgezaehlt, unabhaengig
+       davon, ob "anonym" gesendet wurde - die Anonymitaet betrifft nur den
+       in der Nachricht gespeicherten Namen, nicht die eigene Erfolgs-
+       Zaehlung auf diesem Geraet. */
+    const BKMP_FEEDBACK_COUNT_PREFIX = 'bkmp-feedback-count-';
+    function bkmpGetFeedbackCount(category) {
+      try { return Number(localStorage.getItem(BKMP_FEEDBACK_COUNT_PREFIX + category) || 0); } catch (e) { return 0; }
+    }
+    function bkmpIncrementFeedbackCount(category) {
+      const next = bkmpGetFeedbackCount(category) + 1;
+      try { localStorage.setItem(BKMP_FEEDBACK_COUNT_PREFIX + category, String(next)); } catch (e) {}
+      if (typeof renderAchievementBadge === 'function') renderAchievementBadge();
+      return next;
+    }
+
     const feedbackButton = document.getElementById('feedbackButton');
     const feedbackOverlay = document.getElementById('feedbackOverlay');
     const feedbackFormView = document.getElementById('feedbackFormView');
@@ -3140,6 +3176,7 @@
       function doSubmit(imageDataUrl) {
         bkmpSubmitViaApi('feedback', { name, category, message }, imageDataUrl || null).then(() => {
           bkmpStartSubmitCooldown('feedback');
+          bkmpIncrementFeedbackCount(category);
           resetSubmitBtn();
           feedbackFormView.style.display = 'none';
           feedbackSuccessView.style.display = '';
@@ -3552,6 +3589,10 @@
         dailyEventWins: bkmpGetDailyEventWins(),
         wonGoldenHour: bkmpGetWonGoldenHour(),
         streamersClicked: bkmpGetStreamersClicked(),
+        feedbackLobCount: bkmpGetFeedbackCount('lob'),
+        feedbackKritikCount: bkmpGetFeedbackCount('kritik'),
+        feedbackIdeeCount: bkmpGetFeedbackCount('idee'),
+        feedbackSonstigesCount: bkmpGetFeedbackCount('sonstiges'),
         ...(typeof bkmpIdleGetAchievementContextFields === 'function' ? bkmpIdleGetAchievementContextFields() : {}),
         ...(typeof bkmpRaidGetAchievementContextFields === 'function' ? bkmpRaidGetAchievementContextFields() : {})
       };
@@ -3637,6 +3678,22 @@
       [50, 'Fünfzig Erfolge'], [60, 'Sechzig Erfolge'], [70, 'Siebzig Erfolge'], [80, 'Achtzig Erfolge'], [90, 'Neunzig Erfolge'],
       [100, 'Hundert Erfolge'], [110, 'Hundertzehn Erfolge'], [120, 'Hundertzwanzig Erfolge'], [125, 'Fast alles']
     ];
+    /* Feedback-Erfolge (5 pro Kategorie) - Schwellenwerte bewusst niedriger
+       als bei Karten/Wuenschen, da Feedback per Cooldown (siehe
+       bkmpSubmitCooldownSecondsLeft('feedback')) nur begrenzt oft am Stueck
+       abgeschickt werden kann. */
+    const BKMP_FEEDBACK_LOB_TIERS = [
+      [1, 'Erstes Lob'], [3, 'Lob-Fan'], [5, 'Lobredner'], [10, 'Lob-Champion'], [20, 'Legende des Lobes']
+    ];
+    const BKMP_FEEDBACK_KRITIK_TIERS = [
+      [1, 'Erste Kritik'], [3, 'Kritik-Fan'], [5, 'Kritiker'], [10, 'Kritik-Profi'], [20, 'Meister der Kritik']
+    ];
+    const BKMP_FEEDBACK_IDEE_TIERS = [
+      [1, 'Erste Idee'], [3, 'Ideenreich'], [5, 'Ideengeber'], [10, 'Ideenmaschine'], [20, 'Erfinder-Legende']
+    ];
+    const BKMP_FEEDBACK_SONSTIGES_TIERS = [
+      [1, 'Erste Nachricht'], [3, 'Vielschreiber'], [5, 'Kommunikativ'], [10, 'Vielredner'], [20, 'Feedback-Legende']
+    ];
 
     function bkmpBuildAchievementsList() {
     return [
@@ -3648,6 +3705,10 @@
       ...bkmpTieredAchievements('diversity', 'Vielfalt', 'categoryDiversity', BKMP_DIVERSITY_TIERS, n => `Reiche Karten in ${n} verschiedenen Kategorien ein.`),
       ...bkmpTieredAchievements('meta', 'Meilensteine', 'baseUnlockedCount', BKMP_META_TIERS, n => `Schalte ${n} andere Erfolge frei.`),
       ...bkmpTieredAchievements('bonk', 'Bonk', 'bonkCount', BKMP_BONK_TIERS, n => `Klicke ${n}x auf den Bonk-Button.`),
+      ...bkmpTieredAchievements('feedback_lob', 'Feedback', 'feedbackLobCount', BKMP_FEEDBACK_LOB_TIERS, n => `Sende ${n} Feedback${n === 1 ? '' : 's'} der Kategorie "Lob".`),
+      ...bkmpTieredAchievements('feedback_kritik', 'Feedback', 'feedbackKritikCount', BKMP_FEEDBACK_KRITIK_TIERS, n => `Sende ${n} Feedback${n === 1 ? '' : 's'} der Kategorie "Kritik".`),
+      ...bkmpTieredAchievements('feedback_idee', 'Feedback', 'feedbackIdeeCount', BKMP_FEEDBACK_IDEE_TIERS, n => `Sende ${n} Feedback${n === 1 ? '' : 's'} der Kategorie "Idee".`),
+      ...bkmpTieredAchievements('feedback_sonstiges', 'Feedback', 'feedbackSonstigesCount', BKMP_FEEDBACK_SONSTIGES_TIERS, n => `Sende ${n} Feedback${n === 1 ? '' : 's'} der Kategorie "Sonstiges".`),
       { id: 'egg_bkmp', category: 'Easter Eggs', title: '???', revealName: 'BKMP-Flüsterer', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Manche Namen tippt man öfter, als man denkt.', check: ctx => ctx.eggsFound.includes('bkmp') },
       { id: 'egg_konami', category: 'Easter Eggs', title: '???', revealName: 'Konami-Veteran', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Hoch, hoch, runter, runter... eine uralte Cheat-Tradition.', check: ctx => ctx.eggsFound.includes('konami') },
       { id: 'egg_fire', category: 'Easter Eggs', title: '???', revealName: 'Drachenbändiger', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Was fürchten Dörfer und Ritter gleichermaßen? Tipp es einfach.', check: ctx => ctx.eggsFound.includes('drache') },
@@ -3852,6 +3913,28 @@
       { id: 'kuschelkoenig', name: 'Kuschelkönig', desc: 'Herrscher über alle Plüshies.', unlockAchievement: 'plushie_all' },
       { id: 'kuschelmeister', name: 'Kuschelmeister', desc: 'Meister im Plüshie-Sammeln.', unlockCustom: ctx => ctx.ownedPlushies.length >= 4 },
       { id: 'goldjaeger', name: 'Goldjäger', desc: 'Exklusiv für Golden-Hour-Gewinner.', unlockCustom: ctx => ctx.wonGoldenHour },
+      /* Feedback-Titel (5 pro Kategorie) - je einer pro Feedback-Erfolg
+         derselben Kategorie, siehe BKMP_FEEDBACK_*_TIERS weiter oben. */
+      { id: 'lobender', name: 'Der Lobende', desc: 'Findet gerne lobende Worte.', unlockAchievement: 'feedback_lob_1' },
+      { id: 'anerkennend', name: 'Anerkennend', desc: 'Weiß gute Arbeit zu schätzen.', unlockAchievement: 'feedback_lob_3' },
+      { id: 'wertschaetzer', name: 'Wertschätzer', desc: 'Ein echter Wertschätzer.', unlockAchievement: 'feedback_lob_5' },
+      { id: 'lob_ikone', name: 'Lob-Ikone', desc: 'Bekannt für sein positives Feedback.', unlockAchievement: 'feedback_lob_10' },
+      { id: 'legende_lob', name: 'Legende des Lobes', desc: 'Niemand lobt öfter.', unlockAchievement: 'feedback_lob_20' },
+      { id: 'kritischer', name: 'Der Kritische', desc: 'Schaut immer ganz genau hin.', unlockAchievement: 'feedback_kritik_1' },
+      { id: 'scharfzuengig', name: 'Scharfzüngig', desc: 'Nennt die Dinge beim Namen.', unlockAchievement: 'feedback_kritik_3' },
+      { id: 'qualitaetspruefer', name: 'Qualitätsprüfer', desc: 'Lässt nichts durchgehen.', unlockAchievement: 'feedback_kritik_5' },
+      { id: 'kritik_experte', name: 'Kritik-Experte', desc: 'Ein Profi im konstruktiven Feedback.', unlockAchievement: 'feedback_kritik_10' },
+      { id: 'meister_kritik', name: 'Meister der Kritik', desc: 'Niemand kritisiert präziser.', unlockAchievement: 'feedback_kritik_20' },
+      { id: 'ideenreicher', name: 'Der Ideenreiche', desc: 'Sprudelt nur so vor Ideen.', unlockAchievement: 'feedback_idee_1' },
+      { id: 'vordenker', name: 'Vordenker', desc: 'Denkt immer einen Schritt voraus.', unlockAchievement: 'feedback_idee_3' },
+      { id: 'konzeptkuenstler', name: 'Konzeptkünstler', desc: 'Entwirft ständig neue Konzepte.', unlockAchievement: 'feedback_idee_5' },
+      { id: 'ideenschmied', name: 'Ideenschmied', desc: 'Schmiedet Ideen am laufenden Band.', unlockAchievement: 'feedback_idee_10' },
+      { id: 'visionaer', name: 'Visionär', desc: 'Hat die Zukunft schon im Blick.', unlockAchievement: 'feedback_idee_20' },
+      { id: 'mitteilsamer', name: 'Der Mitteilsame', desc: 'Hat immer etwas zu sagen.', unlockAchievement: 'feedback_sonstiges_1' },
+      { id: 'vielschreiber', name: 'Vielschreiber', desc: 'Schreibt öfter mal eine Nachricht.', unlockAchievement: 'feedback_sonstiges_3' },
+      { id: 'stammkommentator', name: 'Stammkommentator', desc: 'Meldet sich regelmäßig zu Wort.', unlockAchievement: 'feedback_sonstiges_5' },
+      { id: 'wortgewaltig', name: 'Wortgewaltig', desc: 'Findet für alles die richtigen Worte.', unlockAchievement: 'feedback_sonstiges_10' },
+      { id: 'feedback_legende', name: 'Feedback-Legende', desc: 'Der treueste Feedback-Geber überhaupt.', unlockAchievement: 'feedback_sonstiges_20' },
       ...BKMP_PLUSHIES.map(p => ({
         id: `plushie_fanboy_${p.id}`,
         name: `Maximaler ${p.name.replace(/\s*Plüshie$/i, '')} Fan`,
@@ -4360,7 +4443,7 @@
       }
       const ctx = bkmpAchievementContextWithMeta();
       const unlockedCount = BKMP_ACHIEVEMENTS.filter(a => a.check(ctx)).length;
-      if (typeof bkmpCheckForNewAchievementUnlocks === 'function') bkmpCheckForNewAchievementUnlocks(ctx);
+      if (bkmpAchievementNotifyReady && typeof bkmpCheckForNewAchievementUnlocks === 'function') bkmpCheckForNewAchievementUnlocks(ctx);
       bkmpApplyActiveCosmetic(badge, unlockedCount, ctx);
       const activePlushieId = typeof bkmpGetActivePlushie === 'function' ? bkmpGetActivePlushie() : '';
       const activePlushie = activePlushieId && ctx.ownedPlushies.includes(activePlushieId) ? BKMP_PLUSHIES.find(p => p.id === activePlushieId) : null;
@@ -4551,6 +4634,7 @@
           ? await bkmpPlayerRegister(name, password)
           : await bkmpPlayerLogin(name, password);
         const canonicalName = await bkmpMergeRemoteStatsIntoLocal(result.displayName);
+        bkmpAchievementNotifyReady = false;
         bkmpSetMcName(canonicalName);
         bkmpClaimAndWatchSession(canonicalName);
         mcNameOverlay.classList.remove('visible');
@@ -4558,6 +4642,10 @@
         bkmpRefreshOwnedPlushies();
         bkmpRefreshMyWishVotes();
         if (typeof bkmpSpawnDerLiberFigures === 'function') bkmpSpawnDerLiberFigures();
+        window.setTimeout(() => {
+          bkmpAchievementNotifyReady = true;
+          renderAchievementBadge(true);
+        }, 3000);
       } catch (e) {
         mcAuthShowError(e && e.message ? e.message : 'Das hat leider nicht geklappt. Bitte versuche es erneut.');
       } finally {
@@ -4775,6 +4863,7 @@
       } catch (e) {
         console.warn('Spieler-Session konnte nicht wiederhergestellt werden.', e);
       } finally {
+        bkmpAchievementNotifyReady = false;
         renderAchievementBadge();
         bkmpRefreshOwnedPlushies();
         bkmpRefreshMyWishVotes();
@@ -4782,6 +4871,16 @@
         if (!bkmpGetMcName()) {
           mcAuthResetForm();
           mcNameOverlay.classList.add('visible');
+        } else {
+          /* Den bekannten Hintergrund-Ladevorgaengen (Pluschies/Idle-Dorf/
+             Raid, siehe bkmpRefreshOwnedPlushies/bkmpIdlePreloadStateIfNamed)
+             Zeit zum Fertigwerden geben, BEVOR die Popup-Benachrichtigung
+             zum ersten Mal scharf geschaltet wird - siehe Kommentar bei
+             bkmpAchievementNotifyReady oben. */
+          window.setTimeout(() => {
+            bkmpAchievementNotifyReady = true;
+            renderAchievementBadge(true);
+          }, 3000);
         }
       }
     })();
