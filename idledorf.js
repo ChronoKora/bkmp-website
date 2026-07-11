@@ -2036,6 +2036,20 @@ function bkmpIdleDetectAutoclickPattern(timestamps) {
 let bkmpIdleClickTimestamps = [];
 let bkmpIdleClickLockedUntil = 0;
 
+/* Harte Rate-Begrenzung pro Klick (unabhaengig von der Muster-Erkennung
+   oben): ohne das lohnte sich Autoklicken trotzdem noch, weil die
+   Muster-Erkennung erst nach 30s greift und danach nur 4s sperrt - macht
+   effektiv >85% der Zeit ungebremstes Autoklicken moeglich (live gemeldet
+   und nachgemessen: 30s voll klicken, 5s Sperre, wieder 30s usw.). Ein
+   Cooldown von 250ms deckt sich mit der bereits an anderer Stelle
+   verwendeten Annahme realistischen menschlichen Klicktempos (siehe
+   ASSUMED_ACTIVE_CLICKS_PER_SECOND = 4 bei den Event-Drachen) - schnellere
+   Klicks kommen einfach ohne Effekt an, kein Schaden, kein Gegenangriff,
+   keine Bestrafung noetig, weil Autoklicken so schlicht keinen Vorteil
+   mehr bringt. */
+const BKMP_CLICK_DAMAGE_COOLDOWN_MS = 250;
+let bkmpIdleLastClickDamageAt = 0;
+
 function bkmpIdleSpawnClickDamage(amount) {
   const target = document.getElementById('idleDragon');
   if (!target) return;
@@ -2053,6 +2067,7 @@ function bkmpIdleHandleDragonClick() {
   if (bkmpIdleEventPauseActive) return;
 
   const now = Date.now();
+  if (now - bkmpIdleLastClickDamageAt < BKMP_CLICK_DAMAGE_COOLDOWN_MS) return;
   if (now < bkmpIdleClickLockedUntil) return;
   bkmpIdleClickTimestamps.push(now);
   bkmpIdleClickTimestamps = bkmpIdleClickTimestamps.filter(t => now - t <= BKMP_AUTOCLICK_HISTORY_MS).slice(-BKMP_AUTOCLICK_WINDOW);
@@ -2063,6 +2078,7 @@ function bkmpIdleHandleDragonClick() {
     return;
   }
 
+  bkmpIdleLastClickDamageAt = now;
   const clickDamage = Math.max(1, Math.round(bkmpIdleEffectiveStats.attack * (0.12 + (bkmpIdleEffectiveStats.clickDamagePct || 0) / 100)));
   bkmpIdleCurrentDragon.hp = Math.max(0, bkmpIdleCurrentDragon.hp - clickDamage);
   bkmpIdleSpawnClickDamage(clickDamage);
