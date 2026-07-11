@@ -893,7 +893,7 @@
   <script src="assets/vendor/supabase-js.min.js"></script>
   <script src="supabase.js?v=20260711-singlesession1"></script>
   <script src="app.js?v=20260709-optpass3"></script>
-  <script src="idledorf.js?v=20260711-prestigesyncfix1"></script>
+  <script src="idledorf.js?v=20260711-flushonkick1"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
   <script>
     bkmpInitTheme();
@@ -3275,13 +3275,13 @@
     }
 
     let bkmpLastStatsSyncAt = 0;
-    function bkmpSyncPlayerStats(unlockedCount) {
+    function bkmpSyncPlayerStats(unlockedCount, force) {
       const name = bkmpGetMcName();
-      if (!name || typeof upsertPlayerStats !== 'function' || !bkmpGetSupabaseClient()) return;
+      if (!name || typeof upsertPlayerStats !== 'function' || !bkmpGetSupabaseClient()) return null;
       const now = Date.now();
-      if (now - bkmpLastStatsSyncAt < 45000) return;
+      if (!force && now - bkmpLastStatsSyncAt < 45000) return null;
       bkmpLastStatsSyncAt = now;
-      upsertPlayerStats(name, {
+      return upsertPlayerStats(name, {
         minutesSpent: bkmpGetTimeSpentMinutes(),
         achievementsUnlocked: unlockedCount,
         eggsFound: bkmpGetEggsFound(),
@@ -3294,6 +3294,15 @@
         activePlushie: typeof bkmpGetActivePlushie === 'function' ? bkmpGetActivePlushie() : '',
         achievementUnlocks: bkmpGetAchievementUnlockedAtMap()
       }).catch(e => console.warn('Konnte Erfolge/Zeit nicht mit dem Leaderboard synchronisieren.', e));
+    }
+    /* Erzwingt eine sofortige Synchronisierung ohne den 45s-Throttle -
+       gebraucht vom Single-Session-Rauswurf, damit z.B. ein gerade erst
+       gewaehlter Titel/Kosmetik nicht verloren geht, nur weil der letzte
+       normale Sync noch keine 45s her ist. */
+    function bkmpSyncPlayerStatsNow() {
+      const ctx = typeof bkmpAchievementContextWithMeta === 'function' ? bkmpAchievementContextWithMeta() : null;
+      const unlockedCount = ctx ? BKMP_ACHIEVEMENTS.filter(a => a.check(ctx)).length : 0;
+      return bkmpSyncPlayerStats(unlockedCount, true) || Promise.resolve();
     }
 
     /* Beim Namen-Eintragen: bestehenden Fortschritt fuer diesen Namen von
@@ -3341,17 +3350,28 @@
         });
         try { localStorage.setItem(BKMP_ACHIEVEMENTS_UNLOCKED_AT_KEY, JSON.stringify(mergedUnlockedAt)); } catch (e) {}
 
-        if (!bkmpGetActiveTitle() && remote.activeTitle) {
+        /* Immer den Server-Stand uebernehmen (nicht nur wenn lokal noch
+           nichts gewaehlt war) - vorher blieb ein Geraet, das schon MAL
+           einen Titel/Kosmetik/Plushie gewaehlt hatte, fuer immer auf
+           diesem alten Stand haengen, selbst wenn auf einem anderen Geraet
+           laengst etwas Neues aktiviert wurde (siehe Screenshot-Report:
+           PC zeigte "Der Geduldige", Handy weiterhin "Nachtschwärmer").
+           Jetzt, wo per Single-Session (siehe bkmpClaimAndWatchSession)
+           ohnehin immer nur ein Geraet gleichzeitig aktiv ist und dessen
+           Stand beim Rauswurf zuverlaessig weggeschrieben wird (siehe
+           bkmpSyncPlayerStatsNow), ist der Server-Stand hier vertrauenswuerdig
+           genug, um bedenkenlos zu gewinnen. */
+        if (remote.activeTitle) {
           const remoteTitle = BKMP_TITLES.find(t => t.name === remote.activeTitle);
           if (remoteTitle) { try { localStorage.setItem(BKMP_ACTIVE_TITLE_KEY, remoteTitle.id); } catch (e) {} }
         }
 
-        if (!bkmpGetActiveCosmetic() && remote.activeCosmetic) {
+        if (remote.activeCosmetic) {
           const remoteCosmetic = BKMP_COSMETICS.find(c => c.id === remote.activeCosmetic);
           if (remoteCosmetic) { try { localStorage.setItem(BKMP_ACTIVE_COSMETIC_KEY, remoteCosmetic.id); } catch (e) {} }
         }
 
-        if (!bkmpGetActivePlushie() && remote.activePlushie) {
+        if (remote.activePlushie) {
           const remotePlushie = BKMP_PLUSHIES.find(p => p.id === remote.activePlushie);
           if (remotePlushie) { try { localStorage.setItem(BKMP_ACTIVE_PLUSHIE_KEY, remotePlushie.id); } catch (e) {} }
         }
@@ -3393,6 +3413,13 @@
           const currentToken = await checkActiveSessionToken(name);
           if (currentToken && currentToken !== bkmpMySessionToken) {
             bkmpStopSessionWatch();
+            /* Vor dem Rauswurf noch offene Idle-Dorf-/Prestige-Speicherungen
+               erzwingen - sonst koennten die letzten paar Sekunden Fortschritt
+               (Debounce-Timer von 4s bzw. 1,5s) verloren gehen, weil die Seite
+               gleich neu laedt. */
+            try { if (typeof bkmpIdleFlushSyncNow === 'function') await bkmpIdleFlushSyncNow(); } catch (e2) {}
+            try { if (typeof bkmpPrestigeFlushSyncNow === 'function') await bkmpPrestigeFlushSyncNow(); } catch (e2) {}
+            try { await bkmpSyncPlayerStatsNow(); } catch (e2) {}
             alert('Du wurdest auf einem anderen Gerät angemeldet. Diese Sitzung wird jetzt beendet.');
             try { await bkmpPlayerLogout(); } catch (e2) {}
             bkmpSetMcName('');

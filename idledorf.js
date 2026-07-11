@@ -1737,6 +1737,18 @@ async function bkmpIdleFlushSyncNow() {
   await bkmpIdleFlushSync();
 }
 
+/* Erzwingt ein sofortiges Speichern des Prestige-Standes, ohne auf den
+   1,5s-Debounce zu warten - gebraucht vom Single-Session-Rauswurf
+   (bkmpClaimAndWatchSession in index.html), damit die letzten paar Sekunden
+   Fortschritt nicht verloren gehen, wenn ein Geraet durch ein Login
+   anderswo zwangsweise beendet wird. */
+async function bkmpPrestigeFlushSyncNow() {
+  if (bkmpPrestigeSaveTimer) { window.clearTimeout(bkmpPrestigeSaveTimer); bkmpPrestigeSaveTimer = null; }
+  if (!bkmpPrestigeState) return;
+  try { if (typeof saveIdlePrestigeState === 'function') await saveIdlePrestigeState(bkmpPrestigeState); }
+  catch (e) { console.warn('Prestige: Speichern fehlgeschlagen.', e); }
+}
+
 function bkmpIdleRenderPrestigePanel() {
   const panel = document.getElementById('idlePanelPrestige');
   if (!panel || !bkmpIdleState) return;
