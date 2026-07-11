@@ -3275,15 +3275,27 @@
     }
 
     let bkmpLastStatsSyncAt = 0;
+    /* Zuletzt vom Server bekannter Erfolge-Zaehler (siehe
+       bkmpMergeRemoteStatsIntoLocal) - der live auf DIESEM Geraet berechnete
+       Zaehler wird beim Hochladen nie darunter gedrueckt. Noetig, weil der
+       Zaehler bei jedem Geraet frisch aus dem lokalen Kontext berechnet wird
+       (Plueschies/Idle-Dorf-Felder/etc. koennen auf einem Geraet kurzzeitig
+       unvollstaendig geladen sein) - ohne diese Sperre kann ein Geraet mit
+       noch nicht ganz geladenem Kontext einen bereits erreichten, hoeheren
+       Stand eines anderen Geraets ueberschreiben (live beobachtet: Handy hat
+       nach einem Reload kurzzeitig 111 statt 115 berechnet und das an den
+       Server zurueckgeschrieben, obwohl der Server schon 115 hatte). */
+    let bkmpLastKnownRemoteAchievementCount = 0;
     function bkmpSyncPlayerStats(unlockedCount, force) {
       const name = bkmpGetMcName();
       if (!name || typeof upsertPlayerStats !== 'function' || !bkmpGetSupabaseClient()) return null;
       const now = Date.now();
       if (!force && now - bkmpLastStatsSyncAt < 45000) return null;
       bkmpLastStatsSyncAt = now;
+      const safeUnlockedCount = Math.max(unlockedCount, bkmpLastKnownRemoteAchievementCount);
       return upsertPlayerStats(name, {
         minutesSpent: bkmpGetTimeSpentMinutes(),
-        achievementsUnlocked: unlockedCount,
+        achievementsUnlocked: safeUnlockedCount,
         eggsFound: bkmpGetEggsFound(),
         daysVisited: bkmpGetDaysVisited(),
         flags: bkmpGetFlags(),
@@ -3313,6 +3325,8 @@
       try {
         const remote = await loadPlayerStatsByName(name);
         if (!remote) return name;
+
+        bkmpLastKnownRemoteAchievementCount = Math.max(bkmpLastKnownRemoteAchievementCount, Number(remote.achievementsUnlocked || 0));
 
         const localMinutes = bkmpGetTimeSpentMinutes();
         const mergedMinutes = Math.max(localMinutes, remote.minutesSpent || 0);
