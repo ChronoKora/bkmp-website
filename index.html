@@ -3723,7 +3723,7 @@
       el.innerHTML = BKMP_COSMETICS.map(c => {
         const unlocked = bkmpCosmeticUnlocked(c, unlockedCount, ctx);
         const isActive = active === c.id;
-        const lockedHint = c.unlockEgg ? 'Finde das passende Easter Egg.' : (c.unlockAchievement ? 'Erst diesen Erfolg freischalten.' : `Ab ${c.unlockAt} Erfolgen`);
+        const lockedHint = c.unlockEgg ? 'Finde das passende Easter Egg.' : (c.unlockAchievement ? 'Erst diesen Erfolg freischalten.' : (c.unlockCustom ? 'Noch nicht freigeschaltet.' : `Ab ${c.unlockAt} Erfolgen`));
         return `
           <button type="button" class="cosmetic-swatch mc-cosmetic-${c.id} ${unlocked ? '' : 'locked'} ${isActive ? 'active' : ''}" data-cosmetic-id="${escapeHtml(c.id)}" ${unlocked ? '' : 'disabled'}>
             <span class="cosmetic-swatch-name">${unlocked ? escapeHtml(c.name) : '🔒'}</span>
