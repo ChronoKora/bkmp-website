@@ -34,7 +34,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260711-adminpopup1">
+<link rel="stylesheet" href="style.css?v=20260711-newsdot1">
 </head>
 <body>
 
@@ -413,7 +413,7 @@
       <div class="tabs" role="tablist" aria-label="Bereiche">
         <button class="tab-btn active" data-index="0">Hauptseite</button>
         <button class="tab-btn" data-index="1">Investoren</button>
-        <button class="tab-btn" data-index="2">Was gibt's Neues?</button>
+        <button class="tab-btn" data-index="2">Was gibt's Neues?<span class="tab-news-dot" id="newsTabDot" aria-hidden="true"></span></button>
         <button class="tab-btn" data-index="3">Kartenideen</button>
         <button class="tab-btn" data-index="4">Wer sind wir?</button>
         <button class="tab-btn" data-index="5">PartnerShops</button>
@@ -919,6 +919,18 @@
     let current = 0;
     const total = tabBtns.length;
     const savedTab = Number(sessionStorage.getItem('bkmp-active-tab') || 0);
+    const newsTabIndex = [...tabBtns].findIndex(b => b.textContent.trim().startsWith("Was gibt's Neues?"));
+    /* goTo() ruft bkmpSyncNewsTabDot() auf, die auf "data" (weiter unten im
+       Script mit const deklariert) zugreift. goTo() selbst wird aber schon
+       HIER, ganz am Anfang des Scripts, fuer die initiale Tab-Wiederherstellung
+       aufgerufen - "data" ist an dieser Stelle noch in der Temporal Dead Zone.
+       Ohne dieses Flag wuerde JEDER Aufruf von goTo() (auch jeder spaetere
+       Tab-Klick) einen "Cannot access 'data' before initialization"-Fehler
+       werfen und die Ausfuehrung des GESAMTEN restlichen Scripts abbrechen -
+       nicht nur den News-Punkt, sondern buchstaeblich alles danach (Kartenideen,
+       Investoren, Achievements, ...). bkmpDataReady wird direkt nach der
+       echten Initialisierung von "data" weiter unten auf true gesetzt. */
+    let bkmpDataReady = false;
 
     function goTo(index, options = {}) {
       current = Math.max(0, Math.min(total - 1, index));
@@ -931,6 +943,7 @@
       panels.forEach((panel, i) => panel.classList.toggle('active-panel', i === current));
       if (!options.skipSave) sessionStorage.setItem('bkmp-active-tab', String(current));
       if (window.bkmpEnhanceImages) window.bkmpEnhanceImages(panels[current]);
+      if (typeof bkmpSyncNewsTabDot === 'function') bkmpSyncNewsTabDot();
     }
 
     tabBtns.forEach((btn, i) => {
@@ -1317,6 +1330,31 @@
       return id => (!isFirstEver && !seen.has(id)) ? '<span class="new-badge">Neu</span>' : '';
     }
 
+    /* Roter Punkt am "Was gibt's Neues?"-Tab (nutzt dasselbe Seen-Ids-System
+       wie oben, Typ "news"). Anders als die anderen Nutzungen (Titel/
+       Erfolge/Pluschies) wird hier NICHT sofort beim Rendern als "gesehen"
+       markiert - renderNews() laeuft schon beim Seitenaufruf, unabhaengig
+       davon, welcher Tab gerade sichtbar ist. Stattdessen: Punkt zeigen,
+       solange man NICHT auf dem News-Tab ist, und erst beim tatsaechlichen
+       Wechsel auf diesen Tab (siehe goTo()) als gesehen markieren. Ist man
+       z. B. wegen einer gespeicherten Sitzung schon beim Laden auf diesem
+       Tab, markiert der erste Aufruf hier direkt alles als gesehen. */
+    function bkmpSyncNewsTabDot() {
+      if (!bkmpDataReady) return;
+      const dot = document.getElementById('newsTabDot');
+      if (!dot || newsTabIndex < 0 || !Array.isArray(data.news)) return;
+      const ids = data.news.map(n => n.id).filter(id => id !== undefined && id !== null);
+      if (current === newsTabIndex) {
+        bkmpMarkAllSeen('news', ids);
+        dot.classList.remove('visible');
+        return;
+      }
+      const isFirstEver = localStorage.getItem(BKMP_SEEN_IDS_PREFIX + 'news') === null;
+      const seen = bkmpGetSeenIds('news');
+      const hasUnseen = !isFirstEver && ids.some(id => !seen.has(id));
+      dot.classList.toggle('visible', hasUnseen);
+    }
+
     /* Generisches "Achievement freigeschaltet"-Popup fuer JEDEN Erfolg (nicht
        nur Jannik) - unten links, damit es sich nicht mit dem Live-Popup
        unten rechts ueberschneidet. bkmpCheckForNewAchievementUnlocks()
@@ -1630,6 +1668,7 @@
 
     /* ---------------- Daten laden & rendern ---------------- */
     const data = bkmpLoadData();
+    bkmpDataReady = true;
     function refreshDeferredPanels() {
       return Promise.all([
         syncUpdatesFromSupabase(data, null, { force: true }),
@@ -2838,6 +2877,7 @@
     function renderNews() {
       if (data.news.length === 0) {
         newsFeed.innerHTML = '<p class="empty-hint">Noch keine Updates gepostet.</p>';
+        if (typeof bkmpSyncNewsTabDot === 'function') bkmpSyncNewsTabDot();
         return;
       }
       const visibleNews = typeof bkmpDedupeUpdates === 'function' ? bkmpDedupeUpdates(data.news) : data.news;
@@ -2859,6 +2899,7 @@
           </article>`;
       }).join('');
       if (window.bkmpEnhanceImages) window.bkmpEnhanceImages(newsFeed);
+      if (typeof bkmpSyncNewsTabDot === 'function') bkmpSyncNewsTabDot();
     }
     renderNews();
 

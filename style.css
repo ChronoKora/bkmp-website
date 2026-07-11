@@ -738,6 +738,19 @@ body.page-loaded .streamer-marquee-track {
 .tab-btn.active { color: var(--ink); background: var(--paper-2); border-color: var(--line); }
 .tab-btn.active { position: relative; }
 
+.tab-news-dot {
+  display: none;
+  position: absolute;
+  top: 5px;
+  right: 8px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--neg);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--paper-2) 62%, transparent);
+}
+.tab-news-dot.visible { display: block; }
+
 /* ---------- Swipe-Bereich ---------- */
 .panels-viewport { overflow: hidden; width: 100%; max-width: 1760px; margin: 0 auto; position: relative; z-index: 1; touch-action: pan-y; }
 .panels-track {
