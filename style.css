@@ -4226,6 +4226,13 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   box-shadow: 0 12px 28px rgba(201, 165, 106, 0.45);
 }
 .idle-adfree-btn:active { transform: translateY(0); }
+/* Die drei AD-Free-Popups koennen ueber dem BEREITS OFFENEN Idle-Dorf-Fenster
+   erscheinen - beide teilen sich .joke-overlay mit z-index:50, bei
+   Gleichstand gewinnt aber das SPAETER im DOM stehende Element
+   (idleDorfOverlay steht hinter diesen Popups im Markup) und lag optisch
+   darueber. Deshalb hier ein hoeherer z-index, unabhaengig von der
+   DOM-Reihenfolge immer ueber dem Idle-Dorf-Fenster. */
+#adFreePopup1, #adFreePopupSure, #adFreePopupCar { z-index: 60; }
 
 /* ---- Stufen-Leiste ---- */
 .idle-stage-bar {
