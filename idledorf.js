@@ -1631,12 +1631,12 @@ function bkmpPrestigeRequiredStage(prestigeLevel) {
    verstaerkt (mehr Punkte -> schneller mehr Punkte) und sonst zu schnell
    explodiert. */
 const BKMP_PRESTIGE_UPGRADES = [
-  { id: 'ewiges_feuer', name: 'Ewiges Feuer', desc: '+8% Angriff pro Rang - dauerhaft, übersteht jeden Aufstieg.', icon: '🔥', effectType: 'attack_pct', effectPerRank: 8, maxRank: 10 },
-  { id: 'drachenblut', name: 'Drachenblut', desc: '+8% Leben pro Rang - dauerhaft.', icon: '🩸', effectType: 'hp_pct', effectPerRank: 8, maxRank: 10 },
-  { id: 'goldene_ranken', name: 'Goldene Ranken', desc: '+8% Gold-Ausbeute pro Rang - dauerhaft.', icon: '🌿', effectType: 'gold_prod_pct', effectPerRank: 8, maxRank: 10 },
-  { id: 'zeitraffer', name: 'Zeitraffer', desc: '+8% XP pro Rang - dauerhaft.', icon: '⏳', effectType: 'xp_pct', effectPerRank: 8, maxRank: 10 },
-  { id: 'kristallkern', name: 'Kristallkern', desc: '+10% Kritischer Schaden pro Rang - dauerhaft.', icon: '💠', effectType: 'crit_damage_pct', effectPerRank: 10, maxRank: 8 },
-  { id: 'portal_meisterschaft', name: 'Portal-Meisterschaft', desc: '+8% mehr Prestige-Punkte bei jedem künftigen Aufstieg pro Rang.', icon: '🌌', effectType: 'prestige_point_bonus_pct', effectPerRank: 8, maxRank: 5 }
+  { id: 'ewiges_feuer', name: 'Ewiges Feuer', desc: '+8% Angriff pro Rang - dauerhaft, übersteht jeden Aufstieg.', icon: '🔥', effectType: 'attack_pct', effectPerRank: 8, maxRank: 20 },
+  { id: 'drachenblut', name: 'Drachenblut', desc: '+8% Leben pro Rang - dauerhaft.', icon: '🩸', effectType: 'hp_pct', effectPerRank: 8, maxRank: 20 },
+  { id: 'goldene_ranken', name: 'Goldene Ranken', desc: '+8% Gold-Ausbeute pro Rang - dauerhaft.', icon: '🌿', effectType: 'gold_prod_pct', effectPerRank: 8, maxRank: 20 },
+  { id: 'zeitraffer', name: 'Zeitraffer', desc: '+8% XP pro Rang - dauerhaft.', icon: '⏳', effectType: 'xp_pct', effectPerRank: 8, maxRank: 20 },
+  { id: 'kristallkern', name: 'Kristallkern', desc: '+10% Kritischer Schaden pro Rang - dauerhaft.', icon: '💠', effectType: 'crit_damage_pct', effectPerRank: 10, maxRank: 15 },
+  { id: 'portal_meisterschaft', name: 'Portal-Meisterschaft', desc: '+8% mehr Prestige-Punkte bei jedem künftigen Aufstieg pro Rang.', icon: '🌌', effectType: 'prestige_point_bonus_pct', effectPerRank: 8, maxRank: 10 }
 ];
 
 function bkmpPrestigeUpgradeCost(rankBeingBought) {
