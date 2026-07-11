@@ -358,7 +358,7 @@ const BKMP_IDLE_FALLBACK_CONFIG = {
 const BKMP_IDLE_FALLBACK_DRAGONS = [
   { id: 'feuerdrache', name: 'Feuerdrache', emoji: '🔥', sprite_key: 'feuerdrache', spawn_rule: 'standard', color_theme: '#f97316', tier_order: 0, base_hp: 60, base_attack: 7, base_defense: 1, gold_reward_base: 6, xp_reward_base: 6, wood_reward_base: 2, stone_reward_base: 1, crystal_reward_base: 0, essence_reward_base: 0, is_boss: false, active: true },
   { id: 'blitzdrache', name: 'Blitzdrache', emoji: '⚡', sprite_key: 'blitzdrache', spawn_rule: 'standard', color_theme: '#facc15', tier_order: 1, base_hp: 55, base_attack: 8, base_defense: 1, gold_reward_base: 6, xp_reward_base: 6, wood_reward_base: 1, stone_reward_base: 2, crystal_reward_base: 0, essence_reward_base: 0, is_boss: false, active: true },
-  { id: 'erddrache', name: 'Erddrache', emoji: '🪨', sprite_key: 'erddrache', spawn_rule: 'standard', color_theme: '#84cc16', tier_order: 2, base_hp: 70, base_attack: 6, base_defense: 3, gold_reward_base: 6, xp_reward_base: 6, wood_reward_base: 1, stone_reward_base: 3, crystal_reward_base: 0, essence_reward_base: 0, is_boss: false, active: true },
+  { id: 'erddrache', name: 'Erddrache', emoji: '🗿', sprite_key: 'erddrache', spawn_rule: 'standard', color_theme: '#84cc16', tier_order: 2, base_hp: 70, base_attack: 6, base_defense: 3, gold_reward_base: 6, xp_reward_base: 6, wood_reward_base: 1, stone_reward_base: 3, crystal_reward_base: 0, essence_reward_base: 0, is_boss: false, active: true },
   { id: 'wasserdrache', name: 'Wasserdrache', emoji: '💧', sprite_key: 'wasserdrache', spawn_rule: 'standard', color_theme: '#38bdf8', tier_order: 3, base_hp: 65, base_attack: 6, base_defense: 2, gold_reward_base: 6, xp_reward_base: 6, wood_reward_base: 2, stone_reward_base: 2, crystal_reward_base: 0, essence_reward_base: 0, is_boss: false, active: true },
   { id: 'yakshas-drache', name: 'Yakshas Drache', emoji: '🐲', sprite_key: 'yakshas-drache', spawn_rule: 'miniboss_10', color_theme: '#a78bfa', tier_order: 4, base_hp: 115, base_attack: 10, base_defense: 4, gold_reward_base: 14, xp_reward_base: 14, wood_reward_base: 3, stone_reward_base: 3, crystal_reward_base: 2, essence_reward_base: 1, is_boss: true, active: true },
   { id: 'yaksha-boss', name: 'Yaksha der Drachenboss', emoji: '👑', sprite_key: 'yaksha-boss', spawn_rule: 'boss_25', color_theme: '#ef4444', tier_order: 5, base_hp: 220, base_attack: 16, base_defense: 8, gold_reward_base: 28, xp_reward_base: 28, wood_reward_base: 5, stone_reward_base: 5, crystal_reward_base: 5, essence_reward_base: 3, is_boss: true, active: true },
@@ -1417,9 +1417,11 @@ function bkmpIdleFormatTitleBonus(title) {
   return fmt ? fmt(title.effectValue) : '';
 }
 
-function bkmpIdleRenderSammlungPanel() {
-  const panel = document.getElementById('idlePanelSammlung');
-  if (!panel) return;
+/* Baut die komplette Titel-Boni-Liste (Ueberschrift + Zaehler + Hinweis +
+   alle Zeilen) - wird sowohl im Sammlung- als auch im Erfolge-Tab gezeigt,
+   damit man sie nicht extra suchen muss, egal welchen der beiden Tabs man
+   zuerst aufmacht. */
+function bkmpIdleBuildTitleBonusListHtml() {
   const ctx = bkmpIdleGetAchievementContextFields();
   const bonusTitles = window.BKMP_IDLE_TITLES.filter(t => t.effectType);
   const unlockedCount = bonusTitles.filter(t => t.unlockCustom(ctx)).length;
@@ -1438,12 +1440,20 @@ function bkmpIdleRenderSammlungPanel() {
       </div>`;
   }).join('');
   if (typeof bkmpMarkAllSeen === 'function') bkmpMarkAllSeen('idletitles', bonusTitles.map(t => t.id));
-  panel.innerHTML = `
-    <p class="idle-panel-hint">Deine 18 Idle-Dorf-Kosmetiken schaltest du durch Fortschritt frei und findest sie in deinem Erfolge-Fenster unter „Kosmetik".</p>
-    <button type="button" class="btn-ja" id="idleOpenCosmeticsBtn">Kosmetik öffnen</button>
+  return `
     <h4 class="idle-sammlung-subheading">🏅 Titel-Boni <span class="idle-sammlung-count">${unlockedCount}/${bonusTitles.length}</span></h4>
     <p class="idle-panel-hint">Jeder freigeschaltete Titel gibt einen dauerhaften Bonus - egal, welchen Titel du gerade als Namenszusatz trägst. Freigeschaltet bleibt freigeschaltet.</p>
     <div class="idle-title-bonus-list">${rows}</div>
+  `;
+}
+
+function bkmpIdleRenderSammlungPanel() {
+  const panel = document.getElementById('idlePanelSammlung');
+  if (!panel) return;
+  panel.innerHTML = `
+    <p class="idle-panel-hint">Deine 18 Idle-Dorf-Kosmetiken schaltest du durch Fortschritt frei und findest sie in deinem Erfolge-Fenster unter „Kosmetik".</p>
+    <button type="button" class="btn-ja" id="idleOpenCosmeticsBtn">Kosmetik öffnen</button>
+    ${bkmpIdleBuildTitleBonusListHtml()}
   `;
   const btn = document.getElementById('idleOpenCosmeticsBtn');
   if (btn) btn.addEventListener('click', () => {
@@ -1457,7 +1467,11 @@ function bkmpIdleRenderSammlungPanel() {
 function bkmpIdleRenderErfolgePanel() {
   const panel = document.getElementById('idlePanelErfolge');
   if (!panel) return;
-  panel.innerHTML = '<p class="idle-panel-hint">Deine Idle-Dorf-Erfolge findest du in deinem Erfolge-Fenster unter der Kategorie „Idle Dorf".</p><button type="button" class="btn-ja" id="idleOpenAchievementsBtn">Erfolge öffnen</button>';
+  panel.innerHTML = `
+    <p class="idle-panel-hint">Deine Idle-Dorf-Erfolge findest du in deinem Erfolge-Fenster unter der Kategorie „Idle Dorf".</p>
+    <button type="button" class="btn-ja" id="idleOpenAchievementsBtn">Erfolge öffnen</button>
+    ${bkmpIdleBuildTitleBonusListHtml()}
+  `;
   const btn = document.getElementById('idleOpenAchievementsBtn');
   if (btn) btn.addEventListener('click', () => {
     bkmpIdleCloseModal();
@@ -2572,7 +2586,7 @@ async function bkmpRaidShowResult() {
       <div class="raid-result-stat"><div class="raid-result-stat-label">MVP</div><div class="raid-result-stat-value raid-result-mvp">${mvp ? escapeHtml(mvp.displayName) : '-'}</div></div>
       <div class="raid-result-stat"><div class="raid-result-stat-label">${won ? 'Stadt-HP übrig' : 'Boss-HP übrig'}</div><div class="raid-result-stat-value">${bkmpIdleFormatNumber(won ? bkmpRaidState.cityHp : bkmpRaidState.bossHp)}</div></div>
     </div>
-    ${won ? `<div class="raid-result-rewards"><span>💰 +${bkmpIdleFormatNumber(5000)}</span><span>💎 +25</span><span>✨ +2000</span></div>` : ''}
+    ${won ? `<div class="raid-result-rewards"><span>💰 +${bkmpIdleFormatNumber(bkmpRaidState.goldReward || 5000)}</span><span>💎 +${bkmpIdleFormatNumber(bkmpRaidState.gemReward || 25)}</span><span>✨ +${bkmpIdleFormatNumber(bkmpRaidState.xpReward || 2000)}</span></div>` : ''}
     ${rewardCode ? `
     <div class="raid-result-zerator-code">
       <div class="raid-result-zerator-title">🎁 Plushie! Hier ist dein Code:</div>

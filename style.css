@@ -3248,50 +3248,14 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   100% { top: var(--bkmp-carrot-land, 60vh); transform: rotate(200deg); }
 }
 
-/* ---------- Geheimer Hinweis-Button ---------- */
-.secret-hint {
-  position: fixed;
-  left: 1.2rem;
-  bottom: 1.2rem;
-  z-index: 20;
-  border: 1px solid color-mix(in srgb, var(--gold) 22%, transparent);
-  background: color-mix(in srgb, var(--paper-2) 80%, transparent);
-  color: var(--muted);
-  border-radius: 999px;
-  padding: 0.5rem 0.9rem;
-  font-family: 'Inter', sans-serif;
-  font-size: 0.72rem;
-  cursor: pointer;
-  opacity: 0.55;
-  transition: opacity 0.2s ease, border-color 0.2s ease, color 0.2s ease;
-  animation: bkmpSecretHintPulse 3s ease-in-out infinite;
-}
-.secret-hint:hover {
-  opacity: 1;
-  color: var(--gold);
-  border-color: color-mix(in srgb, var(--gold) 45%, transparent);
-}
-@keyframes bkmpSecretHintPulse {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 0.85; }
-}
-@media (max-width: 640px) {
-  .secret-hint { left: 0.7rem; bottom: 0.7rem; padding: 0.4rem 0.7rem; font-size: 0.68rem; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .secret-hint { animation: none; opacity: 0.7; }
-}
-
 /* ---------- Admin-Login (dezent, unten links) ---------- */
 /* Bewusst nicht mehr in .top-actions oben rechts (dort ist Admin-Login fuer
    normale Besucher irrelevant und beansprucht unnoetig Platz) - stattdessen
-   ein dezenter Fixed-Link unten links, oberhalb von .secret-hint gestapelt
-   (gleicher left-Versatz, damit beide sauber untereinander sitzen statt
-   sich zu ueberlappen). */
+   ein dezenter Fixed-Link unten links. */
 .login-btn-corner {
   position: fixed;
   left: 1.2rem;
-  bottom: 3.5rem;
+  bottom: 1.2rem;
   z-index: 20;
   border: 1px solid var(--line);
   background: color-mix(in srgb, var(--paper-2) 80%, transparent);
@@ -3306,7 +3270,7 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 }
 .login-btn-corner:hover { opacity: 1; color: var(--gold); border-color: color-mix(in srgb, var(--gold) 45%, transparent); }
 @media (max-width: 640px) {
-  .login-btn-corner { left: 0.7rem; bottom: 2.7rem; padding: 0.4rem 0.7rem; font-size: 0.68rem; }
+  .login-btn-corner { left: 0.7rem; bottom: 0.7rem; padding: 0.4rem 0.7rem; font-size: 0.68rem; }
 }
 
 /* ---------- Erfolge-Panel ---------- */
@@ -4503,8 +4467,13 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   border: none; font-weight: 700; box-shadow: 0 0 18px rgba(167, 139, 250, 0.4);
 }
 .idle-prestige-hint { margin: 0.6rem 0 0; font-size: 0.8rem; color: var(--muted); }
+/* .idle-prestige-buy ist mit .btn-ja kombiniert (fuer Pill-Form/Padding),
+   dessen Hintergrund-/Textfarbe aber per !important erzwungen wird - ein
+   direktes background/color hier auf :disabled wuerde also nie sichtbar
+   werden. Deshalb wie beim (funktionierenden) .idle-upgrade-buy:disabled
+   ueber opacity abdunkeln statt Farben zu ueberschreiben. */
 .idle-prestige-buy { background: linear-gradient(135deg, #a78bfa, #7c3aed); border: none; color: #fff; }
-.idle-prestige-buy:disabled { background: var(--paper-3); color: var(--muted); }
+.idle-prestige-buy:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* ---- Skilltree ---- */
 .idle-skillpoints-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 0.9rem; }

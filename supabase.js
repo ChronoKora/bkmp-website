@@ -3261,7 +3261,7 @@ async function loadRaidState(raidId) {
   if (!client) return null;
   const { data, error } = await client
     .from('raid_instances')
-    .select('id, boss_id, boss_max_hp, boss_hp, city_max_hp, city_hp, city_attack, city_defense, status, next_boss_attack_at, fight_starts_at, fight_ends_at, participant_count, total_damage, raid_bosses(name, sprite_key)')
+    .select('id, boss_id, boss_max_hp, boss_hp, city_max_hp, city_hp, city_attack, city_defense, status, next_boss_attack_at, fight_starts_at, fight_ends_at, participant_count, total_damage, raid_bosses(name, sprite_key, gold_reward, gem_reward, xp_reward)')
     .eq('id', raidId)
     .limit(1);
   if (error) throw error;
@@ -3272,6 +3272,9 @@ async function loadRaidState(raidId) {
     bossId: row.boss_id,
     bossName: row.raid_bosses ? row.raid_bosses.name : '',
     spriteKey: row.raid_bosses ? row.raid_bosses.sprite_key : '',
+    goldReward: Number(row.raid_bosses ? row.raid_bosses.gold_reward : 0) || 0,
+    gemReward: Number(row.raid_bosses ? row.raid_bosses.gem_reward : 0) || 0,
+    xpReward: Number(row.raid_bosses ? row.raid_bosses.xp_reward : 0) || 0,
     bossMaxHp: Number(row.boss_max_hp || 0),
     bossHp: Number(row.boss_hp || 0),
     cityMaxHp: Number(row.city_max_hp || 0),
