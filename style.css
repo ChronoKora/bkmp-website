@@ -3316,7 +3316,17 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 .achievements-card h3 { font-family: 'Fraunces', serif; font-size: 1.25rem; margin-bottom: 0.5rem; text-align: center; }
 .achievements-summary { color: var(--muted); font-size: 0.85rem; text-align: center; margin-bottom: 1rem; }
 .achievements-list {
-  display: grid;
+  /* Bewusst display:flex statt display:grid: als Grid-Container INNERHALB
+     eines flex:1 1 auto-Elements mit min-height:0 hat der Browser die
+     scrollbare Ueberlauf-Hoehe faelschlich auf die eigene (verfuegbare)
+     Hoehe begrenzt statt auf die tatsaechliche Inhaltshoehe - scrollHeight
+     war identisch zu clientHeight, obwohl aufgeklappte Kategorien weit
+     darueber hinausragten. Ergebnis: kein Scrollen moeglich, nur die erste
+     Zeile einer aufgeklappten Kategorie war sichtbar. Da hier ohnehin nur
+     eine einzelne Spalte (.achievement-category pro Kategorie) gebraucht
+     wird, behebt eine simple Flex-Spalte das Problem vollstaendig. */
+  display: flex;
+  flex-direction: column;
   gap: 0.6rem;
   flex: 1 1 auto;
   min-height: 0;
@@ -3401,7 +3411,7 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   border-color: transparent;
 }
 
-.achievement-category { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.achievement-category { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; flex-shrink: 0; }
 .achievement-category + .achievement-category { margin-top: 0.5rem; }
 .achievement-category-head {
   width: 100%;
