@@ -3238,7 +3238,7 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   padding: 1rem 1.1rem;
   border: 1px solid color-mix(in srgb, var(--gold) 45%, var(--line));
   border-radius: 16px;
-  background: linear-gradient(145deg, rgba(18, 16, 22, 0.96), rgba(8, 7, 10, 0.94));
+  background: linear-gradient(145deg, var(--paper-2), var(--paper));
   color: var(--ink);
   box-shadow: 0 20px 70px rgba(0, 0, 0, 0.38), 0 0 34px rgba(201, 165, 106, 0.18);
   opacity: 0;
