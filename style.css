@@ -682,28 +682,22 @@ body.page-loaded .streamer-marquee-track {
 
 /* ---------- Topbar / Tabs ---------- */
 /* ---------- Umfrage-Banner (oben mittig) ---------- */
-/* Dauerhaftes OPSUCHT-Logo oben mittig - klein, dezent, immer sichtbar
-   (anders als der Umfrage-Banner darunter: kein Schliessen-Button, kein
-   Ein-/Ausblenden). Der Umfrage-Banner bekommt einen groesseren top-Wert,
-   damit sich beide nie ueberlappen, egal ob gerade eine Umfrage laeuft. */
+/* Dauerhaftes OPSUCHT-Logo direkt neben dem Feedback-Button (oben links) -
+   ein fixer Platz oben mittig kollidierte optisch mit dem Idle-Dorf-Button
+   dort. Als normales Flex-Kind von .top-actions-left braucht es keine
+   eigene Positionierung, nur eine kleine, zur Zeile passende Hoehe. */
 .opsucht-logo {
-  position: fixed;
-  top: 0.5rem;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 46;
-  height: 34px;
+  height: 40px;
   width: auto;
   pointer-events: none;
-  filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.35));
 }
 @media (max-width: 640px) {
-  .opsucht-logo { height: 26px; top: 0.4rem; }
+  .opsucht-logo { height: 30px; }
 }
 
 .poll-banner {
   position: fixed;
-  top: 3.2rem;
+  top: 0.8rem;
   left: 50%;
   transform: translateX(-50%);
   z-index: 45;
@@ -786,7 +780,7 @@ body.page-loaded .streamer-marquee-track {
 .poll-banner-result-fill-yes { background: linear-gradient(90deg, #4ade80, #16a34a); }
 .poll-banner-result-fill-no { background: linear-gradient(90deg, #f87171, #dc2626); }
 @media (max-width: 640px) {
-  .poll-banner { top: 2.6rem; padding: 0.8rem 2rem 0.8rem 0.9rem; }
+  .poll-banner { top: 0.5rem; padding: 0.8rem 2rem 0.8rem 0.9rem; }
   .poll-banner-question { font-size: 0.88rem; }
 }
 
