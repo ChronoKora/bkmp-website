@@ -34,7 +34,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260711-newsdot1">
+<link rel="stylesheet" href="style.css?v=20260711-deleteaccount1">
 </head>
 <body>
 
@@ -166,6 +166,8 @@
         <button type="button" class="auth-switch-link" id="achievementsRenameBtn">Namen &auml;ndern</button>
         &middot;
         <button type="button" class="auth-switch-link" id="achievementsChangePasswordBtn">Passwort &auml;ndern</button>
+        &middot;
+        <button type="button" class="auth-switch-link auth-switch-link-danger" id="achievementsDeleteAccountBtn">Account l&ouml;schen</button>
       </p>
       <div class="joke-buttons">
         <button class="btn-nein" id="achievementsChangeName" type="button">Ausloggen</button>
@@ -212,6 +214,18 @@
       <div class="joke-buttons">
         <button class="btn-nein" id="passwordChangeCancel" type="button">Abbrechen</button>
         <button class="btn-ja" id="passwordChangeSubmit" type="button">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="joke-overlay" id="deleteAccountOverlay">
+    <div class="joke-card">
+      <h3>Account l&ouml;schen</h3>
+      <p class="delete-account-warning">Sicher? Du verlierst <strong>alles</strong> unwiderruflich: deinen kompletten Spielstand, alle Erfolge, Titel, Pl&uuml;shies und deinen Login. Das kann nicht r&uuml;ckg&auml;ngig gemacht werden.</p>
+      <p class="auth-error" id="deleteAccountError" style="display:none;"></p>
+      <div class="joke-buttons">
+        <button class="btn-nein" id="deleteAccountCancel" type="button">Abbrechen</button>
+        <button class="btn-ja" id="deleteAccountConfirm" type="button" disabled>Endg&uuml;ltig l&ouml;schen (10)</button>
       </div>
     </div>
   </div>
@@ -752,6 +766,7 @@
           <option value="lob">❤️ Lob</option>
           <option value="idee" selected>💡 Idee</option>
           <option value="kritik">⚠️ Kritik</option>
+          <option value="bug">🐛 Bug</option>
           <option value="sonstiges">📌 Sonstiges</option>
         </select>
         <label for="feedbackMessage">Nachricht</label>
@@ -898,7 +913,7 @@
 
   <script>window.BKMP_CLIENT_STORAGE_KEY = 'bkmp-customer-auth';</script>
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260711-raidrewarddisplay1"></script>
+  <script src="supabase.js?v=20260711-deleteaccount1"></script>
   <script src="app.js?v=20260709-optpass3"></script>
   <script src="idledorf.js?v=20260711-prestigecap1"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
@@ -4843,6 +4858,76 @@
     }
     if (passwordChangeRepeat) passwordChangeRepeat.addEventListener('keydown', e => { if (e.key === 'Enter') passwordChangeSubmitBtn.click(); });
 
+    /* ---------------- Account loeschen (10s-Bedenkzeit) ---------------- */
+    const deleteAccountOverlay = document.getElementById('deleteAccountOverlay');
+    const deleteAccountError = document.getElementById('deleteAccountError');
+    const deleteAccountConfirmBtn = document.getElementById('deleteAccountConfirm');
+    const deleteAccountCancelBtn = document.getElementById('deleteAccountCancel');
+    const achievementsDeleteAccountBtn = document.getElementById('achievementsDeleteAccountBtn');
+    let deleteAccountCountdownTimer = null;
+
+    function deleteAccountShowError(message) {
+      deleteAccountError.textContent = message || '';
+      deleteAccountError.style.display = message ? '' : 'none';
+    }
+    function deleteAccountStopCountdown() {
+      if (deleteAccountCountdownTimer) { clearInterval(deleteAccountCountdownTimer); deleteAccountCountdownTimer = null; }
+    }
+    function deleteAccountStartCountdown() {
+      deleteAccountStopCountdown();
+      let secondsLeft = 10;
+      deleteAccountConfirmBtn.disabled = true;
+      deleteAccountConfirmBtn.textContent = `Endgültig löschen (${secondsLeft})`;
+      deleteAccountCountdownTimer = window.setInterval(() => {
+        secondsLeft -= 1;
+        if (secondsLeft <= 0) {
+          deleteAccountStopCountdown();
+          deleteAccountConfirmBtn.disabled = false;
+          deleteAccountConfirmBtn.textContent = 'Endgültig löschen';
+        } else {
+          deleteAccountConfirmBtn.textContent = `Endgültig löschen (${secondsLeft})`;
+        }
+      }, 1000);
+    }
+
+    if (achievementsDeleteAccountBtn) {
+      achievementsDeleteAccountBtn.addEventListener('click', () => {
+        deleteAccountShowError('');
+        achievementsOverlay.classList.remove('visible');
+        deleteAccountOverlay.classList.add('visible');
+        deleteAccountStartCountdown();
+      });
+    }
+    if (deleteAccountCancelBtn) {
+      deleteAccountCancelBtn.addEventListener('click', () => {
+        deleteAccountStopCountdown();
+        deleteAccountOverlay.classList.remove('visible');
+      });
+    }
+    if (deleteAccountConfirmBtn) {
+      deleteAccountConfirmBtn.addEventListener('click', async () => {
+        if (deleteAccountConfirmBtn.disabled) return;
+        deleteAccountShowError('');
+        deleteAccountConfirmBtn.disabled = true;
+        const originalLabel = deleteAccountConfirmBtn.textContent;
+        deleteAccountConfirmBtn.textContent = 'Wird gelöscht...';
+        try {
+          if (typeof bkmpStopSessionWatch === 'function') bkmpStopSessionWatch();
+          await bkmpPlayerDeleteOwnAccount();
+          try { localStorage.removeItem(BKMP_OWNED_PLUSHIES_CACHE_KEY); } catch (e) {}
+          try { localStorage.removeItem('bkmp-idle-achievement-fields-cache'); } catch (e) {}
+          bkmpSetMcName('');
+          deleteAccountOverlay.classList.remove('visible');
+          alert('Dein Account und dein kompletter Spielstand wurden gelöscht.');
+          window.location.reload();
+        } catch (e) {
+          deleteAccountShowError(e && e.message ? e.message : 'Der Account konnte nicht gelöscht werden.');
+          deleteAccountConfirmBtn.disabled = false;
+          deleteAccountConfirmBtn.textContent = originalLabel;
+        }
+      });
+    }
+
     renderAchievementBadge();
     bkmpRefreshPlushieDefinitions().then(() => bkmpRefreshOwnedPlushies());
 
@@ -4969,7 +5054,14 @@
          entfernen. */
       idleEventDragonOverlay: () => {},
       mapWorkspaceOverlay: () => { if (typeof bkmpMapCloseWorkspace === 'function') bkmpMapCloseWorkspace(); },
-      mapCompanyDetailOverlay: () => { if (typeof bkmpMapCloseCompanyDetail === 'function') bkmpMapCloseCompanyDetail(); }
+      mapCompanyDetailOverlay: () => { if (typeof bkmpMapCloseCompanyDetail === 'function') bkmpMapCloseCompanyDetail(); },
+      /* Ohne diesen Eintrag wuerde der ESC-Sweep nur die "visible"-Klasse
+         entfernen, der laufende 10s-Bedenkzeit-Countdown-Timer aber
+         unbemerkt im Hintergrund weiterlaufen. */
+      deleteAccountOverlay: () => {
+        if (typeof deleteAccountStopCountdown === 'function') deleteAccountStopCountdown();
+        document.getElementById('deleteAccountOverlay').classList.remove('visible');
+      }
     };
     document.addEventListener('keydown', e => {
       if (e.key !== 'Escape') return;

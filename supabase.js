@@ -541,6 +541,22 @@ async function bkmpPlayerLogout() {
   await client.auth.signOut();
 }
 
+/* Loescht den kompletten Spielstand + Login-Account unwiderruflich, siehe
+   supabase-player-account-delete.sql (delete_own_player_account, security
+   definer - prueft server-seitig auth.uid(), ein Nutzer kann also nur
+   seinen EIGENEN Account loeschen). Meldet sich am Ende selbst ab, da der
+   Auth-Account nach dem Aufruf nicht mehr existiert. */
+async function bkmpPlayerDeleteOwnAccount() {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { error } = await client.rpc('delete_own_player_account');
+  if (error) {
+    if (String(error.message || '').includes('not_authenticated')) throw new Error('Du bist nicht mehr eingeloggt. Bitte melde dich erneut an.');
+    throw new Error('Der Account konnte nicht gelöscht werden. Bitte versuche es später erneut.');
+  }
+  try { await client.auth.signOut(); } catch (e) { /* Account existiert eh nicht mehr */ }
+}
+
 async function bkmpGetPlayerSession() {
   const client = bkmpGetPlayerAuthClient();
   if (!client) return null;

@@ -64,7 +64,7 @@ const TABLE_CONFIG = {
     allowedFields: ['name', 'category', 'message'],
     requireImage: false,
     hasStatus: false,
-    allowedValues: { category: ['lob', 'idee', 'kritik', 'sonstiges'] }
+    allowedValues: { category: ['lob', 'idee', 'kritik', 'bug', 'sonstiges'] }
   }
 };
 

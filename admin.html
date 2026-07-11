@@ -20,7 +20,7 @@
 <title>BKMP — Admin</title>
 
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
-<link rel="stylesheet" href="style.css?v=20260711-newsdot1">
+<link rel="stylesheet" href="style.css?v=20260711-achscroll1">
 </head>
 <body>
 
@@ -1746,7 +1746,7 @@
        als Offline-Fallback fuer OEFFENTLICHE Inhalte teilen. Gleiches Muster
        wie bkmpMapAdminOrdersCache in mapart.js: eigene, seiteneigene Variable. */
     let bkmpFeedbackCache = [];
-    const FEEDBACK_CATEGORY_LABELS = { lob: '❤️ Lob', idee: '💡 Idee', kritik: '⚠️ Kritik', sonstiges: '📌 Sonstiges' };
+    const FEEDBACK_CATEGORY_LABELS = { lob: '❤️ Lob', idee: '💡 Idee', kritik: '⚠️ Kritik', bug: '🐛 Bug', sonstiges: '📌 Sonstiges' };
 
     async function refreshFeedbackList() {
       if (typeof loadFeedback !== 'function' || !bkmpGetSupabaseClient()) return;

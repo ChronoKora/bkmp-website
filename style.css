@@ -393,6 +393,8 @@ body.modal-open .bkmp-easter > span {
   text-underline-offset: 3px;
 }
 .auth-switch-link:hover { opacity: 0.85; }
+.auth-switch-link-danger { color: var(--neg); }
+.delete-account-warning { color: var(--neg); font-size: 0.9rem; line-height: 1.5; }
 
 /* ---------- Hero ---------- */
 .hero {
@@ -2667,6 +2669,7 @@ input.cardcatalog-search:focus {
 .feedback-category-tag.cat-lob { color: #F87171; border-color: color-mix(in srgb, #F87171 40%, var(--line)); background: color-mix(in srgb, #F87171 12%, transparent); }
 .feedback-category-tag.cat-idee { color: #FBBF24; border-color: color-mix(in srgb, #FBBF24 40%, var(--line)); background: color-mix(in srgb, #FBBF24 12%, transparent); }
 .feedback-category-tag.cat-kritik { color: #F59E0B; border-color: color-mix(in srgb, #F59E0B 45%, var(--line)); background: color-mix(in srgb, #F59E0B 14%, transparent); }
+.feedback-category-tag.cat-bug { color: #EF4444; border-color: color-mix(in srgb, #EF4444 45%, var(--line)); background: color-mix(in srgb, #EF4444 14%, transparent); }
 .feedback-card-unread-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); flex-shrink: 0; }
 .feedback-card-message { font-size: 0.87rem; color: var(--ink); line-height: 1.55; white-space: pre-wrap; margin-bottom: 0.7rem; }
 .feedback-card-image { display: block; max-width: 220px; max-height: 220px; border-radius: 10px; border: 1px solid var(--line); object-fit: cover; margin-bottom: 0.7rem; cursor: pointer; }
@@ -3288,13 +3291,35 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 }
 
 /* ---------- Erfolge-Panel ---------- */
-.achievements-card { max-width: 760px; width: 92vw; max-height: 88vh; overflow-y: auto; text-align: left; border-radius: 22px; }
+/* Bewusst KEIN eigenes Scrollen mehr auf der Karte selbst (frueher
+   overflow-y:auto) - verschachtelt mit dem Scrollen der Liste darunter
+   (.achievements-list/.cosmetics-list) fuehrte zu zwei unabhaengigen
+   Scrollbalken uebereinander: man landete beim Scrollen haeufig im
+   inneren (grossen) statt im aeusseren (kleinen, kaum greifbaren)
+   Scrollbereich und kam so kaum an "Schliessen" unten vorbei. Stattdessen
+   jetzt dasselbe Muster wie beim Idle-Dorf-Kampf-Tab: die Karte ist eine
+   Flexbox-Spalte, Kopf/Tabs/Login-Links/Buttons bleiben fix (flex-shrink:0),
+   nur der jeweils sichtbare Listenbereich waechst/scrollt im verbleibenden
+   Platz - ein einziger, klar erreichbarer Scrollbereich. */
+.achievements-card {
+  max-width: 760px; width: 92vw; max-height: 88vh;
+  display: flex; flex-direction: column; overflow-y: hidden;
+  text-align: left; border-radius: 22px;
+}
+.achievements-card > h3,
+.achievements-card > .achievements-summary,
+.achievements-card > .achievements-subtabs,
+.achievements-card > .auth-switch,
+.achievements-card > .joke-buttons {
+  flex-shrink: 0;
+}
 .achievements-card h3 { font-family: 'Fraunces', serif; font-size: 1.25rem; margin-bottom: 0.5rem; text-align: center; }
 .achievements-summary { color: var(--muted); font-size: 0.85rem; text-align: center; margin-bottom: 1rem; }
 .achievements-list {
   display: grid;
   gap: 0.6rem;
-  max-height: 50vh;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overflow-anchor: none;
   margin-bottom: 0.4rem;
@@ -3401,11 +3426,23 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 0.6rem;
-  max-height: 50vh;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overflow-anchor: none;
   margin-bottom: 0.4rem;
 }
+/* #plushiesPanel sitzt zwischen Karte und Liste (wegen der Code-Einloese-Box
+   davor) - braucht selbst eine Flex-Spalte, damit die Box fix bleibt und nur
+   #plushiesList (hat ebenfalls .cosmetics-list) im Rest waechst/scrollt. */
+#plushiesPanel {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.plushie-redeem-box { flex-shrink: 0; }
 /* "Neu"-Badge fuer frisch hinzugefuegte Titel/Erfolge/Pluschies/PartnerShops/
    Idle-Dorf-Sammlung (siehe bkmpNewBadgeChecker in index.html) - klein,
    gut sichtbar, aber ohne das Kartenlayout zu stoeren. */
