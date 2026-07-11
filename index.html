@@ -34,7 +34,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260711-nosecrethint1">
+<link rel="stylesheet" href="style.css?v=20260711-adminpopup1">
 </head>
 <body>
 
@@ -44,6 +44,17 @@
       <div class="joke-buttons">
         <button class="btn-ja" id="jokeYes" type="button">Ja</button>
         <button class="btn-nein" id="jokeNo" type="button">Verdrückt</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="joke-overlay" id="bkmpAdminPendingPopup">
+    <div class="joke-card admin-pending-popup-card">
+      <h3 id="bkmpAdminPendingPopupTitle">Neue Anfragen</h3>
+      <p id="bkmpAdminPendingPopupBody"></p>
+      <div class="joke-buttons">
+        <button class="btn-nein" id="bkmpAdminPendingPopupClose" type="button">Später</button>
+        <a class="btn-ja" id="bkmpAdminPendingPopupOpen" href="/admin">Admin-Panel öffnen</a>
       </div>
     </div>
   </div>
@@ -889,7 +900,7 @@
   <script src="assets/vendor/supabase-js.min.js"></script>
   <script src="supabase.js?v=20260711-raidrewarddisplay1"></script>
   <script src="app.js?v=20260709-optpass3"></script>
-  <script src="idledorf.js?v=20260711-erfolgebonilist1"></script>
+  <script src="idledorf.js?v=20260711-raidreopenfix1"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
   <script>
     bkmpInitTheme();
@@ -4733,6 +4744,70 @@
         }
       }
     })();
+
+    /* Zeigt Admins, die zufaellig gerade auf der Hauptseite statt im Admin-
+       Panel unterwegs sind, dieselbe "Neue Anfragen"-Meldung wie admin.html
+       (siehe showPendingSummaryPopup dort). Nutzt absichtlich denselben
+       Supabase-Auth-Client wie das Spieler-Login (beide laufen auf
+       demselben Origin ueber dieselbe persistierte Session) - ein Admin, der
+       sich hier gerade eingeloggt hat, hat also automatisch eine aktive
+       Session, ganz ohne separates Login auf dieser Seite. is_active_admin()
+       ist eine reine JWT-Pruefung (kein Tabellenzugriff) und fuer anon UND
+       authenticated freigegeben - fuer normale Besucher ohne Session wird
+       hier ueberhaupt kein Netzwerkaufruf ausgeloest (Sitzungspruefung ist
+       rein lokal), fuer eingeloggte Spieler nur der eine leichte RPC-Call.
+       Erst wenn der wirklich admin ist, werden die zusaetzlichen Anfragen-
+       Tabellen geladen - schont das ohnehin knappe Egress-Kontingent. */
+    async function bkmpCheckAdminPendingRequestsOnMainSite() {
+      const client = bkmpGetSupabaseClient();
+      if (!client) return;
+      try {
+        const { data: sessionData } = await client.auth.getSession();
+        if (!sessionData || !sessionData.session) return;
+        const { data: isAdmin } = await client.rpc('is_active_admin');
+        if (!isAdmin) return;
+
+        const [investorRequests, cardSaleRequests, wishes, partnerShops, cardCatalog, feedback] = await Promise.all([
+          typeof loadInvestorRequests === 'function' ? loadInvestorRequests().catch(() => []) : [],
+          typeof loadCardSaleRequests === 'function' ? loadCardSaleRequests().catch(() => []) : [],
+          typeof loadWishes === 'function' ? loadWishes().catch(() => []) : [],
+          typeof loadPartnerShops === 'function' ? loadPartnerShops().catch(() => []) : [],
+          typeof loadCardCatalog === 'function' ? loadCardCatalog().catch(() => []) : [],
+          typeof loadFeedback === 'function' ? loadFeedback().catch(() => []) : []
+        ]);
+
+        const isNewPending = item => item && item.status === 'pending' && !item.isRead;
+        const pendingCardCatalog = (cardCatalog || []).filter(isNewPending).length;
+        const pendingWishes = (wishes || []).filter(isNewPending).length;
+        const pendingInvestorRequests = (investorRequests || []).filter(isNewPending).length;
+        const pendingCardSaleRequests = (cardSaleRequests || []).filter(isNewPending).length;
+        const pendingPartnerShops = (partnerShops || []).filter(isNewPending).length;
+        const unreadFeedback = (feedback || []).filter(f => f && !f.isRead && !f.isArchived).length;
+        const total = pendingCardCatalog + pendingWishes + pendingInvestorRequests + pendingCardSaleRequests + pendingPartnerShops + unreadFeedback;
+        if (total === 0) return;
+
+        const parts = [];
+        if (pendingCardCatalog) parts.push(`${pendingCardCatalog} Karte${pendingCardCatalog === 1 ? '' : 'n'}`);
+        if (pendingWishes) parts.push(`${pendingWishes} Kartenidee${pendingWishes === 1 ? '' : 'n'}`);
+        if (pendingInvestorRequests) parts.push(`${pendingInvestorRequests} Investoren-Anfrage${pendingInvestorRequests === 1 ? '' : 'n'}`);
+        if (pendingCardSaleRequests) parts.push(`${pendingCardSaleRequests} Verkaufsanfrage${pendingCardSaleRequests === 1 ? '' : 'n'}`);
+        if (pendingPartnerShops) parts.push(`${pendingPartnerShops} PartnerShop-Anfrage${pendingPartnerShops === 1 ? '' : 'n'}`);
+        if (unreadFeedback) parts.push(`${unreadFeedback} Feedback-Eintrag${unreadFeedback === 1 ? '' : 'e'}`);
+
+        const popup = document.getElementById('bkmpAdminPendingPopup');
+        if (!popup) return;
+        document.getElementById('bkmpAdminPendingPopupTitle').textContent = `Du hast ${total} neue Anfrage${total === 1 ? '' : 'n'}`;
+        document.getElementById('bkmpAdminPendingPopupBody').textContent = `Wartet auf Prüfung: ${parts.join(', ')}.`;
+        popup.classList.add('visible');
+      } catch (e) {
+        console.warn('Admin-Anfragen-Hinweis auf der Hauptseite konnte nicht geladen werden.', e);
+      }
+    }
+    const bkmpAdminPendingPopupCloseBtn = document.getElementById('bkmpAdminPendingPopupClose');
+    if (bkmpAdminPendingPopupCloseBtn) bkmpAdminPendingPopupCloseBtn.addEventListener('click', () => {
+      document.getElementById('bkmpAdminPendingPopup').classList.remove('visible');
+    });
+    bkmpCheckAdminPendingRequestsOnMainSite();
 
     /* ---------------- ESC schliesst alle offenen Popups ---------------- */
     /* Alle Dialoge dieser Seite sind einheitlich .joke-overlay (Login,

@@ -2287,6 +2287,18 @@ async function bkmpRaidStartCombatView(raidId) {
   if (raidTerminalStatus) {
     bkmpRaidJoinedId = 'ended-' + raidId;
     bkmpRaidToggleCombatView(false);
+    /* Derselbe Loop-Neustart wie in bkmpRaidCheckOutcome, aber fuer einen
+       anderen Fall: dort wird ein Raid-Ende live mitverfolgt (Fenster war
+       die ganze Zeit offen). Hier oeffnet der Spieler das Idle-Dorf-Fenster
+       NEU (oder erneut), nachdem ein Raid, dem er beigetreten war, LAENGST
+       zuende ist, ohne dass dieser Client das live mitbekommen hat -
+       bkmpIdleOpenModal stoppt den normalen Kampf-Loop bereits VOR diesem
+       Aufruf (weil bkmpRaidShouldShowCombatView() faelschlich noch true
+       liefert, solange bkmpRaidJoinedId nicht auf 'ended-...' steht), aber
+       niemand startet ihn hier wieder - das Idle-Dorf-Fenster oeffnet sich
+       dann zwar normal, der automatische Tick bleibt aber fuer den Rest der
+       Sitzung tot ("nichts passiert", genau das gemeldete Symptom). */
+    if (bkmpIdleModalOpen) bkmpIdleStartLoop();
     return;
   }
   bkmpRaidRenderCombat();

@@ -2741,6 +2741,7 @@ input.cardcatalog-search:focus {
 .admin-pending-popup-card { max-width: 380px; }
 .admin-pending-popup-card h3 { font-family: 'Fraunces', serif; font-size: 1.3rem; }
 .admin-pending-popup-card p { color: var(--muted); font-size: 0.94rem; }
+.admin-pending-popup-card a.btn-ja { text-decoration: none; display: inline-flex; align-items: center; }
 
 img[data-bkmp-img] {
   transition: opacity 0.18s ease, filter 0.18s ease;
