@@ -384,6 +384,7 @@ let bkmpIdleDragonDefs = [];
 let bkmpIdleSkillDefs = [];
 let bkmpIdleConfig = {};
 let bkmpIdleCurrentDragon = null;
+let bkmpIdleLastCounterAttackAt = 0;
 let bkmpIdleVillageHp = null;
 let bkmpIdleEffectiveStats = null;
 let bkmpIdleLoopTimer = null;
@@ -897,8 +898,23 @@ function bkmpIdleTick() {
    zu warten), bekam das Dorf dadurch NIE Schaden - komplettes Nullrisiko.
    Aufgerufen wird sie nur, wenn der Drache den Treffer ueberlebt hat - beim
    toedlichen letzten Treffer bleibt der Gegenschlag weiterhin bewusst aus
-   (kein Rachehieb von einem toten Drachen), egal ob per Tick oder Klick. */
+   (kein Rachehieb von einem toten Drachen), egal ob per Tick oder Klick.
+
+   Abklingzeit (bkmpIdleLastCounterAttackAt): Tick UND Klicks laufen
+   gleichzeitig und unabhaengig voneinander - ohne diese Bremse loeste
+   JEDER einzelne Klick zusaetzlich zum laufenden 900ms-Tick einen eigenen
+   Gegenschlag aus, wodurch schnelles Klicken das Dorf um ein Vielfaches
+   schneller draufgehen liess als vor der obigen Aenderung (genau das
+   Gegenteil des beabsichtigten Effekts). Der Drache greift dadurch
+   hoechstens einmal pro Tick-Intervall zurueck, egal ob dieser Treffer vom
+   Tick oder von einem Klick kam - schliesst weiterhin das Nullrisiko-Klicken
+   von oben, ohne Vielfach-Gegenschlaege bei normalem/schnellem Klicken. */
 function bkmpIdleDragonCounterAttack(stats) {
+  const now = Date.now();
+  const cooldownMs = stats.tickIntervalMs || 900;
+  if (now - bkmpIdleLastCounterAttackAt < cooldownMs) return;
+  bkmpIdleLastCounterAttackAt = now;
+
   /* Eis (magie_eis): Chance, den Gegenangriff komplett auszusetzen. */
   const frozen = stats.iceChancePct > 0 && Math.random() * 100 < stats.iceChancePct;
   if (frozen) {
