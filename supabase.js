@@ -1286,6 +1286,7 @@ function bkmpMapWishFromSupabase(row) {
     likes: Number(row.likes || 0),
     dislikes: Number(row.dislikes || 0),
     status: row.status || 'approved',
+    isRead: Boolean(row.is_read),
     date: row.created_at ? row.created_at.slice(0, 10) : '',
     createdAt: row.created_at ? Date.parse(row.created_at) : 0,
     source: 'supabase'
@@ -1306,7 +1307,7 @@ async function loadWishes() {
   if (!client) return null;
   let { data, error } = await client
     .from('wishes')
-    .select('id, name, image_url, likes, dislikes, status, created_at')
+    .select('id, name, image_url, likes, dislikes, status, is_read, created_at')
     .order('created_at', { ascending: false });
 
   if (error && (String(error.message || '').includes('likes') || String(error.message || '').includes('dislikes'))) {
@@ -1329,7 +1330,21 @@ async function updateWishStatus(id, status) {
     .from('wishes')
     .update({ status })
     .eq('id', id)
-    .select('id, name, image_url, likes, dislikes, status, created_at')
+    .select('id, name, image_url, likes, dislikes, status, is_read, created_at')
+    .limit(1);
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : null;
+  return row ? bkmpMapWishFromSupabase(row) : null;
+}
+
+async function updateWishRead(id, isRead) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('wishes')
+    .update({ is_read: isRead })
+    .eq('id', id)
+    .select('id, name, image_url, likes, dislikes, status, is_read, created_at')
     .limit(1);
   if (error) throw error;
   const row = Array.isArray(data) ? data[0] : null;
@@ -1626,6 +1641,7 @@ function bkmpMapPartnerShopFromSupabase(row) {
     link: row.link || '',
     contact: row.contact || '',
     status: row.status || 'approved',
+    isRead: Boolean(row.is_read),
     createdAt: row.created_at ? Date.parse(row.created_at) : 0,
     source: 'supabase'
   };
@@ -1650,7 +1666,7 @@ async function loadPartnerShops() {
   if (!client) return null;
   const { data, error } = await client
     .from('partner_shops')
-    .select('id, shop_name, image_url, location, category, description, link, contact, status, created_at')
+    .select('id, shop_name, image_url, location, category, description, link, contact, status, is_read, created_at')
     .order('created_at', { ascending: false });
   if (error) throw error;
   return (data || []).map(bkmpMapPartnerShopFromSupabase);
@@ -1689,7 +1705,21 @@ async function updatePartnerShopStatus(id, status) {
     .from('partner_shops')
     .update({ status })
     .eq('id', id)
-    .select('id, shop_name, image_url, location, category, description, link, contact, status, created_at')
+    .select('id, shop_name, image_url, location, category, description, link, contact, status, is_read, created_at')
+    .limit(1);
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : null;
+  return row ? bkmpMapPartnerShopFromSupabase(row) : null;
+}
+
+async function updatePartnerShopRead(id, isRead) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('partner_shops')
+    .update({ is_read: isRead })
+    .eq('id', id)
+    .select('id, shop_name, image_url, location, category, description, link, contact, status, is_read, created_at')
     .limit(1);
   if (error) throw error;
   const row = Array.isArray(data) ? data[0] : null;
@@ -2027,6 +2057,7 @@ function bkmpMapInvestorRequestFromSupabase(row) {
     sharePercent: Number(row.share_percent || 0),
     periodMonths: Number(row.period_months || 0),
     status: row.status || 'pending',
+    isRead: Boolean(row.is_read),
     createdAt: row.created_at ? Date.parse(row.created_at) : 0,
     createdAtIso: row.created_at || '',
     source: 'supabase'
@@ -2058,7 +2089,7 @@ async function loadInvestorRequests() {
   if (!client) return null;
   const { data, error } = await client
     .from('investor_requests')
-    .select('id, name, minecraft_name, anonymous, amount, share_percent, period_months, status, created_at')
+    .select('id, name, minecraft_name, anonymous, amount, share_percent, period_months, status, is_read, created_at')
     .order('created_at', { ascending: false });
   if (error) throw error;
   return (data || []).map(bkmpMapInvestorRequestFromSupabase);
@@ -2071,7 +2102,21 @@ async function updateInvestorRequestStatus(id, status) {
     .from('investor_requests')
     .update({ status })
     .eq('id', id)
-    .select('id, name, minecraft_name, anonymous, amount, share_percent, period_months, status, created_at')
+    .select('id, name, minecraft_name, anonymous, amount, share_percent, period_months, status, is_read, created_at')
+    .limit(1);
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : null;
+  return row ? bkmpMapInvestorRequestFromSupabase(row) : null;
+}
+
+async function updateInvestorRequestRead(id, isRead) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('investor_requests')
+    .update({ is_read: isRead })
+    .eq('id', id)
+    .select('id, name, minecraft_name, anonymous, amount, share_percent, period_months, status, is_read, created_at')
     .limit(1);
   if (error) throw error;
   const row = Array.isArray(data) ? data[0] : null;
@@ -2115,6 +2160,7 @@ function bkmpMapCardSaleRequestFromSupabase(row) {
     discord: row.discord || '',
     image: row.image_url || '',
     status: row.status || 'pending',
+    isRead: Boolean(row.is_read),
     createdAt: row.created_at ? Date.parse(row.created_at) : 0,
     source: 'supabase'
   };
@@ -2125,7 +2171,7 @@ async function loadCardSaleRequests() {
   if (!client) return null;
   const { data, error } = await client
     .from('card_sale_requests')
-    .select('id, minecraft_name, discord, image_url, status, created_at')
+    .select('id, minecraft_name, discord, image_url, status, is_read, created_at')
     .order('created_at', { ascending: false });
   if (error) throw error;
   return (data || []).map(bkmpMapCardSaleRequestFromSupabase);
@@ -2138,7 +2184,21 @@ async function updateCardSaleRequestStatus(id, status) {
     .from('card_sale_requests')
     .update({ status })
     .eq('id', id)
-    .select('id, minecraft_name, discord, image_url, status, created_at')
+    .select('id, minecraft_name, discord, image_url, status, is_read, created_at')
+    .limit(1);
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : null;
+  return row ? bkmpMapCardSaleRequestFromSupabase(row) : null;
+}
+
+async function updateCardSaleRequestRead(id, isRead) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('card_sale_requests')
+    .update({ is_read: isRead })
+    .eq('id', id)
+    .select('id, minecraft_name, discord, image_url, status, is_read, created_at')
     .limit(1);
   if (error) throw error;
   const row = Array.isArray(data) ? data[0] : null;
@@ -2258,6 +2318,7 @@ function bkmpMapCardCatalogFromSupabase(row) {
     description: row.description || '',
     image: row.image_url || '',
     status: row.status || 'approved',
+    isRead: Boolean(row.is_read),
     createdAt: row.created_at ? Date.parse(row.created_at) : 0,
     source: 'supabase'
   };
@@ -2283,7 +2344,7 @@ async function loadCardCatalog() {
   if (!client) return null;
   const { data, error } = await client
     .from('card_catalog')
-    .select('id, name, category, shop_name, cb, size, submitted_by, description, image_url, status, created_at')
+    .select('id, name, category, shop_name, cb, size, submitted_by, description, image_url, status, is_read, created_at')
     .order('created_at', { ascending: false });
   if (error) throw error;
   return (data || []).map(bkmpMapCardCatalogFromSupabase);
@@ -2296,7 +2357,21 @@ async function updateCardCatalogStatus(id, status) {
     .from('card_catalog')
     .update({ status })
     .eq('id', id)
-    .select('id, name, category, shop_name, cb, size, submitted_by, description, image_url, status, created_at')
+    .select('id, name, category, shop_name, cb, size, submitted_by, description, image_url, status, is_read, created_at')
+    .limit(1);
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : null;
+  return row ? bkmpMapCardCatalogFromSupabase(row) : null;
+}
+
+async function updateCardCatalogRead(id, isRead) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('card_catalog')
+    .update({ is_read: isRead })
+    .eq('id', id)
+    .select('id, name, category, shop_name, cb, size, submitted_by, description, image_url, status, is_read, created_at')
     .limit(1);
   if (error) throw error;
   const row = Array.isArray(data) ? data[0] : null;

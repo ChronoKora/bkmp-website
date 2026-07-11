@@ -20,7 +20,7 @@
 <title>BKMP — Admin</title>
 
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
-<link rel="stylesheet" href="style.css?v=20260710-maintenance1">
+<link rel="stylesheet" href="style.css?v=20260711-requestread1">
 </head>
 <body>
 
@@ -924,7 +924,7 @@
   </div>
 
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260711-lbstats1"></script>
+  <script src="supabase.js?v=20260711-requestread1"></script>
   <script src="app.js?v=20260709-optpass3"></script>
   <script src="idledorf.js?v=20260711-clickcounter1"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
@@ -1016,12 +1016,13 @@
        gerade erst frisch geladen, ein erneuter Fetch hier waere reine
        Verdopplung derselben 3 Tabellen. */
     function showPendingSummaryPopup() {
-      const pendingCardCatalog = (data.cardCatalog || []).filter(item => item.status === 'pending').length;
-      const pendingWishes = (data.wishes || []).filter(item => item.status === 'pending').length;
-      const pendingInvestorRequests = (data.investorRequests || []).filter(item => item.status === 'pending').length;
-      const pendingCardSaleRequests = (data.cardSaleRequests || []).filter(item => item.status === 'pending').length;
+      const pendingCardCatalog = (data.cardCatalog || []).filter(item => item.status === 'pending' && !item.isRead).length;
+      const pendingWishes = (data.wishes || []).filter(item => item.status === 'pending' && !item.isRead).length;
+      const pendingInvestorRequests = (data.investorRequests || []).filter(item => item.status === 'pending' && !item.isRead).length;
+      const pendingCardSaleRequests = (data.cardSaleRequests || []).filter(item => item.status === 'pending' && !item.isRead).length;
+      const pendingPartnerShops = (data.partnerShops || []).filter(item => item.status === 'pending' && !item.isRead).length;
       const unreadFeedback = bkmpFeedbackCache.filter(f => !f.isRead && !f.isArchived).length;
-      const total = pendingCardCatalog + pendingWishes + pendingInvestorRequests + pendingCardSaleRequests + unreadFeedback;
+      const total = pendingCardCatalog + pendingWishes + pendingInvestorRequests + pendingCardSaleRequests + pendingPartnerShops + unreadFeedback;
       if (total === 0) return;
 
       const parts = [];
@@ -1029,6 +1030,7 @@
       if (pendingWishes) parts.push(`${pendingWishes} Kartenidee${pendingWishes === 1 ? '' : 'n'}`);
       if (pendingInvestorRequests) parts.push(`${pendingInvestorRequests} Investoren-Anfrage${pendingInvestorRequests === 1 ? '' : 'n'}`);
       if (pendingCardSaleRequests) parts.push(`${pendingCardSaleRequests} Verkaufsanfrage${pendingCardSaleRequests === 1 ? '' : 'n'}`);
+      if (pendingPartnerShops) parts.push(`${pendingPartnerShops} PartnerShop-Anfrage${pendingPartnerShops === 1 ? '' : 'n'}`);
       if (unreadFeedback) parts.push(`${unreadFeedback} Feedback-Eintrag${unreadFeedback === 1 ? '' : 'e'}`);
 
       const popup = document.getElementById('adminPendingPopup');
@@ -1577,6 +1579,18 @@
       return ({ pending: 'Offen', confirmed: 'Bestätigt', rejected: 'Abgelehnt' })[status] || 'Offen';
     }
 
+    async function markInvestorRequestRead(id) {
+      if (typeof updateInvestorRequestRead !== 'function' || !bkmpGetSupabaseClient()) return;
+      try {
+        const updated = await updateInvestorRequestRead(id, true);
+        data.investorRequests = data.investorRequests.map(r => r.id === id ? (updated || { ...r, isRead: true }) : r);
+        bkmpSaveData(data);
+        renderAll();
+      } catch (e) {
+        showAdminToast('Konnte nicht als gelesen markiert werden: ' + supabaseErrorText(e), 'error');
+      }
+    }
+
     function renderInvestorRequestList() {
       const el = document.getElementById('investorRequestList');
       if (!el) return;
@@ -1588,15 +1602,17 @@
       const sorted = [...data.investorRequests].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
       sorted.forEach(req => {
         const row = document.createElement('div');
-        row.className = 'entry-row investor-request-row';
+        row.className = 'entry-row investor-request-row' + (!req.isRead ? ' is-unread' : '');
         const dateLabel = req.createdAtIso ? formatDate(req.createdAtIso.slice(0, 10)) : '';
         row.innerHTML = `
           <div class="desc">
+            ${!req.isRead ? '<span class="entry-row-unread-dot" aria-hidden="true"></span>' : ''}
             <span class="name">${escapeHtml(req.name)}${req.anonymous ? ' <span class="investor-anonymous-badge">Möchte anonym sein</span>' : ''}</span>
             <span class="meta">${req.minecraftName ? escapeHtml(req.minecraftName) + ' · ' : ''}${bkmpFormatCurrency(req.amount)} · ${req.sharePercent}% · ${req.periodMonths} Monate · ${escapeHtml(dateLabel)}</span>
           </div>
           <span class="investor-request-status status-${req.status}">${investorRequestStatusLabel(req.status)}</span>
           <div class="entry-actions">
+            ${!req.isRead ? '<button class="edit-btn read-btn" type="button">Gelesen</button>' : ''}
             ${req.status === 'pending' ? `
               <button class="edit-btn confirm-btn" type="button">Bestätigen</button>
               <button class="edit-btn reject-btn" type="button">Ablehnen</button>
@@ -1604,6 +1620,8 @@
             <button class="del-btn" type="button" aria-label="Anfrage löschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>
           </div>
         `;
+        const readBtn = row.querySelector('.read-btn');
+        if (readBtn) readBtn.addEventListener('click', () => markInvestorRequestRead(req.id));
         if (req.status === 'pending') {
           row.querySelector('.confirm-btn').addEventListener('click', () => confirmInvestorRequest(req.id));
           row.querySelector('.reject-btn').addEventListener('click', () => rejectInvestorRequest(req.id));
@@ -1650,6 +1668,18 @@
       }
     }
 
+    async function markCardSaleRequestRead(id) {
+      if (typeof updateCardSaleRequestRead !== 'function' || !bkmpGetSupabaseClient()) return;
+      try {
+        const updated = await updateCardSaleRequestRead(id, true);
+        data.cardSaleRequests = data.cardSaleRequests.map(r => r.id === id ? (updated || { ...r, isRead: true }) : r);
+        bkmpSaveData(data);
+        renderAll();
+      } catch (e) {
+        showAdminToast('Konnte nicht als gelesen markiert werden: ' + supabaseErrorText(e), 'error');
+      }
+    }
+
     async function deleteCardSaleRequestEntry(id) {
       if (typeof deleteCardSaleRequest === 'function' && bkmpGetSupabaseClient()) {
         try {
@@ -1681,14 +1711,16 @@
       const sorted = [...items].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
       sorted.forEach(req => {
         const row = document.createElement('div');
-        row.className = 'entry-row investor-request-row';
+        row.className = 'entry-row investor-request-row' + (!req.isRead ? ' is-unread' : '');
         row.innerHTML = `
           <div class="desc">
+            ${!req.isRead ? '<span class="entry-row-unread-dot" aria-hidden="true"></span>' : ''}
             <span class="name">${escapeHtml(req.minecraftName)}</span>
             <span class="meta">${req.discord ? escapeHtml(req.discord) + ' · ' : ''}${req.image ? '<a href="' + escapeHtml(req.image) + '" target="_blank" rel="noopener">Bild ansehen</a>' : 'Kein Bild'}</span>
           </div>
           <span class="investor-request-status status-${req.status}">${investorRequestStatusLabel(req.status)}</span>
           <div class="entry-actions">
+            ${!req.isRead ? '<button class="edit-btn read-btn" type="button">Gelesen</button>' : ''}
             ${req.status === 'pending' ? `
               <button class="edit-btn confirm-btn" type="button">Bestätigen</button>
               <button class="edit-btn reject-btn" type="button">Ablehnen</button>
@@ -1696,6 +1728,8 @@
             <button class="del-btn" type="button" aria-label="Anfrage löschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>
           </div>
         `;
+        const readBtn = row.querySelector('.read-btn');
+        if (readBtn) readBtn.addEventListener('click', () => markCardSaleRequestRead(req.id));
         if (req.status === 'pending') {
           row.querySelector('.confirm-btn').addEventListener('click', () => confirmCardSaleRequest(req.id));
           row.querySelector('.reject-btn').addEventListener('click', () => rejectCardSaleRequest(req.id));
@@ -1843,6 +1877,18 @@
       persist();
     }
 
+    async function markCardCatalogRead(id) {
+      if (typeof updateCardCatalogRead !== 'function' || !bkmpGetSupabaseClient()) return;
+      try {
+        const updated = await updateCardCatalogRead(id, true);
+        data.cardCatalog = data.cardCatalog.map(item => String(item.id) === String(id) ? (updated || { ...item, isRead: true }) : item);
+        bkmpSaveData(data);
+        renderAll();
+      } catch (e) {
+        showAdminToast('Konnte nicht als gelesen markiert werden: ' + supabaseErrorText(e), 'error');
+      }
+    }
+
     async function setCardCatalogStatus(id, status, successMessage) {
       if (typeof updateCardCatalogStatus !== 'function' || !bkmpGetSupabaseClient()) {
         showAdminToast('Supabase ist gerade nicht verbunden.', 'error');
@@ -1950,20 +1996,24 @@
       el.innerHTML = '';
       items.forEach(item => {
         const row = document.createElement('div');
-        row.className = 'entry-row partner-admin-row';
+        row.className = 'entry-row partner-admin-row' + (!item.isRead ? ' is-unread' : '');
         row.innerHTML = `
           ${item.image ? `<span class="partner-admin-thumb-wrap" data-bkmp-image-wrap data-empty-label="Karte"><img data-bkmp-img class="partner-admin-thumb" src="${item.image}" alt="" loading="lazy" decoding="async"></span>` : '<div class="partner-admin-thumb partner-admin-thumb-empty">Karte</div>'}
           <div class="desc">
+            ${!item.isRead ? '<span class="entry-row-unread-dot" aria-hidden="true"></span>' : ''}
             <span class="name">${escapeHtml(item.name)}</span>
             <span class="meta">${item.category ? escapeHtml(item.category) + ' · ' : ''}${item.shopName ? escapeHtml(item.shopName.toUpperCase()) + ' · ' : ''}${item.cb ? escapeHtml(item.cb) + ' · ' : ''}${item.size ? escapeHtml(item.size) + ' · ' : ''}${item.submittedBy ? 'von ' + escapeHtml(item.submittedBy) : ''}</span>
           </div>
           <div class="entry-actions">
+            ${!item.isRead ? '<button class="edit-btn read-btn" type="button">Gelesen</button>' : ''}
             ${actionsHtml(item)}
             <button class="edit-btn edit-cardcatalog" type="button">Bearbeiten</button>
             <button class="del-btn" type="button" aria-label="Karte löschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>
           </div>
         `;
         wireActions(row, item);
+        const readBtn = row.querySelector('.read-btn');
+        if (readBtn) readBtn.addEventListener('click', () => markCardCatalogRead(item.id));
         row.querySelector('.edit-cardcatalog').addEventListener('click', () => startEditCardCatalogEntry(item.id));
         row.querySelector('.del-btn').addEventListener('click', () => removeCardCatalogEntry(item.id));
         el.appendChild(row);
@@ -2357,6 +2407,18 @@
     const approvePartnerShop = id => setPartnerShopStatus(id, 'approved', 'PartnerShop freigegeben.');
     const rejectPartnerShop = id => setPartnerShopStatus(id, 'rejected', 'PartnerShop abgelehnt.');
 
+    async function markPartnerShopRead(id) {
+      if (typeof updatePartnerShopRead !== 'function' || !bkmpGetSupabaseClient()) return;
+      try {
+        const updated = await updatePartnerShopRead(id, true);
+        data.partnerShops = data.partnerShops.map(item => String(item.id) === String(id) ? (updated || { ...item, isRead: true }) : item);
+        bkmpSaveData(data);
+        renderAll();
+      } catch (e) {
+        showAdminToast('Konnte nicht als gelesen markiert werden: ' + supabaseErrorText(e), 'error');
+      }
+    }
+
     function renderPartnerShopGroup(listId, countId, items, actionsHtml, wireActions) {
       const el = document.getElementById(listId);
       const countEl = document.getElementById(countId);
@@ -2369,20 +2431,24 @@
       el.innerHTML = '';
       items.forEach(item => {
         const row = document.createElement('div');
-        row.className = 'entry-row partner-admin-row';
+        row.className = 'entry-row partner-admin-row' + (!item.isRead ? ' is-unread' : '');
         row.innerHTML = `
           ${item.image ? `<span class="partner-admin-thumb-wrap" data-bkmp-image-wrap data-empty-label="Shop"><img data-bkmp-img class="partner-admin-thumb" src="${item.image}" alt="" loading="lazy" decoding="async"></span>` : '<div class="partner-admin-thumb partner-admin-thumb-empty">Shop</div>'}
           <div class="desc">
+            ${!item.isRead ? '<span class="entry-row-unread-dot" aria-hidden="true"></span>' : ''}
             <span class="name">${escapeHtml(item.name)}</span>
             <span class="meta">${escapeHtml(item.category || 'Partner')}${item.location ? ' &middot; ' + escapeHtml(item.location) : ''}${item.contact ? ' &middot; ' + escapeHtml(item.contact) : ''}</span>
           </div>
           <div class="entry-actions">
+            ${!item.isRead ? '<button class="edit-btn read-btn" type="button">Gelesen</button>' : ''}
             ${actionsHtml(item)}
             <button class="edit-btn edit-partner" type="button">Bearbeiten</button>
             <button class="del-btn" type="button" aria-label="PartnerShop löschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>
           </div>
         `;
         wireActions(row, item);
+        const readBtn = row.querySelector('.read-btn');
+        if (readBtn) readBtn.addEventListener('click', () => markPartnerShopRead(item.id));
         row.querySelector('.edit-partner').addEventListener('click', () => startEditPartnerShop(item.id));
         row.querySelector('.del-btn').addEventListener('click', () => {
           if (editingPartnerShopId === item.id) clearPartnerShopForm();
@@ -2549,6 +2615,18 @@
     const approveWish = id => setWishStatus(id, 'approved', 'Kartenidee freigegeben.');
     const rejectWish = id => setWishStatus(id, 'rejected', 'Kartenidee abgelehnt.');
 
+    async function markWishRead(id) {
+      if (typeof updateWishRead !== 'function' || !bkmpGetSupabaseClient()) return;
+      try {
+        const updated = await updateWishRead(id, true);
+        data.wishes = data.wishes.map(item => String(item.id) === String(id) ? (updated || { ...item, isRead: true }) : item);
+        bkmpSaveData(data);
+        renderAll();
+      } catch (e) {
+        showAdminToast('Konnte nicht als gelesen markiert werden: ' + supabaseErrorText(e), 'error');
+      }
+    }
+
     function renderWishAdminGroup(listId, countId, items, actionsHtml, wireActions) {
       const el = document.getElementById(listId);
       const countEl = document.getElementById(countId);
@@ -2561,20 +2639,24 @@
       el.innerHTML = '';
       items.forEach(item => {
         const row = document.createElement('div');
-        row.className = 'entry-row wish-admin-row';
+        row.className = 'entry-row wish-admin-row' + (!item.isRead ? ' is-unread' : '');
         row.innerHTML = `
           ${item.image ? `<span class="wish-admin-thumb-wrap" data-bkmp-image-wrap data-empty-label="Bild"><img data-bkmp-img class="wish-admin-thumb" src="${item.image}" alt="" loading="lazy" decoding="async"></span>` : '<div class="wish-admin-thumb wish-admin-thumb-empty">Bild</div>'}
           <div class="desc">
+            ${!item.isRead ? '<span class="entry-row-unread-dot" aria-hidden="true"></span>' : ''}
             <span class="name">${escapeHtml(item.name)}</span>
             <span class="meta">${item.date ? escapeHtml(formatDate(item.date)) + ' · ' : ''}Like ${Number(item.likes || 0)} · Dislike ${Number(item.dislikes || 0)}</span>
           </div>
           <div class="entry-actions">
             ${item.image ? `<a class="edit-btn" href="${item.image}" download="kartenwunsch-${escapeHtml(item.name || 'bkmp')}.${bkmpImageExtension(item.image)}">Download</a>` : ''}
+            ${!item.isRead ? '<button class="edit-btn read-btn" type="button">Gelesen</button>' : ''}
             ${actionsHtml(item)}
             <button class="del-btn" type="button" aria-label="Kartenidee löschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>
           </div>
         `;
         wireActions(row, item);
+        const readBtn = row.querySelector('.read-btn');
+        if (readBtn) readBtn.addEventListener('click', () => markWishRead(item.id));
         row.querySelector('.del-btn').addEventListener('click', () => removeWish(item.id));
         el.appendChild(row);
       });

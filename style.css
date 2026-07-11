@@ -1697,6 +1697,9 @@ label { display: block; font-size: 0.76rem; color: var(--muted); margin-bottom: 
 }
 .entry-row .del-btn:hover { background: color-mix(in srgb, var(--neg) 16%, transparent); color: var(--neg); }
 .entry-row .del-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
+.entry-row.is-unread { background: color-mix(in srgb, var(--gold) 7%, var(--paper)); border-left: 3px solid var(--gold); padding-left: calc(0.85rem - 3px); }
+.entry-row.is-unread:nth-child(even) { background: color-mix(in srgb, var(--gold) 10%, var(--paper-2)); }
+.entry-row-unread-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); flex-shrink: 0; }
 
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
 .form-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
