@@ -2023,6 +2023,18 @@ const BKMP_AUTOCLICK_LOCK_MS = 10 * 60 * 1000;
 const BKMP_AUTOCLICK_HISTORY_MS = 62000; // etwas mehr als MIN_SPAN_MS, sonst wuerden aeltere, fuer die 60s-Pruefung noetige Zeitstempel schon vorher weggefiltert
 const BKMP_AUTOCLICK_TOAST = 'Deine Klicks wirken verdächtig gleichmäßig – kurze Pause fürs Handgelenk 😉';
 
+/* Zusaetzliche harte Obergrenze (unabhaengig von der Muster-Erkennung
+   oben): die CV-Pruefung erkennt nur SEHR gleichmaessige Abstaende - ein
+   Skript, das absichtlich mit leichtem Zufalls-Jitter klickt, koennte die
+   Muster-Erkennung umgehen und trotzdem z.B. 50x/Sekunde klicken. 10
+   Klicks/Sekunde (= 100ms Abstand) sind fuer echtes, auch sehr hektisches
+   Hass-Klicken locker erreichbar, fuer dauerhaftes/automatisiertes Klicken
+   aber bereits eine spuerbare Bremse - schliesst die Luecke, ohne echte
+   kurze Ausbrueche zu beeintraechtigen. */
+const BKMP_CLICK_RATE_CAP_MS = 100;
+let bkmpIdleLastClickAt = 0;
+let bkmpRaidLastClickAt = 0;
+
 function bkmpIdleDetectAutoclickPattern(timestamps) {
   if (!timestamps || timestamps.length < BKMP_AUTOCLICK_MIN_SAMPLES) return false;
   /* Absichtlich KEIN erneutes .slice() hier - das hatte denselben Bug nur
@@ -2062,7 +2074,9 @@ function bkmpIdleHandleDragonClick() {
   if (bkmpIdleEventPauseActive) return;
 
   const now = Date.now();
+  if (now - bkmpIdleLastClickAt < BKMP_CLICK_RATE_CAP_MS) return;
   if (now < bkmpIdleClickLockedUntil) return;
+  bkmpIdleLastClickAt = now;
   bkmpIdleClickTimestamps.push(now);
   bkmpIdleClickTimestamps = bkmpIdleClickTimestamps.filter(t => now - t <= BKMP_AUTOCLICK_HISTORY_MS).slice(-BKMP_AUTOCLICK_WINDOW);
   if (bkmpIdleDetectAutoclickPattern(bkmpIdleClickTimestamps)) {
@@ -2491,7 +2505,9 @@ async function bkmpRaidBossPoll() {
 function bkmpRaidHandleBossClick() {
   if (!bkmpRaidState || bkmpRaidState.status !== 'fighting' || !bkmpIdleEffectiveStats) return;
   const now = Date.now();
+  if (now - bkmpRaidLastClickAt < BKMP_CLICK_RATE_CAP_MS) return;
   if (now < bkmpRaidClickLockedUntil) return;
+  bkmpRaidLastClickAt = now;
   bkmpRaidClickTimestamps.push(now);
   bkmpRaidClickTimestamps = bkmpRaidClickTimestamps.filter(t => now - t <= BKMP_AUTOCLICK_HISTORY_MS).slice(-BKMP_AUTOCLICK_WINDOW);
   if (bkmpIdleDetectAutoclickPattern(bkmpRaidClickTimestamps)) {
