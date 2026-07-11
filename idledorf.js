@@ -1945,7 +1945,21 @@ function bkmpIdlePreloadStateIfNamed() {
    Idle-Dorf-Klicks (bkmpIdleHandleDragonClick) UND Raid-Klicks
    (bkmpRaidHandleBossClick), damit beide Stellen exakt dasselbe,
    einmal getestete Muster nutzen. */
-const BKMP_AUTOCLICK_WINDOW = 300;
+/* BKMP_AUTOCLICK_WINDOW ist bewusst ein reiner NOTBREMSE-Deckel gegen
+   unbegrenztes Array-Wachstum, NICHT Teil der eigentlichen Erkennungslogik -
+   das war vorher ein echter Bug: bei 300 Eintraegen gedeckelt UND
+   gleichzeitig muss die Zeitspanne mindestens 30s (MIN_SPAN_MS) betragen.
+   Bei jedem Klick-Tempo schneller als 30000/300 = 100ms/Klick wurde das
+   Array schon durch das Mengenlimit auf z.B. nur 24s Spanne gestutzt, BEVOR
+   die 30s ueberhaupt erreicht werden konnten - die Pruefung "muss 30s
+   angehalten haben" war dadurch bei schnellen (z.B. 80ms-)Autoklickern
+   NIEMALS erfuellbar, egal wie lange gewartet wurde (live durch einen
+   Community-Test bestaetigt: 80ms-Autoklicker 60s laufen lassen -> nie
+   ausgeloest). Jetzt hoch genug (8000 Eintraege = volle 32s Verlauf noch bei
+   4ms/Klick, weit unterhalb jeder realistischen Klick-Rate) angesetzt, damit
+   der Zeit-Filter (HISTORY_MS) allein die Begrenzung uebernimmt und nie
+   vorzeitig eingreift. */
+const BKMP_AUTOCLICK_WINDOW = 8000;
 const BKMP_AUTOCLICK_MIN_SAMPLES = 15;
 const BKMP_AUTOCLICK_MIN_SPAN_MS = 30000;
 const BKMP_AUTOCLICK_MAX_AVG_INTERVAL_MS = 260;
@@ -1956,7 +1970,10 @@ const BKMP_AUTOCLICK_TOAST = 'Deine Klicks wirken verdächtig gleichmäßig – 
 
 function bkmpIdleDetectAutoclickPattern(timestamps) {
   if (!timestamps || timestamps.length < BKMP_AUTOCLICK_MIN_SAMPLES) return false;
-  const recent = timestamps.slice(-BKMP_AUTOCLICK_WINDOW);
+  /* Absichtlich KEIN erneutes .slice() hier - das hatte denselben Bug nur
+     eine Ebene tiefer reproduziert. timestamps kommt bereits zeitlich
+     korrekt begrenzt vom Aufrufer (HISTORY_MS-Filter). */
+  const recent = timestamps;
   /* Muss ueber mindestens 30 Sekunden hinweg angehalten haben - ein kurzer,
      zufaellig gleichmaessiger Klick-Ausbruch (z.B. 1-2s) reicht bewusst
      nicht aus, egal wie niedrig dessen Variationskoeffizient ausfaellt. */

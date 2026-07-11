@@ -893,7 +893,7 @@
   <script src="assets/vendor/supabase-js.min.js"></script>
   <script src="supabase.js?v=20260711-achfreshcheck1"></script>
   <script src="app.js?v=20260709-optpass3"></script>
-  <script src="idledorf.js?v=20260711-raidforcesync1"></script>
+  <script src="idledorf.js?v=20260711-autoclickfix1"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
   <script>
     bkmpInitTheme();
@@ -4232,8 +4232,18 @@
         const isMe = Boolean(myName) && row.name.trim().toLowerCase() === myName;
         const stat = bkmpLeaderboardStats.find(s => s.name.trim().toLowerCase() === row.name.trim().toLowerCase());
         const title = stat && stat.activeTitle ? stat.activeTitle : '';
-        const cosmetic = stat && stat.activeCosmetic && stat.activeCosmetic !== 'default' ? stat.activeCosmetic : '';
-        const cosmeticCls = cosmetic ? ` mc-cosmetic-${cosmetic}` : '';
+        /* Nicht direkt aus stat.activeCosmetic in die Klasse interpolieren -
+           das kommt aus player_stats und ist damit ueber die Supabase-API
+           theoretisch von jedem eingeloggten Nutzer auf einen beliebigen
+           String setzbar (die UI beschraenkt nur die eigene Auswahl, nicht
+           was serverseitig ankommt). Erst gegen die bekannte Kosmetik-Liste
+           pruefen (wie schon in bkmpApplyActiveCosmetic) - alles andere
+           landet sonst ungeescaped in einem class-Attribut und koennte bei
+           einem passend gewaehlten String daraus ausbrechen. */
+        const knownCosmetic = stat && stat.activeCosmetic && stat.activeCosmetic !== 'default'
+          ? BKMP_COSMETICS.find(c => c.id === stat.activeCosmetic)
+          : null;
+        const cosmeticCls = knownCosmetic ? ` mc-cosmetic-${knownCosmetic.id}` : '';
         const plushie = stat && stat.activePlushie ? BKMP_PLUSHIES.find(p => p.id === stat.activePlushie) : null;
         const plushieImg = plushie ? `<img src="${escapeHtml(plushie.image)}" alt="" class="leaderboard-plushie" title="${escapeHtml(plushie.name)}">` : '';
         const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : '';
