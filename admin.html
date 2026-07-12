@@ -20,7 +20,7 @@
 <title>BKMP — Admin</title>
 
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
-<link rel="stylesheet" href="style.css?v=20260712-goldfixed1">
+<link rel="stylesheet" href="style.css?v=20260713-visitors1">
 </head>
 <body>
 
@@ -126,6 +126,10 @@
         <button class="admin-nav-btn active" data-page="overview">
           <svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="5" rx="1.5"/><rect x="13" y="10" width="8" height="11" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/></svg>
           &Uuml;bersicht
+        </button>
+        <button class="admin-nav-btn" data-page="visitors">
+          <svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+          Besucher
         </button>
         <button class="admin-nav-btn" data-page="income">
           <svg viewBox="0 0 24 24"><path d="M12 3v18M6 8l6-5 6 5M6 16l6 5 6-5"/></svg>
@@ -238,6 +242,19 @@
           <div class="admin-section">
             <h2>Letzte Aktivität</h2>
             <div class="overview-activity" id="overviewActivity"></div>
+          </div>
+        </section>
+
+        <!-- Besucher / Spieler-Aktivität -->
+        <section class="admin-page" id="page-visitors">
+          <div class="admin-section">
+            <h2>Besucher</h2>
+            <p class="admin-help-text">Basiert auf allen Spieler-Konten (player_stats) &ndash; erfasst nur Besucher, die sich mit einem Namen angemeldet haben, keine reinen Seitenaufrufe ohne Account. "Gerade aktiv" heisst: in den letzten 3 Minuten synchronisiert. Erneut auf "Besucher" klicken l&auml;dt die Zahlen neu.</p>
+            <div class="overview-grid" id="visitorsGrid"></div>
+          </div>
+          <div class="admin-section">
+            <h2>Zuletzt aktiv</h2>
+            <div class="entry-table-wrapper"><div class="entry-list" id="visitorsRecentList"></div></div>
           </div>
         </section>
 
@@ -947,7 +964,7 @@
   <script src="assets/vendor/supabase-js.min.js"></script>
   <script src="supabase.js?v=20260712-syncwarn1"></script>
   <script src="app.js?v=20260712-themefix1"></script>
-  <script src="idledorf.js?v=20260712-goldfixed1"></script>
+  <script src="idledorf.js?v=20260713-visitors1"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
   <script>
     bkmpInitTheme();
@@ -1103,6 +1120,7 @@
         adminNavBtns.forEach(item => item.classList.toggle('active', item === btn));
         adminPages.forEach(section => section.classList.toggle('active', section.id === 'page-' + page));
         if (page === 'overview') refreshAdminDataFromSupabase();
+        if (page === 'visitors') refreshVisitorsAdmin();
         if (page === 'wishes') refreshWishesFromSupabase();
         if (page === 'streamers') refreshStreamersFromSupabase();
         if (page === 'about') refreshAboutBlocksFromSupabase();
@@ -2339,6 +2357,102 @@
           <span class="overview-activity-label">${escapeHtml(item.label || '')}</span>
           ${typeof item.amount === 'number' ? `<span class="overview-activity-amount ${item.amount >= 0 ? 'pos' : 'neg'}">${item.amount >= 0 ? '+' : ''}${bkmpFormatCurrency(item.amount)}</span>` : `<span class="overview-activity-date">${item.date ? escapeHtml(formatDate(item.date)) : ''}</span>`}
         </div>`).join('');
+    }
+
+    /* "Gerade aktiv": ein Geraet synchronisiert minutesSpent/panelOpens etc.
+       alle ~30s (throttled auf min. 45s, siehe bkmpSyncPlayerStats in
+       index.html) - 3 Minuten Fenster ist grosszuegig genug, um den
+       Throttle sicher abzudecken, ohne laengst geschlossene Tabs noch als
+       aktiv zu zeigen. */
+    const BKMP_VISITOR_ACTIVE_WINDOW_MS = 3 * 60 * 1000;
+    const BKMP_VISITOR_NEW_WINDOW_DAYS = 7;
+
+    function bkmpFormatRelativeTime(ms) {
+      const diff = Date.now() - ms;
+      if (diff < 60000) return 'gerade eben';
+      const mins = Math.floor(diff / 60000);
+      if (mins < 60) return `vor ${mins} Min.`;
+      const hours = Math.floor(mins / 60);
+      if (hours < 24) return `vor ${hours} Std.`;
+      const days = Math.floor(hours / 24);
+      return `vor ${days} Tag${days === 1 ? '' : 'en'}`;
+    }
+
+    function bkmpFormatDuration(totalMinutes) {
+      const hours = Math.floor(totalMinutes / 60);
+      const mins = Math.round(totalMinutes % 60);
+      if (hours === 0) return `${mins} Min.`;
+      return `${hours} Std. ${mins} Min.`;
+    }
+
+    async function refreshVisitorsAdmin() {
+      const grid = document.getElementById('visitorsGrid');
+      const list = document.getElementById('visitorsRecentList');
+      if (!grid || !list) return;
+      grid.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Lade...</p>';
+      let players = [];
+      try {
+        players = (typeof loadLeaderboardStats === 'function' ? await loadLeaderboardStats() : null) || [];
+      } catch (e) {
+        console.warn('Besucher-Stats konnten nicht geladen werden.', e);
+        grid.innerHTML = '<p style="color:var(--neg); font-size:0.85rem;">Konnte Besucher-Daten nicht laden.</p>';
+        list.innerHTML = '';
+        return;
+      }
+
+      const now = Date.now();
+      const today = new Date().toISOString().slice(0, 10);
+      const total = players.length;
+      const activeToday = players.filter(p => p.daysVisited.includes(today)).length;
+      const activeNow = players.filter(p => p.updatedAt && now - p.updatedAt < BKMP_VISITOR_ACTIVE_WINDOW_MS).length;
+      const newCutoff = now - BKMP_VISITOR_NEW_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+      const newPlayers = players.filter(p => {
+        const firstSeen = p.daysVisited[0];
+        if (!firstSeen) return false;
+        return Date.parse(firstSeen + 'T00:00:00Z') >= newCutoff;
+      }).length;
+      const totalMinutes = players.reduce((sum, p) => sum + (p.minutesSpent || 0), 0);
+      const avgMinutes = total ? totalMinutes / total : 0;
+
+      const icons = {
+        total: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3-6 7-6s7 2.7 7 6"/><circle cx="17" cy="8" r="2.6"/><path d="M17 5.2c1.7.3 3 1.5 3 3M22 20c0-2.4-1.7-4.5-4.2-5.4"/></svg>',
+        today: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>',
+        now: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>',
+        neu: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+        time: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>'
+      };
+
+      grid.innerHTML = [
+        overviewCard(icons.total, 'Spieler insgesamt', String(total), null),
+        overviewCard(icons.today, 'Heute aktiv', String(activeToday), null),
+        overviewCard(icons.now, 'Gerade aktiv', String(activeNow), 'letzte 3 Min.'),
+        overviewCard(icons.neu, 'Neue Spieler', String(newPlayers), `letzte ${BKMP_VISITOR_NEW_WINDOW_DAYS} Tage`),
+        overviewCard(icons.time, 'Gesamt-Spielzeit', bkmpFormatDuration(totalMinutes), `alle Spieler`),
+        overviewCard(icons.time, 'Ø Zeit / Spieler', bkmpFormatDuration(avgMinutes), null)
+      ].join('');
+      grid.querySelectorAll('.overview-card').forEach((card, i) => {
+        card.classList.add(['gold', 'pos', i === 2 && activeNow > 0 ? 'pos' : 'gold', 'gold', 'gold', 'gold'][i]);
+      });
+
+      const recent = players
+        .filter(p => p.updatedAt)
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+        .slice(0, 20);
+      if (!recent.length) {
+        list.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Noch keine Aktivität.</p>';
+        return;
+      }
+      list.innerHTML = recent.map(p => {
+        const isActiveNow = now - p.updatedAt < BKMP_VISITOR_ACTIVE_WINDOW_MS;
+        return `
+        <div class="entry-row">
+          <div class="desc">
+            <span class="name">${escapeHtml(p.name || '')}${isActiveNow ? ' <span style="color:var(--pos);">●</span>' : ''}</span>
+            <span class="meta">${bkmpFormatDuration(p.minutesSpent || 0)} gespielt &middot; ${p.daysVisited.length} Tag${p.daysVisited.length === 1 ? '' : 'e'} besucht</span>
+          </div>
+          <span class="overview-activity-date">${bkmpFormatRelativeTime(p.updatedAt)}</span>
+        </div>`;
+      }).join('');
     }
 
     function hasValidEntryId(id) {
