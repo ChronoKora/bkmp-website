@@ -380,6 +380,14 @@ function bkmpInitTheme() {
     root.setAttribute('data-theme', next);
     localStorage.setItem(BKMP_THEME_KEY, next);
     updateLabel();
+    /* Akzentfarben-Hintergrundmischung (--paper/-2/-3) neu berechnen, falls
+       eine eigene Farbe gespeichert ist - setTheme() ist die EINZIGE
+       Stelle, durch die jeder Theme-Wechsel laeuft (Toggle-Button UND der
+       "Verdrückt"-Button im Spass-Popup, siehe jokeNo unten). Vorher hing
+       das nur am Toggle-Klick, wodurch "Verdrückt" zwar data-theme korrekt
+       zurueckstellte, der Hintergrund aber auf der Mischung des VORHERIGEN
+       Themes haengen blieb - sah aus wie "wechselt nicht zurueck". */
+    if (typeof bkmpRefreshAccentForTheme === 'function') bkmpRefreshAccentForTheme();
     window.clearTimeout(window.__bkmpThemeSwitchTimer);
     window.__bkmpThemeSwitchTimer = window.setTimeout(() => {
       root.classList.remove('theme-switching');
@@ -428,59 +436,61 @@ const BKMP_PAPER_DEFAULT = {
   dark: { p: '#08070A', p2: '#121016', p3: '#1A1720' },
   light: { p: '#F6F3EC', p2: '#EFEADD', p3: '#E5DFCE' }
 };
+/* Faerbt nicht nur --gold um, sondern mischt dieselbe Farbe auch leicht in
+   den Seitenhintergrund (--paper/-2/-3) - Spieler-Wunsch: "die komplette
+   Hintergrundfarbe soll mit dem Regler anpassbar sein", nicht nur Buttons/
+   Rahmen. Bleibt ueberwiegend dunkel/hell fuer Lesbarkeit. Nutzt IMMER das
+   gerade aktive data-theme als Basis, nicht ein zwischengespeichertes -
+   muss deshalb bei jedem Theme-Wechsel neu aufgerufen werden. */
+function bkmpApplyAccentForCurrentTheme() {
+  const root = document.documentElement;
+  const saved = localStorage.getItem(BKMP_ACCENT_COLOR_KEY);
+  if (!saved) {
+    root.style.removeProperty('--gold');
+    root.style.removeProperty('--paper');
+    root.style.removeProperty('--paper-2');
+    root.style.removeProperty('--paper-3');
+    return;
+  }
+  const base = root.getAttribute('data-theme') === 'light' ? BKMP_PAPER_DEFAULT.light : BKMP_PAPER_DEFAULT.dark;
+  root.style.setProperty('--gold', saved);
+  root.style.setProperty('--paper', `color-mix(in srgb, ${saved} 14%, ${base.p})`);
+  root.style.setProperty('--paper-2', `color-mix(in srgb, ${saved} 18%, ${base.p2})`);
+  root.style.setProperty('--paper-3', `color-mix(in srgb, ${saved} 22%, ${base.p3})`);
+}
+/* Von setTheme() bei JEDEM Theme-Wechsel aufgerufen (Toggle-Button UND der
+   "Verdrückt"-Button im Spass-Popup, der setTheme() direkt aufruft, siehe
+   bkmpInitTheme) - haelt sowohl die Hintergrundmischung als auch den
+   Picker-Vorschauwert (falls keine eigene Farbe gespeichert ist) mit dem
+   jeweils aktiven Theme synchron. */
+function bkmpRefreshAccentForTheme() {
+  bkmpApplyAccentForCurrentTheme();
+  const picker = document.getElementById('accentColorPicker');
+  if (picker && !localStorage.getItem(BKMP_ACCENT_COLOR_KEY)) {
+    picker.value = document.documentElement.getAttribute('data-theme') === 'light' ? BKMP_ACCENT_DEFAULT.light : BKMP_ACCENT_DEFAULT.dark;
+  }
+}
 function bkmpInitAccentColor() {
   const root = document.documentElement;
   const picker = document.getElementById('accentColorPicker');
   const resetBtn = document.getElementById('accentColorReset');
   if (!picker) return;
 
-  function defaultForCurrentTheme() {
-    return root.getAttribute('data-theme') === 'light' ? BKMP_ACCENT_DEFAULT.light : BKMP_ACCENT_DEFAULT.dark;
-  }
   function syncPickerValue() {
     const saved = localStorage.getItem(BKMP_ACCENT_COLOR_KEY);
-    picker.value = saved || defaultForCurrentTheme();
+    picker.value = saved || (root.getAttribute('data-theme') === 'light' ? BKMP_ACCENT_DEFAULT.light : BKMP_ACCENT_DEFAULT.dark);
   }
   syncPickerValue();
 
-  /* Faerbt nicht nur --gold um, sondern mischt dieselbe Farbe auch leicht
-     in den Seitenhintergrund (--paper/-2/-3) - Spieler-Wunsch: "die
-     komplette Hintergrundfarbe soll mit dem Regler anpassbar sein", nicht
-     nur Buttons/Rahmen. Bleibt ueberwiegend dunkel/hell fuer Lesbarkeit. */
-  function applyAccent(color) {
-    const base = root.getAttribute('data-theme') === 'light' ? BKMP_PAPER_DEFAULT.light : BKMP_PAPER_DEFAULT.dark;
-    root.style.setProperty('--gold', color);
-    root.style.setProperty('--paper', `color-mix(in srgb, ${color} 14%, ${base.p})`);
-    root.style.setProperty('--paper-2', `color-mix(in srgb, ${color} 18%, ${base.p2})`);
-    root.style.setProperty('--paper-3', `color-mix(in srgb, ${color} 22%, ${base.p3})`);
-  }
-  function clearAccent() {
-    root.style.removeProperty('--gold');
-    root.style.removeProperty('--paper');
-    root.style.removeProperty('--paper-2');
-    root.style.removeProperty('--paper-3');
-  }
-
   picker.addEventListener('input', () => {
-    applyAccent(picker.value);
     localStorage.setItem(BKMP_ACCENT_COLOR_KEY, picker.value);
+    bkmpApplyAccentForCurrentTheme();
   });
 
   if (resetBtn) resetBtn.addEventListener('click', () => {
-    clearAccent();
     localStorage.removeItem(BKMP_ACCENT_COLOR_KEY);
+    bkmpApplyAccentForCurrentTheme();
     syncPickerValue();
-  });
-
-  /* Beim Theme-Wechsel: ohne eigene Farbe nur den Picker-Vorschauwert
-     nachfuehren; mit eigener Farbe die Hintergrundmischung neu berechnen,
-     da sich die Basis (hell/dunkel) dabei aendert. */
-  const toggleBtn = document.getElementById('themeToggle');
-  if (toggleBtn) toggleBtn.addEventListener('click', () => {
-    const saved = localStorage.getItem(BKMP_ACCENT_COLOR_KEY);
-    window.setTimeout(() => {
-      if (saved) applyAccent(saved); else syncPickerValue();
-    }, 0);
   });
 }
 
