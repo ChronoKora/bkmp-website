@@ -2668,9 +2668,18 @@ async function loadPlayerAchievementsUnlockedByName(name) {
 async function upsertPlayerStats(displayName, stats) {
   const client = bkmpGetPlayerAuthClient();
   if (!client || !displayName) return false;
-  const { data: sessionData } = await client.auth.getSession();
+  const { data: sessionData, error: sessionError } = await client.auth.getSession();
   const userId = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
-  if (!userId) return false;
+  if (!userId) {
+    /* Bisher schlug das hier komplett lautlos fehl (nur "return false") -
+       ein Spieler blieb dadurch unbemerkt fuer Tage auf einem veralteten
+       Erfolge-/Bonk-Stand haengen, obwohl er sichtbar aktiv eingeloggt war
+       (siehe Bug-Report RandomAuto: Badge zeigte live 148/299, DB blieb
+       seit Tagen bei 65). Jetzt wenigstens sichtbar im Log, damit sowas
+       kuenftig auffaellt statt sich lautlos zu wiederholen. */
+    console.warn('Konnte Erfolge/Zeit nicht synchronisieren: keine gueltige Spieler-Session (Login evtl. abgelaufen).', sessionError || '');
+    return false;
+  }
   const statsPayload = {
     minutes_spent: Math.max(0, Math.round(stats.minutesSpent || 0)),
     achievements_unlocked: Math.max(0, Math.round(stats.achievementsUnlocked || 0)),
