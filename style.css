@@ -3570,6 +3570,102 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 .idle-title-bonus-hidden { background: transparent; color: var(--muted); border-color: var(--line); }
 .achievements-card .joke-buttons { margin-top: 1rem; justify-content: space-between; }
 
+/* ---------------- Runen-Tab (Design-Vorschau, siehe idledorf.js) ---------------- */
+.idle-runen-hint { text-align: center; margin-bottom: 1.1rem; }
+.idle-runen-circle-wrap { display: flex; justify-content: center; margin-bottom: 1.2rem; }
+.idle-runen-circle-inner { position: relative; display: inline-block; }
+.idle-runen-circle-img {
+  display: block;
+  width: min(340px, 60vw);
+  max-width: 100%;
+  height: auto;
+  border-radius: 50%;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+}
+/* Eingesetzte Rune direkt auf einem der 6 Hex-Rahmen, siehe
+   BKMP_RUNE_SLOT_POSITIONS in idledorf.js. */
+.idle-runen-equip-slot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+.idle-runen-equip-slot img {
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--rune-color) 65%, transparent));
+  transition: transform 0.15s ease;
+}
+.idle-runen-equip-slot:hover img, .idle-runen-equip-slot:focus-visible img { transform: scale(1.1); }
+.idle-runen-stat-box {
+  min-height: 4.2rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  padding: 0.85rem 1rem;
+  margin-bottom: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.idle-runen-stat-placeholder { color: var(--muted); font-size: 0.85rem; margin: 0; text-align: center; width: 100%; }
+.idle-runen-stat-head { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 0.5rem; }
+.idle-runen-stat-head img { width: 42px; height: 42px; object-fit: contain; filter: drop-shadow(0 0 8px color-mix(in srgb, var(--rune-color) 55%, transparent)); }
+.idle-runen-equip-btn { margin-left: auto; flex-shrink: 0; padding: 0.45rem 0.9rem; font-size: 0.8rem; }
+.idle-runen-stat-name { font-weight: 700; font-size: 0.92rem; }
+.idle-runen-stat-rarity { font-size: 0.76rem; font-weight: 700; color: var(--rune-color); }
+.idle-runen-stat-line { margin: 0; font-size: 0.88rem; }
+.idle-runen-stat-note { color: var(--muted); font-size: 0.74rem; }
+.idle-runen-inventory {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 0.55rem;
+  margin-top: 0.6rem;
+}
+.idle-runen-item {
+  position: relative;
+  aspect-ratio: 1;
+  border: 1px solid color-mix(in srgb, var(--rune-color) 45%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--rune-color) 10%, var(--paper));
+  padding: 0.4rem;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.idle-runen-item img { width: 100%; height: 100%; object-fit: contain; }
+.idle-runen-item.is-equipped {
+  border-color: var(--rune-color);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--rune-color) 45%, transparent) inset;
+}
+.idle-runen-equipped-badge {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--rune-color);
+  color: #14110c;
+  font-size: 0.62rem;
+  font-weight: 900;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 6px color-mix(in srgb, var(--rune-color) 70%, transparent);
+}
+.idle-runen-item:hover, .idle-runen-item:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--rune-color) 35%, transparent);
+  outline: none;
+}
+@media (max-width: 640px) {
+  .idle-runen-inventory { grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); }
+}
+
 .achievements-subtabs { display: flex; gap: 0.5rem; margin-bottom: 0.8rem; }
 .achievements-subtab {
   flex: 1;
@@ -4249,7 +4345,7 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 
 .idle-dorf-overlay .idle-dorf-card {
   position: relative;
-  max-width: 1100px;
+  max-width: 1200px;
   width: 94vw;
   max-height: 95vh;
   /* Etwas knapperes Innenpolster als der generische .joke-card-Wert (fuer
@@ -4341,6 +4437,8 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   transition: all 0.15s ease;
   white-space: nowrap;
 }
+.idle-dorf-tab:disabled { opacity: 0.45; cursor: not-allowed; }
+.idle-dorf-tab:disabled:hover { background: var(--paper); color: var(--muted); }
 .idle-dorf-tab.active {
   background: linear-gradient(135deg, #f5d58a, var(--gold));
   color: #0A0A0F;

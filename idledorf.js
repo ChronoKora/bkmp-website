@@ -1940,6 +1940,145 @@ function bkmpIdleRenderPrestigePanel() {
   panel.querySelectorAll('.idle-prestige-buy').forEach(btn => btn.addEventListener('click', () => bkmpPrestigeBuyUpgrade(btn.dataset.prestigeId)));
 }
 
+/* ---------------- Runen (in Vorbereitung) ----------------
+   Noch kein Backend/Datenmodell - reine Design-Vorschau, damit das
+   Grundlayout schon jetzt begutachtet werden kann. Farmen (Weltboss/Bosse,
+   geringe Chance) und echte, nach Seltenheit gestaffelte Werte kommen
+   erst spaeter; die hier gezeigten Zahlen sind ausdruecklich nur
+   Beispielwerte fuers Layout, kein echtes Balancing. */
+window.BKMP_RUNE_SLOTS = [
+  { id: 'slot1', name: 'Rune I' },
+  { id: 'slot2', name: 'Rune II' },
+  { id: 'slot3', name: 'Rune III' },
+  { id: 'slot4', name: 'Rune IV' },
+  { id: 'slot5', name: 'Rune V' },
+  { id: 'slot6', name: 'Rune VI' }
+];
+window.BKMP_RUNE_RARITIES = [
+  { id: 'gray', name: 'Gewöhnlich', color: '#9ca3af', mult: 1 },
+  { id: 'green', name: 'Ungewöhnlich', color: '#4ade80', mult: 1.6 },
+  { id: 'blue', name: 'Selten', color: '#38bdf8', mult: 2.4 },
+  { id: 'purple', name: 'Episch', color: '#a78bfa', mult: 3.4 },
+  { id: 'gold', name: 'Legendär', color: '#facc15', mult: 5 }
+];
+
+/* Prozent-Positionen der 6 Hex-Rahmen auf circle-empty.png (1254x1254),
+   im Uhrzeigersinn ab oben zugeordnet - rein optisch, hat noch keine
+   Verbindung zu echten Slot-Eigenschaften (die gibt es erst mit dem
+   spaeteren Backend/Balancing). */
+const BKMP_RUNE_SLOT_POSITIONS = {
+  slot1: { top: '15.85%', left: '50%', width: '18.6%', height: '22.1%' },
+  slot2: { top: '33.25%', left: '80.05%', width: '16.5%', height: '22.1%' },
+  slot3: { top: '64.95%', left: '80.05%', width: '16.5%', height: '20.9%' },
+  slot4: { top: '81.75%', left: '49.95%', width: '17.5%', height: '20.3%' },
+  slot5: { top: '64.9%', left: '19.85%', width: '16.7%', height: '21%' },
+  slot6: { top: '33.35%', left: '19.85%', width: '17.3%', height: '20.6%' }
+};
+
+/* Rein clientseitige Design-Vorschau des Einsetzen/Rausnehmen-Mechanismus
+   - es gibt noch keine echten, per Drop erspielten Runen, deshalb einfach
+   in localStorage statt einer echten idle_player_runes-Tabelle. Wird durch
+   das spaetere Backend ersetzt, sobald Farmen wirklich moeglich ist. */
+const BKMP_RUNE_EQUIP_KEY = 'bkmp-rune-equipped-preview';
+function bkmpRuneGetEquipped() {
+  try { const v = JSON.parse(localStorage.getItem(BKMP_RUNE_EQUIP_KEY) || '{}'); return v && typeof v === 'object' ? v : {}; } catch (e) { return {}; }
+}
+function bkmpRuneSaveEquipped(state) {
+  try { localStorage.setItem(BKMP_RUNE_EQUIP_KEY, JSON.stringify(state)); } catch (e) {}
+}
+
+let bkmpRuneCurrentlyViewing = null;
+
+/* Anklicken im Lager zeigt eine Rune nur noch an (Stats-Vorschau) - das
+   eigentliche Einsetzen/Rausnehmen passiert erst ueber den Button im
+   Stats-Feld selbst, per Spieler-Wunsch als eigener, expliziter Schritt
+   statt automatisch beim reinen Anschauen. Direkt auf dem Kreis bleibt das
+   Entfernen weiterhin ein einzelner Klick - da gibt's ja nur die eine
+   sinnvolle Aktion. */
+function bkmpRuneViewItem(slotId, rarityId) {
+  bkmpRuneCurrentlyViewing = { slotId, rarityId };
+  bkmpIdleRenderRunenPanel();
+}
+
+function bkmpRuneStatBoxHTML() {
+  const viewing = bkmpRuneCurrentlyViewing;
+  const slot = viewing && window.BKMP_RUNE_SLOTS.find(s => s.id === viewing.slotId);
+  const rarity = viewing && window.BKMP_RUNE_RARITIES.find(r => r.id === viewing.rarityId);
+  if (!slot || !rarity) return '<p class="idle-runen-stat-placeholder">Wähle unten eine Rune aus, um ihre Werte zu sehen.</p>';
+  const equipped = bkmpRuneGetEquipped();
+  const isEquipped = equipped[viewing.slotId] === viewing.rarityId;
+  const exampleValue = Math.round(2 * rarity.mult * 10) / 10;
+  return `
+    <div class="idle-runen-stat-head" style="--rune-color:${rarity.color}">
+      <img src="assets/runes/${viewing.slotId}-${viewing.rarityId}.png" alt="">
+      <div>
+        <div class="idle-runen-stat-name">${escapeHtml(slot.name)}</div>
+        <div class="idle-runen-stat-rarity">${escapeHtml(rarity.name)}</div>
+      </div>
+      <button type="button" class="${isEquipped ? 'btn-nein' : 'btn-ja'} idle-runen-equip-btn" id="idleRuneEquipBtn" data-slot="${viewing.slotId}" data-rarity="${viewing.rarityId}">
+        ${isEquipped ? 'Entfernen' : 'Einsetzen'}
+      </button>
+    </div>
+    <p class="idle-runen-stat-line">+${exampleValue}% Angriff <span class="idle-runen-stat-note">(Beispielwert – echtes Balancing folgt)</span></p>
+  `;
+}
+
+/* Einsetzen: klickt man eine andere Rarity fuer denselben Slot an, wird
+   die vorherige einfach ersetzt (kein extra "erst rausnehmen" noetig).
+   Rausnehmen: den Einsetzen-Button erneut anklicken (heisst dann
+   "Entfernen"), oder direkt auf dem Kreis auf die eingesetzte Rune klicken. */
+function bkmpRuneToggleEquip(slotId, rarityId) {
+  const state = bkmpRuneGetEquipped();
+  if (state[slotId] === rarityId) {
+    delete state[slotId];
+  } else {
+    state[slotId] = rarityId;
+  }
+  bkmpRuneCurrentlyViewing = { slotId, rarityId };
+  bkmpRuneSaveEquipped(state);
+  bkmpIdleRenderRunenPanel();
+}
+
+function bkmpIdleRenderRunenPanel() {
+  const panel = document.getElementById('idlePanelRunen');
+  if (!panel) return;
+  const equipped = bkmpRuneGetEquipped();
+  panel.innerHTML = `
+    <p class="idle-panel-hint idle-runen-hint">🔒 Runen sind ein kommendes Feature: bald mit geringer Chance beim Weltboss und bei Bossen farmbar, mit Werten je nach Seltenheit. Hier schon mal die Design-Vorschau zum Einsetzen/Rausnehmen.</p>
+    <div class="idle-runen-circle-wrap">
+      <div class="idle-runen-circle-inner">
+        <img src="assets/runes/circle-empty.png" alt="Runen-Kreis" class="idle-runen-circle-img">
+        ${window.BKMP_RUNE_SLOTS.map(slot => {
+          const rarityId = equipped[slot.id];
+          if (!rarityId) return '';
+          const rarity = window.BKMP_RUNE_RARITIES.find(r => r.id === rarityId);
+          const pos = BKMP_RUNE_SLOT_POSITIONS[slot.id];
+          if (!rarity || !pos) return '';
+          return `<button type="button" class="idle-runen-equip-slot" style="top:${pos.top}; left:${pos.left}; width:${pos.width}; height:${pos.height}; --rune-color:${rarity.color}" data-slot="${slot.id}" data-rarity="${rarityId}" title="${escapeHtml(slot.name)} entfernen">
+            <img src="assets/runes/${slot.id}-${rarityId}.png" alt="${escapeHtml(slot.name)} (${escapeHtml(rarity.name)})">
+          </button>`;
+        }).join('')}
+      </div>
+    </div>
+    <div class="idle-runen-stat-box" id="idleRunenStatBox">${bkmpRuneStatBoxHTML()}</div>
+    <h4 class="idle-sammlung-subheading">🎒 Runen-Lager <span class="idle-sammlung-count">Vorschau</span></h4>
+    <div class="idle-runen-inventory" id="idleRunenInventory">
+      ${window.BKMP_RUNE_SLOTS.map(slot => window.BKMP_RUNE_RARITIES.map(rarity => {
+        const isEquipped = equipped[slot.id] === rarity.id;
+        return `
+        <button type="button" class="idle-runen-item ${isEquipped ? 'is-equipped' : ''}" data-slot="${slot.id}" data-rarity="${rarity.id}" style="--rune-color:${rarity.color}" title="${escapeHtml(slot.name)} · ${escapeHtml(rarity.name)}${isEquipped ? ' (eingesetzt)' : ''}">
+          <img src="assets/runes/${slot.id}-${rarity.id}.png" alt="${escapeHtml(slot.name)} (${escapeHtml(rarity.name)})">
+          ${isEquipped ? '<span class="idle-runen-equipped-badge">✓</span>' : ''}
+        </button>`;
+      }).join('')).join('')}
+    </div>
+  `;
+  panel.querySelectorAll('.idle-runen-item').forEach(btn => btn.addEventListener('click', () => bkmpRuneViewItem(btn.dataset.slot, btn.dataset.rarity)));
+  panel.querySelectorAll('.idle-runen-equip-slot').forEach(btn => btn.addEventListener('click', () => bkmpRuneToggleEquip(btn.dataset.slot, btn.dataset.rarity)));
+  const equipBtn = document.getElementById('idleRuneEquipBtn');
+  if (equipBtn) equipBtn.addEventListener('click', () => bkmpRuneToggleEquip(equipBtn.dataset.slot, equipBtn.dataset.rarity));
+}
+
 /* ---------------- Tabs & Modal ---------------- */
 
 const bkmpIdleTabs = [
@@ -1949,7 +2088,8 @@ const bkmpIdleTabs = [
   { id: 'sammlung', btn: 'idleTabBtnSammlung', panel: 'idlePanelSammlung', render: bkmpIdleRenderSammlungPanel },
   { id: 'erfolge', btn: 'idleTabBtnErfolge', panel: 'idlePanelErfolge', render: bkmpIdleRenderErfolgePanel },
   { id: 'bestenliste', btn: 'idleTabBtnBestenliste', panel: 'idlePanelBestenliste', render: bkmpIdleRenderBestenlistePanel },
-  { id: 'prestige', btn: 'idleTabBtnPrestige', panel: 'idlePanelPrestige', render: bkmpIdleRenderPrestigePanel }
+  { id: 'prestige', btn: 'idleTabBtnPrestige', panel: 'idlePanelPrestige', render: bkmpIdleRenderPrestigePanel },
+  { id: 'runen', btn: 'idleTabBtnRunen', panel: 'idlePanelRunen', render: bkmpIdleRenderRunenPanel }
 ];
 let bkmpIdleActiveTab = 'kampf';
 
@@ -2872,9 +3012,30 @@ function bkmpRaidInit() {
   if (bossEl) bossEl.addEventListener('click', bkmpRaidHandleBossClick);
 }
 
+/* Runen-Tab ist absichtlich per HTML-Attribut standardmaessig "disabled"
+   (fail-closed - fuer echte Besucher ohne Session wird dadurch ueberhaupt
+   kein Netzwerkaufruf ausgeloest, siehe gleiches Muster bei
+   bkmpCheckAdminPendingRequestsOnMainSite). Nur wenn wirklich eine aktive
+   Admin-Session erkannt wird, wird der Button freigeschaltet - fuer alle
+   anderen (oeffentliche Nutzer) bleibt er dauerhaft gesperrt, das Schloss
+   im Label ist also kein reines Deko-Icon. */
+async function bkmpIdleUnlockRunenTabForAdmins() {
+  const client = typeof bkmpGetSupabaseClient === 'function' ? bkmpGetSupabaseClient() : null;
+  if (!client) return;
+  try {
+    const { data: sessionData } = await client.auth.getSession();
+    if (!sessionData || !sessionData.session) return;
+    const { data: isAdmin } = await client.rpc('is_active_admin');
+    if (!isAdmin) return;
+    const btn = document.getElementById('idleTabBtnRunen');
+    if (btn) { btn.disabled = false; btn.title = ''; }
+  } catch (e) { /* bleibt gesperrt, kein Fehler-UI noetig */ }
+}
+
 function bkmpIdleInit() {
   bkmpIdleInitTabs();
   bkmpRaidInit();
+  bkmpIdleUnlockRunenTabForAdmins();
   const openBtn = document.getElementById('idleDorfButton');
   if (openBtn) openBtn.addEventListener('click', bkmpIdleOpenModal);
   bkmpIdleMaintenancePoll();
