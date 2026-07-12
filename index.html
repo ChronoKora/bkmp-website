@@ -55,7 +55,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260712-lbfixedgold1">
+<link rel="stylesheet" href="style.css?v=20260712-skillhelp1">
 </head>
 <body>
 
@@ -367,6 +367,17 @@
       <p id="idleMaintenanceMessage">Das Idle Drachen Dorf ist gerade kurz für Wartungsarbeiten pausiert. Es geht bald weiter, bitte versuch es später nochmal.</p>
       <div class="joke-buttons">
         <button class="btn-ja" id="idleMaintenanceClose" type="button">Verstanden</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="joke-overlay" id="idleSkillHelpOverlay">
+    <div class="joke-card achievements-card skillhelp-card">
+      <h3>❓ Skilltree-Hilfe</h3>
+      <p class="achievements-summary">Was jeder Skill wirklich bringt, pro Rang und bei Max-Rang.</p>
+      <div class="skillhelp-list" id="idleSkillHelpList"></div>
+      <div class="joke-buttons">
+        <button class="btn-ja" id="idleSkillHelpClose" type="button">Schlie&szlig;en</button>
       </div>
     </div>
   </div>
@@ -986,7 +997,7 @@
   <script src="assets/vendor/supabase-js.min.js"></script>
   <script src="supabase.js?v=20260712-syncwarn1"></script>
   <script src="app.js?v=20260712-themefix1"></script>
-  <script src="idledorf.js?v=20260712-clicklockpersist1"></script>
+  <script src="idledorf.js?v=20260712-burstlock1"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
   <script>
     bkmpInitTheme();

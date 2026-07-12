@@ -1361,6 +1361,7 @@ function bkmpIdleRenderSkilltreePanel() {
   panel.innerHTML = `
     <div class="idle-skillpoints-row">
       <p class="idle-skillpoints-hint">Verfügbare Skillpunkte: <strong>${bkmpIdleState.skill_points_available}</strong></p>
+      <button type="button" class="btn-nein idle-skilltree-help-btn" id="idleSkilltreeHelpBtn">❓ Hilfe</button>
       ${(() => {
         const cooldownMs = bkmpIdleSkilltreeResetCooldownMsLeft();
         if (cooldownMs > 0) {
@@ -1411,6 +1412,83 @@ function bkmpIdleRenderSkilltreePanel() {
   panel.querySelectorAll('.idle-skilltree-tree').forEach(treeEl => bkmpIdleDrawSkillTreeLines(treeEl));
   const resetBtn = document.getElementById('idleSkilltreeResetBtn');
   if (resetBtn) resetBtn.addEventListener('click', bkmpIdleResetSkilltree);
+  const helpBtn = document.getElementById('idleSkilltreeHelpBtn');
+  if (helpBtn) helpBtn.addEventListener('click', bkmpIdleOpenSkillHelp);
+}
+
+/* ---------------- Skilltree-Hilfe-Fenster ---------------- */
+
+/* Wandelt effect_type + Gesamtwert (effect_value_per_rank * max_rank, bei
+   extra_archer/ballista_unlock zusaetzlich mit dem echten Multiplikator aus
+   bkmpIdleRecomputeEffectiveStats) in eine lesbare "bei Max-Rang"-Zeile um.
+   Bewusst dieselbe Umrechnung wie dort - wenn sich die Kampfformel je
+   aendert, muss nur diese eine Stelle mitgepflegt werden. */
+function bkmpIdleSkillEffectAtMaxLabel(node) {
+  const total = Number(node.effect_value_per_rank || 0) * Number(node.max_rank || 0);
+  const fmt = v => (Math.round(v * 10) / 10).toString().replace('.', ',');
+  switch (node.effect_type) {
+    case 'attack_pct': case 'attack_speed_pct': case 'crit_chance_pct': case 'crit_chance_flat':
+    case 'crit_damage_pct': case 'crit_damage_flat': case 'hp_pct': case 'defense_pct':
+    case 'gold_prod_pct': case 'gold_find_pct': case 'xp_pct': case 'loot_chance_pct':
+    case 'wood_prod_pct': case 'stone_prod_pct': case 'offline_income_pct': case 'click_damage_pct': {
+      const labels = {
+        attack_pct: 'Angriff', attack_speed_pct: 'Tempo', crit_chance_pct: 'Krit-Chance', crit_chance_flat: 'Krit-Chance',
+        crit_damage_pct: 'Krit-Schaden', crit_damage_flat: 'Krit-Schaden', hp_pct: 'Leben', defense_pct: 'Verteidigung',
+        gold_prod_pct: 'Gold', gold_find_pct: 'Gold', xp_pct: 'XP', loot_chance_pct: 'Lootchance',
+        wood_prod_pct: 'Holz', stone_prod_pct: 'Stein', offline_income_pct: 'Offline-Effizienz', click_damage_pct: 'Klick-Schaden'
+      };
+      return `bei Max: +${fmt(total)}% ${labels[node.effect_type]}`;
+    }
+    case 'attack_flat': return `bei Max: +${fmt(total)} Angriff (fest)`;
+    case 'hp_flat': return `bei Max: +${fmt(total)} Leben (fest)`;
+    case 'defense_flat': return `bei Max: +${fmt(total)} Verteidigung (fest)`;
+    case 'extra_archer': return `bei Max: +${fmt(total * 6)}% Angriff`;
+    case 'ballista_unlock': return `bei Max: +${fmt(total * 8)} Angriff (fest)`;
+    case 'elem_fire': return `bei Max: ${fmt(Math.min(60, total))}% Feuer-Chance`;
+    case 'elem_ice': return `bei Max: ${fmt(Math.min(60, total))}% Einfrier-Chance`;
+    case 'elem_lightning': return `bei Max: ${fmt(Math.min(60, total))}% Blitz-Chance`;
+    case 'magic_resist_pct': return `bei Max: +${fmt(Math.min(75, total))}% Schadensreduktion`;
+    case 'shield_regen': case 'repair_speed_pct': case 'heal_pct':
+      return 'Teil der Dorf-Regeneration (siehe Hinweis unten)';
+    default: return '';
+  }
+}
+
+function bkmpIdleOpenSkillHelp() {
+  bkmpIdleRenderSkillHelp();
+  const overlay = document.getElementById('idleSkillHelpOverlay');
+  if (overlay) { overlay.classList.add('visible'); document.body.classList.add('modal-open'); }
+}
+
+function bkmpIdleRenderSkillHelp() {
+  const list = document.getElementById('idleSkillHelpList');
+  if (!list) return;
+  if (!bkmpIdleSkillDefs.length) { list.innerHTML = '<p class="empty-hint">Skilltree wird bald verfügbar sein.</p>'; return; }
+  list.innerHTML = BKMP_IDLE_BRANCH_ORDER.map(branch => {
+    const nodes = bkmpIdleSkillDefs.filter(n => n.branch === branch).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+    if (!nodes.length) return '';
+    const rows = nodes.map(node => `
+      <div class="skillhelp-row">
+        <span class="skillhelp-icon">${node.icon || '✨'}</span>
+        <div class="skillhelp-body">
+          <div class="skillhelp-name">${escapeHtml(node.name)}</div>
+          <div class="skillhelp-desc">${escapeHtml(node.description || '')}</div>
+        </div>
+        <div class="skillhelp-meta">
+          <span class="skillhelp-badge">${bkmpIdleSkillEffectAtMaxLabel(node)}</span>
+          <span class="skillhelp-cost">Max ${node.max_rank} · ${node.cost_per_rank}🔹/Rang</span>
+        </div>
+      </div>`).join('');
+    return `
+      <div class="skillhelp-branch">
+        <div class="skillhelp-branch-title">${BKMP_IDLE_BRANCH_LABELS[branch] || branch}</div>
+        ${rows}
+      </div>`;
+  }).join('') + `
+    <div class="skillhelp-note">
+      <strong>Dorf-Regeneration:</strong> Schildgenerator (Burg), Reparaturtempo (Burg) und Heilung (Magie) speisen gemeinsam die passive Leben-Regeneration pro Kampf-Tick - alle drei maximiert ergeben zusammen ca. 15% Leben-Regeneration pro Tick.<br>
+      <strong>Krit-Schaden-Stapel:</strong> Brandpfeile (Dorf) und Dimensionsportal (Magie) addieren sich beide auf denselben Wert.
+    </div>`;
 }
 
 /* ---------------- Rendering: Sammlung- / Erfolge-Tab (Shortcuts ins bestehende System) ---------------- */
@@ -2050,6 +2128,17 @@ const BKMP_CLICK_RATE_CAP_MS = 100;
 let bkmpIdleLastClickAt = 0;
 let bkmpRaidLastClickAt = 0;
 
+/* Sofort-Sperre bei eindeutigem Extrem-Ausbruch: 20+ Klick-VERSUCHE
+   innerhalb einer Sekunde (auch die vom 100ms-Ratenlimit ohnehin
+   verworfenen zaehlen mit, deshalb ein eigener Zaehler VOR dem Ratenlimit-
+   Check) sind fuer einen Menschen unmoeglich und eindeutig ein Bot/Skript -
+   loest dieselbe 10-Minuten-Sperre wie die 60s-Mustererkennung aus, aber
+   sofort statt erst nach einer vollen Minute Beobachtung. */
+const BKMP_BURST_CLICK_THRESHOLD = 20;
+const BKMP_BURST_WINDOW_MS = 1000;
+let bkmpIdleClickBurst = [];
+let bkmpRaidClickBurst = [];
+
 /* Sperre + Klick-Verlauf muessen einen Seiten-Reload ueberleben - sonst
    waere der ganze Autoklicker-Schutz kostenlos umgehbar (Reload sobald
    gesperrt hebt die Sperre sofort auf; regelmaessiges Reload alle ~55s
@@ -2111,8 +2200,21 @@ function bkmpIdleHandleDragonClick() {
   if (bkmpIdleEventPauseActive) return;
 
   const now = Date.now();
-  if (now - bkmpIdleLastClickAt < BKMP_CLICK_RATE_CAP_MS) return;
   if (now < bkmpIdleClickLockedUntil) return;
+
+  bkmpIdleClickBurst = bkmpIdleClickBurst.filter(t => now - t <= BKMP_BURST_WINDOW_MS);
+  bkmpIdleClickBurst.push(now);
+  if (bkmpIdleClickBurst.length >= BKMP_BURST_CLICK_THRESHOLD) {
+    bkmpIdleClickLockedUntil = now + BKMP_AUTOCLICK_LOCK_MS;
+    bkmpIdleClickBurst = [];
+    bkmpIdleClickTimestamps = [];
+    bkmpAutoclickSaveNumber(BKMP_IDLE_CLICK_LOCK_KEY, bkmpIdleClickLockedUntil);
+    bkmpAutoclickSaveTimestamps(BKMP_IDLE_CLICK_HISTORY_KEY, bkmpIdleClickTimestamps);
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(BKMP_AUTOCLICK_TOAST, 3200);
+    return;
+  }
+
+  if (now - bkmpIdleLastClickAt < BKMP_CLICK_RATE_CAP_MS) return;
   bkmpIdleLastClickAt = now;
   bkmpIdleClickTimestamps.push(now);
   bkmpIdleClickTimestamps = bkmpIdleClickTimestamps.filter(t => now - t <= BKMP_AUTOCLICK_HISTORY_MS).slice(-BKMP_AUTOCLICK_WINDOW);
@@ -2545,8 +2647,21 @@ async function bkmpRaidBossPoll() {
 function bkmpRaidHandleBossClick() {
   if (!bkmpRaidState || bkmpRaidState.status !== 'fighting' || !bkmpIdleEffectiveStats) return;
   const now = Date.now();
-  if (now - bkmpRaidLastClickAt < BKMP_CLICK_RATE_CAP_MS) return;
   if (now < bkmpRaidClickLockedUntil) return;
+
+  bkmpRaidClickBurst = bkmpRaidClickBurst.filter(t => now - t <= BKMP_BURST_WINDOW_MS);
+  bkmpRaidClickBurst.push(now);
+  if (bkmpRaidClickBurst.length >= BKMP_BURST_CLICK_THRESHOLD) {
+    bkmpRaidClickLockedUntil = now + BKMP_AUTOCLICK_LOCK_MS;
+    bkmpRaidClickBurst = [];
+    bkmpRaidClickTimestamps = [];
+    bkmpAutoclickSaveNumber(BKMP_RAID_CLICK_LOCK_KEY, bkmpRaidClickLockedUntil);
+    bkmpAutoclickSaveTimestamps(BKMP_RAID_CLICK_HISTORY_KEY, bkmpRaidClickTimestamps);
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(BKMP_AUTOCLICK_TOAST, 3200);
+    return;
+  }
+
+  if (now - bkmpRaidLastClickAt < BKMP_CLICK_RATE_CAP_MS) return;
   bkmpRaidLastClickAt = now;
   bkmpRaidClickTimestamps.push(now);
   bkmpRaidClickTimestamps = bkmpRaidClickTimestamps.filter(t => now - t <= BKMP_AUTOCLICK_HISTORY_MS).slice(-BKMP_AUTOCLICK_WINDOW);
@@ -2773,6 +2888,12 @@ function bkmpIdleInit() {
   if (closeBtn) closeBtn.addEventListener('click', bkmpIdleCloseModal);
   const closeX = document.getElementById('idleDorfCloseX');
   if (closeX) closeX.addEventListener('click', bkmpIdleCloseModal);
+  const skillHelpClose = document.getElementById('idleSkillHelpClose');
+  if (skillHelpClose) skillHelpClose.addEventListener('click', () => {
+    const overlay = document.getElementById('idleSkillHelpOverlay');
+    if (overlay) overlay.classList.remove('visible');
+    document.body.classList.remove('modal-open');
+  });
   const dragonEl = document.getElementById('idleDragon');
   if (dragonEl) { dragonEl.classList.add('idle-dragon-clickable'); dragonEl.addEventListener('click', bkmpIdleHandleDragonClick); }
   bkmpIdleWireStagePicker();
