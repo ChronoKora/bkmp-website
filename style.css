@@ -72,6 +72,11 @@
   --paper-2: #121016;
   --paper-3: #1A1720;
   --gold: #C9A56A;
+  /* Fest, NICHT vom Akzentfarben-Regler ueberschreibbar - fuer Stellen wie
+     die Bestenliste, die Infos ueber ANDERE Spieler zeigen. Dort soll die
+     persoenliche Akzentfarbe des Betrachters nicht mit reinfaerben (sonst
+     wirkt es so, als haette der jeweilige Spieler diese Farbe). */
+  --gold-fixed: #C9A56A;
   --purple: #9333EA;
   --line: rgba(244, 242, 245, 0.08);
   --muted: rgba(244, 242, 245, 0.55);
@@ -85,6 +90,7 @@ html[data-theme="light"] {
   --paper-2: #EFEADD;
   --paper-3: #E5DFCE;
   --gold: #B08D57;
+  --gold-fixed: #B08D57;
   --purple: #7C3AED;
   --line: rgba(14, 28, 23, 0.12);
   --muted: rgba(14, 28, 23, 0.64);
@@ -2672,13 +2678,13 @@ input.cardcatalog-search:focus {
 .leaderboard-rank { flex-shrink: 0; width: 2.2rem; text-align: center; font-weight: 800; font-size: 1.05rem; }
 .leaderboard-name { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 0.4rem; }
 .leaderboard-plushie { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; flex-shrink: 0; box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--gold) 45%, var(--line)); }
-.leaderboard-value { flex-shrink: 0; color: var(--gold); font-weight: 700; font-size: 0.88rem; }
+.leaderboard-value { flex-shrink: 0; color: var(--gold-fixed); font-weight: 700; font-size: 0.88rem; }
 .leaderboard-title {
   display: block;
   margin-top: 0.15rem;
   font-size: 0.7rem;
   font-weight: 600;
-  color: var(--gold);
+  color: var(--gold-fixed);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
