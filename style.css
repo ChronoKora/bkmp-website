@@ -206,7 +206,7 @@ a { color: inherit; text-decoration: none; }
   height: 20px;
   padding: 0 5px;
   border-radius: 999px;
-  background: var(--gold);
+  background: var(--gold-fixed);
   color: #111018;
   font-size: 0.68rem;
   font-weight: 800;
@@ -661,7 +661,11 @@ body.page-loaded .streamer-marquee-track {
   filter: brightness(1.08);
 }
 .streamer-purple { background: #a78bfa; }
-.streamer-gold { background: var(--gold); }
+/* --gold-fixed statt --gold: das ist die zugewiesene Markenfarbe EINES
+   Streamers, nicht der Viewer soll sie mit der eigenen Akzentfarbe
+   ueberschreiben (gleiches Prinzip wie bei der Bestenliste, siehe
+   --gold-fixed-Definition weiter oben). */
+.streamer-gold { background: var(--gold-fixed); }
 .streamer-green { background: #4ade80; }
 .streamer-blue { background: #38bdf8; }
 .streamer-red { background: #f87171; }
@@ -683,7 +687,7 @@ body.page-loaded .streamer-marquee-track {
 .streamer-eis { background: linear-gradient(90deg, #e0f2fe, #7dd3fc, #38bdf8); }
 .streamer-galaxy { background: linear-gradient(120deg, #7c3aed, #a78bfa, #f472b6, #7c3aed); background-size: 300% 100%; animation: streamerShimmer 6s linear infinite; }
 .streamer-sonnenuntergang { background: linear-gradient(90deg, #fb923c, #f472b6, #a78bfa); }
-.streamer-goldglut { background: var(--gold); animation: streamerGlowPulseGold 2s ease-in-out infinite; }
+.streamer-goldglut { background: var(--gold-fixed); animation: streamerGlowPulseGold 2s ease-in-out infinite; }
 .streamer-toxic { background: #a3e635; animation: streamerGlowPulseToxic 2s ease-in-out infinite; }
 .streamer-mitternacht { background: linear-gradient(135deg, #1e1b4b, #4c1d95, #1e3a8a); color: #e0e7ff; }
 .streamer-neonpink { background: #ec4899; animation: streamerGlowPulsePink 1.8s ease-in-out infinite; }
