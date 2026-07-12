@@ -7,6 +7,27 @@
     var saved = localStorage.getItem('bkmp-theme');
     var theme = saved === 'light' ? 'light' : 'dark'; // Dunkel ist Standard
     document.documentElement.setAttribute('data-theme', theme);
+    /* Eigene Akzentfarbe (Spieler-Idee: statt nur Hell/Dunkel die
+       Akzentfarbe selbst waehlen koennen). Ueberschreibt --gold als
+       Inline-Style auf <html> - Inline-Styles gewinnen immer gegen
+       Stylesheet-Regeln, unabhaengig von data-theme, deshalb faerbt das
+       zuverlaessig in BEIDEN Themes gleich um. Schon hier (vor dem
+       Rendern) gesetzt, damit die Standardfarbe nicht kurz aufblitzt. */
+    var savedAccent = localStorage.getItem('bkmp-accent-color');
+    if (savedAccent) {
+      var root = document.documentElement;
+      root.style.setProperty('--gold', savedAccent);
+      /* Spieler-Wunsch: nicht nur Buttons/Rahmen, auch der komplette
+         Seitenhintergrund soll sich mit demselben Regler einfaerben.
+         Hintergrund bleibt dabei ueberwiegend dunkel/hell (Lesbarkeit),
+         bekommt aber einen klar sichtbaren Farbstich der gewaehlten Farbe. */
+      var paperBase = theme === 'light'
+        ? { p: '#F6F3EC', p2: '#EFEADD', p3: '#E5DFCE' }
+        : { p: '#08070A', p2: '#121016', p3: '#1A1720' };
+      root.style.setProperty('--paper', 'color-mix(in srgb, ' + savedAccent + ' 14%, ' + paperBase.p + ')');
+      root.style.setProperty('--paper-2', 'color-mix(in srgb, ' + savedAccent + ' 18%, ' + paperBase.p2 + ')');
+      root.style.setProperty('--paper-3', 'color-mix(in srgb, ' + savedAccent + ' 22%, ' + paperBase.p3 + ')');
+    }
   })();
 </script>
 <meta charset="UTF-8">
@@ -34,9 +55,11 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260711-opsuchtlogo2">
+<link rel="stylesheet" href="style.css?v=20260712-accentcolor1">
 </head>
 <body>
+
+  <div class="site-top-bar" aria-hidden="true"></div>
 
   <div class="poll-banner" id="pollBanner" style="display:none;">
     <button type="button" class="poll-banner-close" id="pollBannerCloseBtn" aria-label="Schließen">&times;</button>
@@ -104,6 +127,11 @@
       </span>
       <span id="themeLabel">Hell</span>
     </button>
+
+    <label class="accent-color-picker" id="accentColorPickerLabel" title="Akzentfarbe der Seite wählen" aria-label="Akzentfarbe der Seite wählen">
+      <input type="color" id="accentColorPicker">
+      <button type="button" class="accent-color-reset" id="accentColorReset" title="Standardfarbe wiederherstellen" aria-label="Standardfarbe wiederherstellen">↺</button>
+    </label>
 
     <button class="pill-btn" id="mcNameBadge" type="button">
       <span class="mc-name-badge-icon" id="mcNameBadgeIcon" aria-hidden="true">⛏️</span>
@@ -957,11 +985,12 @@
   <script>window.BKMP_CLIENT_STORAGE_KEY = 'bkmp-customer-auth';</script>
   <script src="assets/vendor/supabase-js.min.js"></script>
   <script src="supabase.js?v=20260711-polls1"></script>
-  <script src="app.js?v=20260709-optpass3"></script>
-  <script src="idledorf.js?v=20260711-ratecap10ps1"></script>
+  <script src="app.js?v=20260712-accentcolor2"></script>
+  <script src="idledorf.js?v=20260712-clicklockpersist1"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
   <script>
     bkmpInitTheme();
+    bkmpInitAccentColor();
     window.addEventListener('load', () => document.body.classList.add('page-loaded'));
     document.addEventListener('visibilitychange', () => {
       document.body.classList.toggle('page-hidden', document.hidden);
@@ -3820,6 +3849,7 @@
       ...(Array.isArray(window.BKMP_IDLE_LEVEL_TIERS) ? bkmpTieredAchievements('idlelevel', 'Idle Dorf', 'idleLevel', window.BKMP_IDLE_LEVEL_TIERS, n => `Erreiche Dorf-Level ${n} im Idle Dorf.`) : []),
       ...(Array.isArray(window.BKMP_IDLE_GOLD_TIERS) ? bkmpTieredAchievements('idlegold', 'Idle Dorf', 'idleGoldEarned', window.BKMP_IDLE_GOLD_TIERS, n => `Sammle insgesamt ${n} Gold im Idle Dorf.`) : []),
       ...(Array.isArray(window.BKMP_IDLE_SKILLPOINTS_TIERS) ? bkmpTieredAchievements('idleskill', 'Idle Dorf', 'idleSkillPointsSpent', window.BKMP_IDLE_SKILLPOINTS_TIERS, n => `Investiere ${n} Skillpunkte im Idle Dorf.`) : []),
+      ...(Array.isArray(window.BKMP_IDLE_PRESTIGE_TIERS) ? bkmpTieredAchievements('idleprestige', 'Idle Dorf', 'idlePrestigeLevel', window.BKMP_IDLE_PRESTIGE_TIERS, n => `Steige ${n}x im Idle Dorf auf (Prestige).`) : []),
       ...(Array.isArray(window.BKMP_RAID_ACHIEVEMENTS_EXTRA) ? window.BKMP_RAID_ACHIEVEMENTS_EXTRA : [])
     ];
     }

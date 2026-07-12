@@ -414,6 +414,77 @@ function bkmpInitTheme() {
 }
 
 /* ============================================================
+   Eigene Akzentfarbe (Spieler-Idee: statt nur Hell/Dunkel die
+   Akzentfarbe der Seite selbst waehlen). Ueberschreibt die CSS-Variable
+   --gold als Inline-Style auf <html> - praktisch der gesamte
+   Akzent-Farbton der Seite (Buttons, Raender, Highlights) laeuft schon
+   darueber, faerbt sich dadurch automatisch um. Ein paar Stellen mit fest
+   einprogrammierter Gold-Farbe (Leucht-Schatten) ziehen bewusst NICHT mit -
+   das war die abgesprochene erste, einfachere Ausbaustufe.
+   ============================================================ */
+const BKMP_ACCENT_COLOR_KEY = 'bkmp-accent-color';
+const BKMP_ACCENT_DEFAULT = { dark: '#C9A56A', light: '#B08D57' };
+const BKMP_PAPER_DEFAULT = {
+  dark: { p: '#08070A', p2: '#121016', p3: '#1A1720' },
+  light: { p: '#F6F3EC', p2: '#EFEADD', p3: '#E5DFCE' }
+};
+function bkmpInitAccentColor() {
+  const root = document.documentElement;
+  const picker = document.getElementById('accentColorPicker');
+  const resetBtn = document.getElementById('accentColorReset');
+  if (!picker) return;
+
+  function defaultForCurrentTheme() {
+    return root.getAttribute('data-theme') === 'light' ? BKMP_ACCENT_DEFAULT.light : BKMP_ACCENT_DEFAULT.dark;
+  }
+  function syncPickerValue() {
+    const saved = localStorage.getItem(BKMP_ACCENT_COLOR_KEY);
+    picker.value = saved || defaultForCurrentTheme();
+  }
+  syncPickerValue();
+
+  /* Faerbt nicht nur --gold um, sondern mischt dieselbe Farbe auch leicht
+     in den Seitenhintergrund (--paper/-2/-3) - Spieler-Wunsch: "die
+     komplette Hintergrundfarbe soll mit dem Regler anpassbar sein", nicht
+     nur Buttons/Rahmen. Bleibt ueberwiegend dunkel/hell fuer Lesbarkeit. */
+  function applyAccent(color) {
+    const base = root.getAttribute('data-theme') === 'light' ? BKMP_PAPER_DEFAULT.light : BKMP_PAPER_DEFAULT.dark;
+    root.style.setProperty('--gold', color);
+    root.style.setProperty('--paper', `color-mix(in srgb, ${color} 14%, ${base.p})`);
+    root.style.setProperty('--paper-2', `color-mix(in srgb, ${color} 18%, ${base.p2})`);
+    root.style.setProperty('--paper-3', `color-mix(in srgb, ${color} 22%, ${base.p3})`);
+  }
+  function clearAccent() {
+    root.style.removeProperty('--gold');
+    root.style.removeProperty('--paper');
+    root.style.removeProperty('--paper-2');
+    root.style.removeProperty('--paper-3');
+  }
+
+  picker.addEventListener('input', () => {
+    applyAccent(picker.value);
+    localStorage.setItem(BKMP_ACCENT_COLOR_KEY, picker.value);
+  });
+
+  if (resetBtn) resetBtn.addEventListener('click', () => {
+    clearAccent();
+    localStorage.removeItem(BKMP_ACCENT_COLOR_KEY);
+    syncPickerValue();
+  });
+
+  /* Beim Theme-Wechsel: ohne eigene Farbe nur den Picker-Vorschauwert
+     nachfuehren; mit eigener Farbe die Hintergrundmischung neu berechnen,
+     da sich die Basis (hell/dunkel) dabei aendert. */
+  const toggleBtn = document.getElementById('themeToggle');
+  if (toggleBtn) toggleBtn.addEventListener('click', () => {
+    const saved = localStorage.getItem(BKMP_ACCENT_COLOR_KEY);
+    window.setTimeout(() => {
+      if (saved) applyAccent(saved); else syncPickerValue();
+    }, 0);
+  });
+}
+
+/* ============================================================
    Robuste Bild-Ladehilfe
    Kurze Netzwerk- oder Storage-Haenger sollen Bilder nicht
    dauerhaft durch Platzhalter ersetzen.

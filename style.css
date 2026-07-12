@@ -127,6 +127,32 @@ html.theme-switching *::after {
 
 a { color: inherit; text-decoration: none; }
 
+/* ---------- Durchgehende Kopfleiste hinter den fixen Buttons ----------
+   .top-actions/.top-actions-left waren schon immer position:fixed (blieben
+   also technisch schon beim Scrollen stehen) - zwischen den beiden
+   Button-Gruppen war aber kein durchgehender Hintergrund, nur die
+   einzelnen Pillen hatten eine eigene Farbe. Beim Scrollen rutschte der
+   Seiteninhalt dadurch sichtbar in die Luecke zwischen den Buttons - genau
+   das erzeugte den "verschmilzt mit dem Inhalt"-Eindruck. Dieser reine
+   Hintergrund-Balken (niedrigerer z-index als die Buttons, aber hoeher als
+   der normale Seiteninhalt) loest das, ohne die bestehende Button-Logik
+   anzufassen. */
+.site-top-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 96px;
+  z-index: 15;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--paper) 97%, transparent), color-mix(in srgb, var(--paper) 90%, transparent));
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+}
+@media (max-width: 640px) {
+  .site-top-bar { height: 72px; }
+}
+
 /* ---------- Top-rechts: Theme-Toggle + Login ---------- */
 .top-actions {
   position: fixed;
@@ -241,6 +267,50 @@ a { color: inherit; text-decoration: none; }
   font-weight: 500;
   color: var(--muted);
   transition: background 0.3s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+/* Eigene Akzentfarbe waehlen (Spieler-Idee, siehe bkmpInitAccentColor in
+   app.js) - dezente Pille im selben Stil wie die anderen Header-Buttons,
+   der native Color-Picker wird auf einen runden Farb-Swatch zurechtgestutzt
+   (Browser-Standardrahmen/-Padding sind sonst uneinheitlich). */
+.accent-color-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.4rem;
+  cursor: pointer;
+}
+.accent-color-picker input[type="color"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  padding: 0;
+  cursor: pointer;
+  background: none;
+}
+.accent-color-picker input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; border-radius: 50%; }
+.accent-color-picker input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 50%; }
+.accent-color-picker input[type="color"]::-moz-color-swatch { border: 0; border-radius: 50%; }
+.accent-color-reset {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.1rem;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+.accent-color-reset:hover { color: var(--gold); transform: rotate(-45deg); }
+@media (max-width: 640px) {
+  .accent-color-picker { padding: 0.32rem; gap: 0.3rem; }
+  .accent-color-picker input[type="color"] { width: 18px; height: 18px; }
 }
 
 .pill-btn:hover { border-color: var(--gold); color: var(--ink); }
@@ -532,7 +602,7 @@ body.page-loaded .streamer-marquee-track {
   padding: 1rem 1.05rem;
   border: 1px solid rgba(239, 68, 68, 0.38);
   border-radius: 16px;
-  background: linear-gradient(145deg, rgba(18, 16, 22, 0.96), rgba(8, 7, 10, 0.94));
+  background: linear-gradient(145deg, var(--paper-2), var(--paper));
   color: var(--ink);
   box-shadow: 0 20px 70px rgba(0, 0, 0, 0.38), 0 0 34px rgba(239, 68, 68, 0.18);
   opacity: 0;
@@ -4393,6 +4463,13 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   transition: transform 0.15s ease, border-color 0.2s ease;
 }
 .idle-stagepicker-stage:hover { transform: translateY(-1px); border-color: var(--gold); }
+/* Boss-Stufen (alle 25 Kaempfe) farblich abgesetzt, damit man sie im
+   Raster schnell wiederfindet - bewusst Lila statt Gold, damit sie sich
+   von der Gold-Markierung fuer "aktuelle/beste Stufe" unterscheiden. Vor
+   .is-current/.is-highest in der Kaskade, damit deren Gold-Stil bei
+   Ueberschneidung weiterhin gewinnt (die Krone im Text bleibt trotzdem
+   sichtbar). */
+.idle-stagepicker-stage.is-boss { border-color: var(--purple); color: var(--purple); background: color-mix(in srgb, var(--purple) 10%, var(--paper)); }
 .idle-stagepicker-stage.is-current { background: var(--gold); color: #1a1408; border-color: var(--gold); }
 .idle-stagepicker-stage.is-highest:not(.is-current) { border-color: var(--gold); color: var(--gold); }
 @media (max-width: 640px) {

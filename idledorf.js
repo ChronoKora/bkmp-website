@@ -658,7 +658,7 @@ function bkmpIdleGetCachedAchievementFields() {
 function bkmpIdleGetAchievementContextFields() {
   const s = bkmpIdleState;
   if (!s) {
-    return bkmpIdleGetCachedAchievementFields() || { idleDragonKills: 0, idleBossKills: 0, idleLevel: 0, idleGoldEarned: 0, idleSkillPointsSpent: 0, idleBranchesMaxed: 0, shenlossDefeated: false, liberDefeated: false };
+    return bkmpIdleGetCachedAchievementFields() || { idleDragonKills: 0, idleBossKills: 0, idleLevel: 0, idleGoldEarned: 0, idleSkillPointsSpent: 0, idleBranchesMaxed: 0, shenlossDefeated: false, liberDefeated: false, idlePrestigeLevel: 0 };
   }
   const fields = {
     idleDragonKills: Number(s.dragon_kills || 0),
@@ -668,7 +668,15 @@ function bkmpIdleGetAchievementContextFields() {
     idleSkillPointsSpent: Number(s.skill_points_spent || 0),
     idleBranchesMaxed: bkmpIdleCountMaxedBranches(),
     shenlossDefeated: Boolean(bkmpIdleEventDragonState && bkmpIdleEventDragonState.shenloss_defeated),
-    liberDefeated: Boolean(bkmpIdleEventDragonState && bkmpIdleEventDragonState.liber_defeated)
+    liberDefeated: Boolean(bkmpIdleEventDragonState && bkmpIdleEventDragonState.liber_defeated),
+    /* Faellt auf den zuletzt gecachten Wert zurueck statt auf 0, falls der
+       Prestige-Stand (eigene Tabelle, eigener Ladevorgang) in diesem
+       Moment noch nicht durch ist - sonst wuerde ein bereits erspieltes
+       Prestige-Achievement/Titel kurzzeitig faelschlich wieder gesperrt
+       wirken (gleiche Vorsicht wie bei bkmpPrestigeLoadFailed). */
+    idlePrestigeLevel: bkmpPrestigeState
+      ? Number(bkmpPrestigeState.prestige_level || 0)
+      : Number((bkmpIdleGetCachedAchievementFields() || {}).idlePrestigeLevel || 0)
   };
   try { localStorage.setItem(BKMP_IDLE_ACHIEVEMENT_CACHE_KEY, JSON.stringify(fields)); } catch (e) {}
   return fields;
@@ -1182,10 +1190,17 @@ function bkmpIdleRenderStagePickerBody() {
         const idx = act * 10 + s;
         const isCurrent = idx === current;
         const isHighest = idx === highest;
+        /* Boss-Stufe: alle 25 Kaempfe (1-indiziert, siehe
+           bkmpIdleSelectDragonKindId: stage = killIndex+1, stage % 25 === 0)
+           - im Auswahl-Raster optisch markiert, damit man sie schnell
+           wiederfindet (Spieler-Feedback von DerJannikHase). */
+        const isBoss = (idx + 1) % 25 === 0;
         const cls = ['idle-stagepicker-stage'];
         if (isCurrent) cls.push('is-current');
         if (isHighest) cls.push('is-highest');
-        html += `<button type="button" class="${cls.join(' ')}" data-stage-index="${idx}" title="Stufe ${bkmpIdleFormatStage(idx)}${isHighest ? ' (Beste Stufe)' : ''}">${bkmpIdleFormatStage(idx)}${isHighest ? ' ⭐' : ''}</button>`;
+        if (isBoss) cls.push('is-boss');
+        const titleSuffix = [isHighest ? 'Beste Stufe' : '', isBoss ? 'Boss-Stufe' : ''].filter(Boolean).join(', ');
+        html += `<button type="button" class="${cls.join(' ')}" data-stage-index="${idx}" title="Stufe ${bkmpIdleFormatStage(idx)}${titleSuffix ? ' (' + titleSuffix + ')' : ''}">${isBoss ? '👑 ' : ''}${bkmpIdleFormatStage(idx)}${isHighest ? ' ⭐' : ''}</button>`;
       }
       html += '</div>';
     }
@@ -2035,6 +2050,28 @@ const BKMP_CLICK_RATE_CAP_MS = 100;
 let bkmpIdleLastClickAt = 0;
 let bkmpRaidLastClickAt = 0;
 
+/* Sperre + Klick-Verlauf muessen einen Seiten-Reload ueberleben - sonst
+   waere der ganze Autoklicker-Schutz kostenlos umgehbar (Reload sobald
+   gesperrt hebt die Sperre sofort auf; regelmaessiges Reload alle ~55s
+   verhindert sogar, dass die 60s-Mustererkennung je zuschlaegt). Deshalb
+   in localStorage statt nur im Skript-Speicher. */
+const BKMP_IDLE_CLICK_LOCK_KEY = 'bkmp-idle-click-locked-until';
+const BKMP_IDLE_CLICK_HISTORY_KEY = 'bkmp-idle-click-timestamps';
+const BKMP_RAID_CLICK_LOCK_KEY = 'bkmp-raid-click-locked-until';
+const BKMP_RAID_CLICK_HISTORY_KEY = 'bkmp-raid-click-timestamps';
+function bkmpAutoclickLoadNumber(key) {
+  try { return Number(localStorage.getItem(key) || 0) || 0; } catch (e) { return 0; }
+}
+function bkmpAutoclickSaveNumber(key, value) {
+  try { localStorage.setItem(key, String(value)); } catch (e) {}
+}
+function bkmpAutoclickLoadTimestamps(key) {
+  try { const arr = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(arr) ? arr : []; } catch (e) { return []; }
+}
+function bkmpAutoclickSaveTimestamps(key, arr) {
+  try { localStorage.setItem(key, JSON.stringify(arr)); } catch (e) {}
+}
+
 function bkmpIdleDetectAutoclickPattern(timestamps) {
   if (!timestamps || timestamps.length < BKMP_AUTOCLICK_MIN_SAMPLES) return false;
   /* Absichtlich KEIN erneutes .slice() hier - das hatte denselben Bug nur
@@ -2054,8 +2091,8 @@ function bkmpIdleDetectAutoclickPattern(timestamps) {
   return coefficientOfVariation < BKMP_AUTOCLICK_CV_THRESHOLD;
 }
 
-let bkmpIdleClickTimestamps = [];
-let bkmpIdleClickLockedUntil = 0;
+let bkmpIdleClickTimestamps = bkmpAutoclickLoadTimestamps(BKMP_IDLE_CLICK_HISTORY_KEY);
+let bkmpIdleClickLockedUntil = bkmpAutoclickLoadNumber(BKMP_IDLE_CLICK_LOCK_KEY);
 
 function bkmpIdleSpawnClickDamage(amount) {
   const target = document.getElementById('idleDragon');
@@ -2079,9 +2116,12 @@ function bkmpIdleHandleDragonClick() {
   bkmpIdleLastClickAt = now;
   bkmpIdleClickTimestamps.push(now);
   bkmpIdleClickTimestamps = bkmpIdleClickTimestamps.filter(t => now - t <= BKMP_AUTOCLICK_HISTORY_MS).slice(-BKMP_AUTOCLICK_WINDOW);
+  bkmpAutoclickSaveTimestamps(BKMP_IDLE_CLICK_HISTORY_KEY, bkmpIdleClickTimestamps);
   if (bkmpIdleDetectAutoclickPattern(bkmpIdleClickTimestamps)) {
     bkmpIdleClickLockedUntil = now + BKMP_AUTOCLICK_LOCK_MS;
     bkmpIdleClickTimestamps = [];
+    bkmpAutoclickSaveNumber(BKMP_IDLE_CLICK_LOCK_KEY, bkmpIdleClickLockedUntil);
+    bkmpAutoclickSaveTimestamps(BKMP_IDLE_CLICK_HISTORY_KEY, bkmpIdleClickTimestamps);
     if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(BKMP_AUTOCLICK_TOAST, 3200);
     return;
   }
@@ -2127,8 +2167,8 @@ let bkmpRaidButtonTimer = null;
 let bkmpRaidLoopTimer = null;
 let bkmpRaidBossPollTimer = null;
 let bkmpRaidResultShown = false;
-let bkmpRaidClickTimestamps = [];
-let bkmpRaidClickLockedUntil = 0;
+let bkmpRaidClickTimestamps = bkmpAutoclickLoadTimestamps(BKMP_RAID_CLICK_HISTORY_KEY);
+let bkmpRaidClickLockedUntil = bkmpAutoclickLoadNumber(BKMP_RAID_CLICK_LOCK_KEY);
 
 function bkmpRaidGetPhaseInfo(now) {
   const d = now || new Date();
@@ -2510,9 +2550,12 @@ function bkmpRaidHandleBossClick() {
   bkmpRaidLastClickAt = now;
   bkmpRaidClickTimestamps.push(now);
   bkmpRaidClickTimestamps = bkmpRaidClickTimestamps.filter(t => now - t <= BKMP_AUTOCLICK_HISTORY_MS).slice(-BKMP_AUTOCLICK_WINDOW);
+  bkmpAutoclickSaveTimestamps(BKMP_RAID_CLICK_HISTORY_KEY, bkmpRaidClickTimestamps);
   if (bkmpIdleDetectAutoclickPattern(bkmpRaidClickTimestamps)) {
     bkmpRaidClickLockedUntil = now + BKMP_AUTOCLICK_LOCK_MS;
     bkmpRaidClickTimestamps = [];
+    bkmpAutoclickSaveNumber(BKMP_RAID_CLICK_LOCK_KEY, bkmpRaidClickLockedUntil);
+    bkmpAutoclickSaveTimestamps(BKMP_RAID_CLICK_HISTORY_KEY, bkmpRaidClickTimestamps);
     if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(BKMP_AUTOCLICK_TOAST, 3200);
     return;
   }
@@ -2786,6 +2829,18 @@ window.BKMP_IDLE_SKILLPOINTS_TIERS = [
   [5, 'Erste Talente'], [15, 'Talentiert'], [30, 'Vielseitig geschult'], [50, 'Meister der Künste'],
   [75, 'Großmeister'], [100, 'Skilltree-Experte'], [150, 'Vollendete Kunst'], [200, 'Meister aller Zweige']
 ];
+/* Ein Erfolg pro Prestige-Aufstieg (1 bis 10) - Erfolgs-Titel bewusst
+   schlicht "Prestige N", waehrend die zugehoerigen Sammlung-Titel (siehe
+   BKMP_IDLE_PRESTIGE_TITLE_NAMES) eine eigene, eskalierende Namensreihe
+   bekommen. */
+window.BKMP_IDLE_PRESTIGE_TIERS = [
+  [1, 'Prestige 1'], [2, 'Prestige 2'], [3, 'Prestige 3'], [4, 'Prestige 4'], [5, 'Prestige 5'],
+  [6, 'Prestige 6'], [7, 'Prestige 7'], [8, 'Prestige 8'], [9, 'Prestige 9'], [10, 'Prestige 10']
+];
+window.BKMP_IDLE_PRESTIGE_TITLE_NAMES = [
+  'Prestige Jäger', 'Prestige Krieger', 'Prestige Veteran', 'Prestige Meister', 'Prestige Champion',
+  'Prestige Legende', 'Prestige Titan', 'Prestige Halbgott', 'Prestige Gott', 'Was ist Prestige?'
+];
 
 window.BKMP_IDLE_ACHIEVEMENTS_EXTRA = [
   { id: 'idle_started', category: 'Idle Dorf', title: 'Dorfgründung', desc: 'Öffne das Idle Drachen Dorf zum ersten Mal.', check: ctx => ctx.idleLevel >= 1 },
@@ -2824,6 +2879,10 @@ window.BKMP_IDLE_TITLES = [
   ...window.BKMP_IDLE_SKILLPOINTS_TIERS.map(([n, label], i) => ({
     id: `idletitle_skill_${n}`, name: label, desc: `Investiere ${n} Skillpunkte.`,
     unlockCustom: ctx => ctx.idleSkillPointsSpent >= n, effectType: 'attack_flat', effectValue: i + 1
+  })),
+  ...window.BKMP_IDLE_PRESTIGE_TIERS.map(([n], i) => ({
+    id: `idletitle_prestige_${n}`, name: window.BKMP_IDLE_PRESTIGE_TITLE_NAMES[i], desc: `Erreiche Prestige-Stufe ${n} im Idle Dorf.`,
+    unlockCustom: ctx => ctx.idlePrestigeLevel >= n, effectType: 'attack_pct', effectValue: i + 1
   })),
   { id: 'idletitle_founder', name: 'Dorfgründer', desc: 'Das Idle Dorf gegründet.', unlockCustom: ctx => ctx.idleLevel >= 1 },
   { id: 'idletitle_boss1', name: 'Bosskämpfer', desc: 'Besiegt den ersten Boss.', unlockCustom: ctx => ctx.idleBossKills >= 1, effectType: 'crit_chance_flat', effectValue: 1 },
