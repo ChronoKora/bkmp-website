@@ -55,7 +55,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260715-drawerclosefix1">
+<link rel="stylesheet" href="style.css?v=20260715-streamsync1">
 </head>
 <body>
 
@@ -411,6 +411,12 @@
       <h3>🏰 Idle Drachen Dorf</h3>
       <div class="idle-dorf-offline-card" id="idleDorfOfflineCard" style="display:none;"></div>
       <div class="raid-join-banner" id="raidJoinBanner" style="display:none;"></div>
+      <!-- Nutzerwunsch (15.07.): "auf der Hauptseite dann stehen tut 'Wird
+           in Twitch angezeigt der Kampf' das alles sync ist" - erscheint
+           automatisch, sobald idledorf.js einen frischen Herzschlag von
+           idle-stream.html/idle-stream-mini.html erkennt (siehe
+           bkmpIdleStreamApplyLockState). -->
+      <div class="idle-stream-live-banner" id="idleStreamLiveBanner" style="display:none;">📡 Wird gerade auf Twitch gespielt – du siehst hier live mit, die Steuerung ist währenddessen gesperrt.</div>
       <div class="idle-dorf-hud" id="idleDorfHud"></div>
 
       <div class="raid-combat-view idle-dorf-panel" id="raidCombatView" style="display:none;">
@@ -1029,9 +1035,9 @@
 
   <script>window.BKMP_CLIENT_STORAGE_KEY = 'bkmp-customer-auth';</script>
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260715-runeupgrade1"></script>
+  <script src="supabase.js?v=20260715-streamsync1"></script>
   <script src="app.js?v=20260712-themefix1"></script>
-  <script src="idledorf.js?v=20260715-runerisk1"></script>
+  <script src="idledorf.js?v=20260715-streamsync1"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
   <script>
     bkmpInitTheme();

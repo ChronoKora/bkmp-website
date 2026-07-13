@@ -5,20 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="favicon.ico" sizes="any">
-<title>BKMP – Idle Drachen Dorf (Stream-Overlay)</title>
+<title>BKMP – Idle Drachen Dorf (Mini-Stream-Overlay)</title>
 <link rel="stylesheet" href="style.css?v=20260715-streamsync1">
 <style>
   /* ============================================================
-     Eigenstaendige Seite NUR fuer das Idle Drachen Dorf, gedacht als
-     OBS-Browser-Quelle fuer Twitch-Streams (Nutzerwunsch, 15.07.:
-     "ein Browsercode für Twitch nur für das idle Game"). Zeigt
-     ausschliesslich das Spiel (keine Kopfzeile/Navigation/restliche
-     Seite), voll spielbar, mit transparentem Seitenhintergrund - das
-     Karten-Fenster selbst bleibt dabei blickdicht (eigene --paper-
-     Variablen aus dem "Hoehlen"-Theme in style.css), nur die
-     Abdunklungs-Ebene DAHINTER wird durchsichtig. In OBS als
-     "Browser-Quelle" mit dieser Datei-URL einbinden - Transparenz
-     funktioniert dort automatisch, kein Sonderflag noetig. */
+     Winzige "nur Dorf+Drache" Variante von idle-stream.html
+     (Nutzerwunsch, 15.07.: "Süße Mini Version... nur das Dorf +
+     Drache... direkt dadrüber der LvL Balken... über Drache/Dorf die
+     Damage Zahl... irgendwo mega süß +?? Gold +?? XP"). Nutzt exakt
+     dieselbe Spiel-Logik/DOM-IDs wie idle-stream.html (idledorf.js
+     kennt/braucht keine Sonderbehandlung), blendet per CSS nur alles
+     bis auf Level-Leiste + Kampf-Szene aus. */
   html, body {
     background: transparent !important;
     margin: 0;
@@ -27,14 +24,120 @@
   }
   .joke-overlay { background: transparent !important; }
   .idle-dorf-overlay.visible { background: transparent !important; }
-  /* Diese Seite IST das Spiel - "Schliessen" wuerde nur eine leere,
-     durchsichtige Flaeche ohne jeden Weg zurueck hinterlassen (kein
-     Header-Button wie auf der Hauptseite). Zum Ein-/Ausblenden im
-     Stream ist die OBS-eigene Sichtbarkeits-Umschaltung der Quelle
-     gedacht, nicht ein Button auf der Seite selbst. */
   #idleDorfOverlay .idle-dorf-card > .idle-dorf-close,
-  #idleDorfOverlay .idle-dorf-card > .joke-buttons {
+  #idleDorfOverlay .idle-dorf-card > .joke-buttons,
+  #idleDorfOverlay .idle-dorf-card > h3,
+  #idleDorfOfflineCard,
+  #raidJoinBanner,
+  #idleDorfTabs,
+  #idleStageBar,
+  #idleAdFreeBtn,
+  #idleDorfLog,
+  #idlePanelUpgrades, #idlePanelSkilltree, #idlePanelSammlung,
+  #idlePanelErfolge, #idlePanelBestenliste, #idlePanelPrestige, #idlePanelRunen,
+  #idleRuneDrawer,
+  .idle-hud-stats, .idle-hud-resources,
+  #idleDragonName {
     display: none !important;
+  }
+  /* Nutzerwunsch (15.07.): "Gerne viel mehr in die Breite!" - breites,
+     flaches Banner statt der urspruenglichen kleinen Karte, Dorf/Drache
+     entsprechend groesser dargestellt statt gestaucht.
+     Weitere Nachbesserung (15.07.): "Das dadrunter kann alles weg. Und
+     mehr Transparent machen?" - die Basis-Regel (style.css) erzwingt unter
+     640px Fensterbreite "height:100vh" (fuer die normale, vollflaechige
+     Handy-Ansicht gedacht) - bei einer schmal eingestellten OBS-Quelle
+     blieb dadurch ein riesiger leerer Bereich unter dem kurzen Inhalt
+     stehen (Spieler-Screenshot). height:auto erzwingt jetzt IMMER die
+     reine Inhaltshoehe, unabhaengig von der Fensterbreite. Zusaetzlich:
+     die Karte ist jetzt selbst durchscheinend (Glas-Look per
+     backdrop-filter) statt voll deckend, damit im Stream dahinter noch
+     etwas vom Bild/Hintergrund durchschimmert. */
+  #idleDorfOverlay .idle-dorf-card {
+    max-width: 1100px;
+    width: 94vw;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    padding: 1.1rem 1.7rem 1rem;
+    border-radius: 28px;
+    overflow: visible !important;
+    background: linear-gradient(165deg, color-mix(in srgb, var(--paper-2) 62%, transparent), color-mix(in srgb, var(--paper) 62%, transparent)) padding-box,
+                linear-gradient(120deg, var(--gold), rgba(56, 189, 248, 0.7), #a78bfa, var(--gold)) border-box;
+    backdrop-filter: blur(10px) saturate(1.2);
+    -webkit-backdrop-filter: blur(10px) saturate(1.2);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35), 0 0 30px color-mix(in srgb, var(--gold) 18%, transparent);
+    animation: idleMiniPopIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  @keyframes idleMiniPopIn {
+    from { transform: scale(0.85); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+  #idleDorfHud { margin-bottom: 0.6rem; }
+  .idle-hud-top { margin-bottom: 0; gap: 0.9rem; }
+  #idlePanelKampf { padding: 0; }
+  /* Der Kampf-Szene-Kasten war ebenfalls fast blickdicht (radialer
+     Verlauf aus style.css) - hier zusaetzlich aufgehellt/durchscheinender,
+     behaelt aber genug Kontrast, damit Sprites/HP-Balken lesbar bleiben. */
+  .idle-battlefield {
+    min-height: 190px;
+    padding: 1.1rem 2.2rem;
+    border-radius: 22px;
+    background: radial-gradient(circle at 50% 20%, color-mix(in srgb, var(--gold) 6%, transparent), transparent 75%);
+    border-color: color-mix(in srgb, var(--line) 70%, transparent);
+    /* Nutzerwunsch (15.07.): "Das Dorf und der Drache schön gerade sind" -
+       die Standard-Regel (align-items:center, style.css) zentriert beide
+       Kaesten nach ihrer GESAMTHOEHE (Sprite+HP-Balken+Label), aber Dorf-
+       und Drachen-Sprite haben je nach Bildausschnitt unterschiedliche
+       Hoehen - dadurch standen beide Kreaturen sichtbar auf verschiedener
+       "Bodenhoehe" statt auf einer gemeinsamen Linie. flex-end richtet
+       stattdessen die UNTERKANTE beider Kaesten (HP-Label) aneinander
+       aus, wodurch beide Sprites auf derselben Grundlinie stehen. */
+    align-items: flex-end;
+  }
+  .idle-village, .idle-dragon {
+    width: 38%;
+    padding: 0.7rem 0.6rem;
+    background: color-mix(in srgb, var(--paper-2) 55%, transparent) padding-box,
+                linear-gradient(135deg, var(--gold), color-mix(in srgb, var(--gold) 25%, transparent)) border-box;
+  }
+  .idle-village-sprite { max-width: 320px; }
+  .idle-dragon-sprite { max-width: 240px; }
+
+  /* Gold/XP-Hochschweb-Anzeige (Nutzerwunsch: "irgendwo mega süß +?? Gold
+     +?? XP") - reagiert auf das "bkmpIdleRewardGained"-Event, das
+     idledorf.js bei jedem besiegten Drachen feuert (siehe dort), unabhaengig
+     von dieser Seite. */
+  .idle-reward-float {
+    position: absolute;
+    top: 10%;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 0.5rem;
+    pointer-events: none;
+    z-index: 6;
+    animation: idleRewardFloat 1.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+  .idle-reward-float span {
+    font-family: 'Fraunces', serif;
+    font-weight: 800;
+    font-size: 1.05rem;
+    white-space: nowrap;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  }
+  .idle-reward-float .rf-gold { color: #ffd166; }
+  .idle-reward-float .rf-xp { color: #8ecdf7; }
+  @keyframes idleRewardFloat {
+    0% { opacity: 0; transform: translate(-50%, 8px) scale(0.6); }
+    18% { opacity: 1; transform: translate(-50%, -4px) scale(1.2); }
+    30% { transform: translate(-50%, -2px) scale(1); }
+    82% { opacity: 1; transform: translate(-50%, -52px) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -66px) scale(0.9); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #idleDorfOverlay .idle-dorf-card { animation: none; }
+    .idle-reward-float { animation: none; opacity: 0; }
   }
 </style>
 </head>
@@ -217,19 +320,14 @@
 
   <script>
     window.BKMP_CLIENT_STORAGE_KEY = 'bkmp-customer-auth';
-    /* Markiert diese Seite als "Twitch-Seite" fuer idledorf.js (siehe
-       bkmpIdleStreamStartHeartbeat/-StartPresencePoll) - sendet dadurch
-       einen Herzschlag statt auf einen fremden zu warten, siehe
-       Nutzerwunsch "auf der Hauptseite ... alles sync ist". */
     window.BKMP_IDLE_IS_STREAM_PAGE = true;
   </script>
   <script src="assets/vendor/supabase-js.min.js"></script>
   <script src="supabase.js?v=20260715-streamsync1"></script>
   <script>
-    /* ---------------- Minimal-Set der Helfer, die idledorf.js von der
-       Hauptseite braucht (siehe index.html fuer die Originale) - bewusst
-       NUR das Noetigste fuer das Spiel selbst, ohne das komplette
-       Erfolge-/Kosmetik-/Cross-Device-Sync-System von index.html. ---------------- */
+    /* ---------------- Minimal-Set der Helfer, die idledorf.js braucht
+       (siehe idle-stream.html fuer die ausfuehrlichere Variante mit allen
+       Tabs) ---------------- */
     function escapeHtml(value) {
       return String(value || '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
     }
@@ -280,6 +378,20 @@
   </script>
   <script src="idledorf.js?v=20260715-streamsync1"></script>
   <script>
+    /* ---------------- Gold/XP-Hochschweb-Anzeige ----------------
+       Reagiert auf das "bkmpIdleRewardGained"-Event (siehe
+       bkmpIdleHandleDragonDefeated in idledorf.js) - komplett unabhaengig
+       vom Spiel selbst, rein dekorativ fuer diese Mini-Ansicht. */
+    document.addEventListener('bkmpIdleRewardGained', e => {
+      const field = document.getElementById('idleBattlefield');
+      if (!field || !e.detail) return;
+      const el = document.createElement('div');
+      el.className = 'idle-reward-float';
+      el.innerHTML = `<span class="rf-gold">+${Math.round(e.detail.gold)} &#128176;</span><span class="rf-xp">+${Math.round(e.detail.xp)} &#10024;</span>`;
+      field.appendChild(el);
+      window.setTimeout(() => el.remove(), 1500);
+    });
+
     /* ---------------- Login/Registrieren (schlanke Fassung von index.html)
        ---------------- */
     const mcNameOverlay = document.getElementById('mcNameOverlay');
@@ -346,11 +458,6 @@
     mcAuthSetupPasswordToggle('mcAuthPassword', 'mcAuthPasswordToggle');
     mcAuthSetupPasswordToggle('mcAuthPasswordRepeat', 'mcAuthPasswordRepeatToggle');
 
-    /* Bewusst OHNE bkmpMergeRemoteStatsIntoLocal/bkmpClaimAndWatchSession
-       (siehe index.html) - beide gehoeren zum Erfolge-/Cross-Device-/
-       Single-Session-System der Hauptseite, nicht zum Idle-Dorf selbst.
-       bkmpIdleOpenModal() laedt den Spielstand direkt und unabhaengig
-       davon anhand des Namens. */
     async function mcAuthSubmitHandler() {
       const name = mcAuthName.value.trim();
       const password = mcAuthPassword.value;
@@ -384,10 +491,6 @@
       input.addEventListener('keydown', e => { if (e.key === 'Enter') mcAuthSubmitHandler(); });
     });
 
-    /* ESC schliesst die Hilfs-Popups wie auf der Hauptseite - bewusst OHNE
-       Eintrag fuer idleDorfOverlay selbst (diese Seite IST das Spiel, siehe
-       CSS oben) und mit demselben No-op fuer das Event-Drachen-Popup
-       (nur ueber den "Ich bin bereit"-Button verlassbar). */
     const BKMP_OVERLAY_CLOSERS = {
       idleStagePickerOverlay: () => { if (typeof bkmpIdleCloseStagePicker === 'function') bkmpIdleCloseStagePicker(); },
       idleEventDragonOverlay: () => {},
@@ -401,8 +504,6 @@
       });
     });
 
-    /* ---------------- Start: eingeloggt -> Spiel sofort zeigen, sonst
-       Login-Formular ---------------- */
     if (bkmpGetMcName()) {
       bkmpIdleOpenModal();
     } else {

@@ -3104,6 +3104,38 @@ async function deletePlayerRunes(runeIds) {
   return true;
 }
 
+/* ---------------- Idle-Dorf: Twitch-Overlay-Herzschlag ----------------
+   Nutzerwunsch (15.07.): die Twitch-Seite (idle-stream.html/idle-stream-
+   mini.html) meldet sich hier alle paar Sekunden ("ich bin noch offen"),
+   die Hauptseite fragt das ab, um zu erkennen, ob gerade live gespielt
+   wird (siehe bkmpIdleStreamStartHeartbeat/-PresencePoll in idledorf.js).
+   Bewusst eine eigene, winzige Tabelle statt eines Feldes in
+   idle_player_state - reiner Praesenz-Signal, keine Spieldaten. */
+async function bkmpIdleStreamHeartbeat(nameKey) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client || !nameKey) return false;
+  const { data: sessionData } = await client.auth.getSession();
+  const userId = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
+  if (!userId) return false;
+  const { error } = await client
+    .from('idle_stream_presence')
+    .upsert({ name_key: String(nameKey).trim().toLowerCase(), auth_user_id: userId, last_seen_at: new Date().toISOString() }, { onConflict: 'name_key' });
+  if (error) throw error;
+  return true;
+}
+
+async function loadIdleStreamPresence(nameKey) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !nameKey) return null;
+  const { data, error } = await client
+    .from('idle_stream_presence')
+    .select('last_seen_at')
+    .eq('name_key', String(nameKey).trim().toLowerCase())
+    .limit(1);
+  if (error) throw error;
+  return Array.isArray(data) && data[0] ? data[0].last_seen_at : null;
+}
+
 async function loadIdleLeaderboardStats() {
   const client = bkmpGetSupabaseClient();
   if (!client) return null;

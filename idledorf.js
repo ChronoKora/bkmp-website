@@ -859,6 +859,13 @@ function bkmpIdleHandleDragonDefeated() {
   bkmpIdleAddXp(rewards.xp);
   bkmpIdleVillageHp = bkmpIdleEffectiveStats.hp;
   bkmpIdleLog(`${bkmpIdleCurrentDragon.emoji} ${bkmpIdleCurrentDragon.name} besiegt! +${rewards.gold}💰 +${rewards.xp}✨` + (bkmpIdleCurrentDragon.isBoss ? ' 👑 BOSS!' : '') + (autoAdvance ? '' : ' (bleibt auf dieser Stufe)'));
+  /* Feuert ein leichtes, folgenloses DOM-Event mit den Belohnungen dieses
+     Kills - fuer die Hauptseite bedeutungslos (kein Listener dort), aber
+     die Grundlage fuer die schlanke Stream-Mini-Ansicht (idle-stream-
+     mini.html, Nutzerwunsch 15.07.: "irgendwo mega süß +?? Gold +?? XP"),
+     die daraus eine kleine Hochschweb-Anzeige baut, ohne dass idledorf.js
+     selbst irgendetwas Seiten-spezifisches ueber DOM-Struktur wissen muss. */
+  document.dispatchEvent(new CustomEvent('bkmpIdleRewardGained', { detail: { gold: rewards.gold, xp: rewards.xp, isBoss: !!bkmpIdleCurrentDragon.isBoss } }));
   bkmpIdleSpawnDragon();
   bkmpIdleUpdateVillageHpBar();
   bkmpIdleRenderHud();
@@ -3034,6 +3041,136 @@ function bkmpIdleInitTabs() {
   window.addEventListener('resize', bkmpRuneSyncDrawerPosition);
 }
 
+/* ---------------- Live-Sync zwischen Hauptseite und Twitch-Overlay ----------------
+   Nutzerwunsch (15.07.): "auf der Hauptseite geupgraded wird / oder Stufe
+   Skills etc / und hier im TwitchBrowser alles sync ist" - Fortschritt, der
+   auf der Twitch-Seite (idle-stream.html/idle-stream-mini.html) gespielt
+   wird, soll auf der Hauptseite live sichtbar sein. Um Konflikte durch
+   gleichzeitiges Spielen an zwei Stellen zu vermeiden (Entscheidung mit dem
+   Nutzer, 15.07.): die Twitch-Seite ist die aktive Instanz, die Hauptseite
+   wird waehrend die Twitch-Seite offen ist zu einer reinen Zuschauer-
+   Ansicht (Bedienung gesperrt, eigener Kampf-Loop pausiert, Stand kommt
+   stattdessen periodisch direkt aus der DB).
+
+   window.BKMP_IDLE_IS_STREAM_PAGE (gesetzt in idle-stream.html/idle-
+   stream-mini.html VOR dieser Datei, auf der Hauptseite nicht gesetzt)
+   entscheidet, welche der beiden Rollen eine Seite spielt:
+   - Twitch-Seite: sendet alle 20s einen Herzschlag (bkmpIdleStreamHeartbeat).
+   - Hauptseite: prueft alle 8s, ob ein frischer Herzschlag da ist
+     (loadIdleStreamPresence) und sperrt/entsperrt sich entsprechend.
+
+   WICHTIG (bewusste Grenze): nur der PERSISTENTE Fortschritt (Level/Gold/
+   Rohstoffe/Skillpunkte/Upgrades/Stufe/Prestige/Runen) wird gespiegelt -
+   der laufende Kampf selbst (aktuelle Drachen-HP/Dorf-HP) lebt nur lokal
+   im RAM der aktiven Seite und wird nirgends in der DB gespeichert, kann
+   also nicht mitgespiegelt werden. Die Zuschauer-Ansicht zeigt deshalb
+   immer einen neu gespawnten Drachen bei voller HP, aktualisiert aber
+   Level/Ressourcen/Skilltree/Runen alle paar Sekunden korrekt. */
+const BKMP_IDLE_STREAM_HEARTBEAT_MS = 20000;
+const BKMP_IDLE_STREAM_POLL_MS = 8000;
+const BKMP_IDLE_STREAM_STALE_MS = 35000; // > 1x Herzschlag-Intervall + Puffer
+let bkmpIdleStreamTimer = null;
+let bkmpIdleStreamLocked = false;
+
+function bkmpIdleStreamStartHeartbeat() {
+  if (bkmpIdleStreamTimer || !bkmpIdleState) return;
+  const send = () => {
+    if (typeof bkmpIdleStreamHeartbeat === 'function' && bkmpIdleState) bkmpIdleStreamHeartbeat(bkmpIdleState.name_key).catch(() => {});
+  };
+  send();
+  bkmpIdleStreamTimer = window.setInterval(send, BKMP_IDLE_STREAM_HEARTBEAT_MS);
+}
+
+function bkmpIdleStreamStartPresencePoll() {
+  if (bkmpIdleStreamTimer || !bkmpIdleState) return;
+  const check = async () => {
+    if (typeof loadIdleStreamPresence !== 'function' || !bkmpIdleState) return;
+    let lastSeen = null;
+    try { lastSeen = await loadIdleStreamPresence(bkmpIdleState.name_key); } catch (e) { return; }
+    const isLive = !!lastSeen && (Date.now() - new Date(lastSeen).getTime()) < BKMP_IDLE_STREAM_STALE_MS;
+    if (isLive !== bkmpIdleStreamLocked) {
+      await bkmpIdleStreamApplyLockState(isLive);
+    } else if (isLive) {
+      await bkmpIdleStreamRefreshRemoteState();
+    }
+  };
+  check();
+  bkmpIdleStreamTimer = window.setInterval(check, BKMP_IDLE_STREAM_POLL_MS);
+}
+
+function bkmpIdleStreamStopPolling() {
+  if (bkmpIdleStreamTimer) { window.clearInterval(bkmpIdleStreamTimer); bkmpIdleStreamTimer = null; }
+}
+
+/* Sperrt/entsperrt die Bedienung der Hauptseite je nachdem, ob die Twitch-
+   Seite gerade als "live" erkannt wurde. Nur auf der Hauptseite relevant -
+   #idleStreamLiveBanner existiert nur dort (null-sicher). */
+async function bkmpIdleStreamApplyLockState(isLive) {
+  bkmpIdleStreamLocked = isLive;
+  const overlay = document.getElementById('idleDorfOverlay');
+  if (overlay) overlay.classList.toggle('idle-stream-locked', isLive);
+  const banner = document.getElementById('idleStreamLiveBanner');
+  if (banner) banner.style.display = isLive ? '' : 'none';
+  if (isLive) {
+    bkmpIdleStopLoop();
+    await bkmpIdleStreamRefreshRemoteState();
+  } else {
+    /* Zurueck zur eigenen Kontrolle: einen wirklich frischen, eigenstaendigen
+       Stand laden statt mit dem zuletzt gespiegelten (evtl. veralteten)
+       Stand weiterzuspielen. bkmpIdleLoadOrInitState() hat einen Cache-
+       Kurzschluss fuer gleichbleibenden Namen - deshalb bkmpIdleState hier
+       bewusst erst leeren. */
+    const name = typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : (bkmpIdleState ? bkmpIdleState.name_key : '');
+    bkmpIdleState = null;
+    if (name) {
+      await bkmpIdleLoadOrInitState(name);
+      bkmpIdleRecomputeEffectiveStats();
+      if (!bkmpIdleCurrentDragon) bkmpIdleSpawnDragon();
+      bkmpIdleStartLoop();
+    }
+  }
+  bkmpIdleRenderHud();
+  bkmpIdleRenderStageBar();
+  bkmpIdleRenderActiveTabContent();
+}
+
+/* Holt den aktuellen, persistenten Stand direkt aus der DB und ersetzt
+   damit den lokalen Zuschauer-Stand - laesst den laufenden Kampf-Loop
+   bewusst aus (siehe Erklaerung oben, Drachen-HP wird nirgends
+   gespeichert). */
+async function bkmpIdleStreamRefreshRemoteState() {
+  if (!bkmpIdleState) return;
+  const name = bkmpIdleState.name_key;
+  try {
+    const remote = typeof loadIdlePlayerState === 'function' ? await loadIdlePlayerState(name) : null;
+    if (remote) {
+      bkmpIdleState = remote;
+      bkmpIdleCurrentDragon = null;
+    }
+  } catch (e) { /* naechster Poll-Durchlauf versucht es erneut */ }
+  try {
+    const remotePrestige = typeof loadIdlePrestigeState === 'function' ? await loadIdlePrestigeState(name) : null;
+    if (remotePrestige) bkmpPrestigeState = remotePrestige;
+  } catch (e) {}
+  try {
+    const remoteRunes = typeof loadPlayerRunes === 'function' ? await loadPlayerRunes(name) : null;
+    if (Array.isArray(remoteRunes)) bkmpIdlePlayerRunes = remoteRunes.map(r => ({ ...r, _cid: r.id }));
+  } catch (e) {}
+  bkmpIdleRecomputeEffectiveStats();
+  if (!bkmpIdleCurrentDragon) bkmpIdleSpawnDragon();
+  bkmpIdleVillageHp = bkmpIdleEffectiveStats ? bkmpIdleEffectiveStats.hp : bkmpIdleVillageHp;
+  bkmpIdleUpdateVillageHpBar();
+  bkmpIdleUpdateDragonHpBar();
+  bkmpIdleRenderHud();
+  bkmpIdleRenderStageBar();
+  /* Bewusst der generische Renderer statt bkmpIdleRefreshLiveTabs() (das
+     deckt nur Upgrades/Runen/Prestige ab) - beim Zuschauen soll JEDER
+     gerade offene Tab (auch Skilltree/Sammlung/Erfolge/Bestenliste) den
+     gespiegelten Stand zeigen, nicht nur die drei "live-relevanten" Tabs
+     aus dem normalen Eigenspiel-Betrieb. */
+  bkmpIdleRenderActiveTabContent();
+}
+
 async function bkmpIdleOpenModal() {
   /* Immer frisch pruefen statt auf den zuletzt gepollten Stand zu
      vertrauen - so entscheidet exakt der Stand im Moment des Klicks,
@@ -3093,6 +3230,8 @@ async function bkmpIdleOpenModal() {
   bkmpIdleStartLoop();
   bkmpIdleRenderActiveTabContent();
   if (typeof renderAchievementBadge === 'function') renderAchievementBadge();
+  if (window.BKMP_IDLE_IS_STREAM_PAGE) bkmpIdleStreamStartHeartbeat();
+  else bkmpIdleStreamStartPresencePoll();
 
   bkmpRaidRenderJoinBanner();
   if (bkmpRaidShouldShowCombatView()) {
@@ -3117,6 +3256,7 @@ function bkmpIdleCloseModal() {
   document.body.classList.remove('modal-open');
   bkmpIdleModalOpen = false;
   bkmpRuneSyncDrawerVisibility();
+  bkmpIdleStreamStopPolling();
   bkmpIdleQueueSync();
   bkmpIdleFlushSync();
   bkmpRaidStopCombatView();
