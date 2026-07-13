@@ -1682,6 +1682,27 @@
       const timePart = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
       return `${datePart}, ${timePart} Uhr`;
     }
+    /* FEHLER-FIX (Spieler-Report ByAlex0, 13.07.: "Ich habe alle Skilltree-
+       Zweige gemaxed, aber die Erfolge wurden wieder zurueckgesetzt") -
+       Erfolge wie "alle Skilltree-Zweige maxen" oder "alle 6 Runen gleiche
+       Seltenheit ausgeruestet" wurden bisher bei JEDEM Rendern live neu
+       gegen a.check(ctx) geprueft - sobald der zugrunde liegende Zustand
+       sich wieder aendert (Skilltree-Reset, Rune umgeruestet), fiel der
+       Erfolg technisch korrekt, aber fuer den Spieler ueberraschend und
+       frustrierend wieder auf "gesperrt" zurueck. Standard-Konvention bei
+       Achievement-Systemen: einmal geschafft bleibt geschafft. Nutzt die
+       bereits vorhandene, geraeteuebergreifend synchronisierte "Freige-
+       schaltet am"-Zeitstempel-Liste (siehe bkmpMergeRemoteStatsIntoLocal)
+       als Speicher fuer "wurde je erreicht" - kein neues SQL noetig.
+       WICHTIG: bkmpCheckForNewAchievementUnlocks() selbst nutzt weiterhin
+       das ROHE a.check(ctx) (siehe dort) - die erkennt bewusst den
+       Live-Uebergang false->true, um genau EINMAL den Freischalt-Zeitpunkt
+       zu setzen und die Popup-Benachrichtigung auszuloesen; diese Funktion
+       hier ist fuer alle ANDEREN Stellen (Anzeige/Zaehler/Kosmetik-/
+       Titel-Freischaltung), die den STICKY Status sehen sollen. */
+    function bkmpAchievementUnlocked(a, ctx) {
+      return Boolean(a.check(ctx)) || Boolean(bkmpGetAchievementUnlockedAtMap()[a.id]);
+    }
     let bkmpAchievementPopupQueue = [];
     let bkmpAchievementPopupShowing = false;
     function bkmpShowAchievementPopup(achievement) {
@@ -3781,7 +3802,7 @@
        normale Sync noch keine 45s her ist. */
     async function bkmpSyncPlayerStatsNow() {
       const ctx = typeof bkmpAchievementContextWithMeta === 'function' ? bkmpAchievementContextWithMeta() : null;
-      const unlockedCount = ctx ? BKMP_ACHIEVEMENTS.filter(a => a.check(ctx)).length : 0;
+      const unlockedCount = ctx ? BKMP_ACHIEVEMENTS.filter(a => bkmpAchievementUnlocked(a, ctx)).length : 0;
       return (await bkmpSyncPlayerStats(unlockedCount, true)) || Promise.resolve();
     }
 
@@ -4165,7 +4186,7 @@
 
     function bkmpAchievementContextWithMeta() {
       const ctx = bkmpBuildAchievementContext();
-      ctx.baseUnlockedCount = BKMP_ACHIEVEMENTS.filter(a => a.category !== 'Meilensteine' && a.check({ ...ctx, baseUnlockedCount: 0 })).length;
+      ctx.baseUnlockedCount = BKMP_ACHIEVEMENTS.filter(a => a.category !== 'Meilensteine' && bkmpAchievementUnlocked(a, { ...ctx, baseUnlockedCount: 0 })).length;
       return ctx;
     }
 
@@ -4209,7 +4230,7 @@
       if (cosmetic.unlockEgg) return ctx.eggsFound.includes(cosmetic.unlockEgg);
       if (cosmetic.unlockAchievement) {
         const ach = BKMP_ACHIEVEMENTS.find(a => a.id === cosmetic.unlockAchievement);
-        return ach ? ach.check(ctx) : false;
+        return ach ? bkmpAchievementUnlocked(ach, ctx) : false;
       }
       return unlockedCount >= (cosmetic.unlockAt || 0);
     }
@@ -4224,7 +4245,7 @@
     }
     function renderCosmeticsPanel() {
       const ctx = bkmpAchievementContextWithMeta();
-      const unlockedCount = BKMP_ACHIEVEMENTS.filter(a => a.check(ctx)).length;
+      const unlockedCount = BKMP_ACHIEVEMENTS.filter(a => bkmpAchievementUnlocked(a, ctx)).length;
       const active = bkmpGetActiveCosmetic() || 'default';
       const el = document.getElementById('cosmeticsList');
       el.innerHTML = BKMP_COSMETICS.map(c => {
@@ -4357,7 +4378,7 @@
       if (title.unlockCustom) return Boolean(title.unlockCustom(ctx));
       if (title.unlockAchievement) {
         const ach = BKMP_ACHIEVEMENTS.find(a => a.id === title.unlockAchievement);
-        return ach ? ach.check(ctx) : false;
+        return ach ? bkmpAchievementUnlocked(ach, ctx) : false;
       }
       return unlockedCount >= (title.unlockAt || 0);
     }
@@ -4369,7 +4390,7 @@
     }
     function renderTitlesPanel() {
       const ctx = bkmpAchievementContextWithMeta();
-      const unlockedCount = BKMP_ACHIEVEMENTS.filter(a => a.check(ctx)).length;
+      const unlockedCount = BKMP_ACHIEVEMENTS.filter(a => bkmpAchievementUnlocked(a, ctx)).length;
       const active = bkmpGetActiveTitle() || 'none';
       const el = document.getElementById('titlesList');
       const newBadge = bkmpNewBadgeChecker('titles');
@@ -4841,7 +4862,7 @@
         return;
       }
       const ctx = bkmpAchievementContextWithMeta();
-      const unlockedCount = BKMP_ACHIEVEMENTS.filter(a => a.check(ctx)).length;
+      const unlockedCount = BKMP_ACHIEVEMENTS.filter(a => bkmpAchievementUnlocked(a, ctx)).length;
       if (bkmpAchievementNotifyReady && typeof bkmpCheckForNewAchievementUnlocks === 'function') bkmpCheckForNewAchievementUnlocks(ctx);
       bkmpApplyActiveCosmetic(badge, unlockedCount, ctx);
       const activePlushieId = typeof bkmpGetActivePlushie === 'function' ? bkmpGetActivePlushie() : '';
@@ -4891,7 +4912,7 @@
     function renderAchievementsPanel() {
       const ctx = bkmpAchievementContextWithMeta();
       const list = document.getElementById('achievementsList');
-      const unlockedCount = BKMP_ACHIEVEMENTS.filter(a => a.check(ctx)).length;
+      const unlockedCount = BKMP_ACHIEVEMENTS.filter(a => bkmpAchievementUnlocked(a, ctx)).length;
       const unlockedAtMap = bkmpGetAchievementUnlockedAtMap();
       const latestUnlockIso = Object.values(unlockedAtMap).sort().pop();
       const latestSuffix = latestUnlockIso ? ` Zuletzt freigeschaltet: ${bkmpFormatRelativeTime(latestUnlockIso)}.` : '';
@@ -4901,10 +4922,10 @@
       list.innerHTML = BKMP_ACHIEVEMENT_CATEGORY_ORDER.map(category => {
         const items = BKMP_ACHIEVEMENTS.filter(a => a.category === category);
         if (items.length === 0) return '';
-        const unlockedInCategory = items.filter(a => a.check(ctx)).length;
+        const unlockedInCategory = items.filter(a => bkmpAchievementUnlocked(a, ctx)).length;
         const isOpen = bkmpAchievementCategoryOpen[category] || false;
         const rows = items.map(a => {
-          const unlocked = a.check(ctx);
+          const unlocked = bkmpAchievementUnlocked(a, ctx);
           const progress = a.progress ? a.progress(ctx) : null;
           const progressHtml = progress ? `
             <div class="achievement-progress"><div class="achievement-progress-bar" style="width:${Math.min(100, (progress[0] / progress[1]) * 100)}%"></div></div>
