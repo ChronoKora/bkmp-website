@@ -4368,6 +4368,33 @@ function bkmpRaidRequestParticipantsRender() {
   }, 400);
 }
 
+/* Eigener Schaden kommt aus der raid_deal_damage-Antwort SOFORT (der
+   Server hat ihn im selben Aufruf bereits berechnet) statt erst auf den
+   Realtime-Roundtrip zu warten - bei mehreren gleichzeitig tickenden
+   Mitspielern konnte die eigene Zahl sonst spuerbar hinterherhinken. */
+function bkmpRaidApplyOwnDamageResult(result) {
+  if (!result || result.ownDamageDealt == null) return;
+  const myName = typeof bkmpGetMcName === 'function' ? bkmpGetMcName().trim().toLowerCase() : '';
+  if (!myName) return;
+  const idx = bkmpRaidParticipants.findIndex(p => p.displayName.trim().toLowerCase() === myName);
+  if (idx >= 0) {
+    bkmpRaidParticipants[idx].damageDealt = result.ownDamageDealt;
+    bkmpRaidParticipants[idx].critsLanded = result.ownCritsLanded;
+    bkmpRaidParticipants[idx].clicksLanded = result.ownClicksLanded;
+  } else {
+    bkmpRaidParticipants.push({
+      authUserId: null,
+      displayName: bkmpGetMcName(),
+      damageDealt: result.ownDamageDealt,
+      critsLanded: result.ownCritsLanded,
+      clicksLanded: result.ownClicksLanded,
+      joinedAt: Date.now()
+    });
+  }
+  bkmpRaidParticipants.sort((a, b) => b.damageDealt - a.damageDealt);
+  bkmpRaidRequestParticipantsRender();
+}
+
 function bkmpRaidRenderParticipants() {
   const list = document.getElementById('raidParticipantsList');
   if (!list) return;
@@ -4415,7 +4442,7 @@ async function bkmpRaidOwnTick() {
   bkmpRaidHitFlash('raidBoss');
   try {
     const result = await submitRaidDamage(bkmpRaidState.id, roll.amount, roll.isCrit, false);
-    if (result) { bkmpRaidState.bossHp = result.bossHp; bkmpRaidState.status = result.status; bkmpRaidRenderCombat(); bkmpRaidCheckOutcome(); }
+    if (result) { bkmpRaidState.bossHp = result.bossHp; bkmpRaidState.status = result.status; bkmpRaidApplyOwnDamageResult(result); bkmpRaidRenderCombat(); bkmpRaidCheckOutcome(); }
   } catch (e) { /* naechster Tick versucht es erneut */ }
 }
 
@@ -4488,7 +4515,7 @@ function bkmpRaidHandleBossClick() {
   bkmpRaidSpawnFx('raid-fx-magic', 'raidBoss', clickDamage, isCrit);
   bkmpRaidHitFlash('raidBoss');
   submitRaidDamage(bkmpRaidState.id, clickDamage, isCrit, true).then(result => {
-    if (result) { bkmpRaidState.bossHp = result.bossHp; bkmpRaidState.status = result.status; bkmpRaidRenderCombat(); bkmpRaidCheckOutcome(); }
+    if (result) { bkmpRaidState.bossHp = result.bossHp; bkmpRaidState.status = result.status; bkmpRaidApplyOwnDamageResult(result); bkmpRaidRenderCombat(); bkmpRaidCheckOutcome(); }
   }).catch(() => {});
 }
 

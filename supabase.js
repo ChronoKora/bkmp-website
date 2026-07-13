@@ -3581,7 +3581,13 @@ async function submitRaidDamage(raidId, amount, isCrit, isClick) {
   });
   if (error) throw error;
   const row = Array.isArray(data) ? data[0] : data;
-  return row ? { bossHp: Number(row.boss_hp || 0), status: row.status } : null;
+  return row ? {
+    bossHp: Number(row.boss_hp || 0),
+    status: row.status,
+    ownDamageDealt: Number(row.own_damage_dealt || 0),
+    ownCritsLanded: Number(row.own_crits_landed || 0),
+    ownClicksLanded: Number(row.own_clicks_landed || 0)
+  } : null;
 }
 
 async function tickRaidBossAttack(raidId) {
