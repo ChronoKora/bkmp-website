@@ -1880,8 +1880,29 @@ function bkmpIdleMergeCountMaps(local, remote) {
    - skill_points_spent: gleiche Differenz-Logik wie Ressourcen, danach
      wird skill_points_available so nachgerechnet, dass die Gesamtsumme
      (verfuegbar+ausgegeben) nie kleiner wird als auf beiden Seiten bekannt. */
+/* FEHLER-FIX (Streamer-Report DerLiber, 13.07.: "manchmal bricht er den
+   Kampf ab, springt zurueck" - Stufe sprang z.B. von 25-4 auf 24-8 zurueck,
+   Auto-Aufstieg schaltete sich von selbst aus): der Herzschlag (alle 20s,
+   siehe bkmpIdleStreamStartHeartbeat) und der kill-ausgeloeste Autosave
+   (siehe bkmpIdleFlushSync) konnten diese Funktion GLEICHZEITIG aufrufen.
+   `baseline` wird HIER UNTEN erst NACH dem "await loadIdlePlayerState(...)"
+   gelesen - lief waehrenddessen ein ZWEITER, schneller abgeschlossener
+   Aufruf komplett durch (eigener Merge + bkmpIdleSnapshotMergeBaseline()),
+   sah der ERSTE (langsamere) Aufruf beim Aufwachen eine BEREITS
+   AKTUALISIERTE globale Baseline, obwohl sein eigenes `remote` noch der
+   ALTE, vor dem zweiten Aufruf geladene DB-Stand war - localStage schien
+   dadurch faelschlich "seit der Baseline unveraendert", obwohl in
+   Wirklichkeit laengst mehrere Stufen weiter gekaempft wurde, und der
+   veraltete `remote`-Stand wurde faelschlich als neuer lokaler Stand
+   uebernommen (echter Rueckschritt). Fix: nur EIN Abgleich gleichzeitig -
+   ueberlappende Aufrufe werden einfach uebersprungen, der naechste
+   turnusmaessige Aufruf (spaetestens 4s/20s spaeter) holt konsistent nach. */
+let bkmpIdleMergeInFlight = false;
 async function bkmpIdleMergeRemoteSpendableFields() {
   if (!bkmpIdleState || typeof loadIdlePlayerState !== 'function') return;
+  if (bkmpIdleMergeInFlight) return;
+  bkmpIdleMergeInFlight = true;
+  try {
   const remote = await loadIdlePlayerState(bkmpIdleState.name_key);
   if (!remote) return;
   const baseline = bkmpIdleMergeBaseline || bkmpIdleState;
@@ -1946,6 +1967,9 @@ async function bkmpIdleMergeRemoteSpendableFields() {
   if (bkmpIdleEffectiveStats) bkmpIdleVillageHp = Math.min(bkmpIdleVillageHp == null ? bkmpIdleEffectiveStats.hp : bkmpIdleVillageHp, bkmpIdleEffectiveStats.hp);
   if (typeof bkmpIdleUpdateVillageHpBar === 'function') bkmpIdleUpdateVillageHpBar();
   if (typeof bkmpIdleRenderHud === 'function') bkmpIdleRenderHud();
+  } finally {
+    bkmpIdleMergeInFlight = false;
+  }
 }
 
 /* FEHLER-FIX (Spieler-Report 15.07.: "Die Upgrades reseten sich jedesmal
@@ -2080,8 +2104,17 @@ function bkmpPrestigeSnapshotMergeBaseline() {
   bkmpPrestigeMergeBaseline = bkmpPrestigeState ? { prestige_points_spent: Number(bkmpPrestigeState.prestige_points_spent || 0) } : null;
 }
 
+/* Gleicher Race-Fix wie bkmpIdleMergeInFlight bei
+   bkmpIdleMergeRemoteSpendableFields - siehe dort fuer die volle
+   Erklaerung (ueberlappende Herzschlag-/Autosave-Aufrufe konnten sich
+   sonst mit unterschiedlich "frischen" remote/baseline-Staenden
+   ueberschneiden). */
+let bkmpPrestigeMergeInFlight = false;
 async function bkmpPrestigeMergeRemoteSpendable() {
   if (!bkmpPrestigeState || typeof loadIdlePrestigeState !== 'function') return;
+  if (bkmpPrestigeMergeInFlight) return;
+  bkmpPrestigeMergeInFlight = true;
+  try {
   const remote = await loadIdlePrestigeState(bkmpPrestigeState.name_key);
   if (!remote) return;
   bkmpPrestigeState.prestige_allocations = bkmpIdleMergeCountMaps(bkmpPrestigeState.prestige_allocations, remote.prestige_allocations);
@@ -2090,6 +2123,9 @@ async function bkmpPrestigeMergeRemoteSpendable() {
   bkmpPrestigeState.prestige_points_spent = Math.max(0, Number(remote.prestige_points_spent || 0) + Math.max(0, spentDelta));
   bkmpPrestigeState.prestige_points = Math.max(Number(bkmpPrestigeState.prestige_points || 0), Number(remote.prestige_points || 0));
   bkmpPrestigeSnapshotMergeBaseline();
+  } finally {
+    bkmpPrestigeMergeInFlight = false;
+  }
 }
 
 let bkmpPrestigeSaveTimer = null;
