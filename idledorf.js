@@ -314,8 +314,14 @@ const BKMP_IDLE_UPGRADES = [
   { id: 'hp', name: 'Vorratshaus', desc: '+5 Leben pro Stufe.', icon: '❤️', resource: 'wood', baseCost: 25, costRate: 0.22, costExponent: 2.2, effectType: 'hp_flat', effectPerLevel: 5, maxLevel: 500 },
   { id: 'walls', name: 'Steinmauern', desc: '+1 Verteidigung pro Stufe.', icon: '🧱', resource: 'stone', baseCost: 25, costRate: 0.22, costExponent: 2.2, effectType: 'defense_flat', effectPerLevel: 1, maxLevel: 500 },
   { id: 'crit', name: 'Zielübung', desc: '+1 Krit-Chance pro Stufe.', icon: '🎯', resource: 'essence', baseCost: 6, costRate: 0.2, costExponent: 1.8, effectType: 'crit_chance_flat', effectPerLevel: 1, maxLevel: 100 },
-  { id: 'crystal_gold', name: 'Kristallschliff', desc: '+2% Gold-Ausbeute pro Stufe.', icon: '💎', resource: 'crystals', baseCost: 5, costRate: 0.22, costExponent: 2, effectType: 'gold_prod_pct', effectPerLevel: 2, maxLevel: 300 },
-  { id: 'essence_loot', name: 'Essenzbindung', desc: '+2% Lootchance pro Stufe.', icon: '🧪', resource: 'essence', baseCost: 4, costRate: 0.22, costExponent: 2, effectType: 'loot_chance_pct', effectPerLevel: 2, maxLevel: 300 }
+  /* NACHBESSERUNG (Spieler-Report 13.07.: "ich bin schon bei 🍀 +49% obwohl
+     ich noch keine Runen habe, das muss runter skaliert werden") - maxLevel
+     300 x effectPerLevel 2 ergab bis zu +600% aus JEWEILS NUR EINEM einzigen
+     Upgrade, obendrauf zu Skilltree/Titeln/Runen. Auf denselben Rahmen wie
+     'crit' oben gebracht (maxLevel 100 x 1%/Stufe = max +100% pro Upgrade) -
+     zusaetzlich zur harten Gesamt-Obergrenze in bkmpIdleRecomputeEffectiveStats. */
+  { id: 'crystal_gold', name: 'Kristallschliff', desc: '+1% Gold-Ausbeute pro Stufe.', icon: '💎', resource: 'crystals', baseCost: 5, costRate: 0.22, costExponent: 2, effectType: 'gold_prod_pct', effectPerLevel: 1, maxLevel: 100 },
+  { id: 'essence_loot', name: 'Essenzbindung', desc: '+1% Lootchance pro Stufe.', icon: '🧪', resource: 'essence', baseCost: 4, costRate: 0.22, costExponent: 2, effectType: 'loot_chance_pct', effectPerLevel: 1, maxLevel: 100 }
 ];
 
 function bkmpIdleUpgradeCost(def, currentLevel) {
@@ -546,17 +552,32 @@ function bkmpIdleRecomputeEffectiveStats() {
      Aufstieg) als direkter, sofort spuerbarer Anreiz zu prestigen. */
   const prestigeLevel = bkmpPrestigeState ? Number(bkmpPrestigeState.prestige_level || 0) : 0;
   const prestigeLevelBonusPct = prestigeLevel * 5;
-  const attackPctTotal = t('attack_pct') + t('extra_archer') * 6 + prestigeLevelBonusPct;
+  /* NACHBESSERUNG (Spieler-Report 13.07.: "ich bin schon bei 🍀 +49% obwohl
+     ich noch keine Runen habe, das muss alles runter skaliert werden") -
+     Skilltree + Upgrades + Sammlung-Titel + Prestige-Baum speisen ALLE
+     denselben Pott (attack_pct/gold_prod_pct/xp_pct/loot_chance_pct/
+     crit_damage_pct) OHNE gemeinsame Obergrenze - bei Vielspielern mit
+     vielen freigeschalteten Titeln (die sich laut Sammlung-Prinzip alle
+     aufaddieren, siehe bkmpIdleTitleEffectTotals) und hohen Upgrade-Stufen
+     addierte sich das auf mehrere HUNDERT Prozent aus jeder einzelnen
+     Quelle fuer sich genommen schon plausibel wirkender Werte. Analog zu
+     der bereits bestehenden Krit-Chance-/Magieresistenz-/Element-Deckelung
+     (Math.min(75/60, ...) weiter unten) jetzt auch fuer diese vier Werte
+     eine grosszuegige, aber echte Obergrenze - faengt kuenftige Powercreep-
+     Kombinationen ab, ohne den erspielten Fortschritt einzelner Quellen
+     (Skilltree/Titel/Runen/Prestige) zu kappen, solange sie in Summe
+     vernuenftig bleiben. */
+  const attackPctTotal = Math.min(500, t('attack_pct') + t('extra_archer') * 6 + prestigeLevelBonusPct);
   const attackFlatTotal = t('attack_flat') + t('ballista_unlock') * 8;
   bkmpIdleEffectiveStats = {
     attack: (base.attack + attackFlatTotal) * (1 + attackPctTotal / 100),
     defense: (base.defense + t('defense_flat')) * (1 + t('defense_pct') / 100),
     hp: Math.round((base.hp + t('hp_flat')) * (1 + (t('hp_pct') + prestigeLevelBonusPct) / 100)),
     critChance: Math.min(75, base.critChance + t('crit_chance_flat') + t('crit_chance_pct')),
-    critDamage: base.critDamage + t('crit_damage_flat') + t('crit_damage_pct'),
-    goldBonus: base.goldBonus + t('gold_prod_pct') + t('gold_find_pct') + prestigeLevelBonusPct,
-    xpBonus: base.xpBonus + t('xp_pct') + prestigeLevelBonusPct,
-    lootBonus: base.lootBonus + t('loot_chance_pct'),
+    critDamage: base.critDamage + Math.min(300, t('crit_damage_flat') + t('crit_damage_pct')),
+    goldBonus: Math.min(400, base.goldBonus + t('gold_prod_pct') + t('gold_find_pct') + prestigeLevelBonusPct),
+    xpBonus: Math.min(400, base.xpBonus + t('xp_pct') + prestigeLevelBonusPct),
+    lootBonus: Math.min(300, base.lootBonus + t('loot_chance_pct')),
     /* Ab hier: Effekte, die vorher komplett wirkungslos im Skilltree lagen
        (kompletter Magie-Zweig + Teile von Burg/Wirtschaft). */
     woodBonus: t('wood_prod_pct'),
@@ -3913,6 +3934,21 @@ function bkmpRaidUpdateButtonState() {
       btn.classList.remove('raid-prep');
       if (countdownEl) countdownEl.style.display = 'none';
     }
+  }
+
+  /* FEHLER-FIX (Spieler-Wunsch 13.07.: "wenn der stuendliche Boss kommt,
+     soll das direkt im schon offenen Idle-Fenster erscheinen, nicht erst
+     nach dem Schliessen+Neuoeffnen") - das Banner wurde bisher NUR beim
+     (Wieder-)Oeffnen des Fensters gebaut (bkmpRaidRenderJoinBanner() lief
+     nur einmal in bkmpIdleOpenModal()). War das Fenster schon offen, als
+     die Vorbereitungsphase begann, existierte #raidBannerCountdown (wird
+     erst BEIM Bauen des Banners per innerHTML erzeugt) noch nicht - der
+     naechste Check unten brach dann sofort per early-return ab, ohne das
+     Banner je zu erzeugen. Deshalb hier VOR diesem Check: beim Wechsel in
+     die Vorbereitungsphase, waehrend das Fenster offen ist, aber das
+     Banner noch nicht gebaut wurde, einmalig nachholen. */
+  if (bkmpIdleModalOpen && info.phase === 'prep' && !document.getElementById('raidBannerCountdown')) {
+    bkmpRaidRenderJoinBanner();
   }
 
   const bannerCountdownEl = document.getElementById('raidBannerCountdown');
