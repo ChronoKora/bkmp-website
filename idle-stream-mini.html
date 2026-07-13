@@ -75,7 +75,21 @@
   }
   #idleDorfHud { margin-bottom: 0.6rem; }
   .idle-hud-top { margin-bottom: 0; gap: 0.9rem; }
-  #idlePanelKampf { padding: 0; }
+  /* Nutzerwunsch (Screenshot mit rotem Markierungs-Rahmen): "Ich will nur
+     das im Roten Balken als Fenster" - style.css setzt fuer ALLE
+     .idle-dorf-panel eine feste Hoehe (min(58vh, 560px), gedacht fuer die
+     Hauptseite, damit die Karte beim Tab-Wechsel nicht springt). Hier gibt
+     es aber nur den einen sichtbaren Kampf-Tab - die feste Hoehe erzeugte
+     dadurch genau den grossen leeren Bereich unterhalb von Levelleiste +
+     Kampf-Szene, den der Spieler markiert hat. auto/visible laesst die
+     Karte stattdessen exakt an der echten Inhaltshoehe enden. */
+  #idlePanelKampf {
+    padding: 0;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
   /* Der Kampf-Szene-Kasten war ebenfalls fast blickdicht (radialer
      Verlauf aus style.css) - hier zusaetzlich aufgehellt/durchscheinender,
      behaelt aber genug Kontrast, damit Sprites/HP-Balken lesbar bleiben. */
