@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="favicon.ico" sizes="any">
 <title>BKMP – Idle Drachen Dorf (Mini-Stream-Overlay)</title>
-<link rel="stylesheet" href="style.css?v=20260715-streamsync2">
+<link rel="stylesheet" href="style.css?v=20260715-rewardfloat1">
 <style>
   /* ============================================================
      Winzige "nur Dorf+Drache" Variante von idle-stream.html
@@ -123,40 +123,12 @@
   .idle-village-sprite { max-width: 280px; }
   .idle-dragon-sprite { max-width: 210px; }
 
-  /* Gold/XP-Hochschweb-Anzeige (Nutzerwunsch: "irgendwo mega süß +?? Gold
-     +?? XP") - reagiert auf das "bkmpIdleRewardGained"-Event, das
-     idledorf.js bei jedem besiegten Drachen feuert (siehe dort), unabhaengig
-     von dieser Seite. */
-  .idle-reward-float {
-    position: absolute;
-    top: 10%;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    gap: 0.5rem;
-    pointer-events: none;
-    z-index: 6;
-    animation: idleRewardFloat 1.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-  }
-  .idle-reward-float span {
-    font-family: 'Fraunces', serif;
-    font-weight: 800;
-    font-size: 1.05rem;
-    white-space: nowrap;
-    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
-  }
-  .idle-reward-float .rf-gold { color: #ffd166; }
-  .idle-reward-float .rf-xp { color: #8ecdf7; }
-  @keyframes idleRewardFloat {
-    0% { opacity: 0; transform: translate(-50%, 8px) scale(0.6); }
-    18% { opacity: 1; transform: translate(-50%, -4px) scale(1.2); }
-    30% { transform: translate(-50%, -2px) scale(1); }
-    82% { opacity: 1; transform: translate(-50%, -52px) scale(1); }
-    100% { opacity: 0; transform: translate(-50%, -66px) scale(0.9); }
-  }
+  /* Gold/XP-Hochschweb-Anzeige (Nutzerwunsch 15.07.: urspruenglich nur
+     hier, jetzt globaler Standard - CSS/Listener sitzen jetzt zentral in
+     style.css/idledorf.js, siehe dort. Diese Seite bindet beides ganz
+     normal per <link>/<script> ein, keine eigene Kopie mehr noetig. */
   @media (prefers-reduced-motion: reduce) {
     #idleDorfOverlay .idle-dorf-card { animation: none; }
-    .idle-reward-float { animation: none; opacity: 0; }
   }
 </style>
 </head>
@@ -395,21 +367,12 @@
       try { localStorage.setItem(BKMP_MC_NAME_KEY, name); } catch (e) {}
     }
   </script>
-  <script src="idledorf.js?v=20260715-streamsync4"></script>
+  <script src="idledorf.js?v=20260715-rewardfloat1"></script>
   <script>
-    /* ---------------- Gold/XP-Hochschweb-Anzeige ----------------
-       Reagiert auf das "bkmpIdleRewardGained"-Event (siehe
-       bkmpIdleHandleDragonDefeated in idledorf.js) - komplett unabhaengig
-       vom Spiel selbst, rein dekorativ fuer diese Mini-Ansicht. */
-    document.addEventListener('bkmpIdleRewardGained', e => {
-      const field = document.getElementById('idleBattlefield');
-      if (!field || !e.detail) return;
-      const el = document.createElement('div');
-      el.className = 'idle-reward-float';
-      el.innerHTML = `<span class="rf-gold">+${Math.round(e.detail.gold)} &#128176;</span><span class="rf-xp">+${Math.round(e.detail.xp)} &#10024;</span>`;
-      field.appendChild(el);
-      window.setTimeout(() => el.remove(), 1500);
-    });
+    /* Gold/XP-Hochschweb-Anzeige laeuft jetzt zentral in idledorf.js
+       (Nutzerwunsch 15.07.: "auch so Standard mäßig machen") - kein
+       eigener Listener hier mehr noetig (haette sonst zu doppelten
+       Hochschweb-Zahlen gefuehrt). */
 
     /* ---------------- Login/Registrieren (schlanke Fassung von index.html)
        ---------------- */

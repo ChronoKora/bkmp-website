@@ -860,13 +860,18 @@ function bkmpIdleHandleDragonDefeated() {
   bkmpIdleState.highest_dragon_index = Math.max(Number(bkmpIdleState.highest_dragon_index || 0), bkmpIdleState.current_dragon_index);
   bkmpIdleAddXp(rewards.xp);
   bkmpIdleVillageHp = bkmpIdleEffectiveStats.hp;
-  bkmpIdleLog(`${bkmpIdleCurrentDragon.emoji} ${bkmpIdleCurrentDragon.name} besiegt! +${rewards.gold}💰 +${rewards.xp}✨` + (bkmpIdleCurrentDragon.isBoss ? ' 👑 BOSS!' : '') + (autoAdvance ? '' : ' (bleibt auf dieser Stufe)'));
-  /* Feuert ein leichtes, folgenloses DOM-Event mit den Belohnungen dieses
-     Kills - fuer die Hauptseite bedeutungslos (kein Listener dort), aber
-     die Grundlage fuer die schlanke Stream-Mini-Ansicht (idle-stream-
-     mini.html, Nutzerwunsch 15.07.: "irgendwo mega süß +?? Gold +?? XP"),
-     die daraus eine kleine Hochschweb-Anzeige baut, ohne dass idledorf.js
-     selbst irgendetwas Seiten-spezifisches ueber DOM-Struktur wissen muss. */
+  /* Nutzerwunsch (15.07.): "wo dieses Geld und XP hochploppt gerne auch so
+     Standard mäßig machen, anstatt dadrunter so ein Scroll Fenster" - die
+     Gold/XP-Zeile lief bisher bei JEDEM Kill in den Kampf-Log (mehrmals pro
+     Sekunde im Idle-Betrieb - genau das staendige Scrollen, das ersetzt
+     werden sollte). Die Hochschweb-Zahlen (siehe bkmpIdleRewardGained-
+     Listener weiter unten, urspruenglich nur fuer idle-stream-mini.html
+     gebaut) uebernehmen die Gold/XP-Anzeige jetzt ueberall als Standard -
+     bewusst KEIN bkmpIdleLog(...) mehr fuer den Routine-Fall. Seltenere,
+     wichtigere Ereignisse (Level-Aufstieg, Boss-Titel, Runen-Funde,
+     Niederlage, Aufstieg) bleiben ueber bkmpIdleLog erhalten (jetzt
+     zusaetzlich als Toast, siehe dort), damit nichts Wichtiges verloren
+     geht. */
   document.dispatchEvent(new CustomEvent('bkmpIdleRewardGained', { detail: { gold: rewards.gold, xp: rewards.xp, isBoss: !!bkmpIdleCurrentDragon.isBoss } }));
   bkmpIdleSpawnDragon();
   bkmpIdleUpdateVillageHpBar();
@@ -1300,14 +1305,24 @@ function bkmpIdleWireStagePicker() {
   if (closeBtn) closeBtn.addEventListener('click', bkmpIdleCloseStagePicker);
 }
 
+/* Seit der Gold/XP-Hochschweb-Umstellung (15.07.) landen hier nur noch die
+   selteneren, wichtigeren Ereignisse (Level-Aufstieg, Boss-Titel, Runen-
+   Funde/-Aufwertungen, Niederlage, Prestige-Aufstieg) - der Routine-Fall
+   "Drache besiegt, +Gold +XP" wird stattdessen per bkmpIdleRewardGained-
+   Event/Hochschweb-Anzeige dargestellt (siehe bkmpIdleHandleDragonDefeated).
+   Zusaetzlich zum (weiterhin bestehenden, aber deutlich selteneren)
+   Kampf-Log jetzt auch als Toast, damit diese Ereignisse nicht verpasst
+   werden, falls gerade niemand auf den Log schaut. */
 function bkmpIdleLog(msg) {
   const log = document.getElementById('idleDorfLog');
-  if (!log) return;
-  const line = document.createElement('div');
-  line.className = 'idle-dorf-log-line';
-  line.textContent = msg;
-  log.prepend(line);
-  while (log.children.length > 20) log.removeChild(log.lastChild);
+  if (log) {
+    const line = document.createElement('div');
+    line.className = 'idle-dorf-log-line';
+    line.textContent = msg;
+    log.prepend(line);
+    while (log.children.length > 20) log.removeChild(log.lastChild);
+  }
+  if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(msg, 3200);
 }
 
 /* ---------------- Rendering: Upgrades-Tab ---------------- */
@@ -4310,6 +4325,22 @@ function bkmpIdleInit() {
   window.setTimeout(bkmpIdlePreloadStateIfNamed, 0);
 }
 bkmpIdleInit();
+
+/* Gold/XP-Hochschweb-Anzeige (Nutzerwunsch 15.07.: "wo dieses Geld und XP
+   hochploppt gerne auch so Standard mäßig machen") - urspruenglich nur ein
+   Inline-Script in idle-stream-mini.html, jetzt hier zentral fuer JEDE
+   Seite mit einem #idleBattlefield-Element (Hauptseite/admin.html/
+   idle-stream.html/idle-stream-mini.html gleichermassen), reagiert auf das
+   in bkmpIdleHandleDragonDefeated gefeuerte bkmpIdleRewardGained-Event. */
+document.addEventListener('bkmpIdleRewardGained', e => {
+  const field = document.getElementById('idleBattlefield');
+  if (!field || !e.detail) return;
+  const el = document.createElement('div');
+  el.className = 'idle-reward-float';
+  el.innerHTML = `<span class="rf-gold">+${Math.round(e.detail.gold)} 💰</span><span class="rf-xp">+${Math.round(e.detail.xp)} ✨</span>`;
+  field.appendChild(el);
+  window.setTimeout(() => el.remove(), 1500);
+});
 
 /* ============================================================
    Inhalte: 50+ Achievements, 50+ Titel, 18 Kosmetiken.

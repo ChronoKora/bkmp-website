@@ -3597,7 +3597,7 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 }
 .achievements-card h3 { font-family: 'Fraunces', serif; font-size: 1.25rem; margin-bottom: 0.5rem; text-align: center; }
 .achievements-summary { color: var(--muted); font-size: 0.85rem; text-align: center; margin-bottom: 1rem; }
-.plushie-panel-hint { color: var(--muted); font-size: 0.82rem; text-align: center; margin: 0 0 0.9rem; }
+.plushie-panel-hint { color: var(--muted); font-size: 0.82rem; text-align: center; margin: 0 0 0.6rem; }
 .achievements-list {
   /* Bewusst display:flex statt display:grid: als Grid-Container INNERHALB
      eines flex:1 1 auto-Elements mit min-height:0 hat der Browser die
@@ -4100,6 +4100,18 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   flex-direction: column;
   overflow: hidden;
 }
+/* Streamerin-Report (15.07.): "kann bei Plüshie nicht scrollen" - auf
+   niedrigeren Fensterhoehen frisst die Hinweiszeile + Code-Einloese-Box
+   (beide flex-shrink:0, also unveraenderlich) fast den kompletten
+   Platz von #plushiesPanel auf, weil #plushiesList (.cosmetics-list) durch
+   "min-height:0" (noetig gegen den bekannten Grid-in-Flex-Scroll-Bug, siehe
+   .achievements-list weiter oben) auf einen wenige Pixel schmalen Streifen
+   zusammengequetscht wurde - technisch noch scrollbar, aber praktisch
+   unbedienbar (kaum eine halbe Kachelreihe sichtbar). Fester Mindestwert
+   garantiert immer einen wirklich nutzbaren Scrollbereich. */
+#plushiesList {
+  min-height: 190px;
+}
 .plushie-redeem-box { flex-shrink: 0; }
 /* "Neu"-Badge fuer frisch hinzugefuegte Titel/Erfolge/Pluschies/PartnerShops/
    Idle-Dorf-Sammlung (siehe bkmpNewBadgeChecker in index.html) - klein,
@@ -4170,10 +4182,10 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   border: 1px solid var(--line);
   border-radius: 14px;
   background: linear-gradient(145deg, color-mix(in srgb, var(--paper-2) 92%, transparent), color-mix(in srgb, var(--paper-2) 80%, transparent));
-  padding: 0.9rem 1rem;
-  margin-bottom: 0.8rem;
+  padding: 0.65rem 0.9rem;
+  margin-bottom: 0.5rem;
 }
-.plushie-redeem-box label { display: block; font-size: 0.8rem; font-weight: 700; margin-bottom: 0.4rem; }
+.plushie-redeem-box label { display: block; font-size: 0.8rem; font-weight: 700; margin-bottom: 0.3rem; }
 .plushie-redeem-row { display: flex; gap: 0.5rem; }
 .plushie-redeem-row input {
   flex: 1;
@@ -5224,6 +5236,43 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   color: var(--muted);
 }
 .idle-dorf-log-line { padding: 0.15rem 0; }
+
+/* Gold/XP-Hochschweb-Anzeige (Nutzerwunsch 15.07.: "wo dieses Geld und XP
+   hochploppt gerne auch so Standard mäßig machen, anstatt dadrunter so ein
+   Scroll Fenster") - urspruenglich nur idle-stream-mini.html, jetzt
+   globaler Standard fuer #idleBattlefield (siehe zentraler Listener in
+   idledorf.js). Ersetzt die bisherige "Drache besiegt! +Gold +XP"-Zeile im
+   Kampf-Log, das dadurch nur noch fuer seltenere Ereignisse genutzt wird. */
+.idle-reward-float {
+  position: absolute;
+  top: 10%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.5rem;
+  pointer-events: none;
+  z-index: 6;
+  animation: idleRewardFloat 1.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.idle-reward-float span {
+  font-family: 'Fraunces', serif;
+  font-weight: 800;
+  font-size: 1.05rem;
+  white-space: nowrap;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+.idle-reward-float .rf-gold { color: #ffd166; }
+.idle-reward-float .rf-xp { color: #8ecdf7; }
+@keyframes idleRewardFloat {
+  0% { opacity: 0; transform: translate(-50%, 8px) scale(0.6); }
+  18% { opacity: 1; transform: translate(-50%, -4px) scale(1.2); }
+  30% { transform: translate(-50%, -2px) scale(1); }
+  82% { opacity: 1; transform: translate(-50%, -52px) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -66px) scale(0.9); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .idle-reward-float { animation: none; opacity: 0; }
+}
 
 /* ---- Upgrades ---- */
 .idle-upgrade-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.8rem; }
