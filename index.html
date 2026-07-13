@@ -2105,6 +2105,10 @@
         }
         grouped[item.name].amount += Number(item.amount || 0);
       });
+      /* Nutzerwunsch (Feedback von DerJannikHase): hoechste Prozentsaetze
+         zuerst, statt in reiner Buchungs-Reihenfolge - macht Legende UND
+         Donut-Farbverteilung auf einen Blick lesbarer. */
+      groupedIncome.sort((a, b) => b.amount - a.amount);
 
       let gradientParts = [];
       let cursor = 0;
