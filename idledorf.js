@@ -1632,7 +1632,12 @@ const BKMP_IDLE_EFFECT_LABELS = {
   crit_chance_flat: v => `+${v}% Krit-Chance`,
   gold_prod_pct: v => `+${v}% Gold`,
   xp_pct: v => `+${v}% XP`,
-  loot_chance_pct: v => `+${v}% Lootchance`
+  loot_chance_pct: v => `+${v}% Lootchance`,
+  attack_pct: v => `+${v}% Angriff`,
+  defense_pct: v => `+${v}% Verteidigung`,
+  hp_pct: v => `+${v}% Leben`,
+  crit_damage_pct: v => `+${v}% Krit-Schaden`,
+  prestige_point_bonus_pct: v => `+${v}% Prestige-Punkte`
 };
 function bkmpIdleFormatTitleBonus(title) {
   const fmt = BKMP_IDLE_EFFECT_LABELS[title.effectType];
