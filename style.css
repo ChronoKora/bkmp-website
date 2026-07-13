@@ -5121,6 +5121,10 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
    drueber: ohne hoeheren z-index landet der Bestaetigungs-Dialog je nach
    DOM-Reihenfolge HINTER statt VOR dem Idle-Dorf-Fenster. */
 #bkmpConfirmOverlay { z-index: 65; }
+/* Gleiches Ueberlappungs-Problem wie oben bei #idleSkillHelpOverlay - der
+   "❓ Hilfe"-Button im Runen-Tab oeffnet dieses Popup ebenfalls aus dem schon
+   offenen idleDorfOverlay heraus (Spieler-Meldung: Popup landet dahinter). */
+#idleRunenHelpOverlay { z-index: 60; }
 .skillhelp-card { max-width: 720px; }
 .skillhelp-list {
   display: flex;
