@@ -55,7 +55,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260713-visitors1">
+<link rel="stylesheet" href="style.css?v=20260715-sheepadmin1">
 </head>
 <body>
 
@@ -191,6 +191,7 @@
       <div class="cosmetics-list" id="cosmeticsList" style="display:none;"></div>
       <div class="cosmetics-list" id="titlesList" style="display:none;"></div>
       <div id="plushiesPanel" style="display:none;">
+        <p class="plushie-panel-hint">🧸 Woher bekommt man Plüshies? Sie droppen zufällig aus den täglichen Random-Drops - oder du fragst einfach mal lieb unsere OPSUCHT Creator Lieblinge nach einem Code!</p>
         <div class="plushie-redeem-box">
           <label for="plushieCodeInput">Code einl&ouml;sen</label>
           <div class="plushie-redeem-row">
@@ -265,6 +266,17 @@
       <div class="joke-buttons">
         <button class="btn-nein" id="deleteAccountCancel" type="button">Abbrechen</button>
         <button class="btn-ja" id="deleteAccountConfirm" type="button" disabled>Endg&uuml;ltig l&ouml;schen (10)</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="joke-overlay" id="bkmpConfirmOverlay">
+    <div class="joke-card">
+      <h3 id="bkmpConfirmTitle"></h3>
+      <p id="bkmpConfirmBody" style="white-space:pre-line;"></p>
+      <div class="joke-buttons">
+        <button class="btn-nein" id="bkmpConfirmCancelBtn" type="button">Abbrechen</button>
+        <button class="btn-ja" id="bkmpConfirmOkBtn" type="button">OK</button>
       </div>
     </div>
   </div>
@@ -382,6 +394,17 @@
     </div>
   </div>
 
+  <div class="joke-overlay" id="idleRunenHelpOverlay">
+    <div class="joke-card achievements-card skillhelp-card">
+      <h3>❓ Runen-Hilfe</h3>
+      <p class="achievements-summary">Wie Runen droppen, wirken, aufgewertet und verschmolzen werden.</p>
+      <div class="skillhelp-list" id="idleRunenHelpList"></div>
+      <div class="joke-buttons">
+        <button class="btn-ja" id="idleRunenHelpClose" type="button">Schlie&szlig;en</button>
+      </div>
+    </div>
+  </div>
+
   <div class="joke-overlay idle-dorf-overlay" id="idleDorfOverlay">
     <div class="joke-card idle-dorf-card">
       <button type="button" class="idle-dorf-close" id="idleDorfCloseX" aria-label="Schlie&szlig;en">&times;</button>
@@ -421,7 +444,7 @@
         <button type="button" class="idle-dorf-tab" id="idleTabBtnErfolge">&#127942; Erfolge</button>
         <button type="button" class="idle-dorf-tab" id="idleTabBtnBestenliste">&#128202; Bestenliste</button>
         <button type="button" class="idle-dorf-tab" id="idleTabBtnPrestige">&#127756; Prestige</button>
-        <button type="button" class="idle-dorf-tab" id="idleTabBtnRunen" title="Noch nicht verfügbar &ndash; kommt bald" disabled>&#128274; Runen</button>
+        <button type="button" class="idle-dorf-tab" id="idleTabBtnRunen">🔮 Runen</button>
       </div>
 
       <div class="idle-dorf-panel" id="idlePanelKampf">
@@ -497,9 +520,11 @@
         <div class="streamer-marquee-track" id="streamerMarqueeTrack"></div>
       </div>
     </div>
-    <picture>
+    <picture class="hero-banner-picture">
       <source srcset="assets/top-banner.webp" type="image/webp">
       <img class="hero-banner" src="assets/top-banner.png" width="1983" height="527" fetchpriority="high" decoding="async" alt="Willkommen bei Bkmp">
+      <div class="bkmp-sheep-easter-egg" id="bkmpSheepEgg" role="button" tabindex="0" aria-label="Schaf antippen"></div>
+      <div class="bkmp-sheep-bubble" id="bkmpSheepBubble" aria-hidden="true"><span id="bkmpSheepBubbleText"></span></div>
     </picture>
   </header>
 
@@ -997,9 +1022,9 @@
 
   <script>window.BKMP_CLIENT_STORAGE_KEY = 'bkmp-customer-auth';</script>
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260712-syncwarn1"></script>
+  <script src="supabase.js?v=20260715-runeupgrade1"></script>
   <script src="app.js?v=20260712-themefix1"></script>
-  <script src="idledorf.js?v=20260713-visitors1"></script>
+  <script src="idledorf.js?v=20260715-substatfix2"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
   <script>
     bkmpInitTheme();
@@ -1032,6 +1057,27 @@
        echten Initialisierung von "data" weiter unten auf true gesetzt. */
     let bkmpDataReady = false;
 
+    /* .panels-track ist eine Flex-Reihe mit allen 10 Panels nebeneinander -
+       auch mit align-items:flex-start (siehe style.css) bestimmt trotzdem
+       IMMER das hoechste Panel die Eigenhoehe der Reihe (so rechnet Flexbox
+       die Kreuzachsen-Groesse einer Zeile aus, unabhaengig von align-items).
+       Die Kartendatenbank ist mit ~14500px (viele Karten) mit Abstand am
+       hoechsten, wodurch .panels-viewport (overflow:hidden) auf diese Hoehe
+       mitwuchs und JEDE andere, eigentlich kurze Seite genauso lang
+       scrollbar machte (Spieler-Meldung: "auf allen Seiten endlos
+       scrollen"). Fix: die Viewport-Hoehe wird explizit auf die Hoehe NUR
+       des gerade aktiven Panels gesetzt - bei jedem Tab-Wechsel neu, plus
+       einmal verzoegert danach (faengt Karten/Investoren/... ab, die erst
+       nach dem Tab-Wechsel asynchron nachgeladen werden) und bei jedem
+       Fenster-Resize. Bewusst KEIN ResizeObserver hier - der reagiert auch
+       auf Groessenaenderungen, die durch das eigene Setzen von
+       viewport.style.height indirekt ausgeloest werden, und kann sich damit
+       leicht aufschaukeln. */
+    function bkmpSyncPanelHeight() {
+      viewport.style.height = panels[current].scrollHeight + 'px';
+    }
+    window.addEventListener('resize', bkmpSyncPanelHeight);
+
     function goTo(index, options = {}) {
       current = Math.max(0, Math.min(total - 1, index));
       track.style.transform = `translate3d(-${current * 100}%, 0, 0)`;
@@ -1041,6 +1087,8 @@
         btn.setAttribute('aria-selected', active ? 'true' : 'false');
       });
       panels.forEach((panel, i) => panel.classList.toggle('active-panel', i === current));
+      bkmpSyncPanelHeight();
+      setTimeout(bkmpSyncPanelHeight, 400);
       if (!options.skipSave) sessionStorage.setItem('bkmp-active-tab', String(current));
       if (window.bkmpEnhanceImages) window.bkmpEnhanceImages(panels[current]);
       if (typeof bkmpSyncNewsTabDot === 'function') bkmpSyncNewsTabDot();
@@ -1388,6 +1436,35 @@
       } catch (e) {}
     }
 
+    /* Generischer Ersatz fuer window.confirm() im hausseigenen .joke-card-Look
+       statt der haesslichen nativen Browser-Box. Faellt auf window.confirm()
+       zurueck, falls das Overlay-Markup mal nicht im DOM ist (z.B. wenn
+       idledorf.js versehentlich auf admin.html denselben Code-Pfad erreichen
+       wuerde - #bkmpConfirmOverlay existiert nur in index.html). */
+    function bkmpConfirmDialog(title, body, okLabel, cancelLabel) {
+      const overlay = document.getElementById('bkmpConfirmOverlay');
+      if (!overlay) return Promise.resolve(window.confirm([title, body].filter(Boolean).join('\n\n')));
+      return new Promise(resolve => {
+        document.getElementById('bkmpConfirmTitle').textContent = title || '';
+        document.getElementById('bkmpConfirmBody').textContent = body || '';
+        const okBtn = document.getElementById('bkmpConfirmOkBtn');
+        const cancelBtn = document.getElementById('bkmpConfirmCancelBtn');
+        okBtn.textContent = okLabel || 'OK';
+        cancelBtn.textContent = cancelLabel || 'Abbrechen';
+        function cleanup(result) {
+          overlay.classList.remove('visible');
+          okBtn.removeEventListener('click', onOk);
+          cancelBtn.removeEventListener('click', onCancel);
+          resolve(result);
+        }
+        function onOk() { cleanup(true); }
+        function onCancel() { cleanup(false); }
+        okBtn.addEventListener('click', onOk);
+        cancelBtn.addEventListener('click', onCancel);
+        overlay.classList.add('visible');
+      });
+    }
+
     function bkmpShowJannikToast(text, ms) {
       const toast = document.createElement('div');
       toast.className = 'bkmp-jannik-toast';
@@ -1632,6 +1709,68 @@
         bkmpSecretZone.addEventListener(evt, bkmpCancelJannikPress, { passive: true });
       });
       bkmpSecretHint.addEventListener('click', triggerBkmpJannikEasterEgg);
+    }
+
+    /* Anklickbares Schaf-Easter-Egg: zeigt eine Sprechblase mit einem Text,
+       den der Admin im Admin-Panel (Uebersicht > Schaf-Sprechblase) jederzeit
+       aendern kann (site_flags.sheep_speech_text, siehe supabase.js
+       loadSiteFlags/setSheepSpeechText). Text wird erst beim ersten Klick
+       nachgeladen (kein Grund, ihn beim Seitenaufruf ungefragt zu holen). */
+    const bkmpSheepEgg = document.getElementById('bkmpSheepEgg');
+    const bkmpSheepBubble = document.getElementById('bkmpSheepBubble');
+    const bkmpSheepBubbleText = document.getElementById('bkmpSheepBubbleText');
+    if (bkmpSheepEgg && bkmpSheepBubble && bkmpSheepBubbleText) {
+      let bkmpSheepSpeechCache = null;
+      let bkmpSheepBubbleHideTimer = null;
+      async function bkmpGetSheepSpeechText() {
+        if (bkmpSheepSpeechCache) return bkmpSheepSpeechCache;
+        try {
+          const text = typeof loadSheepSpeechText === 'function' ? await loadSheepSpeechText() : null;
+          bkmpSheepSpeechCache = text || 'Määäh! 🐑';
+        } catch (e) {
+          bkmpSheepSpeechCache = 'Määäh! 🐑';
+        }
+        return bkmpSheepSpeechCache;
+      }
+      function bkmpHideSheepBubble() {
+        bkmpSheepBubble.classList.remove('visible');
+        bkmpSheepBubble.setAttribute('aria-hidden', 'true');
+        clearTimeout(bkmpSheepBubbleHideTimer);
+      }
+      /* Easter Egg "Schaf-Zitate-Fluesterer": beim ALLERERSTEN Klick (egal
+         wann) gibt es einmalig das Easter Egg + die SheepMasterLP-Pluschie -
+         siehe supabase-sheep-plushie-easter-egg.sql fuer den (nie im UI
+         gezeigten) Einloese-Code, gleiches Muster wie BKMP_ADFREE_CODE. */
+      const BKMP_SHEEP_EGG_CODE = 'SHEEP-QUOTE-WHISPERER-EGG';
+      async function bkmpSheepGrantEggReward() {
+        if (typeof bkmpMarkEggFound === 'function') bkmpMarkEggFound('sheep');
+        const name = typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : '';
+        if (name && typeof redeemPlushieCode === 'function') {
+          try { await redeemPlushieCode(BKMP_SHEEP_EGG_CODE, name); } catch (e) {}
+          if (typeof bkmpRefreshOwnedPlushies === 'function') bkmpRefreshOwnedPlushies();
+        }
+        if (typeof renderAchievementBadge === 'function') renderAchievementBadge(true);
+      }
+      async function bkmpToggleSheepBubble() {
+        if (bkmpSheepBubble.classList.contains('visible')) { bkmpHideSheepBubble(); return; }
+        const isFirstClick = typeof bkmpGetEggsFound === 'function' && !bkmpGetEggsFound().includes('sheep');
+        if (isFirstClick) bkmpSheepGrantEggReward();
+        if (typeof bkmpTrackSheepQuoteClick === 'function') bkmpTrackSheepQuoteClick();
+        bkmpSheepBubbleText.textContent = await bkmpGetSheepSpeechText();
+        bkmpSheepBubble.classList.add('visible');
+        bkmpSheepBubble.setAttribute('aria-hidden', 'false');
+        clearTimeout(bkmpSheepBubbleHideTimer);
+        bkmpSheepBubbleHideTimer = setTimeout(bkmpHideSheepBubble, 5000);
+      }
+      bkmpSheepEgg.addEventListener('click', bkmpToggleSheepBubble);
+      bkmpSheepEgg.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); bkmpToggleSheepBubble(); }
+      });
+      document.addEventListener('click', e => {
+        if (bkmpSheepBubble.classList.contains('visible') && !bkmpSheepEgg.contains(e.target) && !bkmpSheepBubble.contains(e.target)) {
+          bkmpHideSheepBubble();
+        }
+      });
     }
 
     /* Easter Egg: 3 Minuten inaktiv - schläfriger Titel + Zzz-Blase */
@@ -3439,6 +3578,44 @@
       flags[name] = true;
       try { localStorage.setItem(BKMP_FLAGS_KEY, JSON.stringify(flags)); } catch (e) {}
     }
+    /* Wie bkmpSetFlag, aber fuer beliebige Werte (Zahlen usw.) statt nur
+       true/false - genutzt fuer den Schaf-Zitat-Streak (sheepStreakBest).
+       flags wird schon komplett remote gesynct (siehe bkmpSyncPlayerStats/
+       bkmpMergeRemoteStatsIntoLocal), also bekommt der Streak dadurch ohne
+       eigene DB-Spalte/Sync-Code kostenlos Geraete-Uebergreifenheit. */
+    function bkmpSetFlagValue(name, value) {
+      const flags = bkmpGetFlags();
+      flags[name] = value;
+      try { localStorage.setItem(BKMP_FLAGS_KEY, JSON.stringify(flags)); } catch (e) {}
+    }
+    function bkmpLocalDateStr(d) {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+    function bkmpGetSheepStreakBest() {
+      return Number(bkmpGetFlags().sheepStreakBest || 0);
+    }
+    /* Zaehlt einen Schaf-Klick fuer den taeglichen "Zitat des Tages"-Streak -
+       nur wenn es lokal schon nach 12 Uhr ist UND heute noch nicht gezaehlt
+       wurde (ein Klick pro Tag reicht/zaehlt). Ein ausgelassener Tag setzt
+       den AKTUELLEN Streak auf 1 zurueck, der fuer Erfolge genutzte
+       sheepStreakBest sinkt aber NIE - alle Erfolge auf dieser Seite werden
+       live aus dem aktuellen Wert neu berechnet (siehe renderAchievementsPanel:
+       a.check(ctx)), ein sinkender Wert wuerde also bereits freigeschaltete
+       Erfolge optisch wieder sperren. */
+    function bkmpTrackSheepQuoteClick() {
+      const now = new Date();
+      if (now.getHours() < 12) return;
+      const today = bkmpLocalDateStr(now);
+      const flags = bkmpGetFlags();
+      if (flags.sheepLastQuoteDate === today) return;
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const current = flags.sheepLastQuoteDate === bkmpLocalDateStr(yesterday) ? Number(flags.sheepStreakCurrent || 0) + 1 : 1;
+      bkmpSetFlagValue('sheepStreakCurrent', current);
+      bkmpSetFlagValue('sheepLastQuoteDate', today);
+      if (current > Number(flags.sheepStreakBest || 0)) bkmpSetFlagValue('sheepStreakBest', current);
+      if (typeof renderAchievementBadge === 'function') renderAchievementBadge();
+    }
     function bkmpTrackTimeBasedFlags() {
       const now = new Date();
       const hour = now.getHours();
@@ -3535,6 +3712,11 @@
 
         const localFlags = bkmpGetFlags();
         const mergedFlags = { ...localFlags, ...(remote.flags || {}) };
+        /* sheepStreakBest ist ein monoton wachsender Zaehler wie bonkCount/
+           panelOpens unten - "remote gewinnt" (siehe Zeile drueber) waere
+           hier falsch, ein aelterer/niedrigerer Remote-Stand duerfte den
+           lokal schon erreichten Bestwert nie herabsetzen. */
+        mergedFlags.sheepStreakBest = Math.max(Number(localFlags.sheepStreakBest || 0), Number((remote.flags || {}).sheepStreakBest || 0));
         try { localStorage.setItem(BKMP_FLAGS_KEY, JSON.stringify(mergedFlags)); } catch (e) {}
 
         const mergedPanelOpens = Math.max(bkmpGetPanelOpens(), remote.panelOpens || 0);
@@ -3689,6 +3871,7 @@
         dailyEventWins: bkmpGetDailyEventWins(),
         wonGoldenHour: bkmpGetWonGoldenHour(),
         streamersClicked: bkmpGetStreamersClicked(),
+        sheepStreak: bkmpGetSheepStreakBest(),
         feedbackLobCount: bkmpGetFeedbackCount('lob'),
         feedbackKritikCount: bkmpGetFeedbackCount('kritik'),
         feedbackIdeeCount: bkmpGetFeedbackCount('idee'),
@@ -3769,6 +3952,16 @@
       [14, 'Zwei Wochen'], [21, 'Drei Wochen'], [30, 'Ein Monat'], [45, 'Sechs Wochen'], [60, 'Zwei Monate'],
       [90, 'Ein Quartal'], [120, 'Vier Monate'], [180, 'Ein halbes Jahr'], [270, 'Neun Monate'], [365, 'Ein ganzes Jahr']
     ];
+    /* Schaf-Zitat-Streak: 1x taeglich ab 12 Uhr aufs Schaf klicken (siehe
+       bkmpTrackSheepQuoteClick). Titel bewusst suess/verspielt statt
+       trocken "Tag N" - auf Nutzerwunsch ("Erstelle süße Titel"). */
+    const BKMP_SHEEP_STREAK_TIERS = [
+      [1, 'Erstes Määh'], [2, 'Zwei Määhs'], [3, 'Woll-Neuling'], [4, 'Schaf-Stammgast'],
+      [5, 'Fünf-Tage-Fellfreund'], [6, 'Halbdutzend-Määher'], [7, 'Wochen-Schäfchen'],
+      [8, 'Wolliger Wiederholungstäter'], [9, 'Fast-Zehn-Zottel'], [10, 'Zehn-Tage-Treue'],
+      [15, 'Anderthalb Wochen wollig'], [30, 'Monats-Määhster'], [60, 'Zwei-Monats-Zottel'],
+      [120, 'Vier-Monats-Fellnase'], [240, 'Achtmonatiger Wollversteher'], [365, 'Schafsweisheit des Jahres']
+    ];
     const BKMP_DIVERSITY_TIERS = [
       [1, 'Erste Kategorie'], [2, 'Zwei Kategorien'], [3, 'Drei Kategorien'], [4, 'Vier Kategorien'],
       [5, 'Fünf Kategorien'], [6, 'Sechs Kategorien'], [7, 'Sieben Kategorien'], [8, 'Alleskönner']
@@ -3821,7 +4014,9 @@
       { id: 'egg_derliber', category: 'Easter Eggs', title: '???', revealName: 'Liber-Jäger', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Suche 10 kleine Liber-Strichmännchen, versteckt auf der ganzen Website.', progress: ctx => [ctx.derLiberFound, 10], check: ctx => ctx.eggsFound.includes('derliber') },
       { id: 'egg_jannik', category: 'Easter Eggs', title: '???', revealName: 'Jannik der Hase', desc: 'Finde ein verstecktes Easter Egg.', revealDesc: 'Man sagt, irgendwo auf dieser Website hoppelt ein kleiner Hase herum. Herzlichen Glückwunsch – du hast ihn gefunden! 🥕', hint: 'Es heißt, irgendwo hoppelt ein kleiner Jannik Hase herum... Aber niemand weiß genau, wo.', check: ctx => ctx.eggsFound.includes('jannik') },
       { id: 'egg_adfree', category: 'Easter Eggs', title: '???', revealName: 'Hab kein Geld', desc: 'Finde ein verstecktes Easter Egg.', revealDesc: '99 Dollar gespart. Bester Deal überhaupt.', hint: 'Werbung nervt echt manchmal, oder?', check: ctx => ctx.eggsFound.includes('adfree') },
-      { id: 'egg_all', category: 'Easter Eggs', title: 'Osterhase', desc: 'Finde alle 11 versteckten Easter Eggs.', progress: ctx => [ctx.eggsFound.length, 11], check: ctx => ctx.eggsFound.length >= 11 },
+      { id: 'egg_sheep', category: 'Easter Eggs', title: 'Zitate von unserem Schäfchen (???)', revealName: 'Schaf Zitate Flüsterer', desc: 'Finde ein verstecktes Easter Egg.', revealDesc: 'Jeden Tag werden wir bereichert damit!', hint: 'Jeden Tag werden wir bereichert damit!', check: ctx => ctx.eggsFound.includes('sheep') },
+      ...bkmpTieredAchievements('sheepstreak', 'Zeit & Treue', 'sheepStreak', BKMP_SHEEP_STREAK_TIERS, n => `Klicke ${n} Tag${n === 1 ? '' : 'e'} in Folge ab 12 Uhr auf unser Schaf für das Zitat des Tages.`),
+      { id: 'egg_all', category: 'Easter Eggs', title: 'Osterhase', desc: 'Finde alle 12 versteckten Easter Eggs.', progress: ctx => [ctx.eggsFound.length, 12], check: ctx => ctx.eggsFound.length >= 12 },
       { id: 'combo_card_wish', category: 'Sonstiges', title: 'Vielseitig', desc: 'Reiche mindestens 1 Karte und 1 Kartenidee ein.', check: ctx => ctx.cardCount >= 1 && ctx.wishCount >= 1 },
       { id: 'night_owl', category: 'Sonstiges', title: 'Nachteule', desc: 'Besuche die Seite zwischen 0 und 5 Uhr nachts.', check: ctx => ctx.nightOwl },
       { id: 'early_bird', category: 'Sonstiges', title: 'Frühaufsteher', desc: 'Besuche die Seite zwischen 5 und 7 Uhr morgens.', check: ctx => ctx.earlyBird },
@@ -5298,6 +5493,15 @@
       deleteAccountOverlay: () => {
         if (typeof deleteAccountStopCountdown === 'function') deleteAccountStopCountdown();
         document.getElementById('deleteAccountOverlay').classList.remove('visible');
+      },
+      /* Sorgt dafuer, dass ESC bei bkmpConfirmDialog() genauso wie der
+         Abbrechen-Button behandelt wird (Promise loest mit false auf,
+         Klick-Listener werden sauber entfernt) statt die "visible"-Klasse
+         einfach kommentarlos zu entfernen und das Promise ewig haengen zu
+         lassen. */
+      bkmpConfirmOverlay: () => {
+        const btn = document.getElementById('bkmpConfirmCancelBtn');
+        if (btn) btn.click();
       }
     };
     document.addEventListener('keydown', e => {

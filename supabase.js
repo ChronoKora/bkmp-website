@@ -3032,6 +3032,78 @@ async function upsertIdlePlayerState(state) {
   return true;
 }
 
+/* ---------------- Idle-Dorf: Runen ----------------
+   Ownership-Muster identisch zu upsertIdlePlayerState oben (auth_user_id
+   aus der aktiven Session, siehe supabase-idle-runes.sql) - jede Rune ist
+   eine eigene Zeile statt eines JSON-Blobs, deshalb hier echte
+   insert/update/delete-Helfer statt eines einzelnen Upserts. */
+async function loadPlayerRunes(name) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !name) return [];
+  const { data, error } = await client
+    .from('idle_player_runes')
+    .select('id, rune_type, rarity, rolled_value, equipped, upgrade_level, substats, created_at')
+    .eq('name_key', String(name).trim().toLowerCase());
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+}
+
+async function insertPlayerRunes(nameKey, runes) {
+  if (!Array.isArray(runes) || !runes.length) return [];
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return [];
+  const { data: sessionData } = await client.auth.getSession();
+  const userId = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
+  if (!userId) return [];
+  const payload = runes.map(r => ({
+    name_key: String(nameKey).trim().toLowerCase(),
+    auth_user_id: userId,
+    rune_type: r.rune_type,
+    rarity: r.rarity,
+    rolled_value: r.rolled_value,
+    equipped: !!r.equipped,
+    upgrade_level: r.upgrade_level || 0,
+    substats: Array.isArray(r.substats) ? r.substats : []
+  }));
+  const { data, error } = await client
+    .from('idle_player_runes')
+    .insert(payload)
+    .select('id, rune_type, rarity, rolled_value, equipped, upgrade_level, substats, created_at');
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+}
+
+async function updatePlayerRuneEquipped(runeId, equipped) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client || !runeId) return false;
+  const { error } = await client.from('idle_player_runes').update({ equipped: !!equipped }).eq('id', runeId);
+  if (error) throw error;
+  return true;
+}
+
+/* Generischer Patch fuer das +0..+15-Aufwertungssystem - schreibt
+   upgrade_level und/oder substats in einem Aufruf statt eigener Helfer je
+   Feld (identisches Muster zu updatePlayerRuneEquipped oben). */
+async function updatePlayerRuneUpgrade(runeId, upgradeLevel, substats) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client || !runeId) return false;
+  const { error } = await client.from('idle_player_runes').update({
+    upgrade_level: upgradeLevel,
+    substats: Array.isArray(substats) ? substats : []
+  }).eq('id', runeId);
+  if (error) throw error;
+  return true;
+}
+
+async function deletePlayerRunes(runeIds) {
+  if (!Array.isArray(runeIds) || !runeIds.length) return false;
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return false;
+  const { error } = await client.from('idle_player_runes').delete().in('id', runeIds);
+  if (error) throw error;
+  return true;
+}
+
 async function loadIdleLeaderboardStats() {
   const client = bkmpGetSupabaseClient();
   if (!client) return null;
@@ -3545,6 +3617,39 @@ async function loadSiteFlags() {
     .limit(1);
   if (error) throw error;
   return Array.isArray(data) && data[0] ? data[0] : null;
+}
+
+/* Bewusst NICHT Teil von loadSiteFlags(): die Wartungsmodus-Pruefung in
+   idledorf.js (bkmpIdleRefreshMaintenanceFlag) ist "fail closed" - schlaegt
+   die Abfrage fehl, gilt das Idle-Dorf als gesperrt. Wuerde sheep_speech_text
+   in derselben select()-Zeile mitlaufen, wuerde ein fehlendes/noch nicht per
+   SQL angelegtes Feld das gesamte Idle-Dorf lahmlegen, obwohl nur die
+   Schaf-Sprechblase betroffen waere. Eigene, unabhaengige Abfrage haelt
+   beide Faelle sauber getrennt. */
+async function loadSheepSpeechText() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('site_flags')
+    .select('sheep_speech_text')
+    .eq('id', true)
+    .limit(1);
+  if (error) throw error;
+  return Array.isArray(data) && data[0] ? data[0].sheep_speech_text : null;
+}
+
+async function setSheepSpeechText(text) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const patch = { sheep_speech_text: (text || '').trim().slice(0, 180), updated_at: new Date().toISOString() };
+  const { data, error } = await client
+    .from('site_flags')
+    .update(patch)
+    .eq('id', true)
+    .select('sheep_speech_text')
+    .limit(1);
+  if (error) throw error;
+  return Array.isArray(data) ? data[0] : null;
 }
 
 async function setIdleMaintenanceFlag(enabled, message) {

@@ -487,6 +487,29 @@ async function bkmpIdleLoadOrInitState(name) {
     console.warn('Idle Dorf: Event-Drachen-Status konnte nicht geladen werden (Migration evtl. noch nicht ausgefuehrt).', e);
     bkmpIdleEventDragonState = { shenloss_defeated: false, liber_defeated: false };
   }
+  /* Runen sind ein Bonus-System oben drauf, kein Kernfortschritt wie
+     bkmpIdleState/bkmpPrestigeState oben - ein Ladefehler blockiert das
+     Spiel deshalb bewusst NICHT, sondern startet einfach mit einem leeren
+     Runen-Lager (Migration evtl. noch nicht ausgefuehrt). */
+  bkmpIdlePlayerRunes = [];
+  bkmpIdlePendingRuneDrops = [];
+  try {
+    const remoteRunes = typeof loadPlayerRunes === 'function' ? await loadPlayerRunes(name) : [];
+    /* _cid: stabile CLIENT-seitige Kennung fuer UI-Referenzen (Ansehen/
+       Aufwerten/Ausruesten) - unabhaengig von .id, das bei frisch
+       gedroppten, noch nicht synchronisierten Runen zunaechst null ist
+       (siehe bkmpIdleMaybeDropRune). Bei geladenen Runen ist die echte DB-id
+       stabil, wird hier also 1:1 uebernommen. */
+    bkmpIdlePlayerRunes = Array.isArray(remoteRunes) ? remoteRunes.map(r => ({
+      ...r,
+      _cid: r.id,
+      upgrade_level: Number(r.upgrade_level || 0),
+      substats: Array.isArray(r.substats) ? r.substats : []
+    })) : [];
+  } catch (e) {
+    console.warn('Idle Dorf: Runen konnten nicht geladen werden (Migration evtl. noch nicht ausgefuehrt - siehe supabase-idle-runes.sql / supabase-idle-runes-v2.sql).', e);
+    bkmpIdlePlayerRunes = [];
+  }
 }
 
 function bkmpIdleEventDragonExcludedIds() {
@@ -507,7 +530,8 @@ function bkmpIdleRecomputeEffectiveStats() {
      Sammlung-Titeln. Kampfwerte nutzen "_flat" (feste Zahlen, addiert VOR dem
      Prozent-Multiplikator), Produktionsraten (Gold/Loot) bleiben "_pct". */
   const prestigeTotals = bkmpPrestigeEffectTotals(bkmpPrestigeState ? bkmpPrestigeState.prestige_allocations : null);
-  const t = key => (skillTotals[key] || 0) + (upgradeTotals[key] || 0) + (titleTotals[key] || 0) + (prestigeTotals[key] || 0);
+  const runeTotals = bkmpIdleRuneEffectTotals();
+  const t = key => (skillTotals[key] || 0) + (upgradeTotals[key] || 0) + (titleTotals[key] || 0) + (prestigeTotals[key] || 0) + (runeTotals[key] || 0);
   const prevMaxHp = bkmpIdleEffectiveStats ? bkmpIdleEffectiveStats.hp : null;
   const prevTickMs = bkmpIdleEffectiveStats ? bkmpIdleEffectiveStats.tickIntervalMs : null;
   /* extra_archer (Dorf) und ballista_unlock (Dorf) hatten vorher gar keinen
@@ -549,7 +573,11 @@ function bkmpIdleRecomputeEffectiveStats() {
     fireChancePct: Math.min(60, t('elem_fire')),
     iceChancePct: Math.min(60, t('elem_ice')),
     lightningChancePct: Math.min(60, t('elem_lightning')),
-    clickDamagePct: t('click_damage_pct')
+    clickDamagePct: t('click_damage_pct'),
+    /* Nur von der ausgeruesteten Glücksrune gespeist (siehe
+       BKMP_RUNE_SLOTS/bkmpIdleRuneEffectTotals) - erhoeht die Chance auf
+       seltenere Runen beim naechsten Drop, siehe bkmpIdleRollRuneRarity. */
+    runeLuckPct: t('rune_luck_pct')
   };
   if (bkmpIdleVillageHp === null || bkmpIdleVillageHp === undefined) {
     bkmpIdleVillageHp = bkmpIdleEffectiveStats.hp;
@@ -619,14 +647,21 @@ function bkmpIdleSkilltreeResetCooldownMsLeft() {
    kein permanenter Verlust, nur eine Umverteilungs-Moeglichkeit. Deshalb
    reicht 1x/Tag als Limit, nicht als harte Strafe gedacht, sondern damit
    nicht bei jedem Kampf hin- und hergeschaltet wird. */
-function bkmpIdleResetSkilltree() {
+async function bkmpIdleResetSkilltree() {
   if (!bkmpIdleState || bkmpIdleSkilltreeResetCooldownMsLeft() > 0) return;
-  if (!confirm('Skilltree wirklich zurücksetzen? Alle investierten Skillpunkte werden erstattet und können neu verteilt werden.')) return;
+  const confirmed = await bkmpConfirmDialog(
+    '🔄 Skilltree zurücksetzen?',
+    'Alle investierten Skillpunkte werden erstattet und können neu verteilt werden.',
+    'Zurücksetzen',
+    'Abbrechen'
+  );
+  if (!confirmed) return;
   bkmpIdleState.skill_points_available = Number(bkmpIdleState.skill_points_available || 0) + Number(bkmpIdleState.skill_points_spent || 0);
   bkmpIdleState.skill_points_spent = 0;
   bkmpIdleState.skill_allocations = {};
   bkmpIdleState.last_skilltree_reset_at = new Date().toISOString();
   bkmpIdleRecomputeEffectiveStats();
+  bkmpIdleSkillBranchOpenState = null; // nach Reset frisch entscheiden, welcher Zweig aufklappt
   bkmpIdleRenderSkilltreePanel();
   bkmpIdleRenderHud();
   bkmpIdleQueueSync();
@@ -817,6 +852,7 @@ function bkmpIdleHandleDragonDefeated() {
   bkmpIdleState.essence += rewards.essence;
   bkmpIdleState.dragon_kills += 1;
   if (bkmpIdleCurrentDragon.isBoss) bkmpIdleState.boss_kills += 1;
+  bkmpIdleMaybeDropRune(bkmpIdleCurrentDragon.isBoss ? 'boss' : 'normal');
   const autoAdvance = bkmpIdleState.auto_advance !== false;
   if (autoAdvance) bkmpIdleState.current_dragon_index += 1;
   bkmpIdleState.highest_dragon_index = Math.max(Number(bkmpIdleState.highest_dragon_index || 0), bkmpIdleState.current_dragon_index);
@@ -1079,9 +1115,14 @@ function bkmpIdleRenderHud() {
   const xpPct = Math.max(0, Math.min(100, (bkmpIdleState.xp / xpNeeded) * 100));
   const s = bkmpIdleEffectiveStats;
   hud.innerHTML = `
-    <div class="idle-hud-level">Level ${bkmpIdleState.level} <span class="idle-hud-skillpoints">🔹 ${bkmpIdleState.skill_points_available} Skillpunkte</span></div>
-    <div class="idle-xp-bar"><div class="idle-xp-fill" style="width:${xpPct}%"></div></div>
-    <div class="idle-xp-label">${Math.floor(bkmpIdleState.xp)} / ${xpNeeded} XP</div>
+    <div class="idle-hud-top">
+      <div class="idle-hud-level-badge"><span class="idle-hud-level-num">${bkmpIdleState.level}</span><span class="idle-hud-level-tag">Level</span></div>
+      <div class="idle-hud-xp-wrap">
+        <div class="idle-hud-skillpoints">🔹 ${bkmpIdleState.skill_points_available} Skillpunkte</div>
+        <div class="idle-xp-bar"><div class="idle-xp-fill" style="width:${xpPct}%"></div></div>
+        <div class="idle-xp-label">${Math.floor(bkmpIdleState.xp)} / ${xpNeeded} XP</div>
+      </div>
+    </div>
     ${s ? `
     <div class="idle-hud-stats">
       <span title="Angriff">⚔️ ${bkmpIdleFormatNumber(Math.round(s.attack))}</span>
@@ -1089,6 +1130,7 @@ function bkmpIdleRenderHud() {
       <span title="Maximale Leben">❤️ ${bkmpIdleFormatNumber(Math.round(s.hp))}</span>
       <span title="Kritische-Treffer-Chance">🎯 ${s.critChance.toFixed(1)}%</span>
       <span title="Kritischer Schaden">💥 ${Math.round(s.critDamage)}%</span>
+      <span title="Angriffstempo (Angriffe pro Sekunde)">⚡ ${(1000 / (s.tickIntervalMs || 900)).toFixed(2)}/s</span>
     </div>` : ''}
     <div class="idle-hud-resources">
       <span>💰 ${bkmpIdleFormatNumber(bkmpIdleState.gold)}</span>
@@ -1353,11 +1395,41 @@ function bkmpIdleDrawSkillTreeLines(treeEl) {
   });
 }
 
+/* Welche Zweige gerade aufgeklappt sind - persistiert ueber wiederholte
+   Render-Aufrufe hinweg (nach jedem +1-Klick und nach Reset wird die ganze
+   Panel-HTML neu gebaut), damit ein einmal manuell geoeffneter/geschlossener
+   Zweig nicht bei der naechsten Punktevergabe wieder zuklappt. null = noch
+   nie initialisiert -> beim allerersten Rendern wird automatisch der erste
+   Zweig mit sofort ausgebbaren Punkten aufgeklappt (das war genau das
+   gemeldete Problem: Punkte in weiter unten liegenden Zweigen wurden bei
+   der alten, immer volltaendig ausgeklappten Ansicht leicht uebersehen). */
+let bkmpIdleSkillBranchOpenState = null;
+
 function bkmpIdleRenderSkilltreePanel() {
   const panel = document.getElementById('idlePanelSkilltree');
   if (!panel || !bkmpIdleState) return;
   if (!bkmpIdleSkillDefs.length) { panel.innerHTML = '<p class="empty-hint">Skilltree wird bald verfügbar sein.</p>'; return; }
   const alloc = bkmpIdleState.skill_allocations || {};
+
+  const branches = BKMP_IDLE_BRANCH_ORDER.map(branch => {
+    const nodes = bkmpIdleSkillDefs.filter(n => n.branch === branch).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+    if (!nodes.length) return null;
+    const withDepth = nodes.map(node => ({ node, depth: bkmpIdleSkillNodeDepth(node, nodes) }));
+    const maxDepth = Math.max(0, ...withDepth.map(n => n.depth));
+    const rows = [];
+    for (let d = 0; d <= maxDepth; d++) rows.push(withDepth.filter(n => n.depth === d).map(n => n.node));
+    const investedRanks = nodes.reduce((sum, n) => sum + Number(alloc[n.id] || 0), 0);
+    const maxRanks = nodes.reduce((sum, n) => sum + Number(n.max_rank || 0), 0);
+    const hasAllocatable = nodes.some(n => bkmpIdleCanAllocateSkill(n));
+    return { branch, nodes, rows, investedRanks, maxRanks, hasAllocatable };
+  }).filter(Boolean);
+
+  if (!bkmpIdleSkillBranchOpenState) {
+    bkmpIdleSkillBranchOpenState = {};
+    const autoOpen = branches.find(b => b.hasAllocatable) || branches[0];
+    if (autoOpen) bkmpIdleSkillBranchOpenState[autoOpen.branch] = true;
+  }
+
   panel.innerHTML = `
     <div class="idle-skillpoints-row">
       <p class="idle-skillpoints-hint">Verfügbare Skillpunkte: <strong>${bkmpIdleState.skill_points_available}</strong></p>
@@ -1373,43 +1445,64 @@ function bkmpIdleRenderSkilltreePanel() {
         return `<button type="button" class="btn-nein idle-skilltree-reset-btn" id="idleSkilltreeResetBtn">🔄 Zurücksetzen</button>`;
       })()}
     </div>
-    ${BKMP_IDLE_BRANCH_ORDER.map(branch => {
-      const nodes = bkmpIdleSkillDefs.filter(n => n.branch === branch).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-      if (!nodes.length) return '';
-      const withDepth = nodes.map(node => ({ node, depth: bkmpIdleSkillNodeDepth(node, nodes) }));
-      const maxDepth = Math.max(0, ...withDepth.map(n => n.depth));
-      const rows = [];
-      for (let d = 0; d <= maxDepth; d++) rows.push(withDepth.filter(n => n.depth === d).map(n => n.node));
-
-      return `<div class="idle-skill-branch">
-        <div class="idle-skill-branch-title">${BKMP_IDLE_BRANCH_LABELS[branch] || branch}</div>
-        <div class="idle-skilltree-tree">
-          <svg class="idle-skilltree-lines"></svg>
-          ${rows.map(rowNodes => `
-            <div class="idle-skilltree-row">
-              ${rowNodes.map(node => {
-                const rank = Number(alloc[node.id] || 0);
-                const canAllocate = bkmpIdleCanAllocateSkill(node);
-                const maxed = rank >= node.max_rank;
-                const parentNode = node.requires_node_id ? nodes.find(n => n.id === node.requires_node_id) : null;
-                return `
-                  <div class="idle-skill-node ${rank > 0 ? 'ranked' : ''} ${maxed ? 'maxed' : ''} ${canAllocate && rank === 0 ? 'can-allocate' : ''} ${!node.requires_node_id ? 'is-root' : ''}" data-node-id="${node.id}" ${node.requires_node_id ? `data-requires-node-id="${node.requires_node_id}"` : ''}>
-                    <div class="idle-skill-node-icon">${node.icon || '✨'}</div>
-                    <div class="idle-skill-node-name">${escapeHtml(node.name)}</div>
-                    <div class="idle-skill-node-desc">${escapeHtml(node.description || '')}</div>
-                    ${parentNode ? `<div class="idle-skill-node-requires">Braucht ${escapeHtml(parentNode.name)} Rang ${node.requires_rank}</div>` : ''}
-                    <div class="idle-skill-node-rank">Rang ${rank}/${node.max_rank}</div>
-                    <button type="button" class="btn-ja idle-skill-node-btn" data-node-id="${node.id}" ${!canAllocate ? 'disabled' : ''}>
-                      ${maxed ? 'Max' : `+1 (${node.cost_per_rank} 🔹)`}
-                    </button>
-                  </div>`;
-              }).join('')}
-            </div>`).join('')}
+    ${branches.map(({ branch, nodes, rows, investedRanks, maxRanks, hasAllocatable }) => {
+      const isOpen = !!bkmpIdleSkillBranchOpenState[branch];
+      return `<div class="idle-skill-branch ${isOpen ? 'expanded' : ''} ${hasAllocatable ? 'has-available' : ''}">
+        <button type="button" class="idle-skill-branch-header" data-branch-toggle="${branch}" aria-expanded="${isOpen}">
+          <span class="idle-skill-branch-name">${BKMP_IDLE_BRANCH_LABELS[branch] || branch}</span>
+          <span class="idle-skill-branch-progress">${investedRanks}/${maxRanks} Ränge</span>
+          ${hasAllocatable ? '<span class="idle-skill-branch-pulse" title="Hier kannst du gerade einen Punkt ausgeben!"></span>' : ''}
+          <span class="idle-skill-branch-chevron">▾</span>
+        </button>
+        <div class="idle-skill-branch-collapse">
+          <div class="idle-skill-branch-collapse-inner">
+            <div class="idle-skilltree-tree">
+              <svg class="idle-skilltree-lines"></svg>
+              ${rows.map(rowNodes => `
+                <div class="idle-skilltree-row">
+                  ${rowNodes.map(node => {
+                    const rank = Number(alloc[node.id] || 0);
+                    const canAllocate = bkmpIdleCanAllocateSkill(node);
+                    const maxed = rank >= node.max_rank;
+                    const parentNode = node.requires_node_id ? nodes.find(n => n.id === node.requires_node_id) : null;
+                    return `
+                      <div class="idle-skill-node ${rank > 0 ? 'ranked' : ''} ${maxed ? 'maxed' : ''} ${canAllocate && rank === 0 ? 'can-allocate' : ''} ${!node.requires_node_id ? 'is-root' : ''}" data-node-id="${node.id}" ${node.requires_node_id ? `data-requires-node-id="${node.requires_node_id}"` : ''}>
+                        <div class="idle-skill-node-icon">${node.icon || '✨'}</div>
+                        <div class="idle-skill-node-name">${escapeHtml(node.name)}</div>
+                        <div class="idle-skill-node-desc">${escapeHtml(node.description || '')}</div>
+                        ${parentNode ? `<div class="idle-skill-node-requires">Braucht ${escapeHtml(parentNode.name)} Rang ${node.requires_rank}</div>` : ''}
+                        <div class="idle-skill-node-rank">Rang ${rank}/${node.max_rank}</div>
+                        <button type="button" class="btn-ja idle-skill-node-btn" data-node-id="${node.id}" ${!canAllocate ? 'disabled' : ''}>
+                          ${maxed ? 'Max' : `+1 (${node.cost_per_rank} 🔹)`}
+                        </button>
+                      </div>`;
+                  }).join('')}
+                </div>`).join('')}
+            </div>
+          </div>
         </div>
       </div>`;
     }).join('')}`;
   panel.querySelectorAll('.idle-skill-node-btn').forEach(btn => btn.addEventListener('click', () => bkmpIdleAllocateSkill(btn.dataset.nodeId)));
-  panel.querySelectorAll('.idle-skilltree-tree').forEach(treeEl => bkmpIdleDrawSkillTreeLines(treeEl));
+  /* Verbindungslinien nur fuer bereits aufgeklappte Zweige zeichnen - bei
+     collapsed (grid-template-rows:0fr) liefert getBoundingClientRect()
+     ueberall (0,0), das Nachzeichnen passiert stattdessen im Toggle-Handler
+     unten, sobald ein Zweig tatsaechlich geoeffnet wird. */
+  panel.querySelectorAll('.idle-skill-branch.expanded .idle-skilltree-tree').forEach(treeEl => bkmpIdleDrawSkillTreeLines(treeEl));
+  panel.querySelectorAll('.idle-skill-branch-header').forEach(header => header.addEventListener('click', () => {
+    const branch = header.dataset.branchToggle;
+    const branchEl = header.closest('.idle-skill-branch');
+    const nowOpen = !branchEl.classList.contains('expanded');
+    bkmpIdleSkillBranchOpenState[branch] = nowOpen;
+    branchEl.classList.toggle('expanded', nowOpen);
+    header.setAttribute('aria-expanded', String(nowOpen));
+    if (nowOpen) {
+      const treeEl = branchEl.querySelector('.idle-skilltree-tree');
+      /* Erst nach der CSS-Aufklapp-Transition zeichnen, sonst hat der
+         Baum beim Messen noch die Hoehe 0 (Grid-Zeile startet bei 0fr). */
+      setTimeout(() => bkmpIdleDrawSkillTreeLines(treeEl), 360);
+    }
+  }));
   const resetBtn = document.getElementById('idleSkilltreeResetBtn');
   if (resetBtn) resetBtn.addEventListener('click', bkmpIdleResetSkilltree);
   const helpBtn = document.getElementById('idleSkilltreeHelpBtn');
@@ -1430,12 +1523,14 @@ function bkmpIdleSkillEffectAtMaxLabel(node) {
     case 'attack_pct': case 'attack_speed_pct': case 'crit_chance_pct': case 'crit_chance_flat':
     case 'crit_damage_pct': case 'crit_damage_flat': case 'hp_pct': case 'defense_pct':
     case 'gold_prod_pct': case 'gold_find_pct': case 'xp_pct': case 'loot_chance_pct':
-    case 'wood_prod_pct': case 'stone_prod_pct': case 'offline_income_pct': case 'click_damage_pct': {
+    case 'wood_prod_pct': case 'stone_prod_pct': case 'offline_income_pct': case 'click_damage_pct':
+    case 'rune_luck_pct': {
       const labels = {
         attack_pct: 'Angriff', attack_speed_pct: 'Tempo', crit_chance_pct: 'Krit-Chance', crit_chance_flat: 'Krit-Chance',
         crit_damage_pct: 'Krit-Schaden', crit_damage_flat: 'Krit-Schaden', hp_pct: 'Leben', defense_pct: 'Verteidigung',
         gold_prod_pct: 'Gold', gold_find_pct: 'Gold', xp_pct: 'XP', loot_chance_pct: 'Lootchance',
-        wood_prod_pct: 'Holz', stone_prod_pct: 'Stein', offline_income_pct: 'Offline-Effizienz', click_damage_pct: 'Klick-Schaden'
+        wood_prod_pct: 'Holz', stone_prod_pct: 'Stein', offline_income_pct: 'Offline-Effizienz', click_damage_pct: 'Klick-Schaden',
+        rune_luck_pct: 'Runenglück'
       };
       return `bei Max: +${fmt(total)}% ${labels[node.effect_type]}`;
     }
@@ -1811,10 +1906,13 @@ async function bkmpIdlePerformPrestige() {
   const stage = Number(bkmpIdleState.highest_dragon_index || 0);
   const bonusPct = bkmpPrestigeState ? (bkmpPrestigeEffectTotals(bkmpPrestigeState.prestige_allocations).prestige_point_bonus_pct || 0) : 0;
   const pointsGained = Math.max(1, Math.round(bkmpPrestigePointsForStage(stage) * (1 + bonusPct / 100)));
-  const confirmed = window.confirm(
-    `Jetzt aufsteigen? Level, Gold, Rohstoffe, Skilltree, Upgrades und deine aktuelle Stufen-Position werden zurückgesetzt.\n\n` +
+  const confirmed = await bkmpConfirmDialog(
+    '🌌 Jetzt aufsteigen?',
+    `Level, Gold, Rohstoffe, Skilltree, Upgrades und deine aktuelle Stufen-Position werden zurückgesetzt.\n\n` +
     `Du erhältst dafür ${pointsGained} Prestige-Punkte (dauerhaft, für den permanenten Bonusbaum) ` +
-    `und einen dauerhaften +5%-Bonus auf Angriff/Leben/Gold/XP.\n\nErfolge, Titel, Kosmetiken, deine Gesamtzahl besiegter Drachen/Bosse und deine insgesamt erreichten Stufen bleiben erhalten.`
+    `und einen dauerhaften +5%-Bonus auf Angriff/Leben/Gold/XP.\n\nErfolge, Titel, Kosmetiken, deine Runen-Sammlung (inkl. Stufen/Sub-Stats), deine Gesamtzahl besiegter Drachen/Bosse und deine insgesamt erreichten Stufen bleiben erhalten.`,
+    'Jetzt aufsteigen',
+    'Abbrechen'
   );
   if (!confirmed) return;
 
@@ -1844,6 +1942,12 @@ async function bkmpIdlePerformPrestige() {
     bkmpIdleState.current_dragon_index = 0;
     bkmpIdleState.highest_dragon_index = 0;
     bkmpIdleState.auto_advance = true;
+    /* bkmpIdlePlayerRunes wird hier bewusst NICHT angefasst - Runen bleiben
+       ueber Prestige hinweg erhalten, genau wie Erfolge/Titel/Kosmetiken.
+       Entscheidung (14.07., auf explizite Nutzerfrage hin): eine muehsam
+       erspielte/aufgewertete Rune bei jedem Aufstieg zu verlieren waere reine
+       Frustration ohne spielerischen Mehrwert - der Prestige-Reiz kommt schon
+       aus dem Punkte-/Bonusbaum-System, nicht aus einem "alles auf Null". */
 
     if (!bkmpPrestigeState) bkmpPrestigeState = { name_key: bkmpIdleState.name_key, display_name: bkmpIdleState.display_name, prestige_level: 0, prestige_points: 0, prestige_points_spent: 0, prestige_allocations: {} };
     bkmpPrestigeState.prestige_level = Number(bkmpPrestigeState.prestige_level || 0) + 1;
@@ -1940,32 +2044,44 @@ function bkmpIdleRenderPrestigePanel() {
   panel.querySelectorAll('.idle-prestige-buy').forEach(btn => btn.addEventListener('click', () => bkmpPrestigeBuyUpgrade(btn.dataset.prestigeId)));
 }
 
-/* ---------------- Runen (in Vorbereitung) ----------------
-   Noch kein Backend/Datenmodell - reine Design-Vorschau, damit das
-   Grundlayout schon jetzt begutachtet werden kann. Farmen (Weltboss/Bosse,
-   geringe Chance) und echte, nach Seltenheit gestaffelte Werte kommen
-   erst spaeter; die hier gezeigten Zahlen sind ausdruecklich nur
-   Beispielwerte fuers Layout, kein echtes Balancing. */
+/* ---------------- Runen ----------------
+   Echtes Drop-/Ausruestungs-/Verschmelzungs-System (loest die vorherige
+   reine Design-Vorschau ab, siehe supabase-idle-runes.sql). Jede Rune ist
+   eine einzelne, individuell gewuerfelte Zeile in idle_player_runes -
+   Spieler sammeln beliebig viele, ruesten pro Slot (=Rune-Typ) maximal
+   eine aus und koennen 3 unausgeruestete gleicher Slot+Seltenheit zu einer
+   der naechsten Seltenheitsstufe verschmelzen.
+
+   Die 6 Slots und 5 Seltenheitsstufen (inkl. Farben/Bild-Dateinamen unter
+   assets/runes/) waren schon vor diesem Umbau als reine Optik-Vorschau
+   angelegt - hier nur mit echter Bedeutung (Kampfwert-Typ) versehen und
+   ans echte Drop-/Ausruestungs-System angeschlossen, damit alle bereits
+   vorbereiteten Bilder unveraendert weiterverwendet werden. */
+/* Cache-Bust fuer die Runen-Bilder selbst (bisher OHNE ?v= verlinkt) -
+   noetig, weil alle 30 Bilder am 14.07. nachtraeglich von "loechrigem"
+   Alpha-Kanal (kaputt wirkende Transparenz-Speckles im Metallrahmen,
+   Spieler-Meldung) bereinigt wurden; ohne Versionsnummer haetten Browser
+   mit bereits geladenem Cache weiter die alten, fehlerhaften Bilder
+   gezeigt. */
+const BKMP_RUNE_IMG_V = '20260714-alphafix1';
 window.BKMP_RUNE_SLOTS = [
-  { id: 'slot1', name: 'Rune I' },
-  { id: 'slot2', name: 'Rune II' },
-  { id: 'slot3', name: 'Rune III' },
-  { id: 'slot4', name: 'Rune IV' },
-  { id: 'slot5', name: 'Rune V' },
-  { id: 'slot6', name: 'Rune VI' }
+  { id: 'slot1', name: 'Kraftrune', icon: '⚔️', stat: 'attack_pct', desc: 'Angriff' },
+  { id: 'slot2', name: 'Schildrune', icon: '🛡️', stat: 'defense_pct', desc: 'Verteidigung' },
+  { id: 'slot3', name: 'Herzrune', icon: '❤️', stat: 'hp_pct', desc: 'Leben' },
+  { id: 'slot4', name: 'Zielrune', icon: '🎯', stat: 'crit_chance_pct', desc: 'Krit.-Chance' },
+  { id: 'slot5', name: 'Wuchtrune', icon: '💥', stat: 'crit_damage_pct', desc: 'Krit.-Schaden' },
+  { id: 'slot6', name: 'Glücksrune', icon: '🍀', stat: 'rune_luck_pct', desc: 'Runen-Fund-Chance' }
 ];
 window.BKMP_RUNE_RARITIES = [
-  { id: 'gray', name: 'Gewöhnlich', color: '#9ca3af', mult: 1 },
-  { id: 'green', name: 'Ungewöhnlich', color: '#4ade80', mult: 1.6 },
-  { id: 'blue', name: 'Selten', color: '#38bdf8', mult: 2.4 },
-  { id: 'purple', name: 'Episch', color: '#a78bfa', mult: 3.4 },
-  { id: 'gold', name: 'Legendär', color: '#facc15', mult: 5 }
+  { id: 'gray', name: 'Gewöhnlich', color: '#9ca3af', mult: 1, sellGold: 15 },
+  { id: 'green', name: 'Ungewöhnlich', color: '#4ade80', mult: 1.6, sellGold: 24 },
+  { id: 'blue', name: 'Selten', color: '#38bdf8', mult: 2.4, sellGold: 36 },
+  { id: 'purple', name: 'Episch', color: '#a78bfa', mult: 3.4, sellGold: 51 },
+  { id: 'gold', name: 'Legendär', color: '#facc15', mult: 5, sellGold: 75 }
 ];
 
-/* Prozent-Positionen der 6 Hex-Rahmen auf circle-empty.png (1254x1254),
-   im Uhrzeigersinn ab oben zugeordnet - rein optisch, hat noch keine
-   Verbindung zu echten Slot-Eigenschaften (die gibt es erst mit dem
-   spaeteren Backend/Balancing). */
+/* Prozent-Positionen der 6 Hex-Rahmen auf circle-empty.png/circle-full.png
+   (1254x1254), im Uhrzeigersinn ab oben - rein optisch. */
 const BKMP_RUNE_SLOT_POSITIONS = {
   slot1: { top: '15.85%', left: '50%', width: '18.6%', height: '22.1%' },
   slot2: { top: '33.25%', left: '80.05%', width: '16.5%', height: '22.1%' },
@@ -1975,108 +2091,615 @@ const BKMP_RUNE_SLOT_POSITIONS = {
   slot6: { top: '33.35%', left: '19.85%', width: '17.3%', height: '20.6%' }
 };
 
-/* Rein clientseitige Design-Vorschau des Einsetzen/Rausnehmen-Mechanismus
-   - es gibt noch keine echten, per Drop erspielten Runen, deshalb einfach
-   in localStorage statt einer echten idle_player_runes-Tabelle. Wird durch
-   das spaetere Backend ersetzt, sobald Farmen wirklich moeglich ist. */
-const BKMP_RUNE_EQUIP_KEY = 'bkmp-rune-equipped-preview';
-function bkmpRuneGetEquipped() {
-  try { const v = JSON.parse(localStorage.getItem(BKMP_RUNE_EQUIP_KEY) || '{}'); return v && typeof v === 'object' ? v : {}; } catch (e) { return {}; }
+/* Wert-Spannen je Stat-Schluessel + Seltenheit, zentriert um den frueheren
+   "Beispielwert" (2 * rarity.mult) aus der Design-Vorschau, damit die vorher
+   schon gezeigten Zahlen ungefaehr stimmen bleiben. Krit-Chance nutzt
+   deutlich kleinere Zahlen (Prozentpunkte auf einer 0-75-Skala, kein
+   Multiplikator wie bei den anderen 5 Stats). Nach Stat-Schluessel statt nur
+   Slot-Id, weil ab jetzt auch Sub-Stats (bkmpIdleRollSubstatValue) aus
+   diesem Topf gewuerfelt werden - ein Sub-Stat kann jeden der 6 Werte
+   tragen, nicht nur den "eigenen" des jeweiligen Slots. */
+const BKMP_RUNE_STAT_BASE = {
+  attack_pct: 2, defense_pct: 2, hp_pct: 2, crit_chance_pct: 0.5, crit_damage_pct: 2, rune_luck_pct: 2,
+  attack_flat: 5.714, defense_flat: 5.714, hp_flat: 14.286, attack_speed_pct: 2
+};
+/* Abweichende Variance-Spanne je Stat statt der generischen 0,8-1,2x fuer
+   alle - auf Nutzerwunsch (15.07., "Ruhig Legendär Angriff/Verteidigung
+   zwischen 7-10 und Leben zwischen 15-35") extra breit fuer hp_flat, damit
+   der Sub-Stat-Wert bei Legendaer wirklich zwischen 15 und 35 landen kann
+   statt nur 7-10 wie vorher. Nicht gelistete Stats nutzen weiterhin die
+   Standard-Spanne (siehe bkmpIdleRuneStatRange). */
+const BKMP_RUNE_STAT_VARIANCE = {
+  attack_flat: [0.7, 1.0], defense_flat: [0.7, 1.0], hp_flat: [0.6, 1.4]
+};
+/* Fest-Wert-Varianten (attack_flat/defense_flat/hp_flat) sind dieselben
+   Schluessel, die Skilltree/Upgrades/Titel schon nutzen (siehe z.B.
+   "Ballisten"-Skillknoten) - koennen jetzt auch als Rune-Sub-Stat kommen.
+   Auf Nutzerwunsch bewusst NIEDRIGER gewichtet als die %-Varianten (siehe
+   BKMP_RUNE_SUBSTAT_WEIGHTS) und ohne Ausnahme fuer hohe Seltenheiten - "es
+   muss auch mit Pech scheiss Runen rauskommen", auch bei Legendaer.
+   attack_speed_pct (Angriffstempo) ist ebenfalls ein bereits bestehender,
+   generisch verdrahteter Skilltree-Schluessel (verkuerzt tickIntervalMs in
+   bkmpIdleRecomputeEffectiveStats) - auf Nutzerwunsch ab sofort auch als
+   Rune-Sub-Stat moeglich. */
+const BKMP_RUNE_SUBSTAT_WEIGHTS = {
+  attack_pct: 16, defense_pct: 16, hp_pct: 16, crit_chance_pct: 12, crit_damage_pct: 12, rune_luck_pct: 10,
+  attack_speed_pct: 12, attack_flat: 6, defense_flat: 6, hp_flat: 6
+};
+const BKMP_RUNE_EXTRA_STAT_META = {
+  attack_flat: { icon: '⚔️', desc: 'Angriff (fest)' },
+  defense_flat: { icon: '🛡️', desc: 'Verteidigung (fest)' },
+  hp_flat: { icon: '❤️', desc: 'Leben (fest)' },
+  attack_speed_pct: { icon: '⚡', desc: 'Angriffstempo' }
+};
+/* Liefert Icon/Beschreibung fuer JEDEN moeglichen Sub-Stat-Schluessel - bei
+   den 6 "Haupt"-Stats identisch zum jeweiligen Slot (Kraftrune usw.), sonst
+   aus der eigenen kleinen Tabelle, weil die zu keinem Slot als Hauptwert
+   gehoeren. */
+function bkmpRuneStatMeta(statKey) {
+  const slot = window.BKMP_RUNE_SLOTS.find(s => s.stat === statKey);
+  if (slot) return { icon: slot.icon, desc: slot.desc };
+  return BKMP_RUNE_EXTRA_STAT_META[statKey] || { icon: '✦', desc: statKey };
 }
-function bkmpRuneSaveEquipped(state) {
-  try { localStorage.setItem(BKMP_RUNE_EQUIP_KEY, JSON.stringify(state)); } catch (e) {}
+function bkmpRunePickWeightedStat(candidates) {
+  const total = candidates.reduce((sum, st) => sum + (BKMP_RUNE_SUBSTAT_WEIGHTS[st] || 1), 0);
+  let roll = Math.random() * total;
+  for (const st of candidates) {
+    roll -= (BKMP_RUNE_SUBSTAT_WEIGHTS[st] || 1);
+    if (roll <= 0) return st;
+  }
+  return candidates[candidates.length - 1];
+}
+function bkmpIdleRuneStatRange(statKey, rarityId) {
+  const rarity = window.BKMP_RUNE_RARITIES.find(r => r.id === rarityId);
+  if (!rarity) return [0, 0];
+  const base = BKMP_RUNE_STAT_BASE[statKey] ?? 2;
+  const center = base * rarity.mult;
+  const [vLo, vHi] = BKMP_RUNE_STAT_VARIANCE[statKey] || [0.8, 1.2];
+  return [Math.round(center * vLo * 100) / 100, Math.round(center * vHi * 100) / 100];
+}
+function bkmpIdleRuneValueRange(slotId, rarityId) {
+  const slot = window.BKMP_RUNE_SLOTS.find(s => s.id === slotId);
+  return bkmpIdleRuneStatRange(slot ? slot.stat : null, rarityId);
 }
 
+/* Drop-Gewichtung je Quelle (normaler Kill / Boss-Kill alle 25 Kaempfe) -
+   je hoeher die Stufe/der Gegner, desto besser die Chance auf Seltenes.
+   Glueck (ausgeruestete Glücksrune) verschiebt das Gewicht zusaetzlich
+   weg von "Gewöhnlich" hin zu den selteneren Stufen.
+
+   WICHTIG (Nachbesserung): die Gewichte allein reichten NICHT, um seltene
+   Runen wirklich selten zu MACHEN - selbst mit nur 0,2% Gewicht war ein
+   Legendaer-Drop bereits in den ersten paar Kaempfen theoretisch moeglich
+   (unabhaengig gewuerfelt bei JEDEM Kill, "das Los kennt keine Vorgeschichte"),
+   was sich in der Praxis genau so gezeigt hat (Legendaer-Rune bei Stufe
+   0-9). Deshalb zusaetzlich eine harte Mindeststufe pro Raritaet: unterhalb
+   davon ist diese Raritaet komplett ausgeschlossen (Gewicht 0), nicht nur
+   unwahrscheinlich. Verschmelzen (bkmpRuneFuse) ist davon bewusst NICHT
+   betroffen - wer sich 3 Epische erspielt/ertauscht hat, darf sie jederzeit
+   zu Legendaer verschmelzen, das ist ja schon die Muehe wert gewesen. */
+/* NACHBESSERUNG (15.07.): Boss-Drops waren bisher garantiert (100%) - auf
+   Nutzerwunsch bewusst zurueckgenommen, Runen sollen insgesamt selten
+   bleiben. Bosse (alle 25 Kaempfe) sind jetzt nur noch 2 Prozentpunkte
+   wahrscheinlicher als ein normaler Kill, keine Garantie mehr. */
+const BKMP_RUNE_DROP_CHANCE = { normal: 0.10, boss: 0.12 };
+const BKMP_RUNE_DROP_WEIGHTS = {
+  normal: [65, 25, 8, 1.8, 0.2],
+  boss: [30, 35, 25, 8, 2]
+};
+const BKMP_RUNE_RARITY_MIN_STAGE = { gray: 0, green: 5, blue: 15, purple: 35, gold: 75 };
+/* NACHBESSERUNG (14.07., "Aber Stufe 75 ist nichts?"): die Gating-Stufe kam
+   bisher aus highest_dragon_index - das wird bei JEDEM Prestige-Aufstieg
+   auf 0 zurueckgesetzt (siehe bkmpIdlePerformPrestige), waehrend
+   prestige_stage_offset die vor dem Aufstieg erreichte Hoechststufe dauerhaft
+   aufsummiert. Ergebnis: jeder Spieler, der schon einmal aufgestiegen ist,
+   galt fuer's Runen-Gating faelschlich wieder als "Stufe 0", egal wie weit
+   er vorher gekommen war - deshalb wirkte "Stufe 75" wie eine Wand, die nie
+   erreichbar war. Fix: bkmpIdleLifetimeStageCount() (== prestige_stage_offset
+   + highest_dragon_index) ist die tatsaechliche Lebenszeit-Bestleistung und
+   sinkt nie, auch nicht durch Prestige. */
+function bkmpIdleRollRuneRarity(source, luckPct) {
+  const weights = BKMP_RUNE_DROP_WEIGHTS[source] || BKMP_RUNE_DROP_WEIGHTS.normal;
+  const stage = bkmpIdleLifetimeStageCount();
+  const luckFactor = 1 + Math.max(0, Number(luckPct) || 0) / 100;
+  const adjusted = window.BKMP_RUNE_RARITIES.map((rarity, i) => {
+    if (stage < (BKMP_RUNE_RARITY_MIN_STAGE[rarity.id] || 0)) return 0;
+    const w = weights[i];
+    return i === 0 ? w : w * luckFactor;
+  });
+  const total = adjusted.reduce((a, b) => a + b, 0);
+  if (total <= 0) return window.BKMP_RUNE_RARITIES[0].id;
+  let roll = Math.random() * total;
+  for (let i = 0; i < adjusted.length; i++) {
+    roll -= adjusted[i];
+    if (roll <= 0) return window.BKMP_RUNE_RARITIES[i].id;
+  }
+  return window.BKMP_RUNE_RARITIES[0].id;
+}
+function bkmpIdleRollRuneValue(slotId, rarityId) {
+  const [lo, hi] = bkmpIdleRuneValueRange(slotId, rarityId);
+  return Math.round((lo + Math.random() * (hi - lo)) * 100) / 100;
+}
+/* Sub-Stats sind bewusst schwaecher als der Hauptwert derselben Seltenheit
+   (35% davon) - genau wie in Summoners War: Sky Arena ein Sub-Stat nie so
+   stark ist wie ein frischer Hauptwert gleicher Stufe, sondern ihn nur
+   ergaenzt. */
+function bkmpIdleRollSubstatValue(statKey, rarityId) {
+  const [lo, hi] = bkmpIdleRuneStatRange(statKey, rarityId);
+  const raw = (lo + Math.random() * (hi - lo)) * 0.35;
+  /* Fest-Werte als ganze Zahl (mind. 1) statt Nachkommastellen - "+1,4
+     Angriff (fest)" waere fuer einen Fest-Wert unueblich/unschoen. */
+  return statKey.endsWith('_flat') ? Math.max(1, Math.round(raw)) : Math.round(raw * 100) / 100;
+}
+
+/* Rollt die Sub-Stats, mit denen eine Rune SOFORT droppt/verschmilzt -
+   Anzahl nach Seltenheit (BKMP_RUNE_MAX_SUBSTATS), Typen gewichtet-zufaellig
+   aus BKMP_RUNE_SUBSTAT_WEIGHTS, nie doppelt und nie identisch zum
+   Hauptstat der Rune. Wird von bkmpIdleMaybeDropRune UND bkmpRuneFuse
+   genutzt (Verschmelzen liefert seit der Nachbesserung ebenfalls direkt
+   Sub-Stats passend zur neuen Seltenheit, nicht mehr leer). */
+function bkmpIdleRollInitialSubstats(primaryStat, rarityId) {
+  const count = BKMP_RUNE_MAX_SUBSTATS[rarityId] || 0;
+  const substats = [];
+  const used = new Set([primaryStat]);
+  for (let i = 0; i < count; i++) {
+    const pool = Object.keys(BKMP_RUNE_SUBSTAT_WEIGHTS).filter(st => !used.has(st));
+    if (!pool.length) break;
+    const stat = bkmpRunePickWeightedStat(pool);
+    used.add(stat);
+    substats.push({ stat, value: bkmpIdleRollSubstatValue(stat, rarityId) });
+  }
+  return substats;
+}
+
+function bkmpRuneNewLocalId() {
+  return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : ('local-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+}
+
+let bkmpIdlePlayerRunes = [];
+let bkmpIdlePendingRuneDrops = [];
+let bkmpIdleRuneSyncTimer = null;
+
+/* Neue Drops werden gesammelt statt sofort einzeln gespeichert - bei
+   mehreren Kaempfen kurz hintereinander (autoklickender Spieler, schnelle
+   Stufen) landet so bei Bedarf mehr als ein Drop in EINEM Insert-Aufruf
+   statt einer Schreib-Anfrage pro Kampf (gleiche Ueberlegung wie beim
+   Egress-Vorfall vom 12.07. - siehe Projektnotizen). */
+function bkmpIdleQueueRuneSync() {
+  if (bkmpIdleRuneSyncTimer) return;
+  bkmpIdleRuneSyncTimer = window.setTimeout(async () => {
+    bkmpIdleRuneSyncTimer = null;
+    const pending = bkmpIdlePendingRuneDrops;
+    bkmpIdlePendingRuneDrops = [];
+    if (!pending.length || !bkmpIdleState || typeof insertPlayerRunes !== 'function') return;
+    try {
+      const inserted = await insertPlayerRunes(bkmpIdleState.name_key, pending.map(r => ({
+        rune_type: r.rune_type, rarity: r.rarity, rolled_value: r.rolled_value, equipped: r.equipped, upgrade_level: r.upgrade_level, substats: r.substats
+      })));
+      inserted.forEach((row, i) => {
+        const item = pending[i];
+        if (!item || !row) return;
+        item.id = row.id;
+        /* Falls zwischen dem Droppen und dem Eintreffen der echten DB-id
+           (bis zu 4s Debounce + Netzwerk-Laufzeit) schon ausgeruestet oder
+           aufgewertet wurde, tragen bkmpRuneToggleEquip/bkmpRuneUpgrade das
+           mangels id noch nicht nach - hier einmalig mit dem aktuellen Stand
+           nachholen, statt es fuer immer zu verlieren. */
+        if (item.equipped && typeof updatePlayerRuneEquipped === 'function') updatePlayerRuneEquipped(item.id, true).catch(() => {});
+        if ((item.upgrade_level || (item.substats && item.substats.length)) && typeof updatePlayerRuneUpgrade === 'function') {
+          updatePlayerRuneUpgrade(item.id, item.upgrade_level, item.substats).catch(() => {});
+        }
+      });
+    } catch (e) {
+      console.warn('Idle Dorf: Runen-Drop konnte nicht gespeichert werden.', e);
+    }
+  }, 4000);
+}
+
+/* Wird aus bkmpIdleHandleDragonDefeated() aufgerufen. source: 'normal'
+   oder 'boss'. */
+function bkmpIdleMaybeDropRune(source) {
+  if (!bkmpIdleState) return null;
+  const chance = BKMP_RUNE_DROP_CHANCE[source] ?? BKMP_RUNE_DROP_CHANCE.normal;
+  if (Math.random() > chance) return null;
+  const luck = bkmpIdleEffectiveStats ? Number(bkmpIdleEffectiveStats.runeLuckPct || 0) : 0;
+  const slot = window.BKMP_RUNE_SLOTS[Math.floor(Math.random() * window.BKMP_RUNE_SLOTS.length)];
+  const rarityId = bkmpIdleRollRuneRarity(source, luck);
+  const rolledValue = bkmpIdleRollRuneValue(slot.id, rarityId);
+  const rune = { id: null, _cid: bkmpRuneNewLocalId(), rune_type: slot.id, rarity: rarityId, rolled_value: rolledValue, equipped: false, upgrade_level: 0, substats: bkmpIdleRollInitialSubstats(slot.stat, rarityId), created_at: new Date().toISOString() };
+  bkmpIdlePlayerRunes.push(rune);
+  bkmpIdlePendingRuneDrops.push(rune);
+  bkmpIdleQueueRuneSync();
+  const rarityDef = window.BKMP_RUNE_RARITIES.find(r => r.id === rarityId);
+  bkmpIdleLog(`🔮 ${rarityDef.name} ${slot.name} gefunden! (+${rolledValue}% ${slot.desc})`);
+  return rune;
+}
+
+/* ---------------- Aufwertung (+0 bis +15) + Sub-Stats ----------------
+   Nach dem Vorbild von Summoners War: Sky Arena (auf Nutzerwunsch recher-
+   chiert), an unsere kleinere Wirtschaft angepasst:
+   - Jede Stufe erhoeht den Hauptwert der Rune um einen festen Anteil.
+   - Bei +3/+6/+9/+12 kommt (falls unter dem Sub-Stat-Limit BKMP_RUNE_SUBSTAT_
+     CAP) ein neuer, zufaellig gewuerfelter Sub-Stat hinzu (anderer Wert als
+     der Hauptstat) - sonst wird stattdessen ein zufaelliger bereits
+     vorhandener Sub-Stat weiter verstaerkt, genau wie in Summoners War jede
+     Aufwertung IMMER etwas bewirkt, nicht nur an den Meilenstein-Stufen.
+   - NACHBESSERUNG (15.07., Nutzerwunsch): Runen droppen/verschmelzen ab
+     sofort schon MIT Sub-Stats, nicht mehr leer - die Anzahl haengt von der
+     Seltenheit ab (BKMP_RUNE_MAX_SUBSTATS, unveraendert: gray 0/green 1/
+     blue 2/purple 3/gold 4). Das universelle Maximum bleibt bei 4
+     (BKMP_RUNE_SUBSTAT_CAP) fuer ALLE Seltenheiten - der Unterschied ist nur,
+     wie viele davon schon beim Drop da sind und wie viele Meilensteine also
+     noch NEUE Sub-Stats bringen statt vorhandene zu verstaerken. Beispiel:
+     Gewoehnlich (0 beim Drop) -> alle 4 Meilensteine bringen einen neuen
+     Sub-Stat, keiner wird je verstaerkt. Legendaer (4 beim Drop, schon am
+     Limit) -> alle 4 Meilensteine verstaerken nur noch vorhandene.
+   - Bewusst OHNE Fehlschlag-/Zerstoerungsrisiko (das beruehmte "+15 kann
+     die Rune zerstoeren" aus dem Vorbild) - fuer dieses eher gemuetliche
+     Browser-Idle-Spiel waere das reine Frustration ohne Mehrwert, das Gold
+     als alleiniger Preis reicht als Fortschrittsbremse. */
+const BKMP_RUNE_MAX_LEVEL = 15;
+const BKMP_RUNE_SUBSTAT_MILESTONES = [3, 6, 9, 12];
+/* Anzahl Sub-Stats, mit denen eine Rune dieser Seltenheit droppt/verschmilzt
+   (siehe bkmpIdleRollInitialSubstats). Das absolute Maximum ist immer 4
+   (BKMP_RUNE_SUBSTAT_CAP), unabhaengig von der Seltenheit. */
+const BKMP_RUNE_MAX_SUBSTATS = { gray: 0, green: 1, blue: 2, purple: 3, gold: 4 };
+const BKMP_RUNE_SUBSTAT_CAP = 4;
+function bkmpIdleRuneUpgradeCost(rune) {
+  const rarity = window.BKMP_RUNE_RARITIES.find(r => r.id === rune.rarity);
+  const mult = rarity ? rarity.mult : 1;
+  return Math.round(16 * mult * Math.pow(1.42, Number(rune.upgrade_level || 0)));
+}
+/* +8% des Grundwerts pro Stufe -> bei +15 rund das 2,2-fache des rohen
+   rolled_value (2 * 5 fuer Legendaer waere z.B. 2 -> 4,4). */
+function bkmpIdleRuneEffectivePrimaryValue(rune) {
+  return Math.round(Number(rune.rolled_value || 0) * (1 + Number(rune.upgrade_level || 0) * 0.08) * 100) / 100;
+}
+function bkmpRuneUpgrade(cid) {
+  const rune = bkmpIdlePlayerRunes.find(r => r._cid === cid);
+  if (!rune || !bkmpIdleState) return;
+  const level = Number(rune.upgrade_level || 0);
+  if (level >= BKMP_RUNE_MAX_LEVEL) return;
+  const cost = bkmpIdleRuneUpgradeCost(rune);
+  if (bkmpIdleState.gold < cost) {
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('💰 Nicht genug Gold zum Aufwerten.', 2400);
+    return;
+  }
+  const slot = window.BKMP_RUNE_SLOTS.find(s => s.id === rune.rune_type);
+  bkmpIdleState.gold -= cost;
+  rune.upgrade_level = level + 1;
+  rune.substats = Array.isArray(rune.substats) ? rune.substats : [];
+  /* WICHTIG (Nachbesserung, Spieler-Meldung "bei jedem +1 Upgrade hoehere
+     Substats?"): Sub-Stats duerfen sich NUR an den 4 Meilenstein-Stufen
+     +3/+6/+9/+12 aendern (neu ODER verstaerkt) - an allen anderen 11 Stufen
+     passiert mit den Sub-Stats gar nichts, nur der Hauptwert steigt (siehe
+     bkmpIdleRuneEffectivePrimaryValue). Der Bug vorher: die "verstaerke
+     einen vorhandenen Sub-Stat"-Zeile lief als reines else OHNE eigene
+     Meilenstein-Abfrage, also bei JEDER Nicht-Meilenstein-Stufe auch -
+     dadurch wuchsen Sub-Stats bei praktisch jedem Klick, nicht nur alle 3
+     Stufen wie eigentlich gewollt. */
+  if (BKMP_RUNE_SUBSTAT_MILESTONES.includes(rune.upgrade_level)) {
+    if (rune.substats.length < BKMP_RUNE_SUBSTAT_CAP) {
+      const usedStats = new Set([slot.stat, ...rune.substats.map(s => s.stat)]);
+      const pool = Object.keys(BKMP_RUNE_SUBSTAT_WEIGHTS).filter(st => !usedStats.has(st));
+      if (pool.length) {
+        const newStat = bkmpRunePickWeightedStat(pool);
+        rune.substats.push({ stat: newStat, value: bkmpIdleRollSubstatValue(newStat, rune.rarity) });
+        const meta = bkmpRuneStatMeta(newStat);
+        bkmpIdleLog(`✨ ${slot.name} +${rune.upgrade_level}: neuer Sub-Stat ${meta.icon} ${meta.desc}!`);
+      }
+    } else if (rune.substats.length) {
+      const pick = rune.substats[Math.floor(Math.random() * rune.substats.length)];
+      const bump = bkmpIdleRollSubstatValue(pick.stat, rune.rarity) * 0.5;
+      pick.value = pick.stat.endsWith('_flat') ? pick.value + Math.max(1, Math.round(bump)) : Math.round((pick.value + bump) * 100) / 100;
+    }
+  }
+  /* Ohne echte DB-id (frisch gedroppt/verschmolzen, Insert noch nicht
+     zurueck) kann hier noch nicht persistiert werden - die Aufwertung
+     wird trotzdem sofort lokal angewendet (spielt sich sonst wie ein
+     Blocker an), und sobald die id eintrifft (siehe bkmpIdleQueueRuneSync/
+     bkmpRuneFuse), wird der dann aktuelle Stand automatisch nachgetragen. */
+  if (rune.id) updatePlayerRuneUpgrade(rune.id, rune.upgrade_level, rune.substats).catch(() => {});
+  bkmpRuneCurrentlyViewing = cid;
+  bkmpIdleRecomputeEffectiveStats();
+  bkmpIdleRenderRunenPanel();
+  bkmpIdleRenderHud();
+  bkmpIdleQueueSync();
+}
+
+/* Aggregiert alle AUSGERUESTETEN Runen (Hauptwert UND Sub-Stats) zu denselben
+   Effekt-Schluesseln, die Skilltree/Upgrades/Titel/Prestige schon nutzen
+   (attack_pct usw.) - flieszt dadurch ganz ohne Sonderbehandlung in
+   bkmpIdleRecomputeEffectiveStats ein. rune_luck_pct ist der einzige
+   Schluessel, der NUR von Runen (oder dem magie_runenglueck-Skillknoten)
+   kommt (siehe dort). */
+function bkmpIdleRuneEffectTotals() {
+  const totals = {};
+  bkmpIdlePlayerRunes.forEach(r => {
+    if (!r.equipped) return;
+    const slot = window.BKMP_RUNE_SLOTS.find(s => s.id === r.rune_type);
+    if (!slot) return;
+    totals[slot.stat] = (totals[slot.stat] || 0) + bkmpIdleRuneEffectivePrimaryValue(r);
+    (r.substats || []).forEach(s => { totals[s.stat] = (totals[s.stat] || 0) + Number(s.value || 0); });
+  });
+  return totals;
+}
+
+/* ---------------- Runen-UI: eigenes Inventarfenster je Slot ---------------- */
+
+let bkmpRuneActiveSlotTab = 'slot1';
 let bkmpRuneCurrentlyViewing = null;
 
-/* Anklicken im Lager zeigt eine Rune nur noch an (Stats-Vorschau) - das
-   eigentliche Einsetzen/Rausnehmen passiert erst ueber den Button im
-   Stats-Feld selbst, per Spieler-Wunsch als eigener, expliziter Schritt
-   statt automatisch beim reinen Anschauen. Direkt auf dem Kreis bleibt das
-   Entfernen weiterhin ein einzelner Klick - da gibt's ja nur die eine
-   sinnvolle Aktion. */
-function bkmpRuneViewItem(slotId, rarityId) {
-  bkmpRuneCurrentlyViewing = { slotId, rarityId };
+function bkmpRuneSelectSlotTab(slotId) {
+  if (!window.BKMP_RUNE_SLOTS.some(s => s.id === slotId)) return;
+  bkmpRuneActiveSlotTab = slotId;
+  bkmpRuneCurrentlyViewing = null;
   bkmpIdleRenderRunenPanel();
 }
 
-function bkmpRuneStatBoxHTML() {
-  const viewing = bkmpRuneCurrentlyViewing;
-  const slot = viewing && window.BKMP_RUNE_SLOTS.find(s => s.id === viewing.slotId);
-  const rarity = viewing && window.BKMP_RUNE_RARITIES.find(r => r.id === viewing.rarityId);
-  if (!slot || !rarity) return '<p class="idle-runen-stat-placeholder">Wähle unten eine Rune aus, um ihre Werte zu sehen.</p>';
-  const equipped = bkmpRuneGetEquipped();
-  const isEquipped = equipped[viewing.slotId] === viewing.rarityId;
-  const exampleValue = Math.round(2 * rarity.mult * 10) / 10;
+function bkmpRuneStatBoxHTML(slot, rune) {
+  if (!rune) return `<p class="idle-runen-stat-placeholder">Du besitzt noch keine ${escapeHtml(slot.name)} - beim Kämpfen und bei Bossen droppen zufällig neue.</p>`;
+  const rarity = window.BKMP_RUNE_RARITIES.find(r => r.id === rune.rarity);
+  const level = Number(rune.upgrade_level || 0);
+  const unit = '%';
+  const effectiveValue = bkmpIdleRuneEffectivePrimaryValue(rune);
+  const isMaxLevel = level >= BKMP_RUNE_MAX_LEVEL;
+  const cost = bkmpIdleRuneUpgradeCost(rune);
+  const canAffordUpgrade = bkmpIdleState && bkmpIdleState.gold >= cost;
+  const sameGroup = bkmpIdlePlayerRunes.filter(r => r.rune_type === rune.rune_type && r.rarity === rune.rarity && !r.equipped);
+  const canFuse = sameGroup.length >= 3 && rune.rarity !== 'gold';
   return `
     <div class="idle-runen-stat-head" style="--rune-color:${rarity.color}">
-      <img src="assets/runes/${viewing.slotId}-${viewing.rarityId}.png" alt="">
+      <img src="assets/runes/${slot.id}-${rune.rarity}.png?v=${BKMP_RUNE_IMG_V}" alt="">
       <div>
-        <div class="idle-runen-stat-name">${escapeHtml(slot.name)}</div>
+        <div class="idle-runen-stat-name">${slot.icon} ${escapeHtml(slot.name)} <span class="idle-runen-stat-level">+${level}</span></div>
         <div class="idle-runen-stat-rarity">${escapeHtml(rarity.name)}</div>
       </div>
-      <button type="button" class="${isEquipped ? 'btn-nein' : 'btn-ja'} idle-runen-equip-btn" id="idleRuneEquipBtn" data-slot="${viewing.slotId}" data-rarity="${viewing.rarityId}">
-        ${isEquipped ? 'Entfernen' : 'Einsetzen'}
+      <button type="button" class="${rune.equipped ? 'btn-nein' : 'btn-ja'} idle-runen-equip-btn" id="idleRuneEquipBtn" data-cid="${rune._cid}">
+        ${rune.equipped ? 'Entfernen' : 'Einsetzen'}
       </button>
     </div>
-    <p class="idle-runen-stat-line">+${exampleValue}% Angriff <span class="idle-runen-stat-note">(Beispielwert – echtes Balancing folgt)</span></p>
+    <p class="idle-runen-stat-line idle-runen-stat-primary">+${effectiveValue}${unit} ${escapeHtml(slot.desc)}</p>
+    ${rune.substats && rune.substats.length ? `<ul class="idle-runen-substat-list">
+      ${rune.substats.map(s => {
+        const meta = bkmpRuneStatMeta(s.stat);
+        const subUnit = s.stat.endsWith('_flat') ? '' : '%';
+        return `<li>${meta.icon} +${s.value}${subUnit} ${escapeHtml(meta.desc)}</li>`;
+      }).join('')}
+    </ul>` : '<p class="idle-runen-stat-note">Noch keine Sub-Stats - bei +3/+6/+9/+12 kommt bis zu insgesamt 4 jeweils einer dazu.</p>'}
+    <div class="idle-runen-stat-actions">
+      <button type="button" class="btn-ja idle-runen-upgrade-btn" id="idleRuneUpgradeBtn" data-cid="${rune._cid}" ${isMaxLevel || !canAffordUpgrade ? 'disabled' : ''}>
+        ${isMaxLevel ? '⭐ Maximal aufgewertet' : `⬆️ Aufwerten (${cost} Gold)`}
+      </button>
+    </div>
+    <div class="idle-runen-stat-actions">
+      <button type="button" class="btn-nein idle-runen-fuse-btn" id="idleRuneFuseBtn" data-slot="${slot.id}" data-rarity="${rune.rarity}" ${canFuse ? '' : 'disabled'}>
+        ✨ 3× verschmelzen${canFuse ? '' : ` (${sameGroup.length}/3)`}
+      </button>
+      <button type="button" class="btn-nein idle-runen-sell-btn" id="idleRuneSellBtn" data-cid="${rune._cid}" ${rune.equipped ? 'disabled' : ''}>
+        💰 verkaufen (+${rarity.sellGold})
+      </button>
+    </div>
   `;
 }
 
-/* Einsetzen: klickt man eine andere Rarity fuer denselben Slot an, wird
-   die vorherige einfach ersetzt (kein extra "erst rausnehmen" noetig).
-   Rausnehmen: den Einsetzen-Button erneut anklicken (heisst dann
-   "Entfernen"), oder direkt auf dem Kreis auf die eingesetzte Rune klicken. */
-function bkmpRuneToggleEquip(slotId, rarityId) {
-  const state = bkmpRuneGetEquipped();
-  if (state[slotId] === rarityId) {
-    delete state[slotId];
+/* Ruestet eine konkrete Rune-Instanz aus/ab (per _cid, nicht mehr nur
+   Slot+Seltenheit, da Instanzen jetzt durch Stufe/Sub-Stats unterschiedlich
+   stark sein koennen) - ersetzt dabei automatisch eine evtl. schon im
+   selben Slot sitzende andere Rune (max. 1 pro Slot). */
+function bkmpRuneToggleEquip(cid) {
+  const rune = bkmpIdlePlayerRunes.find(r => r._cid === cid);
+  if (!rune) return;
+  if (rune.equipped) {
+    rune.equipped = false;
+    if (rune.id) updatePlayerRuneEquipped(rune.id, false).catch(() => {});
   } else {
-    state[slotId] = rarityId;
+    const otherInSlot = bkmpIdlePlayerRunes.find(r => r.rune_type === rune.rune_type && r.equipped);
+    if (otherInSlot) {
+      otherInSlot.equipped = false;
+      if (otherInSlot.id) updatePlayerRuneEquipped(otherInSlot.id, false).catch(() => {});
+    }
+    rune.equipped = true;
+    if (rune.id) updatePlayerRuneEquipped(rune.id, true).catch(() => {});
   }
-  bkmpRuneCurrentlyViewing = { slotId, rarityId };
-  bkmpRuneSaveEquipped(state);
+  bkmpRuneCurrentlyViewing = cid;
+  bkmpIdleRecomputeEffectiveStats();
   bkmpIdleRenderRunenPanel();
+  bkmpIdleRenderHud();
+}
+
+/* 3 unausgeruestete Runen gleichen Slots + gleicher Seltenheit -> 1 neue
+   Rune der naechsten Seltenheitsstufe (frisch gewuerfelter Hauptwert +
+   frisch gewuerfelte Sub-Stats passend zur neuen Seltenheit, siehe
+   bkmpIdleRollInitialSubstats - startet aber bewusst wieder bei +0, sonst
+   wuerde Verschmelzen zum umstaendlichen Umweg, um eine hoehere Stufe
+   "billiger" aufzuwerten, statt einer eigenstaendigen Belohnung fuer viele
+   gesammelte Runen). Legendär ist die Obergrenze, kann nicht weiter
+   verschmolzen werden. */
+function bkmpRuneFuse(slotId, rarityId) {
+  const rarityIndex = window.BKMP_RUNE_RARITIES.findIndex(r => r.id === rarityId);
+  if (rarityIndex < 0 || rarityIndex >= window.BKMP_RUNE_RARITIES.length - 1) return;
+  const candidates = bkmpIdlePlayerRunes.filter(r => r.rune_type === slotId && r.rarity === rarityId && !r.equipped);
+  if (candidates.length < 3) return;
+  const consumed = candidates.slice(0, 3);
+  const consumedIds = consumed.map(r => r.id).filter(Boolean);
+  bkmpIdlePlayerRunes = bkmpIdlePlayerRunes.filter(r => !consumed.includes(r));
+  const newRarity = window.BKMP_RUNE_RARITIES[rarityIndex + 1];
+  const newValue = bkmpIdleRollRuneValue(slotId, newRarity.id);
+  const primarySlotObj = window.BKMP_RUNE_SLOTS.find(s => s.id === slotId);
+  const newSubstats = bkmpIdleRollInitialSubstats(primarySlotObj ? primarySlotObj.stat : null, newRarity.id);
+  const newRune = { id: null, _cid: bkmpRuneNewLocalId(), rune_type: slotId, rarity: newRarity.id, rolled_value: newValue, equipped: false, upgrade_level: 0, substats: newSubstats, created_at: new Date().toISOString() };
+  bkmpIdlePlayerRunes.push(newRune);
+  if (consumedIds.length && typeof deletePlayerRunes === 'function') deletePlayerRunes(consumedIds).catch(() => {});
+  if (bkmpIdleState && typeof insertPlayerRunes === 'function') {
+    insertPlayerRunes(bkmpIdleState.name_key, [{ rune_type: slotId, rarity: newRarity.id, rolled_value: newValue, equipped: false, upgrade_level: 0, substats: newSubstats }])
+      .then(rows => {
+        if (!rows || !rows[0]) return;
+        newRune.id = rows[0].id;
+        /* Siehe bkmpIdleQueueRuneSync - falls die frisch verschmolzene Rune
+           schon ausgeruestet/aufgewertet wurde, bevor die id zurueckkam. */
+        if (newRune.equipped && typeof updatePlayerRuneEquipped === 'function') updatePlayerRuneEquipped(newRune.id, true).catch(() => {});
+        if ((newRune.upgrade_level || (newRune.substats && newRune.substats.length)) && typeof updatePlayerRuneUpgrade === 'function') {
+          updatePlayerRuneUpgrade(newRune.id, newRune.upgrade_level, newRune.substats).catch(() => {});
+        }
+      })
+      .catch(() => {});
+  }
+  const slot = window.BKMP_RUNE_SLOTS.find(s => s.id === slotId);
+  bkmpIdleLog(`✨ 3× ${slot.name} (${window.BKMP_RUNE_RARITIES[rarityIndex].name}) zu ${newRarity.name} verschmolzen!`);
+  if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`✨ Verschmolzen: ${newRarity.name} ${slot.name}!`, 3200);
+  bkmpRuneCurrentlyViewing = newRune._cid;
+  bkmpIdleRenderRunenPanel();
+}
+
+function bkmpRuneSell(cid) {
+  const rune = bkmpIdlePlayerRunes.find(r => r._cid === cid);
+  if (!rune || rune.equipped || !bkmpIdleState) return;
+  const rarity = window.BKMP_RUNE_RARITIES.find(r => r.id === rune.rarity);
+  bkmpIdlePlayerRunes = bkmpIdlePlayerRunes.filter(r => r !== rune);
+  bkmpIdleState.gold += rarity.sellGold;
+  if (rune.id && typeof deletePlayerRunes === 'function') deletePlayerRunes([rune.id]).catch(() => {});
+  if (bkmpRuneCurrentlyViewing === cid) bkmpRuneCurrentlyViewing = null;
+  bkmpIdleRenderHud();
+  bkmpIdleRenderRunenPanel();
+  bkmpIdleQueueSync();
+}
+
+/* ❓-Hilfe-Overlay statt eines Dauer-Hinweistexts im Panel selbst (auf
+   Nutzerwunsch - der Fliesstext oben im Runen-Tab wirkte zu textlastig).
+   Gleiches Muster wie bkmpIdleOpenSkillHelp/#idleSkillHelpOverlay, nur mit
+   Runen-eigenem Inhalt statt der Skill-Knoten-Liste. */
+function bkmpIdleOpenRunenHelp() {
+  bkmpIdleRenderRunenHelp();
+  const overlay = document.getElementById('idleRunenHelpOverlay');
+  if (overlay) { overlay.classList.add('visible'); document.body.classList.add('modal-open'); }
+}
+
+function bkmpIdleRenderRunenHelp() {
+  const list = document.getElementById('idleRunenHelpList');
+  if (!list) return;
+  const slotsHtml = window.BKMP_RUNE_SLOTS.map(slot => `
+    <div class="skillhelp-row">
+      <span class="skillhelp-icon">${slot.icon}</span>
+      <div class="skillhelp-body">
+        <div class="skillhelp-name">${escapeHtml(slot.name)}</div>
+        <div class="skillhelp-desc">Haupt-Stat: ${escapeHtml(slot.desc)}</div>
+      </div>
+    </div>`).join('');
+  const raritiesHtml = window.BKMP_RUNE_RARITIES.map(rarity => `
+    <div class="skillhelp-row">
+      <span class="skillhelp-icon" style="color:${rarity.color}">●</span>
+      <div class="skillhelp-body">
+        <div class="skillhelp-name" style="color:${rarity.color}">${escapeHtml(rarity.name)}</div>
+      </div>
+      <div class="skillhelp-meta">
+        <span class="skillhelp-cost">Verkauf: ${rarity.sellGold} Gold</span>
+      </div>
+    </div>`).join('');
+  list.innerHTML = `
+    <div class="skillhelp-branch">
+      <div class="skillhelp-branch-title">🔮 Wie bekomme ich Runen?</div>
+      <p class="skillhelp-note" style="margin:0 0 0.6rem;">Kleine Chance nach jedem besiegten Drachen, bei Bossen (alle 25 Kämpfe) etwas höher. Eine ausgerüstete Glücksrune oder der Skilltree-Knoten „Runenglück" (Zweig Magie) erhöhen zusätzlich die Chance auf bessere Seltenheitsstufen.</p>
+    </div>
+    <div class="skillhelp-branch">
+      <div class="skillhelp-branch-title">Die 6 Rune-Typen</div>
+      ${slotsHtml}
+    </div>
+    <div class="skillhelp-branch">
+      <div class="skillhelp-branch-title">Seltenheitsstufen</div>
+      ${raritiesHtml}
+    </div>
+    <div class="skillhelp-note">
+      <strong>⬆️ Aufwerten:</strong> Mit Gold von +0 bis +15 - jede Stufe erhöht den Hauptwert der Rune, Kosten steigen mit Stufe und Seltenheit.<br>
+      <strong>✦ Sub-Stats:</strong> Runen droppen schon MIT Sub-Stats - Anzahl je nach Seltenheit (Gewöhnlich 0, Ungewöhnlich 1, Selten 2, Episch 3, Legendär 4). Bei +3/+6/+9/+12 kommt jeweils ein neuer dazu, bis maximal 4 erreicht sind - danach verstärkt jede dieser Stufen stattdessen einen vorhandenen Sub-Stat weiter. Meist ein zweiter %-Wert, seltener ein fester Bonus (z. B. „+2 Angriff fest" statt „+3% Angriff") oder Angriffstempo - das kann bei jeder Seltenheit passieren, auch bei Legendär.<br>
+      <strong>✨ Verschmelzen:</strong> 3 unausgerüstete Runen gleichen Slots und gleicher Seltenheit ergeben 1 neue der nächsthöheren Seltenheit mit frisch gewürfelten Sub-Stats passend zur neuen Seltenheit - startet aber wieder bei +0.<br>
+      <strong>💰 Verkaufen:</strong> Unausgerüstete Runen lassen sich jederzeit für Gold verkaufen.
+    </div>
+  `;
 }
 
 function bkmpIdleRenderRunenPanel() {
   const panel = document.getElementById('idlePanelRunen');
   if (!panel) return;
-  const equipped = bkmpRuneGetEquipped();
+  const equippedBySlot = {};
+  bkmpIdlePlayerRunes.forEach(r => { if (r.equipped) equippedBySlot[r.rune_type] = r; });
+  const allSixEquipped = Object.keys(equippedBySlot).length >= 6;
+  const totalOwned = bkmpIdlePlayerRunes.length;
+
+  if (!window.BKMP_RUNE_SLOTS.some(s => s.id === bkmpRuneActiveSlotTab)) bkmpRuneActiveSlotTab = 'slot1';
+  const activeSlot = window.BKMP_RUNE_SLOTS.find(s => s.id === bkmpRuneActiveSlotTab);
+  const slotOwned = bkmpIdlePlayerRunes.filter(r => r.rune_type === activeSlot.id).slice().sort((a, b) => {
+    const ra = window.BKMP_RUNE_RARITIES.findIndex(x => x.id === a.rarity);
+    const rb = window.BKMP_RUNE_RARITIES.findIndex(x => x.id === b.rarity);
+    if (rb !== ra) return rb - ra;
+    if (!!b.equipped !== !!a.equipped) return b.equipped ? 1 : -1;
+    return Number(b.upgrade_level || 0) - Number(a.upgrade_level || 0);
+  });
+
+  if (!bkmpRuneCurrentlyViewing || !slotOwned.some(r => r._cid === bkmpRuneCurrentlyViewing)) {
+    const preferred = slotOwned.find(r => r.equipped) || slotOwned[0] || null;
+    bkmpRuneCurrentlyViewing = preferred ? preferred._cid : null;
+  }
+  const viewingRune = slotOwned.find(r => r._cid === bkmpRuneCurrentlyViewing) || null;
+
   panel.innerHTML = `
-    <p class="idle-panel-hint idle-runen-hint">🔒 Runen sind ein kommendes Feature: bald mit geringer Chance beim Weltboss und bei Bossen farmbar, mit Werten je nach Seltenheit. Hier schon mal die Design-Vorschau zum Einsetzen/Rausnehmen.</p>
+    <div class="idle-runen-header-row">
+      <button type="button" class="btn-nein idle-runen-help-btn" id="idleRunenHelpBtn">❓ Hilfe</button>
+    </div>
     <div class="idle-runen-circle-wrap">
       <div class="idle-runen-circle-inner">
-        <img src="assets/runes/circle-empty.png" alt="Runen-Kreis" class="idle-runen-circle-img">
+        <img src="assets/runes/${allSixEquipped ? 'circle-full' : 'circle-empty'}.png?v=${BKMP_RUNE_IMG_V}" alt="Runen-Kreis" class="idle-runen-circle-img">
         ${window.BKMP_RUNE_SLOTS.map(slot => {
-          const rarityId = equipped[slot.id];
-          if (!rarityId) return '';
-          const rarity = window.BKMP_RUNE_RARITIES.find(r => r.id === rarityId);
+          const eq = equippedBySlot[slot.id];
+          if (!eq) return '';
+          const rarity = window.BKMP_RUNE_RARITIES.find(r => r.id === eq.rarity);
           const pos = BKMP_RUNE_SLOT_POSITIONS[slot.id];
           if (!rarity || !pos) return '';
-          return `<button type="button" class="idle-runen-equip-slot" style="top:${pos.top}; left:${pos.left}; width:${pos.width}; height:${pos.height}; --rune-color:${rarity.color}" data-slot="${slot.id}" data-rarity="${rarityId}" title="${escapeHtml(slot.name)} entfernen">
-            <img src="assets/runes/${slot.id}-${rarityId}.png" alt="${escapeHtml(slot.name)} (${escapeHtml(rarity.name)})">
+          return `<button type="button" class="idle-runen-equip-slot" style="top:${pos.top}; left:${pos.left}; width:${pos.width}; height:${pos.height}; --rune-color:${rarity.color}" data-cid="${eq._cid}" title="${escapeHtml(slot.name)} entfernen">
+            <img src="assets/runes/${slot.id}-${eq.rarity}.png?v=${BKMP_RUNE_IMG_V}" alt="${escapeHtml(slot.name)} (${escapeHtml(rarity.name)})">
+            ${eq.upgrade_level ? `<span class="idle-runen-slot-level">+${eq.upgrade_level}</span>` : ''}
           </button>`;
         }).join('')}
       </div>
     </div>
-    <div class="idle-runen-stat-box" id="idleRunenStatBox">${bkmpRuneStatBoxHTML()}</div>
-    <h4 class="idle-sammlung-subheading">🎒 Runen-Lager <span class="idle-sammlung-count">Vorschau</span></h4>
-    <div class="idle-runen-inventory" id="idleRunenInventory">
-      ${window.BKMP_RUNE_SLOTS.map(slot => window.BKMP_RUNE_RARITIES.map(rarity => {
-        const isEquipped = equipped[slot.id] === rarity.id;
-        return `
-        <button type="button" class="idle-runen-item ${isEquipped ? 'is-equipped' : ''}" data-slot="${slot.id}" data-rarity="${rarity.id}" style="--rune-color:${rarity.color}" title="${escapeHtml(slot.name)} · ${escapeHtml(rarity.name)}${isEquipped ? ' (eingesetzt)' : ''}">
-          <img src="assets/runes/${slot.id}-${rarity.id}.png" alt="${escapeHtml(slot.name)} (${escapeHtml(rarity.name)})">
-          ${isEquipped ? '<span class="idle-runen-equipped-badge">✓</span>' : ''}
+    <div class="idle-runen-slot-tabs" id="idleRunenSlotTabs">
+      ${window.BKMP_RUNE_SLOTS.map(slot => {
+        const count = bkmpIdlePlayerRunes.filter(r => r.rune_type === slot.id).length;
+        return `<button type="button" class="idle-runen-slot-tab ${slot.id === activeSlot.id ? 'active' : ''}" data-slot="${slot.id}">
+          <span class="idle-runen-slot-tab-icon">${slot.icon}</span>
+          <span class="idle-runen-slot-tab-name">${escapeHtml(slot.name)}</span>
+          ${count ? `<span class="idle-runen-slot-tab-count">${count}</span>` : ''}
         </button>`;
-      }).join('')).join('')}
+      }).join('')}
+    </div>
+    <div class="idle-runen-stat-box" id="idleRunenStatBox">${bkmpRuneStatBoxHTML(activeSlot, viewingRune)}</div>
+    <h4 class="idle-sammlung-subheading">🎒 ${escapeHtml(activeSlot.name)}-Lager <span class="idle-sammlung-count">${slotOwned.length} von ${totalOwned} gesamt</span></h4>
+    <div class="idle-runen-inventory" id="idleRunenInventory">
+      ${slotOwned.length ? slotOwned.map(r => {
+        const rarity = window.BKMP_RUNE_RARITIES.find(x => x.id === r.rarity);
+        const isViewing = r._cid === bkmpRuneCurrentlyViewing;
+        return `
+        <button type="button" class="idle-runen-item ${r.equipped ? 'is-equipped' : ''} ${isViewing ? 'is-viewing' : ''}" data-cid="${r._cid}" style="--rune-color:${rarity.color}" title="${escapeHtml(rarity.name)}${r.upgrade_level ? ' +' + r.upgrade_level : ''}${r.equipped ? ' (eingesetzt)' : ''}">
+          <img src="assets/runes/${activeSlot.id}-${r.rarity}.png?v=${BKMP_RUNE_IMG_V}" alt="${escapeHtml(rarity.name)}">
+          ${r.equipped ? '<span class="idle-runen-equipped-badge">✓</span>' : ''}
+          ${r.upgrade_level ? `<span class="idle-runen-count-badge idle-runen-level-badge">+${r.upgrade_level}</span>` : ''}
+        </button>`;
+      }).join('') : `<p class="idle-runen-stat-placeholder">Noch keine ${escapeHtml(activeSlot.name)} gefunden - beim Kämpfen und bei Bossen droppen zufällig neue.</p>`}
     </div>
   `;
-  panel.querySelectorAll('.idle-runen-item').forEach(btn => btn.addEventListener('click', () => bkmpRuneViewItem(btn.dataset.slot, btn.dataset.rarity)));
-  panel.querySelectorAll('.idle-runen-equip-slot').forEach(btn => btn.addEventListener('click', () => bkmpRuneToggleEquip(btn.dataset.slot, btn.dataset.rarity)));
+  panel.querySelectorAll('.idle-runen-slot-tab').forEach(btn => btn.addEventListener('click', () => bkmpRuneSelectSlotTab(btn.dataset.slot)));
+  panel.querySelectorAll('.idle-runen-item').forEach(btn => btn.addEventListener('click', () => { bkmpRuneCurrentlyViewing = btn.dataset.cid; bkmpIdleRenderRunenPanel(); }));
+  panel.querySelectorAll('.idle-runen-equip-slot').forEach(btn => btn.addEventListener('click', () => bkmpRuneToggleEquip(btn.dataset.cid)));
   const equipBtn = document.getElementById('idleRuneEquipBtn');
-  if (equipBtn) equipBtn.addEventListener('click', () => bkmpRuneToggleEquip(equipBtn.dataset.slot, equipBtn.dataset.rarity));
+  if (equipBtn) equipBtn.addEventListener('click', () => bkmpRuneToggleEquip(equipBtn.dataset.cid));
+  const upgradeBtn = document.getElementById('idleRuneUpgradeBtn');
+  if (upgradeBtn) upgradeBtn.addEventListener('click', () => bkmpRuneUpgrade(upgradeBtn.dataset.cid));
+  const fuseBtn = document.getElementById('idleRuneFuseBtn');
+  if (fuseBtn) fuseBtn.addEventListener('click', () => bkmpRuneFuse(fuseBtn.dataset.slot, fuseBtn.dataset.rarity));
+  const sellBtn = document.getElementById('idleRuneSellBtn');
+  if (sellBtn) sellBtn.addEventListener('click', () => bkmpRuneSell(sellBtn.dataset.cid));
+  const runenHelpBtn = document.getElementById('idleRunenHelpBtn');
+  if (runenHelpBtn) runenHelpBtn.addEventListener('click', bkmpIdleOpenRunenHelp);
 }
 
 /* ---------------- Tabs & Modal ---------------- */
@@ -2182,12 +2805,21 @@ async function bkmpIdleOpenModal() {
   }
 }
 
+/* NACHBESSERUNG (Spieler-Wunsch): frueher stoppte das Schliessen des
+   Fensters den Kampf-Loop komplett ("Fenster zu = Spiel pausiert"), obwohl
+   der Spieler ja weiterhin auf der Seite blieb - beim naechsten Oeffnen sah
+   es dann so aus, als waere in der Zwischenzeit gar nichts passiert
+   (Offline-Fortschritt-Logik griff, weil serverseitig kein Sync in der
+   Zwischenzeit ankam). bkmpIdleStopLoop() wird hier bewusst NICHT mehr
+   aufgerufen - der Kampf laeuft im Hintergrund weiter (Gold/XP/Kills), auch
+   ohne offenes Fenster, solange der Tab offen bleibt. Der Raid-Kampf bleibt
+   davon unberuehrt (bkmpRaidStopCombatView pausiert weiterhin gezielt nur
+   die Live-Raid-Ansicht, die echt das offene Fenster braucht). */
 function bkmpIdleCloseModal() {
   const overlay = document.getElementById('idleDorfOverlay');
   if (overlay) overlay.classList.remove('visible');
   document.body.classList.remove('modal-open');
   bkmpIdleModalOpen = false;
-  bkmpIdleStopLoop();
   bkmpIdleQueueSync();
   bkmpIdleFlushSync();
   bkmpRaidStopCombatView();
@@ -3012,30 +3644,9 @@ function bkmpRaidInit() {
   if (bossEl) bossEl.addEventListener('click', bkmpRaidHandleBossClick);
 }
 
-/* Runen-Tab ist absichtlich per HTML-Attribut standardmaessig "disabled"
-   (fail-closed - fuer echte Besucher ohne Session wird dadurch ueberhaupt
-   kein Netzwerkaufruf ausgeloest, siehe gleiches Muster bei
-   bkmpCheckAdminPendingRequestsOnMainSite). Nur wenn wirklich eine aktive
-   Admin-Session erkannt wird, wird der Button freigeschaltet - fuer alle
-   anderen (oeffentliche Nutzer) bleibt er dauerhaft gesperrt, das Schloss
-   im Label ist also kein reines Deko-Icon. */
-async function bkmpIdleUnlockRunenTabForAdmins() {
-  const client = typeof bkmpGetSupabaseClient === 'function' ? bkmpGetSupabaseClient() : null;
-  if (!client) return;
-  try {
-    const { data: sessionData } = await client.auth.getSession();
-    if (!sessionData || !sessionData.session) return;
-    const { data: isAdmin } = await client.rpc('is_active_admin');
-    if (!isAdmin) return;
-    const btn = document.getElementById('idleTabBtnRunen');
-    if (btn) { btn.disabled = false; btn.title = ''; }
-  } catch (e) { /* bleibt gesperrt, kein Fehler-UI noetig */ }
-}
-
 function bkmpIdleInit() {
   bkmpIdleInitTabs();
   bkmpRaidInit();
-  bkmpIdleUnlockRunenTabForAdmins();
   const openBtn = document.getElementById('idleDorfButton');
   if (openBtn) openBtn.addEventListener('click', bkmpIdleOpenModal);
   bkmpIdleMaintenancePoll();
@@ -3052,6 +3663,12 @@ function bkmpIdleInit() {
   const skillHelpClose = document.getElementById('idleSkillHelpClose');
   if (skillHelpClose) skillHelpClose.addEventListener('click', () => {
     const overlay = document.getElementById('idleSkillHelpOverlay');
+    if (overlay) overlay.classList.remove('visible');
+    document.body.classList.remove('modal-open');
+  });
+  const runenHelpClose = document.getElementById('idleRunenHelpClose');
+  if (runenHelpClose) runenHelpClose.addEventListener('click', () => {
+    const overlay = document.getElementById('idleRunenHelpOverlay');
     if (overlay) overlay.classList.remove('visible');
     document.body.classList.remove('modal-open');
   });

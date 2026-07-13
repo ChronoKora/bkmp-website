@@ -20,7 +20,7 @@
 <title>BKMP — Admin</title>
 
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
-<link rel="stylesheet" href="style.css?v=20260713-visitors1">
+<link rel="stylesheet" href="style.css?v=20260715-sheepadmin1">
 </head>
 <body>
 
@@ -122,6 +122,10 @@
         <button class="admin-nav-btn" data-page="companydashboard" data-role="company">
           <svg viewBox="0 0 24 24"><path d="M4 21V10l8-6 8 6v11"/><path d="M9 21v-6h6v6"/></svg>
           Firmen-Dashboard
+        </button>
+        <button class="admin-nav-btn" data-page="sheepeditor" data-role="sheep_editor">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M9 10h.01M15 10h.01M9 15c1 1 5 1 6 0"/></svg>
+          Zitat des Tages
         </button>
         <button class="admin-nav-btn active" data-page="overview">
           <svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="5" rx="1.5"/><rect x="13" y="10" width="8" height="11" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/></svg>
@@ -237,8 +241,32 @@
           </div>
         </section>
 
+        <!-- Eingeschraenktes Konto: NUR Zitat des Tages, sonst nichts sichtbar -->
+        <section class="admin-page" id="page-sheepeditor">
+          <div class="admin-section" style="max-width:520px;">
+            <h2>&#128017; Zitat des Tages</h2>
+            <p class="admin-help-text">Text, der erscheint, wenn Besucher auf das Schaf im Banner klicken. &Auml;nderung wirkt sofort ohne Deploy.</p>
+            <div style="margin-bottom:0.7rem;">
+              <label for="sheepEditorTextInput">Sprechblasen-Text</label>
+              <textarea id="sheepEditorTextInput" rows="3" maxlength="180" style="width:100%; resize:vertical;"></textarea>
+            </div>
+            <button class="btn btn-primary" id="sheepEditorSave" type="button">Speichern</button>
+            <span id="sheepEditorStatus" style="margin-left:0.8rem; font-size:0.9rem;"></span>
+          </div>
+        </section>
+
         <section class="admin-page active" id="page-overview">
           <div class="overview-grid" id="overviewGrid"></div>
+          <div class="admin-section" style="border:1px solid var(--gold); border-radius:12px; padding:1rem 1.2rem; margin-bottom:1.4rem;">
+            <h3 style="margin-top:0;">&#128017; Schaf-Sprechblase</h3>
+            <p class="admin-help-text">Text, der erscheint, wenn Besucher auf das Schaf im Banner klicken. Kannst du jederzeit &auml;ndern, wirkt sofort ohne Deploy.</p>
+            <div style="margin-bottom:0.7rem;">
+              <label for="sheepSpeechTextInput">Sprechblasen-Text</label>
+              <textarea id="sheepSpeechTextInput" rows="2" maxlength="180" style="width:100%; resize:vertical;"></textarea>
+            </div>
+            <button class="btn btn-primary" id="sheepSpeechSave" type="button">Speichern</button>
+            <span id="sheepSpeechStatus" style="margin-left:0.8rem; font-size:0.9rem;"></span>
+          </div>
           <div class="admin-section">
             <h2>Letzte Aktivität</h2>
             <div class="overview-activity" id="overviewActivity"></div>
@@ -917,6 +945,7 @@
                   <option value="admin">Admin</option>
                   <option value="editor">Editor</option>
                   <option value="company">Kartenbaufirma-Mitarbeiter</option>
+                  <option value="sheep_editor">Schaf-Zitat-Editor (nur Zitat des Tages)</option>
                 </select>
               </div>
             </div>
@@ -962,9 +991,9 @@
   </div>
 
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260712-syncwarn1"></script>
+  <script src="supabase.js?v=20260715-runeupgrade1"></script>
   <script src="app.js?v=20260712-themefix1"></script>
-  <script src="idledorf.js?v=20260713-visitors1"></script>
+  <script src="idledorf.js?v=20260715-substatfix2"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
   <script>
     bkmpInitTheme();
@@ -1013,9 +1042,73 @@
         refreshInvestorRequestsFromSupabase(),
         refreshCardCatalogFromSupabase(),
         refreshCardSaleRequestsFromSupabase(),
-        refreshFeedbackList()
+        refreshFeedbackList(),
+        refreshSheepSpeechAdmin()
       ]);
     }
+
+    async function refreshSheepSpeechAdmin() {
+      const input = document.getElementById('sheepSpeechTextInput');
+      if (!input) return;
+      try {
+        const text = typeof loadSheepSpeechText === 'function' ? await loadSheepSpeechText() : null;
+        input.value = text || '';
+      } catch (e) {
+        showAdminToast('Schaf-Sprechblasen-Text konnte nicht geladen werden: ' + supabaseErrorText(e), 'error');
+      }
+    }
+
+    const sheepSpeechSaveBtn = document.getElementById('sheepSpeechSave');
+    if (sheepSpeechSaveBtn) sheepSpeechSaveBtn.addEventListener('click', async () => {
+      const input = document.getElementById('sheepSpeechTextInput');
+      const statusEl = document.getElementById('sheepSpeechStatus');
+      sheepSpeechSaveBtn.disabled = true;
+      if (statusEl) statusEl.textContent = 'Speichere...';
+      try {
+        await setSheepSpeechText(input.value);
+        if (statusEl) statusEl.textContent = '✅ Gespeichert.';
+        showAdminToast('Schaf-Sprechblasen-Text gespeichert.', 'success');
+      } catch (e) {
+        if (statusEl) statusEl.textContent = '';
+        showAdminToast('Konnte nicht gespeichert werden: ' + supabaseErrorText(e), 'error');
+      } finally {
+        sheepSpeechSaveBtn.disabled = false;
+      }
+    });
+
+    /* Eigene Lade-/Speicher-Funktionen fuer das eingeschraenkte "Zitat des
+       Tages"-Konto (page-sheepeditor) statt die obigen sheepSpeech*-Funktionen
+       wiederzuverwenden - die haengen an refreshAdminDataFromSupabase(), die
+       fuer dieses Konto (isSheepEditor, siehe showAdmin) bewusst NIE aufgerufen
+       wird (sonst wuerden Karten/Investoren/Feedback/... trotzdem im
+       Hintergrund geladen, obwohl das Konto davon gar nichts sehen soll). */
+    async function bkmpLoadSheepEditorText() {
+      const input = document.getElementById('sheepEditorTextInput');
+      if (!input) return;
+      try {
+        const text = typeof loadSheepSpeechText === 'function' ? await loadSheepSpeechText() : null;
+        input.value = text || '';
+      } catch (e) {
+        showAdminToast('Zitat des Tages konnte nicht geladen werden: ' + supabaseErrorText(e), 'error');
+      }
+    }
+    const sheepEditorSaveBtn = document.getElementById('sheepEditorSave');
+    if (sheepEditorSaveBtn) sheepEditorSaveBtn.addEventListener('click', async () => {
+      const input = document.getElementById('sheepEditorTextInput');
+      const statusEl = document.getElementById('sheepEditorStatus');
+      sheepEditorSaveBtn.disabled = true;
+      if (statusEl) statusEl.textContent = 'Speichere...';
+      try {
+        await setSheepSpeechText(input.value);
+        if (statusEl) statusEl.textContent = '✅ Gespeichert.';
+        showAdminToast('Zitat des Tages gespeichert.', 'success');
+      } catch (e) {
+        if (statusEl) statusEl.textContent = '';
+        showAdminToast('Konnte nicht gespeichert werden: ' + supabaseErrorText(e), 'error');
+      } finally {
+        sheepEditorSaveBtn.disabled = false;
+      }
+    });
 
     async function refreshBackupDataFromSupabase() {
       await Promise.all([
@@ -1043,6 +1136,18 @@
         document.querySelectorAll('.admin-nav-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.page === 'companydashboard'));
         document.querySelectorAll('.admin-page').forEach(section => section.classList.toggle('active', section.id === 'page-companydashboard'));
         if (typeof bkmpMapRenderCompanyDashboard === 'function') bkmpMapRenderCompanyDashboard(profile);
+        return;
+      }
+      /* Eingeschraenktes Konto (z.B. SheepMasterLP): sieht wirklich NUR die
+         "Zitat des Tages"-Seite, keine Navigation, keine anderen Daten -
+         gleiches Muster wie oben bei Firmen-Accounts, nur mit einer noch
+         kleineren, eigenen Seite statt eines ganzen Dashboards. */
+      const isSheepEditor = Boolean(profile && profile.role === 'sheep_editor');
+      document.body.classList.toggle('admin-mode-sheepeditor', isSheepEditor);
+      if (isSheepEditor) {
+        document.querySelectorAll('.admin-nav-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.page === 'sheepeditor'));
+        document.querySelectorAll('.admin-page').forEach(section => section.classList.toggle('active', section.id === 'page-sheepeditor'));
+        bkmpLoadSheepEditorText();
         return;
       }
       renderAll();
