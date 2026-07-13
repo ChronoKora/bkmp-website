@@ -4090,29 +4090,33 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   overflow-anchor: none;
   margin-bottom: 0.4rem;
 }
-/* #plushiesPanel sitzt zwischen Karte und Liste (wegen der Code-Einloese-Box
-   davor) - braucht selbst eine Flex-Spalte, damit die Box fix bleibt und nur
-   #plushiesList (hat ebenfalls .cosmetics-list) im Rest waechst/scrollt. */
+/* NACHBESSERUNG (Nutzerwunsch 15.07.: "das der Balken mit Code Einlösen und
+   Plüshies zusammen gehört zum scrollen, für mehr Scrollfläche") - vorher
+   war die Code-Einloese-Box fix (flex-shrink:0) und NUR die Kachel-Liste
+   darunter hatte einen eigenen, kleinen Scrollbereich - der blieb dadurch
+   selbst mit einem Mindestwert (190px) recht knapp. Jetzt gehoert die
+   GESAMTE Flaeche (Hinweistext + Code-Box + Kacheln) zu EINEM einzigen
+   Scrollbereich: #plushiesPanel selbst scrollt, die Kachel-Liste ist darin
+   nur noch normaler, nicht selbst scrollender Inhalt. Wer die Kacheln sehen
+   will, scrollt die (kurze) Code-Box einfach mit weg - dadurch bleibt bei
+   gleicher Fensterhoehe deutlich mehr Platz fuer die Kacheln sichtbar, statt
+   ihn fix an die Code-Box abzugeben. */
 #plushiesPanel {
   flex: 1 1 auto;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-anchor: none;
 }
-/* Streamerin-Report (15.07.): "kann bei Plüshie nicht scrollen" - auf
-   niedrigeren Fensterhoehen frisst die Hinweiszeile + Code-Einloese-Box
-   (beide flex-shrink:0, also unveraenderlich) fast den kompletten
-   Platz von #plushiesPanel auf, weil #plushiesList (.cosmetics-list) durch
-   "min-height:0" (noetig gegen den bekannten Grid-in-Flex-Scroll-Bug, siehe
-   .achievements-list weiter oben) auf einen wenige Pixel schmalen Streifen
-   zusammengequetscht wurde - technisch noch scrollbar, aber praktisch
-   unbedienbar (kaum eine halbe Kachelreihe sichtbar). Fester Mindestwert
-   garantiert immer einen wirklich nutzbaren Scrollbereich. */
+/* #plushiesList (.cosmetics-list) braucht hier KEIN eigenes Scrollen/
+   Wachsen mehr - das uebernimmt jetzt #plushiesPanel selbst (siehe oben).
+   Per ID-Selektor gezielt nur fuer die Plüshies ueberschrieben - Kosmetik-/
+   Titel-Tab (#cosmeticsList/#titlesList) behalten ihr eigenes, unabhaengiges
+   Scrollen, da sie keine vorgeschaltete Code-Box haben. */
 #plushiesList {
-  min-height: 190px;
+  flex: none;
+  overflow: visible;
+  margin-bottom: 0;
 }
-.plushie-redeem-box { flex-shrink: 0; }
 /* "Neu"-Badge fuer frisch hinzugefuegte Titel/Erfolge/Pluschies/PartnerShops/
    Idle-Dorf-Sammlung (siehe bkmpNewBadgeChecker in index.html) - klein,
    gut sichtbar, aber ohne das Kartenlayout zu stoeren. */

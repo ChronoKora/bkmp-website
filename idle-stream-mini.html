@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="favicon.ico" sizes="any">
 <title>BKMP – Idle Drachen Dorf (Mini-Stream-Overlay)</title>
-<link rel="stylesheet" href="style.css?v=20260715-streamerhelp2">
+<link rel="stylesheet" href="style.css?v=20260715-plushiescroll1">
 <style>
   /* ============================================================
      Winzige "nur Dorf+Drache" Variante von idle-stream.html
@@ -122,6 +122,16 @@
   }
   .idle-village-sprite { max-width: 280px; }
   .idle-dragon-sprite { max-width: 210px; }
+
+  /* Nutzerwunsch (Screenshot 15.07.): die Schadenszahl (-252 usw., normale
+     style.css-Regel: top:-6px) hing hier nur 6px ueber dem Dorf-/Drachen-
+     Kasten - auf der Hauptseite (grosszuegiger Platz) fiel das kaum auf,
+     hier auf der kompakteren Mini-Seite (kleinere Kaesten, siehe oben) sass
+     die Zahl dadurch sichtbar AUF dem goldenen Rahmen/der abgerundeten
+     Ecke der Kiste statt klar darueber zu schweben. Deutlich mehr Abstand
+     nach oben - passt locker in den Freiraum zwischen Kasten und
+     Kampf-Box-Rand. */
+  .idle-dmg-float { top: -22px; }
 
   /* Gold/XP-Hochschweb-Anzeige (Nutzerwunsch 15.07.: urspruenglich nur
      hier, jetzt globaler Standard - CSS/Listener sitzen jetzt zentral in
