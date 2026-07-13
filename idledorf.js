@@ -416,7 +416,9 @@ function bkmpIdleDefaultState(name) {
     playtime_seconds: 0,
     last_seen_at: new Date().toISOString(),
     last_offline_claim: {},
-    last_skilltree_reset_at: null
+    last_skilltree_reset_at: null,
+    rune_fuse_successes: 0, rune_fuse_failures: 0,
+    rune_upgrade_successes: 0, rune_upgrade_failures: 0
   };
 }
 
@@ -695,7 +697,7 @@ function bkmpIdleGetCachedAchievementFields() {
 function bkmpIdleGetAchievementContextFields() {
   const s = bkmpIdleState;
   if (!s) {
-    return bkmpIdleGetCachedAchievementFields() || { idleDragonKills: 0, idleBossKills: 0, idleLevel: 0, idleGoldEarned: 0, idleSkillPointsSpent: 0, idleBranchesMaxed: 0, shenlossDefeated: false, liberDefeated: false, idlePrestigeLevel: 0 };
+    return bkmpIdleGetCachedAchievementFields() || { idleDragonKills: 0, idleBossKills: 0, idleLevel: 0, idleGoldEarned: 0, idleSkillPointsSpent: 0, idleBranchesMaxed: 0, shenlossDefeated: false, liberDefeated: false, idlePrestigeLevel: 0, idleRuneFuseSuccesses: 0, idleRuneFuseFailures: 0, idleRuneUpgradeSuccesses: 0, idleRuneUpgradeFailures: 0, idleAllEquippedRarity: null, idleAllEquippedMinLevel: -1 };
   }
   const fields = {
     idleDragonKills: Number(s.dragon_kills || 0),
@@ -713,7 +715,13 @@ function bkmpIdleGetAchievementContextFields() {
        wirken (gleiche Vorsicht wie bei bkmpPrestigeLoadFailed). */
     idlePrestigeLevel: bkmpPrestigeState
       ? Number(bkmpPrestigeState.prestige_level || 0)
-      : Number((bkmpIdleGetCachedAchievementFields() || {}).idlePrestigeLevel || 0)
+      : Number((bkmpIdleGetCachedAchievementFields() || {}).idlePrestigeLevel || 0),
+    idleRuneFuseSuccesses: Number(s.rune_fuse_successes || 0),
+    idleRuneFuseFailures: Number(s.rune_fuse_failures || 0),
+    idleRuneUpgradeSuccesses: Number(s.rune_upgrade_successes || 0),
+    idleRuneUpgradeFailures: Number(s.rune_upgrade_failures || 0),
+    idleAllEquippedRarity: bkmpIdleAllEquippedRarity(),
+    idleAllEquippedMinLevel: bkmpIdleAllEquippedMinLevel()
   };
   try { localStorage.setItem(BKMP_IDLE_ACHIEVEMENT_CACHE_KEY, JSON.stringify(fields)); } catch (e) {}
   return fields;
@@ -2582,6 +2590,7 @@ function bkmpRuneUpgrade(cid) {
   if (Math.random() < failChance) {
     bkmpIdleLog(`💥 ${slot.name} +${level}: Aufwertung fehlgeschlagen! Gold verloren, Stufe bleibt gleich.`);
     if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`💥 Aufwertung fehlgeschlagen - ${cost} Gold futsch, Stufe bleibt +${level}.`, 3200);
+    bkmpIdleState.rune_upgrade_failures = Number(bkmpIdleState.rune_upgrade_failures || 0) + 1;
     bkmpRuneCurrentlyViewing = cid;
     bkmpIdleRecomputeEffectiveStats();
     bkmpIdleRenderRunenPanel();
@@ -2622,6 +2631,7 @@ function bkmpRuneUpgrade(cid) {
      Blocker an), und sobald die id eintrifft (siehe bkmpIdleQueueRuneSync/
      bkmpRuneFuse), wird der dann aktuelle Stand automatisch nachgetragen. */
   if (rune.id) updatePlayerRuneUpgrade(rune.id, rune.upgrade_level, rune.substats).catch(() => {});
+  bkmpIdleState.rune_upgrade_successes = Number(bkmpIdleState.rune_upgrade_successes || 0) + 1;
   bkmpRuneCurrentlyViewing = cid;
   bkmpIdleRecomputeEffectiveStats();
   bkmpIdleRenderRunenPanel();
@@ -2903,6 +2913,10 @@ function bkmpRuneFuse(slotId, rarityId, cids) {
   const failChance = BKMP_RUNE_FUSE_FAIL_CHANCE[rarityId] || 0;
   if (Math.random() < failChance) {
     bkmpIdleLog(`💥 3× ${slot.name} (${rarityDef.name}) beim Verschmelzen zerstört - kein Ergebnis!`);
+    if (bkmpIdleState) {
+      bkmpIdleState.rune_fuse_failures = Number(bkmpIdleState.rune_fuse_failures || 0) + 1;
+      bkmpIdleQueueSync();
+    }
     bkmpIdleRenderRunenPanel();
     return { success: false, destroyed: true };
   }
@@ -2928,9 +2942,31 @@ function bkmpRuneFuse(slotId, rarityId, cids) {
       .catch(() => {});
   }
   bkmpIdleLog(`✨ 3× ${slot.name} (${rarityDef.name}) zu ${newRarity.name} verschmolzen!`);
+  if (bkmpIdleState) {
+    bkmpIdleState.rune_fuse_successes = Number(bkmpIdleState.rune_fuse_successes || 0) + 1;
+    bkmpIdleQueueSync();
+  }
   bkmpRuneCurrentlyViewing = newRune._cid;
   bkmpIdleRenderRunenPanel();
   return { success: true, newRune };
+}
+
+/* Fuer die "alle 6 Slots gleiche Seltenheit"-Erfolge - gibt die geteilte
+   Seltenheits-id zurueck, nur wenn WIRKLICH alle 6 Slots belegt UND
+   gleich sind, sonst null (unvollstaendige Ausruestung zaehlt nicht). */
+function bkmpIdleAllEquippedRarity() {
+  const equipped = bkmpIdlePlayerRunes.filter(r => r.equipped);
+  if (equipped.length !== window.BKMP_RUNE_SLOTS.length) return null;
+  const rarity = equipped[0].rarity;
+  return equipped.every(r => r.rarity === rarity) ? rarity : null;
+}
+
+/* Fuer die "alle 6 Slots mindestens +N"-Erfolge - Minimum ueber alle
+   ausgeruesteten Runen, -1 solange nicht alle 6 Slots belegt sind. */
+function bkmpIdleAllEquippedMinLevel() {
+  const equipped = bkmpIdlePlayerRunes.filter(r => r.equipped);
+  if (equipped.length !== window.BKMP_RUNE_SLOTS.length) return -1;
+  return equipped.reduce((min, r) => Math.min(min, Number(r.upgrade_level || 0)), Infinity);
 }
 
 function bkmpRuneSell(cid) {
@@ -4473,6 +4509,37 @@ window.BKMP_IDLE_PRESTIGE_TITLE_NAMES = [
   'Prestige Legende', 'Prestige Titan', 'Prestige Halbgott', 'Prestige Gott', 'Was ist Prestige?'
 ];
 
+/* Runen-Erfolge (Kategorie "Runen"). Vier Tier-Reihen fuer Verschmelzen/
+   Aufwerten, je Erfolg UND Misserfolg - die Misserfolgs-Reihen sind
+   bewusst genauso ausgebaut wie die Erfolgs-Reihen (nicht nur 1-2
+   Alibi-Stufen), da Pech beim Verschmelzen/Aufwerten ein echter,
+   wiederkehrender Teil des Runen-Systems ist. */
+window.BKMP_RUNE_FUSE_SUCCESS_TIERS = [
+  [1, 'Erste Verschmelzung'], [5, 'Runenschmelzer'], [15, 'Fusionsmeister'], [30, 'Runenalchemist'],
+  [60, 'Schmelztiegel-Meister'], [100, 'Runenveredler'], [200, 'Großmeister der Fusion'], [350, 'Legende der Verschmelzung']
+];
+window.BKMP_RUNE_FUSE_FAIL_TIERS = [
+  [1, 'Erster Rückschlag'], [5, 'Pechvogel'], [15, 'Explosionsgefahr'], [30, 'Unverwüstlicher Optimist'], [50, 'Schmelztiegel des Grauens']
+];
+window.BKMP_RUNE_UPGRADE_SUCCESS_TIERS = [
+  [1, 'Erste Aufwertung'], [10, 'Runenschleifer'], [25, 'Veredelungskünstler'], [50, 'Runenoptimierer'],
+  [100, 'Aufwertungsmeister'], [200, 'Runenperfektionist'], [400, 'Großmeister der Veredelung'], [750, 'Legende der Veredelung']
+];
+window.BKMP_RUNE_UPGRADE_FAIL_TIERS = [
+  [1, 'Gold verbrannt'], [5, 'Teurer Fehlschlag'], [15, 'Risikofreudig'], [30, 'Nerven aus Stahl'], [50, 'Va-Banque-Spieler']
+];
+/* Fuenf Erfolge fuer "alle 6 Slots mit derselben Seltenheit ausgeruestet" -
+   Reihenfolge exakt wie BKMP_RUNE_RARITIES (gray/green/blue/purple/gold). */
+window.BKMP_RUNE_EQUIP_RARITY_TIERS = [
+  ['gray', 'Purist'], ['green', 'Grüner Daumen'], ['blue', 'Blaues Blut'], ['purple', 'Violette Vorherrschaft'], ['gold', 'Runengott']
+];
+/* Fuenf Erfolge fuer "alle 6 Slots mindestens auf Stufe N" - deckt sich
+   exakt mit BKMP_RUNE_MAX_LEVEL = 15 (letzte Stufe = absolutes Maximum
+   auf allen 6 Runen gleichzeitig). */
+window.BKMP_RUNE_EQUIP_LEVEL_TIERS = [
+  [3, 'Frisch geschliffen'], [6, 'Feingeschliffen'], [9, 'Meisterlich veredelt'], [12, 'Nahezu perfekt'], [15, 'Runen-Perfektion']
+];
+
 window.BKMP_IDLE_ACHIEVEMENTS_EXTRA = [
   { id: 'idle_started', category: 'Idle Dorf', title: 'Dorfgründung', desc: 'Öffne das Idle Drachen Dorf zum ersten Mal.', check: ctx => ctx.idleLevel >= 1 },
   { id: 'idle_first_boss', category: 'Idle Dorf', title: 'Bosskämpfer', desc: 'Besiege deinen ersten Boss-Drachen im Idle Dorf.', check: ctx => ctx.idleBossKills >= 1 },
@@ -4481,7 +4548,20 @@ window.BKMP_IDLE_ACHIEVEMENTS_EXTRA = [
   { id: 'idle_skillpoints_1', category: 'Idle Dorf', title: 'Erster Skillpunkt', desc: 'Investiere deinen ersten Skillpunkt.', check: ctx => ctx.idleSkillPointsSpent >= 1 },
   { id: 'idle_branch_one', category: 'Idle Dorf', title: 'Spezialist', desc: 'Maximiere einen kompletten Skilltree-Zweig.', check: ctx => ctx.idleBranchesMaxed >= 1 },
   { id: 'idle_branch_three', category: 'Idle Dorf', title: 'Vielseitiger Anführer', desc: 'Maximiere drei komplette Skilltree-Zweige.', progress: ctx => [ctx.idleBranchesMaxed, 3], check: ctx => ctx.idleBranchesMaxed >= 3 },
-  { id: 'idle_branch_all', category: 'Idle Dorf', title: 'Skilltree-Meister', desc: 'Maximiere alle 5 Skilltree-Zweige.', progress: ctx => [ctx.idleBranchesMaxed, 5], check: ctx => ctx.idleBranchesMaxed >= 5 }
+  { id: 'idle_branch_all', category: 'Idle Dorf', title: 'Skilltree-Meister', desc: 'Maximiere alle 5 Skilltree-Zweige.', progress: ctx => [ctx.idleBranchesMaxed, 5], check: ctx => ctx.idleBranchesMaxed >= 5 },
+  ...window.BKMP_RUNE_EQUIP_RARITY_TIERS.map(([rarityId, label]) => {
+    const rarity = window.BKMP_RUNE_RARITIES.find(r => r.id === rarityId);
+    return {
+      id: `rune_equip_rarity_${rarityId}`, category: 'Runen', title: label,
+      desc: `Ruste alle 6 Runen-Plätze gleichzeitig mit ${rarity.name}-Runen aus.`,
+      check: ctx => ctx.idleAllEquippedRarity === rarityId
+    };
+  }),
+  ...window.BKMP_RUNE_EQUIP_LEVEL_TIERS.map(([n, label]) => ({
+    id: `rune_equip_level_${n}`, category: 'Runen', title: label,
+    desc: `Bringe alle 6 ausgerüsteten Runen gleichzeitig auf mindestens +${n}.`,
+    check: ctx => ctx.idleAllEquippedMinLevel >= n
+  }))
 ];
 
 /* Frueher zeigten alle Tier-Titel auf "unlockAchievement"-IDs (z. B.
@@ -4514,6 +4594,33 @@ window.BKMP_IDLE_TITLES = [
   ...window.BKMP_IDLE_PRESTIGE_TIERS.map(([n], i) => ({
     id: `idletitle_prestige_${n}`, name: window.BKMP_IDLE_PRESTIGE_TITLE_NAMES[i], desc: `Erreiche Prestige-Stufe ${n} im Idle Dorf.`,
     unlockCustom: ctx => ctx.idlePrestigeLevel >= n, effectType: 'attack_pct', effectValue: i + 1
+  })),
+  ...window.BKMP_RUNE_FUSE_SUCCESS_TIERS.map(([n, label], i) => ({
+    id: `runetitle_fuse_${n}`, name: label, desc: `Verschmelze ${n} Runen erfolgreich.`,
+    unlockCustom: ctx => ctx.idleRuneFuseSuccesses >= n, effectType: 'loot_chance_pct', effectValue: i + 1
+  })),
+  ...window.BKMP_RUNE_FUSE_FAIL_TIERS.map(([n, label], i) => ({
+    id: `runetitle_fusefail_${n}`, name: label, desc: `Erlebe ${n} fehlgeschlagene Runen-Verschmelzungen.`,
+    unlockCustom: ctx => ctx.idleRuneFuseFailures >= n
+  })),
+  ...window.BKMP_RUNE_UPGRADE_SUCCESS_TIERS.map(([n, label], i) => ({
+    id: `runetitle_upgrade_${n}`, name: label, desc: `Werte Runen ${n}-mal erfolgreich auf.`,
+    unlockCustom: ctx => ctx.idleRuneUpgradeSuccesses >= n, effectType: 'attack_pct', effectValue: i + 1
+  })),
+  ...window.BKMP_RUNE_UPGRADE_FAIL_TIERS.map(([n, label], i) => ({
+    id: `runetitle_upgradefail_${n}`, name: label, desc: `Erlebe ${n} fehlgeschlagene Runen-Aufwertungen.`,
+    unlockCustom: ctx => ctx.idleRuneUpgradeFailures >= n
+  })),
+  ...window.BKMP_RUNE_EQUIP_RARITY_TIERS.map(([rarityId, label], i) => {
+    const rarity = window.BKMP_RUNE_RARITIES.find(r => r.id === rarityId);
+    return {
+      id: `runetitle_equiprarity_${rarityId}`, name: label, desc: `Alle 6 Runen-Plätze mit ${rarity.name}-Runen ausgerüstet.`,
+      unlockCustom: ctx => ctx.idleAllEquippedRarity === rarityId, effectType: 'crit_chance_flat', effectValue: i + 1
+    };
+  }),
+  ...window.BKMP_RUNE_EQUIP_LEVEL_TIERS.map(([n, label], i) => ({
+    id: `runetitle_equiplevel_${n}`, name: label, desc: `Alle 6 ausgerüsteten Runen auf mindestens +${n}.`,
+    unlockCustom: ctx => ctx.idleAllEquippedMinLevel >= n, effectType: 'crit_damage_pct', effectValue: i + 1
   })),
   { id: 'idletitle_founder', name: 'Dorfgründer', desc: 'Das Idle Dorf gegründet.', unlockCustom: ctx => ctx.idleLevel >= 1 },
   { id: 'idletitle_boss1', name: 'Bosskämpfer', desc: 'Besiegt den ersten Boss.', unlockCustom: ctx => ctx.idleBossKills >= 1, effectType: 'crit_chance_flat', effectValue: 1 },
