@@ -3105,6 +3105,50 @@ async function deletePlayerRunes(runeIds) {
   return true;
 }
 
+/* ---------------- Idle-Dorf: Dorf-Skins ----------------
+   Katalog oeffentlich lesbar (jeder Client kennt alle Skins, auch
+   noch nicht besessene, fuer die Auswahl-Vorschau). Besitz-Zeilen laufen
+   1:1 wie idle_player_runes - Client fuegt nach lokalem Gold-Abzug selbst
+   eine Zeile ein, kein serverseitiger Kauf-RPC (gleicher Vertrauens-
+   Rahmen wie der Rest des Idle-Spiels). */
+async function loadVillageSkinsCatalog() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from('idle_village_skins')
+    .select('id, name, description, icon, image_file, unlock_type, price_gold, price_crystals, unlock_hint, sort_order')
+    .eq('active', true)
+    .order('sort_order', { ascending: true });
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+}
+
+async function loadPlayerVillageSkins(name) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !name) return [];
+  const { data, error } = await client
+    .from('idle_player_village_skins')
+    .select('skin_id, unlocked_at')
+    .eq('name_key', String(name).trim().toLowerCase());
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+}
+
+async function unlockPlayerVillageSkin(nameKey, skinId) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return null;
+  const { data: sessionData } = await client.auth.getSession();
+  const userId = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
+  if (!userId) return null;
+  const { data, error } = await client
+    .from('idle_player_village_skins')
+    .insert({ name_key: String(nameKey).trim().toLowerCase(), auth_user_id: userId, skin_id: skinId })
+    .select('skin_id, unlocked_at')
+    .limit(1);
+  if (error) throw error;
+  return Array.isArray(data) ? data[0] : null;
+}
+
 /* ---------------- Idle-Dorf: Twitch-Overlay-Herzschlag ----------------
    Nutzerwunsch (15.07.): die Twitch-Seite (idle-stream.html/idle-stream-
    mini.html) meldet sich hier alle paar Sekunden ("ich bin noch offen"),

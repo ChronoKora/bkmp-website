@@ -519,6 +519,25 @@ async function bkmpIdleLoadOrInitState(name) {
     console.warn('Idle Dorf: Runen konnten nicht geladen werden (Migration evtl. noch nicht ausgefuehrt - siehe supabase-idle-runes.sql / supabase-idle-runes-v2.sql).', e);
     bkmpIdlePlayerRunes = [];
   }
+  /* Dorf-Skins: ebenfalls ein reines Bonus-/Kosmetik-System oben drauf,
+     siehe Runen-Kommentar oben - ein Ladefehler (Migration evtl. noch
+     nicht ausgefuehrt) blockiert das Spiel nicht, startet nur mit leerem
+     Skin-Katalog/Besitz (dann ist ausser dem Standarddorf nichts waehlbar). */
+  bkmpVillageSkinsCatalog = [];
+  bkmpPlayerVillageSkins = [];
+  try {
+    const [catalog, owned] = await Promise.all([
+      typeof loadVillageSkinsCatalog === 'function' ? loadVillageSkinsCatalog() : [],
+      typeof loadPlayerVillageSkins === 'function' ? loadPlayerVillageSkins(name) : []
+    ]);
+    bkmpVillageSkinsCatalog = Array.isArray(catalog) ? catalog : [];
+    bkmpPlayerVillageSkins = Array.isArray(owned) ? owned.map(r => r.skin_id) : [];
+  } catch (e) {
+    console.warn('Idle Dorf: Dorf-Skins konnten nicht geladen werden (Migration evtl. noch nicht ausgefuehrt - siehe supabase-idle-village-skins.sql).', e);
+    bkmpVillageSkinsCatalog = [];
+    bkmpPlayerVillageSkins = [];
+  }
+  bkmpApplyVillageSkin();
   bkmpIdleSnapshotMergeBaseline();
 }
 
@@ -2749,6 +2768,132 @@ let bkmpIdlePlayerRunes = [];
 let bkmpIdlePendingRuneDrops = [];
 let bkmpIdleRuneSyncTimer = null;
 
+/* ---------------- Dorf-Skins ----------------
+   Reskin nur fuers PERSOENLICHE Dorf-Sprite im Kampf-Tab
+   (.idle-village-sprite) - die geteilte Raid-Stadt (.raid-city-sprite)
+   ist ein eigenes, gemeinsames Bild fuer den ganzen Server-Raid und wird
+   hier bewusst NICHT mit angefasst.
+
+   Freischaltung (Nutzervorgabe 13.07.): hauptsaechlich Kauf mit Gold/
+   Kristallen, aber einzelne Skins koennen laut unlock_type auch per
+   Achievement oder Boss-Drop freigeschaltet werden - diese zwei Wege
+   bekommen noch keine automatische Trigger-Logik, bis der Spieler pro
+   Skin mitteilt, welche Bedingung genau gelten soll (siehe SQL-Kommentar
+   in supabase-idle-village-skins.sql). Das Grundgeruest (Katalog laden,
+   Besitz pruefen, kaufen, ausruesten, Sprite live tauschen) steht schon,
+   damit neue PNGs direkt als weitere Katalog-Zeilen eingehaengt werden
+   koennen, sobald sie fertig sind. */
+let bkmpVillageSkinsCatalog = [];
+let bkmpPlayerVillageSkins = [];
+const BKMP_ACTIVE_VILLAGE_SKIN_KEY = 'bkmp-active-village-skin';
+
+function bkmpGetActiveVillageSkinId() {
+  try { return localStorage.getItem(BKMP_ACTIVE_VILLAGE_SKIN_KEY) || 'standard'; } catch (e) { return 'standard'; }
+}
+function bkmpSetActiveVillageSkinId(skinId) {
+  try { localStorage.setItem(BKMP_ACTIVE_VILLAGE_SKIN_KEY, skinId); } catch (e) { /* localStorage evtl. nicht verfuegbar (Privatmodus) - Auswahl gilt dann nur fuer diese Sitzung */ }
+}
+
+function bkmpVillageSkinOwned(skinId) {
+  const def = bkmpVillageSkinsCatalog.find(s => s.id === skinId);
+  if (!def) return false;
+  return def.unlock_type === 'free' || bkmpPlayerVillageSkins.includes(skinId);
+}
+
+/* Setzt das tatsaechliche Hintergrundbild von #idleVillageSprite. Faellt
+   auf 'standard' zurueck, falls die gewaehlte Skin-ID unbekannt oder (z.B.
+   nach einem spaeteren Entzug) nicht mehr besessen ist - gleiche
+   Nachpruef-Logik wie bkmpApplyActiveCosmetic bei den Namens-Kosmetiken,
+   damit eine manipulierte localStorage-ID kein fremdes Bild erzwingen
+   kann, das der Spieler nie freigeschaltet hat. */
+function bkmpApplyVillageSkin() {
+  const el = document.getElementById('idleVillageSprite');
+  if (!el) return;
+  let activeId = bkmpGetActiveVillageSkinId();
+  let def = bkmpVillageSkinsCatalog.find(s => s.id === activeId);
+  if (!def || !bkmpVillageSkinOwned(activeId)) {
+    def = bkmpVillageSkinsCatalog.find(s => s.id === 'standard');
+  }
+  if (def && def.image_file) {
+    el.style.backgroundImage = `url('${def.image_file}')`;
+  } else {
+    el.style.backgroundImage = '';
+  }
+}
+
+function bkmpIdleBuyVillageSkin(skinId) {
+  const def = bkmpVillageSkinsCatalog.find(s => s.id === skinId);
+  if (!def || def.unlock_type !== 'purchase' || !bkmpIdleState) return;
+  if (bkmpVillageSkinOwned(skinId)) return;
+  const goldCost = Number(def.price_gold || 0);
+  const crystalCost = Number(def.price_crystals || 0);
+  if ((bkmpIdleState.gold || 0) < goldCost || (bkmpIdleState.crystals || 0) < crystalCost) return;
+  bkmpIdleState.gold -= goldCost;
+  bkmpIdleState.crystals -= crystalCost;
+  bkmpIdleRenderHud();
+  bkmpIdleQueueSync();
+  const nameKey = bkmpIdleState.name_key;
+  Promise.resolve(typeof unlockPlayerVillageSkin === 'function' ? unlockPlayerVillageSkin(nameKey, skinId) : null)
+    .then(row => {
+      if (row) bkmpPlayerVillageSkins.push(skinId);
+      bkmpIdleRenderSkinsPanel();
+    })
+    .catch(e => {
+      /* Kauf-Zeile konnte nicht gespeichert werden (Migration evtl. noch
+         nicht ausgefuehrt, oder Netzwerkfehler) - Gold bleibt trotzdem
+         abgezogen (gleiches Verhalten wie ein normaler Upgrade-Kauf bei
+         Sync-Fehlern), der Spieler kann es beim naechsten Laden erneut
+         versuchen. */
+      console.warn('Idle Dorf: Dorf-Skin-Kauf konnte nicht gespeichert werden.', e);
+    });
+}
+
+function bkmpIdleEquipVillageSkin(skinId) {
+  if (!bkmpVillageSkinOwned(skinId)) return;
+  bkmpSetActiveVillageSkinId(skinId);
+  bkmpApplyVillageSkin();
+  bkmpIdleRenderSkinsPanel();
+}
+
+function bkmpIdleRenderSkinsPanel() {
+  const panel = document.getElementById('idlePanelSkins');
+  if (!panel || !bkmpIdleState) return;
+  const activeId = bkmpGetActiveVillageSkinId();
+  if (!bkmpVillageSkinsCatalog.length) {
+    panel.innerHTML = `<p class="idle-skin-empty-hint">Noch keine Dorf-Skins verfuegbar - schau bald wieder vorbei.</p>`;
+    return;
+  }
+  panel.innerHTML = `<div class="idle-skin-grid">${bkmpVillageSkinsCatalog.map(def => {
+    const owned = bkmpVillageSkinOwned(def.id);
+    const isEquipped = owned && activeId === def.id;
+    let actionHtml;
+    if (isEquipped) {
+      actionHtml = `<button type="button" class="btn-ja idle-skin-action" disabled>Ausgerüstet</button>`;
+    } else if (owned) {
+      actionHtml = `<button type="button" class="btn-ja idle-skin-action idle-skin-equip" data-skin-id="${def.id}">Ausrüsten</button>`;
+    } else if (def.unlock_type === 'purchase') {
+      const goldCost = Number(def.price_gold || 0);
+      const crystalCost = Number(def.price_crystals || 0);
+      const affordable = (bkmpIdleState.gold || 0) >= goldCost && (bkmpIdleState.crystals || 0) >= crystalCost;
+      const priceParts = [];
+      if (goldCost > 0) priceParts.push(`💰 ${bkmpIdleFormatNumber(goldCost)}`);
+      if (crystalCost > 0) priceParts.push(`💎 ${bkmpIdleFormatNumber(crystalCost)}`);
+      actionHtml = `<button type="button" class="btn-ja idle-skin-action idle-skin-buy" data-skin-id="${def.id}" ${affordable ? '' : 'disabled'}>${priceParts.join(' + ') || 'Kaufen'}</button>`;
+    } else {
+      actionHtml = `<div class="idle-skin-locked-hint">🔒 ${escapeHtml(def.unlock_hint || (def.unlock_type === 'achievement' ? 'Über einen Erfolg freischaltbar' : 'Seltener Boss-Drop'))}</div>`;
+    }
+    return `
+      <div class="idle-skin-card ${isEquipped ? 'idle-skin-card-equipped' : ''}">
+        <div class="idle-skin-icon">${def.icon || '🏘️'}</div>
+        <div class="idle-skin-name">${escapeHtml(def.name)}</div>
+        <div class="idle-skin-desc">${escapeHtml(def.description || '')}</div>
+        ${actionHtml}
+      </div>`;
+  }).join('')}</div>`;
+  panel.querySelectorAll('.idle-skin-buy').forEach(btn => btn.addEventListener('click', () => bkmpIdleBuyVillageSkin(btn.dataset.skinId)));
+  panel.querySelectorAll('.idle-skin-equip').forEach(btn => btn.addEventListener('click', () => bkmpIdleEquipVillageSkin(btn.dataset.skinId)));
+}
+
 /* Neue Drops werden gesammelt statt sofort einzeln gespeichert - bei
    mehreren Kaempfen kurz hintereinander (autoklickender Spieler, schnelle
    Stufen) landet so bei Bedarf mehr als ein Drop in EINEM Insert-Aufruf
@@ -3543,7 +3688,8 @@ const bkmpIdleTabs = [
   { id: 'erfolge', btn: 'idleTabBtnErfolge', panel: 'idlePanelErfolge', render: bkmpIdleRenderErfolgePanel },
   { id: 'bestenliste', btn: 'idleTabBtnBestenliste', panel: 'idlePanelBestenliste', render: bkmpIdleRenderBestenlistePanel },
   { id: 'prestige', btn: 'idleTabBtnPrestige', panel: 'idlePanelPrestige', render: bkmpIdleRenderPrestigePanel },
-  { id: 'runen', btn: 'idleTabBtnRunen', panel: 'idlePanelRunen', render: bkmpIdleRenderRunenPanel }
+  { id: 'runen', btn: 'idleTabBtnRunen', panel: 'idlePanelRunen', render: bkmpIdleRenderRunenPanel },
+  { id: 'skins', btn: 'idleTabBtnSkins', panel: 'idlePanelSkins', render: bkmpIdleRenderSkinsPanel }
 ];
 let bkmpIdleActiveTab = 'kampf';
 
@@ -3568,6 +3714,7 @@ function bkmpIdleRefreshLiveTabs() {
   if (bkmpIdleActiveTab === 'upgrades') bkmpIdleRenderUpgradesPanel();
   else if (bkmpIdleActiveTab === 'runen') bkmpIdleRenderRunenPanel();
   else if (bkmpIdleActiveTab === 'prestige') bkmpIdleRenderPrestigePanel();
+  else if (bkmpIdleActiveTab === 'skins') bkmpIdleRenderSkinsPanel();
 }
 
 function bkmpIdleInitTabs() {
