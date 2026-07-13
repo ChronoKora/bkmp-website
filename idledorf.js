@@ -2746,9 +2746,16 @@ async function bkmpRuneConfirmFuseSelection() {
   const slot = window.BKMP_RUNE_SLOTS.find(s => s.id === slotId);
   const rarityDef = window.BKMP_RUNE_RARITIES.find(r => r.id === rarityId);
   const failPct = Math.round((BKMP_RUNE_FUSE_FAIL_CHANCE[rarityId] || 0) * 100);
+  /* Spieler-Feedback (15.07.): "Das muss geändert werden.. Entfernen
+     einfach? weil das die sub stats haben wissen sie selber" - bei "Alle
+     verschmelzen" (siehe bkmpRuneQuickSelectFuseAll) kann diese Liste
+     Dutzende/Hunderte Runen einzeln aufzaehlen ("+0 mit 1 Sub-Stat" x50) -
+     eine unlesbare Textwand statt einer hilfreichen Warnung. Nur noch die
+     Anzahl nennen, keine Einzelaufzaehlung mehr - der Spieler kennt seine
+     eigenen Runen ohnehin. */
   const withProgress = runes.filter(r => Number(r.upgrade_level || 0) > 0 || (r.substats && r.substats.length));
   const progressLine = withProgress.length
-    ? `\n\n⚠️ ${withProgress.length} der ausgewählten ${slot ? slot.name : 'Runen'} ${withProgress.length === 1 ? 'ist' : 'sind'} bereits aufgewertet (${withProgress.map(r => `+${r.upgrade_level || 0}${r.substats && r.substats.length ? ` mit ${r.substats.length} Sub-Stat${r.substats.length === 1 ? '' : 's'}` : ''}`).join(', ')}) - bei Erfolg startet das Ergebnis trotzdem wieder bei +0.`
+    ? `\n\n⚠️ ${withProgress.length} der ausgewählten ${slot ? slot.name : 'Runen'} ${withProgress.length === 1 ? 'ist' : 'sind'} bereits aufgewertet - bei Erfolg startet das Ergebnis trotzdem wieder bei +0.`
     : '';
   const confirmed = await bkmpConfirmDialog(
     `✨ ${groupCount}× verschmelzen?`,
