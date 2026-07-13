@@ -424,7 +424,8 @@ function bkmpIdleDefaultState(name) {
     last_offline_claim: {},
     last_skilltree_reset_at: null,
     rune_fuse_successes: 0, rune_fuse_failures: 0,
-    rune_upgrade_successes: 0, rune_upgrade_failures: 0
+    rune_upgrade_successes: 0, rune_upgrade_failures: 0,
+    dwarf_unlocked: false
   };
 }
 
@@ -1864,7 +1865,12 @@ function bkmpIdleSnapshotMergeBaseline() {
     skill_points_available: Number(bkmpIdleState.skill_points_available || 0),
     current_dragon_index: Number(bkmpIdleState.current_dragon_index || 0),
     highest_dragon_index: Number(bkmpIdleState.highest_dragon_index || 0),
-    auto_advance: bkmpIdleState.auto_advance !== false
+    auto_advance: bkmpIdleState.auto_advance !== false,
+    /* Siehe bkmpIdleMergeRemoteSpendableFields - erkennt einen Prestige-
+       Aufstieg, der WAEHREND diese Seite offen war auf einer ANDEREN Seite
+       (z.B. der Hauptseite) passiert ist, damit der dortige Reset nicht
+       durch den normalen Merge hier rueckgaengig gemacht wird. */
+    prestigeLevelKnown: bkmpPrestigeState ? Number(bkmpPrestigeState.prestige_level || 0) : 0
   };
 }
 
@@ -1927,6 +1933,51 @@ async function bkmpIdleMergeRemoteSpendableFields() {
   const remote = await loadIdlePlayerState(bkmpIdleState.name_key);
   if (!remote) return;
   const baseline = bkmpIdleMergeBaseline || bkmpIdleState;
+  /* KRITISCHER FEHLER-FIX (Spieler-Report 13.07.: "Flammengott konnte
+     bereits 3x Prestigen instant, Level geht nicht zurueck, er nutzt das
+     OBS-Twitch-Browser-Fenster") - ein Prestige-Aufstieg auf der
+     HAUPTSEITE setzt current_dragon_index/highest_dragon_index/level/
+     skill_allocations/upgrade_purchases/Ressourcen komplett zurueck und
+     speichert das korrekt (bkmpIdleSkipNextMerge, siehe
+     bkmpIdlePerformPrestige). War aber GLEICHZEITIG die Twitch-Seite offen
+     (eigene, noch nicht zurueckgesetzte bkmpIdleState-Kopie im RAM dieser
+     Seite), hat genau DIESE Funktion hier den frischen Reset praktisch
+     sofort wieder rueckgaengig gemacht: highest_dragon_index nutzte einen
+     reinen Maximal-Merge (siehe Kommentar weiter unten - "rein monoton"
+     stimmt nur INNERHALB eines Laufs, NICHT ueber einen Prestige-Reset
+     hinweg), skill_allocations/upgrade_purchases nutzen ebenfalls
+     Maximal-Merge (koennen nie sinken) - beides hat den alten, hohen Stand
+     der Twitch-Seite postwendend zurueck in die DB geschrieben. Dadurch
+     war die naechste Prestige-Schwelle (die ja an highest_dragon_index
+     haengt, siehe bkmpPrestigeEligible) sofort wieder erreicht, obwohl gar
+     nicht neu gespielt wurde - daher "3x instant".
+     Fix: einen Prestige-Aufstieg AUF EINER ANDEREN SEITE zuverlaessig
+     erkennen (remote prestige_level hoeher als der zuletzt hier bekannte
+     Stand, siehe bkmpIdleSnapshotMergeBaseline) und in dem Fall den
+     kompletten Lauf-Zustand 1:1 vom Server uebernehmen statt ihn zu
+     mergen - keine Differenz-/Maximal-Logik darf hier jemals gegen einen
+     echten Reset gewinnen. */
+  let remotePrestige = null;
+  try { remotePrestige = typeof loadIdlePrestigeState === 'function' ? await loadIdlePrestigeState(bkmpIdleState.name_key) : null; } catch (e) { /* kein Prestige-Stand ladbar - normal weitermachen */ }
+  const remotePrestigeLevel = remotePrestige ? Number(remotePrestige.prestige_level || 0) : 0;
+  const baselinePrestigeLevel = Number(baseline.prestigeLevelKnown || 0);
+  const prestigeHappenedElsewhere = remotePrestigeLevel > baselinePrestigeLevel;
+  let stageChangedByRemote = false;
+  if (prestigeHappenedElsewhere) {
+    ['level', 'xp', 'gold', 'wood', 'stone', 'crystals', 'essence', 'skill_points_available', 'skill_points_spent', 'current_dragon_index', 'highest_dragon_index'].forEach(key => {
+      bkmpIdleState[key] = Number(remote[key] || 0);
+    });
+    bkmpIdleState.skill_allocations = remote.skill_allocations || {};
+    bkmpIdleState.upgrade_purchases = remote.upgrade_purchases || {};
+    bkmpIdleState.auto_advance = remote.auto_advance !== false;
+    if (remotePrestige) { bkmpPrestigeState = remotePrestige; bkmpPrestigeSnapshotMergeBaseline(); }
+    /* Runen gehen bei einem Prestige-Aufstieg ebenfalls verloren (siehe
+       bkmpIdlePerformPrestige) - der lokale, hier noch veraltete Bestand
+       muss geleert werden, sonst zeigt diese Seite weiter laengst
+       geloeschte Runen an. */
+    bkmpIdlePlayerRunes = [];
+    stageChangedByRemote = true;
+  } else {
   ['gold', 'wood', 'stone', 'crystals', 'essence'].forEach(key => {
     const localDelta = Number(bkmpIdleState[key] || 0) - Number(baseline[key] || 0);
     bkmpIdleState[key] = Math.max(0, Number(remote[key] || 0) + localDelta);
@@ -1951,12 +2002,12 @@ async function bkmpIdleMergeRemoteSpendableFields() {
      Kampf-Fortschritt hier), gewinnt der lokale Stand - der naechste
      Abgleich ueberschreibt den entfernten (dann veralteten) Stand ohnehin
      mit dem frischeren lokalen. highest_dragon_index ist wie Upgrade-Stufen
-     rein monoton - dafuer reicht ein einfacher Maximal-Merge. */
+     INNERHALB eines Laufs monoton - ausserhalb eines Prestige-Resets (siehe
+     oben) reicht dafuer ein einfacher Maximal-Merge. */
   bkmpIdleState.highest_dragon_index = Math.max(Number(bkmpIdleState.highest_dragon_index || 0), Number(remote.highest_dragon_index || 0));
   const stageBaseline = Number(baseline.current_dragon_index || 0);
   const localStage = Number(bkmpIdleState.current_dragon_index || 0);
   const remoteStage = Number(remote.current_dragon_index || 0);
-  let stageChangedByRemote = false;
   if (localStage === stageBaseline && remoteStage !== stageBaseline) {
     bkmpIdleState.current_dragon_index = Math.max(0, Math.min(bkmpIdleState.highest_dragon_index, remoteStage));
     stageChangedByRemote = true;
@@ -1966,6 +2017,7 @@ async function bkmpIdleMergeRemoteSpendableFields() {
   const remoteAuto = remote.auto_advance !== false;
   if (localAuto === autoBaseline && remoteAuto !== autoBaseline) {
     bkmpIdleState.auto_advance = remoteAuto;
+  }
   }
   bkmpIdleSnapshotMergeBaseline();
   /* Spieler-Frage (15.07.): "Habe gerade Leben upgraded, wann wird das
