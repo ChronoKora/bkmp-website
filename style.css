@@ -5124,6 +5124,18 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 .idle-sprite-shenloss, .idle-sprite-liber {
   background-size: 100% 400%;
   background-position-x: 0%;
+  /* Spieler-Meldung (15.07.): "Der hat transparent Lücken.. bitte
+     ordentlich nochmal ausschneiden" - beide Event-Drachen sind (anders
+     als die 9 echten Pixel-Art-Sheets oben) glattes Strichzeichnungs-
+     Artwork ohne Anti-Aliasing im Alpha-Kanal. Das geerbte
+     "image-rendering:pixelated" von .idle-dragon-sprite (fuer die echten
+     Pixel-Art-Sprites gedacht) skaliert per Nearest-Neighbor herunter -
+     bei duennem Strichwerk werden dabei einzelne Bildzeilen komplett
+     uebersprungen, wodurch Konturlinien (v.a. die Bauchstreifen) sichtbar
+     aufreissen/Luecken bekommen. Fuer diese beiden zurueck auf normales,
+     geglaettetes Skalieren - behebt das Aufreissen komplett (getestet bei
+     60px Anzeigegroesse). */
+  image-rendering: auto;
 }
 .idle-sprite-shenloss { background-image: url('assets/dragons/shenloss.png?v=20260710-eventdragons1'); aspect-ratio: 473 / 372; }
 .idle-sprite-liber { background-image: url('assets/dragons/liber.png?v=20260710-eventdragons1'); aspect-ratio: 422 / 245; }

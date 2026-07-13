@@ -3134,6 +3134,18 @@ function bkmpIdleRenderRunenPanel() {
     </div>
   `;
 
+  /* FEHLER-FIX (Spieler-Meldung 15.07.: "Wenn man runterscrollt.. scrollt
+     er automatisch direkt wieder hoch") - dieser Neuaufbau laeuft ueber
+     bkmpIdleRefreshLiveTabs() bei JEDEM Drachen-Kill (also im Kampf
+     ungefaehr einmal pro Sekunde), damit Menge/Sortierung live aktuell
+     bleiben. drawerContent.innerHTML = ... ersetzt dabei den kompletten
+     Lager-Bereich inkl. des scrollbaren Containers durch ein frisches,
+     neues Element - das hat IMMER scrollTop 0, die eigene Scroll-Position
+     im Lager ging dadurch bei jedem Kill sofort wieder verloren. Vorher
+     merken, hinterher auf dem neuen Element wiederherstellen. */
+  const oldInventoryScroll = drawerContent.querySelector('.idle-runen-inventory-scroll');
+  const savedInventoryScrollTop = oldInventoryScroll ? oldInventoryScroll.scrollTop : 0;
+
   drawerContent.innerHTML = `
     <h4 class="idle-sammlung-subheading">🎒 ${escapeHtml(activeSlot.name)}-Lager <span class="idle-sammlung-count">${slotOwned.length} von ${totalOwned} gesamt</span></h4>
     <div class="idle-runen-inventory-scroll">
@@ -3156,6 +3168,8 @@ function bkmpIdleRenderRunenPanel() {
       </div>
     </div>
   `;
+  const newInventoryScroll = drawerContent.querySelector('.idle-runen-inventory-scroll');
+  if (newInventoryScroll && savedInventoryScrollTop) newInventoryScroll.scrollTop = savedInventoryScrollTop;
 
   bkmpRuneSyncDrawerVisibility();
 
