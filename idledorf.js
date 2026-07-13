@@ -1801,8 +1801,6 @@ function bkmpIdleQueueSync() {
    Differenz-Merge in bkmpIdleMergeRemoteSpendableFields (siehe dort). Wird
    nach jedem frischen Laden UND nach jedem erfolgreichen Merge neu gesetzt. */
 let bkmpIdleMergeBaseline = null;
-let bkmpIdleLastMergeCheckAt = 0;
-const BKMP_IDLE_MERGE_CHECK_INTERVAL_MS = 15000;
 
 function bkmpIdleSnapshotMergeBaseline() {
   if (!bkmpIdleState) { bkmpIdleMergeBaseline = null; return; }
@@ -1866,13 +1864,27 @@ async function bkmpIdleMergeRemoteSpendableFields() {
   bkmpIdleSnapshotMergeBaseline();
 }
 
+/* FEHLER-FIX (Spieler-Report 15.07.: "Die Upgrades reseten sich jedesmal
+   wenn ich was upgrade") - der Merge-Abgleich lief bisher nur alle 15s
+   (throttled). Die Twitch-Seite speichert aber bei aktivem Kampf viel
+   oefter (alle ~4s, nach JEDEM Drachen-Kill via bkmpIdleQueueSync) - in den
+   Luecken DAZWISCHEN schrieb sie weiterhin blind ihren eigenen (noch nicht
+   abgeglichenen) Stand in die DB und hat damit einen frisch auf der
+   Hauptseite gekauften Upgrade praktisch sofort wieder ueberschrieben.
+   Der Merge muss deshalb bei JEDEM einzelnen Speichervorgang der Twitch-
+   Seite laufen, nicht nur gelegentlich - bkmpIdleSkipNextMerge ist die
+   einzige bewusste Ausnahme (siehe bkmpIdlePerformPrestige: ein Aufstieg
+   IST der Reset, der soll die DB unbedingt ueberschreiben statt mit einem
+   moeglicherweise noch alten Remote-Stand verschmolzen zu werden). */
+let bkmpIdleSkipNextMerge = false;
+
 async function bkmpIdleFlushSync() {
   if (!bkmpIdleSyncPending || !bkmpIdleState) return;
   bkmpIdleSyncPending = false;
-  if (window.BKMP_IDLE_IS_STREAM_PAGE && Date.now() - bkmpIdleLastMergeCheckAt > BKMP_IDLE_MERGE_CHECK_INTERVAL_MS) {
-    bkmpIdleLastMergeCheckAt = Date.now();
+  if (window.BKMP_IDLE_IS_STREAM_PAGE && !bkmpIdleSkipNextMerge) {
     try { await bkmpIdleMergeRemoteSpendableFields(); } catch (e) { /* naechster Autosave versucht den Abgleich erneut */ }
   }
+  bkmpIdleSkipNextMerge = false;
   bkmpIdleState.playtime_seconds = Math.round(Number(bkmpIdleState.playtime_seconds || 0));
   bkmpIdleState.last_seen_at = new Date().toISOString();
   try {
@@ -1978,7 +1990,7 @@ function bkmpPrestigeBuyUpgrade(id) {
    -RemoteSpendableFields oben, nur fuer die separate idle_prestige_state-
    Tabelle (Prestige-Punkte fuer den permanenten Bonusbaum). */
 let bkmpPrestigeMergeBaseline = null;
-let bkmpPrestigeLastMergeCheckAt = 0;
+let bkmpPrestigeSkipNextMerge = false;
 
 function bkmpPrestigeSnapshotMergeBaseline() {
   bkmpPrestigeMergeBaseline = bkmpPrestigeState ? { prestige_points_spent: Number(bkmpPrestigeState.prestige_points_spent || 0) } : null;
@@ -2014,10 +2026,10 @@ function bkmpPrestigeQueueSave() {
 
 async function bkmpPrestigeFlushSave() {
   if (!bkmpPrestigeState) return;
-  if (window.BKMP_IDLE_IS_STREAM_PAGE && Date.now() - bkmpPrestigeLastMergeCheckAt > BKMP_IDLE_MERGE_CHECK_INTERVAL_MS) {
-    bkmpPrestigeLastMergeCheckAt = Date.now();
+  if (window.BKMP_IDLE_IS_STREAM_PAGE && !bkmpPrestigeSkipNextMerge) {
     try { await bkmpPrestigeMergeRemoteSpendable(); } catch (e) { /* naechster Speichervorgang versucht es erneut */ }
   }
+  bkmpPrestigeSkipNextMerge = false;
   try {
     if (typeof saveIdlePrestigeState === 'function') await saveIdlePrestigeState(bkmpPrestigeState);
     bkmpPrestigeSnapshotMergeBaseline();
@@ -2108,12 +2120,11 @@ async function bkmpIdlePerformPrestige() {
        DB unbedingt ueberschreiben, nicht mit einem evtl. noch aelteren
        Remote-Stand verschmolzen werden (der Twitch-Sync-Merge-Check oben in
        bkmpIdleFlushSync ist fuer NORMALE Kaeufe gedacht, nicht fuer einen
-       kompletten Lauf-Reset). Merge-Timer kurz "anfassen", damit dieser
-       eine Speichervorgang die Merge-Pruefung ueberspringt - alle
-       Speichervorgaenge DANACH referenzieren wieder korrekt den neuen
+       kompletten Lauf-Reset) - genau EINEN Speichervorgang lang ueberspringen,
+       alle Speichervorgaenge DANACH referenzieren wieder korrekt den neuen
        (genullten) Basiswert. */
-    bkmpIdleLastMergeCheckAt = Date.now();
-    bkmpPrestigeLastMergeCheckAt = Date.now();
+    bkmpIdleSkipNextMerge = true;
+    bkmpPrestigeSkipNextMerge = true;
     await bkmpIdleFlushSyncNow();
     try { if (typeof saveIdlePrestigeState === 'function') await saveIdlePrestigeState(bkmpPrestigeState); bkmpPrestigeSnapshotMergeBaseline(); }
     catch (e) { console.warn('Prestige: Speichern fehlgeschlagen (Migration ausgefuehrt?).', e); }
