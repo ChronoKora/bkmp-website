@@ -1828,9 +1828,12 @@ function bkmpIdleMergeCountMaps(local, remote) {
 }
 
 /* Kernstueck der Twitch-Sync-Nachbesserung (Nutzerwunsch 15.07.): laeuft
-   NUR auf der Twitch-Seite (window.BKMP_IDLE_IS_STREAM_PAGE), alle ~15s
-   vor dem naechsten Autosave. Holt den aktuellen DB-Stand und gleicht die
-   "ausgebbaren" Felder ab, BEVOR der eigene (evtl. veraltete) Stand
+   NUR auf der Twitch-Seite (window.BKMP_IDLE_IS_STREAM_PAGE) - VOR jedem
+   eigenen Autosave (siehe bkmpIdleFlushSync) UND zusaetzlich alle ~20s im
+   Herzschlag-Takt (siehe bkmpIdleStreamStartHeartbeat), damit ein Kauf auf
+   der Hauptseite auch dann sichtbar wird, wenn gerade kein Drache stirbt
+   und deshalb kein eigener Autosave anstuende. Holt den aktuellen DB-Stand
+   und gleicht die "ausgebbaren" Felder ab, BEVOR der eigene (evtl. veraltete) Stand
    ueberschrieben wird:
    - Ressourcen (Gold/Holz/Stein/Kristalle/Essenz): Differenz-Merge - die
      Twitch-Seite verdient laufend durch Kaempfe dazu, die Hauptseite gibt
@@ -1862,6 +1865,18 @@ async function bkmpIdleMergeRemoteSpendableFields() {
   bkmpIdleState.skill_points_spent = Math.max(0, Number(remote.skill_points_spent || 0) + Math.max(0, spentDelta));
   bkmpIdleState.skill_points_available = Math.max(0, Math.max(totalEarnedLocal, totalEarnedRemote) - bkmpIdleState.skill_points_spent);
   bkmpIdleSnapshotMergeBaseline();
+  /* Spieler-Frage (15.07.): "Habe gerade Leben upgraded, wann wird das
+     akkumuliert?" - ein Upgrade AENDERT effektive Werte (max. HP/Angriff/
+     etc.) nur ueber bkmpIdleRecomputeEffectiveStats(), das hier vorher
+     NICHT aufgerufen wurde. upgrade_purchases war zwar schon korrekt
+     gemerged, aber die sichtbare HP-Leiste/HUD auf der Twitch-Seite haette
+     trotzdem noch den alten Wert gezeigt, bis rein zufaellig ein anderes
+     Ereignis (naechster Kill) den Recompute ausgeloest haette. Jetzt direkt
+     nach jedem Abgleich neu berechnen und anzeigen. */
+  if (typeof bkmpIdleRecomputeEffectiveStats === 'function') bkmpIdleRecomputeEffectiveStats();
+  if (bkmpIdleEffectiveStats) bkmpIdleVillageHp = Math.min(bkmpIdleVillageHp == null ? bkmpIdleEffectiveStats.hp : bkmpIdleVillageHp, bkmpIdleEffectiveStats.hp);
+  if (typeof bkmpIdleUpdateVillageHpBar === 'function') bkmpIdleUpdateVillageHpBar();
+  if (typeof bkmpIdleRenderHud === 'function') bkmpIdleRenderHud();
 }
 
 /* FEHLER-FIX (Spieler-Report 15.07.: "Die Upgrades reseten sich jedesmal
@@ -3224,6 +3239,15 @@ function bkmpIdleStreamStartHeartbeat() {
   if (bkmpIdleStreamTimer || !bkmpIdleState) return;
   const send = () => {
     if (typeof bkmpIdleStreamHeartbeat === 'function' && bkmpIdleState) bkmpIdleStreamHeartbeat(bkmpIdleState.name_key).catch(() => {});
+    /* Spieler-Frage (15.07.): "Habe gerade Leben upgraded, wann wird das
+       akkumuliert?" - der Abgleich lief bisher nur VOR dem naechsten
+       eigenen Autosave (bkmpIdleFlushSync), also erst wieder nach dem
+       naechsten Drachen-Kill. Stirbt gerade kein Drache (z.B. ein starker
+       Boss), war die Wartezeit unvorhersehbar lang. Im selben Takt wie der
+       Herzschlag (alle 20s) jetzt zusaetzlich unabhaengig davon abgleichen -
+       ein Kauf auf der Hauptseite ist damit spaetestens nach ~20s auf der
+       Twitch-Seite sichtbar, auch waehrend eines langen Kampfes. */
+    if (typeof bkmpIdleMergeRemoteSpendableFields === 'function' && bkmpIdleState) bkmpIdleMergeRemoteSpendableFields().catch(() => {});
   };
   send();
   bkmpIdleStreamTimer = window.setInterval(send, BKMP_IDLE_STREAM_HEARTBEAT_MS);
