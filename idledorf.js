@@ -862,6 +862,7 @@ function bkmpIdleHandleDragonDefeated() {
   bkmpIdleSpawnDragon();
   bkmpIdleUpdateVillageHpBar();
   bkmpIdleRenderHud();
+  bkmpIdleRefreshLiveTabs();
   /* Haelt den Erfolge-Zwischenspeicher waehrend des Spielens laufend
      aktuell (schreibt als Nebeneffekt in bkmp-idle-achievement-fields-
      cache, siehe bkmpIdleGetAchievementContextFields) - sonst blieb der
@@ -2819,6 +2820,24 @@ let bkmpIdleActiveTab = 'kampf';
 function bkmpIdleRenderActiveTabContent() {
   const tab = bkmpIdleTabs.find(t => t.id === bkmpIdleActiveTab);
   if (tab && typeof tab.render === 'function') tab.render();
+}
+
+/* Haelt Tabs, deren Inhalt (Kauf-Buttons/Runen-Lager) von automatischen
+   Kaempfen im Hintergrund abhaengt, waehrend des Zusehens live aktuell -
+   vorher aenderte sich z.B. ein "zu teuer"-Button erst nach manuellem
+   Tab-Wechsel zu "kaufbar", und neu gedroppte Runen tauchten im offenen
+   Runen-Fenster erst nach dem Wechsel weg-und-zurueck auf (Spieler-Meldung:
+   "Aktualisieren sich nicht im Runen fenster automatisch.. erst nach tab
+   switch" / "Kann man in dem Runenfenster bleiben und beobachten wenn sie
+   gedropt werden?"). Bewusst NICHT alle Tabs bei jedem Kill neu rendern
+   (z.B. Skilltree zeichnet zusaetzlich SVG-Linien per getBoundingClientRect,
+   das waere bei hoher Angriffsgeschwindigkeit unnoetig teuer) - nur die drei
+   Tabs, deren Anzeige tatsaechlich direkt von Gold/Ressourcen/Runen-Lager
+   abhaengt, die sich durch einen Kill aendern koennen. */
+function bkmpIdleRefreshLiveTabs() {
+  if (bkmpIdleActiveTab === 'upgrades') bkmpIdleRenderUpgradesPanel();
+  else if (bkmpIdleActiveTab === 'runen') bkmpIdleRenderRunenPanel();
+  else if (bkmpIdleActiveTab === 'prestige') bkmpIdleRenderPrestigePanel();
 }
 
 function bkmpIdleInitTabs() {
