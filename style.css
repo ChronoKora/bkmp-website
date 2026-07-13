@@ -5335,6 +5335,27 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
    "❓ Hilfe"-Button im Runen-Tab oeffnet dieses Popup ebenfalls aus dem schon
    offenen idleDorfOverlay heraus (Spieler-Meldung: Popup landet dahinter). */
 #idleRunenHelpOverlay { z-index: 60; }
+/* Gleicher Grund wie bei #idleRunenHelpOverlay - der "Für Streamer"-Link
+   sitzt im Kopf des schon offenen idleDorfOverlay. */
+#idleStreamHelpOverlay { z-index: 60; }
+/* Immer sichtbarer Link im Idle-Dorf-Kopf (Nutzerwunsch 15.07.: Anleitung
+   direkt auf der Seite auffindbar machen, statt nur im Chat) - bewusst
+   dezent (kleine Schrift, gedaempfte Farbe), damit er neben dem Titel nicht
+   dominiert, aber trotzdem klar als klickbarer Link erkennbar bleibt. */
+.idle-stream-help-link {
+  display: block;
+  margin: -0.4rem auto 0.8rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 0.76rem;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  text-align: center;
+}
+.idle-stream-help-link:hover { color: var(--gold); }
 .skillhelp-card { max-width: 720px; }
 .skillhelp-list {
   display: flex;

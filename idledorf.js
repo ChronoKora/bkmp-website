@@ -3027,12 +3027,26 @@ function bkmpRuneSyncDrawerVisibility() {
    deshalb per JS live gemessen statt fix in CSS, und bei jedem
    Fenster-Resize neu synchronisiert (siehe Listener in
    bkmpIdleInitTabs). */
+/* FEHLER-FIX (Spieler-Screenshot 15.07., "Volle Optimierung für kleinere
+   Auflösungen"): auf schmaleren Fenstern (z.B. 1366px - ein sehr
+   gaengiges Laptop-Format) fuellt die Karte fast die ganze Breite aus,
+   sodass rechts davon kein Platz mehr fuer den 360px breiten Balken
+   bleibt - er wurde bisher trotzdem stur an "Kartenkante" positioniert und
+   ragte dadurch weit ueber den rechten Bildschirmrand hinaus (nur ein
+   schmaler Streifen war noch sichtbar/bedienbar). Jetzt wird zusaetzlich
+   die tatsaechlich verfuegbare Fensterbreite beruecksichtigt: reicht der
+   Platz nicht, dockt der Balken stattdessen an die rechte BILDSCHIRM-Kante
+   (ueberlappt dann leicht die Karte) statt teilweise unsichtbar zu sein -
+   auf breiten Fenstern (genug Platz) bleibt das bisherige "flush an die
+   Karte"-Verhalten unveraendert. */
 function bkmpRuneSyncDrawerPosition() {
   const drawer = document.getElementById('idleRuneDrawer');
   const card = document.querySelector('.idle-dorf-overlay .idle-dorf-card');
   if (!drawer || !card || !drawer.classList.contains('visible')) return;
   const rect = card.getBoundingClientRect();
-  drawer.style.left = Math.round(rect.right) + 'px';
+  const drawerWidth = drawer.offsetWidth || 360;
+  const maxLeft = window.innerWidth - drawerWidth - 8;
+  drawer.style.left = Math.max(0, Math.min(Math.round(rect.right), maxLeft)) + 'px';
 }
 
 function bkmpRuneToggleDrawer() {
@@ -4296,6 +4310,21 @@ function bkmpIdleInit() {
     const overlay = document.getElementById('idleRunenHelpOverlay');
     if (overlay) overlay.classList.remove('visible');
     document.body.classList.remove('modal-open');
+  });
+  /* Nutzerwunsch (15.07.): "brauche eine Einbettung für die Streamer... + 1
+     Anleitung", danach bestaetigt: auch als sichtbare Hilfe-Sektion auf der
+     Seite selbst (nicht nur im Chat) - statischer Inhalt direkt im HTML
+     (siehe #idleStreamHelpOverlay), hier nur Oeffnen/Schliessen verdrahtet,
+     gleiches Muster wie Skill-/Runen-Hilfe oben. */
+  const streamHelpBtn = document.getElementById('idleStreamHelpBtn');
+  if (streamHelpBtn) streamHelpBtn.addEventListener('click', () => {
+    const overlay = document.getElementById('idleStreamHelpOverlay');
+    if (overlay) overlay.classList.add('visible');
+  });
+  const streamHelpClose = document.getElementById('idleStreamHelpClose');
+  if (streamHelpClose) streamHelpClose.addEventListener('click', () => {
+    const overlay = document.getElementById('idleStreamHelpOverlay');
+    if (overlay) overlay.classList.remove('visible');
   });
   const dragonEl = document.getElementById('idleDragon');
   if (dragonEl) { dragonEl.classList.add('idle-dragon-clickable'); dragonEl.addEventListener('click', bkmpIdleHandleDragonClick); }
