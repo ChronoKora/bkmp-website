@@ -629,8 +629,16 @@ function bkmpIdleRecomputeEffectiveStats() {
 
 /* ---------------- Skilltree ---------------- */
 
-const BKMP_IDLE_BRANCH_LABELS = { dorf: '🏹 Dorf', burg: '🏰 Burg', wirtschaft: '⚒ Wirtschaft', forschung: '🐉 Forschung', magie: '✨ Magie' };
-const BKMP_IDLE_BRANCH_ORDER = ['dorf', 'burg', 'wirtschaft', 'forschung', 'magie'];
+const BKMP_IDLE_BRANCH_LABELS = { dorf: '🏹 Dorf', burg: '🏰 Burg', wirtschaft: '⚒ Wirtschaft', forschung: '🐉 Forschung', magie: '✨ Magie', meister: '🔨 Meister' };
+/* "meister" (Zwerg Grimbold) ist bewusst MIT in dieser Liste, obwohl er
+   erst nach allen 5 Basis-Zweigen freischaltet - solange die zugehoerigen
+   Skill-Knoten in der DB noch nicht existieren (Migration nicht
+   ausgefuehrt), filtert bkmpIdleRenderSkilltreePanel ihn automatisch weg
+   (leere nodes-Liste), kein Sonderfall noetig. bkmpIdleCountMaxedBranches()
+   zaehlt ihn erst mit, sobald er selbst gemaxed ist (vorher 0 Ranege
+   allokiert = nicht "maxed") - beeinflusst die bestehende "alle 5 Basis-
+   Zweige"-Schwelle also nicht rueckwirkend. */
+const BKMP_IDLE_BRANCH_ORDER = ['dorf', 'burg', 'wirtschaft', 'forschung', 'magie', 'meister'];
 
 function bkmpIdleCanAllocateSkill(node) {
   if (!bkmpIdleState) return false;
@@ -1454,10 +1462,9 @@ function bkmpIdleDrawSkillTreeLines(treeEl) {
    Render-Aufrufe hinweg (nach jedem +1-Klick und nach Reset wird die ganze
    Panel-HTML neu gebaut), damit ein einmal manuell geoeffneter/geschlossener
    Zweig nicht bei der naechsten Punktevergabe wieder zuklappt. null = noch
-   nie initialisiert -> beim allerersten Rendern wird automatisch der erste
-   Zweig mit sofort ausgebbaren Punkten aufgeklappt (das war genau das
-   gemeldete Problem: Punkte in weiter unten liegenden Zweigen wurden bei
-   der alten, immer volltaendig ausgeklappten Ansicht leicht uebersehen). */
+   nie initialisiert -> alle Zweige starten zugeklappt (siehe Kommentar
+   weiter unten - Spieler-Wunsch 13.07., vorher klappte "Dorf" immer
+   automatisch auf). */
 let bkmpIdleSkillBranchOpenState = null;
 
 function bkmpIdleRenderSkilltreePanel() {
@@ -1466,23 +1473,36 @@ function bkmpIdleRenderSkilltreePanel() {
   if (!bkmpIdleSkillDefs.length) { panel.innerHTML = '<p class="empty-hint">Skilltree wird bald verfügbar sein.</p>'; return; }
   const alloc = bkmpIdleState.skill_allocations || {};
 
+  /* Freischalt-Bedingung fuer den "meister"-Zweig: alle 5 Basis-Zweige
+     komplett gemaxed (siehe Kommentar bei BKMP_IDLE_BRANCH_ORDER oben) UND
+     die Grimbold-Dialogszene wurde bereits gesehen (sonst bleibt der Zweig
+     auch nach Erreichen der Schwelle noch kurz gesperrt angezeigt, bis der
+     weiter unten ausgeloeste Dialog abgeschlossen ist - siehe
+     bkmpMeisterMaybeShowDialog). */
+  const meisterBranchesMaxed = bkmpIdleCountMaxedBranches() >= 5;
+  const meisterUnlocked = meisterBranchesMaxed && bkmpMeisterDialogSeen();
   const branches = BKMP_IDLE_BRANCH_ORDER.map(branch => {
     const nodes = bkmpIdleSkillDefs.filter(n => n.branch === branch).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
     if (!nodes.length) return null;
+    const isLocked = branch === 'meister' && !meisterUnlocked;
     const withDepth = nodes.map(node => ({ node, depth: bkmpIdleSkillNodeDepth(node, nodes) }));
     const maxDepth = Math.max(0, ...withDepth.map(n => n.depth));
     const rows = [];
     for (let d = 0; d <= maxDepth; d++) rows.push(withDepth.filter(n => n.depth === d).map(n => n.node));
     const investedRanks = nodes.reduce((sum, n) => sum + Number(alloc[n.id] || 0), 0);
     const maxRanks = nodes.reduce((sum, n) => sum + Number(n.max_rank || 0), 0);
-    const hasAllocatable = nodes.some(n => bkmpIdleCanAllocateSkill(n));
-    return { branch, nodes, rows, investedRanks, maxRanks, hasAllocatable };
+    const hasAllocatable = !isLocked && nodes.some(n => bkmpIdleCanAllocateSkill(n));
+    return { branch, nodes, rows, investedRanks, maxRanks, hasAllocatable, isLocked };
   }).filter(Boolean);
 
+  /* NACHBESSERUNG (Spieler-Wunsch 13.07.: "Dorf ist immer geoeffnet, bitte
+     wie die anderen geschlossen anzeigen") - vorher wurde beim ersten
+     Rendern automatisch der erste Zweig mit einem gerade kaufbaren Knoten
+     aufgeklappt, was durch die Reihenfolge in BKMP_IDLE_BRANCH_ORDER
+     praktisch immer "Dorf" traf. Jetzt starten alle Zweige einheitlich
+     zugeklappt, der Spieler waehlt selbst. */
   if (!bkmpIdleSkillBranchOpenState) {
     bkmpIdleSkillBranchOpenState = {};
-    const autoOpen = branches.find(b => b.hasAllocatable) || branches[0];
-    if (autoOpen) bkmpIdleSkillBranchOpenState[autoOpen.branch] = true;
   }
 
   panel.innerHTML = `
@@ -1500,8 +1520,22 @@ function bkmpIdleRenderSkilltreePanel() {
         return `<button type="button" class="btn-nein idle-skilltree-reset-btn" id="idleSkilltreeResetBtn">🔄 Zurücksetzen</button>`;
       })()}
     </div>
-    ${branches.map(({ branch, nodes, rows, investedRanks, maxRanks, hasAllocatable }) => {
+    ${branches.map(({ branch, nodes, rows, investedRanks, maxRanks, hasAllocatable, isLocked }) => {
       const isOpen = !!bkmpIdleSkillBranchOpenState[branch];
+      if (isLocked) {
+        return `<div class="idle-skill-branch idle-skill-branch-locked">
+          <button type="button" class="idle-skill-branch-header" data-branch-toggle="${branch}" aria-expanded="${isOpen}">
+            <span class="idle-skill-branch-name">${BKMP_IDLE_BRANCH_LABELS[branch] || branch}</span>
+            <span class="idle-skill-branch-lock" title="Erst freigeschaltet, wenn alle 5 Basis-Zweige komplett gemaxed sind">🔒</span>
+            <span class="idle-skill-branch-chevron">▾</span>
+          </button>
+          <div class="idle-skill-branch-collapse">
+            <div class="idle-skill-branch-collapse-inner">
+              <p class="idle-panel-hint idle-skill-branch-locked-hint">🔒 Ein Fremder wartet vor den Toren deines Dorfes - aber er zeigt sich erst, wenn alle 5 Basis-Zweige (Dorf/Burg/Wirtschaft/Forschung/Magie) komplett gemaxed sind.</p>
+            </div>
+          </div>
+        </div>`;
+      }
       return `<div class="idle-skill-branch ${isOpen ? 'expanded' : ''} ${hasAllocatable ? 'has-available' : ''}">
         <button type="button" class="idle-skill-branch-header" data-branch-toggle="${branch}" aria-expanded="${isOpen}">
           <span class="idle-skill-branch-name">${BKMP_IDLE_BRANCH_LABELS[branch] || branch}</span>
@@ -1554,14 +1588,93 @@ function bkmpIdleRenderSkilltreePanel() {
     if (nowOpen) {
       const treeEl = branchEl.querySelector('.idle-skilltree-tree');
       /* Erst nach der CSS-Aufklapp-Transition zeichnen, sonst hat der
-         Baum beim Messen noch die Hoehe 0 (Grid-Zeile startet bei 0fr). */
-      setTimeout(() => bkmpIdleDrawSkillTreeLines(treeEl), 360);
+         Baum beim Messen noch die Hoehe 0 (Grid-Zeile startet bei 0fr).
+         Bei einem gesperrten Zweig (siehe idle-skill-branch-locked) gibt
+         es gar keinen Baum, nur einen Hinweistext - treeEl waere dann
+         null. */
+      if (treeEl) setTimeout(() => bkmpIdleDrawSkillTreeLines(treeEl), 360);
     }
   }));
   const resetBtn = document.getElementById('idleSkilltreeResetBtn');
   if (resetBtn) resetBtn.addEventListener('click', bkmpIdleResetSkilltree);
   const helpBtn = document.getElementById('idleSkilltreeHelpBtn');
   if (helpBtn) helpBtn.addEventListener('click', bkmpIdleOpenSkillHelp);
+  if (meisterBranchesMaxed && !bkmpMeisterDialogSeen()) bkmpMeisterMaybeShowDialog();
+}
+
+/* ---------------- "Meister"-Zweig: Grimbold-Dialogszene ----------------
+   Schaltet sich frei, sobald alle 5 Basis-Zweige komplett gemaxed sind
+   (siehe bkmpIdleRenderSkilltreePanel) - beim naechsten Rendern des
+   Skilltree-Tabs poppt automatisch EINMALIG diese kleine Dialogszene auf,
+   danach ist der Zweig normal bedienbar. Ob die Szene schon gesehen wurde,
+   merkt sich NUR der Browser (localStorage) - bewusst KEIN Sync-Feld in
+   idle_player_state (siehe Erklaerung bei der SQL-Migration/
+   BKMP_IDLE_BRANCH_ORDER: nach dem dwarf_unlocked-Vorfall keine neue
+   Kern-Spielstand-Spalte mehr ohne vorher ausgefuehrte Migration). Auf
+   einem zweiten Geraet wuerde die Szene also notfalls ein zweites Mal
+   auftauchen - rein kosmetisch, kein Fortschrittsrisiko. */
+const BKMP_MEISTER_DIALOG_SEEN_KEY = 'bkmp-meister-dialog-seen';
+function bkmpMeisterDialogSeen() {
+  try { return localStorage.getItem(BKMP_MEISTER_DIALOG_SEEN_KEY) === '1'; } catch (e) { return false; }
+}
+function bkmpMeisterMarkDialogSeen() {
+  try { localStorage.setItem(BKMP_MEISTER_DIALOG_SEEN_KEY, '1'); } catch (e) {}
+}
+
+const BKMP_MEISTER_DIALOG_LINES = [
+  { face: 'neutral', text: '„Hoho! Diese Rauchsäulen sah man meilenweit übers Tal, junger Anführer. Grimbold ist mein Name.“' },
+  { face: 'erzaehlend', text: '„Einst hatte mein Clan die größte Schmiede unter dem Eisenberg. Klingen, die selbst Drachenschuppen durchtrennten, kamen aus unseren Essen.“' },
+  { face: 'traurig', text: 'Sein Blick verdüstert sich. „Bis der Berg einstürzte. Alles unter sich begraben - die Schmiede, meine Brüder, alles. Nur ich kam raus.“' },
+  { face: 'nachdenklich', text: '„Seitdem ziehe ich umher. Suche einen Ort, der mein letztes Werk verdient. Viele Dörfer sah ich - keines hielt stand.“' },
+  { face: 'ueberrascht', text: 'Er mustert deine Mauern, deine Truppen, deine Vorräte. „Aber DAS hier... jeder Winkel ausgebaut, jede Fertigkeit gemeistert. Das habe ich lange nicht gesehen.“' },
+  { face: 'genervt', text: '„Diese Bögen und Kräuterkissen sind ja ganz nett - aber Stahl, ECHTER Stahl, kennt hier wohl niemand, hm?“' },
+  { face: 'lachend', text: 'Er lacht dröhnend und klopft sich auf den Bauch. „Macht nichts! Genau deshalb bin ich hier. Zeig mir Platz an deiner Esse, und ich mach aus deinem Dorf eine Festung, die man in drei Königreichen fürchtet!“' },
+  { face: 'empoert', text: '„Also? Worauf wartest du noch?! Ein Zwerg wartet nicht gern - meine Geduld ist so kurz wie meine Beine!“' }
+];
+let bkmpMeisterDialogIndex = 0;
+let bkmpMeisterDialogShowing = false;
+
+function bkmpMeisterMaybeShowDialog() {
+  if (bkmpMeisterDialogShowing) return;
+  bkmpMeisterDialogShowing = true;
+  bkmpMeisterDialogIndex = 0;
+  const overlay = document.getElementById('idleMeisterDialogOverlay');
+  if (!overlay) { bkmpMeisterDialogShowing = false; return; }
+  overlay.classList.add('visible');
+  bkmpMeisterRenderDialogStep();
+  const nextBtn = document.getElementById('idleMeisterDialogNextBtn');
+  if (nextBtn) nextBtn.onclick = bkmpMeisterAdvanceDialog;
+}
+
+function bkmpMeisterRenderDialogStep() {
+  const line = BKMP_MEISTER_DIALOG_LINES[bkmpMeisterDialogIndex];
+  if (!line) return;
+  const img = document.getElementById('idleMeisterDialogFace');
+  const text = document.getElementById('idleMeisterDialogText');
+  const btn = document.getElementById('idleMeisterDialogNextBtn');
+  const step = document.getElementById('idleMeisterDialogStep');
+  if (img) img.src = `assets/dwarf/dwarf-${line.face}.png`;
+  if (text) text.textContent = line.text;
+  if (step) step.textContent = `${bkmpMeisterDialogIndex + 1}/${BKMP_MEISTER_DIALOG_LINES.length}`;
+  const isLast = bkmpMeisterDialogIndex >= BKMP_MEISTER_DIALOG_LINES.length - 1;
+  if (btn) btn.textContent = isLast ? 'Willkommen, Grimbold!' : 'Weiter';
+}
+
+function bkmpMeisterAdvanceDialog() {
+  if (bkmpMeisterDialogIndex >= BKMP_MEISTER_DIALOG_LINES.length - 1) {
+    bkmpMeisterCloseDialog();
+    return;
+  }
+  bkmpMeisterDialogIndex += 1;
+  bkmpMeisterRenderDialogStep();
+}
+
+function bkmpMeisterCloseDialog() {
+  const overlay = document.getElementById('idleMeisterDialogOverlay');
+  if (overlay) overlay.classList.remove('visible');
+  bkmpMeisterMarkDialogSeen();
+  bkmpMeisterDialogShowing = false;
+  bkmpIdleRenderSkilltreePanel();
 }
 
 /* ---------------- Skilltree-Hilfe-Fenster ---------------- */

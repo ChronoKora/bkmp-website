@@ -55,7 +55,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260715-mergesammlung1">
+<link rel="stylesheet" href="style.css?v=20260715-meisterbranch1">
 </head>
 <body>
 
@@ -600,6 +600,22 @@
     </div>
   </div>
 
+  <!-- Grimbold-Dialogszene: schaltet sich einmalig frei, sobald alle 5
+       Basis-Skilltree-Zweige gemaxed sind (siehe bkmpMeisterMaybeShowDialog
+       in idledorf.js). Bewusst kein Close-X/Klick-ausserhalb-schliessen -
+       nur ueber den Weiter/Willkommen-Button verlassbar, damit die Szene
+       nicht versehentlich uebersprungen wird. -->
+  <div class="joke-overlay idle-meister-dialog-overlay" id="idleMeisterDialogOverlay">
+    <div class="joke-card idle-meister-dialog-card">
+      <img class="idle-meister-dialog-face" id="idleMeisterDialogFace" src="assets/dwarf/dwarf-neutral.png" alt="Grimbold">
+      <p class="idle-meister-dialog-text" id="idleMeisterDialogText"></p>
+      <span class="idle-meister-dialog-step" id="idleMeisterDialogStep"></span>
+      <div class="joke-buttons">
+        <button class="btn-ja" id="idleMeisterDialogNextBtn" type="button">Weiter</button>
+      </div>
+    </div>
+  </div>
+
   <header class="hero hero-banner-wrap">
     <div class="streamer-strip" id="streamerStrip">
       <div class="streamer-strip-title">
@@ -1114,7 +1130,7 @@
   <script src="assets/vendor/supabase-js.min.js"></script>
   <script src="supabase.js?v=20260715-dwarfcolfix1"></script>
   <script src="app.js?v=20260712-themefix1"></script>
-  <script src="idledorf.js?v=20260715-mergesammlung1"></script>
+  <script src="idledorf.js?v=20260715-meisterbranch1"></script>
   <script src="mapart.js?v=20260709-cardsale1"></script>
   <script>
     bkmpInitTheme();
@@ -5604,6 +5620,9 @@
          wuerde der generische Sweep unten die "visible"-Klasse einfach
          entfernen. */
       idleEventDragonOverlay: () => {},
+      /* Grimbold-Dialogszene: gleicher Grund wie beim Event-Drachen-Popup
+         oben - nur ueber den Weiter/Willkommen-Button verlassbar. */
+      idleMeisterDialogOverlay: () => {},
       mapWorkspaceOverlay: () => { if (typeof bkmpMapCloseWorkspace === 'function') bkmpMapCloseWorkspace(); },
       mapCompanyDetailOverlay: () => { if (typeof bkmpMapCloseCompanyDetail === 'function') bkmpMapCloseCompanyDetail(); },
       /* Ohne diesen Eintrag wuerde der ESC-Sweep nur die "visible"-Klasse

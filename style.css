@@ -4984,6 +4984,26 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 }
 .idle-event-dragon-card h3 { font-family: 'Fraunces', serif; font-size: 1.3rem; margin-bottom: 0.7rem; color: var(--gold); }
 .idle-event-dragon-card p { font-size: 1rem; }
+
+/* Grimbold-Dialogszene ("Meister"-Skilltree-Zweig) */
+.idle-meister-dialog-overlay { z-index: 70; }
+.idle-meister-dialog-card {
+  max-width: 420px;
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box,
+              linear-gradient(135deg, #ff8a4c, #facc15, #ff8a4c) border-box;
+  border: 2px solid transparent;
+}
+.idle-meister-dialog-face {
+  display: block;
+  width: 128px;
+  height: 128px;
+  object-fit: contain;
+  margin: 0 auto 0.9rem;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.5));
+}
+.idle-meister-dialog-text { font-size: 1rem; line-height: 1.5; min-height: 4.5rem; }
+.idle-meister-dialog-step { display: block; margin-top: 0.5rem; font-size: 0.75rem; color: var(--muted); letter-spacing: 0.05em; }
 /* Dezenter goldener Rahmen um den Drachen selbst, waehrend der Kampf
    laeuft - macht die Seltenheit auch nach Bestaetigung des Popups sichtbar. */
 .idle-dragon-event .idle-dragon-sprite { filter: drop-shadow(0 0 14px rgba(250, 204, 21, 0.65)); }
@@ -5478,6 +5498,13 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   .idle-skill-branch-pulse { animation: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 45%, transparent); }
 }
 
+/* "Meister"-Zweig (Grimbold) vor Freischaltung: gedimmter Kartenrahmen +
+   Schloss-Symbol statt Fortschrittsanzeige/Pulse-Punkt. */
+.idle-skill-branch-locked .idle-skill-branch-header { opacity: 0.72; }
+.idle-skill-branch-locked .idle-skill-branch-name { color: var(--muted); }
+.idle-skill-branch-lock { margin-left: auto; font-size: 1rem; }
+.idle-skill-branch-locked-hint { margin: 0; padding: 0.9rem 1.1rem 1.1rem; }
+
 .idle-skill-branch-collapse {
   display: grid;
   grid-template-rows: 0fr;
@@ -5604,6 +5631,7 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 .idle-dorf-overlay,
 .idle-stage-picker-overlay,
 .idle-event-dragon-overlay,
+.idle-meister-dialog-overlay,
 #idleSkillHelpOverlay,
 #idleMaintenanceOverlay {
   --ink: #f4e9da;
