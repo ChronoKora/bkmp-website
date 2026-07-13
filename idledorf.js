@@ -4556,17 +4556,24 @@ window.BKMP_IDLE_PRESTIGE_TITLE_NAMES = [
    wiederkehrender Teil des Runen-Systems ist. */
 window.BKMP_RUNE_FUSE_SUCCESS_TIERS = [
   [1, 'Erste Verschmelzung'], [5, 'Runenschmelzer'], [15, 'Fusionsmeister'], [30, 'Runenalchemist'],
-  [60, 'Schmelztiegel-Meister'], [100, 'Runenveredler'], [200, 'Großmeister der Fusion'], [350, 'Legende der Verschmelzung']
+  [60, 'Schmelztiegel-Meister'], [100, 'Runenveredler'], [200, 'Großmeister der Fusion'], [350, 'Legende der Verschmelzung'],
+  [500, 'Fusionsdämon'], [750, 'Runenschmiede-Titan'], [1000, 'Tausendfache Verschmelzung'], [2500, 'Schmelztiegel-Gottheit'],
+  [5000, 'Ewiger Verschmelzer'], [10000, 'Der Runen-Ursprung']
 ];
 window.BKMP_RUNE_FUSE_FAIL_TIERS = [
-  [1, 'Erster Rückschlag'], [5, 'Pechvogel'], [15, 'Explosionsgefahr'], [30, 'Unverwüstlicher Optimist'], [50, 'Schmelztiegel des Grauens']
+  [1, 'Erster Rückschlag'], [5, 'Pechvogel'], [15, 'Explosionsgefahr'], [30, 'Unverwüstlicher Optimist'], [50, 'Schmelztiegel des Grauens'],
+  [100, 'Fluch des Schmelztiegels'], [250, 'Wandelnde Katastrophe'], [500, 'Meister des Missgeschicks'], [1000, 'Der Verschmelzungs-Fluch'],
+  [2500, 'Von den Runen verflucht'], [5000, 'Sisyphos des Schmelztiegels']
 ];
 window.BKMP_RUNE_UPGRADE_SUCCESS_TIERS = [
   [1, 'Erste Aufwertung'], [10, 'Runenschleifer'], [25, 'Veredelungskünstler'], [50, 'Runenoptimierer'],
-  [100, 'Aufwertungsmeister'], [200, 'Runenperfektionist'], [400, 'Großmeister der Veredelung'], [750, 'Legende der Veredelung']
+  [100, 'Aufwertungsmeister'], [200, 'Runenperfektionist'], [400, 'Großmeister der Veredelung'], [750, 'Legende der Veredelung'],
+  [1500, 'Veredelungstitan'], [3000, 'Runenschleif-Gottheit'], [5000, 'Ewiger Veredler'], [10000, 'Der Aufwertungs-Ursprung']
 ];
 window.BKMP_RUNE_UPGRADE_FAIL_TIERS = [
-  [1, 'Gold verbrannt'], [5, 'Teurer Fehlschlag'], [15, 'Risikofreudig'], [30, 'Nerven aus Stahl'], [50, 'Va-Banque-Spieler']
+  [1, 'Gold verbrannt'], [5, 'Teurer Fehlschlag'], [15, 'Risikofreudig'], [30, 'Nerven aus Stahl'], [50, 'Va-Banque-Spieler'],
+  [100, 'Gold-Verbrenner'], [250, 'Bankrotteur'], [500, 'Meister des Ruins'], [1000, 'Der Aufwertungs-Fluch'],
+  [2500, 'Von Pech verfolgt'], [5000, 'Sisyphos der Aufwertung']
 ];
 /* Fuenf Erfolge fuer "alle 6 Slots mit derselben Seltenheit ausgeruestet" -
    Reihenfolge exakt wie BKMP_RUNE_RARITIES (gray/green/blue/purple/gold). */
