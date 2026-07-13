@@ -1146,6 +1146,7 @@ function bkmpIdleRenderHud() {
       <span title="Kritische-Treffer-Chance">🎯 ${s.critChance.toFixed(1)}%</span>
       <span title="Kritischer Schaden">💥 ${Math.round(s.critDamage)}%</span>
       <span title="Angriffstempo (Angriffe pro Sekunde)">⚡ ${(1000 / (s.tickIntervalMs || 900)).toFixed(2)}/s</span>
+      <span title="Glücksfaktor (Bonus auf Runen-/Ressourcen-Drops, aus Upgrades/Skills/Titeln/Runen zusammen)">🍀 +${(s.lootBonus || 0).toFixed(1)}%</span>
     </div>` : ''}
     <div class="idle-hud-resources">
       <span>💰 ${bkmpIdleFormatNumber(bkmpIdleState.gold)}</span>
@@ -2708,6 +2709,24 @@ function bkmpRuneQuickSelectFuse(count) {
   bkmpRuneFuseSelection.cids = candidates.slice(0, Math.min(count, BKMP_RUNE_FUSE_MAX_SELECT)).map(r => r._cid);
   bkmpIdleRenderRunenPanel();
 }
+/* Feedback-Vorschlag (SpielKein MC HoleNurErfolge, 13.7.: "das Runen
+   verschmelzen automatisieren? weil das etwas krampf mit den einfachen
+   wenn man da 50 hat"), Nutzerentscheidung: "1 Button zusaetzlich einbauen
+   mit alle verschmelzen" - bewusst OHNE das BKMP_RUNE_FUSE_MAX_SELECT-Limit
+   (9) der 3/6/9-Buttons, damit man nicht mehrfach klicken/bestaetigen muss,
+   wenn 50 einfache Runen vorliegen. bkmpRuneConfirmFuseSelection() verarbeitet
+   beliebig viele Dreiergruppen ohnehin schon in einem Rutsch (eine
+   Sammel-Zusammenfassung), das war nie das eigentliche Limit - nur die
+   Auswahl-Buttons waren es. */
+function bkmpRuneQuickSelectFuseAll() {
+  if (!bkmpRuneFuseSelection) return;
+  const candidates = bkmpIdlePlayerRunes
+    .filter(r => r.rune_type === bkmpRuneActiveSlotTab && r.rarity === bkmpRuneFuseSelection.rarityId && !r.equipped)
+    .sort((a, b) => Number(a.upgrade_level || 0) - Number(b.upgrade_level || 0));
+  const usableCount = Math.floor(candidates.length / 3) * 3;
+  bkmpRuneFuseSelection.cids = candidates.slice(0, usableCount).map(r => r._cid);
+  bkmpIdleRenderRunenPanel();
+}
 /* Bestaetigt die aktuelle Auswahl (3, 6 oder 9 Runen = 1, 2 oder 3
    unabhaengige Verschmelzungen) - warnt VORHER ueber beides: die
    Fehlschlagchance (Nutzerwunsch: "Chance einbauen das Runen beim
@@ -2989,8 +3008,9 @@ function bkmpRuneFuseSelectionHTML(slot) {
       <p class="idle-runen-fuse-hint">Wähle unten im Lager ${escapeHtml(rarity.name)}-Kopien in Dreiergruppen aus (3, 6 oder 9) - je Gruppe ${failPct}% Chance, dass die 3 Runen dabei zerstört werden statt zu gelingen.</p>
       <div class="idle-runen-fuse-quick-select">
         ${[3, 6, 9].map(n => `<button type="button" class="btn-nein idle-runen-fuse-quick-btn" data-count="${n}" ${availableCount < n ? 'disabled' : ''}>${n} auswählen</button>`).join('')}
+        <button type="button" class="btn-nein idle-runen-fuse-quick-btn idle-runen-fuse-all-btn" id="idleRuneFuseAllBtn" ${availableCount < 3 ? 'disabled' : ''}>Alle verschmelzen</button>
       </div>
-      <div class="idle-runen-fuse-progress">${count}/${BKMP_RUNE_FUSE_MAX_SELECT} ausgewählt${!isValidCount && count ? ' <span class="idle-runen-fuse-warn">⚠️ muss Vielfaches von 3 sein</span>' : ''}${hasProgress ? ' <span class="idle-runen-fuse-warn">⚠️ enthält Aufwertung</span>' : ''}</div>
+      <div class="idle-runen-fuse-progress">${count} ausgewählt${!isValidCount && count ? ' <span class="idle-runen-fuse-warn">⚠️ muss Vielfaches von 3 sein</span>' : ''}${hasProgress ? ' <span class="idle-runen-fuse-warn">⚠️ enthält Aufwertung</span>' : ''}</div>
       <div class="idle-runen-stat-actions">
         <button type="button" class="btn-ja idle-runen-fuse-confirm-btn" id="idleRuneFuseConfirmBtn" ${isValidCount ? '' : 'disabled'}>✨ Verschmelzen${isValidCount ? ` (${count / 3}×)` : ''}</button>
         <button type="button" class="btn-nein idle-runen-fuse-cancel-btn" id="idleRuneFuseCancelBtn">Abbrechen</button>
@@ -3165,7 +3185,9 @@ function bkmpIdleRenderRunenPanel() {
   if (fuseConfirmBtn) fuseConfirmBtn.addEventListener('click', bkmpRuneConfirmFuseSelection);
   const fuseCancelBtn = document.getElementById('idleRuneFuseCancelBtn');
   if (fuseCancelBtn) fuseCancelBtn.addEventListener('click', bkmpRuneCancelFuseSelection);
-  panel.querySelectorAll('.idle-runen-fuse-quick-btn').forEach(btn => btn.addEventListener('click', () => bkmpRuneQuickSelectFuse(Number(btn.dataset.count))));
+  panel.querySelectorAll('.idle-runen-fuse-quick-btn[data-count]').forEach(btn => btn.addEventListener('click', () => bkmpRuneQuickSelectFuse(Number(btn.dataset.count))));
+  const fuseAllBtn = document.getElementById('idleRuneFuseAllBtn');
+  if (fuseAllBtn) fuseAllBtn.addEventListener('click', bkmpRuneQuickSelectFuseAll);
   const runenHelpBtn = document.getElementById('idleRunenHelpBtn');
   if (runenHelpBtn) runenHelpBtn.addEventListener('click', bkmpIdleOpenRunenHelp);
 }
@@ -3594,17 +3616,36 @@ function bkmpIdleDetectAutoclickPattern(timestamps) {
 let bkmpIdleClickTimestamps = bkmpAutoclickLoadTimestamps(BKMP_IDLE_CLICK_HISTORY_KEY);
 let bkmpIdleClickLockedUntil = bkmpAutoclickLoadNumber(BKMP_IDLE_CLICK_LOCK_KEY);
 
-function bkmpIdleSpawnClickDamage(amount) {
+/* Spieler-Feedback (viceBlade, 13.7.): "die minus Lebenspunkte [sollen]
+   angezeigt werden wo man auch hin klickt anstatt auf einer bestimmten
+   Stelle" - clientX/clientY (falls vorhanden, siehe bkmpIdleHandleDragonClick)
+   ueberschreiben per Inline-Style die feste CSS-Position (left:65%/top:-6px
+   aus .idle-dmg-click) mit der tatsaechlichen Klick-Position relativ zum
+   Drachen-Kasten. Ohne Koordinaten (z.B. Leertaste als Klick-Ersatz) faellt
+   die Zahl auf die alte, feste Position zurueck. */
+function bkmpIdleSpawnClickDamage(amount, clientX, clientY) {
   const target = document.getElementById('idleDragon');
   if (!target) return;
   const dmg = document.createElement('span');
   dmg.className = 'idle-dmg-float idle-dmg-click';
   dmg.textContent = '-' + Math.round(amount);
+  if (typeof clientX === 'number' && typeof clientY === 'number') {
+    /* Nur left/top ueberschreiben, NICHT transform - die bestehende
+       idleDmgFloat-Animation (@keyframes) steuert transform selbst
+       (translate(-50%, 0) -> translate(-50%, -34px)) fuer den Hochschweb-
+       Effekt. translate(-50%, ...) zentriert die Zahl dabei automatisch
+       horizontal genau auf dem hier gesetzten left-Wert - deckt sich exakt
+       mit dem Klickpunkt, kein zusaetzlicher Transform noetig/sinnvoll
+       (wuerde vom Animations-Keyframe ohnehin sofort ueberschrieben). */
+    const rect = target.getBoundingClientRect();
+    dmg.style.left = Math.round(clientX - rect.left) + 'px';
+    dmg.style.top = Math.round(clientY - rect.top) + 'px';
+  }
   target.appendChild(dmg);
   window.setTimeout(() => dmg.remove(), 800);
 }
 
-function bkmpIdleHandleDragonClick() {
+function bkmpIdleHandleDragonClick(e) {
   if (!bkmpIdleModalOpen || !bkmpIdleState || !bkmpIdleCurrentDragon || !bkmpIdleEffectiveStats) return;
   /* Kein Klickschaden, solange das Vorbereitungs-Popup eines Event-
      Drachen noch nicht bestaetigt wurde. */
@@ -3641,7 +3682,7 @@ function bkmpIdleHandleDragonClick() {
 
   const clickDamage = Math.max(1, Math.round(bkmpIdleEffectiveStats.attack * (0.12 + (bkmpIdleEffectiveStats.clickDamagePct || 0) / 100)));
   bkmpIdleCurrentDragon.hp = Math.max(0, bkmpIdleCurrentDragon.hp - clickDamage);
-  bkmpIdleSpawnClickDamage(clickDamage);
+  bkmpIdleSpawnClickDamage(clickDamage, e && typeof e.clientX === 'number' ? e.clientX : undefined, e && typeof e.clientY === 'number' ? e.clientY : undefined);
   bkmpIdleSpawnHitFlash('idleDragon');
   bkmpIdleUpdateDragonHpBar();
 
