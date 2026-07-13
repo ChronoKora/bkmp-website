@@ -2429,12 +2429,68 @@ function bkmpIdleRuneEffectTotals() {
 
 let bkmpRuneActiveSlotTab = 'slot1';
 let bkmpRuneCurrentlyViewing = null;
+/* Aktiver Verschmelzen-Auswahlmodus: { rarityId, cids: [...] } oder null.
+   Auf Nutzerwunsch (15.07., "Warnung einbauen. Und der Spieler soll gezielt
+   einstellen welche verschmolzen") - vorher nahm bkmpRuneFuse() einfach die
+   ersten 3 gefundenen Runen, auch eine +15 landete so ungefragt mit im
+   Ofen. Jetzt waehlt der Spieler die 3 Instanzen selbst aus dem Lager aus,
+   siehe bkmpRuneToggleFuseCandidate/bkmpRuneConfirmFuseSelection. */
+let bkmpRuneFuseSelection = null;
 
 function bkmpRuneSelectSlotTab(slotId) {
   if (!window.BKMP_RUNE_SLOTS.some(s => s.id === slotId)) return;
   bkmpRuneActiveSlotTab = slotId;
   bkmpRuneCurrentlyViewing = null;
+  bkmpRuneFuseSelection = null;
   bkmpIdleRenderRunenPanel();
+}
+
+function bkmpRuneStartFuseSelection(rarityId) {
+  bkmpRuneFuseSelection = { rarityId, cids: [] };
+  bkmpIdleRenderRunenPanel();
+}
+function bkmpRuneCancelFuseSelection() {
+  bkmpRuneFuseSelection = null;
+  bkmpIdleRenderRunenPanel();
+}
+function bkmpRuneToggleFuseCandidate(cid) {
+  if (!bkmpRuneFuseSelection) return;
+  const rune = bkmpIdlePlayerRunes.find(r => r._cid === cid);
+  if (!rune || rune.rarity !== bkmpRuneFuseSelection.rarityId || rune.equipped) return;
+  const idx = bkmpRuneFuseSelection.cids.indexOf(cid);
+  if (idx >= 0) {
+    bkmpRuneFuseSelection.cids.splice(idx, 1);
+  } else {
+    if (bkmpRuneFuseSelection.cids.length >= 3) return;
+    bkmpRuneFuseSelection.cids.push(cid);
+  }
+  bkmpIdleRenderRunenPanel();
+}
+/* Warnt gezielt, wenn eine der 3 ausgewaehlten Runen bereits aufgewertet
+   ist/Sub-Stats hat - das Ergebnis startet IMMER wieder bei +0 ohne
+   Sub-Stats (siehe bkmpRuneFuse), diese Aufwertung waere also weg. Bei 3
+   ganz frischen +0-Runen ohne Sub-Stats kein unnoetiger Extra-Dialog. */
+async function bkmpRuneConfirmFuseSelection() {
+  if (!bkmpRuneFuseSelection || bkmpRuneFuseSelection.cids.length !== 3) return;
+  const slotId = bkmpRuneActiveSlotTab;
+  const rarityId = bkmpRuneFuseSelection.rarityId;
+  const cids = bkmpRuneFuseSelection.cids.slice();
+  const runes = cids.map(cid => bkmpIdlePlayerRunes.find(r => r._cid === cid)).filter(Boolean);
+  if (runes.length !== 3) { bkmpRuneFuseSelection = null; bkmpIdleRenderRunenPanel(); return; }
+  const withProgress = runes.filter(r => Number(r.upgrade_level || 0) > 0 || (r.substats && r.substats.length));
+  if (withProgress.length) {
+    const slot = window.BKMP_RUNE_SLOTS.find(s => s.id === slotId);
+    const details = withProgress.map(r => `+${r.upgrade_level || 0}${r.substats && r.substats.length ? ` mit ${r.substats.length} Sub-Stat${r.substats.length === 1 ? '' : 's'}` : ''}`).join(', ');
+    const confirmed = await bkmpConfirmDialog(
+      '⚠️ Aufgewertete Rune geht verloren!',
+      `${withProgress.length} von 3 ausgewählten ${slot ? slot.name : 'Runen'} ${withProgress.length === 1 ? 'ist' : 'sind'} bereits aufgewertet (${details}). Die verschmolzene Rune startet immer wieder bei +0 ohne Sub-Stats - die komplette Aufwertung geht dabei verloren.\n\nTrotzdem verschmelzen?`,
+      'Ja, trotzdem verschmelzen',
+      'Abbrechen'
+    );
+    if (!confirmed) return;
+  }
+  bkmpRuneFuseSelection = null;
+  bkmpRuneFuse(slotId, rarityId, cids);
 }
 
 function bkmpRuneStatBoxHTML(slot, rune) {
@@ -2473,8 +2529,8 @@ function bkmpRuneStatBoxHTML(slot, rune) {
       </button>
     </div>
     <div class="idle-runen-stat-actions">
-      <button type="button" class="btn-nein idle-runen-fuse-btn" id="idleRuneFuseBtn" data-slot="${slot.id}" data-rarity="${rune.rarity}" ${canFuse ? '' : 'disabled'}>
-        ✨ 3× verschmelzen${canFuse ? '' : ` (${sameGroup.length}/3)`}
+      <button type="button" class="btn-nein idle-runen-fuse-btn" id="idleRuneFuseBtn" data-rarity="${rune.rarity}" ${canFuse ? '' : 'disabled'}>
+        ✨ Verschmelzen (auswählen)${canFuse ? '' : ` (${sameGroup.length}/3)`}
       </button>
       <button type="button" class="btn-nein idle-runen-sell-btn" id="idleRuneSellBtn" data-cid="${rune._cid}" ${rune.equipped ? 'disabled' : ''}>
         💰 verkaufen (+${rarity.sellGold})
@@ -2515,13 +2571,25 @@ function bkmpRuneToggleEquip(cid) {
    wuerde Verschmelzen zum umstaendlichen Umweg, um eine hoehere Stufe
    "billiger" aufzuwerten, statt einer eigenstaendigen Belohnung fuer viele
    gesammelte Runen). Legendär ist die Obergrenze, kann nicht weiter
-   verschmolzen werden. */
-function bkmpRuneFuse(slotId, rarityId) {
+   verschmolzen werden.
+   cids (optional): genau 3 vom Spieler ausgewaehlte Instanzen (siehe
+   bkmpRuneConfirmFuseSelection) - werden diese uebergeben, gelten NUR sie,
+   nicht mehr einfach "die ersten 3 gefundenen" (Spieler-Wunsch: gezielt
+   auswaehlen koennen, damit z.B. eine +15 nicht ungefragt mitverschmilzt). */
+function bkmpRuneFuse(slotId, rarityId, cids) {
   const rarityIndex = window.BKMP_RUNE_RARITIES.findIndex(r => r.id === rarityId);
   if (rarityIndex < 0 || rarityIndex >= window.BKMP_RUNE_RARITIES.length - 1) return;
-  const candidates = bkmpIdlePlayerRunes.filter(r => r.rune_type === slotId && r.rarity === rarityId && !r.equipped);
-  if (candidates.length < 3) return;
-  const consumed = candidates.slice(0, 3);
+  let consumed;
+  if (Array.isArray(cids) && cids.length === 3) {
+    consumed = cids
+      .map(cid => bkmpIdlePlayerRunes.find(r => r._cid === cid && r.rune_type === slotId && r.rarity === rarityId && !r.equipped))
+      .filter(Boolean);
+    if (consumed.length !== 3) return;
+  } else {
+    const candidates = bkmpIdlePlayerRunes.filter(r => r.rune_type === slotId && r.rarity === rarityId && !r.equipped);
+    if (candidates.length < 3) return;
+    consumed = candidates.slice(0, 3);
+  }
   const consumedIds = consumed.map(r => r.id).filter(Boolean);
   bkmpIdlePlayerRunes = bkmpIdlePlayerRunes.filter(r => !consumed.includes(r));
   const newRarity = window.BKMP_RUNE_RARITIES[rarityIndex + 1];
@@ -2612,8 +2680,27 @@ function bkmpIdleRenderRunenHelp() {
     <div class="skillhelp-note">
       <strong>⬆️ Aufwerten:</strong> Mit Gold von +0 bis +15 - jede Stufe erhöht den Hauptwert der Rune, Kosten steigen mit Stufe und Seltenheit.<br>
       <strong>✦ Sub-Stats:</strong> Runen droppen schon MIT Sub-Stats - Anzahl je nach Seltenheit (Gewöhnlich 0, Ungewöhnlich 1, Selten 2, Episch 3, Legendär 4). Bei +3/+6/+9/+12 kommt jeweils ein neuer dazu, bis maximal 4 erreicht sind - danach verstärkt jede dieser Stufen stattdessen einen vorhandenen Sub-Stat weiter. Meist ein zweiter %-Wert, seltener ein fester Bonus (z. B. „+2 Angriff fest" statt „+3% Angriff") oder Angriffstempo - das kann bei jeder Seltenheit passieren, auch bei Legendär.<br>
-      <strong>✨ Verschmelzen:</strong> 3 unausgerüstete Runen gleichen Slots und gleicher Seltenheit ergeben 1 neue der nächsthöheren Seltenheit mit frisch gewürfelten Sub-Stats passend zur neuen Seltenheit - startet aber wieder bei +0.<br>
+      <strong>✨ Verschmelzen:</strong> 3 unausgerüstete Runen gleichen Slots und gleicher Seltenheit (die du selbst auswählst) ergeben 1 neue der nächsthöheren Seltenheit mit frisch gewürfelten Sub-Stats passend zur neuen Seltenheit - startet aber wieder bei +0. Bei aufgewerteten Runen kommt vorher eine Warnung.<br>
       <strong>💰 Verkaufen:</strong> Unausgerüstete Runen lassen sich jederzeit für Gold verkaufen.
+    </div>
+  `;
+}
+
+function bkmpRuneFuseSelectionHTML(slot) {
+  const sel = bkmpRuneFuseSelection;
+  const rarity = window.BKMP_RUNE_RARITIES.find(r => r.id === sel.rarityId);
+  const count = sel.cids.length;
+  const selectedRunes = sel.cids.map(cid => bkmpIdlePlayerRunes.find(r => r._cid === cid)).filter(Boolean);
+  const hasProgress = selectedRunes.some(r => Number(r.upgrade_level || 0) > 0 || (r.substats && r.substats.length));
+  return `
+    <div class="idle-runen-fuse-panel" style="--rune-color:${rarity.color}">
+      <div class="idle-runen-fuse-title">✨ ${escapeHtml(rarity.name)} ${escapeHtml(slot.name)} verschmelzen</div>
+      <p class="idle-runen-fuse-hint">Wähle unten im Lager genau 3 ${escapeHtml(rarity.name)}-Kopien aus, die verschmolzen werden sollen.</p>
+      <div class="idle-runen-fuse-progress">${count}/3 ausgewählt${hasProgress ? ' <span class="idle-runen-fuse-warn">⚠️ enthält Aufwertung</span>' : ''}</div>
+      <div class="idle-runen-stat-actions">
+        <button type="button" class="btn-ja idle-runen-fuse-confirm-btn" id="idleRuneFuseConfirmBtn" ${count === 3 ? '' : 'disabled'}>✨ Verschmelzen</button>
+        <button type="button" class="btn-nein idle-runen-fuse-cancel-btn" id="idleRuneFuseCancelBtn">Abbrechen</button>
+      </div>
     </div>
   `;
 }
@@ -2672,32 +2759,45 @@ function bkmpIdleRenderRunenPanel() {
         </button>`;
       }).join('')}
     </div>
-    <div class="idle-runen-stat-box" id="idleRunenStatBox">${bkmpRuneStatBoxHTML(activeSlot, viewingRune)}</div>
+    <div class="idle-runen-stat-box" id="idleRunenStatBox">${bkmpRuneFuseSelection ? bkmpRuneFuseSelectionHTML(activeSlot) : bkmpRuneStatBoxHTML(activeSlot, viewingRune)}</div>
     <h4 class="idle-sammlung-subheading">🎒 ${escapeHtml(activeSlot.name)}-Lager <span class="idle-sammlung-count">${slotOwned.length} von ${totalOwned} gesamt</span></h4>
     <div class="idle-runen-inventory" id="idleRunenInventory">
       ${slotOwned.length ? slotOwned.map(r => {
         const rarity = window.BKMP_RUNE_RARITIES.find(x => x.id === r.rarity);
         const isViewing = r._cid === bkmpRuneCurrentlyViewing;
+        const inFuseMode = !!bkmpRuneFuseSelection;
+        const isFuseEligible = inFuseMode && r.rarity === bkmpRuneFuseSelection.rarityId && !r.equipped;
+        const isFuseSelected = inFuseMode && bkmpRuneFuseSelection.cids.includes(r._cid);
+        const fuseClasses = inFuseMode ? `${isFuseSelected ? 'is-fuse-selected' : ''} ${isFuseEligible ? 'is-fuse-eligible' : 'is-fuse-ineligible'}` : '';
         return `
-        <button type="button" class="idle-runen-item ${r.equipped ? 'is-equipped' : ''} ${isViewing ? 'is-viewing' : ''}" data-cid="${r._cid}" style="--rune-color:${rarity.color}" title="${escapeHtml(rarity.name)}${r.upgrade_level ? ' +' + r.upgrade_level : ''}${r.equipped ? ' (eingesetzt)' : ''}">
+        <button type="button" class="idle-runen-item ${r.equipped ? 'is-equipped' : ''} ${isViewing && !inFuseMode ? 'is-viewing' : ''} ${fuseClasses}" data-cid="${r._cid}" style="--rune-color:${rarity.color}" title="${escapeHtml(rarity.name)}${r.upgrade_level ? ' +' + r.upgrade_level : ''}${r.equipped ? ' (eingesetzt)' : ''}">
           <img src="assets/runes/${activeSlot.id}-${r.rarity}.png?v=${BKMP_RUNE_IMG_V}" alt="${escapeHtml(rarity.name)}">
           ${r.equipped ? '<span class="idle-runen-equipped-badge">✓</span>' : ''}
+          ${isFuseSelected ? '<span class="idle-runen-equipped-badge idle-runen-fuse-check">✓</span>' : ''}
           ${r.upgrade_level ? `<span class="idle-runen-count-badge idle-runen-level-badge">+${r.upgrade_level}</span>` : ''}
         </button>`;
       }).join('') : `<p class="idle-runen-stat-placeholder">Noch keine ${escapeHtml(activeSlot.name)} gefunden - beim Kämpfen und bei Bossen droppen zufällig neue.</p>`}
     </div>
   `;
   panel.querySelectorAll('.idle-runen-slot-tab').forEach(btn => btn.addEventListener('click', () => bkmpRuneSelectSlotTab(btn.dataset.slot)));
-  panel.querySelectorAll('.idle-runen-item').forEach(btn => btn.addEventListener('click', () => { bkmpRuneCurrentlyViewing = btn.dataset.cid; bkmpIdleRenderRunenPanel(); }));
+  panel.querySelectorAll('.idle-runen-item').forEach(btn => btn.addEventListener('click', () => {
+    if (bkmpRuneFuseSelection) { bkmpRuneToggleFuseCandidate(btn.dataset.cid); return; }
+    bkmpRuneCurrentlyViewing = btn.dataset.cid;
+    bkmpIdleRenderRunenPanel();
+  }));
   panel.querySelectorAll('.idle-runen-equip-slot').forEach(btn => btn.addEventListener('click', () => bkmpRuneToggleEquip(btn.dataset.cid)));
   const equipBtn = document.getElementById('idleRuneEquipBtn');
   if (equipBtn) equipBtn.addEventListener('click', () => bkmpRuneToggleEquip(equipBtn.dataset.cid));
   const upgradeBtn = document.getElementById('idleRuneUpgradeBtn');
   if (upgradeBtn) upgradeBtn.addEventListener('click', () => bkmpRuneUpgrade(upgradeBtn.dataset.cid));
   const fuseBtn = document.getElementById('idleRuneFuseBtn');
-  if (fuseBtn) fuseBtn.addEventListener('click', () => bkmpRuneFuse(fuseBtn.dataset.slot, fuseBtn.dataset.rarity));
+  if (fuseBtn) fuseBtn.addEventListener('click', () => bkmpRuneStartFuseSelection(fuseBtn.dataset.rarity));
   const sellBtn = document.getElementById('idleRuneSellBtn');
   if (sellBtn) sellBtn.addEventListener('click', () => bkmpRuneSell(sellBtn.dataset.cid));
+  const fuseConfirmBtn = document.getElementById('idleRuneFuseConfirmBtn');
+  if (fuseConfirmBtn) fuseConfirmBtn.addEventListener('click', bkmpRuneConfirmFuseSelection);
+  const fuseCancelBtn = document.getElementById('idleRuneFuseCancelBtn');
+  if (fuseCancelBtn) fuseCancelBtn.addEventListener('click', bkmpRuneCancelFuseSelection);
   const runenHelpBtn = document.getElementById('idleRunenHelpBtn');
   if (runenHelpBtn) runenHelpBtn.addEventListener('click', bkmpIdleOpenRunenHelp);
 }

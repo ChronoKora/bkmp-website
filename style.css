@@ -3873,6 +3873,25 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 .idle-runen-stat-actions { display: flex; gap: 0.5rem; margin-top: 0.7rem; }
 .idle-runen-fuse-btn, .idle-runen-sell-btn { flex: 1; font-size: 0.74rem; padding: 0.45rem 0.5rem; white-space: nowrap; }
 .idle-runen-fuse-btn:disabled, .idle-runen-sell-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Verschmelzen-Auswahlmodus (bkmpRuneFuseSelection) - Spieler waehlt gezielt
+   3 Instanzen im Lager aus, statt dass die ersten 3 gefundenen automatisch
+   verschmolzen werden (Spieler-Wunsch, "gezielt einstellen welche"). */
+.idle-runen-fuse-panel { text-align: center; }
+.idle-runen-fuse-title { font-weight: 700; font-size: 0.95rem; color: var(--rune-color); margin-bottom: 0.3rem; }
+.idle-runen-fuse-hint { color: var(--muted); font-size: 0.82rem; margin: 0 0 0.6rem; }
+.idle-runen-fuse-progress { font-weight: 700; font-size: 0.88rem; margin-bottom: 0.4rem; }
+.idle-runen-fuse-warn { color: #facc15; font-weight: 700; font-size: 0.78rem; }
+.idle-runen-fuse-confirm-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.idle-runen-item.is-fuse-ineligible { opacity: 0.28; filter: grayscale(0.7); cursor: not-allowed; }
+.idle-runen-item.is-fuse-ineligible:hover { transform: none; box-shadow: none; }
+.idle-runen-item.is-fuse-eligible { border-style: dashed; }
+.idle-runen-item.is-fuse-selected {
+  border-color: var(--gold);
+  border-style: solid;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--gold) 55%, transparent) inset;
+}
+.idle-runen-fuse-check { background: var(--gold); border-color: var(--gold); top: 3px; right: 3px; bottom: auto; }
 @media (max-width: 640px) {
   .idle-runen-inventory { grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); }
   .idle-runen-stat-actions { flex-direction: column; }
