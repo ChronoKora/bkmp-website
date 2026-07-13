@@ -55,7 +55,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260715-streamerhelp1">
+<link rel="stylesheet" href="style.css?v=20260715-streamerhelp2">
 </head>
 <body>
 
@@ -476,7 +476,6 @@
     <div class="joke-card idle-dorf-card">
       <button type="button" class="idle-dorf-close" id="idleDorfCloseX" aria-label="Schlie&szlig;en">&times;</button>
       <h3>🏰 Idle Drachen Dorf</h3>
-      <button type="button" class="idle-stream-help-link" id="idleStreamHelpBtn">📡 Für Streamer: Twitch-Einbindung</button>
       <div class="idle-dorf-offline-card" id="idleDorfOfflineCard" style="display:none;"></div>
       <div class="raid-join-banner" id="raidJoinBanner" style="display:none;"></div>
       <!-- Nutzerwunsch (15.07.): "auf der Hauptseite dann stehen tut 'Wird
@@ -555,7 +554,15 @@
       <div class="idle-dorf-panel" id="idlePanelPrestige" style="display:none;"></div>
       <div class="idle-dorf-panel" id="idlePanelRunen" style="display:none;"></div>
 
+      <!-- Nutzerwunsch (15.07.): "Baust du das dann unten ein und im
+           gleichen Design overlay wie den Rest?" - der Link stand vorher
+           oben direkt neben dem Titel und kollidierte optisch mit dem
+           Live-Sync-Banner (Spieler-Screenshot). Jetzt unten in der
+           Button-Leiste, als ganz normaler .btn-nein-Pillenbutton -
+           gleiches Muster wie ueberall sonst auf der Seite (z.B. die
+           "❓ Hilfe"-Buttons), statt eines separaten Text-Links. -->
       <div class="joke-buttons">
+        <button class="btn-nein idle-stream-help-btn" id="idleStreamHelpBtn" type="button">📡 Für Streamer</button>
         <button class="btn-ja" id="idleDorfClose" type="button">Schlie&szlig;en</button>
       </div>
     </div>
