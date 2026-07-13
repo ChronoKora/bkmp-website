@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="favicon.ico" sizes="any">
+<title>BKMP – Idle Drachen Dorf (Stream-Overlay)</title>
+<link rel="stylesheet" href="style.css?v=20260715-drawerclosefix1">
+<style>
+  /* ============================================================
+     Eigenstaendige Seite NUR fuer das Idle Drachen Dorf, gedacht als
+     OBS-Browser-Quelle fuer Twitch-Streams (Nutzerwunsch, 15.07.:
+     "ein Browsercode für Twitch nur für das idle Game"). Zeigt
+     ausschliesslich das Spiel (keine Kopfzeile/Navigation/restliche
+     Seite), voll spielbar, mit transparentem Seitenhintergrund - das
+     Karten-Fenster selbst bleibt dabei blickdicht (eigene --paper-
+     Variablen aus dem "Hoehlen"-Theme in style.css), nur die
+     Abdunklungs-Ebene DAHINTER wird durchsichtig. In OBS als
+     "Browser-Quelle" mit dieser Datei-URL einbinden - Transparenz
+     funktioniert dort automatisch, kein Sonderflag noetig. */
+  html, body {
+    background: transparent !important;
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+  }
+  .joke-overlay { background: transparent !important; }
+  .idle-dorf-overlay.visible { background: transparent !important; }
+  /* Diese Seite IST das Spiel - "Schliessen" wuerde nur eine leere,
+     durchsichtige Flaeche ohne jeden Weg zurueck hinterlassen (kein
+     Header-Button wie auf der Hauptseite). Zum Ein-/Ausblenden im
+     Stream ist die OBS-eigene Sichtbarkeits-Umschaltung der Quelle
+     gedacht, nicht ein Button auf der Seite selbst. */
+  #idleDorfOverlay .idle-dorf-card > .idle-dorf-close,
+  #idleDorfOverlay .idle-dorf-card > .joke-buttons {
+    display: none !important;
+  }
+</style>
+</head>
+<body>
+
+  <div class="joke-overlay" id="mcNameOverlay">
+    <div class="joke-card auth-card">
+      <h3 id="mcAuthTitle">Anmelden</h3>
+      <p id="mcAuthSubtitle">Melde dich mit deinem Ingame-Namen und Passwort an, um dein Idle-Dorf hier im Stream zu spielen.</p>
+
+      <div class="auth-field">
+        <label for="mcAuthName">Ingame-Name</label>
+        <input type="text" id="mcAuthName" placeholder="Dein Minecraft-Name" maxlength="32" autocomplete="username">
+      </div>
+      <div class="auth-field">
+        <label for="mcAuthPassword" id="mcAuthPasswordLabel">Passwort</label>
+        <div class="auth-password-row">
+          <input type="password" id="mcAuthPassword" placeholder="Passwort" autocomplete="current-password">
+          <button type="button" class="auth-password-toggle" id="mcAuthPasswordToggle" aria-label="Passwort anzeigen">&#128065;</button>
+        </div>
+      </div>
+      <div class="auth-field" id="mcAuthPasswordRepeatField" style="display:none;">
+        <label for="mcAuthPasswordRepeat">Passwort wiederholen</label>
+        <div class="auth-password-row">
+          <input type="password" id="mcAuthPasswordRepeat" placeholder="Passwort wiederholen" autocomplete="new-password">
+          <button type="button" class="auth-password-toggle" id="mcAuthPasswordRepeatToggle" aria-label="Passwort anzeigen">&#128065;</button>
+        </div>
+      </div>
+
+      <p class="auth-error" id="mcAuthError" style="display:none;"></p>
+
+      <div class="joke-buttons">
+        <button class="btn-ja" id="mcAuthSubmit" type="button">Anmelden</button>
+      </div>
+      <p class="auth-switch">
+        <button type="button" class="auth-switch-link" id="mcAuthSwitchBtn">Noch keinen Account? Registrieren</button>
+      </p>
+    </div>
+  </div>
+
+  <div class="joke-overlay" id="bkmpConfirmOverlay">
+    <div class="joke-card">
+      <h3 id="bkmpConfirmTitle"></h3>
+      <p id="bkmpConfirmBody" style="white-space:pre-line;"></p>
+      <div class="joke-buttons">
+        <button class="btn-nein" id="bkmpConfirmCancelBtn" type="button">Abbrechen</button>
+        <button class="btn-ja" id="bkmpConfirmOkBtn" type="button">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="joke-overlay" id="idleMaintenanceOverlay">
+    <div class="joke-card">
+      <h3>&#128295; Wartungsarbeiten</h3>
+      <p id="idleMaintenanceMessage">Das Idle Drachen Dorf wird gerade gewartet. Bitte versuche es gleich nochmal.</p>
+      <div class="joke-buttons"><button class="btn-ja" id="idleMaintenanceClose" type="button">Verstanden</button></div>
+    </div>
+  </div>
+
+  <div class="joke-overlay" id="idleSkillHelpOverlay">
+    <div class="joke-card achievements-card skillhelp-card">
+      <h3>&#10067; Skilltree-Hilfe</h3>
+      <div class="skillhelp-list" id="idleSkillHelpList"></div>
+      <div class="joke-buttons"><button class="btn-ja" id="idleSkillHelpClose" type="button">Schlie&szlig;en</button></div>
+    </div>
+  </div>
+
+  <div class="joke-overlay" id="idleRunenHelpOverlay">
+    <div class="joke-card achievements-card skillhelp-card">
+      <h3>&#10067; Runen-Hilfe</h3>
+      <div class="skillhelp-list" id="idleRunenHelpList"></div>
+      <div class="joke-buttons"><button class="btn-ja" id="idleRunenHelpClose" type="button">Schlie&szlig;en</button></div>
+    </div>
+  </div>
+
+  <div class="joke-overlay idle-stage-picker-overlay" id="idleStagePickerOverlay">
+    <div class="joke-card idle-stage-picker-card">
+      <button type="button" class="idle-dorf-close" id="idleStagePickerCloseX" aria-label="Schlie&szlig;en">&times;</button>
+      <h3>&#128506;&#65039; Zu Stufe wechseln</h3>
+      <p class="idle-stage-picker-hint">W&auml;hle eine bereits erreichte Stufe. Deine beste Stufe bleibt dabei immer erhalten.</p>
+      <div class="idle-stage-picker-body" id="idleStagePickerBody"></div>
+      <div class="joke-buttons"><button class="btn-nein" id="idleStagePickerCloseBtn" type="button">Schlie&szlig;en</button></div>
+    </div>
+  </div>
+
+  <div class="joke-overlay idle-event-dragon-overlay" id="idleEventDragonOverlay">
+    <div class="joke-card idle-event-dragon-card">
+      <h3 id="idleEventDragonTitle"></h3>
+      <p id="idleEventDragonMessage"></p>
+      <div class="joke-buttons">
+        <button class="btn-ja" id="idleEventDragonReadyBtn" type="button"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="joke-overlay idle-dorf-overlay" id="idleDorfOverlay">
+    <div class="joke-card idle-dorf-card">
+      <button type="button" class="idle-dorf-close" id="idleDorfCloseX" aria-label="Schlie&szlig;en">&times;</button>
+      <h3>&#127984; Idle Drachen Dorf</h3>
+      <div class="idle-dorf-offline-card" id="idleDorfOfflineCard" style="display:none;"></div>
+      <div class="raid-join-banner" id="raidJoinBanner" style="display:none;"></div>
+      <div class="idle-dorf-hud" id="idleDorfHud"></div>
+
+      <div class="raid-combat-view idle-dorf-panel" id="raidCombatView" style="display:none;">
+        <div class="raid-combat-header">
+          <span>&#128009; Weltboss-Raid</span>
+          <span class="raid-timer" id="raidCombatTimer"></span>
+        </div>
+        <div class="raid-battlefield" id="raidBattlefield">
+          <div class="raid-city" id="raidCity">
+            <div class="raid-city-sprite"></div>
+            <div class="raid-hp-bar"><div class="raid-hp-fill raid-hp-fill-city" id="raidCityHpFill" style="width:100%"></div></div>
+            <div class="raid-hp-label" id="raidCityHpLabel"></div>
+            <div class="raid-city-stats" id="raidCityStats"></div>
+          </div>
+          <div class="raid-boss raid-clickable" id="raidBoss">
+            <div class="raid-boss-sprite raid-sprite-zerathor" id="raidBossSprite"></div>
+            <div class="raid-hp-bar"><div class="raid-hp-fill raid-hp-fill-boss" id="raidBossHpFill" style="width:100%"></div></div>
+            <div class="raid-hp-label" id="raidBossHpLabel"></div>
+            <div class="raid-boss-name" id="raidBossName"></div>
+          </div>
+        </div>
+        <div class="raid-participants-list" id="raidParticipantsList"></div>
+        <div class="raid-result-card" id="raidResultCard" style="display:none;"></div>
+      </div>
+
+      <div class="idle-dorf-tabs" id="idleDorfTabs">
+        <button type="button" class="idle-dorf-tab active" id="idleTabBtnKampf">&#9876;&#65039; Kampf</button>
+        <button type="button" class="idle-dorf-tab" id="idleTabBtnUpgrades">&#11014;&#65039; Upgrades</button>
+        <button type="button" class="idle-dorf-tab" id="idleTabBtnSkilltree">&#127795; Skilltree</button>
+        <button type="button" class="idle-dorf-tab" id="idleTabBtnSammlung">&#127873; Sammlung</button>
+        <button type="button" class="idle-dorf-tab" id="idleTabBtnErfolge">&#127942; Erfolge</button>
+        <button type="button" class="idle-dorf-tab" id="idleTabBtnBestenliste">&#128202; Bestenliste</button>
+        <button type="button" class="idle-dorf-tab" id="idleTabBtnPrestige">&#127756; Prestige</button>
+        <button type="button" class="idle-dorf-tab" id="idleTabBtnRunen">&#128302; Runen</button>
+      </div>
+
+      <div class="idle-dorf-panel" id="idlePanelKampf">
+        <div class="idle-stage-bar" id="idleStageBar"></div>
+        <div class="idle-battlefield" id="idleBattlefield">
+          <div class="idle-village" id="idleVillage">
+            <div class="idle-village-sprite"></div>
+            <div class="idle-hp-bar"><div class="idle-hp-fill idle-hp-fill-village" id="idleVillageHpFill" style="width:100%"></div></div>
+            <div class="idle-hp-label" id="idleVillageHpLabel"></div>
+          </div>
+          <div class="idle-dragon" id="idleDragon">
+            <div class="idle-dragon-sprite" id="idleDragonSprite"></div>
+            <div class="idle-hp-bar"><div class="idle-hp-fill idle-hp-fill-dragon" id="idleDragonHpFill" style="width:100%"></div></div>
+            <div class="idle-hp-label" id="idleDragonHpLabel"></div>
+            <div class="idle-dragon-name" id="idleDragonName"></div>
+          </div>
+        </div>
+        <button type="button" class="idle-adfree-btn" id="idleAdFreeBtn" style="display:none;">AD-Free &ndash; nur 99$</button>
+        <div class="idle-dorf-log" id="idleDorfLog"></div>
+      </div>
+
+      <div class="idle-dorf-panel" id="idlePanelUpgrades" style="display:none;"></div>
+      <div class="idle-dorf-panel" id="idlePanelSkilltree" style="display:none;"></div>
+      <div class="idle-dorf-panel" id="idlePanelSammlung" style="display:none;"></div>
+      <div class="idle-dorf-panel" id="idlePanelErfolge" style="display:none;"></div>
+      <div class="idle-dorf-panel" id="idlePanelBestenliste" style="display:none;">
+        <div class="idle-dorf-leaderboard-tabs" id="idleLeaderboardTabs"></div>
+        <div id="idleLeaderboardList"></div>
+      </div>
+      <div class="idle-dorf-panel" id="idlePanelPrestige" style="display:none;"></div>
+      <div class="idle-dorf-panel" id="idlePanelRunen" style="display:none;"></div>
+
+      <div class="joke-buttons">
+        <button class="btn-ja" id="idleDorfClose" type="button">Schlie&szlig;en</button>
+      </div>
+    </div>
+
+    <div class="idle-runen-drawer" id="idleRuneDrawer">
+      <button type="button" class="idle-runen-drawer-toggle" id="idleRuneDrawerToggle" aria-label="Runen-Lager ein-/ausklappen">&#8250;</button>
+      <div class="idle-runen-drawer-panel">
+        <div class="idle-runen-drawer-panel-inner" id="idleRuneDrawerContent"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>window.BKMP_CLIENT_STORAGE_KEY = 'bkmp-customer-auth';</script>
+  <script src="assets/vendor/supabase-js.min.js"></script>
+  <script src="supabase.js?v=20260715-runerisk1"></script>
+  <script>
+    /* ---------------- Minimal-Set der Helfer, die idledorf.js von der
+       Hauptseite braucht (siehe index.html fuer die Originale) - bewusst
+       NUR das Noetigste fuer das Spiel selbst, ohne das komplette
+       Erfolge-/Kosmetik-/Cross-Device-Sync-System von index.html. ---------------- */
+    function escapeHtml(value) {
+      return String(value || '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+    }
+
+    function bkmpConfirmDialog(title, body, okLabel, cancelLabel) {
+      const overlay = document.getElementById('bkmpConfirmOverlay');
+      if (!overlay) return Promise.resolve(window.confirm([title, body].filter(Boolean).join('\n\n')));
+      return new Promise(resolve => {
+        document.getElementById('bkmpConfirmTitle').textContent = title || '';
+        document.getElementById('bkmpConfirmBody').textContent = body || '';
+        const okBtn = document.getElementById('bkmpConfirmOkBtn');
+        const cancelBtn = document.getElementById('bkmpConfirmCancelBtn');
+        okBtn.textContent = okLabel || 'OK';
+        cancelBtn.textContent = cancelLabel || 'Abbrechen';
+        function cleanup(result) {
+          overlay.classList.remove('visible');
+          okBtn.removeEventListener('click', onOk);
+          cancelBtn.removeEventListener('click', onCancel);
+          resolve(result);
+        }
+        function onOk() { cleanup(true); }
+        function onCancel() { cleanup(false); }
+        okBtn.addEventListener('click', onOk);
+        cancelBtn.addEventListener('click', onCancel);
+        overlay.classList.add('visible');
+      });
+    }
+
+    function bkmpShowJannikToast(text, ms) {
+      const toast = document.createElement('div');
+      toast.className = 'bkmp-jannik-toast';
+      toast.textContent = text;
+      document.body.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.add('visible'));
+      setTimeout(() => {
+        toast.classList.remove('visible');
+        setTimeout(() => toast.remove(), 450);
+      }, ms || 2500);
+    }
+
+    const BKMP_MC_NAME_KEY = 'bkmp-mc-name';
+    function bkmpGetMcName() {
+      try { return (localStorage.getItem(BKMP_MC_NAME_KEY) || '').trim(); } catch (e) { return ''; }
+    }
+    function bkmpSetMcName(name) {
+      try { localStorage.setItem(BKMP_MC_NAME_KEY, name); } catch (e) {}
+    }
+  </script>
+  <script src="idledorf.js?v=20260715-runerisk1"></script>
+  <script>
+    /* ---------------- Login/Registrieren (schlanke Fassung von index.html)
+       ---------------- */
+    const mcNameOverlay = document.getElementById('mcNameOverlay');
+    const mcAuthTitle = document.getElementById('mcAuthTitle');
+    const mcAuthSubtitle = document.getElementById('mcAuthSubtitle');
+    const mcAuthName = document.getElementById('mcAuthName');
+    const mcAuthPassword = document.getElementById('mcAuthPassword');
+    const mcAuthPasswordLabel = document.getElementById('mcAuthPasswordLabel');
+    const mcAuthPasswordRepeatField = document.getElementById('mcAuthPasswordRepeatField');
+    const mcAuthPasswordRepeat = document.getElementById('mcAuthPasswordRepeat');
+    const mcAuthError = document.getElementById('mcAuthError');
+    const mcAuthSubmit = document.getElementById('mcAuthSubmit');
+    const mcAuthSwitchBtn = document.getElementById('mcAuthSwitchBtn');
+    let mcAuthMode = 'login';
+
+    function mcAuthShowError(message) {
+      mcAuthError.textContent = message || '';
+      mcAuthError.style.display = message ? '' : 'none';
+    }
+
+    function mcAuthApplyMode() {
+      mcAuthShowError('');
+      if (mcAuthMode === 'register') {
+        mcAuthTitle.textContent = 'Account erstellen';
+        mcAuthSubtitle.textContent = 'Erstelle einen Account, damit dein Idle-Dorf-Fortschritt erhalten bleibt.';
+        mcAuthPasswordLabel.textContent = 'Passwort erstellen';
+        mcAuthPasswordRepeatField.style.display = '';
+        mcAuthSubmit.textContent = 'Account erstellen';
+        mcAuthSwitchBtn.textContent = 'Du hast dich schon registriert? Hier anmelden';
+      } else {
+        mcAuthTitle.textContent = 'Anmelden';
+        mcAuthSubtitle.textContent = 'Melde dich mit deinem Ingame-Namen und Passwort an, um dein Idle-Dorf hier im Stream zu spielen.';
+        mcAuthPasswordLabel.textContent = 'Passwort';
+        mcAuthPasswordRepeatField.style.display = 'none';
+        mcAuthSubmit.textContent = 'Anmelden';
+        mcAuthSwitchBtn.textContent = 'Noch keinen Account? Registrieren';
+      }
+    }
+
+    function mcAuthResetForm() {
+      mcAuthMode = 'login';
+      mcAuthName.value = '';
+      mcAuthPassword.value = '';
+      mcAuthPasswordRepeat.value = '';
+      mcAuthApplyMode();
+    }
+
+    mcAuthSwitchBtn.addEventListener('click', () => {
+      mcAuthMode = mcAuthMode === 'register' ? 'login' : 'register';
+      mcAuthApplyMode();
+    });
+
+    function mcAuthSetupPasswordToggle(inputId, btnId) {
+      const input = document.getElementById(inputId);
+      const btn = document.getElementById(btnId);
+      if (!input || !btn) return;
+      btn.addEventListener('click', () => {
+        const show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        btn.innerHTML = show ? '&#128584;' : '&#128065;';
+        btn.setAttribute('aria-label', show ? 'Passwort verbergen' : 'Passwort anzeigen');
+      });
+    }
+    mcAuthSetupPasswordToggle('mcAuthPassword', 'mcAuthPasswordToggle');
+    mcAuthSetupPasswordToggle('mcAuthPasswordRepeat', 'mcAuthPasswordRepeatToggle');
+
+    /* Bewusst OHNE bkmpMergeRemoteStatsIntoLocal/bkmpClaimAndWatchSession
+       (siehe index.html) - beide gehoeren zum Erfolge-/Cross-Device-/
+       Single-Session-System der Hauptseite, nicht zum Idle-Dorf selbst.
+       bkmpIdleOpenModal() laedt den Spielstand direkt und unabhaengig
+       davon anhand des Namens. */
+    async function mcAuthSubmitHandler() {
+      const name = mcAuthName.value.trim();
+      const password = mcAuthPassword.value;
+      if (!name) { mcAuthShowError('Bitte deinen Ingame-Namen eintragen.'); mcAuthName.focus(); return; }
+      if (!password) { mcAuthShowError('Bitte ein Passwort eintragen.'); mcAuthPassword.focus(); return; }
+      if (mcAuthMode === 'register' && password !== mcAuthPasswordRepeat.value) {
+        mcAuthShowError('Die Passwörter stimmen nicht überein.');
+        mcAuthPasswordRepeat.focus();
+        return;
+      }
+      mcAuthShowError('');
+      mcAuthSubmit.disabled = true;
+      const originalLabel = mcAuthSubmit.textContent;
+      mcAuthSubmit.textContent = 'Wird geladen...';
+      try {
+        const result = mcAuthMode === 'register'
+          ? await bkmpPlayerRegister(name, password)
+          : await bkmpPlayerLogin(name, password);
+        bkmpSetMcName(result.displayName);
+        mcNameOverlay.classList.remove('visible');
+        bkmpIdleOpenModal();
+      } catch (e) {
+        mcAuthShowError(e && e.message ? e.message : 'Das hat leider nicht geklappt. Bitte versuche es erneut.');
+      } finally {
+        mcAuthSubmit.disabled = false;
+        mcAuthSubmit.textContent = originalLabel;
+      }
+    }
+    mcAuthSubmit.addEventListener('click', mcAuthSubmitHandler);
+    [mcAuthName, mcAuthPassword, mcAuthPasswordRepeat].forEach(input => {
+      input.addEventListener('keydown', e => { if (e.key === 'Enter') mcAuthSubmitHandler(); });
+    });
+
+    /* ESC schliesst die Hilfs-Popups wie auf der Hauptseite - bewusst OHNE
+       Eintrag fuer idleDorfOverlay selbst (diese Seite IST das Spiel, siehe
+       CSS oben) und mit demselben No-op fuer das Event-Drachen-Popup
+       (nur ueber den "Ich bin bereit"-Button verlassbar). */
+    const BKMP_OVERLAY_CLOSERS = {
+      idleStagePickerOverlay: () => { if (typeof bkmpIdleCloseStagePicker === 'function') bkmpIdleCloseStagePicker(); },
+      idleEventDragonOverlay: () => {},
+      bkmpConfirmOverlay: () => { document.getElementById('bkmpConfirmCancelBtn').click(); }
+    };
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Escape') return;
+      document.querySelectorAll('.joke-overlay.visible').forEach(el => {
+        const closer = BKMP_OVERLAY_CLOSERS[el.id];
+        if (closer) closer(); else el.classList.remove('visible');
+      });
+    });
+
+    /* ---------------- Start: eingeloggt -> Spiel sofort zeigen, sonst
+       Login-Formular ---------------- */
+    if (bkmpGetMcName()) {
+      bkmpIdleOpenModal();
+    } else {
+      mcAuthResetForm();
+      mcNameOverlay.classList.add('visible');
+      mcAuthName.focus();
+    }
+  </script>
+</body>
+</html>
