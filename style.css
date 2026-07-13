@@ -5733,6 +5733,21 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   opacity: 0.72;
   filter: saturate(0.75);
 }
+/* NACHBESSERUNG (Streamer-Wunsch DerLiber, 13.07.: "ich kann jetzt diese
+   button nicht mehr anklicken... die button sollen auch gehen, das dann
+   live und automatisch der Drache wechselt im Twitch OBS") - die
+   Stufenleiste (Bleibt auf dieser Stufe/Zur besten Stufe springen/Zu
+   bestimmter Stufe wechseln) ist bewusst KEIN echter Kampf-Konflikt wie das
+   Drachen-anklicken/die laufende HP-Animation daneben: sie soll als
+   Fernsteuerung von der Hauptseite aus funktionieren, waehrend die
+   Twitch-Seite den eigentlichen Kampf zeigt. Deshalb hier gezielt wieder
+   entsperrt (siehe idledorf.js bkmpIdleMergeRemoteSpendableFields fuer den
+   Abgleich, der den Stufensprung auf der Twitch-Seite live nachzieht). */
+#idleDorfOverlay.idle-stream-locked #idlePanelKampf .idle-stage-bar {
+  pointer-events: auto;
+  opacity: 1;
+  filter: none;
+}
 
 /* ---- HUD: Level-Medaillon + XP/Ressourcen-Leiste statt Fliesstext ---- */
 .idle-dorf-hud { margin-bottom: 1.1rem; }

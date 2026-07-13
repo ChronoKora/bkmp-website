@@ -1835,7 +1835,10 @@ function bkmpIdleSnapshotMergeBaseline() {
     crystals: Number(bkmpIdleState.crystals || 0),
     essence: Number(bkmpIdleState.essence || 0),
     skill_points_spent: Number(bkmpIdleState.skill_points_spent || 0),
-    skill_points_available: Number(bkmpIdleState.skill_points_available || 0)
+    skill_points_available: Number(bkmpIdleState.skill_points_available || 0),
+    current_dragon_index: Number(bkmpIdleState.current_dragon_index || 0),
+    highest_dragon_index: Number(bkmpIdleState.highest_dragon_index || 0),
+    auto_advance: bkmpIdleState.auto_advance !== false
   };
 }
 
@@ -1888,6 +1891,35 @@ async function bkmpIdleMergeRemoteSpendableFields() {
   const totalEarnedRemote = Number(remote.skill_points_available || 0) + Number(remote.skill_points_spent || 0);
   bkmpIdleState.skill_points_spent = Math.max(0, Number(remote.skill_points_spent || 0) + Math.max(0, spentDelta));
   bkmpIdleState.skill_points_available = Math.max(0, Math.max(totalEarnedLocal, totalEarnedRemote) - bkmpIdleState.skill_points_spent);
+  /* Stufe/Auto-Aufstieg (current_dragon_index/auto_advance): kein additiver
+     Wert wie Gold, deshalb kein Differenz-Merge moeglich - stattdessen
+     "hat sich diese Seite selbst seit dem letzten Abgleich veraendert?"-
+     Regel (Streamer-Wunsch DerLiber, 13.07.: Stufensprung-Buttons auf der
+     Hauptseite sollen den Drachen auf der Twitch-Seite live wechseln).
+     Ist der lokale Wert seit der letzten Baseline UNVERAENDERT (kein
+     eigener Kill/Sprung hier auf der Twitch-Seite), aber der entfernte
+     Stand hat sich veraendert (Sprung-Klick auf der Hauptseite) - dann den
+     entfernten Stand uebernehmen und weiter unten den passenden Drachen neu
+     spawnen. Hat sich der lokale Wert dagegen selbst veraendert (normaler
+     Kampf-Fortschritt hier), gewinnt der lokale Stand - der naechste
+     Abgleich ueberschreibt den entfernten (dann veralteten) Stand ohnehin
+     mit dem frischeren lokalen. highest_dragon_index ist wie Upgrade-Stufen
+     rein monoton - dafuer reicht ein einfacher Maximal-Merge. */
+  bkmpIdleState.highest_dragon_index = Math.max(Number(bkmpIdleState.highest_dragon_index || 0), Number(remote.highest_dragon_index || 0));
+  const stageBaseline = Number(baseline.current_dragon_index || 0);
+  const localStage = Number(bkmpIdleState.current_dragon_index || 0);
+  const remoteStage = Number(remote.current_dragon_index || 0);
+  let stageChangedByRemote = false;
+  if (localStage === stageBaseline && remoteStage !== stageBaseline) {
+    bkmpIdleState.current_dragon_index = Math.max(0, Math.min(bkmpIdleState.highest_dragon_index, remoteStage));
+    stageChangedByRemote = true;
+  }
+  const autoBaseline = baseline.auto_advance !== false;
+  const localAuto = bkmpIdleState.auto_advance !== false;
+  const remoteAuto = remote.auto_advance !== false;
+  if (localAuto === autoBaseline && remoteAuto !== autoBaseline) {
+    bkmpIdleState.auto_advance = remoteAuto;
+  }
   bkmpIdleSnapshotMergeBaseline();
   /* Spieler-Frage (15.07.): "Habe gerade Leben upgraded, wann wird das
      akkumuliert?" - ein Upgrade AENDERT effektive Werte (max. HP/Angriff/
@@ -1898,6 +1930,14 @@ async function bkmpIdleMergeRemoteSpendableFields() {
      Ereignis (naechster Kill) den Recompute ausgeloest haette. Jetzt direkt
      nach jedem Abgleich neu berechnen und anzeigen. */
   if (typeof bkmpIdleRecomputeEffectiveStats === 'function') bkmpIdleRecomputeEffectiveStats();
+  if (stageChangedByRemote && typeof bkmpIdleSpawnDragon === 'function') {
+    /* Frischer Kampf auf der neuen Stufe - volle Dorf-HP wie bei einem
+       manuellen Sprung (siehe bkmpIdleJumpToStage), kein Uebertrag der HP
+       vom vorherigen Drachen/Stand. */
+    bkmpIdleVillageHp = null;
+    bkmpIdleCurrentDragon = null;
+    bkmpIdleSpawnDragon();
+  }
   if (bkmpIdleEffectiveStats) bkmpIdleVillageHp = Math.min(bkmpIdleVillageHp == null ? bkmpIdleEffectiveStats.hp : bkmpIdleVillageHp, bkmpIdleEffectiveStats.hp);
   if (typeof bkmpIdleUpdateVillageHpBar === 'function') bkmpIdleUpdateVillageHpBar();
   if (typeof bkmpIdleRenderHud === 'function') bkmpIdleRenderHud();
