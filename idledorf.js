@@ -474,6 +474,7 @@ async function bkmpIdleLoadOrInitState(name) {
   try {
     const remotePrestige = typeof loadIdlePrestigeState === 'function' ? await loadIdlePrestigeState(name) : null;
     bkmpPrestigeState = remotePrestige || { name_key: key, display_name: name, prestige_level: 0, prestige_points: 0, prestige_points_spent: 0, prestige_allocations: {} };
+    bkmpPrestigeSnapshotMergeBaseline();
   } catch (e) {
     console.warn('Idle Dorf: Prestige-Fortschritt konnte nicht geladen werden (Netzwerkfehler oder Migration noch nicht ausgefuehrt).', e);
     bkmpPrestigeState = null;
@@ -510,6 +511,7 @@ async function bkmpIdleLoadOrInitState(name) {
     console.warn('Idle Dorf: Runen konnten nicht geladen werden (Migration evtl. noch nicht ausgefuehrt - siehe supabase-idle-runes.sql / supabase-idle-runes-v2.sql).', e);
     bkmpIdlePlayerRunes = [];
   }
+  bkmpIdleSnapshotMergeBaseline();
 }
 
 function bkmpIdleEventDragonExcludedIds() {
@@ -1779,17 +1781,103 @@ function bkmpIdleShowOfflineCard(result) {
 
 function bkmpIdleQueueSync() {
   bkmpIdleSyncPending = true;
+  /* Nutzerwunsch (15.07.): "man muss trotzdem upgraden können auf der
+     Hauptseite" - waehrend hier (Zuschauer-Seite) gerade Ressourcen
+     ausgegeben werden, SOFORT statt erst nach 4s speichern. Verkuerzt das
+     Zeitfenster, in dem die Twitch-Seite mit ihrem eigenen naechsten
+     Autosave (siehe bkmpIdleMergeRemoteSpendableFields unten) noch einen
+     veralteten Stand haben und den gerade getaetigten Kauf ueberschreiben
+     koennte. */
+  if (bkmpIdleStreamLocked) {
+    if (bkmpIdleSyncTimer) { window.clearTimeout(bkmpIdleSyncTimer); bkmpIdleSyncTimer = null; }
+    bkmpIdleFlushSync();
+    return;
+  }
   if (bkmpIdleSyncTimer) return;
   bkmpIdleSyncTimer = window.setTimeout(() => { bkmpIdleSyncTimer = null; bkmpIdleFlushSync(); }, 4000);
+}
+
+/* Schnappschuss der "ausgebbaren" Felder - Referenzpunkt fuer den
+   Differenz-Merge in bkmpIdleMergeRemoteSpendableFields (siehe dort). Wird
+   nach jedem frischen Laden UND nach jedem erfolgreichen Merge neu gesetzt. */
+let bkmpIdleMergeBaseline = null;
+let bkmpIdleLastMergeCheckAt = 0;
+const BKMP_IDLE_MERGE_CHECK_INTERVAL_MS = 15000;
+
+function bkmpIdleSnapshotMergeBaseline() {
+  if (!bkmpIdleState) { bkmpIdleMergeBaseline = null; return; }
+  bkmpIdleMergeBaseline = {
+    gold: Number(bkmpIdleState.gold || 0),
+    wood: Number(bkmpIdleState.wood || 0),
+    stone: Number(bkmpIdleState.stone || 0),
+    crystals: Number(bkmpIdleState.crystals || 0),
+    essence: Number(bkmpIdleState.essence || 0),
+    skill_points_spent: Number(bkmpIdleState.skill_points_spent || 0),
+    skill_points_available: Number(bkmpIdleState.skill_points_available || 0)
+  };
+}
+
+/* Nimmt pro Schluessel den hoeheren Wert - sicher fuer Zaehler, die nur
+   wachsen (Upgrade-Stufen, verteilte Skillpunkte pro Knoten): egal welche
+   Seite zuletzt gekauft hat, die weiter fortgeschrittene Seite gewinnt,
+   ohne dass ein Kauf von der ANDEREN Seite verloren geht. */
+function bkmpIdleMergeCountMaps(local, remote) {
+  const merged = { ...(local || {}) };
+  Object.keys(remote || {}).forEach(key => {
+    merged[key] = Math.max(Number(merged[key] || 0), Number(remote[key] || 0));
+  });
+  return merged;
+}
+
+/* Kernstueck der Twitch-Sync-Nachbesserung (Nutzerwunsch 15.07.): laeuft
+   NUR auf der Twitch-Seite (window.BKMP_IDLE_IS_STREAM_PAGE), alle ~15s
+   vor dem naechsten Autosave. Holt den aktuellen DB-Stand und gleicht die
+   "ausgebbaren" Felder ab, BEVOR der eigene (evtl. veraltete) Stand
+   ueberschrieben wird:
+   - Ressourcen (Gold/Holz/Stein/Kristalle/Essenz): Differenz-Merge - die
+     Twitch-Seite verdient laufend durch Kaempfe dazu, die Hauptseite gibt
+     evtl. etwas aus. remote-Wert (frischer DB-Stand) + eigener Zuwachs
+     seit dem letzten Abgleich (bkmpIdleMergeBaseline) = korrektes Ergebnis
+     in beide Richtungen, ohne dass eine Seite die andere blind ueberschreibt.
+   - Upgrade-Stufen/Skillpunkt-Verteilung: Maximal-Merge pro Schluessel
+     (siehe bkmpIdleMergeCountMaps) - beide Seiten koennen nur kaufen/
+     verteilen, nie verringern (ausser bei einem Prestige-Aufstieg, der
+     ueber bkmpIdleFlushSyncNow sofort speichert und den Basiswert direkt
+     danach neu setzt - kein Konflikt mit diesem Abgleich).
+   - skill_points_spent: gleiche Differenz-Logik wie Ressourcen, danach
+     wird skill_points_available so nachgerechnet, dass die Gesamtsumme
+     (verfuegbar+ausgegeben) nie kleiner wird als auf beiden Seiten bekannt. */
+async function bkmpIdleMergeRemoteSpendableFields() {
+  if (!bkmpIdleState || typeof loadIdlePlayerState !== 'function') return;
+  const remote = await loadIdlePlayerState(bkmpIdleState.name_key);
+  if (!remote) return;
+  const baseline = bkmpIdleMergeBaseline || bkmpIdleState;
+  ['gold', 'wood', 'stone', 'crystals', 'essence'].forEach(key => {
+    const localDelta = Number(bkmpIdleState[key] || 0) - Number(baseline[key] || 0);
+    bkmpIdleState[key] = Math.max(0, Number(remote[key] || 0) + localDelta);
+  });
+  bkmpIdleState.upgrade_purchases = bkmpIdleMergeCountMaps(bkmpIdleState.upgrade_purchases, remote.upgrade_purchases);
+  bkmpIdleState.skill_allocations = bkmpIdleMergeCountMaps(bkmpIdleState.skill_allocations, remote.skill_allocations);
+  const spentDelta = Number(bkmpIdleState.skill_points_spent || 0) - Number(baseline.skill_points_spent || 0);
+  const totalEarnedLocal = Number(bkmpIdleState.skill_points_available || 0) + Number(bkmpIdleState.skill_points_spent || 0);
+  const totalEarnedRemote = Number(remote.skill_points_available || 0) + Number(remote.skill_points_spent || 0);
+  bkmpIdleState.skill_points_spent = Math.max(0, Number(remote.skill_points_spent || 0) + Math.max(0, spentDelta));
+  bkmpIdleState.skill_points_available = Math.max(0, Math.max(totalEarnedLocal, totalEarnedRemote) - bkmpIdleState.skill_points_spent);
+  bkmpIdleSnapshotMergeBaseline();
 }
 
 async function bkmpIdleFlushSync() {
   if (!bkmpIdleSyncPending || !bkmpIdleState) return;
   bkmpIdleSyncPending = false;
+  if (window.BKMP_IDLE_IS_STREAM_PAGE && Date.now() - bkmpIdleLastMergeCheckAt > BKMP_IDLE_MERGE_CHECK_INTERVAL_MS) {
+    bkmpIdleLastMergeCheckAt = Date.now();
+    try { await bkmpIdleMergeRemoteSpendableFields(); } catch (e) { /* naechster Autosave versucht den Abgleich erneut */ }
+  }
   bkmpIdleState.playtime_seconds = Math.round(Number(bkmpIdleState.playtime_seconds || 0));
   bkmpIdleState.last_seen_at = new Date().toISOString();
   try {
     if (typeof upsertIdlePlayerState === 'function') await upsertIdlePlayerState(bkmpIdleState);
+    bkmpIdleSnapshotMergeBaseline();
   } catch (e) {
     console.warn('Idle Dorf: Speichern fehlgeschlagen.', e);
   }
@@ -1886,15 +1974,54 @@ function bkmpPrestigeBuyUpgrade(id) {
   bkmpPrestigeQueueSave();
 }
 
+/* Gleiche Twitch-Sync-Absicherung wie bkmpIdleMergeBaseline/
+   -RemoteSpendableFields oben, nur fuer die separate idle_prestige_state-
+   Tabelle (Prestige-Punkte fuer den permanenten Bonusbaum). */
+let bkmpPrestigeMergeBaseline = null;
+let bkmpPrestigeLastMergeCheckAt = 0;
+
+function bkmpPrestigeSnapshotMergeBaseline() {
+  bkmpPrestigeMergeBaseline = bkmpPrestigeState ? { prestige_points_spent: Number(bkmpPrestigeState.prestige_points_spent || 0) } : null;
+}
+
+async function bkmpPrestigeMergeRemoteSpendable() {
+  if (!bkmpPrestigeState || typeof loadIdlePrestigeState !== 'function') return;
+  const remote = await loadIdlePrestigeState(bkmpPrestigeState.name_key);
+  if (!remote) return;
+  bkmpPrestigeState.prestige_allocations = bkmpIdleMergeCountMaps(bkmpPrestigeState.prestige_allocations, remote.prestige_allocations);
+  const baseline = bkmpPrestigeMergeBaseline || bkmpPrestigeState;
+  const spentDelta = Number(bkmpPrestigeState.prestige_points_spent || 0) - Number(baseline.prestige_points_spent || 0);
+  bkmpPrestigeState.prestige_points_spent = Math.max(0, Number(remote.prestige_points_spent || 0) + Math.max(0, spentDelta));
+  bkmpPrestigeState.prestige_points = Math.max(Number(bkmpPrestigeState.prestige_points || 0), Number(remote.prestige_points || 0));
+  bkmpPrestigeSnapshotMergeBaseline();
+}
+
 let bkmpPrestigeSaveTimer = null;
 function bkmpPrestigeQueueSave() {
+  /* Nutzerwunsch (15.07.): waehrend die Zuschauer-Seite gerade Prestige-
+     Punkte ausgibt, sofort speichern statt 1,5s zu warten - verkleinert
+     das Zeitfenster fuer die Twitch-Seite, mit ihrem eigenen naechsten
+     Autosave einen veralteten Stand zurueckzuschreiben (siehe
+     bkmpIdleQueueSync oben, gleiches Prinzip). */
+  if (bkmpIdleStreamLocked) {
+    if (bkmpPrestigeSaveTimer) { window.clearTimeout(bkmpPrestigeSaveTimer); bkmpPrestigeSaveTimer = null; }
+    bkmpPrestigeFlushSave();
+    return;
+  }
   if (bkmpPrestigeSaveTimer) return;
-  bkmpPrestigeSaveTimer = window.setTimeout(async () => {
-    bkmpPrestigeSaveTimer = null;
-    if (!bkmpPrestigeState) return;
-    try { if (typeof saveIdlePrestigeState === 'function') await saveIdlePrestigeState(bkmpPrestigeState); }
-    catch (e) { console.warn('Prestige: Speichern fehlgeschlagen (Migration ausgefuehrt?).', e); }
-  }, 1500);
+  bkmpPrestigeSaveTimer = window.setTimeout(() => { bkmpPrestigeSaveTimer = null; bkmpPrestigeFlushSave(); }, 1500);
+}
+
+async function bkmpPrestigeFlushSave() {
+  if (!bkmpPrestigeState) return;
+  if (window.BKMP_IDLE_IS_STREAM_PAGE && Date.now() - bkmpPrestigeLastMergeCheckAt > BKMP_IDLE_MERGE_CHECK_INTERVAL_MS) {
+    bkmpPrestigeLastMergeCheckAt = Date.now();
+    try { await bkmpPrestigeMergeRemoteSpendable(); } catch (e) { /* naechster Speichervorgang versucht es erneut */ }
+  }
+  try {
+    if (typeof saveIdlePrestigeState === 'function') await saveIdlePrestigeState(bkmpPrestigeState);
+    bkmpPrestigeSnapshotMergeBaseline();
+  } catch (e) { console.warn('Prestige: Speichern fehlgeschlagen (Migration ausgefuehrt?).', e); }
 }
 
 async function bkmpIdlePerformPrestige() {
@@ -1977,8 +2104,18 @@ async function bkmpIdlePerformPrestige() {
     bkmpIdleRenderHud();
     bkmpIdleLog(`🌌 Aufstieg #${bkmpPrestigeState.prestige_level}! +${pointsGained} Prestige-Punkte, dauerhafter +5%-Bonus.`);
 
+    /* Ein Aufstieg IST der Reset - hier soll der frisch genullte Stand die
+       DB unbedingt ueberschreiben, nicht mit einem evtl. noch aelteren
+       Remote-Stand verschmolzen werden (der Twitch-Sync-Merge-Check oben in
+       bkmpIdleFlushSync ist fuer NORMALE Kaeufe gedacht, nicht fuer einen
+       kompletten Lauf-Reset). Merge-Timer kurz "anfassen", damit dieser
+       eine Speichervorgang die Merge-Pruefung ueberspringt - alle
+       Speichervorgaenge DANACH referenzieren wieder korrekt den neuen
+       (genullten) Basiswert. */
+    bkmpIdleLastMergeCheckAt = Date.now();
+    bkmpPrestigeLastMergeCheckAt = Date.now();
     await bkmpIdleFlushSyncNow();
-    try { if (typeof saveIdlePrestigeState === 'function') await saveIdlePrestigeState(bkmpPrestigeState); }
+    try { if (typeof saveIdlePrestigeState === 'function') await saveIdlePrestigeState(bkmpPrestigeState); bkmpPrestigeSnapshotMergeBaseline(); }
     catch (e) { console.warn('Prestige: Speichern fehlgeschlagen (Migration ausgefuehrt?).', e); }
 
     bkmpIdleRenderActiveTabContent();
@@ -3146,11 +3283,12 @@ async function bkmpIdleStreamRefreshRemoteState() {
     if (remote) {
       bkmpIdleState = remote;
       bkmpIdleCurrentDragon = null;
+      bkmpIdleSnapshotMergeBaseline();
     }
   } catch (e) { /* naechster Poll-Durchlauf versucht es erneut */ }
   try {
     const remotePrestige = typeof loadIdlePrestigeState === 'function' ? await loadIdlePrestigeState(name) : null;
-    if (remotePrestige) bkmpPrestigeState = remotePrestige;
+    if (remotePrestige) { bkmpPrestigeState = remotePrestige; bkmpPrestigeSnapshotMergeBaseline(); }
   } catch (e) {}
   try {
     const remoteRunes = typeof loadPlayerRunes === 'function' ? await loadPlayerRunes(name) : null;

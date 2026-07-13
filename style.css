@@ -5639,15 +5639,21 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 @media (prefers-reduced-motion: reduce) {
   .idle-stream-live-banner { animation: none; }
 }
-/* Sperrt die komplette Bedienung (Tabs/Panels/Runen-Lager-Balken), solange
-   die Twitch-Seite als "live" erkannt wird - die Klasse sitzt bewusst am
-   #idleDorfOverlay (nicht nur an der Karte), damit auch der ausserhalb der
-   Karte liegende Runen-Lager-Balken (siehe idle-runen-drawer) mit
-   gesperrt wird. Schliessen-Button bleibt bewusst weiterhin bedienbar
-   (keine Sperre auf .idle-dorf-close/.joke-buttons). */
-#idleDorfOverlay.idle-stream-locked #idleDorfTabs,
-#idleDorfOverlay.idle-stream-locked .idle-dorf-panel,
-#idleDorfOverlay.idle-stream-locked #idleRuneDrawer {
+/* NACHBESSERUNG (Nutzerwunsch, 15.07.: "man muss trotzdem upgraden können
+   auf der Hauptseite") - urspruenglich wurde hier die KOMPLETTE Bedienung
+   gesperrt (Tabs + alle Panels + Runen-Lager), solange die Twitch-Seite
+   lief. Das ging zu weit: nur die laufende Kampf-Ansicht selbst kann nicht
+   sinnvoll von zwei Seiten gleichzeitig gesteuert werden (welcher Drache
+   gerade bekaempft wird/Stufensprung waeren ein echter Konflikt mit der
+   Twitch-Seite) - Upgrades/Skilltree/Runen/Prestige kaufen/verteilen ist
+   dagegen unproblematisch, SOLANGE idledorf.js beim Speichern verhindert,
+   dass die Twitch-Seite so einen Kauf beim naechsten eigenen Autosave
+   wieder ueberschreibt (siehe bkmpIdleMergeRemoteSpendableFields in
+   idledorf.js - der eigentliche Schutz vor Datenverlust sitzt DORT, nicht
+   hier in der CSS). Gesperrt bleibt deshalb NUR noch das Kampf-Panel
+   selbst (Drachen anklicken/Stufensprung/Auto-Aufstieg) - Tabs, alle
+   anderen Panels und das Runen-Lager sind jetzt frei bedienbar. */
+#idleDorfOverlay.idle-stream-locked #idlePanelKampf {
   pointer-events: none;
   opacity: 0.72;
   filter: saturate(0.75);
