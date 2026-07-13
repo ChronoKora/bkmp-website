@@ -43,30 +43,27 @@
   /* Nutzerwunsch (15.07.): "Gerne viel mehr in die Breite!" - breites,
      flaches Banner statt der urspruenglichen kleinen Karte, Dorf/Drache
      entsprechend groesser dargestellt statt gestaucht.
-     Nachbesserung (15.07.): "Voll Transparente Variante?" - vorher war die
-     Karte noch ein durchscheinendes Glas (color-mix-Fuellung + backdrop-
-     filter). Jetzt bleibt NUR noch der goldene Rahmen/Glow zur optischen
-     Abgrenzung uebrig (Nutzerentscheidung: "dezenter Rahmen/Glow bleibt")
-     - die Flaeche selbst ist komplett transparent, der Stream-Hintergrund
-     scheint ungefiltert durch. */
+     Nachbesserung (15.07., "Voll Transparente Variante?"): Fuellung kurz
+     komplett transparent, nur Rahmen/Glow sichtbar.
+     Erneute Nachbesserung (15.07.): "gerne doch wieder Hintergrund einbauen
+     was dunkles Schwarzes" - der Spieler wollte die Flaeche doch wieder
+     abgedunkelt sehen (reine Transparenz war zu schwer lesbar vor hellen
+     Stream-Hintergruenden). Einfache EINSCHICHTIGE Fuellfarbe (rgba) statt
+     des alten Verlauf-Tricks - der Verlauf-Trick braucht zwingend eine
+     UNDURCHSICHTIGE Fuellschicht in der ersten Ebene, "transparent" dort
+     macht die ganze background-Deklaration ungueltig (siehe vorherige
+     Fassung, Rahmen war dadurch komplett verschwunden). Eine schlichte
+     rgba()-Flaeche + separate border-Farbe ist garantiert gueltiges CSS. */
   #idleDorfOverlay .idle-dorf-card {
     max-width: 1100px;
     width: 94vw;
     height: auto !important;
     max-height: none !important;
     min-height: 0 !important;
-    padding: 2rem 1.7rem 1rem;
+    padding: 1.6rem 1.7rem 0.9rem;
     border-radius: 28px;
     overflow: visible !important;
-    /* Der alte Zwei-Layer-Verlaufsrahmen-Trick (durchsichtige Fuellschicht +
-       Farbverlauf-Rahmenschicht) braucht zwingend eine UNDURCHSICHTIGE
-       Fuellschicht, um den Verlauf im Innenbereich zu verdecken - mit
-       "transparent" als Fuellung ist das kein gueltiges CSS mehr (der ganze
-       background-Wert wurde dadurch verworfen, Rahmen war komplett weg).
-       Einfache, garantiert funktionierende Loesung: eine schlichte goldene
-       Randfarbe statt Verlauf - respektiert auch den border-radius sauber
-       (border-image wuerde die runden Ecken zerstoeren). */
-    background: transparent;
+    background: rgba(8, 7, 6, 0.8);
     border: 1.5px solid color-mix(in srgb, var(--gold) 55%, transparent);
     box-shadow: 0 0 26px color-mix(in srgb, var(--gold) 22%, transparent);
     animation: idleMiniPopIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -75,7 +72,7 @@
     from { transform: scale(0.85); opacity: 0; }
     to { transform: scale(1); opacity: 1; }
   }
-  #idleDorfHud { margin-bottom: 0.6rem; }
+  #idleDorfHud { margin-bottom: 0.35rem; }
   .idle-hud-top { margin-bottom: 0; gap: 0.9rem; }
   /* Nutzerwunsch (Screenshot mit rotem Markierungs-Rahmen): "Ich will nur
      das im Roten Balken als Fenster" - style.css setzt fuer ALLE
@@ -92,14 +89,19 @@
     max-height: none !important;
     overflow: visible !important;
   }
-  /* Voll-transparente Variante (Nutzerwunsch 15.07.): Fuellung komplett
-     weg, nur noch ein dezenter Rand zur Abgrenzung vom Stream-Hintergrund
-     (siehe .idle-dorf-card oben - gleiche Entscheidung). */
+  /* Nachbesserung (15.07., Screenshot mit rotem Markierungs-Rahmen: "Lvl
+     Balken dort runter... Höhe weiter reduzieren") - min-height war mit
+     190px deutlich groesser als der tatsaechliche Inhalt (Sprites+HP-
+     Balken+Label brauchen ~140px), wodurch bei flex-end-Ausrichtung oben
+     ein grosser leerer Bereich stehen blieb (dort floaten nur die Gold/XP-
+     Zahlen). Kleinerer Mindestwert + weniger Innenpolster schliesst diese
+     Luecke und macht die gesamte Karte spuerbar niedriger. Fuellung wieder
+     dunkel (gleiche Begruendung wie bei der Karte oben). */
   .idle-battlefield {
-    min-height: 190px;
-    padding: 1.1rem 2.2rem;
+    min-height: 148px;
+    padding: 0.7rem 2.2rem;
     border-radius: 22px;
-    background: transparent;
+    background: rgba(6, 5, 4, 0.6);
     border-color: color-mix(in srgb, var(--gold) 35%, transparent);
     /* Nutzerwunsch (15.07.): "Das Dorf und der Drache schön gerade sind" -
        die Standard-Regel (align-items:center, style.css) zentriert beide
@@ -114,12 +116,12 @@
   .idle-village, .idle-dragon {
     width: 38%;
     padding: 0.7rem 0.6rem;
-    background: transparent;
+    background: rgba(10, 8, 7, 0.55);
     border: 1.5px solid color-mix(in srgb, var(--gold) 45%, transparent);
     box-shadow: none;
   }
-  .idle-village-sprite { max-width: 320px; }
-  .idle-dragon-sprite { max-width: 240px; }
+  .idle-village-sprite { max-width: 280px; }
+  .idle-dragon-sprite { max-width: 210px; }
 
   /* Gold/XP-Hochschweb-Anzeige (Nutzerwunsch: "irgendwo mega süß +?? Gold
      +?? XP") - reagiert auf das "bkmpIdleRewardGained"-Event, das
