@@ -424,8 +424,7 @@ function bkmpIdleDefaultState(name) {
     last_offline_claim: {},
     last_skilltree_reset_at: null,
     rune_fuse_successes: 0, rune_fuse_failures: 0,
-    rune_upgrade_successes: 0, rune_upgrade_failures: 0,
-    dwarf_unlocked: false
+    rune_upgrade_successes: 0, rune_upgrade_failures: 0
   };
 }
 
