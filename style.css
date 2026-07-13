@@ -5418,7 +5418,17 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   background-size: 100% 100%, 100% 100%, 100% 100%, 220% 220%;
   animation: bkmpTierGlow 7s ease infinite;
   box-shadow: 0 30px 90px rgba(0, 0, 0, 0.65), 0 0 50px color-mix(in srgb, var(--gold) 20%, transparent);
-  overflow: hidden;
+  /* NACHBESSERUNG: "overflow: hidden" hat hier ungewollt das vom
+     Grund-Regelsatz (weiter oben, gleiche Spezifitaet) gesetzte
+     "overflow-y: auto" ueberschrieben, weil diese neuere Design-Regel
+     spaeter in der Kaskade steht. Ohne eigenen Scroll-Container hat die
+     Maus ueber dem Fenster (z.B. Titel/HUD-Bereich) einfach die Seite
+     dahinter durchgescrollt statt des Fensterinhalts (Spieler-Meldung:
+     "wenn meine Maus dort im roten Fenster ist.. scrolle ich die
+     komplette Seite im Hintergrund"). overflow-x bleibt hidden (rundet
+     weiterhin die Ecken sauber ab), nur overflow-y wieder auf auto. */
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 /* Treibende Glutfunken: eine einzelne, sehr guenstige Ebene (nur
    background-position animiert, kein zusaetzliches DOM/Layout) statt

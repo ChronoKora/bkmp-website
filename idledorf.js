@@ -1907,11 +1907,14 @@ async function bkmpIdlePerformPrestige() {
   const stage = Number(bkmpIdleState.highest_dragon_index || 0);
   const bonusPct = bkmpPrestigeState ? (bkmpPrestigeEffectTotals(bkmpPrestigeState.prestige_allocations).prestige_point_bonus_pct || 0) : 0;
   const pointsGained = Math.max(1, Math.round(bkmpPrestigePointsForStage(stage) * (1 + bonusPct / 100)));
+  const runeCountBeforePrestige = bkmpIdlePlayerRunes.length;
   const confirmed = await bkmpConfirmDialog(
     '🌌 Jetzt aufsteigen?',
     `Level, Gold, Rohstoffe, Skilltree, Upgrades und deine aktuelle Stufen-Position werden zurückgesetzt.\n\n` +
     `Du erhältst dafür ${pointsGained} Prestige-Punkte (dauerhaft, für den permanenten Bonusbaum) ` +
-    `und einen dauerhaften +5%-Bonus auf Angriff/Leben/Gold/XP.\n\nErfolge, Titel, Kosmetiken, deine Runen-Sammlung (inkl. Stufen/Sub-Stats), deine Gesamtzahl besiegter Drachen/Bosse und deine insgesamt erreichten Stufen bleiben erhalten.`,
+    `und einen dauerhaften +5%-Bonus auf Angriff/Leben/Gold/XP.\n\n` +
+    `⚠️ Deine komplette Runen-Sammlung${runeCountBeforePrestige ? ` (${runeCountBeforePrestige} Runen inkl. Stufen/Sub-Stats)` : ''} geht dabei verloren!\n\n` +
+    `Erfolge, Titel, Kosmetiken, deine Gesamtzahl besiegter Drachen/Bosse und deine insgesamt erreichten Stufen bleiben erhalten.`,
     'Jetzt aufsteigen',
     'Abbrechen'
   );
@@ -1943,12 +1946,17 @@ async function bkmpIdlePerformPrestige() {
     bkmpIdleState.current_dragon_index = 0;
     bkmpIdleState.highest_dragon_index = 0;
     bkmpIdleState.auto_advance = true;
-    /* bkmpIdlePlayerRunes wird hier bewusst NICHT angefasst - Runen bleiben
-       ueber Prestige hinweg erhalten, genau wie Erfolge/Titel/Kosmetiken.
-       Entscheidung (14.07., auf explizite Nutzerfrage hin): eine muehsam
-       erspielte/aufgewertete Rune bei jedem Aufstieg zu verlieren waere reine
-       Frustration ohne spielerischen Mehrwert - der Prestige-Reiz kommt schon
-       aus dem Punkte-/Bonusbaum-System, nicht aus einem "alles auf Null". */
+    /* NACHBESSERUNG (Nutzerwunsch): Runen gehen ab sofort beim Prestige-
+       Aufstieg verloren - kehrt die fruehere Entscheidung vom 14.07. (Runen
+       bewusst behalten, um Frustration zu vermeiden) bewusst wieder um. Lokal
+       UND in der DB loeschen (nicht nur den Speicher leeren), sonst wuerden
+       beim naechsten Laden die alten Runen einfach wieder auftauchen. */
+    const runeIdsToDelete = bkmpIdlePlayerRunes.map(r => r.id).filter(Boolean);
+    bkmpIdlePlayerRunes = [];
+    bkmpIdlePendingRuneDrops = [];
+    bkmpRuneCurrentlyViewing = null;
+    bkmpRuneFuseSelection = null;
+    if (runeIdsToDelete.length && typeof deletePlayerRunes === 'function') deletePlayerRunes(runeIdsToDelete).catch(() => {});
 
     if (!bkmpPrestigeState) bkmpPrestigeState = { name_key: bkmpIdleState.name_key, display_name: bkmpIdleState.display_name, prestige_level: 0, prestige_points: 0, prestige_points_spent: 0, prestige_allocations: {} };
     bkmpPrestigeState.prestige_level = Number(bkmpPrestigeState.prestige_level || 0) + 1;
@@ -2682,7 +2690,8 @@ function bkmpIdleRenderRunenHelp() {
       <strong>⬆️ Aufwerten:</strong> Mit Gold von +0 bis +15 - jede Stufe erhöht den Hauptwert der Rune, Kosten steigen mit Stufe und Seltenheit.<br>
       <strong>✦ Sub-Stats:</strong> Runen droppen schon MIT Sub-Stats - Anzahl je nach Seltenheit (Gewöhnlich 0, Ungewöhnlich 1, Selten 2, Episch 3, Legendär 4). Bei +3/+6/+9/+12 kommt jeweils ein neuer dazu, bis maximal 4 erreicht sind - danach verstärkt jede dieser Stufen stattdessen einen vorhandenen Sub-Stat weiter. Meist ein zweiter %-Wert, seltener ein fester Bonus (z. B. „+2 Angriff fest" statt „+3% Angriff") oder Angriffstempo - das kann bei jeder Seltenheit passieren, auch bei Legendär.<br>
       <strong>✨ Verschmelzen:</strong> 3 unausgerüstete Runen gleichen Slots und gleicher Seltenheit (die du selbst auswählst) ergeben 1 neue der nächsthöheren Seltenheit mit frisch gewürfelten Sub-Stats passend zur neuen Seltenheit - startet aber wieder bei +0. Bei aufgewerteten Runen kommt vorher eine Warnung.<br>
-      <strong>💰 Verkaufen:</strong> Unausgerüstete Runen lassen sich jederzeit für Gold verkaufen.
+      <strong>💰 Verkaufen:</strong> Unausgerüstete Runen lassen sich jederzeit für Gold verkaufen.<br>
+      <strong>🌌 Prestige:</strong> Ein Aufstieg setzt deine komplette Runen-Sammlung zurück - sammle vor dem Aufsteigen lieber nochmal alles Wichtige ein oder verschmelze/verkaufe erst.
     </div>
   `;
 }
