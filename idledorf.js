@@ -1695,36 +1695,37 @@ function bkmpIdleBuildTitleBonusListHtml() {
   `;
 }
 
-function bkmpIdleRenderSammlungPanel() {
-  const panel = document.getElementById('idlePanelSammlung');
-  if (!panel) return;
-  panel.innerHTML = `
-    <p class="idle-panel-hint">Deine 18 Idle-Dorf-Kosmetiken schaltest du durch Fortschritt frei und findest sie in deinem Erfolge-Fenster unter „Kosmetik".</p>
-    <button type="button" class="btn-ja" id="idleOpenCosmeticsBtn">Kosmetik öffnen</button>
-    ${bkmpIdleBuildTitleBonusListHtml()}
-  `;
-  const btn = document.getElementById('idleOpenCosmeticsBtn');
-  if (btn) btn.addEventListener('click', () => {
-    bkmpIdleCloseModal();
-    const mcNameBadge = document.getElementById('mcNameBadge');
-    if (mcNameBadge) mcNameBadge.click();
-    window.setTimeout(() => { const cosBtn = document.getElementById('achievementsSubtabCosmetics'); if (cosBtn) cosBtn.click(); }, 60);
-  });
-}
-
+/* NACHBESSERUNG (Spieler-Wunsch 13.07.: "Sammlung und Erfolge sind 1zu1
+   das gleiche, bitte pack das zusammen") - beide Tabs zeigten bereits
+   dieselbe Titel-Boni-Liste (siehe bkmpIdleBuildTitleBonusListHtml) und
+   unterschieden sich nur durch jeweils EINEN Shortcut-Button (Sammlung:
+   "Kosmetik öffnen", Erfolge: "Erfolge öffnen") - zwei fast identische
+   Tabs fuer im Grunde eine einzige Sache. Der "Sammlung"-Tab entfaellt
+   komplett, der "Kosmetik öffnen"-Button zieht mit hier rein, sodass
+   beide Shortcuts jetzt gemeinsam im verbleibenden "Erfolge"-Tab stehen. */
 function bkmpIdleRenderErfolgePanel() {
   const panel = document.getElementById('idlePanelErfolge');
   if (!panel) return;
   panel.innerHTML = `
-    <p class="idle-panel-hint">Deine Idle-Dorf-Erfolge findest du in deinem Erfolge-Fenster unter der Kategorie „Idle Dorf".</p>
-    <button type="button" class="btn-ja" id="idleOpenAchievementsBtn">Erfolge öffnen</button>
+    <p class="idle-panel-hint">Deine Idle-Dorf-Erfolge und -Kosmetiken schaltest du durch Fortschritt frei und findest sie in deinem Erfolge-Fenster.</p>
+    <div class="idle-erfolge-shortcut-row">
+      <button type="button" class="btn-ja" id="idleOpenAchievementsBtn">Erfolge öffnen</button>
+      <button type="button" class="btn-ja" id="idleOpenCosmeticsBtn">Kosmetik öffnen</button>
+    </div>
     ${bkmpIdleBuildTitleBonusListHtml()}
   `;
-  const btn = document.getElementById('idleOpenAchievementsBtn');
-  if (btn) btn.addEventListener('click', () => {
+  const achBtn = document.getElementById('idleOpenAchievementsBtn');
+  if (achBtn) achBtn.addEventListener('click', () => {
     bkmpIdleCloseModal();
     const mcNameBadge = document.getElementById('mcNameBadge');
     if (mcNameBadge) mcNameBadge.click();
+  });
+  const cosBtn2 = document.getElementById('idleOpenCosmeticsBtn');
+  if (cosBtn2) cosBtn2.addEventListener('click', () => {
+    bkmpIdleCloseModal();
+    const mcNameBadge = document.getElementById('mcNameBadge');
+    if (mcNameBadge) mcNameBadge.click();
+    window.setTimeout(() => { const cosBtn = document.getElementById('achievementsSubtabCosmetics'); if (cosBtn) cosBtn.click(); }, 60);
   });
 }
 
@@ -3426,7 +3427,6 @@ const bkmpIdleTabs = [
   { id: 'kampf', btn: 'idleTabBtnKampf', panel: 'idlePanelKampf', render: null },
   { id: 'upgrades', btn: 'idleTabBtnUpgrades', panel: 'idlePanelUpgrades', render: bkmpIdleRenderUpgradesPanel },
   { id: 'skilltree', btn: 'idleTabBtnSkilltree', panel: 'idlePanelSkilltree', render: bkmpIdleRenderSkilltreePanel },
-  { id: 'sammlung', btn: 'idleTabBtnSammlung', panel: 'idlePanelSammlung', render: bkmpIdleRenderSammlungPanel },
   { id: 'erfolge', btn: 'idleTabBtnErfolge', panel: 'idlePanelErfolge', render: bkmpIdleRenderErfolgePanel },
   { id: 'bestenliste', btn: 'idleTabBtnBestenliste', panel: 'idlePanelBestenliste', render: bkmpIdleRenderBestenlistePanel },
   { id: 'prestige', btn: 'idleTabBtnPrestige', panel: 'idlePanelPrestige', render: bkmpIdleRenderPrestigePanel },

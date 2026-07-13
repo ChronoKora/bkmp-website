@@ -4843,6 +4843,7 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
    des Panels statt die ganze Karte zu strecken. */
 .idle-dorf-panel { height: min(58vh, 560px); overflow-y: auto; overflow-x: hidden; }
 .idle-panel-hint { color: var(--muted); font-size: 0.85rem; margin-bottom: 0.8rem; }
+.idle-erfolge-shortcut-row { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 1rem; }
 
 /* Kampf-Tab: Stufenleiste + Schlachtfeld (Dorf/Drache) sollen NIE
    mitscrollen - nur der Kampf-Log/Belohnungsverlauf unten soll bei
