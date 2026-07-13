@@ -4239,6 +4239,37 @@ function bkmpRaidMarkJoined(raidId) {
   bkmpRaidJoinedId = raidId;
 }
 
+/* FEHLER-FIX (Spieler-Report 14.07.: "Er hat gerade den Welt-Raidboss
+   gemacht, aber wurde im [OBS-]Overlay nicht angezeigt") - der Beitritt
+   wurde bisher AUSSCHLIESSLICH per localStorage-Flag erkannt
+   (bkmpRaidHasJoined oben). localStorage ist NICHT geteilt zwischen dem
+   normalen Browser (wo "Jetzt beitreten" geklickt wurde) und dem OBS-
+   Browser-Source-Prozess (idle-stream.html/idle-stream-mini.html) - selbst
+   wenn dort der GLEICHE Account eingeloggt ist, sieht der eigene
+   Chromium-Prozess von OBS diesen Flag nie. Die Kampfansicht blieb dadurch
+   im Overlay unsichtbar, obwohl der Account serverseitig laengst als
+   Teilnehmer registriert war.
+   Fix: einmalig pro Raid-ID (bkmpRaidServerJoinCheckedFor als Sperre -
+   kein Wiederholungs-Polling, um kein zusaetzliches Egress zu erzeugen)
+   serverseitig bei raid_participants nachfragen und den lokalen Flag bei
+   Treffer selbst heilen (bkmpRaidMarkJoined) - der naechste Sekunden-Tick
+   von bkmpRaidUpdateButtonState sieht dann ganz normal "beigetreten". */
+let bkmpRaidServerJoinCheckedFor = null;
+async function bkmpRaidSyncJoinFlagFromServer(raidId) {
+  if (!raidId || bkmpRaidServerJoinCheckedFor === raidId || bkmpRaidHasJoined(raidId)) return;
+  bkmpRaidServerJoinCheckedFor = raidId;
+  try {
+    const participants = typeof loadRaidParticipants === 'function' ? await loadRaidParticipants(raidId) : [];
+    const myName = typeof bkmpGetMcName === 'function' ? bkmpGetMcName().trim().toLowerCase() : '';
+    const alreadyJoined = myName && Array.isArray(participants) && participants.some(p => (p.displayName || '').trim().toLowerCase() === myName);
+    if (alreadyJoined) bkmpRaidMarkJoined(raidId);
+  } catch (e) {
+    /* Netzwerkfehler - naechster Phasenwechsel/Seitenaufruf versucht es
+       erneut, deshalb die Sperre wieder freigeben statt dauerhaft zu blocken. */
+    bkmpRaidServerJoinCheckedFor = null;
+  }
+}
+
 /* ---------------- Button-Feuer/Glow (laeuft immer, auch ohne offenes Fenster) ---------------- */
 function bkmpRaidFormatParticipantCount(count) {
   return count > 0 ? `${count} Spieler bereits angemeldet` : 'Sei der/die Erste, die beitritt!';
@@ -4255,6 +4286,9 @@ function bkmpRaidUpdateButtonState() {
   const btn = document.getElementById('idleDorfButton');
   const countdownEl = document.getElementById('raidBtnCountdown');
   const info = bkmpRaidGetPhaseInfo();
+  if (info.raidId && (info.phase === 'prep' || info.phase === 'fight')) {
+    bkmpRaidSyncJoinFlagFromServer(info.raidId);
+  }
   if (btn) {
     if (info.phase === 'prep') {
       btn.classList.add('raid-prep');
