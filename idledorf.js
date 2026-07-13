@@ -1856,6 +1856,7 @@ let bkmpIdleMergeBaseline = null;
 function bkmpIdleSnapshotMergeBaseline() {
   if (!bkmpIdleState) { bkmpIdleMergeBaseline = null; return; }
   bkmpIdleMergeBaseline = {
+    level: Number(bkmpIdleState.level || 0),
     gold: Number(bkmpIdleState.gold || 0),
     wood: Number(bkmpIdleState.wood || 0),
     stone: Number(bkmpIdleState.stone || 0),
@@ -1865,12 +1866,7 @@ function bkmpIdleSnapshotMergeBaseline() {
     skill_points_available: Number(bkmpIdleState.skill_points_available || 0),
     current_dragon_index: Number(bkmpIdleState.current_dragon_index || 0),
     highest_dragon_index: Number(bkmpIdleState.highest_dragon_index || 0),
-    auto_advance: bkmpIdleState.auto_advance !== false,
-    /* Siehe bkmpIdleMergeRemoteSpendableFields - erkennt einen Prestige-
-       Aufstieg, der WAEHREND diese Seite offen war auf einer ANDEREN Seite
-       (z.B. der Hauptseite) passiert ist, damit der dortige Reset nicht
-       durch den normalen Merge hier rueckgaengig gemacht wird. */
-    prestigeLevelKnown: bkmpPrestigeState ? Number(bkmpPrestigeState.prestige_level || 0) : 0
+    auto_advance: bkmpIdleState.auto_advance !== false
   };
 }
 
@@ -1951,17 +1947,31 @@ async function bkmpIdleMergeRemoteSpendableFields() {
      war die naechste Prestige-Schwelle (die ja an highest_dragon_index
      haengt, siehe bkmpPrestigeEligible) sofort wieder erreicht, obwohl gar
      nicht neu gespielt wurde - daher "3x instant".
-     Fix: einen Prestige-Aufstieg AUF EINER ANDEREN SEITE zuverlaessig
-     erkennen (remote prestige_level hoeher als der zuletzt hier bekannte
-     Stand, siehe bkmpIdleSnapshotMergeBaseline) und in dem Fall den
-     kompletten Lauf-Zustand 1:1 vom Server uebernehmen statt ihn zu
-     mergen - keine Differenz-/Maximal-Logik darf hier jemals gegen einen
-     echten Reset gewinnen. */
-  let remotePrestige = null;
-  try { remotePrestige = typeof loadIdlePrestigeState === 'function' ? await loadIdlePrestigeState(bkmpIdleState.name_key) : null; } catch (e) { /* kein Prestige-Stand ladbar - normal weitermachen */ }
-  const remotePrestigeLevel = remotePrestige ? Number(remotePrestige.prestige_level || 0) : 0;
-  const baselinePrestigeLevel = Number(baseline.prestigeLevelKnown || 0);
-  const prestigeHappenedElsewhere = remotePrestigeLevel > baselinePrestigeLevel;
+
+     NACHBESSERUNG (gleicher Report, Folgefehler NACH dem ersten Fix): die
+     erste Fassung erkannte "Prestige woanders passiert" ueber einen
+     Vergleich des prestige_level aus einer SEPARAT geladenen zweiten
+     Tabelle (idle_prestige_state). bkmpIdlePerformPrestige() speichert
+     idle_player_state (Reset) und idle_prestige_state (neuer Level) aber
+     nacheinander in ZWEI getrennten Requests - fiel ein Abgleich hier
+     GENAU in die kurze Luecke dazwischen, sah er den Reset in
+     idle_player_state zwar schon, aber den erhoehten prestige_level in
+     idle_prestige_state noch nicht - "prestigeHappenedElsewhere" blieb
+     faelschlich false, die alte Differenz-/Maximal-Merge-Logik lief
+     normal weiter und hat den frischen Reset genau wie beim urspruenglichen
+     Bug sofort wieder rueckgaengig gemacht ("er ist direkt wieder auf
+     Level 691 hochgesprungen").
+     Robusterer Fix: KEIN Signal aus einer zweiten, separat getimten
+     Tabelle mehr noetig - highest_dragon_index UND level koennen unter
+     NORMALEM Spielen niemals sinken (beide sind streng monoton wachsend,
+     siehe bkmpIdleAddXp/bkmpIdleJumpToStage), NUR ein Prestige-Reset kann
+     sie auf einen niedrigeren Wert setzen. remote < baseline bei einem
+     dieser beiden Werte ist deshalb ein in sich konsistentes Signal aus
+     EINEM einzigen Request (idle_player_state), ohne Race-Fenster
+     gegenueber einer zweiten Tabelle. */
+  const remoteHighest = Number(remote.highest_dragon_index || 0);
+  const remoteLevel = Number(remote.level || 0);
+  const prestigeHappenedElsewhere = remoteHighest < Number(baseline.highest_dragon_index || 0) || remoteLevel < Number(baseline.level || 0);
   let stageChangedByRemote = false;
   if (prestigeHappenedElsewhere) {
     ['level', 'xp', 'gold', 'wood', 'stone', 'crystals', 'essence', 'skill_points_available', 'skill_points_spent', 'current_dragon_index', 'highest_dragon_index'].forEach(key => {
@@ -1970,7 +1980,15 @@ async function bkmpIdleMergeRemoteSpendableFields() {
     bkmpIdleState.skill_allocations = remote.skill_allocations || {};
     bkmpIdleState.upgrade_purchases = remote.upgrade_purchases || {};
     bkmpIdleState.auto_advance = remote.auto_advance !== false;
-    if (remotePrestige) { bkmpPrestigeState = remotePrestige; bkmpPrestigeSnapshotMergeBaseline(); }
+    /* Den zugehoerigen, ebenfalls neuen Prestige-Baum-Stand mituebernehmen -
+       falls die zweite Tabelle in genau diesem Moment noch den alten Wert
+       zeigt (siehe Race-Erklaerung oben), holt der naechste turnusmaessige
+       Abgleich (spaetestens 4-20s spaeter, ueber bkmpPrestigeMergeRemoteSpendable)
+       das korrekt nach - hier keine eigene Vorbedingung mehr dafuer. */
+    try {
+      const remotePrestige = typeof loadIdlePrestigeState === 'function' ? await loadIdlePrestigeState(bkmpIdleState.name_key) : null;
+      if (remotePrestige) { bkmpPrestigeState = remotePrestige; bkmpPrestigeSnapshotMergeBaseline(); }
+    } catch (e) { /* naechster Abgleich versucht es erneut */ }
     /* Runen gehen bei einem Prestige-Aufstieg ebenfalls verloren (siehe
        bkmpIdlePerformPrestige) - der lokale, hier noch veraltete Bestand
        muss geleert werden, sonst zeigt diese Seite weiter laengst
