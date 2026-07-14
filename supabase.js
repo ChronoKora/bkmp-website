@@ -3128,7 +3128,7 @@ async function loadVillageSkinsCatalog() {
   if (!client) return [];
   const { data, error } = await client
     .from('idle_village_skins')
-    .select('id, name, description, icon, image_file, unlock_type, price_gold, price_crystals, unlock_hint, sort_order, frame_count, frame_aspect_w, frame_aspect_h')
+    .select('id, name, description, icon, image_file, video_file, unlock_type, price_gold, price_crystals, unlock_hint, sort_order, frame_count, frame_aspect_w, frame_aspect_h')
     .eq('active', true)
     .order('sort_order', { ascending: true });
   if (error) throw error;
