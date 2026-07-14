@@ -4681,18 +4681,25 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   right: 0.9rem;
   background: none;
   border: none;
-  color: var(--muted);
+  color: #c9c2dd;
   font-size: 1.4rem;
   line-height: 1;
   cursor: pointer;
 }
-.bkmp-daily-popup-close:hover { color: var(--ink); }
+.bkmp-daily-popup-close:hover { color: #f3ecff; }
 
 .bkmp-daily-popup-icon { font-size: 2.4rem; margin-bottom: 0.3rem; filter: drop-shadow(0 0 12px rgba(167, 139, 250, 0.6)); }
 .golden-hour .bkmp-daily-popup-icon { filter: drop-shadow(0 0 14px rgba(255, 190, 20, 0.75)); }
 
-.bkmp-daily-popup-card h3 { font-family: 'Fraunces', serif; font-size: 1.25rem; margin: 0 0 0.4rem; color: var(--ink); }
-.bkmp-daily-popup-sub { font-size: 0.85rem; color: var(--muted); margin: 0 0 0.9rem; }
+/* Feste helle Textfarben statt var(--ink)/var(--muted): die Karte hat
+   IMMER einen fest dunklen Verlauf-Hintergrund (siehe .bkmp-daily-popup-
+   card oben, bewusst unabhaengig vom Hell-/Dunkelmodus - mystisches
+   Event-Design). --ink/--muted werden im Hellmodus aber dunkel (fuer die
+   sonst helle Seite gedacht) - auf diesem immer-dunklen Hintergrund wurde
+   der Text dadurch im Hellmodus fast unlesbar (dunkler Text auf dunklem
+   Grund). Gleicher Fehlertyp wie bei --gold vs. --gold-fixed. */
+.bkmp-daily-popup-card h3 { font-family: 'Fraunces', serif; font-size: 1.25rem; margin: 0 0 0.4rem; color: #f3ecff; }
+.bkmp-daily-popup-sub { font-size: 0.85rem; color: #c9c2dd; margin: 0 0 0.9rem; }
 
 .bkmp-daily-popup-plushie {
   display: flex;
