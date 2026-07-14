@@ -5399,16 +5399,21 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 .idle-upgrade-buy:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ---- Dorf-Skins ---- */
-.idle-skin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.8rem; }
-.idle-skin-card { border: 1px solid var(--line); border-radius: 14px; padding: 0.9rem; background: var(--paper); text-align: center; }
+.idle-skin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.8rem; align-items: stretch; }
+/* flex-Spalte + margin-top:auto auf Button/Hinweis (statt fixer min-height
+   auf der Beschreibung): richtet die Buttons ueber alle Karten einer Reihe
+   an der GLEICHEN Unterkante aus, egal wie lang der jeweilige
+   Beschreibungstext ist (Nutzerwunsch: Buttons sprangen vorher je nach
+   Textlaenge unterschiedlich hoch). */
+.idle-skin-card { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 14px; padding: 0.9rem; background: var(--paper); text-align: center; }
 .idle-skin-card-equipped { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }
 .idle-skin-icon { font-size: 1.6rem; margin-bottom: 0.3rem; }
 .idle-skin-name { font-weight: 700; font-size: 0.85rem; margin-bottom: 0.2rem; }
-.idle-skin-desc { font-size: 0.72rem; color: var(--muted); margin-bottom: 0.6rem; min-height: 2em; }
-.idle-skin-action { width: 100%; padding: 0.4rem 0.6rem; font-size: 0.78rem; }
+.idle-skin-desc { font-size: 0.72rem; color: var(--muted); margin-bottom: 0.6rem; }
+.idle-skin-action { width: 100%; padding: 0.4rem 0.6rem; font-size: 0.78rem; margin-top: auto; }
 .idle-skin-action:disabled { opacity: 0.7; cursor: default; }
 .idle-skin-buy:disabled { opacity: 0.5; cursor: not-allowed; }
-.idle-skin-locked-hint { font-size: 0.72rem; color: var(--muted); padding: 0.4rem 0.2rem; }
+.idle-skin-locked-hint { font-size: 0.72rem; color: var(--muted); padding: 0.4rem 0.2rem; margin-top: auto; }
 .idle-skin-empty-hint { color: var(--muted); font-size: 0.85rem; text-align: center; padding: 1.2rem 0.6rem; }
 
 /* ---- Prestige ---- */

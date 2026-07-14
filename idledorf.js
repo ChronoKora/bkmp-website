@@ -424,7 +424,8 @@ function bkmpIdleDefaultState(name) {
     last_offline_claim: {},
     last_skilltree_reset_at: null,
     rune_fuse_successes: 0, rune_fuse_failures: 0,
-    rune_upgrade_successes: 0, rune_upgrade_failures: 0
+    rune_upgrade_successes: 0, rune_upgrade_failures: 0,
+    village_defeats: 0, yaksha_boss_kills: 0
   };
 }
 
@@ -910,6 +911,13 @@ function bkmpIdleHandleDragonDefeated() {
   bkmpIdleState.essence += rewards.essence;
   bkmpIdleState.dragon_kills += 1;
   if (bkmpIdleCurrentDragon.isBoss) bkmpIdleState.boss_kills += 1;
+  /* Yakshas-Heimat-Skin braucht Siege GENAU gegen diesen einen Boss
+     (id 'yaksha-boss'), nicht Bosse allgemein - eigener Zaehler getrennt
+     vom generischen boss_kills. */
+  if (bkmpIdleCurrentDragon.id === 'yaksha-boss') {
+    bkmpIdleState.yaksha_boss_kills = Number(bkmpIdleState.yaksha_boss_kills || 0) + 1;
+    bkmpIdleCheckYakshasHeimatUnlock();
+  }
   bkmpIdleMaybeDropRune(bkmpIdleCurrentDragon.isBoss ? 'boss' : 'normal');
   const autoAdvance = bkmpIdleState.auto_advance !== false;
   if (autoAdvance) bkmpIdleState.current_dragon_index += 1;
@@ -945,14 +953,59 @@ function bkmpIdleHandleDragonDefeated() {
   if (defeatedEventDragon) bkmpIdleClaimEventDragonVictory(defeatedEventDragon);
 }
 
+/* Zerstoertes-Dorf-Skin: unlock_type='achievement' bekommt (anders als
+   'purchase'/'boss_drop') noch keine generische Freischalt-Logik im
+   Skin-System - hier direkt am einzigen Ort geprueft, an dem
+   village_defeats sich aendert. Kein Einloese-Code noetig (wie bei
+   Zerathor Dorf), gleicher direkter Insert wie beim normalen Kauf-Weg
+   (bkmpIdleBuyVillageSkin), nur ohne Gold-Abzug. */
+const BKMP_ZERSTOERTES_DORF_UNLOCK_THRESHOLD = 15000;
+function bkmpIdleCheckZerstoertesDorfUnlock() {
+  if (!bkmpIdleState || bkmpPlayerVillageSkins.includes('zerstoertesdorf')) return;
+  if (Number(bkmpIdleState.village_defeats || 0) < BKMP_ZERSTOERTES_DORF_UNLOCK_THRESHOLD) return;
+  const nameKey = bkmpIdleState.name_key;
+  Promise.resolve(typeof unlockPlayerVillageSkin === 'function' ? unlockPlayerVillageSkin(nameKey, 'zerstoertesdorf') : null)
+    .then(row => {
+      if (row) {
+        bkmpPlayerVillageSkins.push('zerstoertesdorf');
+        bkmpIdleLog('🏚️ Dorf-Skin freigeschaltet: Zerstörtes Dorf!');
+        if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('🏚️ Dorf-Skin freigeschaltet: Zerstörtes Dorf!', 3200);
+        bkmpIdleRenderSkinsPanel();
+      }
+    })
+    .catch(e => console.warn('Idle Dorf: Zerstoertes-Dorf-Freischaltung konnte nicht gespeichert werden.', e));
+}
+
+/* Yakshas-Heimat-Skin: gleicher direkter Freischalt-Mechanismus wie
+   Zerstoertes Dorf oben, nur an yaksha_boss_kills statt village_defeats
+   geknuepft (siehe bkmpIdleHandleDragonDefeated). */
+const BKMP_YAKSHAS_HEIMAT_UNLOCK_THRESHOLD = 50000;
+function bkmpIdleCheckYakshasHeimatUnlock() {
+  if (!bkmpIdleState || bkmpPlayerVillageSkins.includes('yakshasheimat')) return;
+  if (Number(bkmpIdleState.yaksha_boss_kills || 0) < BKMP_YAKSHAS_HEIMAT_UNLOCK_THRESHOLD) return;
+  const nameKey = bkmpIdleState.name_key;
+  Promise.resolve(typeof unlockPlayerVillageSkin === 'function' ? unlockPlayerVillageSkin(nameKey, 'yakshasheimat') : null)
+    .then(row => {
+      if (row) {
+        bkmpPlayerVillageSkins.push('yakshasheimat');
+        bkmpIdleLog('👑 Dorf-Skin freigeschaltet: Yakshas Heimat!');
+        if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('👑 Dorf-Skin freigeschaltet: Yakshas Heimat!', 3200);
+        bkmpIdleRenderSkinsPanel();
+      }
+    })
+    .catch(e => console.warn('Idle Dorf: Yakshas-Heimat-Freischaltung konnte nicht gespeichert werden.', e));
+}
+
 function bkmpIdleHandleDefeat() {
   bkmpIdleLog(`💀 Niederlage gegen ${bkmpIdleCurrentDragon.emoji} ${bkmpIdleCurrentDragon.name}! Du fällst eine Stufe zurück.`);
   bkmpIdleState.current_dragon_index = Math.max(0, Number(bkmpIdleState.current_dragon_index || 0) - 1);
+  bkmpIdleState.village_defeats = Number(bkmpIdleState.village_defeats || 0) + 1;
   bkmpIdleVillageHp = bkmpIdleEffectiveStats.hp;
   bkmpIdleSpawnDragon();
   bkmpIdleUpdateVillageHpBar();
   bkmpIdleRenderHud();
   bkmpIdleQueueSync();
+  bkmpIdleCheckZerstoertesDorfUnlock();
 }
 
 function bkmpIdleTick() {
@@ -4892,6 +4945,24 @@ async function bkmpRaidShowResult() {
   if (won && myName) {
     try { rewardCode = await loadRaidRewardCode(bkmpRaidState.id, myName); } catch (e) { console.warn('Raid: Belohnungscode konnte nicht geladen werden.', e); }
   }
+  /* Zerathor-Dorf-Skin: kein Einloese-Code wie beim Pluschie (Dorf-Skins
+     sind nicht handelbar) - raid_finish() hat den 1%-Wurf serverseitig
+     schon direkt in idle_player_village_skins geschrieben, hier wird nur
+     erkannt, ob der Skin GERADE NEU dazugekommen ist (Vergleich gegen den
+     Stand von vor dem Raid), um die Bonus-Zeile unten anzuzeigen und
+     bkmpPlayerVillageSkins/das Skins-Panel sofort zu aktualisieren, ohne
+     dass der Spieler das Fenster neu oeffnen muss. */
+  let newVillageSkin = false;
+  if (won && myName && !bkmpPlayerVillageSkins.includes('zerathordorf')) {
+    try {
+      const owned = typeof loadPlayerVillageSkins === 'function' ? await loadPlayerVillageSkins(myName) : [];
+      const ownedIds = Array.isArray(owned) ? owned.map(r => r.skin_id) : [];
+      if (ownedIds.includes('zerathordorf')) {
+        newVillageSkin = true;
+        bkmpPlayerVillageSkins.push('zerathordorf');
+      }
+    } catch (e) { console.warn('Raid: Dorf-Skin-Beute konnte nicht geprueft werden.', e); }
+  }
   if (battlefield) battlefield.style.display = 'none';
   if (listEl) listEl.style.display = 'none';
   resultCard.style.display = '';
@@ -4917,6 +4988,11 @@ async function bkmpRaidShowResult() {
         <button type="button" class="btn-nein" id="raidZeratorCodeCopyBtn">Kopieren</button>
       </div>
       <p class="raid-result-zerator-hint">Dieser Code kann nur einmal eingelöst werden – am besten gleich sichern.</p>
+    </div>` : ''}
+    ${newVillageSkin ? `
+    <div class="raid-result-zerator-code">
+      <div class="raid-result-zerator-title">🏘️ Seltene Beute! Du hast das Zerathor Dorf freigeschaltet.</div>
+      <p class="raid-result-zerator-hint">Zu finden in den Dorf-Skins - dort einfach ausrüsten.</p>
     </div>` : ''}
     <button type="button" class="btn-ja" id="raidResultCloseBtn">Schließen</button>
   `;

@@ -40,6 +40,16 @@ create table if not exists public.idle_village_skins (
   active boolean not null default true
 );
 
+-- Nachtraeglich hinzugekommene Spalten (urspruenglich in
+-- supabase-idle-village-skins-pilzdorf.sql/-pinguindorf.sql) hier
+-- ebenfalls absichern, damit diese Datei auch bei einer komplett neuen
+-- Installation eigenstaendig lauffaehig bleibt, unabhaengig von der
+-- Reihenfolge, in der die einzelnen Skin-Migrationen ausgefuehrt werden.
+alter table public.idle_village_skins add column if not exists frame_count int not null default 1;
+alter table public.idle_village_skins add column if not exists frame_aspect_w numeric not null default 1164;
+alter table public.idle_village_skins add column if not exists frame_aspect_h numeric not null default 199;
+alter table public.idle_village_skins add column if not exists video_file text;
+
 alter table public.idle_village_skins enable row level security;
 drop policy if exists "Public read village skins" on public.idle_village_skins;
 create policy "Public read village skins"
@@ -72,6 +82,22 @@ with check (auth_user_id = auth.uid());
 -- KEINE eigene Besitz-Zeile - idledorf.js behandelt unlock_type='free'
 -- Skins immer als besessen. Trotzdem als Katalog-Eintrag angelegt, damit
 -- er in der Auswahl-Liste normal neben den kaufbaren Skins auftaucht.
-insert into public.idle_village_skins (id, name, description, icon, image_file, unlock_type, sort_order)
-values ('standard', 'Standarddorf', 'Das gute alte Dorf, wie es schon immer aussah.', '🏘️', 'assets/dragons/dorf.png', 'free', 0)
-on conflict (id) do nothing;
+--
+-- Update (16.07.): auf ein echtes Video umgestellt (gleiches Schema wie
+-- Pinguindorf/Geisterdorf, siehe die dortigen SQL-Dateien) - video_file hat
+-- Vorrang vor image_file (idledorf.js bkmpApplyVillageSkin). Deshalb jetzt
+-- "do update set" statt "do nothing", damit ein erneutes Ausfuehren dieser
+-- Datei den Eintrag auch wirklich aktualisiert.
+insert into public.idle_village_skins (id, name, description, icon, image_file, video_file, unlock_type, frame_count, frame_aspect_w, frame_aspect_h, sort_order)
+values ('standard', 'Standarddorf', 'Das gute alte Dorf, wie es schon immer aussah.', '🏘️', 'assets/dragons/dorf.png', 'assets/village/startdorf.mp4', 'free', 1, 2124, 976, 0)
+on conflict (id) do update set
+  name = excluded.name,
+  description = excluded.description,
+  icon = excluded.icon,
+  image_file = excluded.image_file,
+  video_file = excluded.video_file,
+  unlock_type = excluded.unlock_type,
+  frame_count = excluded.frame_count,
+  frame_aspect_w = excluded.frame_aspect_w,
+  frame_aspect_h = excluded.frame_aspect_h,
+  sort_order = excluded.sort_order;

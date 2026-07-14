@@ -28,7 +28,7 @@
 alter table public.idle_village_skins add column if not exists video_file text;
 
 insert into public.idle_village_skins (id, name, description, icon, image_file, video_file, unlock_type, price_gold, price_crystals, frame_count, frame_aspect_w, frame_aspect_h, sort_order)
-values ('pinguindorf', 'Pinguindorf', 'Ein verschneites Pinguindorf am eisigen Kuestensaum - als vollbewegtes Video statt starrem Sprite.', '🐧', '', 'assets/village/pinguindorf.mp4?v=20260716-2', 'purchase', 2500000, 0, 1, 1612, 720, 2)
+values ('pinguindorf', 'Pinguindorf', 'Ein verschneites Pinguindorf am eisigen Kuestensaum.', '🐧', '', 'assets/village/pinguindorf.mp4?v=20260716-2', 'purchase', 2500000, 0, 1, 1612, 720, 2)
 on conflict (id) do update set
   name = excluded.name,
   description = excluded.description,
