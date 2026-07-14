@@ -2670,6 +2670,10 @@ let bkmpGuildBrowseList = [];
 let bkmpGuildLoaded = false;
 let bkmpGuildLoading = false;
 let bkmpGuildBusy = false;
+let bkmpGuildChatMessages = [];
+let bkmpGuildChatLoadedForGuildId = null;
+let bkmpGuildSettingsOpen = false;
+let bkmpGuildMyInviteCode = null;
 
 async function bkmpGuildEnsureMyAuthUserId() {
   if (bkmpGuildMyAuthUserId) return bkmpGuildMyAuthUserId;
@@ -2726,6 +2730,11 @@ async function bkmpIdleRenderGildePanel() {
           <input type="text" id="idleGuildTagInput" placeholder="Kürzel (max. 5)" maxlength="5" style="max-width:110px;">
           <button type="button" class="btn-ja idle-guild-create-btn" id="idleGuildCreateBtn" ${bkmpGuildBusy ? 'disabled' : ''}>Gründen (500.000 Gold)</button>
         </div>
+        <p style="margin-top:0.8rem;">Hast du einen Einladungscode für eine private Gilde bekommen?</p>
+        <div class="idle-guild-create-row">
+          <input type="text" id="idleGuildCodeInput" placeholder="Einladungscode" maxlength="8" style="text-transform:uppercase;">
+          <button type="button" class="btn-nein idle-guild-join-code-btn" id="idleGuildJoinCodeBtn" ${bkmpGuildBusy ? 'disabled' : ''}>Beitreten</button>
+        </div>
       </div>
       <div class="idle-arena-history">
         <h4 style="margin-top:1rem;">Gilden durchsuchen</h4>
@@ -2775,26 +2784,71 @@ async function bkmpIdleRenderGildePanel() {
         await bkmpIdleRenderGildePanel();
       });
     });
+    const joinCodeBtn = document.getElementById('idleGuildJoinCodeBtn');
+    if (joinCodeBtn) joinCodeBtn.addEventListener('click', async () => {
+      const codeInput = document.getElementById('idleGuildCodeInput');
+      const code = (codeInput.value || '').trim();
+      if (!code) {
+        if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Bitte einen Einladungscode eintragen.', 2800);
+        return;
+      }
+      bkmpGuildBusy = true;
+      try {
+        await bkmpGuildJoinByCode(code);
+        bkmpGuildLoaded = false;
+        bkmpGuildRefreshTreasuryBonusCache();
+      } catch (e) {
+        if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(e.message, 3400);
+      }
+      bkmpGuildBusy = false;
+      await bkmpIdleRenderGildePanel();
+    });
     return;
   }
 
   const g = bkmpGuildState.guild;
-  const isLeaderOrOfficer = bkmpGuildState.myRole === 'leader' || bkmpGuildState.myRole === 'officer';
+  const isLeader = bkmpGuildState.myRole === 'leader';
+  const isLeaderOrOfficer = isLeader || bkmpGuildState.myRole === 'officer';
   const bonusPct = typeof bkmpIdleGuildTreasuryBonusPct === 'function' ? bkmpIdleGuildTreasuryBonusPct(g.treasuryGold) : 0;
   const nextMilestone = typeof bkmpIdleGuildNextTreasuryMilestone === 'function' ? bkmpIdleGuildNextTreasuryMilestone(g.treasuryGold) : null;
 
+  if (isLeader && bkmpGuildMyInviteCode === null && !g.isPublic) {
+    bkmpGuildGetMyInviteCode().then(code => { bkmpGuildMyInviteCode = code || ''; bkmpIdleRenderGildePanel(); });
+  }
+  if (bkmpGuildChatLoadedForGuildId !== g.id) {
+    bkmpGuildChatLoadedForGuildId = g.id;
+    bkmpGuildGetChatMessages(g.id, 50).then(msgs => { bkmpGuildChatMessages = msgs; bkmpIdleRenderGildePanel(); }).catch(() => {});
+  }
+
   panel.innerHTML = `
     <div class="idle-dungeon-intro">
-      <h4>🛡️ [${escapeHtml(g.tag)}] ${escapeHtml(g.name)}</h4>
-      <p>${g.memberCount}/20 Mitglieder &middot; Deine Rolle: ${BKMP_GUILD_ROLE_LABELS[bkmpGuildState.myRole] || bkmpGuildState.myRole}</p>
+      <h4>${g.isPublic ? '🌐' : '🔒'} [${escapeHtml(g.tag)}] ${escapeHtml(g.name)}</h4>
+      ${g.description ? `<p>${escapeHtml(g.description)}</p>` : ''}
+      <p>${g.memberCount}/20 Mitglieder &middot; Deine Rolle: ${BKMP_GUILD_ROLE_LABELS[bkmpGuildState.myRole] || bkmpGuildState.myRole} &middot; ${g.isPublic ? 'Öffentlich' : 'Privat'}</p>
       <p class="idle-dungeon-best">💰 Gildenkasse: ${bkmpIdleFormatNumber(g.treasuryGold)} &middot; 🔺 Aktueller Bonus: +${bonusPct}% Angriff/Verteidigung/Gold für alle Mitglieder</p>
       ${nextMilestone ? `<p>Nächster Meilenstein bei ${bkmpIdleFormatNumber(nextMilestone)} 💰 Kasse.</p>` : ''}
       <div class="idle-guild-create-row">
         <input type="number" id="idleGuildContributeInput" placeholder="Gold-Betrag" min="1">
         <button type="button" class="btn-ja idle-guild-contribute-btn" id="idleGuildContributeBtn" ${bkmpGuildBusy ? 'disabled' : ''}>Beitragen</button>
+        ${isLeader ? `<button type="button" class="btn-nein" id="idleGuildSettingsToggleBtn">${bkmpGuildSettingsOpen ? 'Einstellungen schließen' : '⚙️ Einstellungen'}</button>` : ''}
         <button type="button" class="btn-nein" id="idleGuildLeaveBtn" ${bkmpGuildBusy ? 'disabled' : ''}>Gilde verlassen</button>
       </div>
     </div>
+    ${isLeader && bkmpGuildSettingsOpen ? `
+      <div class="idle-dungeon-intro">
+        <h4>⚙️ Gilden-Einstellungen</h4>
+        <div class="idle-guild-create-row" style="flex-direction:column; align-items:stretch;">
+          <textarea id="idleGuildDescInput" maxlength="200" placeholder="Kurze Beschreibung deiner Gilde (max. 200 Zeichen)" style="min-height:60px; padding:0.5rem 0.7rem; border-radius:10px; border:1px solid var(--line); background:var(--paper-2); color:var(--ink); font-family:inherit;">${escapeHtml(g.description || '')}</textarea>
+          <label class="admin-checkbox-label" style="justify-content:center;">
+            <input type="checkbox" id="idleGuildPublicToggle" ${g.isPublic ? 'checked' : ''}>
+            Öffentlich (jeder kann direkt beitreten, sonst nur per Einladungscode)
+          </label>
+          ${!g.isPublic ? `<p class="idle-dungeon-best">🔑 Einladungscode: ${bkmpGuildMyInviteCode ? escapeHtml(bkmpGuildMyInviteCode) : '⏳ lädt...'}</p>
+          <button type="button" class="btn-nein" id="idleGuildRegenCodeBtn" style="align-self:center;">Neuen Code erzeugen</button>` : ''}
+          <button type="button" class="btn-ja" id="idleGuildSaveSettingsBtn" style="align-self:center;">Speichern</button>
+        </div>
+      </div>
+    ` : ''}
     <div class="idle-arena-history">
       <h4 style="margin-top:1rem;">Mitglieder</h4>
       ${bkmpGuildState.members.map(m => `
@@ -2809,7 +2863,21 @@ async function bkmpIdleRenderGildePanel() {
         </div>
       `).join('')}
     </div>
+    <div class="idle-arena-history">
+      <h4 style="margin-top:1rem;">💬 Gilden-Chat</h4>
+      <div class="idle-guild-chat-log" id="idleGuildChatLog">
+        ${bkmpGuildChatMessages.length === 0 ? '<p class="empty-hint">Noch keine Nachrichten.</p>' : bkmpGuildChatMessages.map(m => `
+          <p class="idle-guild-chat-msg"><strong>${escapeHtml(m.displayName)}:</strong> ${escapeHtml(m.message)} <span class="idle-guild-chat-time">${bkmpArenaFormatTime(m.createdAt)}</span></p>
+        `).join('')}
+      </div>
+      <div class="idle-guild-create-row">
+        <input type="text" id="idleGuildChatInput" placeholder="Nachricht an deine Gilde..." maxlength="300">
+        <button type="button" class="btn-ja" id="idleGuildChatSendBtn">Senden</button>
+      </div>
+    </div>
   `;
+  const chatLog = document.getElementById('idleGuildChatLog');
+  if (chatLog) chatLog.scrollTop = chatLog.scrollHeight;
 
   const contributeBtn = document.getElementById('idleGuildContributeBtn');
   if (contributeBtn) contributeBtn.addEventListener('click', async () => {
@@ -2886,6 +2954,62 @@ async function bkmpIdleRenderGildePanel() {
       await bkmpIdleRenderGildePanel();
     });
   });
+
+  const settingsToggleBtn = document.getElementById('idleGuildSettingsToggleBtn');
+  if (settingsToggleBtn) settingsToggleBtn.addEventListener('click', () => {
+    bkmpGuildSettingsOpen = !bkmpGuildSettingsOpen;
+    bkmpIdleRenderGildePanel();
+  });
+
+  const saveSettingsBtn = document.getElementById('idleGuildSaveSettingsBtn');
+  if (saveSettingsBtn) saveSettingsBtn.addEventListener('click', async () => {
+    const descInput = document.getElementById('idleGuildDescInput');
+    const publicToggle = document.getElementById('idleGuildPublicToggle');
+    if (bkmpGuildBusy) return;
+    bkmpGuildBusy = true;
+    try {
+      const newCode = await bkmpGuildUpdateSettings(descInput.value, publicToggle.checked);
+      if (newCode) bkmpGuildMyInviteCode = newCode;
+      if (publicToggle.checked) bkmpGuildMyInviteCode = null;
+      bkmpGuildLoaded = false;
+      if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Gilden-Einstellungen gespeichert.', 2600);
+    } catch (e) {
+      if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(e.message, 3400);
+    }
+    bkmpGuildBusy = false;
+    await bkmpIdleRenderGildePanel();
+  });
+
+  const regenCodeBtn = document.getElementById('idleGuildRegenCodeBtn');
+  if (regenCodeBtn) regenCodeBtn.addEventListener('click', async () => {
+    if (bkmpGuildBusy) return;
+    bkmpGuildBusy = true;
+    try {
+      bkmpGuildMyInviteCode = await bkmpGuildRegenerateInviteCode();
+      if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Neuer Einladungscode erzeugt - alte Codes gelten nicht mehr.', 3200);
+    } catch (e) {
+      if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(e.message, 3400);
+    }
+    bkmpGuildBusy = false;
+    await bkmpIdleRenderGildePanel();
+  });
+
+  const chatSendBtn = document.getElementById('idleGuildChatSendBtn');
+  const chatInput = document.getElementById('idleGuildChatInput');
+  const sendChat = async () => {
+    const msg = (chatInput.value || '').trim();
+    if (!msg) return;
+    chatInput.value = '';
+    try {
+      await bkmpGuildSendChatMessage(msg);
+      bkmpGuildChatLoadedForGuildId = null;
+    } catch (e) {
+      if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(e.message, 3400);
+    }
+    await bkmpIdleRenderGildePanel();
+  };
+  if (chatSendBtn) chatSendBtn.addEventListener('click', sendChat);
+  if (chatInput) chatInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
 }
 
 /* ---------------- Rendering: Bestenliste-Tab ---------------- */

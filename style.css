@@ -5682,6 +5682,20 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   min-width: 0;
 }
 .idle-guild-create-row button { flex: 0 0 auto; }
+.idle-guild-chat-log {
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+  margin-bottom: 0.6rem;
+}
+.idle-guild-chat-msg { font-size: 0.85rem; margin: 0; color: var(--ink); }
+.idle-guild-chat-time { float: right; font-size: 0.68rem; color: var(--muted); }
 .idle-dungeon-start-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .idle-dungeon-banner {
   display: flex;
@@ -5731,6 +5745,11 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 /* Gleicher Grund wie bei #idleRunenHelpOverlay - der "Für Streamer"-Button
    oeffnet dieses Popup aus dem schon offenen idleDorfOverlay heraus. */
 #idleStreamHelpOverlay { z-index: 60; }
+/* Gleicher Grund wie bei #idleSkillHelpOverlay/#idleRunenHelpOverlay - der
+   Arena-Angreifen-Button oeffnet dieses Popup aus dem schon offenen
+   idleDorfOverlay heraus (Spieler-Meldung 14.07.: "Popup öffnet sich
+   hinter dem idle game"). */
+#arenaBattleOverlay { z-index: 60; }
 /* NACHBESSERUNG (Nutzerwunsch 15.07.: "Baust du das dann unten ein und im
    gleichen Design overlay wie den Rest?") - vorher ein separater Text-Link
    direkt neben dem Titel oben, der optisch mit dem Live-Sync-Banner

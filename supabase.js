@@ -3948,6 +3948,8 @@ async function bkmpAdminDeletePlayerAccount(authUserId) {
    Befoerdern) laufen ausschliesslich ueber die dort definierten
    security-definer-RPCs, gleiche Vorsicht wie beim Weltboss-Raid - die
    Tabellen selbst sind fuer Clients nur lesbar. */
+const BKMP_GUILD_COLUMNS = 'id, name, name_key, tag, description, leader_auth_user_id, treasury_gold, member_count, created_at, is_public';
+
 function bkmpGuildMapRow(row) {
   return {
     id: row.id,
@@ -3958,7 +3960,8 @@ function bkmpGuildMapRow(row) {
     leaderAuthUserId: row.leader_auth_user_id,
     treasuryGold: Number(row.treasury_gold || 0),
     memberCount: Number(row.member_count || 0),
-    createdAt: row.created_at
+    createdAt: row.created_at,
+    isPublic: row.is_public !== false
   };
 }
 
@@ -3978,7 +3981,7 @@ async function bkmpGuildGetMine() {
   if (!membership) return null;
   const { data: guildRows, error: guildError } = await client
     .from('guilds')
-    .select('id, name, name_key, tag, description, leader_auth_user_id, treasury_gold, member_count, created_at')
+    .select(BKMP_GUILD_COLUMNS)
     .eq('id', membership.guild_id)
     .limit(1);
   if (guildError) throw guildError;
@@ -4009,11 +4012,81 @@ async function bkmpGuildBrowse(limit) {
   if (!client) return [];
   const { data, error } = await client
     .from('guilds')
-    .select('id, name, name_key, tag, description, leader_auth_user_id, treasury_gold, member_count, created_at')
+    .select(BKMP_GUILD_COLUMNS)
+    .eq('is_public', true)
     .order('treasury_gold', { ascending: false })
     .limit(limit || 50);
   if (error) throw error;
   return (data || []).map(bkmpGuildMapRow);
+}
+
+async function bkmpGuildUpdateSettings(description, isPublic) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { data, error } = await client.rpc('update_guild_settings', { p_description: description, p_is_public: isPublic });
+  if (error) throw new Error('Einstellungen konnten nicht gespeichert werden. Nur der Anführer darf das.');
+  return data || null;
+}
+
+async function bkmpGuildRegenerateInviteCode() {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { data, error } = await client.rpc('regenerate_guild_invite_code');
+  if (error) throw new Error('Einladungscode konnte nicht erneuert werden. Nur der Anführer darf das.');
+  return data || null;
+}
+
+async function bkmpGuildGetMyInviteCode() {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return null;
+  const { data, error } = await client.rpc('get_my_guild_invite_code');
+  if (error) return null;
+  return data || null;
+}
+
+async function bkmpGuildJoinByCode(code) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { error } = await client.rpc('join_guild_by_code', { p_code: code });
+  if (error) {
+    const msg = String(error.message || '');
+    if (msg.includes('invalid_code')) throw new Error('Dieser Einladungscode ist ungültig.');
+    if (msg.includes('already_in_guild')) throw new Error('Du bist schon in einer Gilde. Verlasse sie zuerst.');
+    if (msg.includes('guild_full')) throw new Error('Diese Gilde ist bereits voll (20 Mitglieder).');
+    if (msg.includes('no_idle_state')) throw new Error('Spiele zuerst im Kampf-Tab, bevor du einer Gilde beitrittst.');
+    throw new Error('Beitritt fehlgeschlagen. Bitte versuche es erneut.');
+  }
+}
+
+async function bkmpGuildSendChatMessage(message) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { error } = await client.rpc('send_guild_chat_message', { p_message: message });
+  if (error) {
+    const msg = String(error.message || '');
+    if (msg.includes('invalid_message')) throw new Error('Nachricht ist leer oder zu lang (max. 300 Zeichen).');
+    if (msg.includes('not_in_guild')) throw new Error('Du bist in keiner Gilde.');
+    throw new Error('Nachricht konnte nicht gesendet werden.');
+  }
+}
+
+async function bkmpGuildGetChatMessages(guildId, limit) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client || !guildId) return [];
+  const { data, error } = await client
+    .from('guild_chat_messages')
+    .select('id, auth_user_id, display_name, message, created_at')
+    .eq('guild_id', guildId)
+    .order('created_at', { ascending: false })
+    .limit(limit || 50);
+  if (error) throw error;
+  return (data || []).map(row => ({
+    id: row.id,
+    authUserId: row.auth_user_id,
+    displayName: row.display_name,
+    message: row.message,
+    createdAt: row.created_at
+  })).reverse();
 }
 
 async function bkmpGuildCreate(name, tag) {
