@@ -5510,6 +5510,19 @@
         if (typeof bkmpStopSessionWatch === 'function') bkmpStopSessionWatch();
         try { await bkmpPlayerLogout(); } catch (e) { console.warn('Ausloggen fehlgeschlagen.', e); }
         bkmpSetMcName('');
+        /* Spieler-Wunsch (14.07., nach mehreren Umgehungsversuchen ueber
+           immer neue Accounts): der Bonk-Zaehler ist rein lokal im
+           localStorage gespeichert (geraetegebunden, nicht account-
+           gebunden) - beim Account-Wechsel "erbte" ein neuer Account sonst
+           den vollen lokalen Stand des vorherigen (siehe
+           bkmpMergeRemoteStatsIntoLocal: nimmt das Maximum aus lokal/remote).
+           Beim Ausloggen jetzt auf 0 zuruecksetzen, damit ein danach neu
+           registrierter/eingeloggter Account wirklich bei seinem EIGENEN
+           Server-Stand startet. Fuer denselben Account erneut einzuloggen
+           bleibt verlustfrei, weil der echte Stand ja schon serverseitig
+           synchronisiert ist und beim naechsten Login von dort geladen wird. */
+        bkmpSetBonkCount(0);
+        if (typeof bkmpUpdateBonkBadge === 'function') bkmpUpdateBonkBadge(0);
         bkmpOwnedPlushies = [];
         try { localStorage.removeItem(BKMP_OWNED_PLUSHIES_CACHE_KEY); } catch (e) {}
         try { localStorage.removeItem('bkmp-idle-achievement-fields-cache'); } catch (e) {}

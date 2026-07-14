@@ -3767,6 +3767,127 @@ async function loadDungeonLeaderboard(difficultyId) {
   return data || [];
 }
 
+/* ---------------- PvP-Arena (siehe supabase-idle-arena.sql) ----------------
+   Asynchroner Kampf gegen die zuletzt synchronisierten Kampfwerte eines
+   anderen Spielers - arena_attack() selbst laeuft komplett serverseitig
+   (security definer), damit niemand sich per direktem Client-Upsert selbst
+   Rating/Gold gutschreiben kann (gleiche Vorsicht wie bei rename_player_account
+   - siehe supabase-player-name-blocklist.sql). */
+async function bkmpArenaGetMyRating() {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return null;
+  const { data: sessionData } = await client.auth.getSession();
+  const userId = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
+  if (!userId) return null;
+  const { data, error } = await client
+    .from('arena_ratings')
+    .select('auth_user_id, name_key, display_name, rating, wins, losses')
+    .eq('auth_user_id', userId)
+    .limit(1);
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : null;
+  return row ? {
+    authUserId: row.auth_user_id,
+    displayName: row.display_name,
+    rating: Number(row.rating || 1000),
+    wins: Number(row.wins || 0),
+    losses: Number(row.losses || 0)
+  } : null;
+}
+
+/* Gegnerauswahl: alle Ratings ausser dem eigenen laden, clientseitig auf
+   eine Zufallsauswahl in Rating-Naehe eingrenzen - bei bisher kleiner
+   Spielerzahl reicht das voellig, ohne eine eigene RPC nur fuers Mischen zu
+   brauchen. */
+async function bkmpArenaGetOpponents(myAuthUserId, myRating, limit) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from('arena_ratings')
+    .select('auth_user_id, name_key, display_name, rating, wins, losses')
+    .neq('auth_user_id', myAuthUserId || '00000000-0000-0000-0000-000000000000')
+    .order('rating', { ascending: false })
+    .limit(200);
+  if (error) throw error;
+  const rows = (data || []).map(row => ({
+    authUserId: row.auth_user_id,
+    displayName: row.display_name,
+    rating: Number(row.rating || 1000),
+    wins: Number(row.wins || 0),
+    losses: Number(row.losses || 0)
+  }));
+  const baseline = Number.isFinite(myRating) ? myRating : 1000;
+  rows.sort((a, b) => Math.abs(a.rating - baseline) - Math.abs(b.rating - baseline));
+  const nearPool = rows.slice(0, Math.max(20, (limit || 8) * 3));
+  for (let i = nearPool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [nearPool[i], nearPool[j]] = [nearPool[j], nearPool[i]];
+  }
+  return nearPool.slice(0, limit || 8);
+}
+
+async function bkmpArenaAttack(targetAuthUserId) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { data, error } = await client.rpc('arena_attack', { p_target_auth_user_id: targetAuthUserId });
+  if (error) {
+    const msg = String(error.message || '');
+    if (msg.includes('cooldown_active')) throw new Error('Du hast dieses Ziel schon vor Kurzem angegriffen. Bitte warte ein paar Minuten.');
+    if (msg.includes('no_attacker_state')) throw new Error('Spiele zuerst im Kampf-Tab, bevor du in die Arena gehst.');
+    if (msg.includes('no_defender_state')) throw new Error('Dieser Gegner hat noch keinen Kampf-Fortschritt.');
+    if (msg.includes('invalid_target') || msg.includes('not_authenticated')) throw new Error('Angriff nicht möglich.');
+    throw new Error('Der Angriff ist fehlgeschlagen. Bitte versuche es erneut.');
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return null;
+  return {
+    won: !!row.attacker_won,
+    ratingChange: Number(row.rating_change || 0),
+    newRating: Number(row.new_rating || 1000),
+    goldReward: Number(row.gold_reward || 0),
+    defenderName: row.defender_display_name || ''
+  };
+}
+
+async function bkmpArenaGetLeaderboard(limit) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from('arena_ratings')
+    .select('auth_user_id, name_key, display_name, rating, wins, losses')
+    .order('rating', { ascending: false })
+    .limit(limit || 100);
+  if (error) throw error;
+  return (data || []).map(row => ({
+    authUserId: row.auth_user_id,
+    displayName: row.display_name,
+    rating: Number(row.rating || 1000),
+    wins: Number(row.wins || 0),
+    losses: Number(row.losses || 0)
+  }));
+}
+
+async function bkmpArenaGetRecentBattles(authUserId, limit) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !authUserId) return [];
+  const { data, error } = await client
+    .from('arena_battle_log')
+    .select('attacker_name, defender_name, attacker_won, rating_change, gold_reward, occurred_at, attacker_auth_user_id')
+    .or(`attacker_auth_user_id.eq.${authUserId},defender_auth_user_id.eq.${authUserId}`)
+    .order('occurred_at', { ascending: false })
+    .limit(limit || 20);
+  if (error) throw error;
+  return (data || []).map(row => ({
+    attackerName: row.attacker_name,
+    defenderName: row.defender_name,
+    attackerWon: !!row.attacker_won,
+    ratingChange: Number(row.rating_change || 0),
+    goldReward: Number(row.gold_reward || 0),
+    occurredAt: row.occurred_at,
+    wasAttacker: row.attacker_auth_user_id === authUserId
+  }));
+}
+
 async function loadRaidBossesAdmin() {
   const client = bkmpGetSupabaseClient();
   if (!client) return [];

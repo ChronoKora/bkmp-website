@@ -84,6 +84,42 @@ create trigger bkmp_block_forbidden_names
   for each row execute function public.block_forbidden_display_names();
 
 -- ============================================================
+-- 3b) NACHTRAG (14.07., Bug-Report "bonkt immer noch weiter"): der obige
+--    Trigger blockt nur die REGISTRIERUNG. Ein bereits eingeloggter Client
+--    behaelt aber ein gueltiges Zugriffstoken bis zu dessen natuerlichem
+--    Ablauf (bis zu 1 Std.) - das gilt selbst NACH dem Loeschen des
+--    auth.users-Eintrags, weil Supabase Tokens rein per Signatur/Ablaufdatum
+--    prueft, nicht per Live-Abgleich gegen auth.users. Ein geloeschter
+--    Account kann also fuer den Rest der Token-Laufzeit weiter Werte
+--    hochschreiben (siehe upsertPlayerStats in supabase.js). Deshalb
+--    zusaetzlich direkt auf player_stats selbst sperren - das greift sofort,
+--    unabhaengig vom Token-Status.
+-- ============================================================
+create or replace function public.block_forbidden_player_stats_names()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if public.is_name_blocked(new.display_name) then
+    raise exception 'name_blocked';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists bkmp_block_forbidden_player_stats on public.player_stats;
+create trigger bkmp_block_forbidden_player_stats
+  before insert or update on public.player_stats
+  for each row execute function public.block_forbidden_player_stats_names();
+
+drop trigger if exists bkmp_block_forbidden_idle_state on public.idle_player_state;
+create trigger bkmp_block_forbidden_idle_state
+  before insert or update on public.idle_player_state
+  for each row execute function public.block_forbidden_player_stats_names();
+
+-- ============================================================
 -- 4) rename_player_account() um denselben Check ergaenzen (1:1 dieselbe
 --    Logik wie in supabase-player-accounts-v3.sql, nur mit der zusaetzlichen
 --    Pruefung nach invalid_name).
