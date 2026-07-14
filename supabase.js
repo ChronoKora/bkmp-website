@@ -449,6 +449,7 @@ async function bkmpPlayerRename(newName) {
     if (code.includes('cooldown_active')) throw new Error('Du kannst deinen Namen erst wieder 30 Tage nach der letzten Aenderung anpassen.');
     if (code.includes('name_taken')) throw new Error('Dieser Ingame-Name ist bereits vergeben.');
     if (code.includes('same_name')) throw new Error('Das ist bereits dein aktueller Name.');
+    if (code.includes('name_blocked')) throw new Error('Dieser Name ist nicht erlaubt.');
     if (code.includes('invalid_name')) throw new Error('Bitte einen gueltigen Ingame-Namen eintragen (max. 32 Zeichen).');
     if (code.includes('no_account')) throw new Error('Es wurde kein Spieler-Konto gefunden. Bitte melde dich erneut an.');
     throw new Error('Der Name konnte nicht geaendert werden. Bitte versuche es spaeter erneut.');
@@ -472,6 +473,21 @@ async function bkmpPlayerRegister(name, password) {
   if (!email) throw new Error('Bitte einen gueltigen Ingame-Namen eintragen.');
   if (!password || password.length < 6) throw new Error('Das Passwort braucht mindestens 6 Zeichen.');
 
+  /* Vorab-Check gegen die Namens-Sperrliste (supabase-player-name-
+     blocklist.sql) - blockiert rassistische/NS-verherrlichende Namen schon
+     vor dem eigentlichen signUp, damit eine saubere deutsche Fehlermeldung
+     erscheint statt eines rohen Datenbankfehlers aus dem gleichnamigen
+     auth.users-Trigger (der als zweite, nicht umgehbare Sperre bestehen
+     bleibt). Schlaegt der RPC-Aufruf selbst fehl (z. B. Migration noch nicht
+     ausgefuehrt), wird die Registrierung nicht blockiert - der Trigger faengt
+     es dann ohnehin serverseitig ab. */
+  try {
+    const { data: blocked } = await client.rpc('is_name_blocked', { p_name: displayName });
+    if (blocked) throw new Error('Dieser Name ist nicht erlaubt.');
+  } catch (e) {
+    if (e instanceof Error && e.message === 'Dieser Name ist nicht erlaubt.') throw e;
+  }
+
   const { data, error } = await client.auth.signUp({
     email,
     password,
@@ -480,6 +496,9 @@ async function bkmpPlayerRegister(name, password) {
   if (error) {
     if (/already registered|already exists|user_already_exists/i.test(error.message || '')) {
       throw new Error('Dieser Ingame-Name ist bereits registriert. Bitte melde dich an.');
+    }
+    if (/name_blocked/i.test(error.message || '')) {
+      throw new Error('Dieser Name ist nicht erlaubt.');
     }
     throw error;
   }
