@@ -586,6 +586,45 @@ function bkmpIdleEventDragonExcludedIds() {
   return excluded;
 }
 
+/* ---------------- Gilden-Kassen-Bonus (siehe supabase-idle-guilds.sql) ----------------
+   Gestaffelter Bonus auf Angriff/Verteidigung/Gold fuer ALLE Mitglieder,
+   abhaengig vom aktuellen Kassenstand der eigenen Gilde - motiviert
+   gemeinsames Beitragen, nicht nur den Anfuehrer. Rein clientseitig
+   gecacht (localStorage, gleiches Muster wie die Erfolge-Caches), damit
+   bkmpIdleRecomputeEffectiveStats() den Wert nutzen kann, OHNE bei jedem
+   Aufruf einen Netzwerk-Request zu brauchen - wird beim Oeffnen des
+   Idle-Dorfs und nach jedem Gilden-Wechsel aufgefrischt. */
+const BKMP_GUILD_TREASURY_BONUS_CACHE_KEY = 'bkmp-guild-treasury-bonus-cache';
+const BKMP_GUILD_TREASURY_TIERS = [
+  { threshold: 1000, pct: 2 },
+  { threshold: 5000, pct: 5 },
+  { threshold: 20000, pct: 8 },
+  { threshold: 50000, pct: 12 },
+  { threshold: 150000, pct: 18 }
+];
+function bkmpIdleGuildTreasuryBonusPct(treasuryGold) {
+  const gold = Number(treasuryGold || 0);
+  let pct = 0;
+  BKMP_GUILD_TREASURY_TIERS.forEach(tier => { if (gold >= tier.threshold) pct = tier.pct; });
+  return pct;
+}
+function bkmpIdleGuildNextTreasuryMilestone(treasuryGold) {
+  const gold = Number(treasuryGold || 0);
+  const next = BKMP_GUILD_TREASURY_TIERS.find(tier => gold < tier.threshold);
+  return next ? next.threshold : null;
+}
+function bkmpIdleGetGuildTreasuryBonusCache() {
+  try { return Number(localStorage.getItem(BKMP_GUILD_TREASURY_BONUS_CACHE_KEY) || 0); } catch (e) { return 0; }
+}
+async function bkmpGuildRefreshTreasuryBonusCache() {
+  try {
+    const mine = await bkmpGuildGetMine();
+    const treasury = mine ? mine.guild.treasuryGold : 0;
+    localStorage.setItem(BKMP_GUILD_TREASURY_BONUS_CACHE_KEY, String(treasury));
+    if (typeof bkmpIdleRecomputeEffectiveStats === 'function') bkmpIdleRecomputeEffectiveStats();
+  } catch (e) { /* offline/kein Login - alter Cache-Stand bleibt bestehen */ }
+}
+
 function bkmpIdleRecomputeEffectiveStats() {
   if (!bkmpIdleState) return;
   const skillTotals = bkmpIdleSkillEffectTotals(bkmpIdleState.skill_allocations, bkmpIdleSkillDefs);
@@ -623,15 +662,16 @@ function bkmpIdleRecomputeEffectiveStats() {
      Kombinationen ab, ohne den erspielten Fortschritt einzelner Quellen
      (Skilltree/Titel/Runen/Prestige) zu kappen, solange sie in Summe
      vernuenftig bleiben. */
-  const attackPctTotal = Math.min(500, t('attack_pct') + t('extra_archer') * 6 + prestigeLevelBonusPct);
+  const guildBonusPct = bkmpIdleGetGuildTreasuryBonusCache();
+  const attackPctTotal = Math.min(500, t('attack_pct') + t('extra_archer') * 6 + prestigeLevelBonusPct + guildBonusPct);
   const attackFlatTotal = t('attack_flat') + t('ballista_unlock') * 8;
   bkmpIdleEffectiveStats = {
     attack: (base.attack + attackFlatTotal) * (1 + attackPctTotal / 100),
-    defense: (base.defense + t('defense_flat')) * (1 + t('defense_pct') / 100),
+    defense: (base.defense + t('defense_flat')) * (1 + (t('defense_pct') + guildBonusPct) / 100),
     hp: Math.round((base.hp + t('hp_flat')) * (1 + (t('hp_pct') + prestigeLevelBonusPct) / 100)),
     critChance: Math.min(75, base.critChance + t('crit_chance_flat') + t('crit_chance_pct')),
     critDamage: base.critDamage + Math.min(300, t('crit_damage_flat') + t('crit_damage_pct')),
-    goldBonus: Math.min(400, base.goldBonus + t('gold_prod_pct') + t('gold_find_pct') + prestigeLevelBonusPct),
+    goldBonus: Math.min(400, base.goldBonus + t('gold_prod_pct') + t('gold_find_pct') + prestigeLevelBonusPct + guildBonusPct),
     xpBonus: Math.min(400, base.xpBonus + t('xp_pct') + prestigeLevelBonusPct),
     lootBonus: Math.min(300, base.lootBonus + t('loot_chance_pct')),
     /* Ab hier: Effekte, die vorher komplett wirkungslos im Skilltree lagen
@@ -2537,6 +2577,7 @@ async function bkmpIdleRenderArenaPanel() {
             : `⚔️ Niederlage gegen ${result.defenderName}. ${result.ratingChange} Rating (jetzt ${result.newRating})`;
           if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(msg, 3800);
           bkmpIdleLog(msg);
+          bkmpArenaRefreshAchievementCache();
         }
       } catch (e) {
         if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(e.message || 'Angriff fehlgeschlagen.', 3200);
@@ -2548,11 +2589,233 @@ async function bkmpIdleRenderArenaPanel() {
   });
 }
 
-/* ---------------- Rendering: Gilde-Tab (siehe supabase-idle-guilds.sql) ---------------- */
+/* ---------------- Rendering: Gilde-Tab (siehe supabase-idle-guilds.sql) ----------------
+   Jeder Spieler ist maximal in EINER Gilde - der Tab zeigt je nach Zustand
+   entweder die eigene Gilde (Kasse/Mitglieder/Rollen) oder eine Gruenden-/
+   Beitreten-Ansicht. Kassen-Bonus-Anzeige nutzt dieselben Meilenstein-
+   Stufen wie bkmpIdleGuildTreasuryBonusPct() (Stat-Verdrahtung). */
+let bkmpGuildMyAuthUserId = null;
+let bkmpGuildState = null;
+let bkmpGuildBrowseList = [];
+let bkmpGuildLoaded = false;
+let bkmpGuildLoading = false;
+let bkmpGuildBusy = false;
+
+async function bkmpGuildEnsureMyAuthUserId() {
+  if (bkmpGuildMyAuthUserId) return bkmpGuildMyAuthUserId;
+  const client = typeof bkmpGetPlayerAuthClient === 'function' ? bkmpGetPlayerAuthClient() : null;
+  if (!client) return null;
+  try {
+    const { data: sessionData } = await client.auth.getSession();
+    bkmpGuildMyAuthUserId = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
+  } catch (e) { bkmpGuildMyAuthUserId = null; }
+  return bkmpGuildMyAuthUserId;
+}
+
+async function bkmpGuildLoadAll() {
+  bkmpGuildLoading = true;
+  const uid = await bkmpGuildEnsureMyAuthUserId();
+  try {
+    bkmpGuildState = uid ? await bkmpGuildGetMine() : null;
+    bkmpGuildBrowseList = uid && !bkmpGuildState ? await bkmpGuildBrowse(30) : [];
+  } catch (e) {
+    console.warn('Gilden-Daten konnten nicht geladen werden.', e);
+  }
+  bkmpGuildLoaded = true;
+  bkmpGuildLoading = false;
+}
+
+const BKMP_GUILD_ROLE_LABELS = { leader: '👑 Anführer', officer: '⭐ Offizier', member: 'Mitglied' };
+
 async function bkmpIdleRenderGildePanel() {
   const panel = document.getElementById('idlePanelGilde');
   if (!panel) return;
-  panel.innerHTML = '<div class="idle-dungeon-intro"><h4>🛡️ Gilde</h4><p class="idle-dungeon-best">⏳ Wird noch gebaut...</p></div>';
+
+  if (!bkmpGuildLoaded && !bkmpGuildLoading) {
+    panel.innerHTML = '<p class="idle-dungeon-best">⏳ Lade Gilde...</p>';
+    await bkmpGuildLoadAll();
+  }
+
+  const uid = bkmpGuildMyAuthUserId;
+  if (!uid) {
+    panel.innerHTML = `
+      <div class="idle-dungeon-intro">
+        <h4>🛡️ Gilde</h4>
+        <p>Melde dich mit deinem Spieler-Konto an und spiele mindestens einmal im Kampf-Tab, um einer Gilde beizutreten oder eine zu gründen.</p>
+      </div>`;
+    return;
+  }
+
+  if (!bkmpGuildState) {
+    panel.innerHTML = `
+      <div class="idle-dungeon-intro">
+        <h4>🛡️ Gilde gründen</h4>
+        <p>Schließ dich mit anderen Spielern zusammen: gemeinsame Kasse, Kassen-Meilensteine geben ALLEN Mitgliedern dauerhafte Boni. Gründung kostet <strong>500.000 Gold</strong> (wird direkt zur Startkasse deiner neuen Gilde).</p>
+        <div class="idle-guild-create-row">
+          <input type="text" id="idleGuildNameInput" placeholder="Gildenname" maxlength="32">
+          <input type="text" id="idleGuildTagInput" placeholder="Kürzel (max. 5)" maxlength="5" style="max-width:110px;">
+          <button type="button" class="btn-ja idle-guild-create-btn" id="idleGuildCreateBtn" ${bkmpGuildBusy ? 'disabled' : ''}>Gründen (500.000 Gold)</button>
+        </div>
+      </div>
+      <div class="idle-arena-history">
+        <h4 style="margin-top:1rem;">Gilden durchsuchen</h4>
+        ${bkmpGuildBrowseList.length === 0 ? '<p class="empty-hint">Noch keine Gilden vorhanden. Gründe die erste!</p>' : bkmpGuildBrowseList.map(g => `
+          <div class="idle-arena-opponent-card" data-guild-id="${escapeHtml(g.id)}">
+            <span class="idle-arena-opponent-name">[${escapeHtml(g.tag)}] ${escapeHtml(g.name)}</span>
+            <span class="idle-arena-opponent-rating">💰 ${bkmpIdleFormatNumber(g.treasuryGold)}</span>
+            <span class="idle-arena-opponent-record">${g.memberCount}/20 Mitglieder</span>
+            <button type="button" class="btn-ja idle-guild-join-btn" ${bkmpGuildBusy || g.memberCount >= 20 ? 'disabled' : ''}>${g.memberCount >= 20 ? 'Voll' : 'Beitreten'}</button>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    const createBtn = document.getElementById('idleGuildCreateBtn');
+    if (createBtn) createBtn.addEventListener('click', async () => {
+      const nameInput = document.getElementById('idleGuildNameInput');
+      const tagInput = document.getElementById('idleGuildTagInput');
+      if (!nameInput.value.trim() || !tagInput.value.trim()) {
+        if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Bitte Name und Kürzel eintragen.', 2800);
+        return;
+      }
+      bkmpGuildBusy = true;
+      try {
+        await bkmpGuildCreate(nameInput.value.trim(), tagInput.value.trim());
+        bkmpGuildLoaded = false;
+        bkmpGuildRefreshTreasuryBonusCache();
+      } catch (e) {
+        if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(e.message, 3400);
+      }
+      bkmpGuildBusy = false;
+      await bkmpIdleRenderGildePanel();
+    });
+    panel.querySelectorAll('.idle-guild-join-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const card = btn.closest('[data-guild-id]');
+        const guildId = card ? card.dataset.guildId : null;
+        if (!guildId || bkmpGuildBusy) return;
+        bkmpGuildBusy = true;
+        try {
+          await bkmpGuildJoin(guildId);
+          bkmpGuildLoaded = false;
+          bkmpGuildRefreshTreasuryBonusCache();
+        } catch (e) {
+          if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(e.message, 3400);
+        }
+        bkmpGuildBusy = false;
+        await bkmpIdleRenderGildePanel();
+      });
+    });
+    return;
+  }
+
+  const g = bkmpGuildState.guild;
+  const isLeaderOrOfficer = bkmpGuildState.myRole === 'leader' || bkmpGuildState.myRole === 'officer';
+  const bonusPct = typeof bkmpIdleGuildTreasuryBonusPct === 'function' ? bkmpIdleGuildTreasuryBonusPct(g.treasuryGold) : 0;
+  const nextMilestone = typeof bkmpIdleGuildNextTreasuryMilestone === 'function' ? bkmpIdleGuildNextTreasuryMilestone(g.treasuryGold) : null;
+
+  panel.innerHTML = `
+    <div class="idle-dungeon-intro">
+      <h4>🛡️ [${escapeHtml(g.tag)}] ${escapeHtml(g.name)}</h4>
+      <p>${g.memberCount}/20 Mitglieder &middot; Deine Rolle: ${BKMP_GUILD_ROLE_LABELS[bkmpGuildState.myRole] || bkmpGuildState.myRole}</p>
+      <p class="idle-dungeon-best">💰 Gildenkasse: ${bkmpIdleFormatNumber(g.treasuryGold)} &middot; 🔺 Aktueller Bonus: +${bonusPct}% Angriff/Verteidigung/Gold für alle Mitglieder</p>
+      ${nextMilestone ? `<p>Nächster Meilenstein bei ${bkmpIdleFormatNumber(nextMilestone)} 💰 Kasse.</p>` : ''}
+      <div class="idle-guild-create-row">
+        <input type="number" id="idleGuildContributeInput" placeholder="Gold-Betrag" min="1">
+        <button type="button" class="btn-ja idle-guild-contribute-btn" id="idleGuildContributeBtn" ${bkmpGuildBusy ? 'disabled' : ''}>Beitragen</button>
+        <button type="button" class="btn-nein" id="idleGuildLeaveBtn" ${bkmpGuildBusy ? 'disabled' : ''}>Gilde verlassen</button>
+      </div>
+    </div>
+    <div class="idle-arena-history">
+      <h4 style="margin-top:1rem;">Mitglieder</h4>
+      ${bkmpGuildState.members.map(m => `
+        <div class="idle-arena-opponent-card" data-member-uid="${escapeHtml(m.authUserId)}">
+          <span class="idle-arena-opponent-name">${escapeHtml(m.displayName)}</span>
+          <span class="idle-arena-opponent-record">${BKMP_GUILD_ROLE_LABELS[m.role] || m.role}</span>
+          <span class="idle-arena-opponent-rating">💰 ${bkmpIdleFormatNumber(m.contributedGold)}</span>
+          ${isLeaderOrOfficer && m.authUserId !== uid && m.role !== 'leader' ? `
+            ${bkmpGuildState.myRole === 'leader' ? `<button type="button" class="btn-nein idle-guild-role-btn" data-role="${m.role === 'officer' ? 'member' : 'officer'}">${m.role === 'officer' ? 'Degradieren' : 'Befördern'}</button>` : ''}
+            <button type="button" class="btn-nein idle-guild-kick-btn">Entfernen</button>
+          ` : ''}
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  const contributeBtn = document.getElementById('idleGuildContributeBtn');
+  if (contributeBtn) contributeBtn.addEventListener('click', async () => {
+    const input = document.getElementById('idleGuildContributeInput');
+    const amount = Math.round(Number(input.value || 0));
+    if (!amount || amount <= 0) {
+      if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Bitte einen gültigen Betrag eintragen.', 2800);
+      return;
+    }
+    bkmpGuildBusy = true;
+    try {
+      await bkmpGuildContribute(amount);
+      bkmpGuildLoaded = false;
+      bkmpGuildRefreshTreasuryBonusCache();
+      if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`💰 ${amount} Gold zur Gildenkasse beigetragen!`, 3200);
+    } catch (e) {
+      if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(e.message, 3400);
+    }
+    bkmpGuildBusy = false;
+    await bkmpIdleRenderGildePanel();
+  });
+
+  const leaveBtn = document.getElementById('idleGuildLeaveBtn');
+  if (leaveBtn) leaveBtn.addEventListener('click', async () => {
+    const confirmed = typeof bkmpConfirmDialog === 'function'
+      ? await bkmpConfirmDialog('🛡️ Gilde verlassen?', 'Möchtest du diese Gilde wirklich verlassen?', 'Ja, verlassen', 'Abbrechen')
+      : confirm('Gilde wirklich verlassen?');
+    if (!confirmed || bkmpGuildBusy) return;
+    bkmpGuildBusy = true;
+    try {
+      await bkmpGuildLeave();
+      bkmpGuildLoaded = false;
+      bkmpGuildRefreshTreasuryBonusCache();
+    } catch (e) {
+      if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(e.message, 3400);
+    }
+    bkmpGuildBusy = false;
+    await bkmpIdleRenderGildePanel();
+  });
+
+  panel.querySelectorAll('.idle-guild-kick-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const card = btn.closest('[data-member-uid]');
+      const targetUid = card ? card.dataset.memberUid : null;
+      if (!targetUid || bkmpGuildBusy) return;
+      bkmpGuildBusy = true;
+      try {
+        await bkmpGuildKickMember(targetUid);
+        bkmpGuildLoaded = false;
+        bkmpGuildRefreshTreasuryBonusCache();
+      } catch (e) {
+        if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(e.message, 3400);
+      }
+      bkmpGuildBusy = false;
+      await bkmpIdleRenderGildePanel();
+    });
+  });
+
+  panel.querySelectorAll('.idle-guild-role-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const card = btn.closest('[data-member-uid]');
+      const targetUid = card ? card.dataset.memberUid : null;
+      const newRole = btn.dataset.role;
+      if (!targetUid || bkmpGuildBusy) return;
+      bkmpGuildBusy = true;
+      try {
+        await bkmpGuildSetMemberRole(targetUid, newRole);
+        bkmpGuildLoaded = false;
+        bkmpGuildRefreshTreasuryBonusCache();
+      } catch (e) {
+        if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(e.message, 3400);
+      }
+      bkmpGuildBusy = false;
+      await bkmpIdleRenderGildePanel();
+    });
+  });
 }
 
 /* ---------------- Rendering: Bestenliste-Tab ---------------- */
@@ -4988,6 +5251,8 @@ function bkmpIdlePreloadStateIfNamed() {
     .then(() => { if (typeof renderAchievementBadge === 'function') renderAchievementBadge(true); })
     .catch(() => {});
   bkmpRaidRefreshAchievementCache();
+  bkmpArenaRefreshAchievementCache();
+  bkmpGuildRefreshTreasuryBonusCache();
 }
 
 /* ---------------- Autoklicker-Erkennung: Muster statt reiner Frequenz ----------------
@@ -6231,4 +6496,14 @@ window.BKMP_RAID_ACHIEVEMENTS_EXTRA = [
   { id: 'raid_damage_1m', category: 'Weltboss', title: 'Ein Millionen Schaden', desc: 'Verursache insgesamt 1.000.000 Schaden in Weltboss-Raids.', progress: ctx => [ctx.raidTotalDamage, 1000000], check: ctx => ctx.raidTotalDamage >= 1000000 },
   { id: 'raid_mvp', category: 'Weltboss', title: 'MVP', desc: 'Sei der Spieler mit dem meisten Schaden in einem Raid.', check: ctx => ctx.raidMvpCount >= 1 },
   { id: 'raid_flawless', category: 'Weltboss', title: 'Ohne Niederlage gewonnen', desc: 'Gewinne einen Raid, ohne dass die Stadt Schaden nimmt.', check: ctx => ctx.raidFlawlessWins >= 1 }
+];
+
+/* ---------------- PvP-Arena: Erfolge (window.BKMP_ARENA_ACHIEVEMENTS_EXTRA) ----------------
+   Gleiches Einbinde-Muster wie BKMP_RAID_ACHIEVEMENTS_EXTRA. */
+window.BKMP_ARENA_ACHIEVEMENTS_EXTRA = [
+  { id: 'arena_first_win', category: 'Arena', title: 'Erster Arena-Sieg', desc: 'Gewinne deinen ersten Arena-Kampf.', check: ctx => ctx.arenaWins >= 1 },
+  { id: 'arena_win_10', category: 'Arena', title: 'Arena-Kämpfer', desc: 'Gewinne 10 Arena-Kämpfe.', progress: ctx => [ctx.arenaWins, 10], check: ctx => ctx.arenaWins >= 10 },
+  { id: 'arena_win_50', category: 'Arena', title: 'Arena-Veteran', desc: 'Gewinne 50 Arena-Kämpfe.', progress: ctx => [ctx.arenaWins, 50], check: ctx => ctx.arenaWins >= 50 },
+  { id: 'arena_win_200', category: 'Arena', title: 'Arena-Champion', desc: 'Gewinne 200 Arena-Kämpfe.', progress: ctx => [ctx.arenaWins, 200], check: ctx => ctx.arenaWins >= 200 },
+  { id: 'arena_rating_1500', category: 'Arena', title: 'Aufstrebender Kämpfer', desc: 'Erreiche ein Arena-Rating von 1500.', progress: ctx => [ctx.arenaRating, 1500], check: ctx => ctx.arenaRating >= 1500 }
 ];

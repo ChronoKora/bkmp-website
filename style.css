@@ -2849,6 +2849,8 @@ input.cardcatalog-search:focus {
 }
 .leaderboard-rank { flex-shrink: 0; width: 2.2rem; text-align: center; font-weight: 800; font-size: 1.05rem; }
 .leaderboard-name { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 0.4rem; }
+.leaderboard-name-clickable { cursor: pointer; border-radius: 8px; transition: background 0.15s ease; }
+.leaderboard-name-clickable:hover { background: color-mix(in srgb, var(--gold) 10%, transparent); }
 .leaderboard-plushie { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; flex-shrink: 0; box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--gold) 45%, var(--line)); }
 .leaderboard-value { flex-shrink: 0; color: var(--gold-fixed); font-weight: 700; font-size: 0.88rem; }
 .leaderboard-title {
@@ -5666,6 +5668,20 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 .idle-arena-opponent-record { font-size: 0.8rem; color: var(--muted); }
 .idle-arena-attack-btn { margin-left: auto; font-size: 0.82rem; padding: 0.35rem 0.8rem; }
 .idle-arena-history .idle-dungeon-best { font-weight: 500; font-size: 0.85rem; margin-bottom: 0.3rem; }
+
+/* Gilden (siehe supabase-idle-guilds.sql) - Gruenden-/Beitrags-Formular. */
+.idle-guild-create-row { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; margin-top: 0.6rem; }
+.idle-guild-create-row input {
+  padding: 0.45rem 0.7rem;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+  color: var(--ink);
+  font-size: 0.85rem;
+  flex: 1 1 160px;
+  min-width: 0;
+}
+.idle-guild-create-row button { flex: 0 0 auto; }
 .idle-dungeon-start-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .idle-dungeon-banner {
   display: flex;
@@ -5723,6 +5739,40 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
    die "❓ Hilfe"-Buttons im Runen-/Skilltree-Tab, statt einer Sonderloesung. */
 .idle-stream-help-btn { padding: 0.4rem 0.8rem; font-size: 0.76rem; white-space: nowrap; }
 .skillhelp-card { max-width: 720px; }
+
+/* Spieler-Profil-Popup (Community-Feedback "Fightmaria", 14.07.) */
+.player-profile-card { max-width: 420px; }
+.player-profile-header { display: flex; align-items: center; gap: 0.9rem; margin-bottom: 1.1rem; }
+.player-profile-plushie {
+  width: 52px; height: 52px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.6rem;
+  background: var(--paper-2);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--gold) 45%, var(--line));
+}
+.player-profile-plushie img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.player-profile-name-outer { flex: 1; min-width: 0; }
+.player-profile-name-outer h3.leaderboard-name-wrap { margin: 0; font-family: 'Fraunces', serif; font-size: 1.1rem; }
+.player-profile-title {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--gold-fixed);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.player-profile-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+.player-profile-stat {
+  display: flex; flex-direction: column; gap: 0.2rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+}
+.player-profile-stat span { font-size: 0.72rem; color: var(--muted); }
+.player-profile-stat strong { font-size: 1.05rem; color: var(--ink); }
+@media (max-width: 480px) { .player-profile-stats { grid-template-columns: 1fr; } }
 .skillhelp-list {
   display: flex;
   flex-direction: column;

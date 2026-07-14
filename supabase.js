@@ -3918,6 +3918,148 @@ async function bkmpAdminDeletePlayerAccount(authUserId) {
   return data || '';
 }
 
+/* ---------------- Gilden (siehe supabase-idle-guilds.sql) ----------------
+   Alle Schreibzugriffe (Gruenden/Beitreten/Verlassen/Beitragen/Kicken/
+   Befoerdern) laufen ausschliesslich ueber die dort definierten
+   security-definer-RPCs, gleiche Vorsicht wie beim Weltboss-Raid - die
+   Tabellen selbst sind fuer Clients nur lesbar. */
+function bkmpGuildMapRow(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    nameKey: row.name_key,
+    tag: row.tag,
+    description: row.description || '',
+    leaderAuthUserId: row.leader_auth_user_id,
+    treasuryGold: Number(row.treasury_gold || 0),
+    memberCount: Number(row.member_count || 0),
+    createdAt: row.created_at
+  };
+}
+
+async function bkmpGuildGetMine() {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return null;
+  const { data: sessionData } = await client.auth.getSession();
+  const userId = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
+  if (!userId) return null;
+  const { data: memberRows, error: memberError } = await client
+    .from('guild_members')
+    .select('auth_user_id, guild_id, name_key, display_name, role, contributed_gold, joined_at')
+    .eq('auth_user_id', userId)
+    .limit(1);
+  if (memberError) throw memberError;
+  const membership = Array.isArray(memberRows) ? memberRows[0] : null;
+  if (!membership) return null;
+  const { data: guildRows, error: guildError } = await client
+    .from('guilds')
+    .select('id, name, name_key, tag, description, leader_auth_user_id, treasury_gold, member_count, created_at')
+    .eq('id', membership.guild_id)
+    .limit(1);
+  if (guildError) throw guildError;
+  const guildRow = Array.isArray(guildRows) ? guildRows[0] : null;
+  if (!guildRow) return null;
+  const { data: memberList, error: listError } = await client
+    .from('guild_members')
+    .select('auth_user_id, display_name, role, contributed_gold, joined_at')
+    .eq('guild_id', membership.guild_id)
+    .order('contributed_gold', { ascending: false });
+  if (listError) throw listError;
+  return {
+    guild: bkmpGuildMapRow(guildRow),
+    myRole: membership.role,
+    myContributedGold: Number(membership.contributed_gold || 0),
+    members: (memberList || []).map(m => ({
+      authUserId: m.auth_user_id,
+      displayName: m.display_name,
+      role: m.role,
+      contributedGold: Number(m.contributed_gold || 0),
+      joinedAt: m.joined_at
+    }))
+  };
+}
+
+async function bkmpGuildBrowse(limit) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from('guilds')
+    .select('id, name, name_key, tag, description, leader_auth_user_id, treasury_gold, member_count, created_at')
+    .order('treasury_gold', { ascending: false })
+    .limit(limit || 50);
+  if (error) throw error;
+  return (data || []).map(bkmpGuildMapRow);
+}
+
+async function bkmpGuildCreate(name, tag) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { data, error } = await client.rpc('create_guild', { p_name: name, p_tag: tag });
+  if (error) {
+    const msg = String(error.message || '');
+    if (msg.includes('name_blocked')) throw new Error('Dieser Gildenname oder Tag ist nicht erlaubt.');
+    if (msg.includes('name_taken')) throw new Error('Dieser Gildenname ist bereits vergeben.');
+    if (msg.includes('already_in_guild')) throw new Error('Du bist schon in einer Gilde. Verlasse sie zuerst.');
+    if (msg.includes('invalid_name')) throw new Error('Bitte einen gültigen Gildennamen eintragen (max. 32 Zeichen).');
+    if (msg.includes('invalid_tag')) throw new Error('Bitte ein gültiges Kürzel eintragen (max. 5 Zeichen).');
+    if (msg.includes('no_idle_state')) throw new Error('Spiele zuerst im Kampf-Tab, bevor du eine Gilde gründest.');
+    if (msg.includes('insufficient_gold')) throw new Error('Eine Gilde zu gründen kostet 500.000 Gold - du hast noch nicht genug.');
+    throw new Error('Die Gilde konnte nicht gegründet werden. Bitte versuche es erneut.');
+  }
+  return data;
+}
+
+async function bkmpGuildJoin(guildId) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { error } = await client.rpc('join_guild', { p_guild_id: guildId });
+  if (error) {
+    const msg = String(error.message || '');
+    if (msg.includes('already_in_guild')) throw new Error('Du bist schon in einer Gilde. Verlasse sie zuerst.');
+    if (msg.includes('guild_full')) throw new Error('Diese Gilde ist bereits voll (20 Mitglieder).');
+    if (msg.includes('no_idle_state')) throw new Error('Spiele zuerst im Kampf-Tab, bevor du einer Gilde beitrittst.');
+    throw new Error('Beitritt fehlgeschlagen. Bitte versuche es erneut.');
+  }
+}
+
+async function bkmpGuildLeave() {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { error } = await client.rpc('leave_guild');
+  if (error) throw new Error('Konnte die Gilde nicht verlassen. Bitte versuche es erneut.');
+}
+
+async function bkmpGuildContribute(amount) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { error } = await client.rpc('contribute_gold', { p_amount: amount });
+  if (error) {
+    const msg = String(error.message || '');
+    if (msg.includes('insufficient_gold')) throw new Error('Nicht genug Gold.');
+    if (msg.includes('not_in_guild')) throw new Error('Du bist in keiner Gilde.');
+    throw new Error('Beitrag fehlgeschlagen. Bitte versuche es erneut.');
+  }
+}
+
+async function bkmpGuildKickMember(targetAuthUserId) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { error } = await client.rpc('kick_guild_member', { p_target_auth_user_id: targetAuthUserId });
+  if (error) {
+    const msg = String(error.message || '');
+    if (msg.includes('cannot_kick_leader')) throw new Error('Der Anführer kann nicht entfernt werden.');
+    if (msg.includes('not_authorized')) throw new Error('Dafür fehlt dir die Berechtigung.');
+    throw new Error('Entfernen fehlgeschlagen. Bitte versuche es erneut.');
+  }
+}
+
+async function bkmpGuildSetMemberRole(targetAuthUserId, newRole) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { error } = await client.rpc('set_guild_member_role', { p_target_auth_user_id: targetAuthUserId, p_new_role: newRole });
+  if (error) throw new Error('Rollenänderung fehlgeschlagen. Nur der Anführer darf Rollen vergeben.');
+}
+
 async function loadRaidBossesAdmin() {
   const client = bkmpGetSupabaseClient();
   if (!client) return [];
