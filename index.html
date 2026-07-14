@@ -55,7 +55,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260714-profile1">
+<link rel="stylesheet" href="style.css?v=20260714-arenabattle1">
 </head>
 <body>
 
@@ -425,6 +425,35 @@
       <div class="joke-buttons">
         <button class="btn-ja" id="playerProfileClose" type="button">Schlie&szlig;en</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Arena-Kampfanimation (Spieler-Wunsch 14.07.: "Bei der Arena irgendeine
+       Animation? Dorf gegen Dorf?") - rein kosmetisch: das Ergebnis steht
+       schon fest (arena_attack() ist eine einzelne, serverseitig bereits
+       entschiedene RPC, kein Mehrfach-Tick-Kampf wie beim Weltboss-Raid),
+       die Animation spielt nur eine plausible Annaeherung an dieses
+       Ergebnis ab. Generische Boxen statt echter Dorf-Skins, weil der Skin
+       des Gegners clientseitig nicht bekannt ist (koennte theoretisch per
+       Zusatzabfrage geladen werden, waere aber fuer eine 2-Sekunden-
+       Kosmetik-Animation unverhaeltnismaessiger Mehraufwand). -->
+  <div class="joke-overlay" id="arenaBattleOverlay">
+    <div class="joke-card arena-battle-card">
+      <h3>⚔️ Arena-Kampf</h3>
+      <div class="arena-battle-field">
+        <div class="arena-battle-side" id="arenaBattleMe">
+          <div class="arena-battle-icon">🏰</div>
+          <div class="arena-battle-name" id="arenaBattleMeName"></div>
+          <div class="idle-hp-bar"><div class="idle-hp-fill idle-hp-fill-village" id="arenaBattleMeHpFill" style="width:100%"></div></div>
+        </div>
+        <div class="arena-battle-vs">VS</div>
+        <div class="arena-battle-side" id="arenaBattleOpponent">
+          <div class="arena-battle-icon">🏰</div>
+          <div class="arena-battle-name" id="arenaBattleOpponentName"></div>
+          <div class="idle-hp-bar"><div class="idle-hp-fill idle-hp-fill-dragon" id="arenaBattleOpponentHpFill" style="width:100%"></div></div>
+        </div>
+      </div>
+      <p class="arena-battle-result" id="arenaBattleResult">&nbsp;</p>
     </div>
   </div>
 
@@ -1202,7 +1231,7 @@
   <script src="assets/vendor/supabase-js.min.js"></script>
   <script src="supabase.js?v=20260714-arenafix1"></script>
   <script src="app.js?v=20260712-themefix1"></script>
-  <script src="idledorf.js?v=20260714-guildbugfix1"></script>
+  <script src="idledorf.js?v=20260714-arenabattle1"></script>
   <script src="mapart.js?v=20260716-companyfix1"></script>
   <script>
     bkmpInitTheme();

@@ -2515,6 +2515,66 @@ function bkmpArenaFormatTime(iso) {
   try { return new Date(iso).toLocaleString('de-DE'); } catch (e) { return ''; }
 }
 
+/* Kampfanimation (Spieler-Wunsch 14.07.: "Dorf gegen Dorf?") - rein
+   kosmetisch: arena_attack() hat das Ergebnis schon serverseitig
+   entschieden (ein einzelner RPC-Aufruf, kein Mehrfach-Tick-Kampf wie beim
+   Weltboss-Raid), die Animation spielt nur eine plausible Annaeherung
+   daran ab, bevor das Ergebnis final angezeigt wird. Gibt ein Promise
+   zurueck, das nach Ende der Animation aufloest. */
+function bkmpArenaPlayBattleAnimation(myName, opponentName, won) {
+  return new Promise(resolve => {
+    const overlay = document.getElementById('arenaBattleOverlay');
+    if (!overlay) { resolve(); return; }
+    const meFill = document.getElementById('arenaBattleMeHpFill');
+    const oppFill = document.getElementById('arenaBattleOpponentHpFill');
+    const resultEl = document.getElementById('arenaBattleResult');
+    document.getElementById('arenaBattleMeName').textContent = myName || 'Du';
+    document.getElementById('arenaBattleOpponentName').textContent = opponentName || 'Gegner';
+    meFill.style.width = '100%';
+    oppFill.style.width = '100%';
+    resultEl.textContent = ' ';
+    overlay.classList.add('visible');
+
+    const loserFill = won ? oppFill : meFill;
+    const loserId = won ? 'arenaBattleOpponent' : 'arenaBattleMe';
+    const winnerFill = won ? meFill : oppFill;
+    const winnerId = won ? 'arenaBattleMe' : 'arenaBattleOpponent';
+    const winnerFinalPct = 30 + Math.round(Math.random() * 40);
+    const ticks = 5;
+    let tick = 0;
+    const spawnDmg = (targetId, isCrit) => {
+      const target = document.getElementById(targetId);
+      if (!target) return;
+      const dmg = document.createElement('span');
+      dmg.className = 'idle-dmg-float' + (isCrit ? ' idle-dmg-crit' : '');
+      dmg.textContent = '-' + Math.round(8 + Math.random() * 30) + (isCrit ? '!' : '');
+      target.appendChild(dmg);
+      window.setTimeout(() => dmg.remove(), 800);
+    };
+    const step = () => {
+      tick++;
+      const loserPct = Math.max(0, Math.round(100 - (100 / ticks) * tick));
+      const winnerPct = tick >= ticks ? winnerFinalPct : Math.max(winnerFinalPct, Math.round(100 - ((100 - winnerFinalPct) / ticks) * tick));
+      loserFill.style.width = loserPct + '%';
+      winnerFill.style.width = winnerPct + '%';
+      if (typeof bkmpIdleSpawnHitFlash === 'function') {
+        bkmpIdleSpawnHitFlash(loserId);
+        if (Math.random() < 0.4) bkmpIdleSpawnHitFlash(winnerId);
+      }
+      spawnDmg(loserId, tick === ticks);
+      if (Math.random() < 0.5) spawnDmg(winnerId, false);
+      if (tick < ticks) {
+        window.setTimeout(step, 420);
+      } else {
+        resultEl.textContent = won ? '🏆 Sieg!' : '💥 Niederlage';
+        resultEl.style.color = won ? '#4ade80' : '#f87171';
+        window.setTimeout(() => { overlay.classList.remove('visible'); resolve(); }, 1100);
+      }
+    };
+    window.setTimeout(step, 350);
+  });
+}
+
 async function bkmpIdleRenderArenaPanel() {
   const panel = document.getElementById('idlePanelArena');
   if (!panel) return;
@@ -2572,12 +2632,16 @@ async function bkmpIdleRenderArenaPanel() {
     btn.addEventListener('click', async () => {
       const card = btn.closest('[data-opponent-uid]');
       const opponentUid = card ? card.dataset.opponentUid : null;
+      const opponentNameEl = card ? card.querySelector('.idle-arena-opponent-name') : null;
+      const opponentName = opponentNameEl ? opponentNameEl.textContent : 'Gegner';
       if (!opponentUid || bkmpArenaAttacking) return;
       bkmpArenaAttacking = opponentUid;
       bkmpIdleRenderArenaPanel();
       try {
         const result = await bkmpArenaAttack(opponentUid);
         if (result) {
+          const myName = (typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : '') || 'Du';
+          await bkmpArenaPlayBattleAnimation(myName, opponentName, result.won);
           const msg = result.won
             ? `⚔️ Sieg gegen ${result.defenderName}! +${result.ratingChange} Rating, +${result.goldReward} 💰 (jetzt ${result.newRating})`
             : `⚔️ Niederlage gegen ${result.defenderName}. ${result.ratingChange} Rating (jetzt ${result.newRating})`;

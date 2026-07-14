@@ -5773,6 +5773,18 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 .player-profile-stat span { font-size: 0.72rem; color: var(--muted); }
 .player-profile-stat strong { font-size: 1.05rem; color: var(--ink); }
 @media (max-width: 480px) { .player-profile-stats { grid-template-columns: 1fr; } }
+
+/* Arena-Kampfanimation (Spieler-Wunsch 14.07.: "Dorf gegen Dorf?") - nutzt
+   die generischen .idle-hp-bar/.idle-hp-fill/.idle-hit-flash/.idle-dmg-
+   float-Klassen aus dem normalen Kampf-Tab weiter, nur die Feld-Boxen
+   selbst sind neu. */
+.arena-battle-card { max-width: 460px; text-align: center; }
+.arena-battle-field { display: flex; align-items: center; gap: 1rem; margin: 1rem 0; }
+.arena-battle-side { flex: 1; min-width: 0; position: relative; }
+.arena-battle-icon { font-size: 2.6rem; line-height: 1; }
+.arena-battle-name { font-weight: 700; font-size: 0.85rem; margin-top: 0.3rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.arena-battle-vs { font-family: 'Fraunces', serif; font-weight: 800; color: var(--gold-fixed); font-size: 1.1rem; flex-shrink: 0; }
+.arena-battle-result { font-weight: 700; min-height: 1.4em; margin-top: 0.4rem; }
 .skillhelp-list {
   display: flex;
   flex-direction: column;
