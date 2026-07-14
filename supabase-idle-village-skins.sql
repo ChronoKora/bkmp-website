@@ -88,8 +88,12 @@ with check (auth_user_id = auth.uid());
 -- Vorrang vor image_file (idledorf.js bkmpApplyVillageSkin). Deshalb jetzt
 -- "do update set" statt "do nothing", damit ein erneutes Ausfuehren dieser
 -- Datei den Eintrag auch wirklich aktualisiert.
+-- Nachbesserung (16.07., "Nochmal Neuer Standard Dorf skin"): Video unter
+-- demselben Dateinamen ausgetauscht - ?v=-Kennung hochgezaehlt, damit
+-- Browser/CDN nicht die alte Fassung aus dem Cache zeigen (gleicher Grund
+-- wie beim Pinguindorf-Video-Update).
 insert into public.idle_village_skins (id, name, description, icon, image_file, video_file, unlock_type, frame_count, frame_aspect_w, frame_aspect_h, sort_order)
-values ('standard', 'Standarddorf', 'Das gute alte Dorf, wie es schon immer aussah.', '🏘️', 'assets/dragons/dorf.png', 'assets/village/startdorf.mp4', 'free', 1, 2124, 976, 0)
+values ('standard', 'Standarddorf', 'Das gute alte Dorf, wie es schon immer aussah.', '🏘️', 'assets/dragons/dorf.png', 'assets/village/startdorf.mp4?v=20260716-2', 'free', 1, 2124, 976, 0)
 on conflict (id) do update set
   name = excluded.name,
   description = excluded.description,

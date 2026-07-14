@@ -6612,6 +6612,12 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   text-align: center;
 }
 .map-company-logo { width: 64px; height: 64px; object-fit: contain; border-radius: 50%; background: var(--paper); margin-bottom: 0.5rem; }
+/* Fehlt logo_url (Firma hat beim Bewerben kein Logo hochgeladen), zeigte
+   die Karte bisher gar nichts an dieser Stelle - dadurch stand sie neben
+   Karten MIT Logo sichtbar schief/unausgewogen da. Gleicher Platzhalter
+   wie im Admin-Bewerbungs-Review (.company-application-logo-empty). */
+.map-company-logo-empty { display: flex; align-items: center; justify-content: center; margin: 0 auto 0.5rem; border: 1px solid var(--line); font-size: 1.6rem; }
+.map-company-detail-head .map-company-logo-empty { margin: 0; }
 .map-company-desc { font-size: 0.8rem; color: var(--muted); margin: 0.4rem 0; }
 .map-company-price { font-size: 0.8rem; color: var(--gold); font-weight: 700; }
 

@@ -31,8 +31,27 @@ const BKMP_MAP_STATUS_LABELS = {
   abgeschlossen: 'Abgeschlossen', abgebrochen: 'Abgebrochen'
 };
 
+/* Kartenauftraege-Preise/Budgets sind durchgehend In-Game-Gold (siehe
+   BKMP_MAP_BUDGET_STEPS: 250.000-500.000, exakt im selben Groessenbereich
+   wie die Dorf-Skin-Preise) - NICHT echtes Geld. bkmpFormatCurrency() aus
+   app.js haengt aber ein Euro-Zeichen an (fuer das echte Finanz-Dashboard
+   gedacht), was hier faelschlich "350.000 €" statt Gold anzeigte. Reine
+   Zahl ohne Waehrungssymbol - das 💰-Symbol setzen die Aufrufstellen
+   selbst davor, damit es nicht doppelt auftaucht wo es schon manuell
+   steht (siehe z.B. bkmpMapRenderCompanyApplicationsList). */
 function bkmpMapFormatMoney(n) {
-  return typeof bkmpFormatCurrency === 'function' ? bkmpFormatCurrency(Number(n) || 0) : new Intl.NumberFormat('de-DE').format(Math.round(Number(n) || 0));
+  return new Intl.NumberFormat('de-DE').format(Math.round(Number(n) || 0));
+}
+
+/* Kappt an der letzten Wortgrenze VOR maxLen statt mitten im Wort (ein
+   simples .slice(0, maxLen) zerschnitt zuvor Woerter wie "bestimmst" zu
+   "besti..."). */
+function bkmpMapTruncateWords(text, maxLen) {
+  const s = text || '';
+  if (s.length <= maxLen) return s;
+  const cut = s.slice(0, maxLen);
+  const lastSpace = cut.lastIndexOf(' ');
+  return (lastSpace > 0 ? cut.slice(0, lastSpace) : cut) + '…';
 }
 
 /* ---------------- Auftrag-erstellen: Formular-Status ---------------- */
@@ -69,7 +88,7 @@ function bkmpMapInitPriorityFilter() {
 function bkmpMapInitBudgetFilter() {
   const el = document.getElementById('mapOrderBudgetFilter');
   if (!el) return;
-  el.innerHTML = BKMP_MAP_BUDGET_STEPS.map((v, i) => `<button type="button" class="${i === 0 ? 'active' : ''}" data-budget="${v}">${bkmpMapFormatMoney(v)}</button>`).join('');
+  el.innerHTML = BKMP_MAP_BUDGET_STEPS.map((v, i) => `<button type="button" class="${i === 0 ? 'active' : ''}" data-budget="${v}">💰 ${bkmpMapFormatMoney(v)}</button>`).join('');
   el.querySelectorAll('button').forEach(btn => btn.addEventListener('click', () => {
     bkmpMapOrderState.budgetPerPart = Number(btn.dataset.budget);
     el.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
@@ -122,7 +141,7 @@ function bkmpMapUpdateTotalPreview() {
   const partsInput = document.getElementById('mapOrderParts');
   const parts = partsInput ? Number(partsInput.value) : 0;
   if (bkmpMapOrderState.sizeKnown && parts > 0 && bkmpMapOrderState.budgetPerPart) {
-    preview.textContent = `Geschätzter Gesamtpreis: ${bkmpMapFormatMoney(bkmpMapOrderState.budgetPerPart * parts)}`;
+    preview.textContent = `Geschätzter Gesamtpreis: 💰 ${bkmpMapFormatMoney(bkmpMapOrderState.budgetPerPart * parts)}`;
   } else {
     preview.textContent = 'Gesamtpreis wird nach Beratung berechnet.';
   }
@@ -328,7 +347,7 @@ function bkmpMapPriorityLabel(id) {
 }
 
 function bkmpMapRenderOrderCard(o, showStatus, actionsHtml) {
-  const budgetText = o.budget_total ? `${bkmpMapFormatMoney(o.budget_total)} gesamt` : `${bkmpMapFormatMoney(o.budget_per_part)} / Kartenteil`;
+  const budgetText = o.budget_total ? `💰 ${bkmpMapFormatMoney(o.budget_total)} gesamt` : `💰 ${bkmpMapFormatMoney(o.budget_per_part)} / Kartenteil`;
   const sizeText = o.size_known ? `${o.size_width || '?'}x${o.size_height || '?'}, ${o.size_parts || '?'} Teile` : 'Größe unsicher – Beratung gewünscht';
   return `
     <div class="map-order-card" data-order-id="${escapeHtml(o.id)}">
@@ -405,10 +424,10 @@ async function bkmpMapRenderCompanies() {
   if (!companies.length) { el.innerHTML = '<p class="empty-hint">Noch keine Kartenbaufirmen gelistet.</p>'; return; }
   el.innerHTML = companies.map(c => `
     <div class="map-company-card" data-company-id="${escapeHtml(c.id)}">
-      ${c.logo_url ? `<img src="${escapeHtml(c.logo_url)}" alt="" class="map-company-logo">` : ''}
+      ${c.logo_url ? `<img src="${escapeHtml(c.logo_url)}" alt="" class="map-company-logo">` : '<div class="map-company-logo map-company-logo-empty">🏗️</div>'}
       <h3>${escapeHtml(c.name)}</h3>
-      <p class="map-company-desc">${escapeHtml((c.description || '').slice(0, 140))}${(c.description || '').length > 140 ? '…' : ''}</p>
-      ${c.price_range_min ? `<p class="map-company-price">${bkmpMapFormatMoney(c.price_range_min)} – ${bkmpMapFormatMoney(c.price_range_max)}</p>` : ''}
+      <p class="map-company-desc">${escapeHtml(bkmpMapTruncateWords(c.description || '', 140))}</p>
+      ${c.price_range_min ? `<p class="map-company-price">💰 ${bkmpMapFormatMoney(c.price_range_min)} – ${bkmpMapFormatMoney(c.price_range_max)}</p>` : ''}
     </div>`).join('');
   el.querySelectorAll('.map-company-card').forEach(card => card.addEventListener('click', () => bkmpMapOpenCompanyDetail(card.dataset.companyId)));
 }
@@ -424,12 +443,12 @@ function bkmpMapOpenCompanyDetail(companyId) {
   content.innerHTML = `
     ${c.banner_url ? `<img src="${escapeHtml(c.banner_url)}" alt="" class="map-company-banner">` : ''}
     <div class="map-company-detail-head">
-      ${c.logo_url ? `<img src="${escapeHtml(c.logo_url)}" alt="" class="map-company-logo">` : ''}
+      ${c.logo_url ? `<img src="${escapeHtml(c.logo_url)}" alt="" class="map-company-logo">` : '<div class="map-company-logo map-company-logo-empty">🏗️</div>'}
       <h3>${escapeHtml(c.name)}</h3>
     </div>
     <p>${escapeHtml(c.description || '')}</p>
     ${specialties ? `<p><strong>Spezialisiert auf:</strong> ${escapeHtml(specialties)}</p>` : ''}
-    ${c.price_range_min ? `<p><strong>Preisspanne:</strong> ${bkmpMapFormatMoney(c.price_range_min)} – ${bkmpMapFormatMoney(c.price_range_max)}</p>` : ''}
+    ${c.price_range_min ? `<p><strong>Preisspanne:</strong> 💰 ${bkmpMapFormatMoney(c.price_range_min)} – ${bkmpMapFormatMoney(c.price_range_max)}</p>` : ''}
     ${c.contact_person ? `<p><strong>Ansprechpartner:</strong> ${escapeHtml(c.contact_person)}</p>` : ''}
     <div class="map-company-links">
       ${c.discord_url ? `<a href="${escapeHtml(c.discord_url)}" target="_blank" rel="noopener">Discord</a>` : ''}
@@ -606,7 +625,7 @@ function bkmpMapCloseWorkspace() {
 function bkmpMapRenderWorkspaceInfo(o) {
   const el = document.getElementById('mapWorkspaceInfo');
   if (!el) return;
-  const budgetText = o.budget_total ? bkmpMapFormatMoney(o.budget_total) + ' gesamt' : bkmpMapFormatMoney(o.budget_per_part) + ' / Kartenteil';
+  const budgetText = o.budget_total ? '💰 ' + bkmpMapFormatMoney(o.budget_total) + ' gesamt' : '💰 ' + bkmpMapFormatMoney(o.budget_per_part) + ' / Kartenteil';
   const sizeText = o.size_known ? `${o.size_width || '?'}x${o.size_height || '?'}, ${o.size_parts || '?'} Teile` : (o.size_notes || 'Unsicher – Beratung gewünscht');
   el.innerHTML = `
     <div><span class="label">Status</span><span class="map-order-status status-${escapeHtml(o.status)}">${escapeHtml(BKMP_MAP_STATUS_LABELS[o.status] || o.status)}</span></div>
