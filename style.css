@@ -819,11 +819,11 @@ body.page-loaded .streamer-marquee-track {
   aspect-ratio: 307 / 512;
   background-image: url('assets/penguin-sprite.png');
   background-repeat: no-repeat;
-  background-size: 400% 100%;
+  background-size: 1000% 100%;
   cursor: pointer;
   z-index: 15;
   filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.25));
-  animation: bkmpPenguinFrames 1.3s steps(4) infinite;
+  animation: bkmpPenguinFrames 3.24s steps(10) infinite;
   transition: filter 0.15s ease, transform 0.15s ease;
 }
 html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
@@ -832,27 +832,23 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
   filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.25)) brightness(1.08);
   transform: scale(1.08);
 }
-/* Nachbesserung (16.07., Spieler-Feedback "wechselt seine Position
-   minimal"): das urspruengliche Sprite hatte 10 Frames, aber Frame 0-4
-   zeigten eine KOMPLETT andere Pose/Bildausschnitt als Frame 5-9 (per
-   PowerShell-Pixelvermessung bestaetigt: Mittelpunkt der Figur sprang beim
-   Loop-Uebergang 4->5 um ueber 130px innerhalb des 512px-Frames). Sprite
-   ist jetzt auf die 4 Frames reduziert (siehe
-   scripts/rebuild-penguin-sprite.ps1), die exakt deckungsgleich sind
-   (Pixelvermessung: 1px Differenz zwischen allen 4) - das alte
-   10-Frame-Original liegt als Backup unter
-   assets/penguin-sprite-original-10frame.png.bak.
-   Gleiche Herleitung wie bei .bkmp-sheep-easter-egg (bkmpSheepFrames) fuer
-   die steps()-Zielprozent-Mathematik, nur jetzt mit 4 statt 10 Frames:
-   4/3*100% = 133.333%, sonst "gleitet" der Pinguin statt sauber zwischen
-   Frames zu springen (Fehler-Report 14.07. zum Pilzdorf-Sprite, gleiche
-   Ursache). */
+/* Korrektur (16.07., zweiter Spieler-Report "isst nicht mehr"): der
+   Kuerzungs-Versuch von eben (4 statt 10 Frames) war ein Fehlschluss - die
+   Pixelvermessung hatte den Sprung im Alpha-Bounding-Box-Mittelpunkt als
+   "Fehlausrichtung" gedeutet, dabei ist es die ECHTE, gewollte Bewegung
+   einer durchgehenden Fressanimation (Pinguin beugt sich runter, schnappt
+   sich einen Fisch, isst ihn, richtet sich wieder auf - Frame 0-4 =
+   Runterbeugen+Fisch schnappen, Frame 5-9 = Kauen+Aufrichten). Zurueck auf
+   alle 10 Original-Frames (Backup war ohnehin unter
+   assets/penguin-sprite-original-10frame.png.bak erhalten). Gleiche
+   Herleitung wie bei .bkmp-sheep-easter-egg (bkmpSheepFrames) fuer die
+   steps()-Zielprozent-Mathematik: 10/9*100% = 111.111%. */
 @keyframes bkmpPenguinFrames {
   from { background-position-x: 0%; }
-  to { background-position-x: 133.333%; }
+  to { background-position-x: 111.111%; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .bkmp-penguin-easter-egg { animation-duration: 5.2s; }
+  .bkmp-penguin-easter-egg { animation-duration: 10.8s; }
 }
 @media (max-width: 720px) {
   .bkmp-penguin-easter-egg { width: 38px; bottom: 0.7rem; right: 0.7rem; }
