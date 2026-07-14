@@ -3778,6 +3778,23 @@ const bkmpIdleTabs = [
 ];
 let bkmpIdleActiveTab = 'kampf';
 
+/* Test-Account (Nutzerwunsch 16.07.: "test123" braucht vollen Zugriff auf
+   noch gesperrte Tabs zum Testen, ohne den Tab fuer alle anderen
+   Spieler mit freizugeben). name_key ist schon durchgehend lowercase
+   (bkmpIdleLoadOrInitState), deshalb reicht ein direkter Vergleich. */
+const BKMP_IDLE_TESTER_NAMES = ['test123'];
+function bkmpIdleIsTesterAccount() {
+  return !!(bkmpIdleState && BKMP_IDLE_TESTER_NAMES.includes(bkmpIdleState.name_key));
+}
+function bkmpIdleSyncLockedTabVisuals() {
+  const isTester = bkmpIdleIsTesterAccount();
+  bkmpIdleTabs.forEach(t => {
+    if (!t.locked) return;
+    const btn = document.getElementById(t.btn);
+    if (btn) btn.classList.toggle('idle-dorf-tab-locked', !isTester);
+  });
+}
+
 function bkmpIdleRenderActiveTabContent() {
   const tab = bkmpIdleTabs.find(t => t.id === bkmpIdleActiveTab);
   if (tab && typeof tab.render === 'function') tab.render();
@@ -3808,8 +3825,10 @@ function bkmpIdleInitTabs() {
     if (!btn) return;
     btn.addEventListener('click', () => {
       /* Dorf-Skins noch gesperrt (Nutzerwunsch 14.07.) - Tab bleibt sichtbar
-         (als Vorschau/Ankuendigung), laesst sich aber noch nicht oeffnen. */
-      if (t.locked) {
+         (als Vorschau/Ankuendigung), laesst sich aber noch nicht oeffnen.
+         Ausnahme: Test-Accounts (Nutzerwunsch 16.07., siehe
+         BKMP_IDLE_TESTER_NAMES) duerfen zum Testen trotzdem rein. */
+      if (t.locked && !bkmpIdleIsTesterAccount()) {
         if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('🔒 Dorf-Skins sind noch gesperrt - schau bald wieder vorbei!', 3200);
         return;
       }
@@ -4013,6 +4032,7 @@ async function bkmpIdleOpenModal() {
     return;
   }
   bkmpIdleRecomputeEffectiveStats();
+  bkmpIdleSyncLockedTabVisuals();
 
   const offlineResult = await bkmpIdleClaimOfflineProgress(name);
   if (offlineResult) bkmpIdleApplyOfflineResult(offlineResult);

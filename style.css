@@ -6120,9 +6120,9 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 /* Zerathor liegt als echtes Video vor (assets/dragons/zerathor.mp4) statt
    eines Bild-Sprite-Streifens - aspect-ratio auf die echten Video-Massse
    gesetzt, damit es ohne Zuschneiden/Verzerren exakt in den Container
-   passt. */
+   passt. (Werte der ueberarbeiteten Fassung vom 16.07., 1012 x 720.) */
 .raid-sprite-zerathor {
-  aspect-ratio: 1706 / 1214;
+  aspect-ratio: 1012 / 720;
 }
 /* Die frueheren einzelnen Angriffs-Frames (Ruhepose/Atem-startet/voller
    Atem/Abklingen) stecken jetzt in der Video-Schleife selbst drin - der
@@ -6501,7 +6501,10 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   padding: 1.3rem 1.6rem;
   border-radius: 18px;
   border: 1.5px solid transparent;
-  background: linear-gradient(135deg, var(--gold), color-mix(in srgb, var(--gold) 55%, transparent)) border-box,
+  /* --gold-fixed statt --gold: soll die feste Markenfarbe bleiben und sich
+     NICHT mit dem vom Nutzer waehlbaren Akzentfarben-Picker mitfaerben
+     (siehe Kommentar bei --gold-fixed weiter oben in dieser Datei). */
+  background: linear-gradient(135deg, var(--gold-fixed), color-mix(in srgb, var(--gold-fixed) 55%, transparent)) border-box,
               linear-gradient(180deg, var(--paper-2), var(--paper-3)) padding-box;
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.2);
 }
