@@ -3398,6 +3398,44 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   .bkmp-creeper-flash { animation: none; opacity: 0.7; }
 }
 
+/* ---------- Zerathor-Erwachen (Easter Egg: "zerathor" tippen) ---------- */
+body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
+.bkmp-zerathor-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 98;
+  pointer-events: none;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 50% 45%, rgba(180, 20, 20, 0.4), rgba(8, 0, 0, 0.8) 75%);
+  opacity: 0;
+  animation: bkmpZerathorFlashIn 0.25s ease-out forwards;
+}
+.bkmp-zerathor-flash.bkmp-zerathor-fading {
+  animation: bkmpZerathorFlashOut 0.65s ease-in forwards;
+}
+.bkmp-zerathor-message {
+  font-family: 'Fraunces', serif;
+  font-size: clamp(1.5rem, 4.5vw, 2.8rem);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #ff6b5b;
+  text-shadow: 0 0 18px rgba(255, 70, 50, 0.85), 0 0 42px rgba(200, 0, 0, 0.5);
+  text-transform: uppercase;
+  text-align: center;
+  padding: 0 1rem;
+  opacity: 0;
+  transform: scale(0.85);
+  animation: bkmpZerathorMessageIn 0.4s ease-out 0.15s forwards;
+}
+@keyframes bkmpZerathorFlashIn { to { opacity: 1; } }
+@keyframes bkmpZerathorFlashOut { to { opacity: 0; } }
+@keyframes bkmpZerathorMessageIn { to { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) {
+  body.bkmp-zerathor-shake { animation: none; }
+  .bkmp-zerathor-flash, .bkmp-zerathor-message { animation: none; opacity: 1; transform: none; }
+}
+
 /* ---------- Matrix-Regen (Easter Egg: "matrix" tippen) ---------- */
 .bkmp-matrix-overlay {
   position: fixed;
@@ -6226,7 +6264,7 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 .raid-result-flawless { color: #facc15; font-weight: 700; font-size: 0.9rem; margin-bottom: 0.6rem; }
 .raid-result-mvp { color: var(--gold); font-size: 0.95rem; }
 
-.raid-result-zerator-code {
+.raid-result-zerathor-code {
   margin-top: 1rem;
   padding: 0.9rem 1rem;
   border-radius: 14px;
@@ -6236,9 +6274,9 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   background-size: 100% 100%, 220% 220%;
   animation: bkmpTierGlow 3.5s ease infinite;
 }
-.raid-result-zerator-title { font-weight: 800; color: var(--gold); margin-bottom: 0.5rem; }
-.raid-result-zerator-code-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.6rem; }
-.raid-result-zerator-code-value {
+.raid-result-zerathor-title { font-weight: 800; color: var(--gold); margin-bottom: 0.5rem; }
+.raid-result-zerathor-code-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.6rem; }
+.raid-result-zerathor-code-value {
   font-family: 'Courier New', monospace;
   font-size: 1.05rem;
   font-weight: 700;
@@ -6249,7 +6287,7 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   border: 1px solid var(--line);
   user-select: all;
 }
-.raid-result-zerator-hint { font-size: 0.75rem; color: var(--muted); margin-top: 0.5rem; }
+.raid-result-zerathor-hint { font-size: 0.75rem; color: var(--muted); margin-top: 0.5rem; }
 
 @media (max-width: 640px) {
   .raid-city, .raid-boss { width: 46%; }

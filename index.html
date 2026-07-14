@@ -55,7 +55,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260716-penguinrestore1">
+<link rel="stylesheet" href="style.css?v=20260716-zerathoregg1">
 </head>
 <body>
 
@@ -1285,6 +1285,8 @@
     let creeperBuffer = '';
     const matrixTarget = 'matrix';
     let matrixBuffer = '';
+    const zerathorTarget = 'zerathor';
+    let zerathorBuffer = '';
     let konamiBuffer = [];
     const konamiCode = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
 
@@ -1412,6 +1414,42 @@
         overlay.innerHTML = '<div class="bkmp-creeper-message">Puh... nochmal gutgegangen. 🟩</div>';
         setTimeout(() => overlay.remove(), 1800);
       }, 1100);
+    }
+
+    /* Easter Egg: "zerathor" tippen - Boss-Erwachen (Drachen-Brüll-Sound, Bildschirm-Flash+Shake) */
+    function bkmpPlayZerathorRoar() {
+      try {
+        const audio = new Audio('assets/zerathor-roar.mp3');
+        audio.volume = 0.45;
+        audio.play().catch(() => {});
+        return audio;
+      } catch (e) { return null; }
+    }
+
+    function triggerBkmpZerathorEasterEgg() {
+      if (document.getElementById('bkmpZerathorOverlay')) return;
+      const audio = bkmpPlayZerathorRoar();
+      document.body.classList.add('bkmp-zerathor-shake');
+      const overlay = document.createElement('div');
+      overlay.id = 'bkmpZerathorOverlay';
+      overlay.className = 'bkmp-zerathor-flash';
+      overlay.innerHTML = '<div class="bkmp-zerathor-message">ZERATHOR ist erwacht 🐉</div>';
+      document.body.appendChild(overlay);
+      const fadeOutZerathor = () => {
+        document.body.classList.remove('bkmp-zerathor-shake');
+        overlay.classList.add('bkmp-zerathor-fading');
+        setTimeout(() => overlay.remove(), 700);
+      };
+      /* Blendet aus, sobald der Bruell-Sound zu Ende ist (statt einer fest
+         verdrahteten Millisekundenzahl) - Spieler-Wunsch "Animation genau
+         so lange wie der Sound". 12s-Fallback falls Autoplay blockiert wird
+         und "ended" nie feuert. */
+      if (audio) {
+        audio.addEventListener('ended', fadeOutZerathor, { once: true });
+        setTimeout(fadeOutZerathor, 12000);
+      } else {
+        setTimeout(fadeOutZerathor, 1500);
+      }
     }
 
     /* Easter Egg: 7x aufs Banner klicken - Diamanten-Regen + Cha-Ching */
@@ -2077,6 +2115,7 @@
       philBuffer = (philBuffer + key).slice(-philTarget.length);
       creeperBuffer = (creeperBuffer + key).slice(-creeperTarget.length);
       matrixBuffer = (matrixBuffer + key).slice(-matrixTarget.length);
+      zerathorBuffer = (zerathorBuffer + key).slice(-zerathorTarget.length);
       konamiBuffer.push(key);
       konamiBuffer = konamiBuffer.slice(-konamiCode.length);
       if (easterBuffer === easterTarget) {
@@ -2103,6 +2142,11 @@
         triggerBkmpMatrixRain();
         if (typeof bkmpMarkEggFound === 'function') bkmpMarkEggFound('matrix');
         matrixBuffer = '';
+      }
+      if (zerathorBuffer === zerathorTarget) {
+        triggerBkmpZerathorEasterEgg();
+        if (typeof bkmpMarkEggFound === 'function') bkmpMarkEggFound('zerathor');
+        zerathorBuffer = '';
       }
       if (konamiBuffer.join('|') === konamiCode.join('|')) {
         triggerBkmpLootRain();
@@ -4209,8 +4253,9 @@
       { id: 'egg_adfree', category: 'Easter Eggs', title: '???', revealName: 'Hab kein Geld', desc: 'Finde ein verstecktes Easter Egg.', revealDesc: '99 Dollar gespart. Bester Deal überhaupt.', hint: 'Werbung nervt echt manchmal, oder?', check: ctx => ctx.eggsFound.includes('adfree') },
       { id: 'egg_sheep', category: 'Easter Eggs', title: '???', revealName: 'Schaf Zitate Flüsterer', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Jeden Tag werden wir bereichert damit!', check: ctx => ctx.eggsFound.includes('sheep') },
       { id: 'egg_penguin', category: 'Easter Eggs', title: '???', revealName: 'Pinguin-Fischer', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Nur bei Tageslicht versteckt sich im Schnee ein kleiner Freund mit Fisch-Appetit.', check: ctx => ctx.eggsFound.includes('penguin') },
+      { id: 'egg_zerathor', category: 'Easter Eggs', title: '???', revealName: 'Boss-Wecker', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Tipp den Namen des Drachen, vor dem sich ganze Dörfer fürchten.', check: ctx => ctx.eggsFound.includes('zerathor') },
       ...bkmpTieredAchievements('sheepstreak', 'Zeit & Treue', 'sheepStreak', BKMP_SHEEP_STREAK_TIERS, n => `Klicke ${n} Tag${n === 1 ? '' : 'e'} in Folge ab 12 Uhr auf unser Schaf für das Zitat des Tages.`),
-      { id: 'egg_all', category: 'Easter Eggs', title: 'Osterhase', desc: 'Finde alle 14 versteckten Easter Eggs.', progress: ctx => [ctx.eggsFound.length, 14], check: ctx => ctx.eggsFound.length >= 14 },
+      { id: 'egg_all', category: 'Easter Eggs', title: 'Osterhase', desc: 'Finde alle 15 versteckten Easter Eggs.', progress: ctx => [ctx.eggsFound.length, 15], check: ctx => ctx.eggsFound.length >= 15 },
       { id: 'combo_card_wish', category: 'Sonstiges', title: 'Vielseitig', desc: 'Reiche mindestens 1 Karte und 1 Kartenidee ein.', check: ctx => ctx.cardCount >= 1 && ctx.wishCount >= 1 },
       { id: 'night_owl', category: 'Sonstiges', title: 'Nachteule', desc: 'Besuche die Seite zwischen 0 und 5 Uhr nachts.', check: ctx => ctx.nightOwl },
       { id: 'early_bird', category: 'Sonstiges', title: 'Frühaufsteher', desc: 'Besuche die Seite zwischen 5 und 7 Uhr morgens.', check: ctx => ctx.earlyBird },
@@ -4401,6 +4446,7 @@
       { id: 'der_verlorene', name: 'Der Verlorene', desc: 'Hat sich fast verirrt.', unlockAchievement: 'egg_jannik' },
       { id: 'der_zufaellige', name: 'Der Zufällige', desc: 'Verlässt sich gern auf den Zufall.', unlockAchievement: 'egg_rainbow' },
       { id: 'schnee_fluesterer', name: 'Schnee-Flüsterer', desc: 'Nur bei Tageslicht im Schnee zu finden.', unlockAchievement: 'egg_penguin' },
+      { id: 'boss_wecker', name: 'Boss-Wecker', desc: 'Weckt lieber keine schlafenden Drachen.', unlockAchievement: 'egg_zerathor' },
       { id: 'wahnsinniger_sammler', name: 'Der Wahnsinnige Sammler', desc: 'Sammelt einfach alles.', unlockAt: 100 },
       { id: 'collector_plus', name: 'Collector++', desc: 'Eine beachtliche Sammlung.', unlockAchievement: 'card_200' },
       { id: 'collector_ultra', name: 'Collector Ultra', desc: 'Eine gewaltige Sammlung.', unlockAchievement: 'card_300' },
