@@ -2916,6 +2916,18 @@ async function bkmpIdleRenderGildePanel() {
     bkmpGuildBusy = true;
     try {
       await bkmpGuildContribute(amount);
+      /* contribute_gold() zieht das Gold serverseitig sofort ab (siehe
+         supabase-idle-guilds.sql), aber bkmpIdleState.gold blieb bisher
+         unveraendert - der naechste normale Autosave (bkmpIdleQueueSync ->
+         upsertIdlePlayerState, schreibt den KOMPLETTEN State) haette den
+         veralteten, noch nicht reduzierten Wert einfach wieder ueber den
+         serverseitig schon abgezogenen geschrieben (Spieler-Meldung: "Gold
+         wird mir nicht abgezogen") - die Kasse bekam das Gold, der Spieler
+         behielt es aber effektiv trotzdem. Gleiches Muster wie bei
+         Upgrade-/Runen-Kaeufen (bkmpIdleState.gold -= cost) noetig.*/
+      bkmpIdleState.gold -= amount;
+      bkmpIdleRenderHud();
+      bkmpIdleQueueSync();
       bkmpGuildLoaded = false;
       bkmpGuildRefreshTreasuryBonusCache();
       if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`💰 ${amount} Gold zur Gildenkasse beigetragen!`, 3200);

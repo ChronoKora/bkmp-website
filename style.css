@@ -4990,15 +4990,18 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
    kleinen Text-Ueberschrift im Idle-Dorf-Fenster. Gleiches WEBP+PNG-
    Fallback-Muster wie .hero-banner-picture/.hero-banner (Startseite),
    aber ohne dessen viewport-relative Breitenformel - dieses Banner lebt
-   innerhalb des bereits begrenzten, gepolsterten .idle-dorf-card und
-   soll dessen volle Innenbreite ausfuellen statt eine eigene Maximalbreite
-   vorzugeben. */
-.idle-dorf-banner-picture { position: relative; display: block; margin-bottom: 1rem; }
+   innerhalb des bereits begrenzten, gepolsterten .idle-dorf-card.
+   NACHBESSERUNG (Spieler-Wunsch 15.07.: "wirkt sehr groß") - volle
+   Kartenbreite (bei max-width:1200px auf der .idle-dorf-card) liess das
+   Banner durch das feste Seitenverhaeltnis auch sehr hoch werden. Max-
+   Breite + Zentrierung statt voller Breite, dadurch schrumpft die Hoehe
+   proportional mit (kein Zuschneiden noetig). */
+.idle-dorf-banner-picture { position: relative; display: block; max-width: 940px; margin: 0 auto 1rem; }
 .idle-dorf-banner-img {
   display: block;
   width: 100%;
   height: auto;
-  aspect-ratio: 1978 / 610;
+  aspect-ratio: 2141 / 568;
   object-fit: cover;
   border-radius: 16px;
   border: 1px solid var(--line);
