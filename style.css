@@ -6503,9 +6503,15 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   border: 1.5px solid transparent;
   /* --gold-fixed statt --gold: soll die feste Markenfarbe bleiben und sich
      NICHT mit dem vom Nutzer waehlbaren Akzentfarben-Picker mitfaerben
-     (siehe Kommentar bei --gold-fixed weiter oben in dieser Datei). */
-  background: linear-gradient(135deg, var(--gold-fixed), color-mix(in srgb, var(--gold-fixed) 55%, transparent)) border-box,
-              linear-gradient(180deg, var(--paper-2), var(--paper-3)) padding-box;
+     (siehe Kommentar bei --gold-fixed weiter oben in dieser Datei).
+     Reihenfolge der Layer ist bei diesem Verlauf-Rahmen-Trick wichtig: die
+     deckende Karten-Fuellung (padding-box) MUSS zuerst stehen (oben), der
+     Gold-Verlauf (border-box) danach (darunter) - sonst ueberdeckt der
+     undurchsichtige Gold-Layer die gesamte Karte statt nur den Rand
+     (genau dieser vertauschte Reihenfolge-Fehler liess die Karte zuvor
+     komplett goldgefuellt statt nur mit Gold-Rand erscheinen). */
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-3)) padding-box,
+              linear-gradient(135deg, var(--gold-fixed), color-mix(in srgb, var(--gold-fixed) 55%, transparent)) border-box;
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.2);
 }
 .company-apply-cta-text h3 { font-family: 'Fraunces', serif; font-size: 1.15rem; margin: 0 0 0.3rem; }
