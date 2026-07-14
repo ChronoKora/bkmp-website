@@ -55,7 +55,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260717-streakconfetti1">
+<link rel="stylesheet" href="style.css?v=20260717-autofuse1">
 </head>
 <body>
 
@@ -518,13 +518,15 @@
         <button type="button" class="idle-dorf-tab" id="idleTabBtnUpgrades">&#11014;&#65039; Upgrades</button>
         <button type="button" class="idle-dorf-tab" id="idleTabBtnSkilltree">&#127795; Skilltree</button>
         <button type="button" class="idle-dorf-tab" id="idleTabBtnErfolge">&#127942; Erfolge</button>
-        <button type="button" class="idle-dorf-tab" id="idleTabBtnBestenliste">&#128202; Bestenliste</button>
         <button type="button" class="idle-dorf-tab" id="idleTabBtnPrestige">&#127756; Prestige</button>
         <button type="button" class="idle-dorf-tab" id="idleTabBtnRunen">🔮 Runen</button>
         <button type="button" class="idle-dorf-tab" id="idleTabBtnSkins">🖼️ Dorf-Skins</button>
+        <button type="button" class="idle-dorf-tab" id="idleTabBtnDungeon">🏛️ Dungeon</button>
+        <button type="button" class="idle-dorf-tab" id="idleTabBtnBestenliste">&#128202; Bestenliste</button>
       </div>
 
       <div class="idle-dorf-panel" id="idlePanelKampf">
+        <div class="idle-dungeon-banner" id="idleDungeonBanner" style="display:none;"></div>
         <div class="idle-stage-bar" id="idleStageBar"></div>
         <div class="idle-battlefield" id="idleBattlefield">
           <div class="idle-village" id="idleVillage">
@@ -553,6 +555,7 @@
       <div class="idle-dorf-panel" id="idlePanelPrestige" style="display:none;"></div>
       <div class="idle-dorf-panel" id="idlePanelRunen" style="display:none;"></div>
       <div class="idle-dorf-panel" id="idlePanelSkins" style="display:none;"></div>
+      <div class="idle-dorf-panel" id="idlePanelDungeon" style="display:none;"></div>
 
       <!-- Nutzerwunsch (15.07.): "Baust du das dann unten ein und im
            gleichen Design overlay wie den Rest?" - der Link stand vorher
@@ -1170,9 +1173,9 @@
 
   <script>window.BKMP_CLIENT_STORAGE_KEY = 'bkmp-customer-auth';</script>
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260716-midasyaksha1"></script>
+  <script src="supabase.js?v=20260717-dungeonlb1"></script>
   <script src="app.js?v=20260712-themefix1"></script>
-  <script src="idledorf.js?v=20260717-streak1"></script>
+  <script src="idledorf.js?v=20260717-tabreorder1"></script>
   <script src="mapart.js?v=20260716-companyfix1"></script>
   <script>
     bkmpInitTheme();
@@ -4391,6 +4394,7 @@
       ...(Array.isArray(window.BKMP_IDLE_GOLD_TIERS) ? bkmpTieredAchievements('idlegold', 'Idle Dorf', 'idleGoldEarned', window.BKMP_IDLE_GOLD_TIERS, n => `Sammle insgesamt ${n} Gold im Idle Dorf.`) : []),
       ...(Array.isArray(window.BKMP_IDLE_SKILLPOINTS_TIERS) ? bkmpTieredAchievements('idleskill', 'Idle Dorf', 'idleSkillPointsSpent', window.BKMP_IDLE_SKILLPOINTS_TIERS, n => `Investiere ${n} Skillpunkte im Idle Dorf.`) : []),
       ...(Array.isArray(window.BKMP_IDLE_PRESTIGE_TIERS) ? bkmpTieredAchievements('idleprestige', 'Idle Dorf', 'idlePrestigeLevel', window.BKMP_IDLE_PRESTIGE_TIERS, n => `Steige ${n}x im Idle Dorf auf (Prestige).`) : []),
+      { id: 'idle_dungeon_cleared', category: 'Idle Dorf', title: '???', revealName: 'Dungeon-Meister', desc: 'Meistere die Dungeon-Herausforderung auf der Schwierigkeit "Albtraum".', check: ctx => ctx.idleDungeonCleared },
       ...(Array.isArray(window.BKMP_RUNE_FUSE_SUCCESS_TIERS) ? bkmpTieredAchievements('runefuse', 'Runen', 'idleRuneFuseSuccesses', window.BKMP_RUNE_FUSE_SUCCESS_TIERS, n => `Verschmelze ${n} Rune${n === 1 ? '' : 'n'} erfolgreich.`) : []),
       ...(Array.isArray(window.BKMP_RUNE_FUSE_FAIL_TIERS) ? bkmpTieredAchievements('runefusefail', 'Runen', 'idleRuneFuseFailures', window.BKMP_RUNE_FUSE_FAIL_TIERS, n => `Erlebe ${n} fehlgeschlagene Runen-Verschmelzung${n === 1 ? '' : 'en'}.`) : []),
       ...(Array.isArray(window.BKMP_RUNE_UPGRADE_SUCCESS_TIERS) ? bkmpTieredAchievements('runeupgrade', 'Runen', 'idleRuneUpgradeSuccesses', window.BKMP_RUNE_UPGRADE_SUCCESS_TIERS, n => `Werte Runen ${n}x erfolgreich auf.`) : []),
@@ -4543,6 +4547,7 @@
       { id: 'boss_wecker', name: 'Boss-Wecker', desc: 'Weckt lieber keine schlafenden Drachen.', unlockAchievement: 'egg_zerathor' },
       { id: 'maus_schuettler', name: 'Maus-Schüttler', desc: 'Findet seinen Mauszeiger notfalls auch durch wildes Wackeln.', unlockAchievement: 'egg_mouseshake' },
       { id: 'rechtsklick_entdecker', name: 'Rechtsklick-Entdecker', desc: 'Schaut auch mal, was hinter der rechten Maustaste steckt.', unlockAchievement: 'egg_rightclick' },
+      { id: 'dungeon_meister', name: 'Dungeon-Meister', desc: 'Hat die Dungeon-Herausforderung auf "Albtraum" gemeistert.', unlockAchievement: 'idle_dungeon_cleared' },
       { id: 'wahnsinniger_sammler', name: 'Der Wahnsinnige Sammler', desc: 'Sammelt einfach alles.', unlockAt: 100 },
       { id: 'collector_plus', name: 'Collector++', desc: 'Eine beachtliche Sammlung.', unlockAchievement: 'card_200' },
       { id: 'collector_ultra', name: 'Collector Ultra', desc: 'Eine gewaltige Sammlung.', unlockAchievement: 'card_300' },

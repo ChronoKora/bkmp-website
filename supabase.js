@@ -3713,6 +3713,41 @@ async function loadRaidLeaderboard() {
   }));
 }
 
+/* Dungeon-Bestenliste (siehe supabase-idle-dungeon-leaderboard.sql) - ein
+   Aufruf pro Spieler+Schwierigkeit, nur wenn bkmpDungeonFinish() (idledorf.js)
+   tatsaechlich einen NEUEN persoenlichen Bestwert erkannt hat (kein Aufruf
+   bei jedem Versuch), daher reicht ein simples upsert ohne serverseitigen
+   "nur wenn besser"-Check. */
+async function submitDungeonResult(nameKey, displayName, difficultyId, wavesCleared, timeMs) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { error } = await client
+    .from('idle_dungeon_results')
+    .upsert({
+      name_key: nameKey,
+      display_name: displayName,
+      difficulty_id: difficultyId,
+      waves_cleared: wavesCleared,
+      time_ms: timeMs,
+      achieved_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'name_key,difficulty_id' });
+  if (error) throw error;
+}
+
+async function loadDungeonLeaderboard(difficultyId) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from('idle_dungeon_results')
+    .select('name_key, display_name, waves_cleared, time_ms, achieved_at')
+    .eq('difficulty_id', difficultyId)
+    .order('waves_cleared', { ascending: false })
+    .limit(100);
+  if (error) throw error;
+  return data || [];
+}
+
 async function loadRaidBossesAdmin() {
   const client = bkmpGetSupabaseClient();
   if (!client) return [];

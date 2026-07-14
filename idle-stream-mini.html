@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="favicon.ico" sizes="any">
 <title>BKMP – Idle Drachen Dorf (Mini-Stream-Overlay)</title>
-<link rel="stylesheet" href="style.css?v=20260717-streakconfetti1">
+<link rel="stylesheet" href="style.css?v=20260717-autofuse1">
 <style>
   /* ============================================================
      Winzige "nur Dorf+Drache" Variante von idle-stream.html
@@ -35,6 +35,7 @@
   #idleDorfLog,
   #idlePanelUpgrades, #idlePanelSkilltree, #idlePanelSammlung,
   #idlePanelErfolge, #idlePanelBestenliste, #idlePanelPrestige, #idlePanelRunen,
+  #idlePanelDungeon, #idleDungeonBanner,
   #idleRuneDrawer,
   .idle-hud-stats, .idle-hud-resources,
   #idleDragonName {
@@ -271,12 +272,14 @@
         <button type="button" class="idle-dorf-tab" id="idleTabBtnSkilltree">&#127795; Skilltree</button>
         <button type="button" class="idle-dorf-tab" id="idleTabBtnSammlung">&#127873; Sammlung</button>
         <button type="button" class="idle-dorf-tab" id="idleTabBtnErfolge">&#127942; Erfolge</button>
-        <button type="button" class="idle-dorf-tab" id="idleTabBtnBestenliste">&#128202; Bestenliste</button>
         <button type="button" class="idle-dorf-tab" id="idleTabBtnPrestige">&#127756; Prestige</button>
         <button type="button" class="idle-dorf-tab" id="idleTabBtnRunen">&#128302; Runen</button>
+        <button type="button" class="idle-dorf-tab" id="idleTabBtnDungeon">&#127963;&#65039; Dungeon</button>
+        <button type="button" class="idle-dorf-tab" id="idleTabBtnBestenliste">&#128202; Bestenliste</button>
       </div>
 
       <div class="idle-dorf-panel" id="idlePanelKampf">
+        <div class="idle-dungeon-banner" id="idleDungeonBanner" style="display:none;"></div>
         <div class="idle-stage-bar" id="idleStageBar"></div>
         <div class="idle-battlefield" id="idleBattlefield">
           <div class="idle-village" id="idleVillage">
@@ -305,6 +308,7 @@
       </div>
       <div class="idle-dorf-panel" id="idlePanelPrestige" style="display:none;"></div>
       <div class="idle-dorf-panel" id="idlePanelRunen" style="display:none;"></div>
+      <div class="idle-dorf-panel" id="idlePanelDungeon" style="display:none;"></div>
 
       <div class="joke-buttons">
         <button class="btn-ja" id="idleDorfClose" type="button">Schlie&szlig;en</button>
@@ -324,7 +328,7 @@
     window.BKMP_IDLE_IS_STREAM_PAGE = true;
   </script>
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260716-midasyaksha1"></script>
+  <script src="supabase.js?v=20260717-dungeonlb1"></script>
   <script>
     /* ---------------- Minimal-Set der Helfer, die idledorf.js braucht
        (siehe idle-stream.html fuer die ausfuehrlichere Variante mit allen
@@ -377,7 +381,7 @@
       try { localStorage.setItem(BKMP_MC_NAME_KEY, name); } catch (e) {}
     }
   </script>
-  <script src="idledorf.js?v=20260717-streak1"></script>
+  <script src="idledorf.js?v=20260717-tabreorder1"></script>
   <script>
     /* Gold/XP-Hochschweb-Anzeige laeuft jetzt zentral in idledorf.js
        (Nutzerwunsch 15.07.: "auch so Standard mäßig machen") - kein

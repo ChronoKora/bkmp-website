@@ -408,6 +408,42 @@ let bkmpIdleConfigLoaded = false;
 let bkmpIdleEventDragonState = null;
 let bkmpIdleEventPauseActive = false;
 
+/* Dungeon-Modus (grosses Update 17.07.): optionaler Wellen-Lauf, der die
+   bestehende Kampf-Engine/Sprite-Anzeige komplett wiederverwendet -
+   bkmpIdleCurrentDragon wird waehrend eines Laufs voruebergehend auf
+   synthetische Wellen-Gegner umgebogen, bkmpIdleTick() selbst merkt davon
+   nichts (kennt nur .hp/.attack/.defense/.maxHp). Siehe die dungeon-
+   spezifischen fruehen Returns in bkmpIdleHandleDragonDefeated/
+   bkmpIdleHandleDefeat weiter unten. Bewusst rein clientseitig (Personal-
+   Best via localStorage) - kein neues DB-Schema, kein Wiederholungsrisiko
+   der Zerstoertes-Dorf-Regression. */
+let bkmpDungeonActive = false;
+let bkmpDungeonWave = 0;
+/* Schwierigkeitsstufen (Spieler-Wunsch 17.07.: "Ruhig viel mehr
+   Schwierigkeits Stufen") - jede Stufe hat eigene Wellenzahl, eigenes
+   Skalierungstempo pro Welle und einen eigenen Belohnungs-Multiplikator.
+   Reihenfolge ist wichtig: die LETZTE Stufe gilt als "die schwerste" fuer
+   das Dungeon-Meister-Achievement (siehe bkmpDungeonIsHardestCleared). */
+/* Balance-Nachbesserung (Spieler-Meldung 17.07.: "Immernoch zu easy..",
+   "Sind die Belohnungen ... nicht bisschen zu heftig?") - waveGrowth
+   spuerbar erhoeht (staerkeres Wellen-Wachstum = echte spaete Wellen
+   gefaehrlich statt trivial), rewardMult deutlich abgesenkt (siehe
+   bkmpDungeonFinish weiter unten fuer die dazugehoerige entkoppelte
+   Belohnungsformel - die alte Formel liess Belohnungen bei vielen Wellen
+   exponentiell explodieren, siehe Kommentar dort). */
+const BKMP_DUNGEON_DIFFICULTIES = [
+  { id: 'leicht', name: 'Leicht', icon: '🟢', waves: 10, waveGrowth: 1.24, rewardMult: 1.0 },
+  { id: 'mittel', name: 'Mittel', icon: '🟡', waves: 15, waveGrowth: 1.30, rewardMult: 1.3 },
+  { id: 'schwer', name: 'Schwer', icon: '🟠', waves: 20, waveGrowth: 1.36, rewardMult: 1.7 },
+  { id: 'albtraum', name: 'Albtraum', icon: '🔴', waves: 25, waveGrowth: 1.42, rewardMult: 2.2 }
+];
+let bkmpDungeonSelectedDifficultyId = BKMP_DUNGEON_DIFFICULTIES[0].id;
+let bkmpDungeonActiveDifficulty = null;
+let bkmpDungeonStartTime = 0;
+let bkmpDungeonPrevDragon = null;
+let bkmpDungeonPrevVillageHp = null;
+let bkmpDungeonTimerInterval = null;
+
 function bkmpIdleDefaultState(name) {
   return {
     name_key: String(name).trim().toLowerCase(),
@@ -746,7 +782,7 @@ function bkmpIdleGetCachedAchievementFields() {
 function bkmpIdleGetAchievementContextFields() {
   const s = bkmpIdleState;
   if (!s) {
-    return bkmpIdleGetCachedAchievementFields() || { idleDragonKills: 0, idleBossKills: 0, idleLevel: 0, idleGoldEarned: 0, idleSkillPointsSpent: 0, idleBranchesMaxed: 0, shenlossDefeated: false, liberDefeated: false, idlePrestigeLevel: 0, idleRuneFuseSuccesses: 0, idleRuneFuseFailures: 0, idleRuneUpgradeSuccesses: 0, idleRuneUpgradeFailures: 0, idleAllEquippedRarity: null, idleAllEquippedMinLevel: -1 };
+    return bkmpIdleGetCachedAchievementFields() || { idleDragonKills: 0, idleBossKills: 0, idleLevel: 0, idleGoldEarned: 0, idleSkillPointsSpent: 0, idleBranchesMaxed: 0, shenlossDefeated: false, liberDefeated: false, idlePrestigeLevel: 0, idleRuneFuseSuccesses: 0, idleRuneFuseFailures: 0, idleRuneUpgradeSuccesses: 0, idleRuneUpgradeFailures: 0, idleAllEquippedRarity: null, idleAllEquippedMinLevel: -1, idleDungeonCleared: bkmpDungeonIsHardestCleared() };
   }
   const fields = {
     idleDragonKills: Number(s.dragon_kills || 0),
@@ -770,7 +806,8 @@ function bkmpIdleGetAchievementContextFields() {
     idleRuneUpgradeSuccesses: Number(s.rune_upgrade_successes || 0),
     idleRuneUpgradeFailures: Number(s.rune_upgrade_failures || 0),
     idleAllEquippedRarity: bkmpIdleAllEquippedRarity(),
-    idleAllEquippedMinLevel: bkmpIdleAllEquippedMinLevel()
+    idleAllEquippedMinLevel: bkmpIdleAllEquippedMinLevel(),
+    idleDungeonCleared: bkmpDungeonIsHardestCleared()
   };
   try { localStorage.setItem(BKMP_IDLE_ACHIEVEMENT_CACHE_KEY, JSON.stringify(fields)); } catch (e) {}
   return fields;
@@ -871,7 +908,18 @@ function bkmpIdleAddXp(amount) {
       bkmpIdleLog(`🎉 Level ${bkmpIdleState.level} erreicht! Bonus: +${bonusGold} 💰 +2 💎`);
     }
   }
-  if (leveled) bkmpIdleRecomputeEffectiveStats();
+  if (leveled) {
+    bkmpIdleRecomputeEffectiveStats();
+    /* Spieler-Meldung 17.07.: Level-Aufstieg (und damit neue Skillpunkte)
+       liess die "+1"-Kaufbuttons im offenen Skilltree-Tab faelschlich
+       ausgegraut, bis man manuell weg- und zurueckwechselte - der
+       Skilltree stand bisher bewusst NICHT auf der Liste der pro Kill
+       live nachgerenderten Tabs (siehe bkmpIdleRefreshLiveTabs, teure
+       SVG-Linien-Neuzeichnung), aber ein Level-Aufstieg ist ein seltenes
+       Ereignis (nicht jeder Kill), das gezielte Nachrendern hier kostet
+       also nichts an der eigentlich vermiedenen Kill-Haeufigkeit. */
+    if (bkmpIdleActiveTab === 'skilltree' && typeof bkmpIdleRenderSkilltreePanel === 'function') bkmpIdleRenderSkilltreePanel();
+  }
 }
 
 /* Meldet einen Sieg gegen einen Event-Drachen serverseitig (siehe
@@ -900,7 +948,361 @@ async function bkmpIdleClaimEventDragonVictory(defeatedDragon) {
   }
 }
 
+/* ---------------- Dungeon-Modus ---------------- */
+
+const BKMP_DUNGEON_BEST_KEY = 'bkmp-idle-dungeon-best';
+/* Bestwert-Speicher jetzt PRO Schwierigkeitsstufe (Map difficultyId ->
+   {waves,timeMs}) statt einem einzigen Wert - migriert das alte
+   Einzel-Format (vor den Schwierigkeitsstufen, 17.07.) automatisch als
+   "leicht"-Eintrag, damit bereits gespeicherte Bestwerte nicht verloren
+   gehen. */
+function bkmpDungeonGetAllBests() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(BKMP_DUNGEON_BEST_KEY) || 'null');
+    if (!raw || typeof raw !== 'object') return {};
+    if ('waves' in raw) return { leicht: raw };
+    return raw;
+  } catch (e) { return {}; }
+}
+function bkmpDungeonGetBest(difficultyId) {
+  return bkmpDungeonGetAllBests()[difficultyId] || { waves: 0, timeMs: 0 };
+}
+function bkmpDungeonSaveBest(difficultyId, data) {
+  const all = bkmpDungeonGetAllBests();
+  all[difficultyId] = data;
+  try { localStorage.setItem(BKMP_DUNGEON_BEST_KEY, JSON.stringify(all)); } catch (e) {}
+}
+function bkmpDungeonIsHardestCleared() {
+  const hardest = BKMP_DUNGEON_DIFFICULTIES[BKMP_DUNGEON_DIFFICULTIES.length - 1];
+  return bkmpDungeonGetBest(hardest.id).waves >= hardest.waves;
+}
+
+/* Sortierung fuer die Bestenliste: vollstaendige Laeufe (alle Wellen
+   dieser Schwierigkeit geschafft) IMMER vor Teil-Laeufen, darunter nach
+   Zeit (schneller = besser); Teil-Laeufe untereinander nach erreichter
+   Welle sortiert. Muss clientseitig passieren, weil "vollstaendig" von
+   der pro-Schwierigkeit unterschiedlichen Wellenzahl abhaengt, die die DB
+   nicht kennt. */
+function bkmpDungeonSortLeaderboardRows(rows, totalWaves) {
+  return [...rows].sort((a, b) => {
+    const aFull = Number(a.waves_cleared || 0) >= totalWaves;
+    const bFull = Number(b.waves_cleared || 0) >= totalWaves;
+    if (aFull && bFull) return Number(a.time_ms || 0) - Number(b.time_ms || 0);
+    if (aFull) return -1;
+    if (bFull) return 1;
+    return Number(b.waves_cleared || 0) - Number(a.waves_cleared || 0);
+  });
+}
+
+let bkmpDungeonLeaderboardDifficultyId = BKMP_DUNGEON_DIFFICULTIES[0].id;
+async function bkmpDungeonRenderLeaderboard() {
+  const listEl = document.getElementById('idleLeaderboardList');
+  if (!listEl) return;
+  const difficulty = BKMP_DUNGEON_DIFFICULTIES.find(d => d.id === bkmpDungeonLeaderboardDifficultyId) || BKMP_DUNGEON_DIFFICULTIES[0];
+  listEl.innerHTML = `
+    <div class="idle-dungeon-diff-row">${BKMP_DUNGEON_DIFFICULTIES.map(d => `
+      <button type="button" class="idle-dungeon-diff-btn${d.id === difficulty.id ? ' active' : ''}" data-lb-difficulty-id="${d.id}">${d.icon} ${d.name}</button>
+    `).join('')}</div>
+    <div id="idleDungeonLeaderboardRows"><p class="empty-hint">Lädt...</p></div>
+  `;
+  listEl.querySelectorAll('.idle-dungeon-diff-btn').forEach(btn => btn.addEventListener('click', () => {
+    bkmpDungeonLeaderboardDifficultyId = btn.dataset.lbDifficultyId;
+    bkmpDungeonRenderLeaderboard();
+  }));
+  let rows = [];
+  try {
+    rows = typeof loadDungeonLeaderboard === 'function' ? (await loadDungeonLeaderboard(difficulty.id)) || [] : [];
+    rows = rows.filter(r => !bkmpIsHiddenTestAccount(r.name_key));
+  } catch (e) { console.warn('Dungeon: Bestenliste konnte nicht geladen werden.', e); }
+  /* Tab kann waehrend des Ladens gewechselt worden sein - dann existiert
+     dieser Container nicht mehr, nicht in eine fremde Ansicht schreiben. */
+  const rowsEl = document.getElementById('idleDungeonLeaderboardRows');
+  if (!rowsEl) return;
+  const sorted = bkmpDungeonSortLeaderboardRows(rows, difficulty.waves);
+  const myName = (typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : '').trim().toLowerCase();
+  rowsEl.innerHTML = sorted.length ? sorted.slice(0, 100).map((row, i) => {
+    const isMe = Boolean(myName) && (row.display_name || '').trim().toLowerCase() === myName;
+    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
+    const full = Number(row.waves_cleared || 0) >= difficulty.waves;
+    const valueText = full ? `🏆 ${bkmpDungeonFormatTime(row.time_ms)}` : `Welle ${row.waves_cleared} / ${difficulty.waves}`;
+    return `<div class="leaderboard-row ${isMe ? 'is-me' : ''}"><span class="leaderboard-rank">${medal}</span><span class="leaderboard-name"><span class="leaderboard-name-text">${escapeHtml(row.display_name)}</span></span><span class="leaderboard-value">${valueText}</span></div>`;
+  }).join('') : '<p class="empty-hint">Noch keine Daten für diese Bestenliste.</p>';
+}
+function bkmpDungeonFormatTime(ms) {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  return `${min}:${String(sec).padStart(2, '0')}`;
+}
+/* Skalierung IMMER relativ zu den eigenen effektiven Werten (nicht zur
+   normalen Fortschritts-Stufe) - dadurch bleibt die Herausforderung fair,
+   egal wie weit jemand in der normalen Progression schon ist, und die
+   Bestzeiten-Rangliste (spaeter moeglich) waere ueber alle Spielstaerken
+   hinweg vergleichbar. */
+function bkmpDungeonWaveMult(wave) {
+  const growth = (bkmpDungeonActiveDifficulty || BKMP_DUNGEON_DIFFICULTIES[0]).waveGrowth;
+  return Math.pow(growth, wave - 1);
+}
+
+function bkmpIdleRenderDungeonPanel() {
+  const panel = document.getElementById('idlePanelDungeon');
+  if (!panel || !bkmpIdleState) return;
+  const selected = BKMP_DUNGEON_DIFFICULTIES.find(d => d.id === bkmpDungeonSelectedDifficultyId) || BKMP_DUNGEON_DIFFICULTIES[0];
+  const best = bkmpDungeonGetBest(selected.id);
+  const bestText = best.waves > 0
+    ? (best.waves >= selected.waves
+        ? `🏆 Bestzeit: ${bkmpDungeonFormatTime(best.timeMs)} (alle ${selected.waves} Wellen)`
+        : `Bestleistung: Welle ${best.waves} / ${selected.waves} erreicht`)
+    : 'Noch kein Versuch gestartet.';
+  panel.innerHTML = `
+    <div class="idle-dungeon-intro">
+      <h4>🏛️ Dungeon-Herausforderung</h4>
+      <div class="idle-dungeon-diff-row">${BKMP_DUNGEON_DIFFICULTIES.map(d => `
+        <button type="button" class="idle-dungeon-diff-btn${d.id === selected.id ? ' active' : ''}" data-difficulty-id="${d.id}" ${bkmpDungeonActive ? 'disabled' : ''}>${d.icon} ${d.name}</button>
+      `).join('')}</div>
+      <p>${selected.waves} Gegner-Wellen direkt hintereinander, ohne Pause und ohne Heilung dazwischen - die Gegner werden mit jeder Welle gefährlicher. Die Belohnung richtet sich nach deinen eigenen Werten, die Herausforderung bleibt also fair, egal wie weit du normal schon bist. Belohnungs-Bonus dieser Stufe: ${selected.rewardMult}×. Schaffst du alle ${selected.waves}?</p>
+      <p class="idle-dungeon-best">${bestText}</p>
+      <button type="button" class="btn-ja idle-dungeon-start-btn" id="idleDungeonStartBtn" ${bkmpDungeonActive ? 'disabled' : ''}>${bkmpDungeonActive ? '⏳ Dungeon läuft...' : `${selected.icon} ${selected.name} starten`}</button>
+    </div>
+  `;
+  panel.querySelectorAll('.idle-dungeon-diff-btn').forEach(btn => btn.addEventListener('click', () => {
+    if (bkmpDungeonActive) return;
+    bkmpDungeonSelectedDifficultyId = btn.dataset.difficultyId;
+    bkmpIdleRenderDungeonPanel();
+  }));
+  const startBtn = document.getElementById('idleDungeonStartBtn');
+  if (startBtn) startBtn.addEventListener('click', bkmpDungeonStart);
+}
+
+function bkmpDungeonUpdateBanner() {
+  const banner = document.getElementById('idleDungeonBanner');
+  if (!banner || !bkmpDungeonActive || !bkmpDungeonActiveDifficulty) return;
+  const elapsed = Date.now() - bkmpDungeonStartTime;
+  banner.innerHTML = `🏛️ Dungeon (${bkmpDungeonActiveDifficulty.icon} ${bkmpDungeonActiveDifficulty.name}) &middot; Welle ${bkmpDungeonWave} / ${bkmpDungeonActiveDifficulty.waves} &middot; ⏱ ${bkmpDungeonFormatTime(elapsed)}`;
+}
+
+/* Setzt den fuer die normale Anzeige zustaendigen Sprite-/Namens-/HP-Kram
+   auf einen beliebigen Drachen (echt oder Dungeon-Welle) - gleiche Logik
+   wie in bkmpIdleSpawnDragon, hier extrahiert, damit sie sowohl fuer
+   Dungeon-Wellen als auch fuer die Wiederherstellung des echten Drachen
+   nach Dungeon-Ende genutzt werden kann, ohne den echten Fortschritt
+   (current_dragon_index) anzufassen. */
+function bkmpDungeonApplyDragonVisuals(dragon) {
+  const nameEl = document.getElementById('idleDragonName');
+  if (nameEl) {
+    nameEl.textContent = dragon.isDungeon
+      ? `${dragon.isBoss ? '👑 ' : ''}${dragon.name}`
+      : `${dragon.isBoss ? '👑 BOSS: ' : ''}${dragon.isEventDragon ? '✨ ' : ''}${dragon.name} (Stufe ${bkmpIdleFormatStage(dragon.killIndex)})`;
+  }
+  const sprite = document.getElementById('idleDragonSprite');
+  if (sprite) {
+    [...sprite.classList].filter(c => c.startsWith(BKMP_IDLE_SPRITE_CLASS_PREFIX)).forEach(c => sprite.classList.remove(c));
+    sprite.classList.remove('idle-sprite-attacking');
+    sprite.classList.add(BKMP_IDLE_SPRITE_CLASS_PREFIX + dragon.spriteKey);
+  }
+  const dragonEl = document.getElementById('idleDragon');
+  if (dragonEl) {
+    dragonEl.classList.toggle('idle-dragon-boss', dragon.bossTier === 'boss');
+    dragonEl.classList.toggle('idle-dragon-miniboss', dragon.bossTier === 'miniboss');
+    dragonEl.classList.toggle('idle-dragon-event', Boolean(dragon.isEventDragon));
+  }
+}
+
+function bkmpDungeonSpawnWave(wave) {
+  bkmpDungeonWave = wave;
+  const s = bkmpIdleEffectiveStats;
+  const waveMult = bkmpDungeonWaveMult(wave);
+  const fullRoster = bkmpIdleDragonDefs.length ? bkmpIdleDragonDefs : BKMP_IDLE_FALLBACK_DRAGONS;
+  /* Nur "normale" aktive Drachen fuer die Wellen-Optik zulassen - Spieler-
+     Meldung 17.07. ("Der hat überall Lücken") zeigte, dass die vorherige
+     blinde Reihum-Auswahl ueber den KOMPLETTEN Roster auch Event-Drachen
+     (spawn_rule 'event_easter', eigene Sonderbehandlung/Popup an anderer
+     Stelle) und inaktive/unfertige Eintraege treffen konnte, deren Sprite
+     nie fuer normale Anzeige gedacht war. */
+  const roster = fullRoster.filter(d => d.active !== false && d.spawn_rule === 'standard');
+  const safeRoster = roster.length ? roster : fullRoster;
+  const archetype = safeRoster[(wave - 1) % safeRoster.length] || {};
+  const isFinalWave = wave === bkmpDungeonActiveDifficulty.waves;
+  bkmpIdleCurrentDragon = {
+    id: 'dungeon-wave-' + wave,
+    name: isFinalWave ? 'Dungeon-Champion' : `Wellen-Wächter (Welle ${wave})`,
+    emoji: archetype.emoji || '🐉',
+    spriteKey: archetype.sprite_key || archetype.id || 'standard',
+    killIndex: 0,
+    isBoss: isFinalWave,
+    bossTier: isFinalWave ? 'boss' : null,
+    isEventDragon: false,
+    eventDragonKey: null,
+    maxHp: Math.max(1, Math.round((s.attack || 10) * 4 * waveMult)),
+    /* Balance-Nachbesserung 17.07.: 0.035 war viel zu niedrig - kombiniert
+       mit der (jetzt separat gefixten) passiven Heilung liess sich der
+       Dungeon komplett ohne echten Gegenschaden durchspielen. 0.09 macht
+       jeden Gegenangriff spuerbar (ca. 9% der eigenen maximalen Stadt-HP
+       pro Treffer bei Welle 1, mit waveMult weiter steigend). */
+    attack: Math.max(1, Math.round((s.hp || 100) * 0.09 * waveMult)),
+    defense: Math.round((s.defense || 0) * 0.3),
+    isDungeon: true
+  };
+  bkmpIdleCurrentDragon.hp = bkmpIdleCurrentDragon.maxHp;
+  bkmpDungeonApplyDragonVisuals(bkmpIdleCurrentDragon);
+  bkmpIdleUpdateDragonHpBar();
+  bkmpDungeonUpdateBanner();
+}
+
+function bkmpDungeonStart() {
+  if (bkmpDungeonActive || !bkmpIdleState || !bkmpIdleEffectiveStats) return;
+  if (bkmpIdleEventPauseActive) {
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Erst den Event-Drachen bestätigen, bevor der Dungeon startet.', 3200);
+    return;
+  }
+  if (typeof bkmpRaidShouldShowCombatView === 'function' && bkmpRaidShouldShowCombatView()) {
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Während eines laufenden Raids kann der Dungeon nicht gestartet werden.', 3200);
+    return;
+  }
+  bkmpDungeonActive = true;
+  bkmpDungeonWave = 0;
+  bkmpDungeonActiveDifficulty = BKMP_DUNGEON_DIFFICULTIES.find(d => d.id === bkmpDungeonSelectedDifficultyId) || BKMP_DUNGEON_DIFFICULTIES[0];
+  bkmpDungeonStartTime = Date.now();
+  bkmpDungeonPrevDragon = bkmpIdleCurrentDragon;
+  bkmpDungeonPrevVillageHp = bkmpIdleVillageHp;
+  bkmpIdleVillageHp = bkmpIdleEffectiveStats.hp;
+
+  bkmpIdleActiveTab = 'kampf';
+  bkmpIdleTabs.forEach(t => {
+    const b = document.getElementById(t.btn);
+    const p = document.getElementById(t.panel);
+    if (b) b.classList.toggle('active', t.id === 'kampf');
+    if (p) p.style.display = t.id === 'kampf' ? '' : 'none';
+  });
+  const stageBar = document.getElementById('idleStageBar');
+  if (stageBar) stageBar.style.display = 'none';
+  const banner = document.getElementById('idleDungeonBanner');
+  if (banner) banner.style.display = '';
+  if (bkmpDungeonTimerInterval) clearInterval(bkmpDungeonTimerInterval);
+  bkmpDungeonTimerInterval = setInterval(bkmpDungeonUpdateBanner, 500);
+  bkmpDungeonSpawnWave(1);
+  bkmpIdleUpdateVillageHpBar();
+  if (typeof bkmpRuneSyncDrawerVisibility === 'function') bkmpRuneSyncDrawerVisibility();
+}
+
+function bkmpDungeonHandleWaveCleared() {
+  if (bkmpDungeonWave >= bkmpDungeonActiveDifficulty.waves) {
+    bkmpDungeonFinish(true);
+    return;
+  }
+  bkmpDungeonSpawnWave(bkmpDungeonWave + 1);
+  bkmpIdleUpdateVillageHpBar();
+}
+
+function bkmpDungeonHandleFailure() {
+  bkmpDungeonFinish(false);
+}
+
+function bkmpDungeonShowResult(success, wavesCleared, totalWaves, elapsedMs, gold, xp, gems, difficulty) {
+  if (document.getElementById('bkmpDungeonResultOverlay')) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'bkmp-easter';
+  overlay.id = 'bkmpDungeonResultOverlay';
+  overlay.innerHTML = `
+    <div class="bkmp-easter-card idle-dungeon-result-card">
+      <small>Dungeon-Ergebnis &middot; ${difficulty.icon} ${difficulty.name}</small>
+      <strong>${success ? '🏆 Dungeon gemeistert!' : `💀 Bei Welle ${wavesCleared + 1} gescheitert`}</strong>
+      <p>${success ? `Alle ${totalWaves} Wellen in ${bkmpDungeonFormatTime(elapsedMs)} geschafft!` : `${wavesCleared} von ${totalWaves} Wellen überstanden.`}<br>Belohnung: +${bkmpIdleFormatNumber(gold)} 💰 +${bkmpIdleFormatNumber(xp)} XP${gems > 0 ? ` +${gems} 💎` : ''}</p>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('visible'));
+  setTimeout(() => {
+    overlay.classList.remove('visible');
+    setTimeout(() => overlay.remove(), 450);
+  }, 4800);
+}
+
+const BKMP_DUNGEON_ACHIEVEMENT_KEY = 'bkmp-idle-dungeon-cleared';
+function bkmpDungeonMarkAchievement() {
+  try {
+    if (localStorage.getItem(BKMP_DUNGEON_ACHIEVEMENT_KEY) === '1') return;
+    localStorage.setItem(BKMP_DUNGEON_ACHIEVEMENT_KEY, '1');
+  } catch (e) {}
+}
+
+function bkmpDungeonFinish(success) {
+  const difficulty = bkmpDungeonActiveDifficulty;
+  const elapsedMs = Date.now() - bkmpDungeonStartTime;
+  const wavesCleared = success ? difficulty.waves : Math.max(0, bkmpDungeonWave - 1);
+  bkmpDungeonActive = false;
+  if (bkmpDungeonTimerInterval) { clearInterval(bkmpDungeonTimerInterval); bkmpDungeonTimerInterval = null; }
+
+  const banner = document.getElementById('idleDungeonBanner');
+  if (banner) banner.style.display = 'none';
+  const stageBar = document.getElementById('idleStageBar');
+  if (stageBar) stageBar.style.display = '';
+
+  bkmpIdleCurrentDragon = bkmpDungeonPrevDragon;
+  bkmpIdleVillageHp = bkmpDungeonPrevVillageHp;
+  if (bkmpIdleCurrentDragon) {
+    bkmpDungeonApplyDragonVisuals(bkmpIdleCurrentDragon);
+  } else {
+    bkmpIdleSpawnDragon();
+  }
+  bkmpIdleUpdateDragonHpBar();
+  bkmpIdleUpdateVillageHpBar();
+  bkmpIdleRenderStageBar();
+
+  const s = bkmpIdleEffectiveStats;
+  /* Balance-Nachbesserung 17.07. ("Sind die Belohnungen ... nicht bisschen
+     zu heftig?"): die alte Formel summierte pro Welle denselben
+     EXPONENTIELLEN waveMult wie die Kampf-Skalierung - bei 25 Wellen
+     Albtraum (waveGrowth hoch 24) explodierte die Summe dadurch auf
+     zweistellige Millionenbetraege. Belohnung jetzt bewusst von der
+     Kampf-Skalierung ENTKOPPELT und nur noch LINEAR pro Welle steigend
+     (+8% je Welle), Basiswert deutlich gesenkt (8 -> 2). */
+  const goldPerWaveBase = Math.round((s.attack || 10) * 2);
+  let totalGold = 0;
+  for (let w = 1; w <= wavesCleared; w++) totalGold += Math.round(goldPerWaveBase * (1 + 0.08 * (w - 1)));
+  totalGold = Math.round(totalGold * difficulty.rewardMult);
+  let totalXp = Math.round(totalGold / 4);
+  let gemBonus = 0;
+  if (success) {
+    totalGold = Math.round(totalGold * 1.2);
+    totalXp = Math.round(totalXp * 1.2);
+    gemBonus = Math.round(5 * difficulty.rewardMult);
+    if (difficulty.id === BKMP_DUNGEON_DIFFICULTIES[BKMP_DUNGEON_DIFFICULTIES.length - 1].id) bkmpDungeonMarkAchievement();
+  }
+  bkmpIdleState.gold = Number(bkmpIdleState.gold || 0) + totalGold;
+  bkmpIdleState.total_gold_earned = Number(bkmpIdleState.total_gold_earned || 0) + totalGold;
+  if (gemBonus > 0) bkmpIdleState.crystals = Number(bkmpIdleState.crystals || 0) + gemBonus;
+  if (totalXp > 0) bkmpIdleAddXp(totalXp);
+
+  const best = bkmpDungeonGetBest(difficulty.id);
+  const newBest = { ...best };
+  let improved = false;
+  if (wavesCleared > best.waves) {
+    newBest.waves = wavesCleared;
+    newBest.timeMs = success ? elapsedMs : 0;
+    improved = true;
+  } else if (success && wavesCleared === difficulty.waves && (best.timeMs === 0 || elapsedMs < best.timeMs)) {
+    newBest.timeMs = elapsedMs;
+    improved = true;
+  }
+  bkmpDungeonSaveBest(difficulty.id, newBest);
+  /* Nur bei ECHTER Verbesserung ans Bestenlisten-Backend melden (Spieler-
+     Meldung 17.07.: "Wo ist die Bestenliste dafuer?") - kein Aufruf bei
+     jedem Versuch, spart unnoetige Schreibzugriffe. */
+  if (improved && bkmpIdleState && bkmpIdleState.name_key && typeof submitDungeonResult === 'function') {
+    const displayName = typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : bkmpIdleState.name_key;
+    submitDungeonResult(bkmpIdleState.name_key, displayName, difficulty.id, newBest.waves, newBest.timeMs)
+      .catch(e => console.warn('Dungeon: Bestwert konnte nicht ans Leaderboard gemeldet werden.', e));
+  }
+
+  bkmpDungeonShowResult(success, wavesCleared, difficulty.waves, elapsedMs, totalGold, totalXp, gemBonus, difficulty);
+  bkmpIdleRenderHud();
+  bkmpIdleQueueSync();
+  if (bkmpIdleActiveTab === 'dungeon') bkmpIdleRenderDungeonPanel();
+}
+
 function bkmpIdleHandleDragonDefeated() {
+  if (bkmpDungeonActive) { bkmpDungeonHandleWaveCleared(); return; }
   const defeatedEventDragon = bkmpIdleCurrentDragon && bkmpIdleCurrentDragon.isEventDragon ? bkmpIdleCurrentDragon : null;
   const rewards = bkmpIdleRewardsAt(bkmpIdleCurrentDragon, bkmpIdleEffectiveStats, bkmpIdleGetMergedRewardScalingCfg());
   bkmpIdleState.gold += rewards.gold;
@@ -997,6 +1399,7 @@ function bkmpIdleCheckYakshasHeimatUnlock() {
 }
 
 function bkmpIdleHandleDefeat() {
+  if (bkmpDungeonActive) { bkmpDungeonHandleFailure(); return; }
   bkmpIdleLog(`💀 Niederlage gegen ${bkmpIdleCurrentDragon.emoji} ${bkmpIdleCurrentDragon.name}! Du fällst eine Stufe zurück.`);
   bkmpIdleState.current_dragon_index = Math.max(0, Number(bkmpIdleState.current_dragon_index || 0) - 1);
   bkmpIdleState.village_defeats = Number(bkmpIdleState.village_defeats || 0) + 1;
@@ -1017,8 +1420,13 @@ function bkmpIdleTick() {
 
   /* Schildgenerator/Reparaturtempo (Burg): passive Regeneration der
      Stadt-Lebenspunkte - vorher wirkungslos, effect_type wurde nie
-     ausgewertet. */
-  if (stats.villageRegenPct > 0 && bkmpIdleVillageHp < stats.hp) {
+     ausgewertet. WAEHREND EINES DUNGEON-LAUFS bewusst deaktiviert
+     (Spieler-Meldung 17.07.: "Heilung deaktivieren von den Skills - beim
+     Dungeon-Boss schaffe ich das ganz ohne Gegenschaden") - das Dungeon-
+     Panel verspricht explizit "ohne Heilung dazwischen", diese passive
+     Regeneration hat genau das unterlaufen und den ganzen Risiko-Reiz des
+     Modus zunichte gemacht. */
+  if (!bkmpDungeonActive && stats.villageRegenPct > 0 && bkmpIdleVillageHp < stats.hp) {
     bkmpIdleVillageHp = Math.min(stats.hp, bkmpIdleVillageHp + stats.hp * (stats.villageRegenPct / 100));
   }
 
@@ -2007,7 +2415,8 @@ const BKMP_IDLE_LEADERBOARD_TABS = [
   { id: 'raid_damage', label: '🐉 Raid-Schaden', isRaid: true },
   { id: 'raid_bosses', label: '🐉 Raid-Bosse', isRaid: true },
   { id: 'raid_joined', label: '🐉 Raid-Teilnahmen', isRaid: true },
-  { id: 'raid_best', label: '🐉 Bester Raid', isRaid: true }
+  { id: 'raid_best', label: '🐉 Bester Raid', isRaid: true },
+  { id: 'dungeon', label: '🏛️ Dungeon', isDungeon: true }
 ];
 let bkmpIdleActiveLeaderboardTab = 'level';
 let bkmpIdleLeaderboardStats = [];
@@ -2040,6 +2449,7 @@ function bkmpIdleRenderLeaderboardList() {
   if (!listEl) return;
   const tab = BKMP_IDLE_LEADERBOARD_TABS.find(t => t.id === bkmpIdleActiveLeaderboardTab) || BKMP_IDLE_LEADERBOARD_TABS[0];
   if (tab.isRaid) { bkmpRaidRenderLeaderboard(); return; }
+  if (tab.isDungeon) { bkmpDungeonRenderLeaderboard(); return; }
   const myName = (typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : '').trim().toLowerCase();
   const rows = [...bkmpIdleLeaderboardStats]
     .filter(s => Number(s[tab.field] || 0) > 0)
@@ -3193,6 +3603,20 @@ function bkmpIdleMaybeDropRune(source) {
      komplett zerstoeren statt eine neue zu liefern (siehe
      BKMP_RUNE_FUSE_FAIL_CHANCE/bkmpIdleRuneUpgradeFailChance unten). */
 const BKMP_RUNE_MAX_LEVEL = 15;
+/* Runen-Aufstieg (Community-Wunsch 17.07., Discord-Zitat "wir brauchen
+   Mythische Runen, hab zu viele legendäre" + eigener Vorschlag "+15 Legi +
+   15 Legi verbinden -> +16, dann +16+16=+17..."): Legendaer (gold) war
+   bisher eine Sackgasse - weder weiter verschmelzbar (siehe BKMP_RUNE_
+   FUSE_FAIL_CHANCE-Kommentar oben, kein Eintrag fuer 'gold') noch ueber
+   +15 aufwertbar, Dubletten blieben nur zum Verkauf fuer ein paar Gold
+   uebrig. Statt einer komplett neuen 6. Seltenheitsstufe (neue Sprites,
+   neue Drop-Tabellen-Balance) loest der Aufstieg das direkt mit dem
+   bereits vorhandenen System: eine ZWEITE Legendaere Rune DERSELBEN Stufe
+   (gleicher Slot) wird komplett verbraucht, die erste steigt um 1 Stufe -
+   bis zum neuen absoluten Maximum +30. Bewusst OHNE Fehlschlagchance (der
+   Preis ist bereits eine ganze zusaetzliche maximal aufgewertete
+   Legendaere plus Gold) - anders als Verschmelzen/normales Aufwerten. */
+const BKMP_RUNE_ASCEND_MAX_LEVEL = 30;
 const BKMP_RUNE_SUBSTAT_MILESTONES = [3, 6, 9, 12];
 /* Anzahl Sub-Stats, mit denen eine Rune dieser Seltenheit droppt/verschmilzt
    (siehe bkmpIdleRollInitialSubstats). Das absolute Maximum ist immer 4
@@ -3288,6 +3712,48 @@ function bkmpRuneUpgrade(cid) {
   bkmpIdleQueueSync();
 }
 
+function bkmpRuneCanAscend(rune) {
+  const level = Number(rune.upgrade_level || 0);
+  return rune.rarity === 'gold' && level >= BKMP_RUNE_MAX_LEVEL && level < BKMP_RUNE_ASCEND_MAX_LEVEL;
+}
+/* Findet eine zweite, unausgeruestete Legendaere desselben Slots UND
+   derselben Stufe - genau die "+15 Legi + +15 Legi"-Bedingung aus dem
+   Spieler-Vorschlag. Absichtlich exakt gleiche Stufe (nicht nur "auch
+   maximal"), damit sich hoehere Aufstiegsstufen nicht mit beliebigen
+   +15-Dubletten billig weiterschummeln lassen. */
+function bkmpRuneFindAscendFodder(rune) {
+  const level = Number(rune.upgrade_level || 0);
+  return bkmpIdlePlayerRunes.find(r => r._cid !== rune._cid && r.rune_type === rune.rune_type && r.rarity === 'gold' && Number(r.upgrade_level || 0) === level && !r.equipped);
+}
+function bkmpRuneAscend(cid) {
+  const rune = bkmpIdlePlayerRunes.find(r => r._cid === cid);
+  if (!rune || !bkmpIdleState || !bkmpRuneCanAscend(rune)) return;
+  const fodder = bkmpRuneFindAscendFodder(rune);
+  if (!fodder) {
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`🌟 Brauchst eine zweite +${Number(rune.upgrade_level || 0)} Legendäre desselben Slots zum Verbrauchen.`, 3200);
+    return;
+  }
+  const cost = bkmpIdleRuneUpgradeCost(rune);
+  if (bkmpIdleState.gold < cost) {
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('💰 Nicht genug Gold zum Aufsteigen.', 2400);
+    return;
+  }
+  const slot = window.BKMP_RUNE_SLOTS.find(s => s.id === rune.rune_type);
+  bkmpIdleState.gold -= cost;
+  bkmpIdlePlayerRunes = bkmpIdlePlayerRunes.filter(r => r._cid !== fodder._cid);
+  if (fodder.id && typeof deletePlayerRunes === 'function') deletePlayerRunes([fodder.id]).catch(() => {});
+  rune.upgrade_level = Number(rune.upgrade_level || 0) + 1;
+  if (rune.id) updatePlayerRuneUpgrade(rune.id, rune.upgrade_level, rune.substats).catch(() => {});
+  bkmpIdleState.rune_upgrade_successes = Number(bkmpIdleState.rune_upgrade_successes || 0) + 1;
+  bkmpIdleLog(`🌟 ${slot ? slot.name : 'Rune'} auf +${rune.upgrade_level} aufgestiegen! Eine zweite Legendäre wurde dafür verbraucht.`);
+  if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`🌟 Aufstieg geglückt: +${rune.upgrade_level}!`, 3200);
+  bkmpRuneCurrentlyViewing = cid;
+  bkmpIdleRecomputeEffectiveStats();
+  bkmpIdleRenderRunenPanel();
+  bkmpIdleRenderHud();
+  bkmpIdleQueueSync();
+}
+
 /* Aggregiert alle AUSGERUESTETEN Runen (Hauptwert UND Sub-Stats) zu denselben
    Effekt-Schluesseln, die Skilltree/Upgrades/Titel/Prestige schon nutzen
    (attack_pct usw.) - flieszt dadurch ganz ohne Sonderbehandlung in
@@ -3372,11 +3838,14 @@ function bkmpRuneQuickSelectFuse(count) {
    verschmelzen automatisieren? weil das etwas krampf mit den einfachen
    wenn man da 50 hat"), Nutzerentscheidung: "1 Button zusaetzlich einbauen
    mit alle verschmelzen" - bewusst OHNE das BKMP_RUNE_FUSE_MAX_SELECT-Limit
-   (9) der 3/6/9-Buttons, damit man nicht mehrfach klicken/bestaetigen muss,
-   wenn 50 einfache Runen vorliegen. bkmpRuneConfirmFuseSelection() verarbeitet
-   beliebig viele Dreiergruppen ohnehin schon in einem Rutsch (eine
-   Sammel-Zusammenfassung), das war nie das eigentliche Limit - nur die
-   Auswahl-Buttons waren es. */
+   (9) des "3 auswaehlen"-Buttons, damit man nicht mehrfach klicken/
+   bestaetigen muss, wenn 50 einfache Runen vorliegen. bkmpRuneConfirmFuseSelection()
+   verarbeitet beliebig viele Dreiergruppen ohnehin schon in einem Rutsch
+   (eine Sammel-Zusammenfassung), das war nie das eigentliche Limit - nur
+   die Auswahl-Buttons waren es. NACHBESSERUNG (17.07., "6 und 9 weg"): die
+   6er/9er-Zwischenstufen wieder entfernt (nur noch 3 + Alle je Seltenheit),
+   siehe bkmpRuneAutoFuseAll weiter unten fuer den neuen, seltenheits-
+   uebergreifenden Ein-Klick-Weg. */
 function bkmpRuneQuickSelectFuseAll() {
   if (!bkmpRuneFuseSelection) return;
   const candidates = bkmpIdlePlayerRunes
@@ -3384,6 +3853,61 @@ function bkmpRuneQuickSelectFuseAll() {
     .sort((a, b) => Number(a.upgrade_level || 0) - Number(b.upgrade_level || 0));
   const usableCount = Math.floor(candidates.length / 3) * 3;
   bkmpRuneFuseSelection.cids = candidates.slice(0, usableCount).map(r => r._cid);
+  bkmpIdleRenderRunenPanel();
+}
+/* Auto-Schmelzen ueber ALLE Seltenheiten (Spieler-Wunsch 17.07.: "6 und 9
+   weg, dann autoschmelzen aller ... Runen mit einem Klick aller Farben") -
+   ersetzt das rarity-weise Durchklicken (Seltenheit waehlen -> "Alle" ->
+   bestaetigen, einmal PRO Seltenheit) durch einen einzigen Klick, der
+   gray/green/blue/purple des aktuell offenen Slots in einem Rutsch
+   durchgeht (Legendaer/gold faellt raus, siehe BKMP_RUNE_FUSE_FAIL_CHANCE-
+   Kommentar - kann nicht weiter verschmolzen werden). Nutzt pro Seltenheit
+   dieselbe "niedrigste Stufe zuerst"-Auswahl wie bkmpRuneQuickSelectFuseAll,
+   damit aufgewertete Runen nur verbraucht werden, wenn nicht genug frische
+   +0-Kopien fuer eine volle Dreiergruppe uebrig sind. */
+async function bkmpRuneAutoFuseAll() {
+  const activeSlot = window.BKMP_RUNE_SLOTS.find(s => s.id === bkmpRuneActiveSlotTab);
+  if (!activeSlot || !bkmpIdleState) return;
+  const fusableRarities = window.BKMP_RUNE_RARITIES.filter(r => r.id !== 'gold');
+  const groups = [];
+  fusableRarities.forEach(rarity => {
+    const candidates = bkmpIdlePlayerRunes
+      .filter(r => r.rune_type === activeSlot.id && r.rarity === rarity.id && !r.equipped)
+      .sort((a, b) => Number(a.upgrade_level || 0) - Number(b.upgrade_level || 0));
+    const usableCount = Math.floor(candidates.length / 3) * 3;
+    for (let i = 0; i < usableCount; i += 3) groups.push({ rarityId: rarity.id, cids: candidates.slice(i, i + 3).map(r => r._cid) });
+  });
+  if (!groups.length) {
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`Keine vollständigen Dreiergruppen zum Verschmelzen bei ${activeSlot.name}.`, 2800);
+    return;
+  }
+  const withProgress = groups.reduce((sum, g) => sum + g.cids.filter(cid => {
+    const r = bkmpIdlePlayerRunes.find(x => x._cid === cid);
+    return r && (Number(r.upgrade_level || 0) > 0 || (r.substats && r.substats.length));
+  }).length, 0);
+  const byRarityCount = {};
+  groups.forEach(g => { byRarityCount[g.rarityId] = (byRarityCount[g.rarityId] || 0) + 1; });
+  const summaryLine = fusableRarities.filter(r => byRarityCount[r.id]).map(r => `${byRarityCount[r.id]}× ${r.name}`).join(', ');
+  const confirmed = await bkmpConfirmDialog(
+    `🔥 Auto-Schmelzen: ${groups.length} Gruppen?`,
+    `Verschmilzt bei ${activeSlot.name} alle vollständigen Dreiergruppen über alle Seltenheiten hinweg: ${summaryLine} (insgesamt ${groups.length * 3} Runen).\n\n⚠️ Jede Gruppe hat je nach Seltenheit eine eigene Chance, komplett zerstört zu werden statt zu gelingen.${withProgress ? `\n⚠️ ${withProgress} der eingesetzten Runen sind bereits aufgewertet.` : ''}\n\nTrotzdem fortfahren?`,
+    'Ja, alle verschmelzen',
+    'Abbrechen'
+  );
+  if (!confirmed) return;
+  bkmpRuneFuseSelection = null;
+  let succeeded = 0;
+  let destroyed = 0;
+  groups.forEach(g => {
+    const result = bkmpRuneFuse(activeSlot.id, g.rarityId, g.cids);
+    if (result && result.success) succeeded += 1;
+    else destroyed += 1;
+  });
+  const summary = destroyed
+    ? `🔥 ${succeeded}/${groups.length} Verschmelzungen erfolgreich, 💥 ${destroyed} zerstört.`
+    : `🔥 Alle ${groups.length} Verschmelzungen erfolgreich!`;
+  bkmpIdleLog(summary);
+  if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(summary, 3800);
   bkmpIdleRenderRunenPanel();
 }
 /* Bestaetigt die aktuelle Auswahl (3, 6 oder 9 Runen = 1, 2 oder 3
@@ -3456,6 +3980,14 @@ function bkmpRuneStatBoxHTML(slot, rune) {
   const sameGroup = bkmpIdlePlayerRunes.filter(r => r.rune_type === rune.rune_type && r.rarity === rune.rarity && !r.equipped);
   const canFuse = sameGroup.length >= 3 && rune.rarity !== 'gold';
   const upgradeFailPct = Math.round(bkmpIdleRuneUpgradeFailChance(rune) * 100);
+  /* Aufstieg (siehe BKMP_RUNE_ASCEND_MAX_LEVEL oben) - nur relevant, sobald
+     eine Legendaere den normalen Cap von +15 erreicht hat. */
+  const showAscend = rune.rarity === 'gold' && level >= BKMP_RUNE_MAX_LEVEL;
+  const canAscend = bkmpRuneCanAscend(rune);
+  const ascendFodder = canAscend ? bkmpRuneFindAscendFodder(rune) : null;
+  const ascendCost = canAscend ? bkmpIdleRuneUpgradeCost(rune) : 0;
+  const canAffordAscend = canAscend && bkmpIdleState && bkmpIdleState.gold >= ascendCost;
+  const isFullyAscended = rune.rarity === 'gold' && level >= BKMP_RUNE_ASCEND_MAX_LEVEL;
   return `
     <div class="idle-runen-stat-head" style="--rune-color:${rarity.color}">
       <img src="assets/runes/${slot.id}-${rune.rarity}.png?v=${BKMP_RUNE_IMG_V}" alt="">
@@ -3477,15 +4009,21 @@ function bkmpRuneStatBoxHTML(slot, rune) {
     </ul>` : '<p class="idle-runen-stat-note">Noch keine Sub-Stats - bei +3/+6/+9/+12 kommt bis zu insgesamt 4 jeweils einer dazu.</p>'}
     <div class="idle-runen-stat-actions">
       <button type="button" class="btn-ja idle-runen-upgrade-btn" id="idleRuneUpgradeBtn" data-cid="${rune._cid}" ${isMaxLevel || !canAffordUpgrade ? 'disabled' : ''} title="${isMaxLevel ? '' : `${upgradeFailPct}% Chance, dass die Aufwertung fehlschlägt (Gold ist dann trotzdem weg)`}">
-        ${isMaxLevel ? '⭐ Maximal aufgewertet' : `⬆️ Aufwerten (${cost} Gold${upgradeFailPct ? `, ${upgradeFailPct}% Risiko` : ''})`}
+        ${isMaxLevel ? `⭐ Maximal aufgewertet (+${BKMP_RUNE_MAX_LEVEL})` : `⬆️ Aufwerten (${cost} Gold${upgradeFailPct ? `, ${upgradeFailPct}% Risiko` : ''})`}
       </button>
     </div>
+    ${showAscend ? `
+    <div class="idle-runen-stat-actions">
+      <button type="button" class="btn-ja idle-runen-ascend-btn" id="idleRuneAscendBtn" data-cid="${rune._cid}" ${!canAscend || !ascendFodder || !canAffordAscend ? 'disabled' : ''} title="Verbraucht eine zweite unausgerüstete Legendäre desselben Slots UND derselben Stufe, um +1 Stufe zu erreichen (bis +${BKMP_RUNE_ASCEND_MAX_LEVEL}).">
+        ${isFullyAscended ? `🌟 Vollständig aufgestiegen (+${BKMP_RUNE_ASCEND_MAX_LEVEL})` : `🌟 Aufsteigen auf +${level + 1} (${ascendCost} Gold${ascendFodder ? '' : `, 2. +${level} Legendäre nötig`})`}
+      </button>
+    </div>` : ''}
     <div class="idle-runen-stat-actions">
       <button type="button" class="btn-nein idle-runen-fuse-btn" id="idleRuneFuseBtn" data-rarity="${rune.rarity}" ${canFuse ? '' : 'disabled'}>
         ✨ Verschmelzen (auswählen)${canFuse ? '' : ` (${sameGroup.length}/3)`}
       </button>
       <button type="button" class="btn-nein idle-runen-sell-btn" id="idleRuneSellBtn" data-cid="${rune._cid}" ${rune.equipped ? 'disabled' : ''}>
-        💰 verkaufen (+${rarity.sellGold})
+        💰 verkaufen (+${bkmpRuneSellValue(rune)})
       </button>
     </div>
   `;
@@ -3618,14 +4156,61 @@ function bkmpIdleAllEquippedMinLevel() {
   return equipped.reduce((min, r) => Math.min(min, Number(r.upgrade_level || 0)), Infinity);
 }
 
+/* Balance-Nachbesserung 17.07. ("Verkaufen ist witzlos ... eine +12
+   Legendaere mit 3 Sub-Stats verkauft sich genauso billig wie eine
+   frische +0"): der Verkaufswert war bisher NUR von der Seltenheit
+   abhaengig (fixe rarity.sellGold), Stufe/Sub-Stats floss nie mit ein.
+   Jetzt: +15% des Basiswerts pro Aufwertungs-Stufe, +25% pro Sub-Stat -
+   eine ausgereizte Legendaere (+15, 4 Sub-Stats) verkauft sich dadurch
+   fuer etwa das 6,5-fache einer frischen. */
+function bkmpRuneSellValue(rune) {
+  const rarity = window.BKMP_RUNE_RARITIES.find(r => r.id === rune.rarity);
+  const base = rarity ? rarity.sellGold : 10;
+  const level = Number(rune.upgrade_level || 0);
+  const substatCount = (rune.substats || []).length;
+  return Math.round(base * (1 + level * 0.15) * (1 + substatCount * 0.25));
+}
 function bkmpRuneSell(cid) {
   const rune = bkmpIdlePlayerRunes.find(r => r._cid === cid);
   if (!rune || rune.equipped || !bkmpIdleState) return;
-  const rarity = window.BKMP_RUNE_RARITIES.find(r => r.id === rune.rarity);
+  const value = bkmpRuneSellValue(rune);
   bkmpIdlePlayerRunes = bkmpIdlePlayerRunes.filter(r => r !== rune);
-  bkmpIdleState.gold += rarity.sellGold;
+  bkmpIdleState.gold += value;
   if (rune.id && typeof deletePlayerRunes === 'function') deletePlayerRunes([rune.id]).catch(() => {});
   if (bkmpRuneCurrentlyViewing === cid) bkmpRuneCurrentlyViewing = null;
+  bkmpIdleRenderHud();
+  bkmpIdleRenderRunenPanel();
+  bkmpIdleQueueSync();
+}
+/* Sammel-Verkauf (Community-Wunsch 17.07., Pendant zu "Alle
+   verschmelzen"): verkauft ALLE unausgeruesteten Runen des aktuell
+   offenen Slot-Tabs auf einmal - bewusst NUR den aktiven Slot, nicht
+   alle 6 gleichzeitig, damit man nicht versehentlich Verschmelzen-/
+   Aufstiegs-Fodder in einem anderen Slot mitverkauft. Mit Bestaetigung
+   vorher (Gesamtwert + Anzahl), da nicht rueckgaengig machbar. */
+async function bkmpRuneSellAllDuplicates() {
+  const activeSlot = window.BKMP_RUNE_SLOTS.find(s => s.id === bkmpRuneActiveSlotTab);
+  if (!activeSlot || !bkmpIdleState) return;
+  const candidates = bkmpIdlePlayerRunes.filter(r => r.rune_type === activeSlot.id && !r.equipped);
+  if (!candidates.length) {
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`Keine unausgerüsteten ${activeSlot.name} zum Verkaufen.`, 2600);
+    return;
+  }
+  const totalValue = candidates.reduce((sum, r) => sum + bkmpRuneSellValue(r), 0);
+  const confirmed = await bkmpConfirmDialog(
+    `💰 ${candidates.length}× ${activeSlot.name} verkaufen?`,
+    `Verkauft alle ${candidates.length} unausgerüsteten ${activeSlot.name} für insgesamt ${bkmpIdleFormatNumber(totalValue)} Gold.\n\n⚠️ Das gilt auch für bereits aufgewertete Runen, die du evtl. noch als 2. Rune fürs Verschmelzen oder den Aufstieg brauchst - nicht rückgängig machbar.`,
+    'Ja, verkaufen',
+    'Abbrechen'
+  );
+  if (!confirmed) return;
+  const ids = candidates.map(r => r.id).filter(Boolean);
+  bkmpIdlePlayerRunes = bkmpIdlePlayerRunes.filter(r => !candidates.includes(r));
+  if (ids.length && typeof deletePlayerRunes === 'function') deletePlayerRunes(ids).catch(() => {});
+  bkmpIdleState.gold += totalValue;
+  if (candidates.some(r => r._cid === bkmpRuneCurrentlyViewing)) bkmpRuneCurrentlyViewing = null;
+  bkmpIdleLog(`💰 ${candidates.length}× ${activeSlot.name} verkauft für ${bkmpIdleFormatNumber(totalValue)} Gold.`);
+  if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`💰 ${candidates.length}× verkauft: +${bkmpIdleFormatNumber(totalValue)} Gold`, 3200);
   bkmpIdleRenderHud();
   bkmpIdleRenderRunenPanel();
   bkmpIdleQueueSync();
@@ -3697,9 +4282,9 @@ function bkmpRuneFuseSelectionHTML(slot) {
   return `
     <div class="idle-runen-fuse-panel" style="--rune-color:${rarity.color}">
       <div class="idle-runen-fuse-title">✨ ${escapeHtml(rarity.name)} ${escapeHtml(slot.name)} verschmelzen</div>
-      <p class="idle-runen-fuse-hint">Wähle unten im Lager ${escapeHtml(rarity.name)}-Kopien in Dreiergruppen aus (3, 6 oder 9) - je Gruppe ${failPct}% Chance, dass die 3 Runen dabei zerstört werden statt zu gelingen.</p>
+      <p class="idle-runen-fuse-hint">Wähle unten im Lager ${escapeHtml(rarity.name)}-Kopien in einer Dreiergruppe aus - ${failPct}% Chance, dass die 3 Runen dabei zerstört werden statt zu gelingen.</p>
       <div class="idle-runen-fuse-quick-select">
-        ${[3, 6, 9].map(n => `<button type="button" class="btn-nein idle-runen-fuse-quick-btn" data-count="${n}" ${availableCount < n ? 'disabled' : ''}>${n} auswählen</button>`).join('')}
+        <button type="button" class="btn-nein idle-runen-fuse-quick-btn" data-count="3" ${availableCount < 3 ? 'disabled' : ''}>3 auswählen</button>
         <button type="button" class="btn-nein idle-runen-fuse-quick-btn idle-runen-fuse-all-btn" id="idleRuneFuseAllBtn" ${availableCount < 3 ? 'disabled' : ''}>Alle verschmelzen</button>
       </div>
       <div class="idle-runen-fuse-progress">${count} ausgewählt${!isValidCount && count ? ' <span class="idle-runen-fuse-warn">⚠️ muss Vielfaches von 3 sein</span>' : ''}${hasProgress ? ' <span class="idle-runen-fuse-warn">⚠️ enthält Aufwertung</span>' : ''}</div>
@@ -3838,8 +4423,23 @@ function bkmpIdleRenderRunenPanel() {
   const oldInventoryScroll = drawerContent.querySelector('.idle-runen-inventory-scroll');
   const savedInventoryScrollTop = oldInventoryScroll ? oldInventoryScroll.scrollTop : 0;
 
+  const unequippedSlotCount = slotOwned.filter(r => !r.equipped).length;
+  const autoFuseGroupCount = window.BKMP_RUNE_RARITIES.filter(r => r.id !== 'gold').reduce((sum, rarity) => {
+    const c = slotOwned.filter(r => r.rarity === rarity.id && !r.equipped).length;
+    return sum + Math.floor(c / 3);
+  }, 0);
   drawerContent.innerHTML = `
-    <h4 class="idle-sammlung-subheading">🎒 ${escapeHtml(activeSlot.name)}-Lager <span class="idle-sammlung-count">${slotOwned.length} von ${totalOwned} gesamt</span></h4>
+    <div class="idle-runen-inventory-header">
+      <h4 class="idle-sammlung-subheading">🎒 ${escapeHtml(activeSlot.name)}-Lager <span class="idle-sammlung-count">${slotOwned.length} von ${totalOwned} gesamt</span></h4>
+      <div class="idle-runen-inventory-header-actions">
+        <button type="button" class="btn-nein idle-runen-autofuse-btn" id="idleRuneAutoFuseBtn" ${autoFuseGroupCount ? '' : 'disabled'}>
+          🔥 Auto-Schmelzen${autoFuseGroupCount ? ` (${autoFuseGroupCount})` : ''}
+        </button>
+        <button type="button" class="btn-nein idle-runen-sell-all-btn" id="idleRuneSellAllBtn" ${unequippedSlotCount ? '' : 'disabled'}>
+          💰 Alle verkaufen${unequippedSlotCount ? ` (${unequippedSlotCount})` : ''}
+        </button>
+      </div>
+    </div>
     <div class="idle-runen-inventory-scroll">
       <div class="idle-runen-inventory" id="idleRunenInventory">
       ${slotOwned.length ? slotOwned.map(r => {
@@ -3883,6 +4483,8 @@ function bkmpIdleRenderRunenPanel() {
   if (equipBtn) equipBtn.addEventListener('click', () => bkmpRuneToggleEquip(equipBtn.dataset.cid));
   const upgradeBtn = document.getElementById('idleRuneUpgradeBtn');
   if (upgradeBtn) upgradeBtn.addEventListener('click', () => bkmpRuneUpgrade(upgradeBtn.dataset.cid));
+  const ascendBtn = document.getElementById('idleRuneAscendBtn');
+  if (ascendBtn) ascendBtn.addEventListener('click', () => bkmpRuneAscend(ascendBtn.dataset.cid));
   const fuseBtn = document.getElementById('idleRuneFuseBtn');
   if (fuseBtn) fuseBtn.addEventListener('click', () => bkmpRuneStartFuseSelection(fuseBtn.dataset.rarity));
   const sellBtn = document.getElementById('idleRuneSellBtn');
@@ -3894,6 +4496,10 @@ function bkmpIdleRenderRunenPanel() {
   panel.querySelectorAll('.idle-runen-fuse-quick-btn[data-count]').forEach(btn => btn.addEventListener('click', () => bkmpRuneQuickSelectFuse(Number(btn.dataset.count))));
   const fuseAllBtn = document.getElementById('idleRuneFuseAllBtn');
   if (fuseAllBtn) fuseAllBtn.addEventListener('click', bkmpRuneQuickSelectFuseAll);
+  const sellAllBtn = document.getElementById('idleRuneSellAllBtn');
+  if (sellAllBtn) sellAllBtn.addEventListener('click', bkmpRuneSellAllDuplicates);
+  const autoFuseBtn = document.getElementById('idleRuneAutoFuseBtn');
+  if (autoFuseBtn) autoFuseBtn.addEventListener('click', bkmpRuneAutoFuseAll);
   const runenHelpBtn = document.getElementById('idleRunenHelpBtn');
   if (runenHelpBtn) runenHelpBtn.addEventListener('click', bkmpIdleOpenRunenHelp);
 }
@@ -3905,10 +4511,11 @@ const bkmpIdleTabs = [
   { id: 'upgrades', btn: 'idleTabBtnUpgrades', panel: 'idlePanelUpgrades', render: bkmpIdleRenderUpgradesPanel },
   { id: 'skilltree', btn: 'idleTabBtnSkilltree', panel: 'idlePanelSkilltree', render: bkmpIdleRenderSkilltreePanel },
   { id: 'erfolge', btn: 'idleTabBtnErfolge', panel: 'idlePanelErfolge', render: bkmpIdleRenderErfolgePanel },
-  { id: 'bestenliste', btn: 'idleTabBtnBestenliste', panel: 'idlePanelBestenliste', render: bkmpIdleRenderBestenlistePanel },
   { id: 'prestige', btn: 'idleTabBtnPrestige', panel: 'idlePanelPrestige', render: bkmpIdleRenderPrestigePanel },
   { id: 'runen', btn: 'idleTabBtnRunen', panel: 'idlePanelRunen', render: bkmpIdleRenderRunenPanel },
-  { id: 'skins', btn: 'idleTabBtnSkins', panel: 'idlePanelSkins', render: bkmpIdleRenderSkinsPanel }
+  { id: 'skins', btn: 'idleTabBtnSkins', panel: 'idlePanelSkins', render: bkmpIdleRenderSkinsPanel },
+  { id: 'dungeon', btn: 'idleTabBtnDungeon', panel: 'idlePanelDungeon', render: bkmpIdleRenderDungeonPanel },
+  { id: 'bestenliste', btn: 'idleTabBtnBestenliste', panel: 'idlePanelBestenliste', render: bkmpIdleRenderBestenlistePanel }
 ];
 let bkmpIdleActiveTab = 'kampf';
 
@@ -5317,8 +5924,9 @@ window.BKMP_RUNE_EQUIP_RARITY_TIERS = [
   ['gray', 'Purist'], ['green', 'Grüner Daumen'], ['blue', 'Blaues Blut'], ['purple', 'Violette Vorherrschaft'], ['gold', 'Runengott']
 ];
 /* Fuenf Erfolge fuer "alle 6 Slots mindestens auf Stufe N" - deckt sich
-   exakt mit BKMP_RUNE_MAX_LEVEL = 15 (letzte Stufe = absolutes Maximum
-   auf allen 6 Runen gleichzeitig). */
+   exakt mit BKMP_RUNE_MAX_LEVEL = 15 (absolutes Maximum fuer alle
+   Seltenheiten AUSSER Legendaer, die per Aufstieg noch bis
+   BKMP_RUNE_ASCEND_MAX_LEVEL weiterkommt - siehe bkmpRuneAscend). */
 window.BKMP_RUNE_EQUIP_LEVEL_TIERS = [
   [3, 'Frisch geschliffen'], [6, 'Feingeschliffen'], [9, 'Meisterlich veredelt'], [12, 'Nahezu perfekt'], [15, 'Runen-Perfektion']
 ];

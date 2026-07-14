@@ -3194,6 +3194,14 @@ img[data-bkmp-img].bkmp-image-missing {
   padding: 1.4rem 1.5rem;
   text-align: center;
   background: linear-gradient(145deg, rgba(18, 16, 22, 0.94), rgba(8, 7, 10, 0.9));
+  /* Hintergrund ist absichtlich IMMER dunkel (Easter-Egg-"Geheimnis"-Look,
+     unabhaengig vom Hell/Dunkel-Modus) - ohne feste Textfarbe erbt der
+     Inhalt sonst var(--ink)/var(--muted) der GLOBALEN Seiten-Theme (im
+     Hellmodus fast schwarz), was auf diesem dunklen Hintergrund unlesbar
+     wird. Gleicher Bug/Fix wie beim Golden-Hour-Popup (Spieler-Meldung
+     17.07., diesmal am Dungeon-Ergebnis entdeckt, betrifft aber jede
+     Karte mit dieser Klasse). */
+  color: #f3ecff;
   box-shadow: 0 28px 90px rgba(0, 0, 0, 0.42), 0 0 42px rgba(201, 165, 106, 0.2);
   transform: translateY(18px) scale(0.94);
   transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
@@ -3221,7 +3229,7 @@ img[data-bkmp-img].bkmp-image-missing {
 }
 .bkmp-easter-card p {
   margin-top: 0.7rem;
-  color: var(--muted);
+  color: #c9c2dd;
   line-height: 1.5;
 }
 .bkmp-easter > span {
@@ -3817,6 +3825,11 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
    nicht im allgemeinen Kosmetik-/Erfolge-Profil (dort bleiben Titel rein
    kosmetisch). */
 .idle-sammlung-subheading { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; font-family: 'Fraunces', serif; font-size: 1rem; margin: 1.2rem 0 0.3rem; }
+.idle-runen-inventory-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; }
+.idle-runen-inventory-header .idle-sammlung-subheading { margin: 0; }
+.idle-runen-inventory-header-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+.idle-runen-sell-all-btn, .idle-runen-autofuse-btn { font-size: 0.76rem; padding: 0.4rem 0.7rem; white-space: nowrap; }
+.idle-runen-sell-all-btn:disabled, .idle-runen-autofuse-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .idle-sammlung-count { font-size: 0.75rem; font-weight: 400; color: var(--muted); font-family: 'Inter', sans-serif; }
 .idle-title-bonus-list { display: grid; gap: 0.5rem; margin-top: 0.6rem; }
 .idle-title-bonus-list .achievement-row { align-items: center; }
@@ -4106,6 +4119,17 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 }
 .idle-runen-upgrade-btn { width: 100%; font-size: 0.82rem; }
 .idle-runen-upgrade-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+/* Aufstieg (ueberwindet den normalen +15-Cap fuer Legendaere, siehe
+   bkmpRuneAscend) - eigene, auffaelligere Gold-Verlauf-Optik statt der
+   normalen .btn-ja-Farbe, damit sich dieser seltene Endgame-Schritt
+   sichtbar vom Alltags-Aufwerten abhebt. */
+.idle-runen-ascend-btn {
+  width: 100%; font-size: 0.82rem;
+  background: linear-gradient(135deg, #facc15, #f59e0b) !important;
+  color: #1a1200 !important;
+  border-color: #f59e0b !important;
+}
+.idle-runen-ascend-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .idle-runen-inventory {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
@@ -4873,7 +4897,11 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   box-shadow: 0 12px 30px rgba(255, 157, 26, 0.5);
 }
 
-.bkmp-daily-popup-msg { min-height: 1.4em; margin: 0.7rem 0 0; font-size: 0.85rem; font-weight: 700; white-space: pre-line; }
+/* Fest helle Grundfarbe (nicht var(--muted)) noetig, falls textContent
+   OHNE .success/.error gesetzt wird (z.B. Test-Vorschau-Pfad
+   ?testDailyPopup=1) - Hintergrund der Karte ist immer dunkel, gleicher
+   Bug-Typ wie bei h3/sub oben, hier per Audit am 17.07. gefunden. */
+.bkmp-daily-popup-msg { min-height: 1.4em; margin: 0.7rem 0 0; font-size: 0.85rem; font-weight: 700; white-space: pre-line; color: #c9c2dd; }
 .bkmp-daily-popup-msg.success { color: #4ade80; }
 .bkmp-daily-popup-msg.error { color: #f87171; }
 
@@ -5584,6 +5612,64 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
    ueber opacity abdunkeln statt Farben zu ueberschreiben. */
 .idle-prestige-buy { background: linear-gradient(135deg, #a78bfa, #7c3aed); border: none; color: #fff; }
 .idle-prestige-buy:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ---- Dungeon-Modus ---- */
+.idle-dungeon-intro {
+  border: 1px solid color-mix(in srgb, #f97316 35%, var(--line));
+  border-radius: 14px;
+  padding: 1.1rem 1.2rem;
+  background: linear-gradient(135deg, color-mix(in srgb, #f97316 14%, var(--paper)), var(--paper));
+  text-align: center;
+}
+.idle-dungeon-intro h4 { font-family: 'Fraunces', serif; font-size: 1.15rem; margin-bottom: 0.6rem; color: #fb923c; }
+.idle-dungeon-diff-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; margin-bottom: 0.8rem; }
+.idle-dungeon-diff-btn {
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.idle-dungeon-diff-btn:hover:not(:disabled) { border-color: color-mix(in srgb, #f97316 45%, var(--line)); }
+.idle-dungeon-diff-btn.active {
+  background: color-mix(in srgb, #f97316 26%, var(--paper-2));
+  border-color: #f97316;
+  color: #fb923c;
+}
+.idle-dungeon-diff-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.idle-dungeon-intro p { font-size: 0.88rem; color: var(--muted); line-height: 1.5; margin-bottom: 0.6rem; }
+.idle-dungeon-best { font-weight: 700; color: var(--ink) !important; }
+/* .btn-ja erzwingt Hintergrund/Textfarbe per !important (siehe Kommentar
+   bei .idle-prestige-buy oben) - ein direkter background hier waere
+   unerreichbarer toter Code, deshalb nur der margin/disabled-Zusatz. */
+.idle-dungeon-start-btn { margin-top: 0.5rem; }
+.idle-dungeon-start-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.idle-dungeon-banner {
+  display: flex;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.9rem;
+  margin-bottom: 0.6rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, color-mix(in srgb, #f97316 22%, var(--paper)), var(--paper));
+  border: 1px solid color-mix(in srgb, #f97316 45%, var(--line));
+  color: #fb923c;
+  font-weight: 800;
+  font-size: 0.85rem;
+  animation: bkmpDungeonBannerPulse 2.4s ease-in-out infinite;
+}
+@keyframes bkmpDungeonBannerPulse {
+  0%, 100% { box-shadow: 0 0 0 rgba(249, 115, 22, 0); }
+  50% { box-shadow: 0 0 16px rgba(249, 115, 22, 0.35); }
+}
+.idle-dungeon-result-card strong { color: #fb923c; }
+@media (prefers-reduced-motion: reduce) {
+  .idle-dungeon-banner { animation: none; }
+}
 
 /* ---- Skilltree ---- */
 .idle-skillpoints-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 0.9rem; }
