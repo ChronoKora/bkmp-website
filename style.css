@@ -5647,6 +5647,25 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
    bei .idle-prestige-buy oben) - ein direkter background hier waere
    unerreichbarer toter Code, deshalb nur der margin/disabled-Zusatz. */
 .idle-dungeon-start-btn { margin-top: 0.5rem; }
+
+/* PvP-Arena (siehe supabase-idle-arena.sql) - Gegner-Reihen im gleichen
+   Karten-Look wie der Rest des Idle-Dorfs. */
+.idle-arena-opponent-card {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+.idle-arena-opponent-name { font-weight: 700; color: var(--ink); flex: 1 1 auto; min-width: 100px; }
+.idle-arena-opponent-rating { font-weight: 700; color: #fb923c; }
+.idle-arena-opponent-record { font-size: 0.8rem; color: var(--muted); }
+.idle-arena-attack-btn { margin-left: auto; font-size: 0.82rem; padding: 0.35rem 0.8rem; }
+.idle-arena-history .idle-dungeon-best { font-weight: 500; font-size: 0.85rem; margin-bottom: 0.3rem; }
 .idle-dungeon-start-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .idle-dungeon-banner {
   display: flex;

@@ -3888,6 +3888,36 @@ async function bkmpArenaGetRecentBattles(authUserId, limit) {
   }));
 }
 
+/* ---------------- Admin: Spieler-Verwaltung (siehe supabase-admin-player-
+   management.sql) - direkte Folge des 14.07.-Troll-Vorfalls (Adolf/
+   KillTheJews88/Heinrich_H/Sakuyumi), die bisher jedes Mal ein manuell in den
+   Chat gepostetes Loesch-Skript brauchten. Beide RPCs sind admin-gated
+   (is_active_admin()), laufen also nur mit einer echten Admin-Session
+   (bkmpGetSupabaseClient(), gleicher Client wie der Rest von admin.html). */
+async function bkmpAdminListRecentPlayers(limit) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return [];
+  const { data, error } = await client.rpc('admin_list_recent_players', { p_limit: limit || 30 });
+  if (error) throw error;
+  return (data || []).map(row => ({
+    authUserId: row.auth_user_id,
+    displayName: row.display_name || '',
+    nameKey: row.name_key || '',
+    createdAt: row.created_at,
+    bonkCount: Number(row.bonk_count || 0),
+    achievementsUnlocked: Number(row.achievements_unlocked || 0),
+    minutesSpent: Number(row.minutes_spent || 0)
+  }));
+}
+
+async function bkmpAdminDeletePlayerAccount(authUserId) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { data, error } = await client.rpc('admin_delete_player_account', { p_auth_user_id: authUserId });
+  if (error) throw error;
+  return data || '';
+}
+
 async function loadRaidBossesAdmin() {
   const client = bkmpGetSupabaseClient();
   if (!client) return [];

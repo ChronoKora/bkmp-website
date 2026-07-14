@@ -20,7 +20,7 @@
 <title>BKMP — Admin</title>
 
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
-<link rel="stylesheet" href="style.css?v=20260717-autofuse1">
+<link rel="stylesheet" href="style.css?v=20260714-arena1">
 </head>
 <body>
 
@@ -207,6 +207,10 @@
           <svg viewBox="0 0 24 24"><path d="M4 4h16v13H8l-4 4V4z"/></svg>
           Feedback
           <span class="admin-nav-badge" id="feedbackNavBadge"></span>
+        </button>
+        <button class="admin-nav-btn" data-page="playermgmt">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v2"/></svg>
+          Spieler-Verwaltung
         </button>
         <button class="admin-nav-btn" data-page="access">
           <svg viewBox="0 0 24 24"><path d="M12 3a5 5 0 0 0-5 5v3H5v10h14V11h-2V8a5 5 0 0 0-5-5z"/><path d="M9 11V8a3 3 0 0 1 6 0v3"/></svg>
@@ -938,6 +942,16 @@
           </div>
         </section>
 
+        <!-- Spieler-Verwaltung -->
+        <section class="admin-page" id="page-playermgmt">
+          <div class="admin-section">
+            <h2>Spieler-Verwaltung</h2>
+            <p class="admin-help-text">Zuletzt registrierte Spieler-Accounts. Auffällig: sehr hohe Werte direkt nach der Registrierung (echte neue Accounts starten bei 0) - Hinweis auf einen ererbten/manipulierten Stand statt echten Fortschritts.</p>
+            <button class="edit-btn" type="button" id="playerMgmtRefreshBtn" style="margin-bottom:1rem;">Aktualisieren</button>
+            <div class="feedback-list" id="playerMgmtList"></div>
+          </div>
+        </section>
+
         <!-- Zugaenge -->
         <section class="admin-page" id="page-access">
           <div class="admin-section">
@@ -997,9 +1011,9 @@
   </div>
 
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260714-nameblock"></script>
+  <script src="supabase.js?v=20260714-adminplayers"></script>
   <script src="app.js?v=20260712-themefix1"></script>
-  <script src="idledorf.js?v=20260714-fusezero"></script>
+  <script src="idledorf.js?v=20260714-arena1"></script>
   <script src="mapart.js?v=20260716-companyfix1"></script>
   <script>
     bkmpInitTheme();
@@ -1240,6 +1254,7 @@
         if (page === 'investorRequests') refreshInvestorRequestsFromSupabase();
         if (page === 'cardcatalog') refreshCardCatalogFromSupabase();
         if (page === 'feedback') refreshFeedbackList();
+        if (page === 'playermgmt') refreshPlayerMgmtList();
         if (page === 'plushies') { bkmpRefreshPlushieDefinitionsAdmin(); refreshPlushieCodesList(); }
         if (page === 'dailyevents') { bkmpRefreshPlushieDefinitionsAdmin(); refreshDailyEventsPage(); }
         if (page === 'polls') refreshPollsAdmin();
@@ -2008,6 +2023,115 @@
 
     const feedbackShowArchivedCheckbox = document.getElementById('feedbackShowArchived');
     if (feedbackShowArchivedCheckbox) feedbackShowArchivedCheckbox.addEventListener('change', renderFeedbackList);
+
+    /* ---------------- Spieler-Verwaltung (siehe supabase-admin-player-
+       management.sql) - Liste zuletzt registrierter Accounts + Loeschen mit
+       einem Klick, direkte Folge des 14.07.-Troll-Vorfalls (mehrere
+       Accounts hintereinander, jedes Mal ein manuell im Chat gepostetes
+       Loesch-Skript noetig). Tabellen-Kaskade fuer den SQL-Datei-Download
+       ist bewusst 1:1 dieselbe wie in admin_delete_player_account() - beide
+       Wege muessen bei Aenderungen an der Tabellenstruktur synchron
+       gehalten werden. */
+    let bkmpPlayerMgmtCache = [];
+    const BKMP_PLAYERMGMT_BONK_WARN_THRESHOLD = 500;
+
+    async function refreshPlayerMgmtList() {
+      if (typeof bkmpAdminListRecentPlayers !== 'function' || !bkmpGetSupabaseClient()) return;
+      try {
+        bkmpPlayerMgmtCache = await bkmpAdminListRecentPlayers(30);
+      } catch (e) {
+        console.warn('Spielerliste konnte nicht geladen werden.', e);
+        showAdminToast('Spielerliste konnte nicht geladen werden: ' + supabaseErrorText(e), 'error');
+      }
+      renderPlayerMgmtList();
+    }
+
+    function bkmpPlayerMgmtDeleteSql(row) {
+      const uid = row.authUserId;
+      const nameKey = row.nameKey || '';
+      const lines = [
+        `-- Löschskript für Account "${row.displayName}" (${uid})`,
+        `-- Erzeugt am ${new Date().toLocaleString('de-DE')} im Admin-Panel (Spieler-Verwaltung)`,
+        '',
+        `delete from public.wish_votes where auth_user_id = '${uid}';`,
+        `delete from public.raid_participants where auth_user_id = '${uid}';`,
+        `delete from public.raid_player_stats where auth_user_id = '${uid}';`,
+        `delete from public.idle_event_dragon_state where auth_user_id = '${uid}' or name_key = '${nameKey}';`,
+        `delete from public.user_plushies where name_key = '${nameKey}';`,
+        `delete from public.idle_prestige_state where name_key = '${nameKey}';`,
+        `delete from public.idle_player_runes where auth_user_id = '${uid}';`,
+        `delete from public.idle_dungeon_results where name_key = '${nameKey}';`,
+        `delete from public.poll_votes where auth_user_id = '${uid}';`,
+        `delete from public.idle_player_state where auth_user_id = '${uid}';`,
+        `delete from public.player_stats where auth_user_id = '${uid}';`,
+        `delete from auth.users where id = '${uid}';`,
+        ''
+      ];
+      return lines.join('\n');
+    }
+
+    function downloadPlayerMgmtSql(row) {
+      const sql = bkmpPlayerMgmtDeleteSql(row);
+      const blob = new Blob([sql], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `delete-${(row.nameKey || row.authUserId || 'account').replace(/[^a-z0-9_-]/gi, '_')}.sql`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    async function deletePlayerMgmtAccount(authUserId) {
+      if (typeof bkmpAdminDeletePlayerAccount !== 'function') return;
+      try {
+        const deletedName = await bkmpAdminDeletePlayerAccount(authUserId);
+        bkmpPlayerMgmtCache = bkmpPlayerMgmtCache.filter(p => p.authUserId !== authUserId);
+        renderPlayerMgmtList();
+        showAdminToast(`Account "${deletedName}" wurde gelöscht.`, 'success');
+      } catch (e) {
+        showAdminToast('Konnte nicht gelöscht werden: ' + supabaseErrorText(e), 'error');
+      }
+    }
+
+    function renderPlayerMgmtList() {
+      const el = document.getElementById('playerMgmtList');
+      if (!el) return;
+      if (bkmpPlayerMgmtCache.length === 0) {
+        el.innerHTML = '<p class="empty-hint">Keine Spieler-Accounts gefunden.</p>';
+        return;
+      }
+      el.innerHTML = bkmpPlayerMgmtCache.map(p => {
+        const suspicious = p.bonkCount > BKMP_PLAYERMGMT_BONK_WARN_THRESHOLD;
+        const created = p.createdAt ? new Date(p.createdAt).toLocaleString('de-DE') : 'unbekannt';
+        return `
+        <div class="feedback-card ${suspicious ? 'is-unread' : ''}" data-player-uid="${escapeHtml(p.authUserId)}">
+          <div class="feedback-card-head">
+            ${suspicious ? '<span class="feedback-card-unread-dot" aria-hidden="true" title="Ungewöhnlich hoher Wert für einen Account"></span>' : ''}
+            <span class="feedback-card-name">${escapeHtml(p.displayName || '(ohne Namen)')}</span>
+            <span class="feedback-card-date">Registriert: ${escapeHtml(created)}</span>
+          </div>
+          <p class="feedback-card-message">🥊 ${p.bonkCount.toLocaleString('de-DE')} Bonks · 🏆 ${p.achievementsUnlocked} Erfolge · ⏱️ ${p.minutesSpent.toLocaleString('de-DE')} Min.${suspicious ? ' <strong>⚠️ Ungewöhnlich hoch für diesen Account</strong>' : ''}</p>
+          <div class="feedback-card-actions">
+            <button class="edit-btn sql-btn" type="button">💾 SQL-Datei</button>
+            <button class="del-btn" type="button" aria-label="Account löschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>
+          </div>
+        </div>`;
+      }).join('');
+      el.querySelectorAll('.feedback-card').forEach(card => {
+        const uid = card.dataset.playerUid;
+        const row = bkmpPlayerMgmtCache.find(p => p.authUserId === uid);
+        if (!row) return;
+        card.querySelector('.sql-btn').addEventListener('click', () => downloadPlayerMgmtSql(row));
+        card.querySelector('.del-btn').addEventListener('click', () => {
+          if (confirm(`Account "${row.displayName}" wirklich endgültig löschen? Das kann nicht rückgängig gemacht werden.`)) deletePlayerMgmtAccount(uid);
+        });
+      });
+    }
+
+    const playerMgmtRefreshBtn = document.getElementById('playerMgmtRefreshBtn');
+    if (playerMgmtRefreshBtn) playerMgmtRefreshBtn.addEventListener('click', refreshPlayerMgmtList);
 
     async function removeCardCatalogEntry(id) {
       if (typeof deleteCardCatalogEntry === 'function' && bkmpGetSupabaseClient()) {

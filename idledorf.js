@@ -2403,6 +2403,158 @@ function bkmpIdleRenderErfolgePanel() {
   });
 }
 
+/* ---------------- Rendering: Arena-Tab (siehe supabase-idle-arena.sql) ----------------
+   Asynchroner PvP-Kampf gegen die zuletzt synchronisierten Kampfwerte
+   anderer Spieler - die eigentliche Kampfabwicklung (Rating-Aenderung,
+   Gold-Belohnung) laeuft komplett serverseitig ueber arena_attack(), hier
+   nur Anzeige + Angriffs-Button. bkmpArenaMyAuthUserId wird einmalig beim
+   ersten Oeffnen des Tabs per Session-Check ermittelt (gleiches Muster wie
+   bkmpRaidRefreshAchievementCache). */
+let bkmpArenaMyAuthUserId = null;
+let bkmpArenaMyRating = null;
+let bkmpArenaOpponents = [];
+let bkmpArenaRecentBattles = [];
+let bkmpArenaLoaded = false;
+let bkmpArenaLoading = false;
+let bkmpArenaAttacking = null;
+
+async function bkmpArenaEnsureMyAuthUserId() {
+  if (bkmpArenaMyAuthUserId) return bkmpArenaMyAuthUserId;
+  const client = typeof bkmpGetPlayerAuthClient === 'function' ? bkmpGetPlayerAuthClient() : null;
+  if (!client) return null;
+  try {
+    const { data: sessionData } = await client.auth.getSession();
+    bkmpArenaMyAuthUserId = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
+  } catch (e) { bkmpArenaMyAuthUserId = null; }
+  return bkmpArenaMyAuthUserId;
+}
+
+/* Erfolge-/Titel-Anbindung (gleiches Cache-Muster wie
+   bkmpRaidGetAchievementContextFields/bkmpRaidRefreshAchievementCache) -
+   arena_ratings.wins wird lokal gecacht, damit Erfolge/Titel auch offline
+   ihren letzten bekannten Stand zeigen. */
+const BKMP_ARENA_ACHIEVEMENT_CACHE_KEY = 'bkmp-arena-achievement-fields-cache';
+function bkmpArenaGetAchievementContextFields() {
+  try {
+    return JSON.parse(localStorage.getItem(BKMP_ARENA_ACHIEVEMENT_CACHE_KEY) || 'null') || { arenaWins: 0, arenaRating: 1000 };
+  } catch (e) {
+    return { arenaWins: 0, arenaRating: 1000 };
+  }
+}
+async function bkmpArenaRefreshAchievementCache() {
+  try {
+    const rating = await bkmpArenaGetMyRating();
+    const fields = { arenaWins: rating ? rating.wins : 0, arenaRating: rating ? rating.rating : 1000 };
+    localStorage.setItem(BKMP_ARENA_ACHIEVEMENT_CACHE_KEY, JSON.stringify(fields));
+    if (typeof renderAchievementBadge === 'function') renderAchievementBadge(true);
+  } catch (e) { /* offline/kein Login - alter Cache-Stand bleibt bestehen */ }
+}
+
+async function bkmpArenaLoadAll() {
+  bkmpArenaLoading = true;
+  const uid = await bkmpArenaEnsureMyAuthUserId();
+  try {
+    bkmpArenaMyRating = uid ? await bkmpArenaGetMyRating() : null;
+    bkmpArenaOpponents = uid ? await bkmpArenaGetOpponents(uid, bkmpArenaMyRating ? bkmpArenaMyRating.rating : 1000, 8) : [];
+    bkmpArenaRecentBattles = uid ? await bkmpArenaGetRecentBattles(uid, 15) : [];
+  } catch (e) {
+    console.warn('Arena-Daten konnten nicht geladen werden.', e);
+  }
+  bkmpArenaLoaded = true;
+  bkmpArenaLoading = false;
+}
+
+function bkmpArenaFormatTime(iso) {
+  if (!iso) return '';
+  try { return new Date(iso).toLocaleString('de-DE'); } catch (e) { return ''; }
+}
+
+async function bkmpIdleRenderArenaPanel() {
+  const panel = document.getElementById('idlePanelArena');
+  if (!panel) return;
+
+  if (!bkmpArenaLoaded && !bkmpArenaLoading) {
+    panel.innerHTML = '<p class="idle-dungeon-best">⏳ Lade Arena...</p>';
+    await bkmpArenaLoadAll();
+  }
+
+  const uid = bkmpArenaMyAuthUserId;
+  if (!uid) {
+    panel.innerHTML = `
+      <div class="idle-dungeon-intro">
+        <h4>⚔️ PvP-Arena</h4>
+        <p>Melde dich mit deinem Spieler-Konto an und spiele mindestens einmal im Kampf-Tab, um in der Arena gegen andere Spieler anzutreten.</p>
+      </div>`;
+    return;
+  }
+
+  const rating = bkmpArenaMyRating ? bkmpArenaMyRating.rating : 1000;
+  const wins = bkmpArenaMyRating ? bkmpArenaMyRating.wins : 0;
+  const losses = bkmpArenaMyRating ? bkmpArenaMyRating.losses : 0;
+  const total = wins + losses;
+  const winRate = total > 0 ? Math.round((wins / total) * 100) : 0;
+
+  panel.innerHTML = `
+    <div class="idle-dungeon-intro">
+      <h4>⚔️ PvP-Arena</h4>
+      <p>Asynchroner Kampf gegen die aktuellen Kampfwerte anderer Spieler - kein Echtzeit-Duell, dein Gegner muss nicht online sein. Sieg bringt Rating + Gold, Niederlage kostet nur Rating (nie Gold).</p>
+      <p class="idle-dungeon-best">🏅 Dein Rating: <strong>${rating}</strong> &middot; ${wins}S / ${losses}N ${total > 0 ? `(${winRate}% Siegquote)` : ''}</p>
+    </div>
+    <div class="idle-arena-opponents">
+      <h4 style="margin-top:1rem;">Gegner in deiner Nähe</h4>
+      ${bkmpArenaOpponents.length === 0 ? '<p class="empty-hint">Noch keine anderen Spieler in der Arena. Schau später nochmal vorbei.</p>' : bkmpArenaOpponents.map(o => `
+        <div class="idle-arena-opponent-card" data-opponent-uid="${escapeHtml(o.authUserId)}">
+          <span class="idle-arena-opponent-name">${escapeHtml(o.displayName)}</span>
+          <span class="idle-arena-opponent-rating">🏅 ${o.rating}</span>
+          <span class="idle-arena-opponent-record">${o.wins}S/${o.losses}N</span>
+          <button type="button" class="btn-ja idle-arena-attack-btn" ${bkmpArenaAttacking ? 'disabled' : ''}>${bkmpArenaAttacking === o.authUserId ? '⏳...' : '⚔️ Angreifen'}</button>
+        </div>
+      `).join('')}
+    </div>
+    <div class="idle-arena-history">
+      <h4 style="margin-top:1rem;">Letzte Kämpfe</h4>
+      ${bkmpArenaRecentBattles.length === 0 ? '<p class="empty-hint">Noch keine Kämpfe.</p>' : bkmpArenaRecentBattles.map(b => {
+        const won = b.wasAttacker ? b.attackerWon : !b.attackerWon;
+        const opponentName = b.wasAttacker ? b.defenderName : b.attackerName;
+        const verb = b.wasAttacker ? (won ? 'besiegt' : 'verloren gegen') : (won ? 'abgewehrt' : 'überrumpelt von');
+        return `<p class="idle-dungeon-best">${won ? '✅' : '❌'} ${b.wasAttacker ? 'Du hast' : ''} ${escapeHtml(opponentName)} ${verb}${b.wasAttacker ? '' : ' dich'} &middot; ${b.wasAttacker ? (won ? '+' : '') + b.ratingChange : (won ? '+' : '') + (-b.ratingChange)} Rating${b.goldReward ? ` &middot; +${b.goldReward} 💰` : ''} &middot; ${bkmpArenaFormatTime(b.occurredAt)}</p>`;
+      }).join('')}
+    </div>
+  `;
+
+  panel.querySelectorAll('.idle-arena-attack-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const card = btn.closest('[data-opponent-uid]');
+      const opponentUid = card ? card.dataset.opponentUid : null;
+      if (!opponentUid || bkmpArenaAttacking) return;
+      bkmpArenaAttacking = opponentUid;
+      bkmpIdleRenderArenaPanel();
+      try {
+        const result = await bkmpArenaAttack(opponentUid);
+        if (result) {
+          const msg = result.won
+            ? `⚔️ Sieg gegen ${result.defenderName}! +${result.ratingChange} Rating, +${result.goldReward} 💰 (jetzt ${result.newRating})`
+            : `⚔️ Niederlage gegen ${result.defenderName}. ${result.ratingChange} Rating (jetzt ${result.newRating})`;
+          if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(msg, 3800);
+          bkmpIdleLog(msg);
+        }
+      } catch (e) {
+        if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(e.message || 'Angriff fehlgeschlagen.', 3200);
+      }
+      bkmpArenaAttacking = null;
+      bkmpArenaLoaded = false;
+      await bkmpIdleRenderArenaPanel();
+    });
+  });
+}
+
+/* ---------------- Rendering: Gilde-Tab (siehe supabase-idle-guilds.sql) ---------------- */
+async function bkmpIdleRenderGildePanel() {
+  const panel = document.getElementById('idlePanelGilde');
+  if (!panel) return;
+  panel.innerHTML = '<div class="idle-dungeon-intro"><h4>🛡️ Gilde</h4><p class="idle-dungeon-best">⏳ Wird noch gebaut...</p></div>';
+}
+
 /* ---------------- Rendering: Bestenliste-Tab ---------------- */
 
 const BKMP_IDLE_LEADERBOARD_TABS = [
@@ -4515,6 +4667,8 @@ const bkmpIdleTabs = [
   { id: 'runen', btn: 'idleTabBtnRunen', panel: 'idlePanelRunen', render: bkmpIdleRenderRunenPanel },
   { id: 'skins', btn: 'idleTabBtnSkins', panel: 'idlePanelSkins', render: bkmpIdleRenderSkinsPanel },
   { id: 'dungeon', btn: 'idleTabBtnDungeon', panel: 'idlePanelDungeon', render: bkmpIdleRenderDungeonPanel },
+  { id: 'arena', btn: 'idleTabBtnArena', panel: 'idlePanelArena', render: bkmpIdleRenderArenaPanel },
+  { id: 'gilde', btn: 'idleTabBtnGilde', panel: 'idlePanelGilde', render: bkmpIdleRenderGildePanel },
   { id: 'bestenliste', btn: 'idleTabBtnBestenliste', panel: 'idlePanelBestenliste', render: bkmpIdleRenderBestenlistePanel }
 ];
 let bkmpIdleActiveTab = 'kampf';
