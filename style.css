@@ -4889,6 +4889,12 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   color: #0A0A0F;
   border-color: transparent;
 }
+/* Tab bleibt klickbar (zeigt einen Hinweis-Toast statt sich zu oeffnen,
+   siehe idledorf.js bkmpIdleInitTabs) - deshalb dezente Opazitaet statt
+   :disabled, damit der Klick weiter ankommt. */
+.idle-dorf-tab-locked { opacity: 0.55; cursor: not-allowed; }
+.idle-dorf-tab-locked:hover { opacity: 0.7; }
+.idle-dorf-tab-locked.active { opacity: 1; }
 
 /* Feste Hoehe statt min-height: Inhalte reichen von ~250px (Erfolge-Hinweis)
    bis ueber 5000px (Skilltree-Grid mit 30 Knoten) - eine gemeinsame

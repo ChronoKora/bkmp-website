@@ -3774,7 +3774,7 @@ const bkmpIdleTabs = [
   { id: 'bestenliste', btn: 'idleTabBtnBestenliste', panel: 'idlePanelBestenliste', render: bkmpIdleRenderBestenlistePanel },
   { id: 'prestige', btn: 'idleTabBtnPrestige', panel: 'idlePanelPrestige', render: bkmpIdleRenderPrestigePanel },
   { id: 'runen', btn: 'idleTabBtnRunen', panel: 'idlePanelRunen', render: bkmpIdleRenderRunenPanel },
-  { id: 'skins', btn: 'idleTabBtnSkins', panel: 'idlePanelSkins', render: bkmpIdleRenderSkinsPanel }
+  { id: 'skins', btn: 'idleTabBtnSkins', panel: 'idlePanelSkins', render: bkmpIdleRenderSkinsPanel, locked: true }
 ];
 let bkmpIdleActiveTab = 'kampf';
 
@@ -3807,6 +3807,12 @@ function bkmpIdleInitTabs() {
     const btn = document.getElementById(t.btn);
     if (!btn) return;
     btn.addEventListener('click', () => {
+      /* Dorf-Skins noch gesperrt (Nutzerwunsch 14.07.) - Tab bleibt sichtbar
+         (als Vorschau/Ankuendigung), laesst sich aber noch nicht oeffnen. */
+      if (t.locked) {
+        if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('🔒 Dorf-Skins sind noch gesperrt - schau bald wieder vorbei!', 3200);
+        return;
+      }
       bkmpIdleActiveTab = t.id;
       bkmpIdleTabs.forEach(other => {
         const b = document.getElementById(other.btn);
