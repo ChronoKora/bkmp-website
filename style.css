@@ -6093,13 +6093,15 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 }
 .raid-city-sprite {
   position: relative;
+  display: block;
   width: 100%;
   max-width: 480px;
   margin: 0 auto;
-  aspect-ratio: 1439 / 685;
-  background-image: url('assets/dragons/raid-stadt.png?v=20260710-raidcity1');
-  background-repeat: no-repeat;
-  background-size: 100% 100%;
+  /* Liegt als echtes Video vor (assets/dragons/raid-stadt.mp4) statt eines
+     statischen Bildes - aspect-ratio auf die echten Video-Massse gesetzt,
+     damit es ohne Zuschneiden/Verzerren exakt in den Container passt. */
+  aspect-ratio: 2090 / 992;
+  object-fit: cover;
   image-rendering: pixelated;
   filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.4));
   border-radius: 10px;
