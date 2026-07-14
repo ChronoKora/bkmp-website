@@ -2898,7 +2898,7 @@ const BKMP_IDLE_PLAYER_STATE_COLUMNS = `name_key, display_name, level, xp, gold,
   total_gold_earned, attack, defense, hp, crit_chance, crit_damage, gold_bonus, xp_bonus, loot_bonus,
   skill_points_available, skill_points_spent, skill_allocations, upgrade_purchases, dragon_kills, boss_kills,
   current_dragon_index, highest_dragon_index, prestige_stage_offset, auto_advance, playtime_seconds, last_seen_at, last_offline_claim, last_skilltree_reset_at, updated_at,
-  rune_fuse_successes, rune_fuse_failures, rune_upgrade_successes, rune_upgrade_failures, village_defeats, yaksha_boss_kills`;
+  rune_fuse_successes, rune_fuse_failures, rune_upgrade_successes, rune_upgrade_failures, village_defeats, yaksha_boss_kills, active_village_skin`;
 
 async function loadIdleDragons() {
   const client = bkmpGetSupabaseClient();
@@ -3814,32 +3814,34 @@ async function bkmpArenaGetOpponents(myAuthUserId, myRating, limit) {
   const client = bkmpGetSupabaseClient();
   if (!client) return [];
   const selfId = myAuthUserId || '00000000-0000-0000-0000-000000000000';
-  const { data, error } = await client
-    .from('arena_ratings')
-    .select('auth_user_id, name_key, display_name, rating, wins, losses')
-    .neq('auth_user_id', selfId)
-    .order('rating', { ascending: false })
-    .limit(200);
-  if (error) throw error;
-  const rows = (data || []).map(row => ({
-    authUserId: row.auth_user_id,
-    displayName: row.display_name,
-    rating: Number(row.rating || 1000),
-    wins: Number(row.wins || 0),
-    losses: Number(row.losses || 0)
-  }));
-  const knownIds = new Set(rows.map(r => r.authUserId));
+  /* idle_player_state ist die primaere Quelle (liefert auch die aktive
+     Dorf-Skin fuer die Kampfanimation, siehe supabase-idle-village-skin-
+     sync.sql) - arena_ratings wird nur noch zum ANREICHERN um echtes
+     Rating/Sieg-Niederlage-Verhaeltnis danebengelegt, wo schon vorhanden. */
   const { data: stateRows, error: stateError } = await client
     .from('idle_player_state')
-    .select('auth_user_id, display_name')
+    .select('auth_user_id, display_name, active_village_skin')
     .not('auth_user_id', 'is', null)
     .neq('auth_user_id', selfId)
     .limit(200);
   if (stateError) throw stateError;
-  (stateRows || []).forEach(row => {
-    if (!row.auth_user_id || knownIds.has(row.auth_user_id)) return;
-    knownIds.add(row.auth_user_id);
-    rows.push({ authUserId: row.auth_user_id, displayName: row.display_name, rating: 1000, wins: 0, losses: 0 });
+  const { data: ratingRows, error: ratingError } = await client
+    .from('arena_ratings')
+    .select('auth_user_id, rating, wins, losses')
+    .neq('auth_user_id', selfId)
+    .limit(200);
+  if (ratingError) throw ratingError;
+  const ratingById = new Map((ratingRows || []).map(r => [r.auth_user_id, r]));
+  const rows = (stateRows || []).filter(r => r.auth_user_id).map(row => {
+    const rating = ratingById.get(row.auth_user_id);
+    return {
+      authUserId: row.auth_user_id,
+      displayName: row.display_name,
+      activeVillageSkin: row.active_village_skin || 'standard',
+      rating: Number(rating ? rating.rating : 1000),
+      wins: Number(rating ? rating.wins : 0),
+      losses: Number(rating ? rating.losses : 0)
+    };
   });
   const baseline = Number.isFinite(myRating) ? myRating : 1000;
   rows.sort((a, b) => Math.abs(a.rating - baseline) - Math.abs(b.rating - baseline));

@@ -504,6 +504,13 @@ async function bkmpIdleLoadOrInitState(name) {
   }
   bkmpIdleLoadFailed = false;
   bkmpIdleState = remote || bkmpIdleDefaultState(name);
+  /* Aktive Dorf-Skin-Wahl geraeteuebergreifend gleichhalten (siehe
+     bkmpIdleEquipVillageSkin - schreibt jetzt zusaetzlich in
+     bkmpIdleState.active_village_skin) - beim Laden auf einem neuen/anderen
+     Geraet den vom Server bekannten Stand als Ausgangspunkt uebernehmen. */
+  if (bkmpIdleState && bkmpIdleState.active_village_skin) {
+    bkmpSetActiveVillageSkinId(bkmpIdleState.active_village_skin);
+  }
   bkmpIdleVillageHp = null;
   bkmpIdleCurrentDragon = null;
   /* Komplett eigenstaendiger Ladevorgang (eigene Tabelle, eigenes
@@ -2521,7 +2528,7 @@ function bkmpArenaFormatTime(iso) {
    Weltboss-Raid), die Animation spielt nur eine plausible Annaeherung
    daran ab, bevor das Ergebnis final angezeigt wird. Gibt ein Promise
    zurueck, das nach Ende der Animation aufloest. */
-function bkmpArenaPlayBattleAnimation(myName, opponentName, won) {
+function bkmpArenaPlayBattleAnimation(myName, opponentName, won, myVillageSkin, opponentVillageSkin) {
   return new Promise(resolve => {
     const overlay = document.getElementById('arenaBattleOverlay');
     if (!overlay) { resolve(); return; }
@@ -2530,6 +2537,12 @@ function bkmpArenaPlayBattleAnimation(myName, opponentName, won) {
     const resultEl = document.getElementById('arenaBattleResult');
     document.getElementById('arenaBattleMeName').textContent = myName || 'Du';
     document.getElementById('arenaBattleOpponentName').textContent = opponentName || 'Gegner';
+    /* Jeder mit seinem eigenen ausgeruesteten Dorf-Skin (Spieler-Wunsch
+       14.07.) - eigene Seite: Ownership-Check greift ganz normal, Gegner-
+       Seite: Server-Angabe wird vertraut (siehe
+       bkmpApplyVillageSkinToElement, checkOwnership:false). */
+    bkmpApplyVillageSkinToElement(document.getElementById('arenaBattleMeSprite'), myVillageSkin);
+    bkmpApplyVillageSkinToElement(document.getElementById('arenaBattleOpponentSprite'), opponentVillageSkin, { checkOwnership: false });
     meFill.style.width = '100%';
     oppFill.style.width = '100%';
     resultEl.textContent = ' ';
@@ -2632,8 +2645,8 @@ async function bkmpIdleRenderArenaPanel() {
     btn.addEventListener('click', async () => {
       const card = btn.closest('[data-opponent-uid]');
       const opponentUid = card ? card.dataset.opponentUid : null;
-      const opponentNameEl = card ? card.querySelector('.idle-arena-opponent-name') : null;
-      const opponentName = opponentNameEl ? opponentNameEl.textContent : 'Gegner';
+      const opponent = bkmpArenaOpponents.find(o => o.authUserId === opponentUid);
+      const opponentName = opponent ? opponent.displayName : 'Gegner';
       if (!opponentUid || bkmpArenaAttacking) return;
       bkmpArenaAttacking = opponentUid;
       bkmpIdleRenderArenaPanel();
@@ -2641,7 +2654,9 @@ async function bkmpIdleRenderArenaPanel() {
         const result = await bkmpArenaAttack(opponentUid);
         if (result) {
           const myName = (typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : '') || 'Du';
-          await bkmpArenaPlayBattleAnimation(myName, opponentName, result.won);
+          const myVillageSkin = typeof bkmpGetActiveVillageSkinId === 'function' ? bkmpGetActiveVillageSkinId() : 'standard';
+          const opponentVillageSkin = opponent ? opponent.activeVillageSkin : 'standard';
+          await bkmpArenaPlayBattleAnimation(myName, opponentName, result.won, myVillageSkin, opponentVillageSkin);
           const msg = result.won
             ? `⚔️ Sieg gegen ${result.defenderName}! +${result.ratingChange} Rating, +${result.goldReward} 💰 (jetzt ${result.newRating})`
             : `⚔️ Niederlage gegen ${result.defenderName}. ${result.ratingChange} Rating (jetzt ${result.newRating})`;
@@ -3993,12 +4008,22 @@ function bkmpEnsureVillageFrameKeyframes(frameCount) {
   return name;
 }
 
-function bkmpApplyVillageSkin() {
-  const el = document.getElementById('idleVillageSprite');
+/* Verallgemeinert aus dem urspruenglich fest an #idleVillageSprite
+   gebundenen Code (Spieler-Wunsch 14.07.: "Jeder mit seinem Dorfskin was
+   er ausgerüstet hat" fuer die Arena-Kampfanimation) - nimmt jetzt ein
+   beliebiges Element + eine Skin-ID entgegen, damit dieselbe Anzeige-Logik
+   sowohl fuer das eigene Dorf im Kampf-Tab als auch fuer BEIDE Seiten der
+   Arena-Animation (eigenes Dorf + Gegner-Dorf, gleichzeitig unterschiedliche
+   Skins) genutzt werden kann. Ownership-Check (bkmpVillageSkinOwned) gilt
+   nur fuer das EIGENE Dorf - beim Gegner wird jede vom Server gemeldete
+   Skin-ID vertrauensvoll angezeigt (kein zusaetzlicher Katalog-Zugriff
+   noetig, der Skin-Katalog ist ohnehin komplett bekannt). */
+function bkmpApplyVillageSkinToElement(el, skinId, options) {
   if (!el) return;
-  let activeId = bkmpGetActiveVillageSkinId();
+  const checkOwnership = !options || options.checkOwnership !== false;
+  let activeId = skinId || 'standard';
   let def = bkmpVillageSkinsCatalog.find(s => s.id === activeId);
-  if (!def || !bkmpVillageSkinOwned(activeId)) {
+  if (!def || (checkOwnership && !bkmpVillageSkinOwned(activeId))) {
     def = bkmpVillageSkinsCatalog.find(s => s.id === 'standard');
   }
   if (def && def.video_file) {
@@ -4059,6 +4084,10 @@ function bkmpApplyVillageSkin() {
   }
 }
 
+function bkmpApplyVillageSkin() {
+  bkmpApplyVillageSkinToElement(document.getElementById('idleVillageSprite'), bkmpGetActiveVillageSkinId());
+}
+
 function bkmpIdleBuyVillageSkin(skinId) {
   const def = bkmpVillageSkinsCatalog.find(s => s.id === skinId);
   if (!def || def.unlock_type !== 'purchase' || !bkmpIdleState) return;
@@ -4091,6 +4120,17 @@ function bkmpIdleEquipVillageSkin(skinId) {
   bkmpSetActiveVillageSkinId(skinId);
   bkmpApplyVillageSkin();
   bkmpIdleRenderSkinsPanel();
+  /* Server-Sync (Spieler-Wunsch 14.07., Arena-Kampfanimation: "Jeder mit
+     seinem Dorfskin was er ausgerüstet hat") - die aktive Skin-Wahl war
+     bisher rein lokal (localStorage), andere Spieler (z.B. ein Arena-Gegner)
+     konnten sie serverseitig gar nicht sehen. Landet ganz normal im
+     naechsten periodischen Sync mit (bkmpIdleQueueSync), kein Sonderpfad
+     noetig - siehe active_village_skin in supabase-idle-village-skin-
+     sync.sql. */
+  if (bkmpIdleState) {
+    bkmpIdleState.active_village_skin = skinId;
+    bkmpIdleQueueSync();
+  }
 }
 
 function bkmpIdleRenderSkinsPanel() {
