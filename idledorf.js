@@ -620,7 +620,13 @@ async function bkmpGuildRefreshTreasuryBonusCache() {
   try {
     const mine = await bkmpGuildGetMine();
     const treasury = mine ? mine.guild.treasuryGold : 0;
-    localStorage.setItem(BKMP_GUILD_TREASURY_BONUS_CACHE_KEY, String(treasury));
+    /* BUGFIX (Spieler-Report 14.07., "Irgendwas stimmt mit der Skalierung
+       nicht! habe 65k Rüstung... nach 50k gold mehr" -> 192,6K): hier wurde
+       versehentlich der ROHE Kassenstand gecacht statt des berechneten
+       Bonus-Prozentsatzes - die Stat-Formel hat den Kassenstand (z.B.
+       26000) direkt als Prozentwert interpretiert ("+26000%" statt "+8%"). */
+    const bonusPct = bkmpIdleGuildTreasuryBonusPct(treasury);
+    localStorage.setItem(BKMP_GUILD_TREASURY_BONUS_CACHE_KEY, String(bonusPct));
     if (typeof bkmpIdleRecomputeEffectiveStats === 'function') bkmpIdleRecomputeEffectiveStats();
   } catch (e) { /* offline/kein Login - alter Cache-Stand bleibt bestehen */ }
 }

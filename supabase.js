@@ -3798,14 +3798,26 @@ async function bkmpArenaGetMyRating() {
 /* Gegnerauswahl: alle Ratings ausser dem eigenen laden, clientseitig auf
    eine Zufallsauswahl in Rating-Naehe eingrenzen - bei bisher kleiner
    Spielerzahl reicht das voellig, ohne eine eigene RPC nur fuers Mischen zu
-   brauchen. */
+   brauchen.
+
+   BOOTSTRAP-PROBLEM (Spieler-Report 14.07.: "Und wann habe ich Gegner?"):
+   arena_ratings bekommt eine Zeile fuer einen Spieler erst, wenn er (als
+   Angreifer ODER Verteidiger) am ERSTEN Kampf ueberhaupt beteiligt war
+   (siehe arena_attack() - Upsert passiert dort, nicht beim blossen
+   Betreten des Tabs). Ganz am Anfang, bevor je jemand gekaempft hat, ist
+   die Tabelle also fuer ALLE komplett leer - ohne Ergaenzung koennte
+   niemand jemals den allerersten Kampf ueberhaupt starten. Deshalb
+   zusaetzlich aus idle_player_state ergaenzen (jeder, der schon mal im
+   Kampf-Tab gespielt hat, ist ein gueltiger Gegner) - virtuelles
+   Rating 1000/0S/0N, bis die echte Zeile beim ersten Kampf entsteht. */
 async function bkmpArenaGetOpponents(myAuthUserId, myRating, limit) {
   const client = bkmpGetSupabaseClient();
   if (!client) return [];
+  const selfId = myAuthUserId || '00000000-0000-0000-0000-000000000000';
   const { data, error } = await client
     .from('arena_ratings')
     .select('auth_user_id, name_key, display_name, rating, wins, losses')
-    .neq('auth_user_id', myAuthUserId || '00000000-0000-0000-0000-000000000000')
+    .neq('auth_user_id', selfId)
     .order('rating', { ascending: false })
     .limit(200);
   if (error) throw error;
@@ -3816,6 +3828,19 @@ async function bkmpArenaGetOpponents(myAuthUserId, myRating, limit) {
     wins: Number(row.wins || 0),
     losses: Number(row.losses || 0)
   }));
+  const knownIds = new Set(rows.map(r => r.authUserId));
+  const { data: stateRows, error: stateError } = await client
+    .from('idle_player_state')
+    .select('auth_user_id, display_name')
+    .not('auth_user_id', 'is', null)
+    .neq('auth_user_id', selfId)
+    .limit(200);
+  if (stateError) throw stateError;
+  (stateRows || []).forEach(row => {
+    if (!row.auth_user_id || knownIds.has(row.auth_user_id)) return;
+    knownIds.add(row.auth_user_id);
+    rows.push({ authUserId: row.auth_user_id, displayName: row.display_name, rating: 1000, wins: 0, losses: 0 });
+  });
   const baseline = Number.isFinite(myRating) ? myRating : 1000;
   rows.sort((a, b) => Math.abs(a.rating - baseline) - Math.abs(b.rating - baseline));
   const nearPool = rows.slice(0, Math.max(20, (limit || 8) * 3));
