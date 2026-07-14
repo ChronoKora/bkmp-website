@@ -55,7 +55,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260716-zerathoregg1">
+<link rel="stylesheet" href="style.css?v=20260717-streakconfetti1">
 </head>
 <body>
 
@@ -1172,7 +1172,7 @@
   <script src="assets/vendor/supabase-js.min.js"></script>
   <script src="supabase.js?v=20260716-midasyaksha1"></script>
   <script src="app.js?v=20260712-themefix1"></script>
-  <script src="idledorf.js?v=20260716-skinsunlock1"></script>
+  <script src="idledorf.js?v=20260717-streak1"></script>
   <script src="mapart.js?v=20260716-companyfix1"></script>
   <script>
     bkmpInitTheme();
@@ -1797,6 +1797,23 @@
     function bkmpAchievementUnlocked(a, ctx) {
       return Boolean(a.check(ctx)) || Boolean(bkmpGetAchievementUnlockedAtMap()[a.id]);
     }
+    /* Konfetti-Burst bei Achievement-Freischaltung - rein optisches
+       Zuckerl, an derselben Ecke wie die Popup-Karte (unten links). */
+    function bkmpFireAchievementConfetti() {
+      const colors = ['#c9a56a', '#a78bfa', '#4ade80', '#f87171', '#60a5fa'];
+      const burst = document.createElement('div');
+      burst.className = 'bkmp-achievement-confetti';
+      burst.innerHTML = Array.from({ length: 18 }, (_, i) => {
+        const color = colors[i % colors.length];
+        const left = Math.round(Math.random() * 85);
+        const duration = (0.85 + Math.random() * 0.55).toFixed(2);
+        const delay = (Math.random() * 0.15).toFixed(2);
+        const rot = Math.round(Math.random() * 320 - 160);
+        return `<span style="left:${left}%; background:${color}; animation-duration:${duration}s; animation-delay:${delay}s; --rot:${rot}deg;"></span>`;
+      }).join('');
+      document.body.appendChild(burst);
+      setTimeout(() => burst.remove(), 1700);
+    }
     let bkmpAchievementPopupQueue = [];
     let bkmpAchievementPopupShowing = false;
     function bkmpShowAchievementPopup(achievement) {
@@ -1810,6 +1827,7 @@
         <div class="bkmp-achievement-popup-unlock">🏆 Achievement freigeschaltet<strong>„${escapeHtml(name)}“</strong></div>
       `;
       document.body.appendChild(card);
+      bkmpFireAchievementConfetti();
       requestAnimationFrame(() => card.classList.add('visible'));
       setTimeout(() => {
         card.classList.remove('visible');
@@ -2152,6 +2170,80 @@
         triggerBkmpLootRain();
         if (typeof bkmpMarkEggFound === 'function') bkmpMarkEggFound('konami');
         konamiBuffer = [];
+      }
+    });
+
+    /* Easter Egg: Maus ganz wild hin und her wackeln (klassische "wo ist
+       mein Mauszeiger"-Geste) - erkannt ueber schnelle Richtungswechsel der
+       X-Bewegung in einem kurzen Zeitfenster, statt Tippen oder Klicks. */
+    let bkmpMouseShakeLastX = null;
+    let bkmpMouseShakeLastDir = 0;
+    let bkmpMouseShakeReversals = [];
+    function triggerBkmpMouseShakeEgg(x, y) {
+      if (document.getElementById('bkmpMouseShakeBurst')) return;
+      const burst = document.createElement('div');
+      burst.id = 'bkmpMouseShakeBurst';
+      burst.className = 'bkmp-mouseshake-burst';
+      burst.style.left = x + 'px';
+      burst.style.top = y + 'px';
+      const sparkles = Array.from({ length: 14 }, (_, i) => `<span style="--i:${i}"></span>`).join('');
+      burst.innerHTML = sparkles;
+      document.body.appendChild(burst);
+      if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Da war doch eben die Maus? 🐭✨', 2600);
+      setTimeout(() => burst.remove(), 900);
+      if (typeof bkmpMarkEggFound === 'function') bkmpMarkEggFound('mouseshake');
+    }
+    document.addEventListener('mousemove', e => {
+      if (bkmpMouseShakeLastX !== null) {
+        const dx = e.clientX - bkmpMouseShakeLastX;
+        if (Math.abs(dx) > 12) {
+          const dir = dx > 0 ? 1 : -1;
+          if (bkmpMouseShakeLastDir !== 0 && dir !== bkmpMouseShakeLastDir) {
+            const now = performance.now();
+            bkmpMouseShakeReversals.push(now);
+            bkmpMouseShakeReversals = bkmpMouseShakeReversals.filter(t => now - t < 1100);
+            if (bkmpMouseShakeReversals.length >= 6) {
+              triggerBkmpMouseShakeEgg(e.clientX, e.clientY);
+              bkmpMouseShakeReversals = [];
+            }
+          }
+          bkmpMouseShakeLastDir = dir;
+        }
+      }
+      bkmpMouseShakeLastX = e.clientX;
+    });
+
+    /* Easter Egg: 3x hintereinander (innerhalb 2s) rechtsklicken - das
+       normale Browser-Kontextmenue bleibt dabei unangetastet, es wird
+       nur beim 3. Rechtsklick zusaetzlich eine eigene Karte eingeblendet. */
+    let bkmpRightClickTimestamps = [];
+    function triggerBkmpRightClickEgg() {
+      if (document.getElementById('bkmpRightClickEasterEgg')) return;
+      const overlay = document.createElement('div');
+      overlay.id = 'bkmpRightClickEasterEgg';
+      overlay.className = 'bkmp-easter';
+      overlay.innerHTML = `
+        <div class="bkmp-easter-card">
+          <small>BKMP Secret</small>
+          <strong>Neugierig, was? 🖱️</strong>
+          <p>Hier gibt's nichts zu klauen - nur ein kleines Dankeschön fürs genaue Hinschauen.</p>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      requestAnimationFrame(() => overlay.classList.add('visible'));
+      setTimeout(() => {
+        overlay.classList.remove('visible');
+        setTimeout(() => overlay.remove(), 450);
+      }, 3200);
+      if (typeof bkmpMarkEggFound === 'function') bkmpMarkEggFound('rightclick');
+    }
+    document.addEventListener('contextmenu', () => {
+      const now = performance.now();
+      bkmpRightClickTimestamps.push(now);
+      bkmpRightClickTimestamps = bkmpRightClickTimestamps.filter(t => now - t < 2000);
+      if (bkmpRightClickTimestamps.length >= 3) {
+        triggerBkmpRightClickEgg();
+        bkmpRightClickTimestamps = [];
       }
     });
 
@@ -4254,8 +4346,10 @@
       { id: 'egg_sheep', category: 'Easter Eggs', title: '???', revealName: 'Schaf Zitate Flüsterer', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Jeden Tag werden wir bereichert damit!', check: ctx => ctx.eggsFound.includes('sheep') },
       { id: 'egg_penguin', category: 'Easter Eggs', title: '???', revealName: 'Pinguin-Fischer', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Nur bei Tageslicht versteckt sich im Schnee ein kleiner Freund mit Fisch-Appetit.', check: ctx => ctx.eggsFound.includes('penguin') },
       { id: 'egg_zerathor', category: 'Easter Eggs', title: '???', revealName: 'Boss-Wecker', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Tipp den Namen des Drachen, vor dem sich ganze Dörfer fürchten.', check: ctx => ctx.eggsFound.includes('zerathor') },
+      { id: 'egg_mouseshake', category: 'Easter Eggs', title: '???', revealName: 'Maus-Schüttler', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Manchmal verliert man seinen Mauszeiger auf dem Bildschirm aus den Augen... wackle mal ganz wild hin und her.', check: ctx => ctx.eggsFound.includes('mouseshake') },
+      { id: 'egg_rightclick', category: 'Easter Eggs', title: '???', revealName: 'Rechtsklick-Entdecker', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Was passiert wohl, wenn man dreimal schnell hintereinander die rechte Maustaste drückt?', check: ctx => ctx.eggsFound.includes('rightclick') },
       ...bkmpTieredAchievements('sheepstreak', 'Zeit & Treue', 'sheepStreak', BKMP_SHEEP_STREAK_TIERS, n => `Klicke ${n} Tag${n === 1 ? '' : 'e'} in Folge ab 12 Uhr auf unser Schaf für das Zitat des Tages.`),
-      { id: 'egg_all', category: 'Easter Eggs', title: 'Osterhase', desc: 'Finde alle 15 versteckten Easter Eggs.', progress: ctx => [ctx.eggsFound.length, 15], check: ctx => ctx.eggsFound.length >= 15 },
+      { id: 'egg_all', category: 'Easter Eggs', title: 'Osterhase', desc: 'Finde alle 17 versteckten Easter Eggs.', progress: ctx => [ctx.eggsFound.length, 17], check: ctx => ctx.eggsFound.length >= 17 },
       { id: 'combo_card_wish', category: 'Sonstiges', title: 'Vielseitig', desc: 'Reiche mindestens 1 Karte und 1 Kartenidee ein.', check: ctx => ctx.cardCount >= 1 && ctx.wishCount >= 1 },
       { id: 'night_owl', category: 'Sonstiges', title: 'Nachteule', desc: 'Besuche die Seite zwischen 0 und 5 Uhr nachts.', check: ctx => ctx.nightOwl },
       { id: 'early_bird', category: 'Sonstiges', title: 'Frühaufsteher', desc: 'Besuche die Seite zwischen 5 und 7 Uhr morgens.', check: ctx => ctx.earlyBird },
@@ -4447,6 +4541,8 @@
       { id: 'der_zufaellige', name: 'Der Zufällige', desc: 'Verlässt sich gern auf den Zufall.', unlockAchievement: 'egg_rainbow' },
       { id: 'schnee_fluesterer', name: 'Schnee-Flüsterer', desc: 'Nur bei Tageslicht im Schnee zu finden.', unlockAchievement: 'egg_penguin' },
       { id: 'boss_wecker', name: 'Boss-Wecker', desc: 'Weckt lieber keine schlafenden Drachen.', unlockAchievement: 'egg_zerathor' },
+      { id: 'maus_schuettler', name: 'Maus-Schüttler', desc: 'Findet seinen Mauszeiger notfalls auch durch wildes Wackeln.', unlockAchievement: 'egg_mouseshake' },
+      { id: 'rechtsklick_entdecker', name: 'Rechtsklick-Entdecker', desc: 'Schaut auch mal, was hinter der rechten Maustaste steckt.', unlockAchievement: 'egg_rightclick' },
       { id: 'wahnsinniger_sammler', name: 'Der Wahnsinnige Sammler', desc: 'Sammelt einfach alles.', unlockAt: 100 },
       { id: 'collector_plus', name: 'Collector++', desc: 'Eine beachtliche Sammlung.', unlockAchievement: 'card_200' },
       { id: 'collector_ultra', name: 'Collector Ultra', desc: 'Eine gewaltige Sammlung.', unlockAchievement: 'card_300' },

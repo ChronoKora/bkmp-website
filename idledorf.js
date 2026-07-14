@@ -1013,6 +1013,8 @@ function bkmpIdleTick() {
   const stats = bkmpIdleEffectiveStats;
   bkmpIdleState.playtime_seconds = Number(bkmpIdleState.playtime_seconds || 0) + (stats.tickIntervalMs || 900) / 1000;
 
+  if (bkmpIdleGetAutoBuy()) bkmpIdleAutoBuyUpgrades();
+
   /* Schildgenerator/Reparaturtempo (Burg): passive Regeneration der
      Stadt-Lebenspunkte - vorher wirkungslos, effect_type wurde nie
      ausgewertet. */
@@ -1231,6 +1233,41 @@ function bkmpIdleSpawnHitFlash(targetId) {
   el.classList.add('idle-hit-flash');
 }
 
+/* Taegliche Login-Streak: rein clientseitig (localStorage), da nur ein
+   "wievielter Tag in Folge" gebraucht wird - kein geraeteuebergreifender
+   Abgleich noetig, kein Risiko fuer den bestehenden Sync-Mechanismus.
+   Bonus fliesst in die bereits synchronisierten Felder gold/crystals -
+   keine neue DB-Spalte, kein Wiederholungsrisiko der Zerstoertes-Dorf-
+   Regression (siehe supabase.js BKMP_IDLE_PLAYER_STATE_COLUMNS). */
+const BKMP_IDLE_STREAK_KEY = 'bkmp-idle-login-streak';
+function bkmpIdleDateStr(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function bkmpIdleGetStreakData() {
+  try { return JSON.parse(localStorage.getItem(BKMP_IDLE_STREAK_KEY) || 'null') || { count: 0, lastDate: null }; } catch (e) { return { count: 0, lastDate: null }; }
+}
+function bkmpIdleSaveStreakData(data) {
+  try { localStorage.setItem(BKMP_IDLE_STREAK_KEY, JSON.stringify(data)); } catch (e) {}
+}
+function bkmpIdleCheckDailyStreak() {
+  if (!bkmpIdleState) return;
+  const data = bkmpIdleGetStreakData();
+  const today = bkmpIdleDateStr(new Date());
+  if (data.lastDate === today) return;
+  const yesterday = bkmpIdleDateStr(new Date(Date.now() - 86400000));
+  const newCount = data.lastDate === yesterday ? Number(data.count || 0) + 1 : 1;
+  bkmpIdleSaveStreakData({ count: newCount, lastDate: today });
+  const goldBonus = Math.min(10000, 500 * newCount);
+  const gemBonus = newCount % 5 === 0 ? 10 : 0;
+  bkmpIdleState.gold = Number(bkmpIdleState.gold || 0) + goldBonus;
+  if (gemBonus > 0) bkmpIdleState.crystals = Number(bkmpIdleState.crystals || 0) + gemBonus;
+  bkmpIdleQueueSync();
+  if (typeof bkmpShowJannikToast === 'function') {
+    const gemMsg = gemBonus > 0 ? ` +${gemBonus} 💎` : '';
+    bkmpShowJannikToast(`🔥 ${newCount}. Tag in Folge! +${bkmpIdleFormatNumber(goldBonus)} 💰${gemMsg}`, 4200);
+  }
+}
+
 function bkmpIdleRenderHud() {
   const hud = document.getElementById('idleDorfHud');
   if (!hud || !bkmpIdleState) return;
@@ -1238,9 +1275,11 @@ function bkmpIdleRenderHud() {
   const xpNeeded = bkmpIdleXpForLevel(bkmpIdleState.level, xpCfg);
   const xpPct = Math.max(0, Math.min(100, (bkmpIdleState.xp / xpNeeded) * 100));
   const s = bkmpIdleEffectiveStats;
+  const streakCount = bkmpIdleGetStreakData().count;
   hud.innerHTML = `
     <div class="idle-hud-top">
       <div class="idle-hud-level-badge"><span class="idle-hud-level-num">${bkmpIdleState.level}</span><span class="idle-hud-level-tag">Level</span></div>
+      ${streakCount > 0 ? `<div class="idle-hud-streak-badge" title="Tage in Folge eingeloggt">🔥 ${streakCount}</div>` : ''}
       <div class="idle-hud-xp-wrap">
         <div class="idle-hud-skillpoints">🔹 ${bkmpIdleState.skill_points_available} Skillpunkte</div>
         <div class="idle-xp-bar"><div class="idle-xp-fill" style="width:${xpPct}%"></div></div>
@@ -1437,6 +1476,35 @@ function bkmpIdleLog(msg) {
 
 /* ---------------- Rendering: Upgrades-Tab ---------------- */
 
+/* Auto-Kauf: rein clientseitiger Schalter (localStorage, kein Schema-
+   Wechsel noetig) - klassisches Idle-Game-QoL-Feature. Kauft pro Tick
+   automatisch das jeweils guenstigste noch bezahlbare Upgrade, so lange
+   noch etwas bezahlbar ist (Kaskaden-Kauf statt nur 1x pro Tick, falls
+   viel Gold auf einmal reinkommt). */
+const BKMP_IDLE_AUTOBUY_KEY = 'bkmp-idle-autobuy';
+function bkmpIdleGetAutoBuy() {
+  try { return localStorage.getItem(BKMP_IDLE_AUTOBUY_KEY) === '1'; } catch (e) { return false; }
+}
+function bkmpIdleSetAutoBuy(on) {
+  try { localStorage.setItem(BKMP_IDLE_AUTOBUY_KEY, on ? '1' : '0'); } catch (e) {}
+}
+function bkmpIdleAutoBuyUpgrades() {
+  if (!bkmpIdleState) return;
+  let guard = 0;
+  while (guard < 50) {
+    guard++;
+    const purchases = bkmpIdleState.upgrade_purchases || {};
+    const affordable = BKMP_IDLE_UPGRADES
+      .map(def => ({ def, level: Number(purchases[def.id] || 0) }))
+      .filter(({ def, level }) => level < def.maxLevel)
+      .map(({ def, level }) => ({ def, cost: bkmpIdleUpgradeCost(def, level) }))
+      .filter(({ def, cost }) => (bkmpIdleState[def.resource] || 0) >= cost)
+      .sort((a, b) => a.cost - b.cost);
+    if (affordable.length === 0) break;
+    bkmpIdleBuyUpgrade(affordable[0].def.id);
+  }
+}
+
 function bkmpIdleBuyUpgrade(id) {
   const def = BKMP_IDLE_UPGRADES.find(u => u.id === id);
   if (!def || !bkmpIdleState) return;
@@ -1457,7 +1525,13 @@ function bkmpIdleRenderUpgradesPanel() {
   const panel = document.getElementById('idlePanelUpgrades');
   if (!panel || !bkmpIdleState) return;
   const purchases = bkmpIdleState.upgrade_purchases || {};
-  panel.innerHTML = `<div class="idle-upgrade-grid">${BKMP_IDLE_UPGRADES.map(def => {
+  const autoBuyOn = bkmpIdleGetAutoBuy();
+  panel.innerHTML = `
+    <label class="idle-autobuy-toggle">
+      <input type="checkbox" id="idleAutoBuyToggle" ${autoBuyOn ? 'checked' : ''}>
+      <span>🤖 Auto-Kauf: kauft automatisch das günstigste bezahlbare Upgrade</span>
+    </label>
+    <div class="idle-upgrade-grid">${BKMP_IDLE_UPGRADES.map(def => {
     const level = Number(purchases[def.id] || 0);
     const maxed = level >= def.maxLevel;
     const cost = maxed ? 0 : bkmpIdleUpgradeCost(def, level);
@@ -1473,6 +1547,13 @@ function bkmpIdleRenderUpgradesPanel() {
       </div>`;
   }).join('')}</div>`;
   panel.querySelectorAll('.idle-upgrade-buy').forEach(btn => btn.addEventListener('click', () => bkmpIdleBuyUpgrade(btn.dataset.upgradeId)));
+  const autoBuyToggle = document.getElementById('idleAutoBuyToggle');
+  if (autoBuyToggle) {
+    autoBuyToggle.addEventListener('change', () => {
+      bkmpIdleSetAutoBuy(autoBuyToggle.checked);
+      if (autoBuyToggle.checked) bkmpIdleAutoBuyUpgrades();
+    });
+  }
 }
 
 /* ---------------- Rendering: Skilltree-Tab ---------------- */
@@ -4091,6 +4172,7 @@ async function bkmpIdleOpenModal() {
   if (offlineResult) bkmpIdleApplyOfflineResult(offlineResult);
   bkmpIdleShowOfflineCard(offlineResult);
   bkmpIdleRecomputeEffectiveStats();
+  bkmpIdleCheckDailyStreak();
 
   if (!bkmpIdleCurrentDragon) bkmpIdleSpawnDragon();
   /* Auch wenn der Drache schon im Speicher war (Fenster nur geschlossen,

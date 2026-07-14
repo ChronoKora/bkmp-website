@@ -3266,6 +3266,34 @@ body.bkmp-aura-active::after {
   100% { transform: translate3d(calc((var(--i) - 9) * 5px), -90px, 0) scale(1); opacity: 0; }
 }
 
+/* ---------- Maus-Schuettel-Funke (Easter Egg: Maus schnell hin und her) ---------- */
+.bkmp-mouseshake-burst {
+  position: fixed;
+  z-index: 96;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+}
+.bkmp-mouseshake-burst > span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 12px rgba(201, 165, 106, 0.8);
+  transform: rotate(calc(var(--i) * 25.7deg));
+  animation: bkmpMouseShakeSpark 0.75s ease-out forwards;
+}
+@keyframes bkmpMouseShakeSpark {
+  0% { opacity: 1; transform: rotate(calc(var(--i) * 25.7deg)) translateX(0) scale(1); }
+  100% { opacity: 0; transform: rotate(calc(var(--i) * 25.7deg)) translateX(46px) scale(0.4); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bkmp-mouseshake-burst > span { animation: none; opacity: 0; }
+}
+
 /* ---------- Loot-Regen (Konami-Code Easter Egg) ---------- */
 .bkmp-loot-rain {
   position: fixed;
@@ -3640,6 +3668,32 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 .bkmp-achievement-popup-desc { font-size: 0.82rem; color: var(--muted); margin-bottom: 0.6rem; }
 .bkmp-achievement-popup-unlock { font-size: 0.78rem; font-weight: 800; color: var(--gold); text-transform: uppercase; letter-spacing: 0.03em; }
 .bkmp-achievement-popup-unlock strong { display: block; color: var(--ink); font-size: 0.92rem; text-transform: none; letter-spacing: 0; margin-top: 0.15rem; font-family: 'Fraunces', serif; }
+
+.bkmp-achievement-confetti {
+  position: fixed;
+  left: 1.2rem;
+  bottom: 1.2rem;
+  width: min(300px, calc(100vw - 2rem));
+  height: 0;
+  z-index: 99;
+  pointer-events: none;
+}
+.bkmp-achievement-confetti > span {
+  position: absolute;
+  bottom: 0;
+  width: 7px;
+  height: 11px;
+  border-radius: 2px;
+  opacity: 0;
+  animation: bkmpConfettiBurst ease-out forwards;
+}
+@keyframes bkmpConfettiBurst {
+  0% { opacity: 1; transform: translateY(0) rotate(0deg); }
+  100% { opacity: 0; transform: translateY(-95px) rotate(var(--rot)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bkmp-achievement-confetti { display: none; }
+}
 
 .bkmp-jannik-carrot {
   position: fixed;
@@ -5461,6 +5515,20 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 }
 
 /* ---- Upgrades ---- */
+.idle-autobuy-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.8rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.idle-autobuy-toggle input { width: 1.05rem; height: 1.05rem; cursor: pointer; accent-color: var(--gold, #c9a24b); }
 .idle-upgrade-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.8rem; }
 .idle-upgrade-card { border: 1px solid var(--line); border-radius: 14px; padding: 0.9rem; background: var(--paper); text-align: center; }
 .idle-upgrade-icon { font-size: 1.6rem; margin-bottom: 0.3rem; }
@@ -5810,6 +5878,14 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   --line: rgba(255, 158, 94, 0.24);
   --muted: #b7a8c4;
   --purple: #a78bfa;
+  /* WICHTIG: body { color: var(--ink) } wird nur einmal ganz oben aufgeloest
+     (mit der GLOBALEN Theme-Farbe), CSS-Variablen selbst vererben sich zwar
+     hierhin neu, die bereits BERECHNETE color-Eigenschaft aber nicht. Ohne
+     dieses explizite Redeklarieren erben Elemente ohne eigene Farbangabe
+     (z.B. .raid-result-stat-value) im Hellmodus die fast-schwarze globale
+     Ink-Farbe auf den hier absichtlich dunklen Hintergruenden - unlesbar.
+     Spieler-Meldung 17.07. zum Raid-Ergebnis-Fenster. */
+  color: var(--ink);
 }
 
 /* Kohle-Vignette hinter dem Fenster statt des generischen Seiten-Dimmers -
@@ -5948,6 +6024,17 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 /* ---- HUD: Level-Medaillon + XP/Ressourcen-Leiste statt Fliesstext ---- */
 .idle-dorf-hud { margin-bottom: 1.1rem; }
 .idle-hud-top { display: flex; align-items: center; gap: 0.9rem; margin-bottom: 0.6rem; }
+.idle-hud-streak-badge {
+  flex-shrink: 0;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, #f97316 20%, var(--paper-2));
+  border: 1px solid color-mix(in srgb, #f97316 45%, var(--line));
+  color: #fb923c;
+  font-weight: 800;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
 .idle-hud-level-badge {
   flex-shrink: 0;
   width: 56px;
