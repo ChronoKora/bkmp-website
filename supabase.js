@@ -2601,6 +2601,18 @@ async function importAllLocalDataToSupabase() {
   };
 }
 
+/* Interne Test-Accounts (Entwickler-Wunsch 14.07.: "unsichtbarer Account
+   zum Testen, soll aber in keine Ranglisten fliessen") - werden NICHT
+   an der Quelle (loadLeaderboardStats/loadIdleLeaderboardStats/
+   loadRaidLeaderboard) rausgefiltert, sondern erst an den jeweiligen
+   OEFFENTLICHEN Ranglisten-Render-Stellen (index.html/idledorf.js) - im
+   Admin-Panel (admin.html, z.B. Besucher-Uebersicht) soll der Account
+   weiterhin normal sichtbar/verwaltbar bleiben. */
+const BKMP_HIDDEN_TEST_ACCOUNTS = ['test123'];
+function bkmpIsHiddenTestAccount(nameOrKey) {
+  return BKMP_HIDDEN_TEST_ACCOUNTS.includes(String(nameOrKey || '').trim().toLowerCase());
+}
+
 function bkmpMapPlayerStatsFromSupabase(row) {
   return {
     name: row.display_name,
@@ -3116,7 +3128,7 @@ async function loadVillageSkinsCatalog() {
   if (!client) return [];
   const { data, error } = await client
     .from('idle_village_skins')
-    .select('id, name, description, icon, image_file, unlock_type, price_gold, price_crystals, unlock_hint, sort_order')
+    .select('id, name, description, icon, image_file, unlock_type, price_gold, price_crystals, unlock_hint, sort_order, frame_count, frame_aspect_w, frame_aspect_h')
     .eq('active', true)
     .order('sort_order', { ascending: true });
   if (error) throw error;
@@ -3491,6 +3503,45 @@ async function deleteCompany(id) {
   const client = bkmpGetSupabaseClient();
   if (!client) throw new Error('Supabase ist nicht verbunden.');
   const { error } = await client.from('companies').delete().eq('id', id);
+  if (error) throw error;
+  return true;
+}
+
+/* ---------------- Firmenbewerbungen ("Bist du eine Kartenbaufirma?
+   Bewirb dich hier") ----------------
+   Gleiches Muster wie Investoren-/Kartenverkaufs-Anfragen: oeffentlich
+   nur einreichbar (per api/submit-entry.js, umgeht RLS ohnehin per
+   Service-Role), nur Admins duerfen die Liste sehen/bestaetigen/ablehnen. */
+const BKMP_COMPANY_APPLICATION_COLUMNS = 'id, name, contact_person, discord_url, website_url, description, specialties, price_range_min, price_range_max, logo_url, banner_url, status, created_at';
+
+async function loadCompanyApplications() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from('company_applications')
+    .select(BKMP_COMPANY_APPLICATION_COLUMNS)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+async function updateCompanyApplicationStatus(id, status) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('company_applications')
+    .update({ status })
+    .eq('id', id)
+    .select(BKMP_COMPANY_APPLICATION_COLUMNS)
+    .limit(1);
+  if (error) throw error;
+  return Array.isArray(data) ? data[0] : null;
+}
+
+async function deleteCompanyApplication(id) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return false;
+  const { error } = await client.from('company_applications').delete().eq('id', id);
   if (error) throw error;
   return true;
 }

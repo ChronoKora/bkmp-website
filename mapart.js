@@ -928,6 +928,7 @@ function bkmpMapInitSubtabs() {
 
 let bkmpMapAdminCompanies = [];
 let bkmpMapEditingCompanyId = null;
+let bkmpMapCompanyApplications = [];
 
 function bkmpMapInitCompanySpecialtiesFilter() {
   const el = document.getElementById('mapartCompanySpecialtiesFilter');
@@ -955,6 +956,138 @@ async function refreshMapartCompaniesAdmin() {
   }
   bkmpMapInitCompanySpecialtiesFilter();
   bkmpMapRenderCompaniesAdminList();
+  refreshCompanyApplicationsAdmin();
+}
+
+/* ---------------- Admin: Firmenbewerbungen ("Bist du eine
+   Kartenbaufirma? Bewirb dich hier") ---------------- */
+
+async function refreshCompanyApplicationsAdmin() {
+  const el = document.getElementById('mapartCompanyApplicationsList');
+  if (!el) return;
+  el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Bewerbungen werden geladen...</p>';
+  try {
+    bkmpMapCompanyApplications = (typeof loadCompanyApplications === 'function' ? await loadCompanyApplications() : []) || [];
+  } catch (e) {
+    console.warn('Firmenbewerbungen konnten nicht geladen werden.', e);
+    bkmpMapCompanyApplications = [];
+    el.innerHTML = '<p style="color:var(--neg); font-size:0.85rem;">Bewerbungen konnten nicht geladen werden. Bitte SQL ausführen (supabase-company-applications.sql).</p>';
+    return;
+  }
+  bkmpMapRenderCompanyApplicationsList();
+}
+
+function bkmpMapRenderCompanyApplicationsList() {
+  const el = document.getElementById('mapartCompanyApplicationsList');
+  const badge = document.getElementById('mapartCompanyApplicationsBadge');
+  if (!el) return;
+  const pending = bkmpMapCompanyApplications.filter(a => a.status === 'pending');
+  if (badge) {
+    badge.textContent = pending.length;
+    badge.style.display = pending.length ? '' : 'none';
+  }
+  if (!bkmpMapCompanyApplications.length) {
+    el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Noch keine Bewerbungen eingegangen.</p>';
+    return;
+  }
+  const sorted = [...bkmpMapCompanyApplications].sort((a, b) => {
+    if (a.status === 'pending' && b.status !== 'pending') return -1;
+    if (a.status !== 'pending' && b.status === 'pending') return 1;
+    return new Date(b.created_at) - new Date(a.created_at);
+  });
+  el.innerHTML = sorted.map(a => {
+    const price = (a.price_range_min || a.price_range_max)
+      ? `${a.price_range_min ? bkmpMapFormatMoney(a.price_range_min) : '?'} – ${a.price_range_max ? bkmpMapFormatMoney(a.price_range_max) : '?'}`
+      : '';
+    const statusLabel = a.status === 'confirmed' ? '✅ Bestätigt' : a.status === 'rejected' ? '❌ Abgelehnt' : '🕓 Offen';
+    return `
+      <div class="company-application-card" data-id="${a.id}">
+        <div class="company-application-head">
+          ${a.logo_url ? `<img class="company-application-logo" src="${escapeHtml(a.logo_url)}" alt="">` : '<div class="company-application-logo company-application-logo-empty">🏗️</div>'}
+          <div>
+            <div class="company-application-name">${escapeHtml(a.name)}</div>
+            <div class="company-application-meta">${escapeHtml(a.contact_person || '')} · <span class="company-application-status">${statusLabel}</span></div>
+          </div>
+        </div>
+        ${a.description ? `<p class="company-application-desc">${escapeHtml(a.description)}</p>` : ''}
+        <div class="company-application-links">
+          ${a.discord_url ? `<span>💬 ${escapeHtml(a.discord_url)}</span>` : ''}
+          ${a.website_url ? `<span>🌐 ${escapeHtml(a.website_url)}</span>` : ''}
+          ${a.specialties ? `<span>🏷️ ${escapeHtml(a.specialties)}</span>` : ''}
+          ${price ? `<span>💰 ${price}</span>` : ''}
+        </div>
+        ${a.banner_url ? `<img class="company-application-banner" src="${escapeHtml(a.banner_url)}" alt="">` : ''}
+        ${a.status === 'pending' ? `
+          <div class="entry-actions">
+            <button class="edit-btn company-application-confirm" type="button">Bestätigen (Firma anlegen)</button>
+            <button class="edit-btn company-application-reject" type="button">Ablehnen</button>
+          </div>` : `
+          <div class="entry-actions">
+            <button class="edit-btn company-application-delete" type="button">Löschen</button>
+          </div>`}
+      </div>`;
+  }).join('');
+  el.querySelectorAll('.company-application-confirm').forEach(btn => btn.addEventListener('click', () => confirmCompanyApplication(btn.closest('.company-application-card').dataset.id)));
+  el.querySelectorAll('.company-application-reject').forEach(btn => btn.addEventListener('click', () => rejectCompanyApplication(btn.closest('.company-application-card').dataset.id)));
+  el.querySelectorAll('.company-application-delete').forEach(btn => btn.addEventListener('click', () => deleteCompanyApplicationEntry(btn.closest('.company-application-card').dataset.id)));
+}
+
+async function confirmCompanyApplication(id) {
+  const application = bkmpMapCompanyApplications.find(a => String(a.id) === String(id));
+  if (!application) return;
+  const company = {
+    name: application.name,
+    contact_person: application.contact_person || null,
+    logo_url: application.logo_url || null,
+    banner_url: application.banner_url || null,
+    discord_url: application.discord_url || null,
+    website_url: application.website_url || null,
+    description: application.description || null,
+    price_range_min: application.price_range_min || null,
+    price_range_max: application.price_range_max || null,
+    specialties: (application.specialties || '').split(',').map(s => s.trim()).filter(Boolean),
+    showcase_image_urls: [],
+    active: true
+  };
+  try {
+    const saved = await saveCompany(company);
+    if (saved) bkmpMapAdminCompanies.unshift(saved);
+    bkmpMapRenderCompaniesAdminList();
+  } catch (e) {
+    bkmpMapNotify('Firma konnte nicht angelegt werden — Bewerbung bleibt offen: ' + (e.message || ''), 'error');
+    return;
+  }
+  try {
+    const updated = await updateCompanyApplicationStatus(id, 'confirmed');
+    bkmpMapCompanyApplications = bkmpMapCompanyApplications.map(a => String(a.id) === String(id) ? (updated || { ...a, status: 'confirmed' }) : a);
+    bkmpMapRenderCompanyApplicationsList();
+    bkmpMapNotify('Bewerbung bestätigt — Firma wurde angelegt.', 'success');
+  } catch (e) {
+    bkmpMapNotify('Firma wurde erstellt, Status der Bewerbung konnte aber nicht aktualisiert werden: ' + (e.message || ''), 'error');
+  }
+}
+
+async function rejectCompanyApplication(id) {
+  try {
+    const updated = await updateCompanyApplicationStatus(id, 'rejected');
+    bkmpMapCompanyApplications = bkmpMapCompanyApplications.map(a => String(a.id) === String(id) ? (updated || { ...a, status: 'rejected' }) : a);
+    bkmpMapRenderCompanyApplicationsList();
+    bkmpMapNotify('Bewerbung abgelehnt.', 'success');
+  } catch (e) {
+    bkmpMapNotify('Konnte nicht abgelehnt werden: ' + (e.message || ''), 'error');
+  }
+}
+
+async function deleteCompanyApplicationEntry(id) {
+  if (!confirm('Diese Bewerbung wirklich endgültig löschen?')) return;
+  try {
+    await deleteCompanyApplication(id);
+    bkmpMapCompanyApplications = bkmpMapCompanyApplications.filter(a => String(a.id) !== String(id));
+    bkmpMapRenderCompanyApplicationsList();
+    bkmpMapNotify('Bewerbung gelöscht.', 'success');
+  } catch (e) {
+    bkmpMapNotify('Konnte nicht gelöscht werden: ' + (e.message || ''), 'error');
+  }
 }
 
 function bkmpMapRenderCompaniesAdminList() {
@@ -1127,6 +1260,91 @@ function bkmpMapInitAdminOrdersFilters() {
   bkmpMapInitCategoryPillFilter('mapartOrdersCategoryFilter', category => { bkmpMapAdminOrdersFilters.category = category; bkmpMapRenderAdminOrdersFiltered(); });
 }
 
+/* ---------------- Öffentliche Firmenbewerbung ("Bist du eine
+   Kartenbaufirma? Bewirb dich hier") ---------------- */
+
+function bkmpMapInitCompanyApplyForm() {
+  const toggleBtn = document.getElementById('companyApplyToggleBtn');
+  const form = document.getElementById('companyApplyForm');
+  if (toggleBtn && form) {
+    toggleBtn.addEventListener('click', () => {
+      const show = form.style.display === 'none';
+      form.style.display = show ? '' : 'none';
+      toggleBtn.textContent = show ? 'Formular ausblenden' : 'Jetzt bewerben';
+      if (show) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
+  const specialtiesEl = document.getElementById('companyApplySpecialtiesFilter');
+  if (specialtiesEl) {
+    specialtiesEl.innerHTML = BKMP_MAP_CATEGORIES.map(c => `<button type="button" data-specialty="${c.id}">${c.label}</button>`).join('');
+    specialtiesEl.querySelectorAll('button').forEach(btn => btn.addEventListener('click', () => btn.classList.toggle('active')));
+  }
+
+  const logoInput = document.getElementById('companyApplyLogo');
+  const logoPreview = document.getElementById('companyApplyLogoPreview');
+  const logoPreviewImg = document.getElementById('companyApplyLogoPreviewImg');
+  if (logoInput && logoPreview && logoPreviewImg) {
+    logoInput.addEventListener('change', () => {
+      const file = logoInput.files && logoInput.files[0];
+      if (!file) { logoPreview.style.display = 'none'; return; }
+      const reader = new FileReader();
+      reader.onload = () => { logoPreviewImg.src = reader.result; logoPreview.style.display = ''; };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  const submitBtn = document.getElementById('companyApplySubmitBtn');
+  if (submitBtn) submitBtn.addEventListener('click', bkmpMapSubmitCompanyApplication);
+}
+
+function bkmpMapSubmitCompanyApplication() {
+  const msgEl = document.getElementById('companyApplySubmitMsg');
+  const setMsg = (text, isError) => { if (msgEl) { msgEl.textContent = text; msgEl.style.color = isError ? 'var(--neg)' : 'var(--gold)'; } };
+
+  const name = document.getElementById('companyApplyName').value.trim();
+  const contact = document.getElementById('companyApplyContact').value.trim();
+  if (!name || !contact) { setMsg('Bitte Firmenname und Ansprechpartner ausfüllen.', true); return; }
+  if (!document.getElementById('companyApplyConsent').checked) { setMsg('Bitte bestätige, dass du berechtigt bist und die Angaben korrekt sind.', true); return; }
+
+  const cooldown = bkmpSubmitCooldownSecondsLeft('companyapply');
+  if (cooldown > 0) { setMsg(`Bitte warte noch ${cooldown} Sekunde(n), bevor du erneut einreichst.`, true); return; }
+
+  const discord_url = document.getElementById('companyApplyDiscord').value.trim();
+  const website_url = document.getElementById('companyApplyWebsite').value.trim();
+  const description = document.getElementById('companyApplyDescription').value.trim();
+  const price_range_min = document.getElementById('companyApplyPriceMin').value.trim();
+  const price_range_max = document.getElementById('companyApplyPriceMax').value.trim();
+  const banner_url = document.getElementById('companyApplyBanner').value.trim();
+  const specialties = [...document.querySelectorAll('#companyApplySpecialtiesFilter button.active')].map(b => b.dataset.specialty).join(',');
+  const logoInput = document.getElementById('companyApplyLogo');
+  const logoFile = logoInput && logoInput.files && logoInput.files[0];
+  if (!logoFile) { setMsg('Bitte ein Firmenlogo hochladen.', true); return; }
+
+  const submitBtn = document.getElementById('companyApplySubmitBtn');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Wird gesendet...';
+  function resetBtn() { submitBtn.disabled = false; submitBtn.textContent = 'Bewerbung einreichen'; }
+
+  bkmpCompressImageFile(logoFile, { maxWidth: 500 }).then(logoDataUrl => {
+    return bkmpSubmitViaApi('company_application', {
+      name, contact_person: contact, discord_url, website_url, description,
+      specialties, price_range_min, price_range_max, banner_url
+    }, logoDataUrl);
+  }).then(() => {
+    bkmpStartSubmitCooldown('companyapply');
+    resetBtn();
+    setMsg('✅ Bewerbung eingereicht! Wir melden uns, sobald sie geprüft wurde.', false);
+    document.getElementById('companyApplyForm').reset();
+    document.getElementById('companyApplyLogoPreview').style.display = 'none';
+    document.querySelectorAll('#companyApplySpecialtiesFilter button.active').forEach(b => b.classList.remove('active'));
+  }).catch(e => {
+    console.error('Firmenbewerbung konnte nicht gesendet werden.', e);
+    resetBtn();
+    setMsg('Fehler beim Senden: ' + (e && e.message || e), true);
+  });
+}
+
 function bkmpMapInit() {
   bkmpMapInitSubtabs();
   bkmpMapInitCategoryFilter();
@@ -1140,6 +1358,7 @@ function bkmpMapInit() {
   bkmpMapInitMyOrdersFilters();
   bkmpMapInitAdminOrdersFilters();
   bkmpMapInitCompanyOrdersFilters();
+  bkmpMapInitCompanyApplyForm();
   const companyDetailCloseBtn = document.getElementById('mapCompanyDetailClose');
   if (companyDetailCloseBtn) companyDetailCloseBtn.addEventListener('click', bkmpMapCloseCompanyDetail);
   const companyAddNewBtn = document.getElementById('mapartCompanyAddNew');

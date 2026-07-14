@@ -65,6 +65,14 @@ const TABLE_CONFIG = {
     requireImage: false,
     hasStatus: false,
     allowedValues: { category: ['lob', 'idee', 'kritik', 'bug', 'sonstiges'] }
+  },
+  company_application: {
+    table: 'company_applications',
+    folder: 'company-logos',
+    imageField: 'logo_url',
+    requiredFields: ['name', 'contact_person'],
+    allowedFields: ['name', 'contact_person', 'discord_url', 'website_url', 'description', 'specialties', 'price_range_min', 'price_range_max', 'banner_url'],
+    requireImage: true
   }
 };
 

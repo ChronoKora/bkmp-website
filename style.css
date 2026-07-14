@@ -797,6 +797,50 @@ body.page-loaded .streamer-marquee-track {
 @media (prefers-reduced-motion: reduce) {
   .bkmp-sheep-easter-egg { animation-duration: 10.8s; }
 }
+
+/* NUR im Hellmodus sichtbar (Nutzerwunsch 14.07.: "vielleicht irgendwo
+   auf der 'hellen' Seite nur sehbar.. wo es weiss ist.. weil schnee und
+   so") - --paper ist im Light-Theme ein warmer Cremeton statt reinem
+   Weiss, aber immer noch hell genug fuer einen "im Schnee versteckten"
+   Pinguin. Sitzt in der Kopfzeilen-Polsterung oben rechts (eigene Ecke,
+   ueberschneidet sich nicht mit dem Schaf in .hero-banner-picture). */
+.bkmp-penguin-easter-egg {
+  display: none;
+  position: absolute;
+  top: 0.7rem;
+  right: 1.3rem;
+  width: 52px;
+  aspect-ratio: 307 / 512;
+  background-image: url('assets/penguin-sprite.png');
+  background-repeat: no-repeat;
+  background-size: 1000% 100%;
+  cursor: pointer;
+  z-index: 2;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.25));
+  animation: bkmpPenguinFrames 3.24s steps(10) infinite;
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
+.bkmp-penguin-easter-egg:hover,
+.bkmp-penguin-easter-egg:focus-visible {
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.25)) brightness(1.08);
+  transform: scale(1.08);
+}
+/* Gleiche Herleitung wie bei .bkmp-sheep-easter-egg (bkmpSheepFrames) -
+   ebenfalls 10 Frames, also identisches Ziel 111.111% (=10/9*100%), sonst
+   "gleitet" der Pinguin statt sauber zwischen Frames zu springen (Fehler-
+   Report 14.07. zum Pilzdorf-Sprite, gleiche Ursache). */
+@keyframes bkmpPenguinFrames {
+  from { background-position-x: 0%; }
+  to { background-position-x: 111.111%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bkmp-penguin-easter-egg { animation-duration: 10.8s; }
+}
+@media (max-width: 720px) {
+  .bkmp-penguin-easter-egg { width: 40px; top: 0.5rem; right: 0.9rem; }
+}
+
 .bkmp-sheep-bubble {
   position: absolute;
   left: 13.5%;
@@ -1498,6 +1542,18 @@ body.page-loaded .streamer-marquee-track {
 .wish-overlay .joke-card { max-width: 460px; text-align: left; border-radius: 22px; }
 .wish-overlay .joke-card h3 { font-family: 'Fraunces', serif; font-size: 1.25rem; margin-bottom: 1.2rem; text-align: center; }
 .wish-overlay .joke-buttons { margin-top: 1rem; justify-content: flex-end; }
+
+/* NACHBESSERUNG (Spieler-Meldung 14.07.: "PC Nachricht optisch schoener
+   machen? Kompakter? mehr in die Breite anstatt Laenge") - bkmpConfirmDialog
+   (Prestige-Bestaetigung, Account loeschen usw.) nutzte bisher den
+   Basis-.joke-card-Wert (max-width 320px, zentrierter Text) - fuer die
+   deutlich laengeren, mehrzeiligen Bestaetigungstexte fuehrte das auf dem
+   Desktop zu einer sehr schmalen, hohen Saeule mit haesslichen 2-3-Wort-
+   Zeilenumbruechen. Gleiches Muster wie bei den anderen Overlays oben:
+   breiter, linksbuendiger Flietext statt zentriert. */
+#bkmpConfirmOverlay .joke-card { max-width: 480px; text-align: left; border-radius: 22px; }
+#bkmpConfirmOverlay .joke-card h3 { font-family: 'Fraunces', serif; font-size: 1.25rem; margin-bottom: 1rem; text-align: center; }
+#bkmpConfirmOverlay .joke-buttons { margin-top: 1.2rem; justify-content: flex-end; }
 
 .investor-request-cta { margin-bottom: 2rem; }
 .investor-request-overlay .joke-card { max-width: 460px; text-align: left; border-radius: 22px; }
@@ -5067,9 +5123,12 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
    links exakt der Beschriftungs-Bereich aus dem sichtbaren Fenster faellt.
    aspect-ratio je Sprite entspricht exakt diesem Ausschnitt, damit nichts
    gestaucht/gestreckt wird. */
-/* Dorf-Bild ist nur noch 1 Frame (kein Sheet mehr, keine Beschriftung
-   mehr im Bild) - deshalb einfache statische Darstellung ohne
-   background-position-Animation, volle Breite, kein Ausschnitt noetig. */
+/* Basiswerte fuer das Standarddorf (1 Frame, kein Sheet) - sobald ein
+   Dorf-Skin aktiv ist (siehe bkmpApplyVillageSkin in idledorf.js), werden
+   background-image/-size/aspect-ratio/animation per Inline-Style
+   ueberschrieben, je nachdem ob der gewaehlte Skin einen animierten
+   Mehr-Frame-Sprite-Streifen mitbringt (z.B. "Pilzdorf", 6 Frames) oder
+   wie das Standarddorf statisch ist. */
 .idle-village-sprite {
   position: relative;
   width: 100%;
@@ -5083,6 +5142,18 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
   filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.3));
   border-radius: 10px;
   overflow: hidden;
+}
+/* Video-Dorf-Skins (z.B. Pinguindorf) werden per JS als Kind-Element
+   eingehaengt (idledorf.js bkmpApplyVillageSkin) statt als CSS-Hintergrund -
+   fuellt den Sprite-Container exakt aus, der ueber aspect-ratio schon auf
+   die echten Video-Massse gesetzt wurde. */
+.idle-village-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
 }
 
 /* Gemeinsamer Ausschnitt fuer alle Drachen-Sprites: zeigt die mittleren
@@ -6030,33 +6101,33 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 }
 .raid-boss-sprite {
   position: relative;
+  display: block;
   width: 100%;
   max-width: 380px;
   margin: 0 auto;
   border-radius: 8px;
-  background-repeat: no-repeat;
-  background-size: 125% 400%;
-  background-position-x: 25%;
-  background-position-y: 0%;
+  object-fit: cover;
   image-rendering: pixelated;
   filter: drop-shadow(0 10px 18px rgba(239, 68, 68, 0.4));
   transition: transform 0.15s ease;
 }
-/* Eigenes 4-Frame-Sheet (Ruhepose/Atem-startet/voller Atem/Abklingen,
-   gleiche Reihenfolge wie bei den normalen Drachen), aber OHNE die
-   "1./2./3./4."-Beschriftung der anderen Sheets - deshalb volle
-   Frame-Breite statt des 125%/25%-Ausschnitts der Basisklasse. */
+/* Zerathor liegt als echtes Video vor (assets/dragons/zerathor.mp4) statt
+   eines Bild-Sprite-Streifens - aspect-ratio auf die echten Video-Massse
+   gesetzt, damit es ohne Zuschneiden/Verzerren exakt in den Container
+   passt. */
 .raid-sprite-zerathor {
-  background-image: url('assets/dragons/zerathor.png?v=20260710-zerathor1');
-  aspect-ratio: 542 / 325;
-  background-size: 100% 400%;
-  background-position-x: 0%;
+  aspect-ratio: 1706 / 1214;
 }
-@keyframes raidBossSpriteAttackFrames {
-  from { background-position-y: 0%; }
-  to { background-position-y: 100%; }
+/* Die frueheren einzelnen Angriffs-Frames (Ruhepose/Atem-startet/voller
+   Atem/Abklingen) stecken jetzt in der Video-Schleife selbst drin - der
+   Angriffs-Hinweis beim Klick/Tick (bkmpRaidPlayBossAttackSprite) wird
+   deshalb per Aufhellungs-/Skalierungs-Puls statt Frame-Wechsel gezeigt. */
+@keyframes raidBossSpriteAttackPulse {
+  0% { filter: brightness(1) drop-shadow(0 10px 18px rgba(239, 68, 68, 0.4)); transform: scale(1); }
+  30% { filter: brightness(1.6) drop-shadow(0 10px 26px rgba(248, 113, 113, 0.8)); transform: scale(1.04); }
+  100% { filter: brightness(1) drop-shadow(0 10px 18px rgba(239, 68, 68, 0.4)); transform: scale(1); }
 }
-.raid-boss-attacking .raid-boss-sprite { animation: raidBossSpriteAttackFrames 0.75s steps(3) 1 forwards; }
+.raid-boss-attacking .raid-boss-sprite { animation: raidBossSpriteAttackPulse 0.75s ease-out 1; }
 @media (prefers-reduced-motion: reduce) {
   .raid-boss-attacking .raid-boss-sprite { animation: none; }
 }
@@ -6416,6 +6487,48 @@ body.bkmp-creeper-shake { animation: bkmpBurningShake 0.12s ease-in-out 9; }
 
 .map-order-total-preview { margin-top: 0.6rem; font-size: 0.85rem; color: var(--gold); font-weight: 700; }
 .map-order-submit-msg { margin-top: 0.6rem; font-size: 0.85rem; font-weight: 700; min-height: 1.2em; }
+
+/* ---- Firmenbewerbung ("Bist du eine Kartenbaufirma? Bewirb dich hier") ---- */
+.company-apply-cta {
+  display: flex; align-items: center; justify-content: space-between; gap: 1.2rem; flex-wrap: wrap;
+  max-width: 720px; margin: 0 auto 1.6rem;
+  padding: 1.3rem 1.6rem;
+  border-radius: 18px;
+  border: 1.5px solid transparent;
+  background: linear-gradient(135deg, var(--gold), color-mix(in srgb, var(--gold) 55%, transparent)) border-box,
+              linear-gradient(180deg, var(--paper-2), var(--paper-3)) padding-box;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.2);
+}
+.company-apply-cta-text h3 { font-family: 'Fraunces', serif; font-size: 1.15rem; margin: 0 0 0.3rem; }
+.company-apply-cta-text p { margin: 0; font-size: 0.85rem; color: var(--muted); }
+.company-apply-cta .btn-ja { flex-shrink: 0; }
+.company-apply-form { margin-bottom: 1.8rem; }
+.company-apply-logo-preview { margin-top: 0.7rem; }
+.company-apply-logo-preview img { width: 96px; height: 96px; object-fit: contain; border-radius: 12px; border: 1px solid var(--line); background: var(--paper); padding: 0.4rem; }
+@media (max-width: 640px) {
+  .company-apply-cta { flex-direction: column; align-items: stretch; text-align: center; }
+}
+
+/* ---- Admin: Firmenbewerbungen-Review ---- */
+.admin-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 1.5em; padding: 0.1em 0.5em;
+  border-radius: 999px; background: var(--gold); color: #111018;
+  font-size: 0.7rem; font-weight: 800; vertical-align: middle; margin-left: 0.4rem;
+}
+.company-application-card {
+  border: 1px solid var(--line); border-radius: 14px; padding: 1rem 1.1rem;
+  background: var(--paper-2); margin-bottom: 0.9rem;
+}
+.company-application-head { display: flex; align-items: center; gap: 0.8rem; }
+.company-application-logo { width: 52px; height: 52px; object-fit: contain; border-radius: 10px; border: 1px solid var(--line); background: var(--paper); padding: 0.25rem; flex-shrink: 0; }
+.company-application-logo-empty { display: flex; align-items: center; justify-content: center; font-size: 1.4rem; }
+.company-application-name { font-weight: 700; font-size: 1rem; }
+.company-application-meta { font-size: 0.78rem; color: var(--muted); }
+.company-application-desc { font-size: 0.85rem; margin: 0.6rem 0; color: var(--ink); }
+.company-application-links { display: flex; flex-wrap: wrap; gap: 0.6rem 1rem; font-size: 0.78rem; color: var(--muted); margin-bottom: 0.6rem; }
+.company-application-banner { width: 100%; max-height: 140px; object-fit: cover; border-radius: 10px; margin-bottom: 0.6rem; }
+.company-application-card .entry-actions { margin-top: 0.4rem; }
 .map-order-submit-msg.error { color: #f87171; }
 
 .map-ref-preview { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.6rem; }

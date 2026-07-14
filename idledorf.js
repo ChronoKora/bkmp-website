@@ -1893,7 +1893,10 @@ async function bkmpIdleRenderBestenlistePanel() {
   }
   listEl.innerHTML = '<p class="empty-hint">Lädt...</p>';
   try {
-    if (typeof loadIdleLeaderboardStats === 'function') bkmpIdleLeaderboardStats = (await loadIdleLeaderboardStats()) || [];
+    if (typeof loadIdleLeaderboardStats === 'function') {
+      const rows = (await loadIdleLeaderboardStats()) || [];
+      bkmpIdleLeaderboardStats = rows.filter(r => !bkmpIsHiddenTestAccount(r.name_key));
+    }
   } catch (e) { console.warn('Idle Dorf: Bestenliste konnte nicht geladen werden.', e); }
   bkmpIdleRenderLeaderboardList();
 }
@@ -2806,6 +2809,37 @@ function bkmpVillageSkinOwned(skinId) {
    Nachpruef-Logik wie bkmpApplyActiveCosmetic bei den Namens-Kosmetiken,
    damit eine manipulierte localStorage-ID kein fremdes Bild erzwingen
    kann, das der Spieler nie freigeschaltet hat. */
+/* FEHLER-FIX (Spieler-Report 14.07.: "Haben denn gleich Fehler wie beim
+   Schaf! Bild bewegt sich von links nach rechts" statt sauber zu
+   springen) - gleiche Ursache wie beim bereits geloesten Schaf-Sprite
+   (bkmpSheepFrames, style.css): bei background-size N*100% darf das
+   keyframe-Ziel NICHT 100% sein, sonst landen die steps(N)-
+   Sprungpositionen von background-position-x auf Bruchteilen einer
+   Frame-Breite statt auf ganzen Frame-Grenzen (offset = (Elementbreite -
+   Hintergrundbreite) * Prozent/100 - mit Hintergrundbreite = N*Element-
+   breite braucht ein glattes 0..100% ueber steps(N) das Ziel
+   N/(N-1)*100%, nicht 100%). Da (anders als beim fest codierten Schaf)
+   die Frame-Anzahl hier pro Skin variiert, wird das passende Keyframe
+   dynamisch pro N erzeugt statt fest in style.css zu stehen. */
+function bkmpEnsureVillageFrameKeyframes(frameCount) {
+  const name = `idleVillageFrames${frameCount}`;
+  let styleEl = document.getElementById('bkmpVillageSkinKeyframes');
+  if (!styleEl) {
+    styleEl = document.createElement('style');
+    styleEl.id = 'bkmpVillageSkinKeyframes';
+    document.head.appendChild(styleEl);
+  }
+  const flagKey = 'frames' + frameCount;
+  if (!styleEl.dataset[flagKey]) {
+    const target = (frameCount / (frameCount - 1) * 100).toFixed(4);
+    styleEl.appendChild(document.createTextNode(
+      `@keyframes ${name} { from { background-position-x: 0%; } to { background-position-x: ${target}%; } }`
+    ));
+    styleEl.dataset[flagKey] = '1';
+  }
+  return name;
+}
+
 function bkmpApplyVillageSkin() {
   const el = document.getElementById('idleVillageSprite');
   if (!el) return;
@@ -2814,10 +2848,61 @@ function bkmpApplyVillageSkin() {
   if (!def || !bkmpVillageSkinOwned(activeId)) {
     def = bkmpVillageSkinsCatalog.find(s => s.id === 'standard');
   }
-  if (def && def.image_file) {
-    el.style.backgroundImage = `url('${def.image_file}')`;
-  } else {
+  if (def && def.video_file) {
+    /* Video-Skin (z.B. Pinguindorf) statt Bild-Sprite-Streifen: aspect-
+       ratio wird hier auf die ECHTEN Video-Massse gesetzt (frame_aspect_w/h
+       zweckentfremdet, siehe supabase-idle-village-skins-pinguindorf.sql),
+       damit das Video ohne Zuschneiden/Verzerren exakt in den Container
+       passt - object-fit:cover (style.css .idle-village-video) greift bei
+       exakt passendem Seitenverhaeltnis ohnehin nicht sichtbar zu. */
     el.style.backgroundImage = '';
+    el.style.backgroundSize = '';
+    el.style.animation = 'none';
+    const aspectW = Number(def.frame_aspect_w || 16);
+    const aspectH = Number(def.frame_aspect_h || 9);
+    el.style.aspectRatio = `${aspectW} / ${aspectH}`;
+    let video = el.querySelector('.idle-village-video');
+    if (!video) {
+      video = document.createElement('video');
+      video.className = 'idle-village-video';
+      video.autoplay = true;
+      video.muted = true;
+      video.loop = true;
+      video.playsInline = true;
+      el.appendChild(video);
+    }
+    if (video.dataset.src !== def.video_file) {
+      video.src = def.video_file;
+      video.dataset.src = def.video_file;
+    }
+  } else if (def && def.image_file) {
+    const existingVideo = el.querySelector('.idle-village-video');
+    if (existingVideo) existingVideo.remove();
+    el.style.backgroundImage = `url('${def.image_file}')`;
+    const frameCount = Math.max(1, Number(def.frame_count || 1));
+    const aspectW = Number(def.frame_aspect_w || 1164);
+    const aspectH = Number(def.frame_aspect_h || 199);
+    el.style.aspectRatio = `${aspectW} / ${aspectH}`;
+    if (frameCount > 1) {
+      /* Mehrere leicht unterschiedliche Frames (ambiente Partikel-
+         Variation, z.B. Pilzdorf) liegen als horizontaler Sprite-Streifen
+         vor - background-size auf die Gesamtbreite des Streifens strecken
+         und per steps() durchschalten, analog zum bestehenden Schaf-
+         Sprite (bkmpSheepFrames). Feste 0.6s pro Frame, damit mehr Frames
+         automatisch einen laengeren, ruhigeren Loop ergeben statt eines
+         hektischeren. */
+      el.style.backgroundSize = `${frameCount * 100}% 100%`;
+      const kfName = bkmpEnsureVillageFrameKeyframes(frameCount);
+      el.style.animation = `${kfName} ${(frameCount * 0.6).toFixed(1)}s steps(${frameCount}) infinite`;
+    } else {
+      el.style.backgroundSize = '100% 100%';
+      el.style.animation = 'none';
+    }
+  } else {
+    const existingVideo = el.querySelector('.idle-village-video');
+    if (existingVideo) existingVideo.remove();
+    el.style.backgroundImage = '';
+    el.style.animation = 'none';
   }
 }
 
@@ -4829,7 +4914,7 @@ async function bkmpRaidRenderLeaderboard() {
   if (!listEl) return;
   listEl.innerHTML = '<p class="empty-hint">Lädt...</p>';
   let rows = [];
-  try { rows = await loadRaidLeaderboard(); } catch (e) { console.warn('Raid: Bestenliste konnte nicht geladen werden.', e); }
+  try { rows = (await loadRaidLeaderboard()).filter(r => !bkmpIsHiddenTestAccount(r.displayName)); } catch (e) { console.warn('Raid: Bestenliste konnte nicht geladen werden.', e); }
   const field = bkmpIdleActiveLeaderboardTab.replace('raid_', '');
   const fieldMap = { damage: 'totalDamageDealt', bosses: 'totalBossesDefeated', joined: 'totalRaidsJoined', best: 'bestSingleRaidDamage' };
   const key = fieldMap[field] || 'totalDamageDealt';

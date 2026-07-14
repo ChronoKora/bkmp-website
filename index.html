@@ -55,7 +55,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260715-villageskins1">
+<link rel="stylesheet" href="style.css?v=20260716-videoskins1">
 </head>
 <body>
 
@@ -503,7 +503,7 @@
             <div class="raid-city-stats" id="raidCityStats"></div>
           </div>
           <div class="raid-boss raid-clickable" id="raidBoss">
-            <div class="raid-boss-sprite raid-sprite-zerathor" id="raidBossSprite"></div>
+            <video class="raid-boss-sprite raid-sprite-zerathor" id="raidBossSprite" src="assets/dragons/zerathor.mp4?v=20260716-zerathorvideo1" autoplay muted loop playsinline></video>
             <div class="raid-hp-bar"><div class="raid-hp-fill raid-hp-fill-boss" id="raidBossHpFill" style="width:100%"></div></div>
             <div class="raid-hp-label" id="raidBossHpLabel"></div>
             <div class="raid-boss-name" id="raidBossName"></div>
@@ -619,6 +619,7 @@
   </div>
 
   <header class="hero hero-banner-wrap">
+    <div class="bkmp-penguin-easter-egg" id="bkmpPenguinEgg" role="button" tabindex="0" aria-label="Pinguin antippen"></div>
     <div class="streamer-strip" id="streamerStrip">
       <div class="streamer-strip-title">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h16v11l-4 4h-4l-3 3H8v-3H3V7l2-4z"/><path d="M9 8v5M15 8v5"/></svg>
@@ -789,6 +790,44 @@
       <section class="panel" id="panel-orders">
         <h2 class="panel-title">Kartenaufträge</h2>
         <p class="leaderboard-intro">Auftrag veröffentlichen, offene Aufträge einsehen, eigene Aufträge verfolgen oder Kartenbaufirmen kennenlernen.</p>
+
+        <div class="company-apply-cta">
+          <div class="company-apply-cta-text">
+            <h3>🏗️ Bist du eine Kartenbaufirma? Bewirb dich hier!</h3>
+            <p>Werde Teil unseres Firmenverzeichnisses, erscheine bei den Firmenprofilen und übernimm Kartenaufträge.</p>
+          </div>
+          <button type="button" class="btn-ja" id="companyApplyToggleBtn">Jetzt bewerben</button>
+        </div>
+
+        <form id="companyApplyForm" class="map-order-form company-apply-form" style="display:none;" onsubmit="return false;">
+          <h3 class="map-form-section-title">🏢 Firmenangaben</h3>
+          <div class="form-grid form-grid-2">
+            <div><label for="companyApplyName">Firmenname</label><input type="text" id="companyApplyName" maxlength="60" required></div>
+            <div><label for="companyApplyContact">Ansprechpartner (Minecraft/Discord-Name)</label><input type="text" id="companyApplyContact" maxlength="40" required></div>
+            <div><label for="companyApplyDiscord">Discord-Link</label><input type="text" id="companyApplyDiscord" maxlength="200" placeholder="https://discord.gg/..."></div>
+            <div><label for="companyApplyWebsite">Website (optional)</label><input type="text" id="companyApplyWebsite" maxlength="200" placeholder="https://..."></div>
+            <div><label for="companyApplyPriceMin">Preisspanne von</label><input type="number" id="companyApplyPriceMin" min="0"></div>
+            <div><label for="companyApplyPriceMax">Preisspanne bis</label><input type="number" id="companyApplyPriceMax" min="0"></div>
+          </div>
+          <label for="companyApplyDescription">Beschreibung eurer Firma</label>
+          <textarea id="companyApplyDescription" rows="3" maxlength="800" placeholder="Wer seid ihr, was macht euch aus?"></textarea>
+
+          <label>Spezialisierungen</label>
+          <div class="partner-filter" id="companyApplySpecialtiesFilter"></div>
+
+          <h3 class="map-form-section-title">🖼️ Firmenlogo</h3>
+          <label for="companyApplyLogo">Logo hochladen</label>
+          <input type="file" id="companyApplyLogo" accept="image/*">
+          <div class="company-apply-logo-preview" id="companyApplyLogoPreview" style="display:none;"><img id="companyApplyLogoPreviewImg" alt="Logo-Vorschau"></div>
+          <label for="companyApplyBanner">Banner-URL (optional)</label>
+          <input type="text" id="companyApplyBanner" maxlength="300" placeholder="https://... (falls schon ein Banner-Bild irgendwo gehostet ist)">
+
+          <label class="admin-checkbox-label"><input type="checkbox" id="companyApplyConsent"> Ich bin berechtigt, diese Firma anzumelden, und die Angaben sind korrekt.</label>
+
+          <button type="button" class="btn-ja" id="companyApplySubmitBtn">Bewerbung einreichen</button>
+          <p class="map-order-submit-msg" id="companyApplySubmitMsg"></p>
+        </form>
+
         <div class="orders-header-row">
           <button type="button" class="btn-nein" id="mapAccessCodeOpenBtn">Zugangscode eingeben</button>
         </div>
@@ -1130,10 +1169,10 @@
 
   <script>window.BKMP_CLIENT_STORAGE_KEY = 'bkmp-customer-auth';</script>
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260715-villageskins1"></script>
+  <script src="supabase.js?v=20260716-companyapply1"></script>
   <script src="app.js?v=20260712-themefix1"></script>
-  <script src="idledorf.js?v=20260716-raidjoinsync1"></script>
-  <script src="mapart.js?v=20260709-cardsale1"></script>
+  <script src="idledorf.js?v=20260716-videoskins1"></script>
+  <script src="mapart.js?v=20260716-companyapply1"></script>
   <script>
     bkmpInitTheme();
     bkmpInitAccentColor();
@@ -1899,6 +1938,26 @@
         if (bkmpSheepBubble.classList.contains('visible') && !bkmpSheepEgg.contains(e.target) && !bkmpSheepBubble.contains(e.target)) {
           bkmpHideSheepBubble();
         }
+      });
+    }
+
+    /* Anklickbares Pinguin-Easter-Egg: nur im Hellmodus sichtbar (siehe
+       .bkmp-penguin-easter-egg CSS), einmaliger Fund-Reward beim ersten
+       Klick, gleiches Grund-Muster wie beim Schaf oben (bkmpMarkEggFound +
+       renderAchievementBadge-Refresh), aber ohne eigene Sprechblase - hier
+       reicht ein kurzer Toast. */
+    const bkmpPenguinEgg = document.getElementById('bkmpPenguinEgg');
+    if (bkmpPenguinEgg) {
+      async function bkmpTogglePenguinEgg() {
+        const isFirstClick = typeof bkmpGetEggsFound === 'function' && !bkmpGetEggsFound().includes('penguin');
+        if (!isFirstClick) return;
+        if (typeof bkmpMarkEggFound === 'function') bkmpMarkEggFound('penguin');
+        if (typeof renderAchievementBadge === 'function') renderAchievementBadge(true);
+        if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('🐧 Ein hungriger kleiner Pinguin freut sich über Gesellschaft!', 3200);
+      }
+      bkmpPenguinEgg.addEventListener('click', bkmpTogglePenguinEgg);
+      bkmpPenguinEgg.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); bkmpTogglePenguinEgg(); }
       });
     }
 
@@ -4148,8 +4207,9 @@
       { id: 'egg_jannik', category: 'Easter Eggs', title: '???', revealName: 'Jannik der Hase', desc: 'Finde ein verstecktes Easter Egg.', revealDesc: 'Man sagt, irgendwo auf dieser Website hoppelt ein kleiner Hase herum. Herzlichen Glückwunsch – du hast ihn gefunden! 🥕', hint: 'Es heißt, irgendwo hoppelt ein kleiner Jannik Hase herum... Aber niemand weiß genau, wo.', check: ctx => ctx.eggsFound.includes('jannik') },
       { id: 'egg_adfree', category: 'Easter Eggs', title: '???', revealName: 'Hab kein Geld', desc: 'Finde ein verstecktes Easter Egg.', revealDesc: '99 Dollar gespart. Bester Deal überhaupt.', hint: 'Werbung nervt echt manchmal, oder?', check: ctx => ctx.eggsFound.includes('adfree') },
       { id: 'egg_sheep', category: 'Easter Eggs', title: '???', revealName: 'Schaf Zitate Flüsterer', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Jeden Tag werden wir bereichert damit!', check: ctx => ctx.eggsFound.includes('sheep') },
+      { id: 'egg_penguin', category: 'Easter Eggs', title: '???', revealName: 'Pinguin-Fischer', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Nur bei Tageslicht versteckt sich im Schnee ein kleiner Freund mit Fisch-Appetit.', check: ctx => ctx.eggsFound.includes('penguin') },
       ...bkmpTieredAchievements('sheepstreak', 'Zeit & Treue', 'sheepStreak', BKMP_SHEEP_STREAK_TIERS, n => `Klicke ${n} Tag${n === 1 ? '' : 'e'} in Folge ab 12 Uhr auf unser Schaf für das Zitat des Tages.`),
-      { id: 'egg_all', category: 'Easter Eggs', title: 'Osterhase', desc: 'Finde alle 12 versteckten Easter Eggs.', progress: ctx => [ctx.eggsFound.length, 12], check: ctx => ctx.eggsFound.length >= 12 },
+      { id: 'egg_all', category: 'Easter Eggs', title: 'Osterhase', desc: 'Finde alle 14 versteckten Easter Eggs.', progress: ctx => [ctx.eggsFound.length, 14], check: ctx => ctx.eggsFound.length >= 14 },
       { id: 'combo_card_wish', category: 'Sonstiges', title: 'Vielseitig', desc: 'Reiche mindestens 1 Karte und 1 Kartenidee ein.', check: ctx => ctx.cardCount >= 1 && ctx.wishCount >= 1 },
       { id: 'night_owl', category: 'Sonstiges', title: 'Nachteule', desc: 'Besuche die Seite zwischen 0 und 5 Uhr nachts.', check: ctx => ctx.nightOwl },
       { id: 'early_bird', category: 'Sonstiges', title: 'Frühaufsteher', desc: 'Besuche die Seite zwischen 5 und 7 Uhr morgens.', check: ctx => ctx.earlyBird },
@@ -4339,6 +4399,7 @@
       { id: 'der_geduldige', name: 'Der Geduldige', desc: 'Wartet einfach mal ab.', unlockAchievement: 'egg_idle' },
       { id: 'der_verlorene', name: 'Der Verlorene', desc: 'Hat sich fast verirrt.', unlockAchievement: 'egg_jannik' },
       { id: 'der_zufaellige', name: 'Der Zufällige', desc: 'Verlässt sich gern auf den Zufall.', unlockAchievement: 'egg_rainbow' },
+      { id: 'schnee_fluesterer', name: 'Schnee-Flüsterer', desc: 'Nur bei Tageslicht im Schnee zu finden.', unlockAchievement: 'egg_penguin' },
       { id: 'wahnsinniger_sammler', name: 'Der Wahnsinnige Sammler', desc: 'Sammelt einfach alles.', unlockAt: 100 },
       { id: 'collector_plus', name: 'Collector++', desc: 'Eine beachtliche Sammlung.', unlockAchievement: 'card_200' },
       { id: 'collector_ultra', name: 'Collector Ultra', desc: 'Eine gewaltige Sammlung.', unlockAchievement: 'card_300' },
@@ -4830,7 +4891,7 @@
       if (typeof loadLeaderboardStats !== 'function' || !bkmpGetSupabaseClient()) { renderLeaderboard(); return; }
       try {
         const stats = await loadLeaderboardStats();
-        if (stats) bkmpLeaderboardStats = stats;
+        if (stats) bkmpLeaderboardStats = stats.filter(s => !bkmpIsHiddenTestAccount(s.name));
       } catch (e) {
         console.warn('Bestenliste konnte nicht geladen werden.', e);
       }
