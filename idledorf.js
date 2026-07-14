@@ -2612,21 +2612,32 @@ async function bkmpIdleRenderArenaPanel() {
   const losses = bkmpArenaMyRating ? bkmpArenaMyRating.losses : 0;
   const total = wins + losses;
   const winRate = total > 0 ? Math.round((wins / total) * 100) : 0;
+  /* Tageslimit-Anzeige (Spieler-Wunsch 14.07.: "Arena nur 10x Täglich
+     Angreifen reset um 0:00") - reine Client-Schaetzung aus den ohnehin
+     schon geladenen letzten Kaempfen (server-seitig ist arena_attack() die
+     eigentliche, verbindliche Grenze - siehe supabase-idle-arena-daily-
+     limit.sql). Reicht fuer die Anzeige, weil ein Tageslimit von 10 locker
+     innerhalb der geladenen 15 juengsten Kaempfe liegt. */
+  const todayStr = new Date().toDateString();
+  const attacksToday = bkmpArenaRecentBattles.filter(b => b.wasAttacker && new Date(b.occurredAt).toDateString() === todayStr).length;
+  const attacksLeft = Math.max(0, 10 - attacksToday);
 
   panel.innerHTML = `
     <div class="idle-dungeon-intro">
       <h4>⚔️ PvP-Arena</h4>
       <p>Asynchroner Kampf gegen die aktuellen Kampfwerte anderer Spieler - kein Echtzeit-Duell, dein Gegner muss nicht online sein. Sieg bringt Rating + Gold, Niederlage kostet nur Rating (nie Gold).</p>
       <p class="idle-dungeon-best">🏅 Dein Rating: <strong>${rating}</strong> &middot; ${wins}S / ${losses}N ${total > 0 ? `(${winRate}% Siegquote)` : ''}</p>
+      <p>⚔️ Angriffe heute: <strong>${attacksLeft}/10</strong> übrig &middot; Reset um 0 Uhr</p>
     </div>
     <div class="idle-arena-opponents">
       <h4 style="margin-top:1rem;">Gegner in deiner Nähe</h4>
+      ${attacksLeft === 0 ? '<p class="empty-hint">Tageslimit erreicht - morgen um 0 Uhr geht es weiter.</p>' : ''}
       ${bkmpArenaOpponents.length === 0 ? '<p class="empty-hint">Noch keine anderen Spieler in der Arena. Schau später nochmal vorbei.</p>' : bkmpArenaOpponents.map(o => `
         <div class="idle-arena-opponent-card" data-opponent-uid="${escapeHtml(o.authUserId)}">
           <span class="idle-arena-opponent-name">${escapeHtml(o.displayName)}</span>
           <span class="idle-arena-opponent-rating">🏅 ${o.rating}</span>
           <span class="idle-arena-opponent-record">${o.wins}S/${o.losses}N</span>
-          <button type="button" class="btn-ja idle-arena-attack-btn" ${bkmpArenaAttacking ? 'disabled' : ''}>${bkmpArenaAttacking === o.authUserId ? '⏳...' : '⚔️ Angreifen'}</button>
+          <button type="button" class="btn-ja idle-arena-attack-btn" ${bkmpArenaAttacking || attacksLeft === 0 ? 'disabled' : ''}>${bkmpArenaAttacking === o.authUserId ? '⏳...' : '⚔️ Angreifen'}</button>
         </div>
       `).join('')}
     </div>

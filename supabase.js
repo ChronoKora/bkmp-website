@@ -3860,6 +3860,7 @@ async function bkmpArenaAttack(targetAuthUserId) {
   if (error) {
     const msg = String(error.message || '');
     if (msg.includes('cooldown_active')) throw new Error('Du hast dieses Ziel schon vor Kurzem angegriffen. Bitte warte ein paar Minuten.');
+    if (msg.includes('daily_limit_reached')) throw new Error('Du hast dein Tageslimit von 10 Arena-Angriffen erreicht. Morgen um 0 Uhr geht es weiter.');
     if (msg.includes('no_attacker_state')) throw new Error('Spiele zuerst im Kampf-Tab, bevor du in die Arena gehst.');
     if (msg.includes('no_defender_state')) throw new Error('Dieser Gegner hat noch keinen Kampf-Fortschritt.');
     if (msg.includes('invalid_target') || msg.includes('not_authenticated')) throw new Error('Angriff nicht möglich.');

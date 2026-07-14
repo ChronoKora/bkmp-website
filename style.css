@@ -5799,10 +5799,16 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
    .idle-hp-bar sind bereits rein klassenbasiert (siehe dortige Regeln),
    hier nur noch ein Groessen-Feintuning fuer den kleineren Popup-Rahmen
    plus der neue Namens-Schriftzug unter der HP-Leiste. */
-.arena-battle-card { max-width: 480px; text-align: center; }
-.arena-battle-field { margin: 1rem 0; min-height: 180px; }
-.arena-battle-name { font-weight: 700; font-size: 0.85rem; margin-top: 0.4rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.arena-battle-result { font-weight: 700; min-height: 1.4em; margin-top: 0.4rem; }
+/* NACHBESSERUNG (Spieler-Wunsch 14.07.: "Darf ruhig viel größer!") - von
+   480px auf 720px, Feld-Mindesthoehe entsprechend mehr als verdoppelt -
+   .idle-village nimmt weiterhin 42% der Feldbreite ein (siehe dortige
+   Regel), skaliert dadurch automatisch mit hoch, keine weitere Anpassung
+   an den Sprite-Boxen selbst noetig. */
+.arena-battle-card { max-width: 720px; text-align: center; }
+.arena-battle-card h3 { font-size: 1.5rem; margin-bottom: 0.3rem; }
+.arena-battle-field { margin: 1.2rem 0; min-height: 320px; }
+.arena-battle-name { font-weight: 700; font-size: 1.15rem; margin-top: 0.6rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.arena-battle-result { font-weight: 700; font-size: 1.4rem; min-height: 1.4em; margin-top: 0.6rem; }
 .skillhelp-list {
   display: flex;
   flex-direction: column;
