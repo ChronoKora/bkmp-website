@@ -55,7 +55,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260714-arenabig1">
+<link rel="stylesheet" href="style.css?v=20260715-arenawide1">
 </head>
 <body>
 
@@ -530,7 +530,14 @@
   <div class="joke-overlay idle-dorf-overlay" id="idleDorfOverlay">
     <div class="joke-card idle-dorf-card">
       <button type="button" class="idle-dorf-close" id="idleDorfCloseX" aria-label="Schlie&szlig;en">&times;</button>
-      <h3>🏰 Idle Drachen Dorf</h3>
+      <!-- Spieler-Wunsch (14.07.): "Wir haben endlich ein banner fürs
+           Spiel. Bau das gerne ordentlich ein!" - ersetzt den bisherigen
+           kleinen Text-Header, gleiches WEBP+PNG-Fallback-Muster wie der
+           Haupt-Hero-Banner auf der Startseite (.hero-banner-picture). -->
+      <picture class="idle-dorf-banner-picture">
+        <source srcset="assets/idle-dorf-banner.webp" type="image/webp">
+        <img class="idle-dorf-banner-img" src="assets/idle-dorf-banner.png" width="1978" height="610" alt="Idle Drachen Dorf – Baue. Verbessere. Besiege. Werde zur Legende!" loading="lazy" decoding="async">
+      </picture>
       <div class="idle-dorf-offline-card" id="idleDorfOfflineCard" style="display:none;"></div>
       <div class="raid-join-banner" id="raidJoinBanner" style="display:none;"></div>
       <!-- Nutzerwunsch (15.07.): "auf der Hauptseite dann stehen tut 'Wird

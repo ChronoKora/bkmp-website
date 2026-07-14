@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="favicon.ico" sizes="any">
 <title>BKMP – Idle Drachen Dorf (Stream-Overlay)</title>
-<link rel="stylesheet" href="style.css?v=20260714-arenabig1">
+<link rel="stylesheet" href="style.css?v=20260715-arenawide1">
 <style>
   /* ============================================================
      Eigenstaendige Seite NUR fuer das Idle Drachen Dorf, gedacht als
@@ -133,7 +133,10 @@
   <div class="joke-overlay idle-dorf-overlay" id="idleDorfOverlay">
     <div class="joke-card idle-dorf-card">
       <button type="button" class="idle-dorf-close" id="idleDorfCloseX" aria-label="Schlie&szlig;en">&times;</button>
-      <h3>&#127984; Idle Drachen Dorf</h3>
+      <picture class="idle-dorf-banner-picture">
+        <source srcset="assets/idle-dorf-banner.webp" type="image/webp">
+        <img class="idle-dorf-banner-img" src="assets/idle-dorf-banner.png" width="1978" height="610" alt="Idle Drachen Dorf – Baue. Verbessere. Besiege. Werde zur Legende!" loading="lazy" decoding="async">
+      </picture>
       <div class="idle-dorf-offline-card" id="idleDorfOfflineCard" style="display:none;"></div>
       <div class="raid-join-banner" id="raidJoinBanner" style="display:none;"></div>
       <div class="idle-dorf-hud" id="idleDorfHud"></div>

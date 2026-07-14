@@ -4986,6 +4986,27 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 }
 .idle-dorf-close:hover { color: var(--ink); border-color: var(--gold); }
 
+/* Spieler-Wunsch (14.07.): offizielles Spiel-Banner statt der bisherigen
+   kleinen Text-Ueberschrift im Idle-Dorf-Fenster. Gleiches WEBP+PNG-
+   Fallback-Muster wie .hero-banner-picture/.hero-banner (Startseite),
+   aber ohne dessen viewport-relative Breitenformel - dieses Banner lebt
+   innerhalb des bereits begrenzten, gepolsterten .idle-dorf-card und
+   soll dessen volle Innenbreite ausfuellen statt eine eigene Maximalbreite
+   vorzugeben. */
+.idle-dorf-banner-picture { position: relative; display: block; margin-bottom: 1rem; }
+.idle-dorf-banner-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1978 / 610;
+  object-fit: cover;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  box-shadow: 0 16px 46px rgba(0, 0, 0, 0.4);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 @media (max-width: 640px) {
   .idle-dorf-overlay .idle-dorf-card {
     width: 100vw;
@@ -4995,6 +5016,7 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
     border-radius: 0;
     padding: 1.4rem 1rem 1rem;
   }
+  .idle-dorf-banner-img { border-radius: 10px; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3); }
 }
 
 .idle-dorf-offline-card {
@@ -5799,14 +5821,18 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
    .idle-hp-bar sind bereits rein klassenbasiert (siehe dortige Regeln),
    hier nur noch ein Groessen-Feintuning fuer den kleineren Popup-Rahmen
    plus der neue Namens-Schriftzug unter der HP-Leiste. */
-/* NACHBESSERUNG (Spieler-Wunsch 14.07.: "Darf ruhig viel größer!") - von
-   480px auf 720px, Feld-Mindesthoehe entsprechend mehr als verdoppelt -
-   .idle-village nimmt weiterhin 42% der Feldbreite ein (siehe dortige
-   Regel), skaliert dadurch automatisch mit hoch, keine weitere Anpassung
-   an den Sprite-Boxen selbst noetig. */
-.arena-battle-card { max-width: 720px; text-align: center; }
+/* NACHBESSERUNG 2 (Spieler-Wunsch 15.07., Screenshot: "Das soll voll in die
+   Breite richtig groß!") - die max-width:720px-Erhoehung von eben griff
+   praktisch nicht: .joke-card setzt nur max-width, nie eine echte width, ein
+   Block mit width:auto in einer flex-zentrierten .joke-overlay schrumpft
+   dadurch immer auf seinen Inhalt statt die max-width tatsaechlich
+   auszufuellen (im Screenshot dadurch weiterhin nur ~320px breit). Jetzt
+   dieselbe width:94vw/max-width-Formel wie .idle-dorf-card (das grosse
+   Hauptfenster) - .idle-village nimmt weiterhin 42% der Feldbreite ein
+   (siehe dortige Regel), skaliert dadurch automatisch mit hoch. */
+.arena-battle-card { width: 94vw; max-width: 1200px; text-align: center; }
 .arena-battle-card h3 { font-size: 1.5rem; margin-bottom: 0.3rem; }
-.arena-battle-field { margin: 1.2rem 0; min-height: 320px; }
+.arena-battle-field { margin: 1.2rem 0; min-height: 340px; }
 .arena-battle-name { font-weight: 700; font-size: 1.15rem; margin-top: 0.6rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .arena-battle-result { font-weight: 700; font-size: 1.4rem; min-height: 1.4em; margin-top: 0.6rem; }
 .skillhelp-list {
@@ -6138,6 +6164,11 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   100% { background-position: 6% -10%, 34% -15%, 50% -12%, 79% -18%, 88% -8%; opacity: 0; }
 }
 .idle-dorf-overlay .idle-dorf-card > * { position: relative; z-index: 1; }
+/* Hoehere Spezifitaet als die generische Regel direkt darueber noetig
+   (3 statt 2 Klassen im Selektor) - der Schliessen-Knopf sitzt in derselben
+   Ecke wie das neue Banner (siehe .idle-dorf-banner-picture) und muss trotz
+   spaeterer DOM-Position des Banners immer sichtbar obenauf bleiben. */
+.idle-dorf-overlay .idle-dorf-card > .idle-dorf-close { z-index: 2; }
 @media (prefers-reduced-motion: reduce) {
   .idle-dorf-overlay .idle-dorf-card::before { animation: none; opacity: 0.2; }
 }
