@@ -35,7 +35,13 @@ alter table public.raid_instances add column if not exists last_counter_hp bigin
 -- raid_deal_damage neu definieren: 1:1 dieselbe bisherige Logik, zusaetzlich
 -- der garantierte 5%-Gegenangriff nach dem Schadenstreffer (nur wenn der
 -- Boss den Treffer ueberlebt).
+--
+-- "create or replace" allein reicht hier nicht: die bestehende Funktion hat
+-- eine andere returns-table-Signatur, Postgres verweigert dann mit 42P13
+-- ("cannot change return type of existing function"). Deshalb vorher explizit
+-- droppen - idempotent, weil "if exists".
 -- ============================================================
+drop function if exists public.raid_deal_damage(text, numeric, boolean, boolean);
 create or replace function public.raid_deal_damage(p_raid_id text, p_amount numeric, p_is_crit boolean default false, p_is_click boolean default false)
 returns table (boss_hp bigint, status text)
 language plpgsql
@@ -118,8 +124,10 @@ grant execute on function public.raid_deal_damage(text, numeric, boolean, boolea
 -- ============================================================
 -- raid_boss_attack_tick neu definieren: 1:1 dieselbe bisherige Logik,
 -- Zeitintervall aber jetzt Enrage-skaliert nach verbleibendem Boss-HP-
--- Anteil statt fest.
+-- Anteil statt fest. Gleicher Grund wie bei raid_deal_damage oben: vorher
+-- droppen, falls sich die returns-table-Signatur unterscheidet (42P13).
 -- ============================================================
+drop function if exists public.raid_boss_attack_tick(text);
 create or replace function public.raid_boss_attack_tick(p_raid_id text)
 returns table (city_hp bigint, boss_hp bigint, status text)
 language plpgsql

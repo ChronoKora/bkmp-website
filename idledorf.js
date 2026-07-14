@@ -3848,9 +3848,11 @@ function bkmpRuneQuickSelectFuse(count) {
    uebergreifenden Ein-Klick-Weg. */
 function bkmpRuneQuickSelectFuseAll() {
   if (!bkmpRuneFuseSelection) return;
+  /* Spieler-Feedback (14.07.): "Es werden auch Runen verschmolzen die +1 +2
+     +3 haben das soll so nicht" - nur noch unangetastete +0-Runen kommen
+     automatisch in die Auswahl, keine Faellt-zurueck-auf-aufgewertet mehr. */
   const candidates = bkmpIdlePlayerRunes
-    .filter(r => r.rune_type === bkmpRuneActiveSlotTab && r.rarity === bkmpRuneFuseSelection.rarityId && !r.equipped)
-    .sort((a, b) => Number(a.upgrade_level || 0) - Number(b.upgrade_level || 0));
+    .filter(r => r.rune_type === bkmpRuneActiveSlotTab && r.rarity === bkmpRuneFuseSelection.rarityId && !r.equipped && Number(r.upgrade_level || 0) === 0);
   const usableCount = Math.floor(candidates.length / 3) * 3;
   bkmpRuneFuseSelection.cids = candidates.slice(0, usableCount).map(r => r._cid);
   bkmpIdleRenderRunenPanel();
@@ -3862,9 +3864,12 @@ function bkmpRuneQuickSelectFuseAll() {
    gray/green/blue/purple des aktuell offenen Slots in einem Rutsch
    durchgeht (Legendaer/gold faellt raus, siehe BKMP_RUNE_FUSE_FAIL_CHANCE-
    Kommentar - kann nicht weiter verschmolzen werden). Nutzt pro Seltenheit
-   dieselbe "niedrigste Stufe zuerst"-Auswahl wie bkmpRuneQuickSelectFuseAll,
-   damit aufgewertete Runen nur verbraucht werden, wenn nicht genug frische
-   +0-Kopien fuer eine volle Dreiergruppe uebrig sind. */
+   dieselbe strikte +0-Auswahl wie bkmpRuneQuickSelectFuseAll. NACHBESSERUNG
+   (14.07., "Es werden auch Runen verschmolzen die +1 +2 +3 haben das soll
+   so nicht"): der fruehere Rueckfall auf aufgewertete Runen (falls nicht
+   genug +0-Kopien vorhanden waren) ist entfernt - eine Seltenheit wird nur
+   noch aus komplett unangetasteten +0-Runen gruppiert, sonst ganz
+   uebersprungen. */
 async function bkmpRuneAutoFuseAll() {
   const activeSlot = window.BKMP_RUNE_SLOTS.find(s => s.id === bkmpRuneActiveSlotTab);
   if (!activeSlot || !bkmpIdleState) return;
@@ -3872,25 +3877,20 @@ async function bkmpRuneAutoFuseAll() {
   const groups = [];
   fusableRarities.forEach(rarity => {
     const candidates = bkmpIdlePlayerRunes
-      .filter(r => r.rune_type === activeSlot.id && r.rarity === rarity.id && !r.equipped)
-      .sort((a, b) => Number(a.upgrade_level || 0) - Number(b.upgrade_level || 0));
+      .filter(r => r.rune_type === activeSlot.id && r.rarity === rarity.id && !r.equipped && Number(r.upgrade_level || 0) === 0);
     const usableCount = Math.floor(candidates.length / 3) * 3;
     for (let i = 0; i < usableCount; i += 3) groups.push({ rarityId: rarity.id, cids: candidates.slice(i, i + 3).map(r => r._cid) });
   });
   if (!groups.length) {
-    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`Keine vollständigen Dreiergruppen zum Verschmelzen bei ${activeSlot.name}.`, 2800);
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`Keine vollständigen +0-Dreiergruppen zum Verschmelzen bei ${activeSlot.name}.`, 2800);
     return;
   }
-  const withProgress = groups.reduce((sum, g) => sum + g.cids.filter(cid => {
-    const r = bkmpIdlePlayerRunes.find(x => x._cid === cid);
-    return r && (Number(r.upgrade_level || 0) > 0 || (r.substats && r.substats.length));
-  }).length, 0);
   const byRarityCount = {};
   groups.forEach(g => { byRarityCount[g.rarityId] = (byRarityCount[g.rarityId] || 0) + 1; });
   const summaryLine = fusableRarities.filter(r => byRarityCount[r.id]).map(r => `${byRarityCount[r.id]}× ${r.name}`).join(', ');
   const confirmed = await bkmpConfirmDialog(
     `🔥 Auto-Schmelzen: ${groups.length} Gruppen?`,
-    `Verschmilzt bei ${activeSlot.name} alle vollständigen Dreiergruppen über alle Seltenheiten hinweg: ${summaryLine} (insgesamt ${groups.length * 3} Runen).\n\n⚠️ Jede Gruppe hat je nach Seltenheit eine eigene Chance, komplett zerstört zu werden statt zu gelingen.${withProgress ? `\n⚠️ ${withProgress} der eingesetzten Runen sind bereits aufgewertet.` : ''}\n\nTrotzdem fortfahren?`,
+    `Verschmilzt bei ${activeSlot.name} alle vollständigen +0-Dreiergruppen über alle Seltenheiten hinweg: ${summaryLine} (insgesamt ${groups.length * 3} Runen).\n\n⚠️ Jede Gruppe hat je nach Seltenheit eine eigene Chance, komplett zerstört zu werden statt zu gelingen.\n\nTrotzdem fortfahren?`,
     'Ja, alle verschmelzen',
     'Abbrechen'
   );
