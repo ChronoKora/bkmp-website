@@ -23,12 +23,24 @@
 -- "Daily Streak" wird NICHT gesetzt - dieser Wert liegt rein
 -- clientseitig in localStorage (siehe BKMP_IDLE_STREAK_KEY in
 -- idledorf.js), es gibt dafuer keine Datenbank-Spalte.
+--
+-- NACHTRAG (Nutzer-Wunsch): seine Upgrades standen ebenfalls auf 0
+-- (upgrade_purchases war {}) - die einzelnen Kaeufe lassen sich nicht
+-- rekonstruieren, aber er soll dafuer tatsaechlich ausgebbares Gold
+-- bekommen (nicht nur den Bestenlisten-Wert total_gold_earned von
+-- oben) sowie die zu Level 200 gehoerenden Skillpunkte: jedes Level
+-- gibt genau 1 Skillpunkt (siehe bkmpIdleAddXp in idledorf.js,
+-- "bkmpIdleState.skill_points_available += 1"), skill_allocations war
+-- {} (nichts ausgegeben) - macht bei Level 200 also 200 verfuegbare
+-- Punkte.
 -- ============================================================
 
 update public.idle_player_state
 set
   level = 200,
   total_gold_earned = 250000000,
+  gold = 250000000,
+  skill_points_available = 200,
   dragon_kills = 280000,
   playtime_seconds = 360000,
   highest_dragon_index = 3900,
