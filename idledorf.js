@@ -3910,6 +3910,31 @@ function bkmpGuildBossHitFlash() {
    Tippfehler. Der urspruengliche Beitritt (bkmpIdleRenderGildeBossPanel)
    nutzt an den RICHTIGEN Stellen bereits korrekt "state.instanceId" -
    nur diese 4 spaeteren Aufrufe hatten den falschen Feldnamen. */
+/* Spieler-Report (15.07., "nur reload aktualisiert den Schaden"): ein
+   eigener Tick/Klick aktualisierte bisher nur bossHp/status lokal - die
+   eigene Zeile in bkmpGuildBossParticipants (Rangliste + "Dein Schaden")
+   wurde ausschliesslich per Realtime-postgres_changes-Event nachgezogen.
+   guild_boss_deal_damage() gab dafuer bisher gar keinen eigenen Schadens-
+   stand zurueck. Exakt dasselbe Muster wie beim Raidboss (siehe
+   bkmpRaidApplyOwnDamageResult/supabase-raid-damage-sync-fix.sql) - die
+   RPC liefert den serverseitig bereits berechneten eigenen Stand jetzt
+   direkt mit (siehe supabase-guild-boss-damage-sync-fix.sql), damit die
+   eigene Zeile SOFORT lokal gesetzt werden kann statt auf Realtime zu
+   warten. */
+function bkmpGuildBossApplyOwnDamageResult(result) {
+  if (!result || result.ownDamageDealt == null) return;
+  const myUid = bkmpGuildMyAuthUserId;
+  if (!myUid) return;
+  const idx = bkmpGuildBossParticipants.findIndex(p => p.authUserId === myUid);
+  if (idx >= 0) {
+    bkmpGuildBossParticipants[idx].damageDealt = result.ownDamageDealt;
+    bkmpGuildBossParticipants[idx].critsLanded = result.ownCritsLanded;
+    bkmpGuildBossParticipants[idx].clicksLanded = result.ownClicksLanded;
+    bkmpGuildBossParticipants.sort((a, b) => b.damageDealt - a.damageDealt);
+    bkmpGuildBossRequestParticipantsRender();
+  }
+}
+
 async function bkmpGuildBossOwnTick() {
   if (!bkmpGuildBossState || bkmpGuildBossState.status !== 'fighting' || !bkmpIdleEffectiveStats) return;
   const roll = bkmpIdleDamageRoll(bkmpIdleEffectiveStats.attack, bkmpIdleEffectiveStats.critChance, bkmpIdleEffectiveStats.critDamage, 0);
@@ -3921,6 +3946,7 @@ async function bkmpGuildBossOwnTick() {
     if (result) {
       bkmpGuildBossState.bossHp = result.bossHp;
       bkmpGuildBossState.status = result.status;
+      bkmpGuildBossApplyOwnDamageResult(result);
       bkmpIdleRenderGildeBossPanel();
       bkmpGuildBossCheckOutcome();
     }
@@ -3937,6 +3963,7 @@ function bkmpGuildBossHandleClick() {
     if (result) {
       bkmpGuildBossState.bossHp = result.bossHp;
       bkmpGuildBossState.status = result.status;
+      bkmpGuildBossApplyOwnDamageResult(result);
       bkmpIdleRenderGildeBossPanel();
       bkmpGuildBossCheckOutcome();
     }
