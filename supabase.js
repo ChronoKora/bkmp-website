@@ -568,6 +568,7 @@ async function bkmpPlayerLogout() {
   const client = bkmpGetPlayerAuthClient();
   if (!client) return;
   await client.auth.signOut();
+  bkmpIdlePlayerStateUserIdCache = null;
 }
 
 /* Loescht den kompletten Spielstand + Login-Account unwiderruflich, siehe
@@ -3040,11 +3041,37 @@ async function loadIdlePlayerState(name) {
   return Array.isArray(data) && data[0] ? data[0] : null;
 }
 
+/* Cache fuer upsertIdlePlayerState (siehe dort) - NICHT global fuer alle
+   Schreibfunktionen gedacht, nur fuer diesen einen Hot-Path relevant. */
+let bkmpIdlePlayerStateUserIdCache = null;
+
 async function upsertIdlePlayerState(state) {
   const client = bkmpGetPlayerAuthClient();
   if (!client || !state || !state.name_key) return false;
-  const { data: sessionData } = await client.auth.getSession();
-  const userId = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
+  /* Bug-Report 17.07.: "Skillpunkte resetten nach Reload" - trat trotz des
+     keepalive-Fixes (siehe bkmpGetPlayerAuthClient) noch auf. Grund: JEDES
+     await VOR dem eigentlichen Speicher-fetch() ist ein Zeitfenster, in dem
+     der Browser die Seite beim Reload/Schliessen schon abbauen kann, bevor
+     der (zwar keepalive-markierte, aber noch gar nicht losgeschickte)
+     Request ueberhaupt abgeht - keepalive rettet nur bereits GESENDETE
+     Requests, keine, die den Sprung zum fetch() nie geschafft haben.
+     client.auth.getSession() war genau so ein Zwischenschritt. Loesung:
+     die zuletzt aufgeloeste auth_user_id zwischenspeichern und bei einem
+     bereits vorhandenen Cache-Wert SOFORT synchron weiterspeichern (keine
+     Wartezeit vor dem fetch), die Session dabei nur im Hintergrund
+     auffrischen. Beim allerersten Aufruf einer Sitzung (Cache noch leer)
+     bleibt der normale await-Weg bestehen. */
+  let userId = bkmpIdlePlayerStateUserIdCache;
+  if (userId) {
+    client.auth.getSession().then(({ data }) => {
+      const freshId = data && data.session && data.session.user ? data.session.user.id : null;
+      if (freshId) bkmpIdlePlayerStateUserIdCache = freshId;
+    }).catch(() => {});
+  } else {
+    const { data: sessionData } = await client.auth.getSession();
+    userId = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
+    if (userId) bkmpIdlePlayerStateUserIdCache = userId;
+  }
   if (!userId) return false;
   /* Gleicher Grund/gleiches Muster wie in upsertPlayerStats: name_key im
      mitgegebenen state-Objekt kann ein Snapshot von VOR einer Umbenennung
