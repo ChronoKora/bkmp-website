@@ -4611,11 +4611,29 @@ async function bkmpGuildBossJoin() {
   };
 }
 
+/* Fehler-Sichtbarkeit (Spieler-Report 15.07.: "Kein Damage" - Gildenboss-
+   HP blieb bei 2M/2M trotz aktivem Kampf, "0 Schaden" fuer alle
+   Teilnehmer server-weit): dieser Aufruf feuert alle ~2,5s (Auto-Tick)
+   plus bei jedem Klick - ein Fehler wurde bisher komplett stillschweigend
+   verschluckt (return null, kein console.warn, kein Toast), der Spieler
+   sah also nie einen Hinweis, WARUM nichts passiert. Jetzt: console.warn
+   bei JEDEM Fehlschlag (Diagnose), zusaetzlich ein auf 15s gedrosselter
+   Toast (kein Spam bei jedem einzelnen Tick, aber der Spieler bekommt
+   den tatsaechlichen Grund zu sehen statt nur "es tut sich nichts"). */
+let bkmpGuildBossDamageErrorToastAt = 0;
 async function bkmpGuildBossDealDamage(instanceId, amount, isCrit, isClick) {
   const client = bkmpGetPlayerAuthClient();
   if (!client) throw new Error('Supabase ist nicht verbunden.');
   const { data, error } = await client.rpc('guild_boss_deal_damage', { p_instance_id: instanceId, p_amount: amount, p_is_crit: !!isCrit, p_is_click: !!isClick });
-  if (error) return null;
+  if (error) {
+    console.warn('Gildenboss: Schaden konnte nicht verbucht werden.', error);
+    const now = Date.now();
+    if (now - bkmpGuildBossDamageErrorToastAt > 15000) {
+      bkmpGuildBossDamageErrorToastAt = now;
+      if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Gildenboss-Schaden konnte nicht verbucht werden: ' + String(error.message || 'unbekannter Fehler'), 4200);
+    }
+    return null;
+  }
   const row = Array.isArray(data) ? data[0] : data;
   return row ? { bossHp: Number(row.boss_hp), status: row.status } : null;
 }
