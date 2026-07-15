@@ -32,6 +32,23 @@
 -- Diese Datei enthaelt jetzt BEIDE Funktionen komplett (den bereits
 -- funktionierenden guild_boss_join()-Fix erneut plus den neuen
 -- guild_boss_deal_damage()-Fix), damit ein einziger Lauf alles abdeckt.
+--
+-- NACHBESSERUNG (Spieler-Report: nach dem ersten Fix-Versuch weiterhin
+-- EXAKT derselbe "instance_id is ambiguous"-Fehler, kein Fortschritt zu
+-- einem anderen Fehler): zusaetzlich zu den manuell qualifizierten
+-- Stellen jetzt "#variable_conflict use_column" direkt als erste Zeile
+-- in beiden Funktionsruempfen ergaenzt - eine Standard-PL/pgSQL-Direktive
+-- genau fuer diese Fehlerklasse, die bei jedem Namenskonflikt zwischen
+-- RETURNS-TABLE-Spalte und Tabellenspalte automatisch die Tabellenspalte
+-- gewinnen laesst, statt einen Fehler zu werfen. Das federt auch jede
+-- Stelle ab, die trotz sorgfaeltiger Durchsicht noch uebersehen wurde.
+-- WICHTIG: falls der Fehler nach dieser Version immer noch exakt gleich
+-- auftritt, pruefe bitte, ob im SQL-Editor wirklich DIESE Datei (mit der
+-- "#variable_conflict"-Zeile) komplett eingefuegt und ausgefuehrt wurde,
+-- nicht eine aeltere Version/ein alter Tab - der exakt identische
+-- Fehlertext ueber mehrere Versuche hinweg deutet stark darauf hin, dass
+-- der vorherige Fix technisch nie angekommen ist.
+--
 -- Sonst 1:1 identisch zu supabase-guild-boss.sql.
 --
 -- Supabase Dashboard > SQL Editor > New query > diesen Inhalt ausfuehren.
@@ -44,6 +61,7 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+#variable_conflict use_column
 declare
   v_uid uuid := auth.uid();
   v_guild_id uuid;
@@ -123,6 +141,7 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+#variable_conflict use_column
 declare
   v_uid uuid := auth.uid();
   v_amount bigint := greatest(0, round(p_amount));
