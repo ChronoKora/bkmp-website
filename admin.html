@@ -1013,8 +1013,8 @@
   <script src="assets/vendor/supabase-js.min.js"></script>
   <script src="supabase.js?v=20260717-obsvisual1"></script>
   <script src="app.js?v=20260712-themefix1"></script>
-  <script src="idledorf.js?v=20260717-raidstuckfix1"></script>
-  <script src="mapart.js?v=20260716-companyfix1"></script>
+  <script src="idledorf.js?v=20260717-perfaudit1"></script>
+  <script src="mapart.js?v=20260717-budgetfix1"></script>
   <script>
     bkmpInitTheme();
 
@@ -1399,6 +1399,7 @@
     }
 
     async function removeExpense(id) {
+      if (!window.confirm('Diese Ausgabe wirklich löschen?')) return;
       if (!hasValidEntryId(id)) return removeEntry('expenses', id);
       if (typeof deleteExpense === 'function' && bkmpGetSupabaseClient()) {
         try {
@@ -1408,7 +1409,9 @@
           renderAll();
           return true;
         } catch (e) {
-          console.warn('Supabase konnte Ausgabe nicht loeschen. localStorage-Fallback wird verwendet.', e);
+          console.error('Supabase konnte Ausgabe nicht loeschen.', e);
+          showAdminToast('Ausgabe konnte nicht gelöscht werden: ' + supabaseErrorText(e), 'error');
+          return false;
         }
       }
       removeEntry('expenses', id);
@@ -1444,6 +1447,7 @@
     }
 
     async function removeUpdate(id) {
+      if (!window.confirm('Diesen News-Beitrag wirklich löschen?')) return;
       if (!hasValidEntryId(id)) return removeEntry('news', id);
       if (typeof deleteUpdate === 'function' && bkmpGetSupabaseClient()) {
         try {
@@ -1453,13 +1457,16 @@
           renderAll();
           return;
         } catch (e) {
-          console.warn('Supabase konnte Update nicht loeschen. localStorage-Fallback wird verwendet.', e);
+          console.error('Supabase konnte Update nicht loeschen.', e);
+          showAdminToast('News-Beitrag konnte nicht gelöscht werden: ' + supabaseErrorText(e), 'error');
+          return;
         }
       }
       removeEntry('news', id);
     }
 
     async function removeWish(id) {
+      if (!window.confirm('Diese Kartenidee wirklich löschen?')) return;
       if (!hasValidEntryId(id)) return removeEntry('wishes', id);
       if (typeof deleteWish === 'function' && bkmpGetSupabaseClient() && !String(id).startsWith('wish-')) {
         try {
@@ -1469,7 +1476,9 @@
           renderAll();
           return;
         } catch (e) {
-          console.warn('Supabase konnte Kartenidee nicht loeschen. localStorage-Fallback wird verwendet.', e);
+          console.error('Supabase konnte Kartenidee nicht loeschen.', e);
+          showAdminToast('Kartenidee konnte nicht gelöscht werden: ' + supabaseErrorText(e), 'error');
+          return;
         }
       }
       removeEntry('wishes', id);
@@ -1506,6 +1515,7 @@
     }
 
     async function removeStreamer(id) {
+      if (!window.confirm('Diesen Twitch-Account wirklich löschen?')) return;
       if (!hasValidEntryId(id)) return removeEntry('streamers', id);
       if (typeof deleteStreamer === 'function' && bkmpGetSupabaseClient() && !String(id).startsWith('str-')) {
         try {
@@ -1515,7 +1525,9 @@
           renderAll();
           return;
         } catch (e) {
-          console.warn('Supabase konnte Twitch-Account nicht loeschen. localStorage-Fallback wird verwendet.', e);
+          console.error('Supabase konnte Twitch-Account nicht loeschen.', e);
+          showAdminToast('Twitch-Account konnte nicht gelöscht werden: ' + supabaseErrorText(e), 'error');
+          return;
         }
       }
       removeEntry('streamers', id);
@@ -1550,6 +1562,7 @@
     }
 
     async function removeAboutBlock(id) {
+      if (!window.confirm('Diesen "Wer sind wir"-Block wirklich löschen?')) return;
       if (!hasValidEntryId(id)) return removeEntry('aboutBlocks', id);
       if (typeof deleteAboutBlock === 'function' && bkmpGetSupabaseClient() && !String(id).startsWith('about-')) {
         try {
@@ -1559,7 +1572,9 @@
           renderAll();
           return;
         } catch (e) {
-          console.warn('Supabase konnte About-Block nicht loeschen. localStorage-Fallback wird verwendet.', e);
+          console.error('Supabase konnte About-Block nicht loeschen.', e);
+          showAdminToast('Block konnte nicht gelöscht werden: ' + supabaseErrorText(e), 'error');
+          return;
         }
       }
       removeEntry('aboutBlocks', id);
@@ -1595,6 +1610,7 @@
     }
 
     async function removePartnerShop(id, localIndex) {
+      if (!window.confirm('Diesen PartnerShop wirklich löschen?')) return;
       const hasUsableId = id !== undefined && id !== null && String(id).trim() !== '';
       if (!hasUsableId && Number.isInteger(localIndex)) {
         data.partnerShops.splice(localIndex, 1);
@@ -1614,7 +1630,9 @@
           renderAll();
           return;
         } catch (e) {
-          console.warn('Supabase konnte PartnerShop nicht loeschen. localStorage-Fallback wird verwendet.', e);
+          console.error('Supabase konnte PartnerShop nicht loeschen.', e);
+          showAdminToast('PartnerShop konnte nicht gelöscht werden: ' + supabaseErrorText(e), 'error');
+          return;
         }
       }
       removeEntry('partnerShops', id);
@@ -1649,6 +1667,7 @@
     }
 
     async function removeCardSale(id) {
+      if (!window.confirm('Diesen Karten-Verkäufer wirklich löschen?')) return;
       if (!hasValidEntryId(id)) return removeEntry('cardSales', id);
       if (typeof deleteCardSale === 'function' && bkmpGetSupabaseClient() && !String(id).startsWith('cardsale-')) {
         try {
@@ -1658,7 +1677,9 @@
           renderAll();
           return;
         } catch (e) {
-          console.warn('Supabase konnte Karten-Verkäufer nicht löschen. localStorage-Fallback wird verwendet.', e);
+          console.error('Supabase konnte Karten-Verkäufer nicht löschen.', e);
+          showAdminToast('Karten-Verkäufer konnte nicht gelöscht werden: ' + supabaseErrorText(e), 'error');
+          return;
         }
       }
       removeEntry('cardSales', id);
@@ -1723,6 +1744,7 @@
     }
 
     async function deleteInvestorRequestEntry(id) {
+      if (!window.confirm('Diese Investor-Anfrage wirklich endgültig löschen?')) return;
       if (typeof deleteInvestorRequest === 'function' && bkmpGetSupabaseClient()) {
         try {
           await deleteInvestorRequest(id);
@@ -1847,6 +1869,7 @@
     }
 
     async function deleteCardSaleRequestEntry(id) {
+      if (!window.confirm('Diese Anfrage wirklich endgültig löschen?')) return;
       if (typeof deleteCardSaleRequest === 'function' && bkmpGetSupabaseClient()) {
         try {
           await deleteCardSaleRequest(id);
@@ -2134,6 +2157,7 @@
     if (playerMgmtRefreshBtn) playerMgmtRefreshBtn.addEventListener('click', refreshPlayerMgmtList);
 
     async function removeCardCatalogEntry(id) {
+      if (!window.confirm('Diese Karte wirklich endgültig löschen?')) return;
       if (typeof deleteCardCatalogEntry === 'function' && bkmpGetSupabaseClient()) {
         try {
           await deleteCardCatalogEntry(id);
@@ -2405,6 +2429,7 @@
     }
 
     async function removeIncome(id) {
+      if (!window.confirm('Diese Einnahme wirklich löschen?')) return;
       if (!hasValidEntryId(id)) return removeEntry('income', id);
       if (typeof deleteIncome === 'function' && bkmpGetSupabaseClient()) {
         try {
@@ -2414,7 +2439,9 @@
           renderAll();
           return;
         } catch (e) {
-          console.warn('Supabase konnte Einnahme nicht loeschen. localStorage-Fallback wird verwendet.', e);
+          console.error('Supabase konnte Einnahme nicht loeschen.', e);
+          showAdminToast('Einnahme konnte nicht gelöscht werden: ' + supabaseErrorText(e), 'error');
+          return;
         }
       }
       removeEntry('income', id);
@@ -2449,6 +2476,7 @@
     }
 
     async function removeInvestor(id) {
+      if (!window.confirm('Diesen Investor wirklich löschen?')) return;
       if (!hasValidEntryId(id)) return removeEntry('investors', id);
       if (typeof deleteInvestor === 'function' && bkmpGetSupabaseClient()) {
         try {
@@ -2458,7 +2486,9 @@
           renderAll();
           return;
         } catch (e) {
-          console.warn('Supabase konnte Investor nicht loeschen. localStorage-Fallback wird verwendet.', e);
+          console.error('Supabase konnte Investor nicht loeschen.', e);
+          showAdminToast('Investor konnte nicht gelöscht werden: ' + supabaseErrorText(e), 'error');
+          return;
         }
       }
       removeEntry('investors', id);
@@ -3221,6 +3251,7 @@
     cancelInvestorEditBtn.addEventListener('click', clearInvestorForm);
 
     addInvestorBtn.addEventListener('click', () => {
+      if (addInvestorBtn.disabled) return;
       const name = document.getElementById('invName').value.trim();
       const minecraftName = document.getElementById('invMinecraft').value.trim();
       const invested = Number(document.getElementById('invAmount').value);
@@ -3236,9 +3267,10 @@
       }
       const payload = { name, minecraftName, invested, sharePercent, startDate, endDate, anonymous };
       if (editingInvestorId) payload.id = editingInvestorId;
+      addInvestorBtn.disabled = true;
       persistInvestor(payload).then(saved => {
         if (saved) clearInvestorForm();
-      });
+      }).finally(() => { addInvestorBtn.disabled = false; });
     });
 
     /* Twitch-Leiste */
@@ -3302,6 +3334,7 @@
     }
 
     addStreamerBtn.addEventListener('click', () => {
+      if (addStreamerBtn.disabled) return;
       const name = streamerNameInput.value.trim();
       let url = streamerUrlInput.value.trim();
       const color = streamerColorInput.value || 'purple';
@@ -3311,9 +3344,10 @@
       const countsForAchievement = streamerCountsAchievementInput ? streamerCountsAchievementInput.checked : true;
       const payload = { name, url, color, countsForAchievement };
       if (editingStreamerId) payload.id = editingStreamerId;
+      addStreamerBtn.disabled = true;
       persistStreamer(payload).then(saved => {
         if (saved) clearStreamerForm();
-      });
+      }).finally(() => { addStreamerBtn.disabled = false; });
     });
 
     /* Wer sind wir */
@@ -3582,11 +3616,13 @@
     cancelPartnerShopEditBtn.addEventListener('click', clearPartnerShopForm);
 
     addPartnerShopBtn.addEventListener('click', () => {
+      if (addPartnerShopBtn.disabled) return;
       const name = partnerNameInput.value.trim();
       if (!name) { partnerNameInput.reportValidity(); return; }
       const currentShop = editingPartnerShopId ? data.partnerShops.find(item => item.id === editingPartnerShopId) : null;
       const file = partnerImageFileInput.files && partnerImageFileInput.files[0] ? partnerImageFileInput.files[0] : null;
       const readImage = file ? bkmpCompressImageFile(file) : Promise.resolve(currentShop ? currentShop.image || '' : '');
+      addPartnerShopBtn.disabled = true;
       readImage.then(image => {
         const shop = {
           id: editingPartnerShopId || '',
@@ -3599,13 +3635,13 @@
           image,
           status: 'approved'
         };
-        persistPartnerShop(shop).then(saved => {
+        return persistPartnerShop(shop).then(saved => {
           if (saved) clearPartnerShopForm();
         });
       }).catch(e => {
         console.error('Bild konnte nicht gelesen werden.', e);
         showAdminToast('Das ausgewählte Bild konnte nicht gelesen werden. Bitte versuche es mit einer anderen Datei erneut.', 'error');
-      });
+      }).finally(() => { addPartnerShopBtn.disabled = false; });
     });
 
     /* Karten Verkaufen */
@@ -3642,12 +3678,14 @@
     cancelCardSaleEditBtn.addEventListener('click', clearCardSaleForm);
 
     addCardSaleBtn.addEventListener('click', () => {
+      if (addCardSaleBtn.disabled) return;
       const playerName = cardSaleNameInput.value.trim();
       if (!playerName) { cardSaleNameInput.reportValidity(); return; }
       const currentItem = editingCardSaleId ? data.cardSales.find(row => row.id === editingCardSaleId) : null;
       const file = cardSaleImageFileInput.files && cardSaleImageFileInput.files[0] ? cardSaleImageFileInput.files[0] : null;
       const readImage = file ? bkmpCompressImageFile(file) : Promise.resolve(currentItem ? currentItem.image || '' : '');
       const soldCount = cardSaleCountInput.value === '' ? (currentItem ? Number(currentItem.soldCount || 0) : 0) : Math.max(0, Number(cardSaleCountInput.value));
+      addCardSaleBtn.disabled = true;
       readImage.then(image => {
         const item = {
           id: editingCardSaleId || '',
@@ -3655,13 +3693,13 @@
           image,
           soldCount
         };
-        persistCardSale(item).then(saved => {
+        return persistCardSale(item).then(saved => {
           if (saved) clearCardSaleForm();
         });
       }).catch(e => {
         console.error('Bild konnte nicht gelesen werden.', e);
         showAdminToast('Das ausgewählte Bild konnte nicht gelesen werden. Bitte versuche es mit einer anderen Datei erneut.', 'error');
-      });
+      }).finally(() => { addCardSaleBtn.disabled = false; });
     });
 
     /* Admin-Zugaenge */
@@ -4304,8 +4342,7 @@
           renderAll();
           setBackupStatus('Backup lokal wiederhergestellt. Supabase wird aktualisiert...');
           if (typeof importAllLocalDataToSupabase === 'function') {
-            const result = await importAllLocalDataToSupabase();
-            console.log('Backup-Import Supabase Ergebnis:', result);
+            await importAllLocalDataToSupabase();
           }
           setBackupStatus('Backup importiert. Fehlende Supabase-Eintraege wurden uebertragen.');
           showAdminToast('Backup erfolgreich importiert.', 'success');
@@ -4479,6 +4516,7 @@
     });
 
     addNewsBtn.addEventListener('click', () => {
+      if (addNewsBtn.disabled) return;
       const title = newsTitleInput.value.trim();
       const text = newsTextInput.value.trim();
       const date = newsDateInput.value || todayStr;
@@ -4498,20 +4536,19 @@
           date,
           createdAt: currentPost && currentPost.createdAt ? currentPost.createdAt : Date.now()
         };
-        persistUpdate(post).then(saved => {
+        return persistUpdate(post).then(saved => {
           if (saved) clearNewsForm();
         });
       }
 
-      if (newsFileInput.files && newsFileInput.files.length) {
-        const files = Array.from(newsFileInput.files);
-        Promise.all(files.map((file, index) => prepareNewsImage(file, index))).then(images => savePost(images)).catch(e => {
-          console.error('Bild konnte nicht verarbeitet werden.', e);
-          showAdminToast('Eines der ausgewählten Bilder konnte nicht verarbeitet werden. Bitte versuche es mit einer anderen Datei erneut.', 'error');
-        });
-      } else {
-        savePost([]);
-      }
+      addNewsBtn.disabled = true;
+      const saveFlow = (newsFileInput.files && newsFileInput.files.length)
+        ? Promise.all(Array.from(newsFileInput.files).map((file, index) => prepareNewsImage(file, index))).then(images => savePost(images)).catch(e => {
+            console.error('Bild konnte nicht verarbeitet werden.', e);
+            showAdminToast('Eines der ausgewählten Bilder konnte nicht verarbeitet werden. Bitte versuche es mit einer anderen Datei erneut.', 'error');
+          })
+        : savePost([]);
+      saveFlow.finally(() => { addNewsBtn.disabled = false; });
     });
 
     /* ---------------- Idle Drachen Dorf (Admin) ---------------- */

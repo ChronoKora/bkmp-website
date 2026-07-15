@@ -1269,8 +1269,8 @@
   <script src="assets/vendor/supabase-js.min.js"></script>
   <script src="supabase.js?v=20260717-obsvisual1"></script>
   <script src="app.js?v=20260712-themefix1"></script>
-  <script src="idledorf.js?v=20260717-raidstuckfix1"></script>
-  <script src="mapart.js?v=20260716-companyfix1"></script>
+  <script src="idledorf.js?v=20260717-perfaudit1"></script>
+  <script src="mapart.js?v=20260717-budgetfix1"></script>
   <script>
     bkmpInitTheme();
     bkmpInitAccentColor();
@@ -2689,8 +2689,101 @@
       bindRevenueModeButtons();
     }
 
+    /* Investoren */
+    const investorGrid = document.getElementById('investorGrid');
+    function isInInvestorPeriod(item, inv) {
+      if (!item.date) return false;
+      if (inv.startDate && item.date < inv.startDate) return false;
+      if (inv.endDate && item.date > inv.endDate) return false;
+      return true;
+    }
+    function sumForInvestorPeriod(list, inv) {
+      return bkmpSum(list.filter(item => isInInvestorPeriod(item, inv)));
+    }
+    function formatInvestorPeriod(inv) {
+      if (inv.startDate && inv.endDate) return `${formatDate(inv.startDate)} - ${formatDate(inv.endDate)}`;
+      if (inv.startDate) return `seit ${formatDate(inv.startDate)}`;
+      if (inv.endDate) return `bis ${formatDate(inv.endDate)}`;
+      return 'Gesamter Zeitraum';
+    }
+
+    if (data.investors.length === 0) {
+      investorGrid.innerHTML = '<p class="empty-hint">Noch keine Investoren eingetragen.</p>';
+    } else {
+      investorGrid.innerHTML = data.investors.map(inv => {
+        const periodIncome = sumForInvestorPeriod(data.income, inv);
+        const periodExpenses = sumForInvestorPeriod(data.expenses, inv);
+        const periodNet = periodIncome - periodExpenses;
+        const payout = periodNet > 0 ? (periodNet * Number(inv.sharePercent || 0)) / 100 : 0;
+        const isAnonymous = Boolean(inv.anonymous);
+        const mcName = isAnonymous ? '' : (inv.minecraftName || '').trim();
+        const avatar = mcName ? `https://minotar.net/helm/${encodeURIComponent(mcName)}/96.png` : '';
+        const invName = isAnonymous ? 'Anonym' : (inv.name || '');
+        return `
+          <div class="investor-card investor-card-rich">
+            <div class="investor-head">
+              ${avatar ? `<img class="investor-avatar" src="${avatar}" alt="Minecraft-Kopf von ${escapeHtml(mcName)}" loading="lazy" decoding="async">` : `<div class="investor-avatar investor-avatar-fallback">${isAnonymous ? '?' : escapeHtml(invName.slice(0, 1).toUpperCase())}</div>`}
+              <div class="investor-title-block">
+                <div class="investor-name">${escapeHtml(invName)}</div>
+                ${mcName ? `<div class="investor-mc">${escapeHtml(mcName)}</div>` : ''}
+              </div>
+            </div>
+            <div class="investor-period">${formatInvestorPeriod(inv)}</div>
+            <div class="investor-highlight">
+              <span>Aktueller Anteil</span>
+              <strong>${bkmpFormatCurrency(payout)}</strong>
+            </div>
+            <div class="investor-metrics">
+              <div><span>Investiert</span><strong>${bkmpFormatCurrency(inv.invested)}</strong></div>
+              <div><span>Beteiligung</span><strong>${Number(inv.sharePercent || 0)}%</strong></div>
+              <div><span>Zeitraum-Gewinn</span><strong class="${periodNet >= 0 ? 'pos' : 'neg'}">${bkmpFormatCurrency(periodNet)}</strong></div>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    /* Alle Einträge (Ledger-Liste) — begrenzt auf die letzten 15 */
+    const ledgerList = document.getElementById('ledgerList');
+    const ledgerEntries = [
+      ...data.income.map((item, index) => ({ ...item, type: 'in', order: item.createdAt || index })),
+      ...data.expenses.map((item, index) => ({ ...item, type: 'out', order: item.createdAt || index }))
+    ]
+      .sort((a, b) => {
+        const dateCompare = (b.date || '').localeCompare(a.date || '');
+        if (dateCompare !== 0) return dateCompare;
+        return (b.order || 0) - (a.order || 0);
+      })
+      .slice(0, 15);
+
+    if (ledgerEntries.length === 0) {
+      ledgerList.innerHTML = '<p class="empty-hint">Noch keine Einträge vorhanden.</p>';
+    } else {
+      ledgerList.innerHTML = ledgerEntries.map(item => `
+        <div class="ledger-row">
+          <div class="l-left">
+            <span class="ledger-tag ${item.type}">${item.type === 'in' ? 'Einnahmen' : 'Ausgaben'}</span>
+            <span>${escapeHtml(item.name)}</span>
+            <span class="ledger-date">${item.date ? escapeHtml(formatDate(item.date)) : ''}</span>
+          </div>
+          <span class="amount ${item.type}">${item.type === 'in' ? '+' : '−'} ${bkmpFormatCurrency(item.amount)}</span>
+        </div>
+      `).join('');
+    }
+    }
+    renderFinancialSections();
+
     /* Easter Egg: Donut-Chart oft klicken -> dreht sich immer schneller, Farben
-       mischen sich zu Regenbogen, am Ende Feuerwerk + Erfolg */
+       mischen sich zu Regenbogen, am Ende Feuerwerk + Erfolg.
+       FEHLER-FIX (Perf-Audit 15.07.): diese Verkabelung lag vorher INNERHALB
+       von renderFinancialSections() - #chartArea selbst wird bei jedem
+       Re-Render nur mit neuem innerHTML befuellt, nie neu erstellt, also
+       sammelten sich bei jedem Live-Update (Realtime-Aenderung an
+       incomes/expenses/investors, siehe oben, oder der 10-Minuten-Poll)
+       weitere mousedown/click-Listener auf demselben Knoten an - ein Klick
+       loeste dadurch mehrere unabhaengige Zaehler gleichzeitig aus (Donut
+       drehte sich zu weit, Feuerwerk/Sound mehrfach). Jetzt einmalig hier,
+       ausserhalb der Render-Funktion, verkabelt. */
+    const chartArea = document.getElementById('chartArea');
     const BKMP_DONUT_MAX_CLICKS = 18;
     let bkmpDonutClickCount = 0;
     let bkmpDonutSpinDeg = 0;
@@ -2774,89 +2867,6 @@
         donut.style.transform = `rotate(${bkmpDonutSpinDeg}deg)`;
       });
     }
-
-    /* Investoren */
-    const investorGrid = document.getElementById('investorGrid');
-    function isInInvestorPeriod(item, inv) {
-      if (!item.date) return false;
-      if (inv.startDate && item.date < inv.startDate) return false;
-      if (inv.endDate && item.date > inv.endDate) return false;
-      return true;
-    }
-    function sumForInvestorPeriod(list, inv) {
-      return bkmpSum(list.filter(item => isInInvestorPeriod(item, inv)));
-    }
-    function formatInvestorPeriod(inv) {
-      if (inv.startDate && inv.endDate) return `${formatDate(inv.startDate)} - ${formatDate(inv.endDate)}`;
-      if (inv.startDate) return `seit ${formatDate(inv.startDate)}`;
-      if (inv.endDate) return `bis ${formatDate(inv.endDate)}`;
-      return 'Gesamter Zeitraum';
-    }
-
-    if (data.investors.length === 0) {
-      investorGrid.innerHTML = '<p class="empty-hint">Noch keine Investoren eingetragen.</p>';
-    } else {
-      investorGrid.innerHTML = data.investors.map(inv => {
-        const periodIncome = sumForInvestorPeriod(data.income, inv);
-        const periodExpenses = sumForInvestorPeriod(data.expenses, inv);
-        const periodNet = periodIncome - periodExpenses;
-        const payout = periodNet > 0 ? (periodNet * Number(inv.sharePercent || 0)) / 100 : 0;
-        const isAnonymous = Boolean(inv.anonymous);
-        const mcName = isAnonymous ? '' : (inv.minecraftName || '').trim();
-        const avatar = mcName ? `https://minotar.net/helm/${encodeURIComponent(mcName)}/96.png` : '';
-        const invName = isAnonymous ? 'Anonym' : (inv.name || '');
-        return `
-          <div class="investor-card investor-card-rich">
-            <div class="investor-head">
-              ${avatar ? `<img class="investor-avatar" src="${avatar}" alt="Minecraft-Kopf von ${escapeHtml(mcName)}" loading="lazy" decoding="async">` : `<div class="investor-avatar investor-avatar-fallback">${isAnonymous ? '?' : escapeHtml(invName.slice(0, 1).toUpperCase())}</div>`}
-              <div class="investor-title-block">
-                <div class="investor-name">${escapeHtml(invName)}</div>
-                ${mcName ? `<div class="investor-mc">${escapeHtml(mcName)}</div>` : ''}
-              </div>
-            </div>
-            <div class="investor-period">${formatInvestorPeriod(inv)}</div>
-            <div class="investor-highlight">
-              <span>Aktueller Anteil</span>
-              <strong>${bkmpFormatCurrency(payout)}</strong>
-            </div>
-            <div class="investor-metrics">
-              <div><span>Investiert</span><strong>${bkmpFormatCurrency(inv.invested)}</strong></div>
-              <div><span>Beteiligung</span><strong>${Number(inv.sharePercent || 0)}%</strong></div>
-              <div><span>Zeitraum-Gewinn</span><strong class="${periodNet >= 0 ? 'pos' : 'neg'}">${bkmpFormatCurrency(periodNet)}</strong></div>
-            </div>
-          </div>`;
-      }).join('');
-    }
-
-    /* Alle Einträge (Ledger-Liste) — begrenzt auf die letzten 15 */
-    const ledgerList = document.getElementById('ledgerList');
-    const ledgerEntries = [
-      ...data.income.map((item, index) => ({ ...item, type: 'in', order: item.createdAt || index })),
-      ...data.expenses.map((item, index) => ({ ...item, type: 'out', order: item.createdAt || index }))
-    ]
-      .sort((a, b) => {
-        const dateCompare = (b.date || '').localeCompare(a.date || '');
-        if (dateCompare !== 0) return dateCompare;
-        return (b.order || 0) - (a.order || 0);
-      })
-      .slice(0, 15);
-
-    if (ledgerEntries.length === 0) {
-      ledgerList.innerHTML = '<p class="empty-hint">Noch keine Einträge vorhanden.</p>';
-    } else {
-      ledgerList.innerHTML = ledgerEntries.map(item => `
-        <div class="ledger-row">
-          <div class="l-left">
-            <span class="ledger-tag ${item.type}">${item.type === 'in' ? 'Einnahmen' : 'Ausgaben'}</span>
-            <span>${escapeHtml(item.name)}</span>
-            <span class="ledger-date">${item.date ? escapeHtml(formatDate(item.date)) : ''}</span>
-          </div>
-          <span class="amount ${item.type}">${item.type === 'in' ? '+' : '−'} ${bkmpFormatCurrency(item.amount)}</span>
-        </div>
-      `).join('');
-    }
-    }
-    renderFinancialSections();
 
     let streamerLiveCache = { checkedAt: 0, live: {} };
     let liveToastTimer = null;

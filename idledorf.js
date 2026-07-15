@@ -3832,6 +3832,7 @@ async function bkmpIdleRenderGildeBossPanel() {
   }
 
   if (!bkmpGuildBossState) {
+    bkmpGuildBossPanelRenderedForKey = null;
     let bodyHtml = '';
     if (info.phase === 'prep') {
       bodyHtml = `<p class="idle-dungeon-best">⏳ Vorbereitung - Kampf startet in ${bkmpRaidFormatCountdown(info.msUntilFightStart)}.</p>`;
@@ -3877,36 +3878,74 @@ async function bkmpIdleRenderGildeBossPanel() {
 
   const g = bkmpGuildBossState;
   const isFinished = g.status === 'won' || g.status === 'expired';
-  const hpPct = g.bossMaxHp > 0 ? Math.max(0, Math.min(100, (g.bossHp / g.bossMaxHp) * 100)) : 0;
-  const myDamage = bkmpGuildBossParticipants.find(p => p.authUserId === bkmpGuildMyAuthUserId);
+  const renderKey = g.id + '|' + isFinished;
 
-  panel.innerHTML = `
-    <div class="idle-dungeon-intro">
-      <h4>🐲 ${escapeHtml(g.bossName || 'Gildenboss')}</h4>
-      <p class="idle-dungeon-best">${isFinished ? (g.status === 'won' ? '🏆 Besiegt!' : '⌛ Zeit abgelaufen.') : `⏳ ${bkmpRaidFormatCountdown(bkmpGuildBossGetPhaseInfo().msUntilFightEnd || 0)} verbleiben`} &middot; ${g.participantCount || bkmpGuildBossParticipants.length} Kämpfer</p>
-    </div>
-    <div class="raid-battlefield" id="guildBossBattlefield" style="justify-content:center;">
-      <div class="raid-boss ${isFinished ? '' : 'raid-clickable'}" id="guildBossCreature">
-        <video class="raid-boss-sprite raid-sprite-malthyros" id="guildBossSprite" src="assets/dragons/malthyros.mp4?v=20260715-2" autoplay muted loop playsinline></video>
-        <div class="raid-hp-bar"><div class="raid-hp-fill raid-hp-fill-boss" id="guildBossHpFill" style="width:${hpPct}%"></div></div>
-        <div class="raid-hp-label" id="guildBossHpLabel">${bkmpIdleFormatNumber(g.bossHp)} / ${bkmpIdleFormatNumber(g.bossMaxHp)}</div>
-        <div class="raid-boss-name" id="guildBossNameLabel">${escapeHtml(g.bossName || '')}</div>
+  if (bkmpGuildBossPanelRenderedForKey !== renderKey) {
+    bkmpGuildBossPanelRenderedForKey = renderKey;
+    const hpPct = g.bossMaxHp > 0 ? Math.max(0, Math.min(100, (g.bossHp / g.bossMaxHp) * 100)) : 0;
+    panel.innerHTML = `
+      <div class="idle-dungeon-intro">
+        <h4>🐲 ${escapeHtml(g.bossName || 'Gildenboss')}</h4>
+        <p class="idle-dungeon-best" id="guildBossStatusText"></p>
       </div>
-    </div>
-    ${myDamage ? `<p class="idle-guild-xp-pct">Dein Schaden: ${bkmpIdleFormatNumber(myDamage.damageDealt)} (${g.totalDamage > 0 ? Math.round(myDamage.damageDealt / g.totalDamage * 100) : 0}% Anteil)</p>` : ''}
-    <div class="idle-arena-history">
-      <h4 style="margin-top:1rem;">🏆 Schadensrangliste</h4>
-      ${bkmpGuildBossParticipants.length === 0 ? '<p class="empty-hint">Noch kein Schaden verursacht.</p>' : bkmpGuildBossParticipants.map((p, i) => `
-        <div class="idle-arena-opponent-card">
-          <span class="idle-arena-opponent-name">${BKMP_GUILD_MEDALS[i] || `${i + 1}.`} ${escapeHtml(p.displayName)}</span>
-          <span class="idle-arena-opponent-rating">${g.totalDamage > 0 ? Math.round(p.damageDealt / g.totalDamage * 100) : 0}%</span>
-          <span class="idle-arena-opponent-record">${bkmpIdleFormatNumber(p.damageDealt)} Schaden</span>
+      <div class="raid-battlefield" id="guildBossBattlefield" style="justify-content:center;">
+        <div class="raid-boss ${isFinished ? '' : 'raid-clickable'}" id="guildBossCreature">
+          <video class="raid-boss-sprite raid-sprite-malthyros" id="guildBossSprite" src="assets/dragons/malthyros.mp4?v=20260715-2" autoplay muted loop playsinline></video>
+          <div class="raid-hp-bar"><div class="raid-hp-fill raid-hp-fill-boss" id="guildBossHpFill" style="width:${hpPct}%"></div></div>
+          <div class="raid-hp-label" id="guildBossHpLabel">${bkmpIdleFormatNumber(g.bossHp)} / ${bkmpIdleFormatNumber(g.bossMaxHp)}</div>
+          <div class="raid-boss-name" id="guildBossNameLabel">${escapeHtml(g.bossName || '')}</div>
         </div>
-      `).join('')}
+      </div>
+      <p class="idle-guild-xp-pct" id="guildBossMyDamage"></p>
+      <div class="idle-arena-history">
+        <h4 style="margin-top:1rem;">🏆 Schadensrangliste</h4>
+        <div id="guildBossParticipantsList"></div>
+      </div>
+    `;
+    const creature = document.getElementById('guildBossCreature');
+    if (creature && !isFinished) creature.addEventListener('click', bkmpGuildBossHandleClick);
+  }
+
+  bkmpGuildBossUpdateCombatUI();
+}
+
+function bkmpGuildBossUpdateCombatUI() {
+  const g = bkmpGuildBossState;
+  if (!g) return;
+  const isFinished = g.status === 'won' || g.status === 'expired';
+  const hpPct = g.bossMaxHp > 0 ? Math.max(0, Math.min(100, (g.bossHp / g.bossMaxHp) * 100)) : 0;
+  const hpFill = document.getElementById('guildBossHpFill');
+  if (hpFill) hpFill.style.width = hpPct + '%';
+  const hpLabel = document.getElementById('guildBossHpLabel');
+  if (hpLabel) hpLabel.textContent = `${bkmpIdleFormatNumber(g.bossHp)} / ${bkmpIdleFormatNumber(g.bossMaxHp)}`;
+  const statusText = document.getElementById('guildBossStatusText');
+  if (statusText) statusText.textContent = `${isFinished ? (g.status === 'won' ? '🏆 Besiegt!' : '⌛ Zeit abgelaufen.') : `⏳ ${bkmpRaidFormatCountdown(bkmpGuildBossGetPhaseInfo().msUntilFightEnd || 0)} verbleiben`} · ${g.participantCount || bkmpGuildBossParticipants.length} Kämpfer`;
+  bkmpGuildBossRequestParticipantsRender();
+}
+
+function bkmpGuildBossRequestParticipantsRender() {
+  if (bkmpGuildBossUpdateRenderTimer) return;
+  bkmpGuildBossUpdateRenderTimer = window.setTimeout(() => {
+    bkmpGuildBossUpdateRenderTimer = null;
+    bkmpGuildBossRenderParticipants();
+  }, 400);
+}
+
+function bkmpGuildBossRenderParticipants() {
+  const g = bkmpGuildBossState;
+  if (!g) return;
+  const myDamage = bkmpGuildBossParticipants.find(p => p.authUserId === bkmpGuildMyAuthUserId);
+  const myDmgEl = document.getElementById('guildBossMyDamage');
+  if (myDmgEl) myDmgEl.innerHTML = myDamage ? `Dein Schaden: ${bkmpIdleFormatNumber(myDamage.damageDealt)} (${g.totalDamage > 0 ? Math.round(myDamage.damageDealt / g.totalDamage * 100) : 0}% Anteil)` : '';
+  const listEl = document.getElementById('guildBossParticipantsList');
+  if (!listEl) return;
+  listEl.innerHTML = bkmpGuildBossParticipants.length === 0 ? '<p class="empty-hint">Noch kein Schaden verursacht.</p>' : bkmpGuildBossParticipants.map((p, i) => `
+    <div class="idle-arena-opponent-card">
+      <span class="idle-arena-opponent-name">${BKMP_GUILD_MEDALS[i] || `${i + 1}.`} ${escapeHtml(p.displayName)}</span>
+      <span class="idle-arena-opponent-rating">${g.totalDamage > 0 ? Math.round(p.damageDealt / g.totalDamage * 100) : 0}%</span>
+      <span class="idle-arena-opponent-record">${bkmpIdleFormatNumber(p.damageDealt)} Schaden</span>
     </div>
-  `;
-  const creature = document.getElementById('guildBossCreature');
-  if (creature && !isFinished) creature.addEventListener('click', bkmpGuildBossHandleClick);
+  `).join('');
 }
 
 /* ---------------- Rendering: Bestenliste-Tab ---------------- */
@@ -4981,8 +5020,13 @@ function bkmpDragonNestCost(slotIndex) {
   return Math.round(base * (1 - reductionPct / 100));
 }
 
+/* Busy-Sperre (Perf-Audit 15.07.): ohne sie loeste ein schneller
+   Doppelklick zwei parallele Kauf-Requests fuer denselben Nest-Slot aus,
+   bevor der erste fertig war - der Server lehnt den zweiten zwar ab, aber
+   der Nutzer bekam keinerlei Rueckmeldung, ob der Kauf nun geklappt hat. */
+let bkmpDragonNestPurchaseBusy = false;
 async function bkmpDragonPurchaseNest() {
-  if (!bkmpIdleState) return;
+  if (!bkmpIdleState || bkmpDragonNestPurchaseBusy) return;
   const nextSlot = bkmpPlayerDragonNests.length + 1;
   if (nextSlot > BKMP_DRAGON_NEST_GOLD_COSTS.length) return;
   const cost = bkmpDragonNestCost(nextSlot);
@@ -4990,6 +5034,7 @@ async function bkmpDragonPurchaseNest() {
     if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Nicht genug Gold für dieses Drachennest.', 2800);
     return;
   }
+  bkmpDragonNestPurchaseBusy = true;
   try {
     const row = await purchaseDragonNestSlot(bkmpIdleState.name_key, nextSlot);
     if (!row) return;
@@ -5001,6 +5046,8 @@ async function bkmpDragonPurchaseNest() {
     if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('🏠 Neues Drachennest freigeschaltet!', 3000);
   } catch (e) {
     console.warn('Idle Dorf: Drachennest konnte nicht gekauft werden.', e);
+  } finally {
+    bkmpDragonNestPurchaseBusy = false;
   }
 }
 
@@ -5069,7 +5116,12 @@ function bkmpDragonNestReady(nest) {
   return Date.now() >= Date.parse(nest.started_at) + bkmpDragonEffectiveBroodSeconds(species) * 1000;
 }
 
+/* Busy-Sperre pro Nest-ID (Perf-Audit 15.07.), analog zu
+   bkmpDragonNestPurchaseBusy - verhindert zwei parallele hatchDragonEgg-
+   Aufrufe fuer dasselbe Nest bei schnellem Doppelklick. */
+const bkmpDragonHatchBusyNestIds = new Set();
 async function bkmpDragonHatch(nestId) {
+  if (bkmpDragonHatchBusyNestIds.has(nestId)) return;
   const nest = bkmpPlayerDragonNests.find(n => n.id === nestId);
   if (!nest || !bkmpDragonNestReady(nest)) return;
   const egg = bkmpPlayerDragonEggs.find(e => e.id === nest.egg_id);
@@ -5084,6 +5136,7 @@ async function bkmpDragonHatch(nestId) {
     return;
   }
   const foodPreference = Math.random() < 0.5 ? 'fruit' : 'meat';
+  bkmpDragonHatchBusyNestIds.add(nestId);
   try {
     const dragon = await hatchDragonEgg(nest.id, egg.id, bkmpIdleState.name_key, egg.species_id, foodPreference);
     if (!dragon) {
@@ -5100,6 +5153,8 @@ async function bkmpDragonHatch(nestId) {
     bkmpIdleRenderDragonsPanel();
   } catch (e) {
     console.warn('Idle Dorf: Ei konnte nicht ausgebrütet werden.', e);
+  } finally {
+    bkmpDragonHatchBusyNestIds.delete(nestId);
   }
 }
 
@@ -7213,7 +7268,27 @@ function bkmpIdleRenderActiveTabContent() {
    das waere bei hoher Angriffsgeschwindigkeit unnoetig teuer) - nur die drei
    Tabs, deren Anzeige tatsaechlich direkt von Gold/Ressourcen/Runen-Lager
    abhaengt, die sich durch einen Kill aendern koennen. */
+/* Throttle (Perf-Audit 15.07.): bei hoher Angriffsgeschwindigkeit kann
+   diese Funktion deutlich unter 900ms pro Kill erneut aufgerufen werden -
+   ohne Bremse baute der aktive Tab (v.a. Runen/Drachen mit grossem
+   Lager/Roster) dann mehrfach pro Sekunde komplett neu, spuerbares
+   Ruckeln waehrend aktivem Kampf. Sofort-Rendern beim ersten Aufruf
+   (kein gefuehltes Lag), danach max. alle 300ms; verpasste Zwischen-
+   staende werden am Ende des Fensters einmal nachgeholt. */
+let bkmpIdleRefreshLiveTabsTimer = null;
+let bkmpIdleRefreshLiveTabsPending = false;
 function bkmpIdleRefreshLiveTabs() {
+  if (bkmpIdleRefreshLiveTabsTimer) { bkmpIdleRefreshLiveTabsPending = true; return; }
+  bkmpIdleRefreshLiveTabsRender();
+  bkmpIdleRefreshLiveTabsTimer = window.setTimeout(() => {
+    bkmpIdleRefreshLiveTabsTimer = null;
+    if (bkmpIdleRefreshLiveTabsPending) {
+      bkmpIdleRefreshLiveTabsPending = false;
+      bkmpIdleRefreshLiveTabsRender();
+    }
+  }, 300);
+}
+function bkmpIdleRefreshLiveTabsRender() {
   if (bkmpIdleActiveTab === 'upgrades') bkmpIdleRenderUpgradesPanel();
   else if (bkmpIdleActiveTab === 'runen') bkmpIdleRenderRunenPanel();
   else if (bkmpIdleActiveTab === 'prestige') bkmpIdleRenderPrestigePanel();

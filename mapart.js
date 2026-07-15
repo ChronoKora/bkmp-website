@@ -109,7 +109,14 @@ function bkmpMapInitBudgetFilter() {
       bkmpMapUpdateTotalPreview();
     });
     customInput.addEventListener('input', () => {
-      let v = Number(customInput.value) || BKMP_MAP_BUDGET_MIN;
+      /* Math.round hier (Perf-Audit 15.07.): das <input type="number"
+         step="1000"> hindert Nutzer im Browser nicht wirklich am Eintippen
+         von Kommazahlen - ohne Rundung landete so ein Wert wie "300000.5"
+         unveraendert in budget_total (Zeile ~218), was denselben Fehler-
+         Typ wie der bekannte Obst/Fleisch-Bigint-Bug ausloesen kann: ein
+         Postgres-Insert-Fehler, den der Kunde nur als generisches
+         "Auftrag konnte nicht veroeffentlicht werden" sieht. */
+      let v = Math.round(Number(customInput.value) || BKMP_MAP_BUDGET_MIN);
       v = Math.min(BKMP_MAP_BUDGET_MAX, Math.max(BKMP_MAP_BUDGET_MIN, v));
       bkmpMapOrderState.budgetPerPart = v;
       bkmpMapUpdateTotalPreview();
@@ -215,7 +222,7 @@ async function bkmpMapSubmitOrder() {
       session = await bkmpGetCustomerSession();
     }
 
-    const total = bkmpMapOrderState.sizeKnown && parts ? bkmpMapOrderState.budgetPerPart * parts : null;
+    const total = bkmpMapOrderState.sizeKnown && parts ? Math.round(bkmpMapOrderState.budgetPerPart * parts) : null;
     const order = await createMapOrder({
       customer_auth_id: session.user.id,
       customer_display_name: mcName.trim(),
@@ -237,6 +244,7 @@ async function bkmpMapSubmitOrder() {
     });
 
     const uploadedUrls = [];
+    let referenceUploadFailed = false;
     for (const file of bkmpMapOrderState.stagedFiles) {
       try {
         const compressed = await bkmpCompressImageFile(file);
@@ -244,16 +252,25 @@ async function bkmpMapSubmitOrder() {
         const namedFile = new File([blob], file.name, { type: blob.type });
         const saved = await uploadOrderFile(order.id, namedFile, 'customer', mcName.trim());
         uploadedUrls.push(saved.storage_path);
-      } catch (e) { console.warn('Referenzbild konnte nicht hochgeladen werden.', e); }
+      } catch (e) { console.warn('Referenzbild konnte nicht hochgeladen werden.', e); referenceUploadFailed = true; }
     }
     if (uploadedUrls.length) {
-      await bkmpMapUpdateOrderReferenceImages(order.id, uploadedUrls);
+      const saved = await bkmpMapUpdateOrderReferenceImages(order.id, uploadedUrls);
+      if (!saved) referenceUploadFailed = true;
     }
 
     await logOrderEvent({ order_id: order.id, event_type: 'created', actor_type: 'customer', actor_auth_id: session.user.id, actor_display_name: mcName.trim(), to_status: 'offen' });
 
     bkmpMapResetOrderForm();
-    setMsg('Auftrag veröffentlicht!', false);
+    /* Perf-Audit 15.07.: bkmpMapUpdateOrderReferenceImages() hat Fehler
+       bisher nur console.warn'd - der Auftrag selbst wird trotzdem korrekt
+       angelegt (nur die Bilder fehlen dann), deshalb hier keine Fehler-
+       Meldung, sondern ein klarer Hinweis statt der stillen "alles ok"-
+       Nachricht, die den Kunden im Glauben liess, die Bilder haetten
+       geklappt. */
+    setMsg(referenceUploadFailed
+      ? 'Auftrag veröffentlicht! Die Referenzbilder konnten aber nicht gespeichert werden - bitte melde dich kurz per Discord, falls sie wichtig für den Auftrag sind.'
+      : 'Auftrag veröffentlicht!', false);
     if (newCode) bkmpMapShowRecoveryCode(newCode);
     bkmpMapRenderOpenOrders();
     bkmpMapRenderMyOrders();
@@ -268,9 +285,10 @@ async function bkmpMapSubmitOrder() {
 
 async function bkmpMapUpdateOrderReferenceImages(orderId, paths) {
   const client = bkmpGetSupabaseClient();
-  if (!client) return;
+  if (!client) return false;
   const { error } = await client.from('map_orders').update({ reference_image_urls: paths }).eq('id', orderId);
-  if (error) console.warn('Referenzbilder konnten nicht gespeichert werden.', error);
+  if (error) { console.warn('Referenzbilder konnten nicht gespeichert werden.', error); return false; }
+  return true;
 }
 
 function bkmpMapShowRecoveryCode(code) {
