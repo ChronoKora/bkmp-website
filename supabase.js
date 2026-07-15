@@ -404,7 +404,17 @@ function bkmpGetPlayerAuthClient() {
   if (!bkmpIsSupabaseConfigured() || !window.supabase) return null;
   if (!bkmpPlayerAuthClient) {
     bkmpPlayerAuthClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: { storageKey: 'bkmp-player-auth' }
+      auth: { storageKey: 'bkmp-player-auth' },
+      /* Bug-Report 17.07.: "Gold wird immer zurueckgesetzt beim Reload."
+         Ursache: der beforeunload/visibilitychange-Speicherversuch (siehe
+         idledorf.js bkmpIdleFlushSync) ist ein ASYNCHRONER fetch() - Browser
+         brechen laufende asynchrone Requests beim Seitenwechsel so gut wie
+         immer ab, bevor die Antwort ankommt, ausser man markiert sie
+         explizit als keepalive (dann darf der Request die Seite ueberleben,
+         siehe MDN fetch keepalive). Alle Spielstand-Schreibvorgaenge sind
+         kleine JSON-Payloads, bleiben also sicher unter dem 64kB-Limit von
+         keepalive-Requests. */
+      global: { fetch: (url, options) => fetch(url, { ...options, keepalive: true }) }
     });
   }
   return bkmpPlayerAuthClient;
