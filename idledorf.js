@@ -6022,35 +6022,55 @@ function bkmpIdleHandleStripeReturn() {
    Stufen) landet so bei Bedarf mehr als ein Drop in EINEM Insert-Aufruf
    statt einer Schreib-Anfrage pro Kampf (gleiche Ueberlegung wie beim
    Egress-Vorfall vom 12.07. - siehe Projektnotizen). */
+async function bkmpIdleFlushRuneSync() {
+  bkmpIdleRuneSyncTimer = null;
+  const pending = bkmpIdlePendingRuneDrops;
+  bkmpIdlePendingRuneDrops = [];
+  if (!pending.length || !bkmpIdleState || typeof insertPlayerRunes !== 'function') return;
+  try {
+    const inserted = await insertPlayerRunes(bkmpIdleState.name_key, pending.map(r => ({
+      rune_type: r.rune_type, rarity: r.rarity, rolled_value: r.rolled_value, equipped: r.equipped, upgrade_level: r.upgrade_level, substats: r.substats
+    })));
+    inserted.forEach((row, i) => {
+      const item = pending[i];
+      if (!item || !row) return;
+      item.id = row.id;
+      /* Falls zwischen dem Droppen und dem Eintreffen der echten DB-id
+         (bis zu 4s Debounce + Netzwerk-Laufzeit) schon ausgeruestet oder
+         aufgewertet wurde, tragen bkmpRuneToggleEquip/bkmpRuneUpgrade das
+         mangels id noch nicht nach - hier einmalig mit dem aktuellen Stand
+         nachholen, statt es fuer immer zu verlieren. */
+      if (item.equipped && typeof updatePlayerRuneEquipped === 'function') updatePlayerRuneEquipped(item.id, true).catch(() => {});
+      if ((item.upgrade_level || (item.substats && item.substats.length)) && typeof updatePlayerRuneUpgrade === 'function') {
+        updatePlayerRuneUpgrade(item.id, item.upgrade_level, item.substats).catch(() => {});
+      }
+    });
+  } catch (e) {
+    console.warn('Idle Dorf: Runen-Drop konnte nicht gespeichert werden.', e);
+  }
+}
+
+/* Neue Drops werden gesammelt statt sofort einzeln gespeichert - bei
+   mehreren Kaempfen kurz hintereinander (autoklickender Spieler, schnelle
+   Stufen) landet so bei Bedarf mehr als ein Drop in EINEM Insert-Aufruf
+   statt einer Schreib-Anfrage pro Kampf (gleiche Ueberlegung wie beim
+   Egress-Vorfall vom 12.07. - siehe Projektnotizen). */
 function bkmpIdleQueueRuneSync() {
   if (bkmpIdleRuneSyncTimer) return;
-  bkmpIdleRuneSyncTimer = window.setTimeout(async () => {
-    bkmpIdleRuneSyncTimer = null;
-    const pending = bkmpIdlePendingRuneDrops;
-    bkmpIdlePendingRuneDrops = [];
-    if (!pending.length || !bkmpIdleState || typeof insertPlayerRunes !== 'function') return;
-    try {
-      const inserted = await insertPlayerRunes(bkmpIdleState.name_key, pending.map(r => ({
-        rune_type: r.rune_type, rarity: r.rarity, rolled_value: r.rolled_value, equipped: r.equipped, upgrade_level: r.upgrade_level, substats: r.substats
-      })));
-      inserted.forEach((row, i) => {
-        const item = pending[i];
-        if (!item || !row) return;
-        item.id = row.id;
-        /* Falls zwischen dem Droppen und dem Eintreffen der echten DB-id
-           (bis zu 4s Debounce + Netzwerk-Laufzeit) schon ausgeruestet oder
-           aufgewertet wurde, tragen bkmpRuneToggleEquip/bkmpRuneUpgrade das
-           mangels id noch nicht nach - hier einmalig mit dem aktuellen Stand
-           nachholen, statt es fuer immer zu verlieren. */
-        if (item.equipped && typeof updatePlayerRuneEquipped === 'function') updatePlayerRuneEquipped(item.id, true).catch(() => {});
-        if ((item.upgrade_level || (item.substats && item.substats.length)) && typeof updatePlayerRuneUpgrade === 'function') {
-          updatePlayerRuneUpgrade(item.id, item.upgrade_level, item.substats).catch(() => {});
-        }
-      });
-    } catch (e) {
-      console.warn('Idle Dorf: Runen-Drop konnte nicht gespeichert werden.', e);
-    }
-  }, 4000);
+  bkmpIdleRuneSyncTimer = window.setTimeout(bkmpIdleFlushRuneSync, 4000);
+}
+
+/* Erzwingt ein sofortiges Speichern der noch nicht gesicherten Runen-Drops,
+   ohne auf den 4s-Debounce zu warten. Bug-Report 17.07.: Skillpunkte/Gold
+   waren bereits gegen Reload-Datenverlust abgesichert (siehe
+   bkmpIdleFlushSyncNow/beforeunload), frisch gedroppte Runen aber NICHT -
+   dieser Timer wurde beim Schliessen/Reload bisher gar nicht erzwungen,
+   die Rune war also bei einem Reload innerhalb der 4s schlicht nie in der
+   DB angekommen (nicht nur "zurueckgesetzt" wie bei Gold, sondern komplett
+   verloren). */
+async function bkmpIdleFlushRuneSyncNow() {
+  if (bkmpIdleRuneSyncTimer) { window.clearTimeout(bkmpIdleRuneSyncTimer); bkmpIdleRuneSyncTimer = null; }
+  await bkmpIdleFlushRuneSync();
 }
 
 /* Wird aus bkmpIdleHandleDragonDefeated() aufgerufen. source: 'normal'
@@ -8382,8 +8402,26 @@ function bkmpIdleInit() {
     if (raidActive) bkmpRaidHandleBossClick();
     else bkmpIdleHandleDragonClick();
   });
-  window.addEventListener('beforeunload', () => { bkmpIdleQueueSync(); bkmpIdleFlushSync(); });
-  document.addEventListener('visibilitychange', () => { if (document.hidden) { bkmpIdleQueueSync(); bkmpIdleFlushSync(); } });
+  /* Bug-Report 17.07. ("Prüfe alles im Idle Game nach der Syncbarkeit"):
+     dieser Handler flushte bisher NUR den Haupt-Spielstand (Gold/Skillpunkte/
+     Rohstoffe). Prestige (eigener 1,5s-Debounce, bkmpPrestigeSaveTimer) und
+     frisch gedroppte Runen (eigener 4s-Debounce, bkmpIdleRuneSyncTimer)
+     haben JEWEILS ihren eigenen, unabhaengigen Speicher-Timer - der wurde
+     hier nie erzwungen, blieb bei einem Reload also einfach unversendet
+     stehen. Alle drei Speicherpfade muessen hier gemeinsam erzwungen
+     werden, sonst bleibt genau die gleiche Bug-Klasse fuer Prestige/Runen
+     bestehen, die fuer Gold/Skillpunkte schon gefixt wurde. */
+  window.addEventListener('beforeunload', () => {
+    bkmpIdleQueueSync(); bkmpIdleFlushSync();
+    bkmpPrestigeFlushSyncNow();
+    bkmpIdleFlushRuneSyncNow();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) return;
+    bkmpIdleQueueSync(); bkmpIdleFlushSync();
+    bkmpPrestigeFlushSyncNow();
+    bkmpIdleFlushRuneSyncNow();
+  });
   window.setTimeout(bkmpIdlePreloadStateIfNamed, 0);
 }
 bkmpIdleInit();
