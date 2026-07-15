@@ -5608,6 +5608,10 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 .idle-skin-action { width: 100%; padding: 0.4rem 0.6rem; font-size: 0.78rem; margin-top: auto; }
 .idle-skin-action:disabled { opacity: 0.7; cursor: default; }
 .idle-skin-buy:disabled { opacity: 0.5; cursor: not-allowed; }
+/* Erster Echtgeld-Artikel (Drachenrahmen) - dezent von Gold-Kosmetik
+   abgesetzt, damit sofort klar ist "das ist eine andere Waehrung". */
+.idle-skin-card-premium { border-color: color-mix(in srgb, var(--gold) 55%, var(--line)); background: linear-gradient(180deg, color-mix(in srgb, var(--gold) 6%, var(--paper)), var(--paper)); }
+.idle-skin-buy-real-money { background: linear-gradient(135deg, #fbbf24, #b45309); border: none; color: #1a1206; font-weight: 700; }
 .idle-skin-locked-hint { font-size: 0.72rem; color: var(--muted); padding: 0.4rem 0.2rem; margin-top: auto; }
 .idle-skin-empty-hint { color: var(--muted); font-size: 0.85rem; text-align: center; padding: 1.2rem 0.6rem; }
 
@@ -6697,6 +6701,36 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
    Zerathor-Platzhalter mehr), siehe supabase-guild-boss.sql. */
 .raid-sprite-malthyros {
   aspect-ratio: 1546 / 1342;
+}
+
+/* Drachenrahmen (erster Echtgeld-Artikel, siehe supabase-real-money-
+   purchases.sql) - 9-Slice-Rahmen ums gesamte Idle-Dorf-Fenster per
+   border-image. Slice-Werte sind exakt aus der Quelldatei vermessen
+   (1402x1122px, Uebergang von Rahmen-Grafik zu "Loch"-Fuellfarbe bei
+   oben=279 rechts=163 unten=112 links=165) - border-image zeichnet den
+   mittleren Ausschnitt ohnehin nie, die Fuellfarbe der Quelldatei dort ist
+   also irrelevant. Braucht hoehere Spezifitaet als die Basis-Kartenregel
+   (".idle-dorf-overlay .idle-dorf-card"), sonst gewinnt deren
+   "border: 1.5px solid transparent"-Kurzschrift. */
+#idleDorfOverlay .idle-dorf-card.idle-window-frame-drachenrahmen {
+  border-style: solid;
+  border-width: 100px 58px 40px 58px;
+  border-image-source: url('assets/frames/drachenrahmen.png?v=20260715-2');
+  border-image-slice: 279 163 112 165;
+  border-image-repeat: stretch;
+  animation: none;
+}
+@media (max-width: 720px) {
+  #idleDorfOverlay .idle-dorf-card.idle-window-frame-drachenrahmen {
+    border-width: 58px 34px 24px 34px;
+  }
+}
+/* Der Rahmen traegt oben bereits den "IDLE DRACHEN DORF"-Schriftzug -
+   Spieler-Wunsch: "wechselt automatisch das Banner gegen diesen Rahmen
+   aus", das bisherige Innen-Banner-Bild also ausblenden statt doppelt
+   anzuzeigen. */
+.idle-window-frame-drachenrahmen .idle-dorf-banner-picture {
+  display: none;
 }
 /* Die frueheren einzelnen Angriffs-Frames (Ruhepose/Atem-startet/voller
    Atem/Abklingen) stecken jetzt in der Video-Schleife selbst drin - der

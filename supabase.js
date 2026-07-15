@@ -2898,7 +2898,7 @@ const BKMP_IDLE_PLAYER_STATE_COLUMNS = `name_key, display_name, level, xp, gold,
   total_gold_earned, attack, defense, hp, crit_chance, crit_damage, gold_bonus, xp_bonus, loot_bonus,
   skill_points_available, skill_points_spent, skill_allocations, upgrade_purchases, dragon_kills, boss_kills,
   current_dragon_index, highest_dragon_index, prestige_stage_offset, auto_advance, playtime_seconds, last_seen_at, last_offline_claim, last_skilltree_reset_at, updated_at,
-  rune_fuse_successes, rune_fuse_failures, rune_upgrade_successes, rune_upgrade_failures, village_defeats, yaksha_boss_kills, active_village_skin`;
+  rune_fuse_successes, rune_fuse_failures, rune_upgrade_successes, rune_upgrade_failures, village_defeats, yaksha_boss_kills, active_village_skin, active_window_frame`;
 
 async function loadIdleDragons() {
   const client = bkmpGetSupabaseClient();
@@ -3147,7 +3147,7 @@ async function loadVillageSkinsCatalog() {
   if (!client) return [];
   const { data, error } = await client
     .from('idle_village_skins')
-    .select('id, name, description, icon, image_file, video_file, unlock_type, price_gold, price_crystals, unlock_hint, sort_order, frame_count, frame_aspect_w, frame_aspect_h')
+    .select('id, name, description, icon, image_file, video_file, unlock_type, price_gold, price_crystals, price_eur_cents, apply_scope, unlock_hint, sort_order, frame_count, frame_aspect_w, frame_aspect_h')
     .eq('active', true)
     .order('sort_order', { ascending: true });
   if (error) throw error;
@@ -3178,6 +3178,32 @@ async function unlockPlayerVillageSkin(nameKey, skinId) {
     .limit(1);
   if (error) throw error;
   return Array.isArray(data) ? data[0] : null;
+}
+
+/* ---------------- Echtgeld-Kaeufe (Stripe, siehe supabase-real-money-
+   purchases.sql + api/create-checkout-session.js) ----------------
+   Der eigentliche Kauf-Nachweis kommt NIE vom Client - diese Funktion
+   startet nur eine Stripe-Checkout-Sitzung und leitet dorthin weiter, die
+   Freischaltung passiert serverseitig im Webhook nach echter Zahlung. */
+async function bkmpCreateStripeCheckoutSession(nameKey, skinId) {
+  const res = await fetch('/api/create-checkout-session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nameKey, skinId })
+  });
+  let payload = null;
+  try { payload = await res.json(); } catch (e) { /* keine JSON-Antwort */ }
+  if (!res.ok || !payload || !payload.url) {
+    const code = payload && payload.error;
+    const messages = {
+      already_owned: 'Du besitzt diesen Artikel bereits.',
+      not_registered: 'Du brauchst einen echten Spieler-Account (registrieren/einloggen), um etwas zu kaufen.',
+      unknown_skin: 'Dieser Artikel ist nicht (mehr) kaeuflich.',
+      server_not_configured: 'Zahlungen sind aktuell nicht verfuegbar. Bitte spaeter erneut versuchen.'
+    };
+    throw new Error((code && messages[code]) || 'Kauf konnte nicht gestartet werden. Bitte versuche es erneut.');
+  }
+  return payload.url;
 }
 
 /* ---------------- Idle-Dorf: Twitch-Overlay-Herzschlag ----------------
