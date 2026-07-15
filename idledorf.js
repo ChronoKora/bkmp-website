@@ -7936,10 +7936,24 @@ function bkmpRaidGetPhaseInfo(now) {
    um dieselbe Aufmerksamkeit. Der Raid faellt jetzt genau in dieser einen
    Stunde jeden Tag aus (alle anderen 23 Stunden laufen unveraendert
    weiter), damit der Fokus auf dem Gildenboss liegt. Berlin-Stunde statt
-   UTC-Stunde, DST-sicher, gleiches Muster wie bkmpGuildBossBerlinDateAt. */
+   UTC-Stunde, DST-sicher, gleiches Muster wie bkmpGuildBossBerlinDateAt.
+
+   FEHLER-FIX (Spieler-Report per Screenshot 15.07.: "Es sollte doch jetzt
+   Gilden Boss sein? bin verwirrt" - beide Banner ("Raidboss erscheint
+   gleich" UND "Gildenboss-Vorbereitung") gleichzeitig sichtbar): dieser
+   Check verglich bisher nur "Stunde === 20", die Gildenboss-Vorbereitung
+   (siehe bkmpGuildBossGetPhaseInfo) faengt aber schon um 19:55 an - fuenf
+   Minuten lang war das hier also noch Stunde 19 und lieferte faelschlich
+   false, obwohl der Gildenboss sich schon in der Vorbereitung befand.
+   Jetzt ueber Minuten-des-Tages verglichen (19:55 bis 21:00), exakt
+   deckungsgleich mit dem tatsaechlichen Gildenboss-Fenster (prep+fight)
+   statt nur dessen Kampf-Phase. */
 function bkmpRaidIsGuildBossHourBerlin(now) {
-  const hour = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Berlin', hour12: false, hour: '2-digit' }).format(now || new Date()));
-  return hour === 20;
+  const parts = {};
+  new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Berlin', hour12: false, hour: '2-digit', minute: '2-digit' })
+    .formatToParts(now || new Date()).forEach(p => { if (p.type !== 'literal') parts[p.type] = p.value; });
+  const minutesOfDay = Number(parts.hour) * 60 + Number(parts.minute);
+  return minutesOfDay >= 19 * 60 + 55 && minutesOfDay < 21 * 60;
 }
 
 function bkmpRaidFormatCountdown(ms) {

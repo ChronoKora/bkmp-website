@@ -4589,7 +4589,13 @@ async function bkmpGuildBossJoin() {
     if (msg.includes('not_in_window')) throw new Error('Der Gildenboss ist gerade nicht aktiv (täglich 20:00-21:00 Uhr, Vorbereitung ab 19:55 Uhr).');
     if (msg.includes('not_in_guild')) throw new Error('Du bist in keiner Gilde.');
     if (msg.includes('no_idle_state')) throw new Error('Spiele zuerst im Kampf-Tab, bevor du am Gildenboss teilnimmst.');
-    throw new Error('Beitritt zum Gildenboss fehlgeschlagen. Bitte versuche es erneut.');
+    if (msg.includes('no_boss_configured')) throw new Error('Es ist aktuell kein Gildenboss konfiguriert. Bitte melde das im Discord.');
+    /* Fehler-Diagnose (Spieler-Report 15.07.: "Beitritt fehlgeschlagen" ohne
+       erkennbaren Grund - keiner der obigen bekannten Faelle passte): statt
+       weiterhin einer nichtssagenden Standardmeldung jetzt den rohen
+       Server-Fehlertext mit anzeigen, damit der tatsaechliche Grund beim
+       naechsten Versuch direkt sichtbar wird, statt blind raten zu muessen. */
+    throw new Error('Beitritt zum Gildenboss fehlgeschlagen: ' + (msg || 'unbekannter Fehler') + '. Bitte versuche es erneut oder melde das im Discord.');
   }
   const row = Array.isArray(data) ? data[0] : data;
   if (!row) return null;
