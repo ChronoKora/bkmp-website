@@ -11,7 +11,19 @@ declare
     'about_blocks',
     'partner_shops',
     'raid_instances',
-    'raid_participants'
+    'raid_participants',
+    -- Spieler-Report 15.07. ("mein Schaden steigt in der Liste, von den
+    -- anderen aber nicht"): guild_boss_instances/guild_boss_participants
+    -- wurden nie in diese Liste aufgenommen, obwohl der Client per
+    -- postgres_changes darauf lauscht (bkmpSubscribeToGuildBossInstance).
+    -- Ohne Publication-Eintrag feuert Postgres fuer diese Tabellen
+    -- ueberhaupt keine Realtime-Events, fuer NIEMANDEN - der eigene
+    -- Schaden wirkte trotzdem "live", weil er inzwischen direkt aus der
+    -- RPC-Antwort gesetzt wird (siehe supabase-guild-boss-damage-sync-fix.sql),
+    -- der Schaden anderer Mitspieler war aber immer ausschliesslich auf
+    -- dieses (bisher tote) Realtime-Event angewiesen.
+    'guild_boss_instances',
+    'guild_boss_participants'
   ];
 begin
   foreach table_name in array tables loop
