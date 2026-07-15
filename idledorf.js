@@ -467,6 +467,27 @@ const BKMP_DUNGEON_DIFFICULTIES = [
 let bkmpDungeonSelectedDifficultyId = BKMP_DUNGEON_DIFFICULTIES[0].id;
 let bkmpDungeonActiveDifficulty = null;
 let bkmpDungeonStartTime = 0;
+/* ---------------- Auto-Lauf (Spieler-Wunsch 15.07.: "10x 20x 30x Auto
+   Run laufen lassen") ----------------
+   bkmpDungeonAutoRunsTotal > 0 markiert "Auto-Modus aktiv", auch in der
+   kurzen Pause ZWISCHEN zwei Laeufen (dort ist bkmpDungeonActive schon
+   wieder false) - deshalb ein eigenes Flag statt bkmpDungeonActive
+   mitzubenutzen. Stoppt automatisch bei der ersten Niederlage (weitere
+   Versuche wuerden mit stark angeschlagener Stadt-HP - siehe die 30%-
+   Zwischenheilung, die es nur ZWISCHEN Wellen, nicht zwischen ganzen
+   Laeufen gibt - vermutlich auch scheitern) statt blind alle Versuche zu
+   verbrennen. Einzelergebnisse zeigen waehrend des Auto-Laufs KEIN
+   Vollbild-Overlay mehr (das waere bei 30 Laeufen 30x 4,8s Popup-Spam),
+   nur eine laufend aktualisierte Zeile im Dungeon-Banner - am Ende (Ziel
+   erreicht, Niederlage oder Abbruch) EIN zusammengefasstes Ergebnis. */
+let bkmpDungeonAutoRunsTotal = 0;
+let bkmpDungeonAutoRunsDone = 0;
+let bkmpDungeonAutoCancelled = false;
+let bkmpDungeonAutoStats = null;
+let bkmpDungeonAutoNextRunTimer = null;
+function bkmpDungeonAutoActive() {
+  return bkmpDungeonAutoRunsTotal > 0;
+}
 let bkmpDungeonPrevDragon = null;
 let bkmpDungeonPrevVillageHp = null;
 let bkmpDungeonTimerInterval = null;
@@ -1249,20 +1270,27 @@ function bkmpIdleRenderDungeonPanel() {
         <p><strong>🎉 Event-Dungeon-Wochenende!</strong> Bis Sonntag hat jeder vollständige Dungeon-Sieg eine Extra-Chance auf ein seltenes Ei (Kora-, Haku-, Obsi- oder Kowalski-Drache).</p>
       </div>` : ''}
       <div class="idle-dungeon-diff-row">${BKMP_DUNGEON_DIFFICULTIES.map(d => `
-        <button type="button" class="idle-dungeon-diff-btn${d.id === selected.id ? ' active' : ''}" data-difficulty-id="${d.id}" ${bkmpDungeonActive ? 'disabled' : ''}>${d.icon} ${d.name}</button>
+        <button type="button" class="idle-dungeon-diff-btn${d.id === selected.id ? ' active' : ''}" data-difficulty-id="${d.id}" ${bkmpDungeonActive || bkmpDungeonAutoActive() ? 'disabled' : ''}>${d.icon} ${d.name}</button>
       `).join('')}</div>
       <p>${selected.waves} Gegner-Wellen direkt hintereinander, ohne Pause - die Gegner werden mit jeder Welle gefährlicher. Die Belohnung richtet sich nach deinen eigenen Werten, die Herausforderung bleibt also fair, egal wie weit du normal schon bist. Belohnungs-Bonus dieser Stufe: ${selected.rewardMult}×. Schaffst du alle ${selected.waves}?</p>
       <p class="idle-dungeon-best">${bestText}</p>
-      <button type="button" class="btn-ja idle-dungeon-start-btn" id="idleDungeonStartBtn" ${bkmpDungeonActive ? 'disabled' : ''}>${bkmpDungeonActive ? '⏳ Dungeon läuft...' : `${selected.icon} ${selected.name} starten`}</button>
+      <button type="button" class="btn-ja idle-dungeon-start-btn" id="idleDungeonStartBtn" ${bkmpDungeonActive || bkmpDungeonAutoActive() ? 'disabled' : ''}>${bkmpDungeonActive || bkmpDungeonAutoActive() ? '⏳ Dungeon läuft...' : `${selected.icon} ${selected.name} starten`}</button>
+      <div class="idle-dungeon-auto-row">
+        <span class="idle-dungeon-auto-label">🔁 Auto-Lauf (stoppt automatisch bei der ersten Niederlage):</span>
+        <div class="idle-dungeon-diff-row">
+          ${[10, 20, 30].map(n => `<button type="button" class="btn-nein idle-dungeon-auto-btn" data-auto-count="${n}" ${bkmpDungeonActive || bkmpDungeonAutoActive() ? 'disabled' : ''}>${n}×</button>`).join('')}
+        </div>
+      </div>
     </div>
   `;
   panel.querySelectorAll('.idle-dungeon-diff-btn').forEach(btn => btn.addEventListener('click', () => {
-    if (bkmpDungeonActive) return;
+    if (bkmpDungeonActive || bkmpDungeonAutoActive()) return;
     bkmpDungeonSelectedDifficultyId = btn.dataset.difficultyId;
     bkmpIdleRenderDungeonPanel();
   }));
   const startBtn = document.getElementById('idleDungeonStartBtn');
   if (startBtn) startBtn.addEventListener('click', bkmpDungeonStart);
+  panel.querySelectorAll('.idle-dungeon-auto-btn').forEach(btn => btn.addEventListener('click', () => bkmpDungeonStartAuto(Number(btn.dataset.autoCount))));
 }
 
 /* ---------------- Event-Dungeon-Wochenende (Spieler-Vorgabe 17.07.) ----------------
@@ -1314,7 +1342,14 @@ function bkmpDungeonUpdateBanner() {
   const banner = document.getElementById('idleDungeonBanner');
   if (!banner || !bkmpDungeonActive || !bkmpDungeonActiveDifficulty) return;
   const elapsed = Date.now() - bkmpDungeonStartTime;
-  banner.innerHTML = `🏛️ Dungeon (${bkmpDungeonActiveDifficulty.icon} ${bkmpDungeonActiveDifficulty.name}) &middot; Welle ${bkmpDungeonWave} / ${bkmpDungeonActiveDifficulty.waves} &middot; ⏱ ${bkmpDungeonFormatTime(elapsed)}`;
+  const autoSuffix = bkmpDungeonAutoActive()
+    ? ` &middot; 🔁 Auto ${bkmpDungeonAutoRunsDone + 1}/${bkmpDungeonAutoRunsTotal} <button type="button" class="idle-dungeon-auto-cancel-btn" id="idleDungeonAutoCancelBtn">Abbrechen</button>`
+    : '';
+  banner.innerHTML = `🏛️ Dungeon (${bkmpDungeonActiveDifficulty.icon} ${bkmpDungeonActiveDifficulty.name}) &middot; Welle ${bkmpDungeonWave} / ${bkmpDungeonActiveDifficulty.waves} &middot; ⏱ ${bkmpDungeonFormatTime(elapsed)}${autoSuffix}`;
+  if (bkmpDungeonAutoActive()) {
+    const cancelBtn = document.getElementById('idleDungeonAutoCancelBtn');
+    if (cancelBtn) cancelBtn.addEventListener('click', bkmpDungeonCancelAuto);
+  }
 }
 
 /* Setzt den fuer die normale Anzeige zustaendigen Sprite-/Namens-/HP-Kram
@@ -1411,15 +1446,84 @@ function bkmpDungeonSpawnWave(wave) {
   bkmpDungeonUpdateBanner();
 }
 
+function bkmpDungeonStartAuto(count) {
+  if (bkmpDungeonActive || bkmpDungeonAutoActive() || !Number.isFinite(count) || count <= 0) return;
+  bkmpDungeonAutoRunsTotal = count;
+  bkmpDungeonAutoRunsDone = 0;
+  bkmpDungeonAutoCancelled = false;
+  bkmpDungeonAutoStats = { wins: 0, losses: 0, gold: 0, xp: 0, gems: 0 };
+  /* bkmpDungeonStart() zeigt bei einer Blockade (Event-Pause/laufender
+     Raid) selbst schon einen erklaerenden Toast - hier nur sauber
+     zuruecksetzen, kein zweiter Hinweis noetig. */
+  if (!bkmpDungeonStart()) {
+    bkmpDungeonAutoRunsTotal = 0;
+    bkmpDungeonAutoStats = null;
+  }
+}
+
+/* Bricht NACH dem gerade laufenden Versuch ab (nicht mitten im Kampf -
+   ein Abbruch waehrend eines Laufs wuerde Belohnung/Bestenliste des
+   angefangenen Versuchs verlieren, ohne echten Vorteil). Waehrend der
+   kurzen Pause zwischen zwei Laeufen (bkmpDungeonAutoNextRunTimer laeuft)
+   greift der Abbruch sofort, da dort noch kein Kampf aktiv ist. */
+function bkmpDungeonCancelAuto() {
+  if (!bkmpDungeonAutoActive()) return;
+  bkmpDungeonAutoCancelled = true;
+  if (bkmpDungeonAutoNextRunTimer) {
+    clearTimeout(bkmpDungeonAutoNextRunTimer);
+    bkmpDungeonAutoNextRunTimer = null;
+    bkmpDungeonAutoFinishSequence();
+  }
+}
+
+function bkmpDungeonAutoFinishSequence() {
+  const stats = bkmpDungeonAutoStats;
+  const done = bkmpDungeonAutoRunsDone;
+  const total = bkmpDungeonAutoRunsTotal;
+  bkmpDungeonAutoRunsTotal = 0;
+  bkmpDungeonAutoRunsDone = 0;
+  bkmpDungeonAutoStats = null;
+  bkmpDungeonAutoCancelled = false;
+  if (stats) {
+    bkmpDungeonShowAutoSummary(stats, done, total);
+  }
+  if (bkmpIdleActiveTab === 'dungeon') bkmpIdleRenderDungeonPanel();
+}
+
+function bkmpDungeonShowAutoSummary(stats, done, total) {
+  if (document.getElementById('bkmpDungeonResultOverlay')) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'bkmp-easter';
+  overlay.id = 'bkmpDungeonResultOverlay';
+  overlay.innerHTML = `
+    <div class="bkmp-easter-card idle-dungeon-result-card">
+      <small>Auto-Lauf beendet &middot; ${done} / ${total} Versuche</small>
+      <strong>${stats.wins} 🏆 &middot; ${stats.losses} 💀</strong>
+      <p>Gesamt-Belohnung: +${bkmpIdleFormatNumber(stats.gold)} 💰 +${bkmpIdleFormatNumber(stats.xp)} XP${stats.gems > 0 ? ` +${stats.gems} 💎` : ''}</p>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('visible'));
+  setTimeout(() => {
+    overlay.classList.remove('visible');
+    setTimeout(() => overlay.remove(), 450);
+  }, 5400);
+}
+
+/* Gibt zurueck, ob der Lauf wirklich gestartet wurde - der Auto-Modus
+   (bkmpDungeonStartAuto/bkmpDungeonFinish) braucht das, um sich sauber
+   zu beenden statt haengen zu bleiben, falls ein Start (Erst-Aufruf ODER
+   ein automatisch nachgeschobener Folgelauf) an einer dieser Bedingungen
+   scheitert. */
 function bkmpDungeonStart() {
-  if (bkmpDungeonActive || !bkmpIdleState || !bkmpIdleEffectiveStats) return;
+  if (bkmpDungeonActive || !bkmpIdleState || !bkmpIdleEffectiveStats) return false;
   if (bkmpIdleEventPauseActive) {
     if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Erst den Event-Drachen bestätigen, bevor der Dungeon startet.', 3200);
-    return;
+    return false;
   }
   if (typeof bkmpRaidShouldShowCombatView === 'function' && bkmpRaidShouldShowCombatView()) {
     if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Während eines laufenden Raids kann der Dungeon nicht gestartet werden.', 3200);
-    return;
+    return false;
   }
   bkmpDungeonActive = true;
   bkmpDungeonWave = 0;
@@ -1445,6 +1549,7 @@ function bkmpDungeonStart() {
   bkmpDungeonSpawnWave(1);
   bkmpIdleUpdateVillageHpBar();
   if (typeof bkmpRuneSyncDrawerVisibility === 'function') bkmpRuneSyncDrawerVisibility();
+  return true;
 }
 
 function bkmpDungeonHandleWaveCleared() {
@@ -1505,10 +1610,20 @@ function bkmpDungeonFinish(success) {
   bkmpDungeonActive = false;
   if (bkmpDungeonTimerInterval) { clearInterval(bkmpDungeonTimerInterval); bkmpDungeonTimerInterval = null; }
 
+  /* Auto-Lauf (siehe bkmpDungeonStartAuto): bei einem Sieg, der noch
+     nicht der letzte angeforderte Versuch war und nicht abgebrochen
+     wurde, bleibt die Kampfansicht/Banner sichtbar - der naechste Lauf
+     startet gleich automatisch, kein Grund, zwischendurch auf die
+     normale Dorf-Ansicht umzuschalten. */
+  const willContinueAuto = bkmpDungeonAutoActive() && success && !bkmpDungeonAutoCancelled
+    && (bkmpDungeonAutoRunsDone + 1) < bkmpDungeonAutoRunsTotal;
+
   const banner = document.getElementById('idleDungeonBanner');
-  if (banner) banner.style.display = 'none';
   const stageBar = document.getElementById('idleStageBar');
-  if (stageBar) stageBar.style.display = '';
+  if (!willContinueAuto) {
+    if (banner) banner.style.display = 'none';
+    if (stageBar) stageBar.style.display = '';
+  }
 
   bkmpIdleCurrentDragon = bkmpDungeonPrevDragon;
   bkmpIdleVillageHp = bkmpDungeonPrevVillageHp;
@@ -1568,9 +1683,40 @@ function bkmpDungeonFinish(success) {
       .catch(e => console.warn('Dungeon: Bestwert konnte nicht ans Leaderboard gemeldet werden.', e));
   }
 
-  bkmpDungeonShowResult(success, wavesCleared, difficulty.waves, elapsedMs, totalGold, totalXp, gemBonus, difficulty);
   bkmpIdleRenderHud();
   bkmpIdleQueueSync();
+
+  if (bkmpDungeonAutoActive()) {
+    /* Kein Vollbild-Overlay pro Einzelversuch waehrend eines Auto-Laufs
+       (bei 30 Versuchen sonst 30x ein 4,8s-Popup) - stattdessen eine
+       Zeile im ohnehin schon offenen Kampf-Log, plus am Ende (Ziel
+       erreicht/Niederlage/Abbruch) EINE zusammengefasste Meldung, siehe
+       bkmpDungeonShowAutoSummary. */
+    bkmpDungeonAutoRunsDone += 1;
+    bkmpDungeonAutoStats.wins += success ? 1 : 0;
+    bkmpDungeonAutoStats.losses += success ? 0 : 1;
+    bkmpDungeonAutoStats.gold += totalGold;
+    bkmpDungeonAutoStats.xp += totalXp;
+    bkmpDungeonAutoStats.gems += gemBonus;
+    bkmpIdleLog(`${success ? '🏆' : '💀'} Auto-Lauf ${bkmpDungeonAutoRunsDone}/${bkmpDungeonAutoRunsTotal} (${difficulty.icon} ${difficulty.name}): ${success ? 'Sieg' : `Niederlage bei Welle ${wavesCleared + 1}`} - +${bkmpIdleFormatNumber(totalGold)} 💰`);
+
+    if (willContinueAuto) {
+      if (banner) {
+        banner.innerHTML = `🔁 Auto-Lauf ${bkmpDungeonAutoRunsDone}/${bkmpDungeonAutoRunsTotal} &middot; naechster Versuch startet gleich... <button type="button" class="idle-dungeon-auto-cancel-btn" id="idleDungeonAutoCancelBtn">Abbrechen</button>`;
+        const cancelBtn = document.getElementById('idleDungeonAutoCancelBtn');
+        if (cancelBtn) cancelBtn.addEventListener('click', bkmpDungeonCancelAuto);
+      }
+      bkmpDungeonAutoNextRunTimer = window.setTimeout(() => {
+        bkmpDungeonAutoNextRunTimer = null;
+        if (!bkmpDungeonStart()) bkmpDungeonAutoFinishSequence();
+      }, 1600);
+    } else {
+      bkmpDungeonAutoFinishSequence();
+    }
+    return;
+  }
+
+  bkmpDungeonShowResult(success, wavesCleared, difficulty.waves, elapsedMs, totalGold, totalXp, gemBonus, difficulty);
   if (bkmpIdleActiveTab === 'dungeon') bkmpIdleRenderDungeonPanel();
 }
 
@@ -7739,6 +7885,32 @@ const BKMP_RAID_BOSS_POLL_MS = 1500;
 let bkmpRaidState = null;
 let bkmpRaidParticipants = [];
 let bkmpRaidJoinedId = null;
+/* Sync-Fix (Spieler-Meldung 15.07., Screenshot: eigene Zeile in der
+   Teilnehmerliste zeigte 0/veraltet, obwohl schon Schaden gemacht wurde):
+   bkmpRaidApplyOwnDamageResult matchte die eigene Zeile bisher per
+   displayName-String-Vergleich (bkmpGetMcName()), waehrend die Realtime-
+   Aktualisierung fuer ALLE ANDEREN Teilnehmer (siehe bkmpSubscribeToRaidInstance
+   weiter unten) per authUserId matcht - zwei verschiedene Schluessel fuer
+   dieselbe Liste. Sobald der lokale Anzeigename nicht exakt (Gross-/
+   Kleinschreibung, Leerzeichen, Sonderzeichen wie Umlaute) mit dem in der
+   DB gespeicherten display_name uebereinstimmt, fand der String-Vergleich
+   keine Zeile und legte STATTDESSEN eine zweite, verwaiste Zeile
+   (authUserId: null) an, die danach nie wieder von Realtime-Updates
+   erreicht wird - das Ergebnis sind doppelte/veraltete Eintraege fuer
+   denselben Spieler. Gleiches Muster wie bkmpArenaMyAuthUserId/
+   bkmpGuildMyAuthUserId - einmal beim Oeffnen der Kampfansicht per
+   Session-Check ermittelt, danach fuer den korrekten Abgleich genutzt. */
+let bkmpRaidMyAuthUserId = null;
+async function bkmpRaidEnsureMyAuthUserId() {
+  if (bkmpRaidMyAuthUserId) return bkmpRaidMyAuthUserId;
+  const client = typeof bkmpGetPlayerAuthClient === 'function' ? bkmpGetPlayerAuthClient() : null;
+  if (!client) return null;
+  try {
+    const { data: sessionData } = await client.auth.getSession();
+    bkmpRaidMyAuthUserId = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
+  } catch (e) { bkmpRaidMyAuthUserId = null; }
+  return bkmpRaidMyAuthUserId;
+}
 let bkmpRaidButtonTimer = null;
 let bkmpRaidLoopTimer = null;
 let bkmpRaidBossPollTimer = null;

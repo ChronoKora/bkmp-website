@@ -5721,6 +5721,10 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
    bei .idle-prestige-buy oben) - ein direkter background hier waere
    unerreichbarer toter Code, deshalb nur der margin/disabled-Zusatz. */
 .idle-dungeon-start-btn { margin-top: 0.5rem; }
+/* Auto-Lauf (Spieler-Wunsch 15.07.: "10x 20x 30x Auto Run") */
+.idle-dungeon-auto-row { margin-top: 0.9rem; padding-top: 0.8rem; border-top: 1px dashed color-mix(in srgb, #f97316 30%, var(--line)); }
+.idle-dungeon-auto-label { display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 0.5rem; }
+.idle-dungeon-auto-btn { min-width: 3.6rem; }
 
 /* PvP-Arena (siehe supabase-idle-arena.sql) - Gegner-Reihen im gleichen
    Karten-Look wie der Rest des Idle-Dorfs. */
@@ -5975,6 +5979,17 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   50% { box-shadow: 0 0 16px rgba(249, 115, 22, 0.35); }
 }
 .idle-dungeon-result-card strong { color: #fb923c; }
+.idle-dungeon-auto-cancel-btn {
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, #fb923c 55%, var(--line));
+  background: var(--paper);
+  color: #fb923c;
+  font-weight: 700;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+.idle-dungeon-auto-cancel-btn:hover { background: color-mix(in srgb, #f97316 18%, var(--paper)); }
 @media (prefers-reduced-motion: reduce) {
   .idle-dungeon-banner { animation: none; }
 }

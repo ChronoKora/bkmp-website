@@ -33,6 +33,17 @@
 -- "bkmpIdleState.skill_points_available += 1"), skill_allocations war
 -- {} (nichts ausgegeben) - macht bei Level 200 also 200 verfuegbare
 -- Punkte.
+--
+-- WICHTIG BEIM AUSFUEHREN: Falls ByAlex0 gerade aktiv spielt (Tab
+-- offen), muss er die Seite DIREKT NACH diesem Skript einmal neu
+-- laden (F5)! Der Kampf-Loop laeuft bewusst im Hintergrund weiter,
+-- solange der Tab offen ist, und speichert dabei automatisch seinen
+-- eigenen (alten) Stand alle paar Sekunden zurueck - ohne Reload
+-- ueberschreibt sein Tab diese Korrektur sofort wieder mit seinem
+-- vorherigen Kontostand/Skillpunkten (schon einmal passiert: gold/
+-- skill_points_available wurden beim ersten Versuch prompt zurueck-
+-- gesetzt, waehrend level/dragon_kills/etc. stehen blieben, weil er
+-- die naechsten Levels/Kills tatsaechlich lebendig dazugespielt hat).
 -- ============================================================
 
 update public.idle_player_state
