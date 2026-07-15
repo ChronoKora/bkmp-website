@@ -3951,7 +3951,7 @@ async function bkmpAdminDeletePlayerAccount(authUserId) {
    Befoerdern) laufen ausschliesslich ueber die dort definierten
    security-definer-RPCs, gleiche Vorsicht wie beim Weltboss-Raid - die
    Tabellen selbst sind fuer Clients nur lesbar. */
-const BKMP_GUILD_COLUMNS = 'id, name, name_key, tag, description, leader_auth_user_id, treasury_gold, member_count, created_at, is_public';
+const BKMP_GUILD_COLUMNS = 'id, name, name_key, tag, description, leader_auth_user_id, treasury_gold, member_count, created_at, is_public, guild_xp, current_goal, banner, bosses_defeated, boss_attempts';
 
 function bkmpGuildMapRow(row) {
   return {
@@ -3964,8 +3964,75 @@ function bkmpGuildMapRow(row) {
     treasuryGold: Number(row.treasury_gold || 0),
     memberCount: Number(row.member_count || 0),
     createdAt: row.created_at,
-    isPublic: row.is_public !== false
+    isPublic: row.is_public !== false,
+    guildXp: Number(row.guild_xp || 0),
+    currentGoal: row.current_goal || '',
+    banner: row.banner && typeof row.banner === 'object' ? row.banner : {},
+    bossesDefeated: Number(row.bosses_defeated || 0),
+    bossAttempts: Number(row.boss_attempts || 0)
   };
+}
+
+/* ---------------- Gilden-Level (siehe guild_level_thresholds in
+   supabase-guild-extension-foundation.sql) ----------------
+   Die Kurve lebt ausschliesslich in der DB-Tabelle (Spieler-Wunsch:
+   "soll spaeter einfach anpassbar sein") - hier nur ein einmaliger,
+   gecachter Abruf, damit nicht bei jedem Panel-Render erneut
+   nachgefragt werden muss (die Kurve aendert sich praktisch nie
+   waehrend einer Sitzung). */
+let bkmpGuildLevelThresholdsCache = null;
+async function bkmpGuildGetLevelThresholds() {
+  if (bkmpGuildLevelThresholdsCache) return bkmpGuildLevelThresholdsCache;
+  const client = bkmpGetSupabaseClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from('guild_level_thresholds')
+    .select('level, xp_required')
+    .order('level', { ascending: true });
+  if (error) return [];
+  bkmpGuildLevelThresholdsCache = (data || []).map(r => ({ level: Number(r.level), xpRequired: Number(r.xp_required) }));
+  return bkmpGuildLevelThresholdsCache;
+}
+
+async function bkmpGuildGetActivityLog(guildId, limit) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client || !guildId) return [];
+  const { data, error } = await client
+    .from('guild_activity_log')
+    .select('id, kind, actor_name, value, extra, created_at')
+    .eq('guild_id', guildId)
+    .order('created_at', { ascending: false })
+    .limit(limit || 30);
+  if (error) return [];
+  return (data || []).map(row => ({
+    id: row.id,
+    kind: row.kind,
+    actorName: row.actor_name,
+    value: row.value == null ? null : Number(row.value),
+    extra: row.extra,
+    createdAt: row.created_at
+  }));
+}
+
+/* ---------------- Online-Status (siehe player_presence in
+   supabase-guild-extension-foundation.sql) ---------------- */
+async function bkmpPlayerHeartbeat() {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return;
+  try { await client.rpc('player_heartbeat'); } catch (e) { /* offline - naechster Versuch beim naechsten Intervall */ }
+}
+
+async function bkmpLoadPresence(authUserIds) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !Array.isArray(authUserIds) || !authUserIds.length) return {};
+  const { data, error } = await client
+    .from('player_presence')
+    .select('auth_user_id, last_seen_at')
+    .in('auth_user_id', authUserIds);
+  if (error) return {};
+  const map = {};
+  (data || []).forEach(row => { map[row.auth_user_id] = row.last_seen_at; });
+  return map;
 }
 
 async function bkmpGuildGetMine() {
@@ -4029,6 +4096,20 @@ async function bkmpGuildUpdateSettings(description, isPublic) {
   const { data, error } = await client.rpc('update_guild_settings', { p_description: description, p_is_public: isPublic });
   if (error) throw new Error('Einstellungen konnten nicht gespeichert werden. Nur der Anführer darf das.');
   return data || null;
+}
+
+async function bkmpGuildUpdateBanner(banner) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { error } = await client.rpc('update_guild_banner', { p_banner: banner });
+  if (error) throw new Error('Banner konnte nicht gespeichert werden. Nur der Anführer darf das.');
+}
+
+async function bkmpGuildUpdateGoal(goal) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { error } = await client.rpc('update_guild_goal', { p_goal: goal });
+  if (error) throw new Error('Gildenziel konnte nicht gespeichert werden. Nur der Anführer darf das.');
 }
 
 async function bkmpGuildRegenerateInviteCode() {
@@ -4161,6 +4242,186 @@ async function bkmpGuildSetMemberRole(targetAuthUserId, newRole) {
   if (error) throw new Error('Rollenänderung fehlgeschlagen. Nur der Anführer darf Rollen vergeben.');
 }
 
+async function bkmpGuildDeleteChatMessage(messageId) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { error } = await client.rpc('delete_guild_chat_message', { p_message_id: messageId });
+  if (error) throw new Error('Nachricht konnte nicht gelöscht werden. Dafür fehlt dir die Berechtigung.');
+}
+
+/* ---------------- Gilden-Technologie (siehe guild_tech_levels in
+   supabase-guild-tech-tree.sql) ---------------- */
+async function bkmpGuildGetTechLevels(guildId) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !guildId) return {};
+  const { data, error } = await client
+    .from('guild_tech_levels')
+    .select('tech_id, level')
+    .eq('guild_id', guildId);
+  if (error) return {};
+  const map = {};
+  (data || []).forEach(row => { map[row.tech_id] = Number(row.level || 0); });
+  return map;
+}
+
+async function bkmpGuildTechUpgrade(techId) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { data, error } = await client.rpc('guild_tech_upgrade', { p_tech_id: techId });
+  if (error) {
+    const msg = String(error.message || '');
+    if (msg.includes('insufficient_treasury')) throw new Error('Nicht genug Gold in der Gildenkasse.');
+    if (msg.includes('max_level')) throw new Error('Diese Technologie ist bereits auf Maximalstufe.');
+    if (msg.includes('not_authorized')) throw new Error('Nur Anführer oder Stellvertreter dürfen Technologie verbessern.');
+    if (msg.includes('not_authenticated')) throw new Error('Du bist nicht eingeloggt (Sitzung abgelaufen?). Bitte neu einloggen.');
+    if (msg.includes('invalid_tech')) throw new Error('Unbekannte Technologie-ID.');
+    /* Nachbesserung: die generische Meldung ("Verbesserung fehlgeschlagen")
+       verschleierte bisher die echte Postgres-Fehlermeldung komplett - jetzt
+       wird sie zumindest mit angehaengt, damit ein Spieler-Report wie
+       "geht nicht" den tatsaechlichen Fehlercode enthaelt statt nur die
+       Wrapper-Nachricht. */
+    throw new Error('Verbesserung fehlgeschlagen: ' + (msg || 'unbekannter Fehler') + '. Bitte versuche es erneut.');
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  return row ? { newLevel: Number(row.new_level), treasuryGold: Number(row.treasury_gold) } : null;
+}
+
+/* ---------------- Gildenquests (siehe supabase-guild-quests.sql) ---------------- */
+async function bkmpGuildQuestEnsureToday() {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return [];
+  const { data, error } = await client.rpc('guild_quest_ensure_today');
+  if (error) return [];
+  return (data || []).map(row => ({
+    id: row.id,
+    questType: row.quest_type,
+    target: Number(row.target),
+    progress: Number(row.progress),
+    tier: Number(row.tier),
+    completed: !!row.completed
+  }));
+}
+
+async function bkmpGuildQuestContribute(deltas) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client || !deltas || !Object.keys(deltas).length) return;
+  try { await client.rpc('guild_quest_contribute', { p_deltas: deltas }); } catch (e) { /* naechster Autosave versucht es erneut */ }
+}
+
+/* ---------------- Gildenboss (siehe supabase-guild-boss.sql) ---------------- */
+async function bkmpGuildBossJoin() {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { data, error } = await client.rpc('guild_boss_join');
+  if (error) {
+    const msg = String(error.message || '');
+    if (msg.includes('not_in_window')) throw new Error('Der Gildenboss ist gerade nicht aktiv (täglich 20:00-21:00 Uhr, Vorbereitung ab 19:55 Uhr).');
+    if (msg.includes('not_in_guild')) throw new Error('Du bist in keiner Gilde.');
+    if (msg.includes('no_idle_state')) throw new Error('Spiele zuerst im Kampf-Tab, bevor du am Gildenboss teilnimmst.');
+    throw new Error('Beitritt zum Gildenboss fehlgeschlagen. Bitte versuche es erneut.');
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return null;
+  return {
+    instanceId: row.instance_id,
+    bossHp: Number(row.boss_hp),
+    bossMaxHp: Number(row.boss_max_hp),
+    status: row.status,
+    bossName: row.boss_name,
+    spriteKey: row.sprite_key,
+    fightStartsAt: row.fight_starts_at,
+    fightEndsAt: row.fight_ends_at
+  };
+}
+
+async function bkmpGuildBossDealDamage(instanceId, amount, isCrit, isClick) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { data, error } = await client.rpc('guild_boss_deal_damage', { p_instance_id: instanceId, p_amount: amount, p_is_crit: !!isCrit, p_is_click: !!isClick });
+  if (error) return null;
+  const row = Array.isArray(data) ? data[0] : data;
+  return row ? { bossHp: Number(row.boss_hp), status: row.status } : null;
+}
+
+async function loadGuildBossInstance(instanceId) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !instanceId) return null;
+  const { data, error } = await client
+    .from('guild_boss_instances')
+    .select('id, guild_id, boss_id, boss_max_hp, boss_hp, status, fight_starts_at, fight_ends_at, participant_count, total_damage, guild_bosses(name, sprite_key)')
+    .eq('id', instanceId)
+    .maybeSingle();
+  if (error || !data) return null;
+  return {
+    id: data.id,
+    guildId: data.guild_id,
+    bossMaxHp: Number(data.boss_max_hp),
+    bossHp: Number(data.boss_hp),
+    status: data.status,
+    fightStartsAt: data.fight_starts_at,
+    fightEndsAt: data.fight_ends_at,
+    participantCount: Number(data.participant_count || 0),
+    totalDamage: Number(data.total_damage || 0),
+    bossName: data.guild_bosses ? data.guild_bosses.name : '',
+    spriteKey: data.guild_bosses ? data.guild_bosses.sprite_key : ''
+  };
+}
+
+async function loadGuildBossParticipants(instanceId) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !instanceId) return [];
+  const { data, error } = await client
+    .from('guild_boss_participants')
+    .select('auth_user_id, display_name, damage_dealt, crits_landed, clicks_landed')
+    .eq('instance_id', instanceId)
+    .order('damage_dealt', { ascending: false });
+  if (error) return [];
+  return (data || []).map(row => ({
+    authUserId: row.auth_user_id,
+    displayName: row.display_name,
+    damageDealt: Number(row.damage_dealt || 0),
+    critsLanded: Number(row.crits_landed || 0),
+    clicksLanded: Number(row.clicks_landed || 0)
+  }));
+}
+
+async function loadGuildBossLeaderboard() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from('guild_boss_player_stats')
+    .select('auth_user_id, display_name, total_fights_joined, total_bosses_defeated, total_damage_dealt, best_single_fight_damage')
+    .order('total_damage_dealt', { ascending: false })
+    .limit(100);
+  if (error) return [];
+  return (data || []).map(row => ({
+    authUserId: row.auth_user_id,
+    displayName: row.display_name,
+    totalFightsJoined: Number(row.total_fights_joined || 0),
+    totalBossesDefeated: Number(row.total_bosses_defeated || 0),
+    totalDamageDealt: Number(row.total_damage_dealt || 0),
+    bestSingleFightDamage: Number(row.best_single_fight_damage || 0)
+  }));
+}
+
+let bkmpGuildBossChannel = null;
+function bkmpSubscribeToGuildBossInstance(instanceId, onChange) {
+  bkmpUnsubscribeFromGuildBossInstance();
+  const client = bkmpGetSupabaseClient();
+  if (!client || !instanceId) return;
+  bkmpGuildBossChannel = client.channel('guildboss-' + instanceId)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'guild_boss_instances', filter: `id=eq.${instanceId}` }, payload => {
+      onChange({ type: 'instance', row: payload.new });
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'guild_boss_participants', filter: `instance_id=eq.${instanceId}` }, payload => {
+      onChange({ type: 'participants', row: payload.new, eventType: payload.eventType });
+    })
+    .subscribe();
+}
+function bkmpUnsubscribeFromGuildBossInstance() {
+  if (bkmpGuildBossChannel) { bkmpGuildBossChannel.unsubscribe(); bkmpGuildBossChannel = null; }
+}
+
 async function loadRaidBossesAdmin() {
   const client = bkmpGetSupabaseClient();
   if (!client) return [];
@@ -4273,6 +4534,26 @@ function bkmpSubscribeToRaidInstance(raidId, onChange) {
 }
 function bkmpUnsubscribeFromRaidInstance() {
   if (bkmpRaidChannel) { bkmpRaidChannel.unsubscribe(); bkmpRaidChannel = null; }
+}
+
+/* ---------------- Gildenchat-Realtime (Spieler-Wunsch: "Gildenchat
+   verbessern... moderner wirken") - vorher lud der Chat neue Nachrichten
+   nur beim Oeffnen/eigenen Senden neu (siehe bkmpGuildGetChatMessages),
+   jetzt ein echter Kanal wie beim Raid-HP-Sync, damit Nachrichten anderer
+   Mitglieder sofort erscheinen. */
+let bkmpGuildChatChannel = null;
+function bkmpSubscribeToGuildChat(guildId, onInsert) {
+  bkmpUnsubscribeFromGuildChat();
+  const client = bkmpGetSupabaseClient();
+  if (!client || !guildId) return;
+  bkmpGuildChatChannel = client.channel('guildchat-' + guildId)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'guild_chat_messages', filter: `guild_id=eq.${guildId}` }, payload => {
+      onInsert(payload.new);
+    })
+    .subscribe();
+}
+function bkmpUnsubscribeFromGuildChat() {
+  if (bkmpGuildChatChannel) { bkmpGuildChatChannel.unsubscribe(); bkmpGuildChatChannel = null; }
 }
 
 window.importLocalExpensesToSupabase = importLocalExpensesToSupabase;

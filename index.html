@@ -55,7 +55,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260715-bannersize1">
+<link rel="stylesheet" href="style.css?v=20260715-techerr1">
 </head>
 <body>
 
@@ -586,6 +586,8 @@
         <button type="button" class="idle-dorf-tab" id="idleTabBtnDungeon">🏛️ Dungeon</button>
         <button type="button" class="idle-dorf-tab" id="idleTabBtnArena">⚔️ Arena</button>
         <button type="button" class="idle-dorf-tab" id="idleTabBtnGilde">🛡️ Gilde</button>
+        <button type="button" class="idle-dorf-tab" id="idleTabBtnGildeTech">🌳 Gilden-Tech</button>
+        <button type="button" class="idle-dorf-tab" id="idleTabBtnGildeBoss">🐲 Gildenboss</button>
         <button type="button" class="idle-dorf-tab" id="idleTabBtnBestenliste">&#128202; Bestenliste</button>
       </div>
 
@@ -622,6 +624,8 @@
       <div class="idle-dorf-panel" id="idlePanelDungeon" style="display:none;"></div>
       <div class="idle-dorf-panel" id="idlePanelArena" style="display:none;"></div>
       <div class="idle-dorf-panel" id="idlePanelGilde" style="display:none;"></div>
+      <div class="idle-dorf-panel" id="idlePanelGildeTech" style="display:none;"></div>
+      <div class="idle-dorf-panel" id="idlePanelGildeBoss" style="display:none;"></div>
 
       <!-- Nutzerwunsch (15.07.): "Baust du das dann unten ein und im
            gleichen Design overlay wie den Rest?" - der Link stand vorher
@@ -1239,9 +1243,9 @@
 
   <script>window.BKMP_CLIENT_STORAGE_KEY = 'bkmp-customer-auth';</script>
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260714-arenalimit1"></script>
+  <script src="supabase.js?v=20260715-techerr1"></script>
   <script src="app.js?v=20260712-themefix1"></script>
-  <script src="idledorf.js?v=20260715-guildgoldfix1"></script>
+  <script src="idledorf.js?v=20260715-techerr1"></script>
   <script src="mapart.js?v=20260716-companyfix1"></script>
   <script>
     bkmpInitTheme();
@@ -4276,7 +4280,8 @@
         feedbackSonstigesCount: bkmpGetFeedbackCount('sonstiges'),
         ...(typeof bkmpIdleGetAchievementContextFields === 'function' ? bkmpIdleGetAchievementContextFields() : {}),
         ...(typeof bkmpRaidGetAchievementContextFields === 'function' ? bkmpRaidGetAchievementContextFields() : {}),
-        ...(typeof bkmpArenaGetAchievementContextFields === 'function' ? bkmpArenaGetAchievementContextFields() : {})
+        ...(typeof bkmpArenaGetAchievementContextFields === 'function' ? bkmpArenaGetAchievementContextFields() : {}),
+        ...(typeof bkmpGuildGetAchievementContextFields === 'function' ? bkmpGuildGetAchievementContextFields() : {})
       };
     }
     /* Daily-Code-Event-Gewinne: lokal gecacht (wird bei Sieg gesetzt, siehe
@@ -4467,7 +4472,8 @@
       ...(Array.isArray(window.BKMP_RUNE_UPGRADE_SUCCESS_TIERS) ? bkmpTieredAchievements('runeupgrade', 'Runen', 'idleRuneUpgradeSuccesses', window.BKMP_RUNE_UPGRADE_SUCCESS_TIERS, n => `Werte Runen ${n}x erfolgreich auf.`) : []),
       ...(Array.isArray(window.BKMP_RUNE_UPGRADE_FAIL_TIERS) ? bkmpTieredAchievements('runeupgradefail', 'Runen', 'idleRuneUpgradeFailures', window.BKMP_RUNE_UPGRADE_FAIL_TIERS, n => `Erlebe ${n} fehlgeschlagene Runen-Aufwertung${n === 1 ? '' : 'en'}.`) : []),
       ...(Array.isArray(window.BKMP_RAID_ACHIEVEMENTS_EXTRA) ? window.BKMP_RAID_ACHIEVEMENTS_EXTRA : []),
-      ...(Array.isArray(window.BKMP_ARENA_ACHIEVEMENTS_EXTRA) ? window.BKMP_ARENA_ACHIEVEMENTS_EXTRA : [])
+      ...(Array.isArray(window.BKMP_ARENA_ACHIEVEMENTS_EXTRA) ? window.BKMP_ARENA_ACHIEVEMENTS_EXTRA : []),
+      ...(Array.isArray(window.BKMP_GUILD_ACHIEVEMENTS_EXTRA) ? window.BKMP_GUILD_ACHIEVEMENTS_EXTRA : [])
     ];
     }
     let BKMP_ACHIEVEMENTS = bkmpBuildAchievementsList();

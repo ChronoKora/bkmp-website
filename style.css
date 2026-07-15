@@ -5721,6 +5721,184 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 }
 .idle-guild-chat-msg { font-size: 0.85rem; margin: 0; color: var(--ink); }
 .idle-guild-chat-time { float: right; font-size: 0.68rem; color: var(--muted); }
+
+/* Gilden-Level (Spieler-Wunsch 15.07.: "Gildensystem erweitern") - bewusst
+   Lila statt des bestehenden Orange-Dungeon/Arena-Tons (var(--purple),
+   gleicher Farbwert wie .idle-prestige-buy) - eine zweite, klar
+   unterscheidbare "Meta-Fortschritt"-Farbe fuer Gilden-Level getrennt vom
+   Kassenstand-Bonus (der bleibt Orange/Gold). */
+.idle-guild-level-row { display: flex; align-items: center; justify-content: center; gap: 0.6rem; margin-top: 0.6rem; flex-wrap: wrap; }
+.idle-guild-level-badge {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #fff;
+  background: linear-gradient(135deg, #a78bfa, #7c3aed);
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+}
+.idle-guild-level-xp { font-size: 0.8rem; color: var(--muted); }
+.idle-guild-xp-bar {
+  position: relative;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--paper);
+  overflow: visible;
+  border: 1px solid var(--line);
+  margin: 0.5rem auto 0;
+  max-width: 420px;
+}
+.idle-guild-xp-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #a78bfa, #7c3aed);
+  transition: width 0.4s ease;
+}
+/* Der kleine Schatz sitzt AUF dem Balkenende (nicht im ueberlaufenden Text),
+   deshalb overflow:visible oben + eigene Positionierung statt einfach im
+   Fliesstext ans Ende zu haengen. */
+.idle-guild-xp-chest {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1rem;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+  transition: left 0.4s ease;
+}
+.idle-guild-xp-pct { text-align: center; font-size: 0.78rem; color: var(--muted); margin: 0.3rem 0 0; }
+
+/* Aktivitätslog + Chat-Systemzeilen (siehe guild_activity_log) - gleiche
+   Scroll-Log-Optik wie .idle-guild-chat-log. */
+.idle-guild-activity-log {
+  max-height: 180px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+}
+.idle-guild-activity-entry { font-size: 0.82rem; margin: 0; color: var(--muted); }
+/* Rollenfarbener Namens-Tag im Chat (Spieler-Wunsch: "Spielerfarbe") -
+   eine echte pro-Spieler-Farbe gibt es im Spiel nicht, deshalb stattdessen
+   nach Rolle gefaerbt (gleiche Farbwerte wie die Rollen-Badges/Boni sonst
+   im Spiel: Gold=Anführer, Lila=Stellvertreter/Level-Farbe, Blau=Veteran). */
+.idle-guild-chat-role-leader { color: var(--gold); }
+.idle-guild-chat-role-officer { color: var(--purple); }
+.idle-guild-chat-role-veteran { color: #38bdf8; }
+.idle-guild-chat-role-member { color: var(--ink); }
+
+/* Gilden-Technologie (9 Karten-Raster) - gleiche Lila-Akzentfarbe wie die
+   Level-Anzeige (var(--purple)), damit "Gilden-Fortschritt" (Level +
+   Technologie) optisch als eine zusammengehoerige Familie erkennbar
+   bleibt, getrennt vom orangenen Kassenstand-Bonus. */
+.idle-guild-tech-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.7rem;
+  margin-top: 0.8rem;
+}
+.idle-guild-tech-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.8rem 0.6rem;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+  text-align: center;
+}
+.idle-guild-tech-icon { font-size: 1.4rem; }
+.idle-guild-tech-name { font-weight: 700; font-size: 0.85rem; color: var(--ink); }
+.idle-guild-tech-level { font-size: 0.72rem; color: var(--muted); }
+.idle-guild-tech-bonus { font-weight: 700; font-size: 0.95rem; color: var(--purple); margin-bottom: 0.2rem; }
+.idle-guild-tech-maxed { font-size: 0.78rem; color: var(--muted); font-weight: 700; }
+.idle-guild-tech-upgrade-btn { font-size: 0.78rem; padding: 0.4rem 0.7rem; }
+.idle-guild-tech-upgrade-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Tägliche Gildenquests - gruene Fortschrittsfarbe (bewusst eine dritte
+   Akzentfarbe neben Orange=Kasse und Lila=Level/Technologie, damit alle
+   drei Gilden-Fortschrittsarten auf einen Blick unterscheidbar bleiben). */
+.idle-guild-quest-card {
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+  padding: 0.6rem 0.8rem;
+  margin-bottom: 0.5rem;
+}
+.idle-guild-quest-card.is-complete { border-color: color-mix(in srgb, #4ade80 55%, var(--line)); }
+.idle-guild-quest-title { font-weight: 700; font-size: 0.88rem; margin-bottom: 0.3rem; }
+.idle-guild-quest-bar { height: 8px; border-radius: 999px; background: var(--paper); overflow: hidden; border: 1px solid var(--line); }
+.idle-guild-quest-fill { height: 100%; background: linear-gradient(90deg, #4ade80, #22c55e); transition: width 0.4s ease; }
+.idle-guild-quest-progress { font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; }
+.idle-guild-quest-reward { font-size: 0.72rem; color: var(--muted); margin-top: 0.15rem; }
+/* Loeschen-Knopf fuer Chat-Moderation (Anfuehrer/Stellvertreter/Veteran) -
+   bewusst unauffaellig (kleine, transparente Schaltflaeche am Zeilenende),
+   erst bei Hover/Fokus deutlicher sichtbar - soll normale Nachrichten
+   nicht zumuellen. */
+.idle-guild-chat-delete-btn {
+  float: right;
+  margin-left: 0.4rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 0.75rem;
+  opacity: 0.35;
+  transition: opacity 0.15s ease;
+}
+.idle-guild-chat-delete-btn:hover, .idle-guild-chat-delete-btn:focus-visible { opacity: 1; }
+/* Gildenbanner (Baukasten aus kuratierten Presets, siehe bkmpRenderGuildBanner
+   in idledorf.js) - an mehreren Stellen wiederverwendet: Gildenkopf,
+   Gilden-durchsuchen-Karten, Gildenboss-Ansicht, Einstellungen-Editor. */
+.idle-guild-banner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  border: 2px solid rgba(0, 0, 0, 0.25);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15), 0 2px 6px rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
+  line-height: 1;
+}
+.idle-guild-header-row { display: flex; align-items: center; gap: 0.6rem; }
+.idle-guild-header-row h4 { margin: 0; }
+.idle-arena-opponent-name .idle-guild-banner { vertical-align: middle; margin-right: 0.3rem; }
+.idle-guild-banner-picker { margin-top: 0.6rem; }
+.idle-guild-banner-preview { display: flex; justify-content: center; margin-bottom: 0.6rem; }
+.idle-guild-banner-colors, .idle-guild-banner-symbols {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+}
+.idle-guild-banner-color-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 2px solid var(--line);
+  cursor: pointer;
+  padding: 0;
+}
+.idle-guild-banner-color-btn.active { border-color: var(--accent, #fbbf24); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #fbbf24) 45%, transparent); }
+.idle-guild-banner-symbol-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+  cursor: pointer;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.idle-guild-banner-symbol-btn.active { border-color: var(--accent, #fbbf24); background: color-mix(in srgb, var(--accent, #fbbf24) 20%, var(--paper-2)); }
+.idle-guild-goal-banner { border-left: 3px solid #fbbf24; padding-left: 0.8rem; }
+.idle-guild-goal-banner p { margin: 0; }
 .idle-dungeon-start-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .idle-dungeon-banner {
   display: flex;
@@ -6514,6 +6692,11 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
    passt. (Werte der ueberarbeiteten Fassung vom 16.07., 1012 x 720.) */
 .raid-sprite-zerathor {
   aspect-ratio: 1012 / 720;
+}
+/* Gildenboss "Malthyros, der Weltenverschlinger" - eigenes Video (kein
+   Zerathor-Platzhalter mehr), siehe supabase-guild-boss.sql. */
+.raid-sprite-malthyros {
+  aspect-ratio: 1546 / 1342;
 }
 /* Die frueheren einzelnen Angriffs-Frames (Ruhepose/Atem-startet/voller
    Atem/Abklingen) stecken jetzt in der Video-Schleife selbst drin - der
