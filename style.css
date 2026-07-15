@@ -6379,32 +6379,43 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   overflow-x: hidden;
   overflow-y: auto;
 }
-/* Treibende Glutfunken: eine einzelne, sehr guenstige Ebene (nur
-   background-position animiert, kein zusaetzliches DOM/Layout) statt
-   vieler separater Partikel-Elemente - bewusst zurueckhaltend nach der
-   CPU-Auslastungs-Untersuchung von eben (nur transform-artige, GPU-guenstige
-   Eigenschaften, kein box-shadow/filter-Loop). */
+/* Treibende Glutfunken: eine einzelne Ebene, kein zusaetzliches DOM/Layout.
+   Bug-Report 17.07. (ChronoKora): "wirkt alles minimal laggend", durchgehend
+   im Hintergrund, unabhaengig von jeder Interaktion - passt exakt zu diesem
+   Element, das die GESAMTE Zeit laeuft, solange das Idle-Dorf-Fenster offen
+   ist. Der alte Kommentar hier ("nur transform-artige, GPU-guenstige
+   Eigenschaften") war ein Denkfehler: background-position ist KEINE
+   Compositor-Eigenschaft wie transform/opacity, sie zwingt den Browser bei
+   JEDEM Frame zu einem Repaint der ganzen Ebene (5 Radial-Gradients ueber
+   die komplette Fenstergroesse), 9s lang in Dauerschleife, komplett
+   unabhaengig vom Kampf-Tick. Jetzt echtes transform/opacity: die Positionen
+   der 5 Punkte bleiben fix im Gradient, die ganze Ebene wandert per
+   translateY nach oben (leicht ueberstehende inset-Werte, damit beim
+   Verschieben keine Kante sichtbar wird) - optisch nahezu identisch
+   (Funken glimmen auf und driften nach oben), aber nur noch Compositor-Arbeit
+   statt Repaint bei jedem einzelnen Frame. */
 .idle-dorf-overlay .idle-dorf-card::before {
   content: '';
   position: absolute;
-  inset: 0;
+  inset: -15% 0;
   pointer-events: none;
   opacity: 0.5;
   background-image:
-    radial-gradient(2px 2px at 10% 85%, rgba(255, 179, 92, 0.9), transparent 60%),
-    radial-gradient(1.5px 1.5px at 30% 95%, rgba(255, 179, 92, 0.7), transparent 60%),
-    radial-gradient(2px 2px at 55% 90%, rgba(255, 179, 92, 0.8), transparent 60%),
-    radial-gradient(1.5px 1.5px at 75% 98%, rgba(255, 179, 92, 0.65), transparent 60%),
-    radial-gradient(2px 2px at 92% 88%, rgba(255, 179, 92, 0.85), transparent 60%);
+    radial-gradient(2px 2px at 10% 80%, rgba(255, 179, 92, 0.9), transparent 60%),
+    radial-gradient(1.5px 1.5px at 30% 88%, rgba(255, 179, 92, 0.7), transparent 60%),
+    radial-gradient(2px 2px at 55% 84%, rgba(255, 179, 92, 0.8), transparent 60%),
+    radial-gradient(1.5px 1.5px at 75% 90%, rgba(255, 179, 92, 0.65), transparent 60%),
+    radial-gradient(2px 2px at 92% 82%, rgba(255, 179, 92, 0.85), transparent 60%);
   background-repeat: no-repeat;
   animation: idleEmbersRise 9s linear infinite;
+  will-change: transform;
   z-index: 0;
 }
 @keyframes idleEmbersRise {
-  0% { background-position: 10% 100%, 30% 105%, 55% 102%, 75% 108%, 92% 100%; opacity: 0; }
+  0% { transform: translateY(0); opacity: 0; }
   10% { opacity: 0.55; }
   90% { opacity: 0.35; }
-  100% { background-position: 6% -10%, 34% -15%, 50% -12%, 79% -18%, 88% -8%; opacity: 0; }
+  100% { transform: translateY(-115%); opacity: 0; }
 }
 .idle-dorf-overlay .idle-dorf-card > * { position: relative; z-index: 1; }
 /* Hoehere Spezifitaet als die generische Regel direkt darueber noetig
