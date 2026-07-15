@@ -4247,6 +4247,17 @@ function bkmpGuildQuestAddDelta(type, amount) {
 }
 function bkmpGuildQuestFlushDeltas() {
   if (!Object.keys(bkmpGuildQuestPendingDeltas).length) return;
+  /* Bug-Report 17.07. (Postgres-Fehlerlog, ChronoKora): guild_quest_contribute()
+     wirft "not_in_guild" fuer jeden Spieler ohne Gilde (siehe
+     supabase-guild-quests.sql) - wurde hier aber bisher unabhaengig vom
+     Gildenstatus bei JEDEM Autosave mit ausstehenden Deltas gefeuert (also
+     praktisch bei jedem aktiven Spieler ohne Gilde, alle ~4s). bkmpGuildState
+     ist nur gesetzt, wenn der Gilde-Tab schon mal geladen wurde (siehe
+     bkmpGuildLoadAll) - erst dann ist wirklich bekannt, ob eine Gilde
+     existiert. Bis dahin/ ohne Gilde sammeln sich die Deltas hier einfach
+     folgenlos weiter, statt einen garantiert fehlschlagenden Request zu
+     senden. */
+  if (!bkmpGuildState || !bkmpGuildState.guild) return;
   const deltas = bkmpGuildQuestPendingDeltas;
   bkmpGuildQuestPendingDeltas = {};
   if (typeof bkmpGuildQuestContribute === 'function') bkmpGuildQuestContribute(deltas);
