@@ -8297,7 +8297,12 @@ async function bkmpRaidJoin(raidId) {
     bkmpRaidRenderJoinBanner();
     bkmpRaidRefreshAchievementCache();
   } catch (e) {
-    alert(e && e.message ? e.message : 'Beitritt fehlgeschlagen. Bitte versuche es erneut.');
+    /* UX-Konsistenz (Raidboss-Neu-Durchtest 15.07.): einziger verbliebener
+       native alert() im ganzen Gildenboss/Raidboss-Fehlerpfad - wirkt
+       neben den sonst ueberall verwendeten Toasts (bkmpShowJannikToast)
+       deplatziert/blockierend. */
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(e && e.message ? e.message : 'Beitritt fehlgeschlagen. Bitte versuche es erneut.', 4200);
+    else alert(e && e.message ? e.message : 'Beitritt fehlgeschlagen. Bitte versuche es erneut.');
     if (joinBtn) { joinBtn.disabled = false; joinBtn.textContent = 'Jetzt beitreten'; }
   }
 }

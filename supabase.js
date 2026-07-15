@@ -3941,7 +3941,13 @@ async function joinRaid(raidId) {
     if (msg.includes('not_in_prep_window')) throw new Error('Der Raid hat schon begonnen oder es ist gerade keine Vorbereitungsphase.');
     if (msg.includes('no_idle_state')) throw new Error('Starte zuerst einmal einen normalen Kampf im Idle-Dorf, bevor du an einem Raid teilnimmst.');
     if (msg.includes('not_authenticated')) throw new Error('Bitte melde dich an, um am Raid teilzunehmen.');
-    throw new Error('Beitritt zum Raid fehlgeschlagen. Bitte versuche es erneut.');
+    if (msg.includes('raid_paused_guild_boss_hour')) throw new Error('Der Weltboss pausiert diese Stunde - Fokus liegt auf dem Gildenboss um 20 Uhr.');
+    if (msg.includes('no_active_boss')) throw new Error('Es ist aktuell kein Weltboss konfiguriert. Bitte melde das im Discord.');
+    /* Konsistenz mit bkmpGuildBossJoin() (siehe dort, gleicher Fix 15.07.):
+       rohen Server-Fehlertext mit anzeigen statt einer nichtssagenden
+       Standardmeldung, damit ein unbekannter Fehlerfall beim naechsten
+       Auftreten direkt sichtbar ist statt blind geraten werden zu muessen. */
+    throw new Error('Beitritt zum Raid fehlgeschlagen: ' + (msg || 'unbekannter Fehler') + '. Bitte versuche es erneut oder melde das im Discord.');
   }
   const row = Array.isArray(data) ? data[0] : data;
   if (!row) return null;
