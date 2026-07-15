@@ -4500,7 +4500,7 @@ async function bkmpIdlePerformPrestige() {
     bkmpIdlePendingRuneDrops = [];
     bkmpRuneCurrentlyViewing = null;
     bkmpRuneFuseSelection = null;
-    if (runeIdsToDelete.length && typeof deletePlayerRunes === 'function') deletePlayerRunes(runeIdsToDelete).catch(() => {});
+    bkmpRuneDeleteRemote(runeIdsToDelete, 'Prestige-Reset');
 
     if (!bkmpPrestigeState) bkmpPrestigeState = { name_key: bkmpIdleState.name_key, display_name: bkmpIdleState.display_name, prestige_level: 0, prestige_points: 0, prestige_points_spent: 0, prestige_allocations: {} };
     bkmpPrestigeState.prestige_level = Number(bkmpPrestigeState.prestige_level || 0) + 1;
@@ -6096,6 +6096,23 @@ function bkmpIdleMaybeDropRune(source) {
      (Gold ist weg, Stufe bleibt gleich), Verschmelzen kann die 3 Runen
      komplett zerstoeren statt eine neue zu liefern (siehe
      BKMP_RUNE_FUSE_FAIL_CHANCE/bkmpIdleRuneUpgradeFailChance unten). */
+/* Gemeinsamer Wrapper fuer alle Rune-Loesch-Aufrufe (Verkaufen/Verschmelzen/
+   Aufstiegs-Fodder/Prestige-Reset): lokal wird die Rune IMMER sofort aus
+   bkmpIdlePlayerRunes entfernt (optimistisches UI), der DB-Delete laeuft
+   parallel fire-and-forget. Frueher wurde ein Fehlschlag dabei ueberall
+   still verschluckt (.catch(() => {})) - GENAU das gleiche Muster wie der
+   Runen-Aufstieg-Bug (siehe bkmpRuneAscend-Kommentar): die Rune verschwindet
+   lokal, bleibt aber in der DB stehen und taucht nach einem Reload wieder
+   auf (bei Verkauf/Verschmelzen sogar dupliziert, da das Gold/die neue Rune
+   ja schon vergeben wurde). Mindestens sichtbar machen statt komplett
+   verschlucken. */
+function bkmpRuneDeleteRemote(ids, context) {
+  if (!Array.isArray(ids) || !ids.length || typeof deletePlayerRunes !== 'function') return;
+  deletePlayerRunes(ids).catch(err => {
+    console.error(`Runen-Loeschung fehlgeschlagen (${context}) - betroffene Runen koennten nach einem Reload dupliziert wieder auftauchen.`, err, ids);
+  });
+}
+
 const BKMP_RUNE_MAX_LEVEL = 15;
 /* Runen-Aufstieg (Community-Wunsch 17.07., Discord-Zitat "wir brauchen
    Mythische Runen, hab zu viele legendäre" + eigener Vorschlag "+15 Legi +
@@ -6235,7 +6252,7 @@ function bkmpRuneAscend(cid) {
   const slot = window.BKMP_RUNE_SLOTS.find(s => s.id === rune.rune_type);
   bkmpIdleState.gold -= cost;
   bkmpIdlePlayerRunes = bkmpIdlePlayerRunes.filter(r => r._cid !== fodder._cid);
-  if (fodder.id && typeof deletePlayerRunes === 'function') deletePlayerRunes([fodder.id]).catch(() => {});
+  if (fodder.id) bkmpRuneDeleteRemote([fodder.id], 'Aufstiegs-Fodder');
   rune.upgrade_level = Number(rune.upgrade_level || 0) + 1;
   if (rune.id) updatePlayerRuneUpgrade(rune.id, rune.upgrade_level, rune.substats).catch(err => {
     console.error('bkmpRuneAscend: Speichern fehlgeschlagen, Aufstieg wird beim naechsten Laden zurueckgesetzt', err);
@@ -6590,7 +6607,7 @@ function bkmpRuneFuse(slotId, rarityId, cids) {
   }
   const consumedIds = consumed.map(r => r.id).filter(Boolean);
   bkmpIdlePlayerRunes = bkmpIdlePlayerRunes.filter(r => !consumed.includes(r));
-  if (consumedIds.length && typeof deletePlayerRunes === 'function') deletePlayerRunes(consumedIds).catch(() => {});
+  bkmpRuneDeleteRemote(consumedIds, 'Verschmelzen');
   const slot = window.BKMP_RUNE_SLOTS.find(s => s.id === slotId);
   const rarityDef = window.BKMP_RUNE_RARITIES[rarityIndex];
 
@@ -6673,7 +6690,7 @@ function bkmpRuneSell(cid) {
   const value = bkmpRuneSellValue(rune);
   bkmpIdlePlayerRunes = bkmpIdlePlayerRunes.filter(r => r !== rune);
   bkmpIdleState.gold += value;
-  if (rune.id && typeof deletePlayerRunes === 'function') deletePlayerRunes([rune.id]).catch(() => {});
+  if (rune.id) bkmpRuneDeleteRemote([rune.id], 'Einzelverkauf');
   if (bkmpRuneCurrentlyViewing === cid) bkmpRuneCurrentlyViewing = null;
   bkmpIdleRenderHud();
   bkmpIdleRenderRunenPanel();
@@ -6703,7 +6720,7 @@ async function bkmpRuneSellAllDuplicates() {
   if (!confirmed) return;
   const ids = candidates.map(r => r.id).filter(Boolean);
   bkmpIdlePlayerRunes = bkmpIdlePlayerRunes.filter(r => !candidates.includes(r));
-  if (ids.length && typeof deletePlayerRunes === 'function') deletePlayerRunes(ids).catch(() => {});
+  bkmpRuneDeleteRemote(ids, 'Sammelverkauf');
   bkmpIdleState.gold += totalValue;
   if (candidates.some(r => r._cid === bkmpRuneCurrentlyViewing)) bkmpRuneCurrentlyViewing = null;
   bkmpIdleLog(`💰 ${candidates.length}× ${activeSlot.name} verkauft für ${bkmpIdleFormatNumber(totalValue)} Gold.`);
