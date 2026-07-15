@@ -8139,6 +8139,7 @@ async function bkmpRaidStartCombatView(raidId) {
   if (resultCard) resultCard.style.display = 'none';
   if (battlefield) battlefield.style.display = '';
   bkmpRaidToggleCombatView(true);
+  bkmpRaidEnsureMyAuthUserId();
   try {
     bkmpRaidState = await loadRaidState(raidId);
     bkmpRaidParticipants = await loadRaidParticipants(raidId);
@@ -8278,16 +8279,25 @@ function bkmpRaidRequestParticipantsRender() {
    Mitspielern konnte die eigene Zahl sonst spuerbar hinterherhinken. */
 function bkmpRaidApplyOwnDamageResult(result) {
   if (!result || result.ownDamageDealt == null) return;
+  /* Primaer per authUserId matchen (siehe bkmpRaidMyAuthUserId-Kommentar
+     oben) - derselbe Schluessel wie die Realtime-Aktualisierung fuer alle
+     anderen Teilnehmer. Der Session-Check dahinter ist async und laeuft
+     nicht garantiert VOR dem allerersten Tick durch, deshalb bleibt der
+     Name-Abgleich als Fallback fuer dieses eine kurze Zeitfenster - sobald
+     bkmpRaidMyAuthUserId bekannt ist, greift ab dann immer der robuste Weg. */
+  const myUid = bkmpRaidMyAuthUserId;
   const myName = typeof bkmpGetMcName === 'function' ? bkmpGetMcName().trim().toLowerCase() : '';
-  if (!myName) return;
-  const idx = bkmpRaidParticipants.findIndex(p => p.displayName.trim().toLowerCase() === myName);
+  const idx = myUid
+    ? bkmpRaidParticipants.findIndex(p => p.authUserId === myUid)
+    : (myName ? bkmpRaidParticipants.findIndex(p => p.displayName.trim().toLowerCase() === myName) : -1);
   if (idx >= 0) {
     bkmpRaidParticipants[idx].damageDealt = result.ownDamageDealt;
     bkmpRaidParticipants[idx].critsLanded = result.ownCritsLanded;
     bkmpRaidParticipants[idx].clicksLanded = result.ownClicksLanded;
-  } else {
+    if (myUid) bkmpRaidParticipants[idx].authUserId = myUid;
+  } else if (myName) {
     bkmpRaidParticipants.push({
-      authUserId: null,
+      authUserId: myUid,
       displayName: bkmpGetMcName(),
       damageDealt: result.ownDamageDealt,
       critsLanded: result.ownCritsLanded,
