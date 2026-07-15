@@ -4627,12 +4627,32 @@ async function bkmpGuildBossDealDamage(instanceId, amount, isCrit, isClick) {
   const { data, error } = await client.rpc('guild_boss_deal_damage', { p_instance_id: instanceId, p_amount: amount, p_is_crit: !!isCrit, p_is_click: !!isClick });
   if (error) {
     console.warn('Gildenboss: Schaden konnte nicht verbucht werden.', error);
-    const now = Date.now();
-    if (now - bkmpGuildBossDamageErrorToastAt > 15000) {
-      bkmpGuildBossDamageErrorToastAt = now;
-      if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Gildenboss-Schaden konnte nicht verbucht werden: ' + String(error.message || 'unbekannter Fehler'), 4200);
+    const msg = String(error.message || '');
+    /* Live-Vorfall 15.07. ("das war heute echt eine Pleite, es haben
+       soviele es mitbekommen"): "boss_not_active"/"boss_not_found"
+       bedeuten, der Kampf ist serverseitig bereits vorbei (jemand anders
+       hat den Boss besiegt, oder die Zeit ist abgelaufen) - kein
+       voruebergehender Fehler, der beim naechsten Tick einfach nochmal
+       klappen koennte. Ohne die Realtime-Publication (siehe
+       supabase-realtime-enable.sql) erfuhren andere, noch aktiv
+       tickende Mitspieler das bisher NIE automatisch: ihr Auto-Tick
+       (alle 2.5s) hämmerte endlos gegen denselben Fehler und zeigte
+       alle 15s einen rohen "boss_not_active"-Fehler-Toast, bis die Seite
+       manuell neu geladen wurde - vermutlich genau das, was heute beim
+       Sieg fuer alle anderen noch kaempfenden Gildenmitglieder sichtbar
+       war. isFinal markiert diese Faelle fuer die Aufrufer (siehe
+       bkmpGuildBossOwnTick/bkmpGuildBossHandleClick), die den eigenen
+       Kampf-Loop dann sofort selbst beenden statt endlos weiterzuticken -
+       kein Toast dafuer, das ist kein Fehler des Spielers. */
+    const isFinal = msg.includes('boss_not_active') || msg.includes('boss_not_found');
+    if (!isFinal) {
+      const now = Date.now();
+      if (now - bkmpGuildBossDamageErrorToastAt > 15000) {
+        bkmpGuildBossDamageErrorToastAt = now;
+        if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Gildenboss-Schaden konnte nicht verbucht werden: ' + (msg || 'unbekannter Fehler'), 4200);
+      }
     }
-    return null;
+    return isFinal ? { final: true } : null;
   }
   const row = Array.isArray(data) ? data[0] : data;
   return row ? {

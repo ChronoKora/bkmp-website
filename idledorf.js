@@ -3935,6 +3935,24 @@ function bkmpGuildBossApplyOwnDamageResult(result) {
   }
 }
 
+/* Live-Vorfall 15.07. (siehe Kommentar bei bkmpGuildBossDealDamage in
+   supabase.js): sobald der Boss besiegt ist, hämmerte der Auto-Tick jedes
+   noch aktiven Mitspielers ohne funktionierendes Realtime endlos gegen
+   "boss_not_active" - der lokale Zustand erfuhr nie vom Sieg. Statt
+   weiterzuticken sofort den eigenen Loop stoppen und den echten Endstand
+   nachladen, sobald der Server "final" meldet. */
+function bkmpGuildBossResyncAfterFinalError() {
+  if (!bkmpGuildBossState) return;
+  bkmpGuildBossStopLoop();
+  loadGuildBossInstance(bkmpGuildBossState.instanceId).then(info => {
+    if (!info || !bkmpGuildBossState) return;
+    bkmpGuildBossState.bossHp = info.bossHp;
+    bkmpGuildBossState.status = info.status;
+    bkmpIdleRenderGildeBossPanel();
+    bkmpGuildBossCheckOutcome();
+  }).catch(() => {});
+}
+
 async function bkmpGuildBossOwnTick() {
   if (!bkmpGuildBossState || bkmpGuildBossState.status !== 'fighting' || !bkmpIdleEffectiveStats) return;
   const roll = bkmpIdleDamageRoll(bkmpIdleEffectiveStats.attack, bkmpIdleEffectiveStats.critChance, bkmpIdleEffectiveStats.critDamage, 0);
@@ -3943,6 +3961,7 @@ async function bkmpGuildBossOwnTick() {
   bkmpGuildBossHitFlash();
   try {
     const result = await bkmpGuildBossDealDamage(bkmpGuildBossState.instanceId, roll.amount, roll.isCrit, false);
+    if (result && result.final) { bkmpGuildBossResyncAfterFinalError(); return; }
     if (result) {
       bkmpGuildBossState.bossHp = result.bossHp;
       bkmpGuildBossState.status = result.status;
@@ -3960,6 +3979,7 @@ function bkmpGuildBossHandleClick() {
   bkmpGuildBossSpawnFx('raid-fx-magic', clickDamage, isCrit);
   bkmpGuildBossHitFlash();
   bkmpGuildBossDealDamage(bkmpGuildBossState.instanceId, clickDamage, isCrit, true).then(result => {
+    if (result && result.final) { bkmpGuildBossResyncAfterFinalError(); return; }
     if (result) {
       bkmpGuildBossState.bossHp = result.bossHp;
       bkmpGuildBossState.status = result.status;
@@ -4057,7 +4077,17 @@ async function bkmpIdleRenderGildeBossPanel() {
       bkmpGuildBossState = state;
       bkmpGuildBossResultShown = false;
       loadGuildBossParticipants(state.instanceId).then(list => { bkmpGuildBossParticipants = list; bkmpIdleRenderGildeBossPanel(); }).catch(() => {});
+      /* Bug-Fix (beim Neu-Testen des kompletten Ablaufs gefunden, 15.07.):
+         war der Kampf beim (Wieder-)Oeffnen des Fensters serverseitig
+         schon vorbei (won/expired) - z.B. Boss vor dem eigenen Beitritt
+         von der Gilde besiegt, oder Seite waehrend 20-21 Uhr neu geladen -
+         wurde weder der Loop gestartet NOCH bkmpGuildBossCheckOutcome()
+         aufgerufen. Die Ergebnisansicht erschien zwar (isFinished greift
+         schon am Status), aber Gold/Kristalle blieben dauerhaft bei "+0",
+         weil deren Nachlade-Fetch (loadGuildBossInstance) nur dort drin
+         angestossen wird. */
       if (state.status === 'fighting') bkmpGuildBossStartLoop();
+      else bkmpGuildBossCheckOutcome();
       bkmpIdleRenderGildeBossPanel();
     }).catch(() => {});
   }
@@ -4102,6 +4132,7 @@ async function bkmpIdleRenderGildeBossPanel() {
           bkmpGuildBossResultShown = false;
           bkmpGuildBossParticipants = await loadGuildBossParticipants(state.instanceId).catch(() => []);
           if (state.status === 'fighting') bkmpGuildBossStartLoop();
+          else bkmpGuildBossCheckOutcome();
         }
       } catch (e) {
         if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(e.message, 3400);
