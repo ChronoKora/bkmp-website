@@ -3047,9 +3047,20 @@ async function bkmpIdleRenderArenaPanel() {
       <h4 style="margin-top:1rem;">Letzte Kämpfe</h4>
       ${bkmpArenaRecentBattles.length === 0 ? '<p class="empty-hint">Noch keine Kämpfe.</p>' : bkmpArenaRecentBattles.map(b => {
         const won = b.wasAttacker ? b.attackerWon : !b.attackerWon;
-        const opponentName = b.wasAttacker ? b.defenderName : b.attackerName;
-        const verb = b.wasAttacker ? (won ? 'besiegt' : 'verloren gegen') : (won ? 'abgewehrt' : 'überrumpelt von');
-        return `<p class="idle-dungeon-best">${won ? '✅' : '❌'} ${b.wasAttacker ? 'Du hast' : ''} ${escapeHtml(opponentName)} ${verb}${b.wasAttacker ? '' : ' dich'} &middot; ${b.wasAttacker ? (won ? '+' : '') + b.ratingChange : (won ? '+' : '') + (-b.ratingChange)} Rating${b.goldReward ? ` &middot; +${b.goldReward} 💰` : ''} &middot; ${bkmpArenaFormatTime(b.occurredAt)}</p>`;
+        const opponentName = escapeHtml(b.wasAttacker ? b.defenderName : b.attackerName);
+        /* Spieler-Report (15.07., "Die verloren Nachrichten machen
+           grammatisch gar keinen Sinn", Screenshot: "vlceBlade verloren
+           gegen", "Kaledoss überrumpelt von dich"): das feste Praefix-
+           /Verb-/Suffix-Muster ging nur fuer EINEN der vier Faelle
+           (wasAttacker+gewonnen, "Du hast X besiegt") tatsaechlich auf -
+           bei den anderen drei landete "gegen"/das Subjekt an der
+           falschen Stelle oder fehlte ganz. Jetzt pro Fall ein
+           vollstaendiger, eigenstaendiger Satz statt eines generischen
+           Bausteins. */
+        const phrase = b.wasAttacker
+          ? (won ? `Du hast ${opponentName} besiegt` : `Du hast gegen ${opponentName} verloren`)
+          : (won ? `Du hast ${opponentName} abgewehrt` : `${opponentName} hat dich überrumpelt`);
+        return `<p class="idle-dungeon-best">${won ? '✅' : '❌'} ${phrase} &middot; ${b.wasAttacker ? (won ? '+' : '') + b.ratingChange : (won ? '+' : '') + (-b.ratingChange)} Rating${b.goldReward ? ` &middot; +${b.goldReward} 💰` : ''} &middot; ${bkmpArenaFormatTime(b.occurredAt)}</p>`;
       }).join('')}
     </div>
   `;
