@@ -1338,15 +1338,28 @@ function bkmpDungeonMaybeGrantEventEgg() {
   if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`🎉 Seltener Fund! Ein ${species.name}-Ei ist aus dem Dungeon gefallen!`, 5000);
 }
 
+/* Spieler-Report (15.07., "Der Abbrechen Knopf geht nicht", Screenshot
+   mitten in einer aktiven Welle): bkmpDungeonCancelAuto() bricht bewusst
+   erst NACH dem gerade laufenden Versuch ab (siehe Kommentar dort), setzt
+   dabei aber bisher NUR den internen bkmpDungeonAutoCancelled-Flag - diese
+   Funktion hier baut den Banner alle 500ms unveraendert mit demselben
+   aktiven "Abbrechen"-Button neu, egal ob der Flag schon gesetzt ist.
+   Fuer den Spieler sah das nach einem Klick optisch exakt gleich aus wie
+   vorher - kein Wunder, dass es wie "geht nicht" wirkte, obwohl der Auto-
+   Lauf nach der aktuellen Welle tatsaechlich korrekt gestoppt haette.
+   Jetzt zeigt der Banner nach dem Klick sofort einen erkennbaren anderen
+   Zustand (kein Button mehr, Hinweistext statt "Abbrechen"). */
 function bkmpDungeonUpdateBanner() {
   const banner = document.getElementById('idleDungeonBanner');
   if (!banner || !bkmpDungeonActive || !bkmpDungeonActiveDifficulty) return;
   const elapsed = Date.now() - bkmpDungeonStartTime;
   const autoSuffix = bkmpDungeonAutoActive()
-    ? ` &middot; 🔁 Auto ${bkmpDungeonAutoRunsDone + 1}/${bkmpDungeonAutoRunsTotal} <button type="button" class="idle-dungeon-auto-cancel-btn" id="idleDungeonAutoCancelBtn">Abbrechen</button>`
+    ? (bkmpDungeonAutoCancelled
+        ? ` &middot; 🔁 Auto ${bkmpDungeonAutoRunsDone + 1}/${bkmpDungeonAutoRunsTotal} &middot; ⏹️ Wird nach dieser Welle beendet...`
+        : ` &middot; 🔁 Auto ${bkmpDungeonAutoRunsDone + 1}/${bkmpDungeonAutoRunsTotal} <button type="button" class="idle-dungeon-auto-cancel-btn" id="idleDungeonAutoCancelBtn">Abbrechen</button>`)
     : '';
   banner.innerHTML = `🏛️ Dungeon (${bkmpDungeonActiveDifficulty.icon} ${bkmpDungeonActiveDifficulty.name}) &middot; Welle ${bkmpDungeonWave} / ${bkmpDungeonActiveDifficulty.waves} &middot; ⏱ ${bkmpDungeonFormatTime(elapsed)}${autoSuffix}`;
-  if (bkmpDungeonAutoActive()) {
+  if (bkmpDungeonAutoActive() && !bkmpDungeonAutoCancelled) {
     const cancelBtn = document.getElementById('idleDungeonAutoCancelBtn');
     if (cancelBtn) cancelBtn.addEventListener('click', bkmpDungeonCancelAuto);
   }
