@@ -2,12 +2,13 @@
    Bkmp - Idle Drachen Dorf: Offline-Fortschritt serverseitig
    berechnen und atomar gutschreiben.
 
-   idle_player_state hat (wie player_stats) offene RLS fuer den
-   laufenden Kampf - diese Funktion ist deshalb kein hartes
-   Sicherheitsnetz gegen manipulierte Werte, sondern verhindert
-   nur, dass "wie lange war ich weg" vom Client selbst behauptet
-   werden kann. Genau wie in api/active-daily-event.js wird die
-   Zeitspanne serverseitig aus last_seen_at berechnet, nie aus
+   idle_player_state hatte lange offene RLS fuer den laufenden Kampf
+   (siehe supabase-security-audit-rls-fix.sql, 15.07., stellt Owner-
+   only-Schreibzugriff wieder her) - diese Funktion war deshalb bisher
+   kein hartes Sicherheitsnetz gegen manipulierte Werte, sondern
+   verhinderte nur, dass "wie lange war ich weg" vom Client selbst
+   behauptet werden kann. Genau wie in api/active-daily-event.js wird
+   die Zeitspanne serverseitig aus last_seen_at berechnet, nie aus
    einem vom Client gesendeten Wert.
 
    Atomarer Claim per PATCH ... WHERE last_seen_at = eq.<gelesener
@@ -25,10 +26,20 @@
    nachgezogen werden, damit Offline- und Live-Fortschritt nicht
    zu weit auseinanderlaufen.
 
+   SICHERHEITS-NACHTRAG (Perf-/Sicherheits-Audit 15.07.): der
+   mitgeschickte "playerName" wurde bisher ungeprueft als Lookup-
+   Schluessel verwendet - jeder haette per wiederholtem Aufruf mit dem
+   Namen eines ANDEREN Spielers dessen last_seen_at immer wieder auf
+   "jetzt" zuruecksetzen und ihm so echten Offline-Fortschritt klauen
+   koennen. Jetzt wird das Access-Token gegen /auth/v1/user geprueft
+   (wie in api/claim-map-order.js) und der Datensatz kommt ueber die
+   verifizierte auth_user_id statt ueber den Client-String.
+
    Braucht SUPABASE_SERVICE_ROLE_KEY in Vercel.
    ============================================================ */
 
 const SUPABASE_URL = 'https://zgknyrwzpohvfdweomxf.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_RuiDW15_3cI0cQZ8WlzoWg_DhGU9r6f';
 
 function send(res, status, payload) {
   res.statusCode = status;
@@ -105,6 +116,10 @@ module.exports = async function handler(req, res) {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!serviceKey) return send(res, 500, { error: 'server_not_configured' });
 
+  const authHeader = req.headers.authorization || '';
+  const accessToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  if (!accessToken) return send(res, 401, { error: 'missing_token' });
+
   let body = req.body;
   try {
     if (typeof body === 'string') body = JSON.parse(body || '{}');
@@ -113,12 +128,15 @@ module.exports = async function handler(req, res) {
   }
   body = body || {};
 
-  const playerName = String(body.playerName || '').trim();
-  if (!playerName) return send(res, 400, { error: 'missing_name' });
-  const nameKey = playerName.toLowerCase();
-
   try {
-    const stateRes = await sbFetch(serviceKey, `idle_player_state?name_key=eq.${encodeURIComponent(nameKey)}&limit=1`);
+    const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${accessToken}` }
+    });
+    if (!userRes.ok) return send(res, 401, { error: 'invalid_session' });
+    const user = await userRes.json();
+    if (!user || !user.id) return send(res, 401, { error: 'invalid_session' });
+
+    const stateRes = await sbFetch(serviceKey, `idle_player_state?auth_user_id=eq.${encodeURIComponent(user.id)}&limit=1`);
     if (!stateRes.ok) return send(res, 502, { error: 'lookup_failed' });
     const stateRows = await stateRes.json();
     const state = Array.isArray(stateRows) ? stateRows[0] : null;
@@ -282,7 +300,7 @@ module.exports = async function handler(req, res) {
       last_offline_claim: { elapsedSeconds, goldGain, xpGain, woodGain, stoneGain, crystalGain, essenceGain, dragonKills: kills, levelsGained, claimedAt: new Date().toISOString() }
     };
 
-    const claimRes = await sbFetch(serviceKey, `idle_player_state?name_key=eq.${encodeURIComponent(nameKey)}&last_seen_at=eq.${encodeURIComponent(lastSeenIso)}`, {
+    const claimRes = await sbFetch(serviceKey, `idle_player_state?auth_user_id=eq.${encodeURIComponent(user.id)}&last_seen_at=eq.${encodeURIComponent(lastSeenIso)}`, {
       method: 'PATCH',
       headers: { Prefer: 'return=representation' },
       body: JSON.stringify(newTotals)
@@ -296,7 +314,7 @@ module.exports = async function handler(req, res) {
       // Zwischenzeitlich hat eine andere Anfrage (z. B. ein zweiter Tab) den
       // Stand schon fortgeschrieben - dessen zuletzt gewaehrten Claim zurueckgeben,
       // statt doppelt gutzuschreiben.
-      const recheck = await sbFetch(serviceKey, `idle_player_state?name_key=eq.${encodeURIComponent(nameKey)}&select=last_offline_claim&limit=1`);
+      const recheck = await sbFetch(serviceKey, `idle_player_state?auth_user_id=eq.${encodeURIComponent(user.id)}&select=last_offline_claim&limit=1`);
       const recheckRows = recheck.ok ? await recheck.json() : [];
       const lastClaim = Array.isArray(recheckRows) && recheckRows[0] ? recheckRows[0].last_offline_claim : null;
       return send(res, 200, { ok: true, elapsedSeconds: 0, rewards: null, newTotals: null, note: 'already_claimed', previousClaim: lastClaim || null });

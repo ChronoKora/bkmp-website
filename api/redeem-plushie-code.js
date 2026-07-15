@@ -14,10 +14,19 @@
      damit zwei gleichzeitige Versuche mit demselben Code nicht beide
      durchgehen.
 
+   SICHERHEITS-NACHTRAG (Perf-/Sicherheits-Audit 15.07.): "faelschungssicher"
+   oben bezog sich nur auf den Code selbst - der mitgeschickte "playerName"
+   wurde bisher ungeprueft uebernommen, jeder haette also einen echten Code
+   unter dem Namen eines ANDEREN Spielers einloesen koennen. Jetzt wird das
+   Access-Token des Aufrufers gegen /auth/v1/user geprueft (wie in
+   api/claim-map-order.js) und der name_key kommt serverseitig aus
+   player_stats.
+
    Braucht die Umgebungsvariable SUPABASE_SERVICE_ROLE_KEY in Vercel.
    ============================================================ */
 
 const SUPABASE_URL = 'https://zgknyrwzpohvfdweomxf.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_RuiDW15_3cI0cQZ8WlzoWg_DhGU9r6f';
 
 function send(res, status, payload) {
   res.statusCode = status;
@@ -47,6 +56,10 @@ module.exports = async function handler(req, res) {
     return send(res, 500, { error: 'server_not_configured', detail: 'SUPABASE_SERVICE_ROLE_KEY fehlt in den Vercel-Umgebungsvariablen.' });
   }
 
+  const authHeader = req.headers.authorization || '';
+  const accessToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  if (!accessToken) return send(res, 401, { error: 'missing_token' });
+
   let body = req.body;
   try {
     if (typeof body === 'string') body = JSON.parse(body || '{}');
@@ -56,12 +69,24 @@ module.exports = async function handler(req, res) {
   body = body || {};
 
   const rawCode = String(body.code || '').trim().toUpperCase();
-  const playerName = String(body.playerName || '').trim();
   if (!rawCode) return send(res, 400, { error: 'missing_code' });
-  if (!playerName) return send(res, 400, { error: 'missing_name' });
-  const nameKey = playerName.toLowerCase();
 
   try {
+    const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${accessToken}` }
+    });
+    if (!userRes.ok) return send(res, 401, { error: 'invalid_session' });
+    const user = await userRes.json();
+    if (!user || !user.id) return send(res, 401, { error: 'invalid_session' });
+
+    const profileRes = await sbFetch(serviceKey, `player_stats?auth_user_id=eq.${encodeURIComponent(user.id)}&select=name_key,display_name&limit=1`);
+    if (!profileRes.ok) return send(res, 502, { error: 'profile_lookup_failed' });
+    const profileRows = await profileRes.json();
+    const profile = Array.isArray(profileRows) ? profileRows[0] : null;
+    if (!profile) return send(res, 400, { error: 'not_registered' });
+    const nameKey = profile.name_key;
+    const playerName = profile.display_name || profile.name_key;
+
     // 1) Code nachschlagen
     const lookupRes = await sbFetch(serviceKey, `plushie_codes?code=eq.${encodeURIComponent(rawCode)}&select=id,plushie_id,is_redeemed,is_reusable&limit=1`);
     if (!lookupRes.ok) {

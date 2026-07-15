@@ -4012,9 +4012,17 @@ function bkmpIdleRenderLeaderboardList() {
 
 async function bkmpIdleClaimOfflineProgress(name) {
   try {
+    /* Sicherheits-Nachtrag (Audit 15.07.): api/claim-idle-offline-progress.js
+       identifiziert den Spieler jetzt ueber dieses Access-Token statt ueber
+       den mitgeschickten Namen - verhindert, dass jemand per wiederholtem
+       Aufruf mit fremdem Namen dessen last_seen_at zuruecksetzt und ihm so
+       Offline-Fortschritt klaut. */
+    const session = typeof bkmpGetPlayerSession === 'function' ? await bkmpGetPlayerSession() : null;
+    const accessToken = session ? session.access_token : null;
+    if (!accessToken) return null;
     const res = await fetch('/api/claim-idle-offline-progress', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
       body: JSON.stringify({ playerName: name })
     });
     if (!res.ok) return null;

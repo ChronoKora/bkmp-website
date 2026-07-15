@@ -2866,9 +2866,16 @@ async function loadOwnedPlushies(name) {
 }
 
 async function redeemPlushieCode(code, playerName) {
+  /* Sicherheits-Nachtrag (Audit 15.07.): api/redeem-plushie-code.js prueft
+     den Aufrufer jetzt serverseitig ueber dieses Access-Token (verhindert
+     Einloesen unter fremdem Namen) - playerName wird nur noch als Hinweis
+     mitgeschickt, massgeblich ist die Session. */
+  const session = typeof bkmpGetPlayerSession === 'function' ? await bkmpGetPlayerSession() : null;
+  const accessToken = session ? session.access_token : null;
+  if (!accessToken) return { ok: false, status: 401, body: { error: 'missing_token' } };
   const response = await fetch('/api/redeem-plushie-code', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
     body: JSON.stringify({ code, playerName })
   });
   let body = null;

@@ -1267,9 +1267,9 @@
 
   <script>window.BKMP_CLIENT_STORAGE_KEY = 'bkmp-customer-auth';</script>
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260717-obsvisual1"></script>
+  <script src="supabase.js?v=20260717-authhardening1"></script>
   <script src="app.js?v=20260712-themefix1"></script>
-  <script src="idledorf.js?v=20260717-perfaudit1"></script>
+  <script src="idledorf.js?v=20260717-authhardening2"></script>
   <script src="mapart.js?v=20260717-budgetfix1"></script>
   <script>
     bkmpInitTheme();
@@ -4861,7 +4861,10 @@
               already_redeemed: 'Dieser Code wurde bereits eingelöst.',
               already_owned: 'Du hast diesen Plüshie schon freigeschaltet.',
               missing_name: 'Bitte trag zuerst deinen Minecraft-Namen ein.',
-              missing_code: 'Bitte gib einen Code ein.'
+              missing_code: 'Bitte gib einen Code ein.',
+              missing_token: 'Bitte melde dich zuerst mit deinem Account an.',
+              invalid_session: 'Deine Anmeldung ist abgelaufen - bitte melde dich erneut an.',
+              not_registered: 'Bitte melde dich zuerst mit deinem Account an.'
             };
             bkmpShowPlushieMsg(errorMap[body.error] || 'Der Code konnte nicht eingelöst werden. Versuch es später erneut.', true);
           }
@@ -5016,9 +5019,21 @@
       btn.disabled = true;
       btn.textContent = 'Wird gesichert...';
       try {
+        /* Sicherheits-Nachtrag (Audit 15.07.): api/redeem-daily-event.js
+           prueft den Aufrufer jetzt serverseitig ueber dieses Access-
+           Token - verhindert, dass jemand einen fremden Sieg unter dem
+           Namen eines anderen Spielers eintraegt. */
+        const session = typeof bkmpGetPlayerSession === 'function' ? await bkmpGetPlayerSession() : null;
+        const accessToken = session ? session.access_token : null;
+        if (!accessToken) {
+          if (msg) { msg.textContent = 'Bitte melde dich zuerst mit deinem Account an.'; msg.classList.add('error'); }
+          btn.disabled = false;
+          btn.textContent = 'Jetzt sichern!';
+          return;
+        }
         const res = await fetch('/api/redeem-daily-event', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
           body: JSON.stringify({ eventId: bkmpCurrentDailyEvent.id, playerName: name })
         });
         const body = await res.json();

@@ -8,10 +8,20 @@
    exakt gleichzeitigem Absenden, laufen ins Leere. So kann es nie zwei
    Gewinner geben.
 
+   SICHERHEITS-NACHTRAG (Perf-/Sicherheits-Audit 15.07.): frueher wurde
+   der vom Client geschickte "playerName" ungeprueft als Gewinner
+   eingetragen - jeder, der den Namen eines anderen Spielers kannte,
+   haette dessen Sieg klauen/faelschen koennen. Jetzt wird stattdessen
+   das Access-Token des Aufrufers gegen /auth/v1/user geprueft (wie in
+   api/claim-map-order.js) und der name_key kommt serverseitig aus
+   player_stats - der Client kann sich also nur noch fuer sich selbst
+   als Gewinner eintragen, nie fuer jemand anderen.
+
    Braucht SUPABASE_SERVICE_ROLE_KEY in Vercel.
    ============================================================ */
 
 const SUPABASE_URL = 'https://zgknyrwzpohvfdweomxf.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_RuiDW15_3cI0cQZ8WlzoWg_DhGU9r6f';
 const EVENT_DURATION_MS = 3 * 60 * 1000;
 
 function send(res, status, payload) {
@@ -39,6 +49,10 @@ module.exports = async function handler(req, res) {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!serviceKey) return send(res, 500, { error: 'server_not_configured' });
 
+  const authHeader = req.headers.authorization || '';
+  const accessToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  if (!accessToken) return send(res, 401, { error: 'missing_token' });
+
   let body = req.body;
   try {
     if (typeof body === 'string') body = JSON.parse(body || '{}');
@@ -48,12 +62,24 @@ module.exports = async function handler(req, res) {
   body = body || {};
 
   const eventId = String(body.eventId || '').trim();
-  const playerName = String(body.playerName || '').trim();
   if (!eventId) return send(res, 400, { error: 'missing_event' });
-  if (!playerName) return send(res, 400, { error: 'missing_name' });
-  const nameKey = playerName.toLowerCase();
 
   try {
+    const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${accessToken}` }
+    });
+    if (!userRes.ok) return send(res, 401, { error: 'invalid_session' });
+    const user = await userRes.json();
+    if (!user || !user.id) return send(res, 401, { error: 'invalid_session' });
+
+    const profileRes = await sbFetch(serviceKey, `player_stats?auth_user_id=eq.${encodeURIComponent(user.id)}&select=name_key,display_name&limit=1`);
+    if (!profileRes.ok) return send(res, 502, { error: 'profile_lookup_failed' });
+    const profileRows = await profileRes.json();
+    const profile = Array.isArray(profileRows) ? profileRows[0] : null;
+    if (!profile) return send(res, 400, { error: 'not_registered' });
+    const nameKey = profile.name_key;
+    const playerName = profile.display_name || profile.name_key;
+
     const lookupRes = await sbFetch(serviceKey, `daily_code_events?id=eq.${encodeURIComponent(eventId)}&select=id,scheduled_at,plushie_id,is_golden_hour,winner_display_name&limit=1`);
     if (!lookupRes.ok) return send(res, 502, { error: 'lookup_failed' });
     const rows = await lookupRes.json();
