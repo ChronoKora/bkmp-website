@@ -6390,14 +6390,24 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
    die komplette Fenstergroesse), 9s lang in Dauerschleife, komplett
    unabhaengig vom Kampf-Tick. Jetzt echtes transform/opacity: die Positionen
    der 5 Punkte bleiben fix im Gradient, die ganze Ebene wandert per
-   translateY nach oben (leicht ueberstehende inset-Werte, damit beim
-   Verschieben keine Kante sichtbar wird) - optisch nahezu identisch
-   (Funken glimmen auf und driften nach oben), aber nur noch Compositor-Arbeit
-   statt Repaint bei jedem einzelnen Frame. */
+   translateY nach oben - optisch nahezu identisch (Funken glimmen auf und
+   driften nach oben), aber nur noch Compositor-Arbeit statt Repaint bei
+   jedem einzelnen Frame.
+   NACHBESSERUNG (Spieler-Report 17.07.): "im Kampf oeffnet sich immer wieder
+   ein Scroll-Balken, habe ich normalerweise nicht" - die urspruengliche
+   Fassung nutzte "inset: -15% 0", damit beim Hochwandern keine Kante
+   sichtbar wird. .idle-dorf-card hat aber "overflow-y: auto" - ein negativer
+   inset vergroessert die LAYOUT-Box dieses ::before ueber die Karte hinaus,
+   und genau diese vergroesserte Box zaehlt fuer den Scrollbereich des
+   Elternelements mit (transform aendert nur die gerenderte Position, nicht
+   die Layout-Groesse, die fuer overflow-y:auto zaehlt). Jetzt wieder
+   "inset: 0" (exakt kartengross, kein Scroll-Einfluss mehr) und eine
+   kleinere translateY-Distanz - die harte Kante am oberen/unteren Rand
+   faellt nicht auf, weil die Deckkraft dort ohnehin schon gegen 0 geht. */
 .idle-dorf-overlay .idle-dorf-card::before {
   content: '';
   position: absolute;
-  inset: -15% 0;
+  inset: 0;
   pointer-events: none;
   opacity: 0.5;
   background-image:

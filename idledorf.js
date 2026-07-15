@@ -3786,12 +3786,28 @@ function bkmpGuildBossCheckOutcome() {
   loadGuildBossParticipants(bkmpGuildBossState.id).then(list => { bkmpGuildBossParticipants = list; bkmpIdleRenderGildeBossPanel(); }).catch(() => {});
 }
 
+let bkmpGuildBossPanelRenderedForKey = null;
+let bkmpGuildBossUpdateRenderTimer = null;
+
+/* Ohne Drosselung baute diese Funktion bei JEDEM eigenen Tick (alle
+   BKMP_GUILD_BOSS_TICK_MS), JEDEM eigenen Klick UND jedem Realtime-Update
+   von ANDEREN Gildenmitgliedern das komplette Panel per innerHTML neu -
+   inklusive des <video autoplay>-Boss-Sprites, das dabei jedes Mal neu
+   gestartet wurde (sichtbares Ruckeln/Flackern alle paar Sekunden,
+   staerker mit mehreren gleichzeitig kaempfenden Mitgliedern). Analog zum
+   bereits gefixten Raid-Screen (siehe bkmpRaidRenderCombat/
+   bkmpRaidRequestParticipantsRender) wird das Grundgeruest (Video, HP-
+   Balken-Container, Rangliste-Container) jetzt nur noch EINMAL pro
+   Boss-Instanz gebaut; Folge-Updates schreiben nur noch in bestehende
+   Knoten (textContent/style.width) bzw. drosseln den Rangliste-Rebuild
+   auf max. alle 400ms. */
 async function bkmpIdleRenderGildeBossPanel() {
   const panel = document.getElementById('idlePanelGildeBoss');
   if (!panel) return;
   if (!bkmpGuildLoaded && !bkmpGuildLoading) await bkmpGuildLoadAll();
 
   if (!bkmpGuildState) {
+    bkmpGuildBossPanelRenderedForKey = null;
     panel.innerHTML = `<div class="idle-dungeon-intro"><h4>🐲 Gildenboss</h4><p>Du musst Mitglied einer Gilde sein, um am Gildenboss teilzunehmen.</p></div>`;
     return;
   }

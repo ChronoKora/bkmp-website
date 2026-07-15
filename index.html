@@ -5430,11 +5430,42 @@
       mcAuthSubmit.disabled = true;
       const originalLabel = mcAuthSubmit.textContent;
       mcAuthSubmit.textContent = 'Wird geladen...';
+      /* Bug-Report 17.07. (ByAlex0/ChronoKora): Account auf dem Handy
+         gewechselt (zweiten Account angelegt, dann zurueck auf den
+         Hauptaccount eingeloggt) - danach war der Hauptaccount auf einen
+         quasi frischen Spielstand zurueckgesetzt (Level 13 statt hoch
+         entwickelt, Prestige/Runen/Erfolge in ihren EIGENEN Tabellen aber
+         unangetastet - per Live-DB-Check bestaetigt). Ursache: der Idle-Dorf-
+         Kampf-Loop laeuft bewusst im Hintergrund weiter, auch bei
+         geschlossenem Fenster (siehe bkmpIdleCloseModal) - signInWithPassword/
+         signUp tauschen die Supabase-Session sofort aus, OHNE dass
+         bkmpIdleState/bkmpPrestigeState (noch vom VORHERIGEN Account im
+         Speicher) je zurueckgesetzt werden. Der naechste Autosave speichert
+         dann den alten In-Memory-Spielstand unter der NEUEN Session, also im
+         Datensatz des gerade aktiven Accounts. Fix: vor dem eigentlichen
+         Login/Registrieren den Spielstand des BISHERIGEN Accounts (falls
+         einer aktiv war) noch unter dessen eigener, noch gueltiger Session
+         final speichern und den Kampf-Loop stoppen; wechselt der Name danach
+         wirklich, per vollem Reload neu starten statt in-place
+         weiterzumachen - garantiert einen sauberen Zustand fuer JEDES
+         Account-gebundene Feature (Raid, Gilde, Arena, ...), nicht nur fuers
+         Idle-Dorf. */
+      const previousName = typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : '';
+      if (previousName) {
+        if (typeof bkmpIdleStopLoop === 'function') bkmpIdleStopLoop();
+        if (typeof bkmpIdleFlushSync === 'function') { try { await bkmpIdleFlushSync(); } catch (e) {} }
+        if (typeof bkmpPrestigeFlushSyncNow === 'function') { try { await bkmpPrestigeFlushSyncNow(); } catch (e) {} }
+      }
       try {
         const result = mcAuthMode === 'register'
           ? await bkmpPlayerRegister(name, password)
           : await bkmpPlayerLogin(name, password);
         const canonicalName = await bkmpMergeRemoteStatsIntoLocal(result.displayName);
+        if (previousName && previousName.trim().toLowerCase() !== canonicalName.trim().toLowerCase()) {
+          bkmpSetMcName(canonicalName);
+          location.reload();
+          return;
+        }
         bkmpAchievementNotifyReady = false;
         bkmpSetMcName(canonicalName);
         bkmpClaimAndWatchSession(canonicalName);
