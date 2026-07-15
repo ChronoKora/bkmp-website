@@ -5391,6 +5391,7 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 .idle-sprite-yaksha-boss { background-image: url('assets/dragons/yaksha-boss.png?v=20260715-holefix1'); aspect-ratio: 1228.8 / 273; }
 .idle-sprite-schattendrache { background-image: url('assets/dragons/schattendrache.png?v=20260713-recrop1'); aspect-ratio: 1228.8 / 247; }
 .idle-sprite-wuffdrache { background-image: url('assets/dragons/wuffdrache.png?v=20260715-holefix1'); aspect-ratio: 1228.8 / 259; }
+.idle-sprite-winddrache { background-image: url('assets/dragons/winddrache.png?v=20260716-winddrachecrop1'); aspect-ratio: 1228.8 / 250; }
 
 /* Die beiden seltenen Event-Drachen (Shenloss/Ganz Liber Drache) sind
    FRISCH aus sauber getrennten Einzelframes zusammengesetzt (siehe
@@ -5592,6 +5593,9 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 .idle-upgrade-desc { font-size: 0.72rem; color: var(--muted); margin-bottom: 0.6rem; min-height: 2em; }
 .idle-upgrade-buy { width: 100%; padding: 0.4rem 0.6rem; font-size: 0.78rem; }
 .idle-upgrade-buy:disabled { opacity: 0.5; cursor: not-allowed; }
+.idle-upgrade-section-title { font-size: 0.95rem; margin: 1.2rem 0 0.6rem; }
+.idle-dragon-building-upgrade { width: 100%; padding: 0.4rem 0.6rem; font-size: 0.78rem; }
+.idle-dragon-building-upgrade:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ---- Dorf-Skins ---- */
 .idle-skin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.8rem; align-items: stretch; }
@@ -5615,6 +5619,37 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 .idle-skin-buy-real-money-locked { background: var(--paper-2); border: 1px dashed var(--line); color: var(--muted); font-weight: 700; cursor: not-allowed; opacity: 0.85; }
 .idle-skin-locked-hint { font-size: 0.72rem; color: var(--muted); padding: 0.4rem 0.2rem; margin-top: auto; }
 .idle-skin-empty-hint { color: var(--muted); font-size: 0.85rem; text-align: center; padding: 1.2rem 0.6rem; }
+
+/* ---- Drachenzucht ---- */
+/* Raritaets-Farbrahmen ueber --dragon-rarity-color (gleiche color-mix()-
+   Technik wie bei Runen, siehe --rune-color) - faellt auf die normale
+   Kartenfarbe zurueck, wenn die Variable nicht gesetzt ist. */
+.idle-skin-card { border-color: color-mix(in srgb, var(--dragon-rarity-color, var(--line)) 45%, var(--line)); position: relative; }
+.idle-dragon-section { margin-bottom: 1.4rem; }
+.idle-dragon-section h4 { font-size: 0.95rem; margin-bottom: 0.5rem; }
+.idle-dragon-thumb { width: 100%; max-width: 96px; aspect-ratio: 1 / 1; object-fit: contain; margin: 0 auto 0.4rem; display: block; }
+.idle-dragon-nest-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0.7rem; }
+.idle-dragon-nest-card { display: flex; flex-direction: column; align-items: center; border: 1px solid var(--line); border-radius: 14px; padding: 0.7rem; background: var(--paper); text-align: center; }
+.idle-dragon-nest-card.is-ready { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; animation: bkmpDragonNestReadyPulse 1.6s ease-in-out infinite; }
+@keyframes bkmpDragonNestReadyPulse { 0%, 100% { box-shadow: 0 0 0 1px var(--gold) inset; } 50% { box-shadow: 0 0 0 3px var(--gold) inset; } }
+.idle-dragon-nest-empty { opacity: 0.6; }
+.idle-dragon-nest-buy { border-style: dashed; opacity: 0.85; }
+.idle-dragon-baby-card { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 14px; padding: 0.9rem; background: var(--paper); text-align: center; }
+.idle-dragon-feed-row { display: flex; gap: 0.5rem; margin-top: 0.4rem; }
+.idle-dragon-feed-row .idle-skin-action { margin-top: 0; }
+.idle-dragon-fav-badge { position: absolute; top: 0.5rem; right: 0.6rem; color: var(--gold); font-size: 1.1rem; }
+.idle-dragon-stats { font-size: 0.75rem; margin-bottom: 0.5rem; }
+.idle-dragon-substats { color: var(--muted); font-size: 0.68rem; margin-top: 0.3rem; display: flex; flex-direction: column; gap: 0.15rem; }
+.idle-dragon-actions-row { display: flex; gap: 0.4rem; margin-top: 0.5rem; align-items: center; }
+.idle-dragon-actions-row .idle-skin-action { margin-top: 0; flex: 1; }
+.idle-dragon-fav-btn, .idle-dragon-release-btn { border: 1px solid var(--line); background: var(--paper-2); border-radius: 8px; padding: 0.3rem 0.5rem; cursor: pointer; font-size: 0.9rem; }
+.idle-dragon-fav-btn:hover, .idle-dragon-release-btn:hover { border-color: var(--gold); }
+.idle-dragon-filter-bar { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 0.8rem; }
+.idle-dragon-filter-bar select { border: 1px solid var(--line); background: var(--paper); color: var(--ink); border-radius: 8px; padding: 0.35rem 0.5rem; font-size: 0.76rem; }
+.idle-dragon-filter-fav { display: flex; align-items: center; gap: 0.3rem; font-size: 0.76rem; color: var(--muted); cursor: pointer; }
+.idle-dragon-lager-card { cursor: pointer; }
+.idle-dragon-detail-card { max-width: 360px; text-align: center; }
+.idle-dragon-detail-img { width: 100%; max-width: 160px; margin: 0 auto 0.6rem; display: block; }
 
 /* ---- Prestige ---- */
 .idle-prestige-summary {
@@ -5904,6 +5939,15 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 .idle-guild-banner-symbol-btn.active { border-color: var(--accent, #fbbf24); background: color-mix(in srgb, var(--accent, #fbbf24) 20%, var(--paper-2)); }
 .idle-guild-goal-banner { border-left: 3px solid #fbbf24; padding-left: 0.8rem; }
 .idle-guild-goal-banner p { margin: 0; }
+.idle-dungeon-event-banner {
+  border: 1px solid #fbbf24;
+  background: color-mix(in srgb, #fbbf24 12%, transparent);
+  border-radius: 10px;
+  padding: 0.7rem 1rem;
+  margin-bottom: 0.8rem;
+}
+.idle-dungeon-event-banner p { margin: 0; }
+.idle-dungeon-event-banner strong { color: #fbbf24; }
 .idle-dungeon-start-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .idle-dungeon-banner {
   display: flex;
@@ -5958,6 +6002,12 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
    idleDorfOverlay heraus (Spieler-Meldung 14.07.: "Popup öffnet sich
    hinter dem idle game"). */
 #arenaBattleOverlay { z-index: 60; }
+/* Gleiches Ueberlappungs-Problem wie oben - der Drachenlager-Karten-Klick
+   (bkmpDragonOpenDetail) oeffnet dieses Popup ebenfalls aus dem schon
+   offenen idleDorfOverlay heraus (Spieler-Meldung 16.07.: "Fenster oeffnet
+   sich dahinter" - nicht ein Schliessen-Problem, sondern fehlender
+   z-index beim OEFFNEN). */
+#idleDragonDetailOverlay { z-index: 60; }
 /* NACHBESSERUNG (Nutzerwunsch 15.07.: "Baust du das dann unten ein und im
    gleichen Design overlay wie den Rest?") - vorher ein separater Text-Link
    direkt neben dem Titel oben, der optisch mit dem Live-Sync-Banner
@@ -6990,6 +7040,93 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 }
 .mc-cosmetic-sternenstaub #mcNameBadgeText, .mc-cosmetic-sternenstaub .cosmetic-swatch-name, .mc-cosmetic-sternenstaub .leaderboard-name-text {
   background: linear-gradient(120deg, #e0e7ff, #a78bfa, #38bdf8, #e0e7ff); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: streamerShimmer 7s linear infinite;
+}
+
+/* ---- 7 weitere Kosmetiken 16.07. (Gilde/Arena/Weltboss/Drachenzucht/
+   Streak/Steampunk) - siehe window.BKMP_IDLE_COSMETICS in idledorf.js. ---- */
+.mc-cosmetic-guild_heraldik {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box, linear-gradient(135deg, #7c2d12, #b45309, #facc15, #7c2d12) border-box;
+  border: 1.5px solid transparent; background-size: 100% 100%, 260% 260%;
+  box-shadow: 0 0 16px rgba(180, 83, 9, 0.4); animation: bkmpTierGlow 6s ease infinite;
+}
+.mc-cosmetic-guild_heraldik #mcNameBadgeText, .mc-cosmetic-guild_heraldik .cosmetic-swatch-name, .mc-cosmetic-guild_heraldik .leaderboard-name-text {
+  background: linear-gradient(135deg, #fbbf24, #b45309, #fde68a); background-size: 220% 220%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: bkmpTierGlow 6s ease infinite;
+}
+
+.mc-cosmetic-arena_blutrausch {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box, linear-gradient(120deg, #7f1d1d, #ef4444, #7f1d1d) border-box;
+  border: 1.5px solid transparent; background-size: 100% 100%, 220% 220%;
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.5); animation: bkmpArenaPulse 1.8s ease-in-out infinite;
+}
+.mc-cosmetic-arena_blutrausch #mcNameBadgeText, .mc-cosmetic-arena_blutrausch .cosmetic-swatch-name, .mc-cosmetic-arena_blutrausch .leaderboard-name-text {
+  background: linear-gradient(120deg, #fca5a5, #ef4444, #7f1d1d, #ef4444, #fca5a5); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: bkmpRainbowBorder 2.5s linear infinite;
+}
+@keyframes bkmpArenaPulse {
+  0%, 100% { box-shadow: 0 0 14px rgba(239, 68, 68, 0.5); }
+  50% { box-shadow: 0 0 26px rgba(239, 68, 68, 0.85); }
+}
+
+.mc-cosmetic-weltenbezwinger {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box, linear-gradient(150deg, #2e1065, #7e22ce, #1e0a3c) border-box;
+  border: 1.5px solid transparent; background-size: 100% 100%, 220% 220%;
+  box-shadow: 0 0 18px rgba(126, 34, 206, 0.5); animation: bkmpTierGlow 5s ease infinite;
+}
+.mc-cosmetic-weltenbezwinger #mcNameBadgeText, .mc-cosmetic-weltenbezwinger .cosmetic-swatch-name, .mc-cosmetic-weltenbezwinger .leaderboard-name-text {
+  background: linear-gradient(150deg, #c4b5fd, #7e22ce, #2e1065, #7e22ce, #c4b5fd); background-size: 260% 260%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: bkmpTierGlow 5s ease infinite;
+}
+
+.mc-cosmetic-drachenschuppen {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box, linear-gradient(100deg, #34d399, #38bdf8, #a78bfa, #34d399) border-box;
+  border: 1.5px solid transparent; background-size: 100% 100%, 280% 280%;
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.4); animation: bkmpTierGlow 4.5s ease infinite;
+}
+.mc-cosmetic-drachenschuppen #mcNameBadgeText, .mc-cosmetic-drachenschuppen .cosmetic-swatch-name, .mc-cosmetic-drachenschuppen .leaderboard-name-text {
+  background: linear-gradient(100deg, #6ee7b7, #38bdf8, #c4b5fd, #6ee7b7); background-size: 280% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: bkmpRainbowBorder 4.5s linear infinite;
+}
+
+.mc-cosmetic-legendaerer_hort {
+  border-color: transparent;
+  background: linear-gradient(180deg, #0d0906, #0d0906) padding-box, linear-gradient(135deg, #facc15, #1a1206, #facc15) border-box;
+  border: 1.5px solid transparent; background-size: 100% 100%, 260% 260%;
+  box-shadow: 0 0 22px rgba(250, 204, 21, 0.55); animation: bkmpTierGlow 3.5s ease infinite;
+}
+.mc-cosmetic-legendaerer_hort .cosmetic-swatch-name { color: #fde68a; }
+.mc-cosmetic-legendaerer_hort .cosmetic-swatch-desc { color: #eab308; }
+.mc-cosmetic-legendaerer_hort #mcNameBadgeText, .mc-cosmetic-legendaerer_hort .leaderboard-name-text {
+  background: linear-gradient(135deg, #fde68a, #facc15, #78350f, #facc15, #fde68a); background-size: 280% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: bkmpRainbowBorder 3.5s linear infinite;
+}
+
+.mc-cosmetic-gluetnfeuer {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box, linear-gradient(180deg, #fb923c, #ef4444) border-box;
+  border: 1.5px solid transparent; box-shadow: 0 0 14px rgba(251, 146, 60, 0.45); animation: bkmpHeartbeatGlow 2.2s ease-in-out infinite;
+}
+.mc-cosmetic-gluetnfeuer #mcNameBadgeText, .mc-cosmetic-gluetnfeuer .cosmetic-swatch-name, .mc-cosmetic-gluetnfeuer .leaderboard-name-text {
+  background: linear-gradient(90deg, #fdba74, #fb923c, #ef4444); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+
+.mc-cosmetic-zahnradglanz {
+  border-color: color-mix(in srgb, #b45309 55%, var(--line));
+  background: linear-gradient(160deg, #2a1a0d, var(--paper-2));
+  box-shadow: 0 0 12px rgba(180, 83, 9, 0.35);
+}
+.mc-cosmetic-zahnradglanz .cosmetic-swatch-name { color: #fbbf24; }
+.mc-cosmetic-zahnradglanz .cosmetic-swatch-desc { color: #d69e5c; }
+.mc-cosmetic-zahnradglanz #mcNameBadgeText, .mc-cosmetic-zahnradglanz .leaderboard-name-text {
+  background: linear-gradient(90deg, #fbbf24, #92400e); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mc-cosmetic-guild_heraldik, .mc-cosmetic-guild_heraldik #mcNameBadgeText, .mc-cosmetic-guild_heraldik .cosmetic-swatch-name, .mc-cosmetic-guild_heraldik .leaderboard-name-text,
+  .mc-cosmetic-arena_blutrausch, .mc-cosmetic-arena_blutrausch #mcNameBadgeText, .mc-cosmetic-arena_blutrausch .cosmetic-swatch-name, .mc-cosmetic-arena_blutrausch .leaderboard-name-text,
+  .mc-cosmetic-weltenbezwinger, .mc-cosmetic-weltenbezwinger #mcNameBadgeText, .mc-cosmetic-weltenbezwinger .cosmetic-swatch-name, .mc-cosmetic-weltenbezwinger .leaderboard-name-text,
+  .mc-cosmetic-drachenschuppen, .mc-cosmetic-drachenschuppen #mcNameBadgeText, .mc-cosmetic-drachenschuppen .cosmetic-swatch-name, .mc-cosmetic-drachenschuppen .leaderboard-name-text,
+  .mc-cosmetic-legendaerer_hort, .mc-cosmetic-legendaerer_hort #mcNameBadgeText, .mc-cosmetic-legendaerer_hort .leaderboard-name-text,
+  .mc-cosmetic-gluetnfeuer, .mc-cosmetic-gluetnfeuer #mcNameBadgeText, .mc-cosmetic-gluetnfeuer .cosmetic-swatch-name, .mc-cosmetic-gluetnfeuer .leaderboard-name-text { animation: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

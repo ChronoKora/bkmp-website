@@ -1,0 +1,32 @@
+-- ============================================================
+-- Bkmp - Fix fuer supabase-dragon-breeding.sql: Winddrache/Aureliadrache
+-- wurden mit tier_order-Werten eingefuegt, die bereits von bestehenden
+-- Drachen belegt waren (winddrache=4 kollidiert mit yakshas-drache,
+-- aureliadrache=9 kollidiert mit liber - live per REST-API bestaetigt,
+-- 15.07.). Das machte die Sortierung der Kampf-Rotation zwischen den
+-- kollidierenden Zeilen unbestimmt (Postgres garantiert ohne eindeutigen
+-- Sortierschluessel keine stabile Reihenfolge) - dadurch sprang die
+-- Kampfstufen-Anzeige unerwartet (Spieler-Report: "Woher kommt dieser
+-- Drache?").
+--
+-- Fix: beide auf bisher UNBENUTZTE tier_order-Werte (10/11) verschoben,
+-- statt die bestehenden Drachen umzunummerieren - ein Umsortieren der
+-- bestehenden Werte wuerde bei JEDEM Spieler current_dragon_index
+-- (Positions-Index in die sortierte Liste) auf einen anderen Drachen als
+-- vorher zeigen lassen, also mitten in der Rotation "umspringen". Neue
+-- Drachen haengen sich damit ans Ende der Rotation an, statt bestehende
+-- Fortschritte zu verschieben.
+--
+-- Zusaetzlicher Fix: aureliadrache fehlte spawn_rule='rare' (Spalte war
+-- in der urspruenglichen INSERT-Spaltenliste gar nicht dabei, fiel damit
+-- auf den Tabellen-Default 'standard' zurueck) - passt aber eigentlich zur
+-- "selten"-Raritaet in dragon_species (siehe supabase-dragon-breeding.sql)
+-- und sollte wie schattendrache/wuffdrache ein SELTENER Kampf-Encounter
+-- sein, kein normaler.
+--
+-- Supabase Dashboard > SQL Editor > New query > diesen Inhalt ausfuehren.
+-- Idempotent.
+-- ============================================================
+
+update public.idle_dragons set tier_order = 10 where id = 'winddrache';
+update public.idle_dragons set tier_order = 11, spawn_rule = 'rare' where id = 'aureliadrache';

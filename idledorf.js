@@ -385,7 +385,7 @@ const BKMP_IDLE_FALLBACK_DRAGONS = [
   { id: 'blitzdrache', name: 'Blitzdrache', emoji: '⚡', sprite_key: 'blitzdrache', spawn_rule: 'standard', color_theme: '#facc15', tier_order: 1, base_hp: 55, base_attack: 8, base_defense: 1, gold_reward_base: 6, xp_reward_base: 6, wood_reward_base: 1, stone_reward_base: 2, crystal_reward_base: 0, essence_reward_base: 0, is_boss: false, active: true },
   { id: 'erddrache', name: 'Erddrache', emoji: '🗿', sprite_key: 'erddrache', spawn_rule: 'standard', color_theme: '#84cc16', tier_order: 2, base_hp: 70, base_attack: 6, base_defense: 3, gold_reward_base: 6, xp_reward_base: 6, wood_reward_base: 1, stone_reward_base: 3, crystal_reward_base: 0, essence_reward_base: 0, is_boss: false, active: true },
   { id: 'wasserdrache', name: 'Wasserdrache', emoji: '💧', sprite_key: 'wasserdrache', spawn_rule: 'standard', color_theme: '#38bdf8', tier_order: 3, base_hp: 65, base_attack: 6, base_defense: 2, gold_reward_base: 6, xp_reward_base: 6, wood_reward_base: 2, stone_reward_base: 2, crystal_reward_base: 0, essence_reward_base: 0, is_boss: false, active: true },
-  { id: 'yakshas-drache', name: 'Yakshas Drache', emoji: '🐲', sprite_key: 'yakshas-drache', spawn_rule: 'miniboss_10', color_theme: '#a78bfa', tier_order: 4, base_hp: 115, base_attack: 10, base_defense: 4, gold_reward_base: 14, xp_reward_base: 14, wood_reward_base: 3, stone_reward_base: 3, crystal_reward_base: 2, essence_reward_base: 1, is_boss: true, active: true },
+  { id: 'yakshas-drache', name: 'Aurelia Drache', emoji: '🐲', sprite_key: 'yakshas-drache', spawn_rule: 'miniboss_10', color_theme: '#a78bfa', tier_order: 4, base_hp: 115, base_attack: 10, base_defense: 4, gold_reward_base: 14, xp_reward_base: 14, wood_reward_base: 3, stone_reward_base: 3, crystal_reward_base: 2, essence_reward_base: 1, is_boss: true, active: true },
   { id: 'yaksha-boss', name: 'Yaksha der Drachenboss', emoji: '👑', sprite_key: 'yaksha-boss', spawn_rule: 'boss_25', color_theme: '#ef4444', tier_order: 5, base_hp: 220, base_attack: 16, base_defense: 8, gold_reward_base: 28, xp_reward_base: 28, wood_reward_base: 5, stone_reward_base: 5, crystal_reward_base: 5, essence_reward_base: 3, is_boss: true, active: true },
   { id: 'schattendrache', name: 'Schattendrache', emoji: '🌑', sprite_key: 'schattendrache', spawn_rule: 'rare', color_theme: '#6b21a8', tier_order: 6, base_hp: 90, base_attack: 10, base_defense: 3, gold_reward_base: 12, xp_reward_base: 10, wood_reward_base: 2, stone_reward_base: 2, crystal_reward_base: 1, essence_reward_base: 1, is_boss: false, active: true },
   { id: 'wuffdrache', name: 'Wuffdrache', emoji: '🐾', sprite_key: 'wuffdrache', spawn_rule: 'rare', color_theme: '#fbbf24', tier_order: 7, base_hp: 50, base_attack: 5, base_defense: 1, gold_reward_base: 10, xp_reward_base: 8, wood_reward_base: 1, stone_reward_base: 1, crystal_reward_base: 1, essence_reward_base: 1, is_boss: false, active: true },
@@ -395,7 +395,14 @@ const BKMP_IDLE_FALLBACK_DRAGONS = [
      bkmpIdleEventDragonScaledStats), die Belohnungsbasis (gold/xp/...) gilt
      aber normal weiter. */
   { id: 'shenloss', name: 'Shenloss', emoji: '🐲', sprite_key: 'shenloss', spawn_rule: 'event_easter', color_theme: '#22c55e', tier_order: 8, base_hp: 1, base_attack: 1, base_defense: 2, gold_reward_base: 250, xp_reward_base: 250, wood_reward_base: 10, stone_reward_base: 10, crystal_reward_base: 20, essence_reward_base: 15, is_boss: false, active: true },
-  { id: 'liber', name: 'Ganz Liber Drache', emoji: '🐉', sprite_key: 'liber', spawn_rule: 'event_easter', color_theme: '#e5e7eb', tier_order: 9, base_hp: 1, base_attack: 1, base_defense: 2, gold_reward_base: 250, xp_reward_base: 250, wood_reward_base: 10, stone_reward_base: 10, crystal_reward_base: 20, essence_reward_base: 15, is_boss: false, active: true }
+  { id: 'liber', name: 'Ganz Liber Drache', emoji: '🐉', sprite_key: 'liber', spawn_rule: 'event_easter', color_theme: '#e5e7eb', tier_order: 9, base_hp: 1, base_attack: 1, base_defense: 2, gold_reward_base: 250, xp_reward_base: 250, wood_reward_base: 10, stone_reward_base: 10, crystal_reward_base: 20, essence_reward_base: 15, is_boss: false, active: true },
+  /* Drachenzucht-Ei-Quelldrache (siehe supabase-dragon-breeding.sql). tier_order
+     10 statt 4, um die vorhandene Rotation nicht zu verschieben (siehe
+     supabase-dragon-breeding-roster-fix.sql). Das Aureliadrache-Ei hat KEINEN
+     eigenen Kampf-Eintrag mehr - der Miniboss "yakshas-drache" wurde zu
+     "Aurelia Drache" umbenannt und dient jetzt als dessen Ei-Quelle (siehe
+     supabase-dragon-roster-aurelia-rename.sql, Spieler-Wunsch 15.07.). */
+  { id: 'winddrache', name: 'Winddrache', emoji: '🌪️', sprite_key: 'winddrache', spawn_rule: 'standard', color_theme: '#7dd3fc', tier_order: 10, base_hp: 68, base_attack: 7, base_defense: 2, gold_reward_base: 6, xp_reward_base: 6, wood_reward_base: 2, stone_reward_base: 1, crystal_reward_base: 0, essence_reward_base: 0, is_boss: false, active: true }
 ];
 
 /* ---------------- State ---------------- */
@@ -480,7 +487,9 @@ function bkmpIdleDefaultState(name) {
     last_skilltree_reset_at: null,
     rune_fuse_successes: 0, rune_fuse_failures: 0,
     rune_upgrade_successes: 0, rune_upgrade_failures: 0,
-    village_defeats: 0, yaksha_boss_kills: 0
+    village_defeats: 0, yaksha_boss_kills: 0,
+    fruit: 0, meat: 0, obstgarten_level: 0, jagdhuette_level: 0,
+    fruit_collected_at: new Date().toISOString(), meat_collected_at: new Date().toISOString()
   };
 }
 
@@ -601,6 +610,7 @@ async function bkmpIdleLoadOrInitState(name) {
     bkmpPlayerVillageSkins = [];
   }
   bkmpApplyVillageSkin();
+  await bkmpIdleLoadDragonBreedingState(name);
   bkmpIdleSnapshotMergeBaseline();
 }
 
@@ -745,7 +755,8 @@ function bkmpIdleRecomputeEffectiveStats() {
      Prozent-Multiplikator), Produktionsraten (Gold/Loot) bleiben "_pct". */
   const prestigeTotals = bkmpPrestigeEffectTotals(bkmpPrestigeState ? bkmpPrestigeState.prestige_allocations : null);
   const runeTotals = bkmpIdleRuneEffectTotals();
-  const t = key => (skillTotals[key] || 0) + (upgradeTotals[key] || 0) + (titleTotals[key] || 0) + (prestigeTotals[key] || 0) + (runeTotals[key] || 0);
+  const dragonTotals = bkmpIdleDragonCompanionEffectTotals();
+  const t = key => (skillTotals[key] || 0) + (upgradeTotals[key] || 0) + (titleTotals[key] || 0) + (prestigeTotals[key] || 0) + (runeTotals[key] || 0) + (dragonTotals[key] || 0);
   const prevMaxHp = bkmpIdleEffectiveStats ? bkmpIdleEffectiveStats.hp : null;
   const prevTickMs = bkmpIdleEffectiveStats ? bkmpIdleEffectiveStats.tickIntervalMs : null;
   /* extra_archer (Dorf) und ballista_unlock (Dorf) hatten vorher gar keinen
@@ -795,7 +806,7 @@ function bkmpIdleRecomputeEffectiveStats() {
     /* Gilden-Technologie "Bossschaden" - siehe bkmpIdleApplyBossDamageBonus,
        wirkt NUR an den Boss-Kampfstellen (Weltboss-Raid, Gildenboss), nicht
        auf den normalen Drachen-Schaden hier. */
-    bossDamageBonus: gt('bossDamagePct'),
+    bossDamageBonus: gt('bossDamagePct') + t('boss_dmg_pct'),
     /* Ab hier: Effekte, die vorher komplett wirkungslos im Skilltree lagen
        (kompletter Magie-Zweig + Teile von Burg/Wirtschaft). */
     woodBonus: t('wood_prod_pct'),
@@ -847,7 +858,7 @@ function bkmpIdleRecomputeEffectiveStats() {
 
 /* ---------------- Skilltree ---------------- */
 
-const BKMP_IDLE_BRANCH_LABELS = { dorf: '🏹 Dorf', burg: '🏰 Burg', wirtschaft: '⚒ Wirtschaft', forschung: '🐉 Forschung', magie: '✨ Magie', meister: '🔨 Meister' };
+const BKMP_IDLE_BRANCH_LABELS = { dorf: '🏹 Dorf', burg: '🏰 Burg', wirtschaft: '⚒ Wirtschaft', forschung: '🐉 Forschung', magie: '✨ Magie', meister: '🔨 Meister', zucht: '🐲 Zucht' };
 /* "meister" (Zwerg Grimbold) ist bewusst MIT in dieser Liste, obwohl er
    erst nach allen 5 Basis-Zweigen freischaltet - solange die zugehoerigen
    Skill-Knoten in der DB noch nicht existieren (Migration nicht
@@ -856,7 +867,7 @@ const BKMP_IDLE_BRANCH_LABELS = { dorf: '🏹 Dorf', burg: '🏰 Burg', wirtscha
    zaehlt ihn erst mit, sobald er selbst gemaxed ist (vorher 0 Ranege
    allokiert = nicht "maxed") - beeinflusst die bestehende "alle 5 Basis-
    Zweige"-Schwelle also nicht rueckwirkend. */
-const BKMP_IDLE_BRANCH_ORDER = ['dorf', 'burg', 'wirtschaft', 'forschung', 'magie', 'meister'];
+const BKMP_IDLE_BRANCH_ORDER = ['dorf', 'burg', 'wirtschaft', 'forschung', 'magie', 'meister', 'zucht'];
 
 function bkmpIdleCanAllocateSkill(node) {
   if (!bkmpIdleState) return false;
@@ -944,7 +955,7 @@ function bkmpIdleGetCachedAchievementFields() {
 function bkmpIdleGetAchievementContextFields() {
   const s = bkmpIdleState;
   if (!s) {
-    return bkmpIdleGetCachedAchievementFields() || { idleDragonKills: 0, idleBossKills: 0, idleLevel: 0, idleGoldEarned: 0, idleSkillPointsSpent: 0, idleBranchesMaxed: 0, shenlossDefeated: false, liberDefeated: false, idlePrestigeLevel: 0, idleRuneFuseSuccesses: 0, idleRuneFuseFailures: 0, idleRuneUpgradeSuccesses: 0, idleRuneUpgradeFailures: 0, idleAllEquippedRarity: null, idleAllEquippedMinLevel: -1, idleDungeonCleared: bkmpDungeonIsHardestCleared() };
+    return bkmpIdleGetCachedAchievementFields() || { idleDragonKills: 0, idleBossKills: 0, idleLevel: 0, idleGoldEarned: 0, idleSkillPointsSpent: 0, idleBranchesMaxed: 0, shenlossDefeated: false, liberDefeated: false, idlePrestigeLevel: 0, idleRuneFuseSuccesses: 0, idleRuneFuseFailures: 0, idleRuneUpgradeSuccesses: 0, idleRuneUpgradeFailures: 0, idleAllEquippedRarity: null, idleAllEquippedMinLevel: -1, idleDungeonCleared: bkmpDungeonIsHardestCleared(), idleLoginStreak: 0, idleDragonsHatched: 0, idleDragonsAdult: 0, idleDragonSpeciesOwned: 0, idleLegendaryDragonsOwned: 0, idleHasSteampunkSkin: false };
   }
   const fields = {
     idleDragonKills: Number(s.dragon_kills || 0),
@@ -969,7 +980,16 @@ function bkmpIdleGetAchievementContextFields() {
     idleRuneUpgradeFailures: Number(s.rune_upgrade_failures || 0),
     idleAllEquippedRarity: bkmpIdleAllEquippedRarity(),
     idleAllEquippedMinLevel: bkmpIdleAllEquippedMinLevel(),
-    idleDungeonCleared: bkmpDungeonIsHardestCleared()
+    idleDungeonCleared: bkmpDungeonIsHardestCleared(),
+    idleLoginStreak: bkmpIdleGetStreakData().count,
+    idleDragonsHatched: bkmpPlayerDragons.length,
+    idleDragonsAdult: bkmpPlayerDragons.filter(d => d.stage === 'adult').length,
+    idleDragonSpeciesOwned: new Set(bkmpPlayerDragons.map(d => d.species_id)).size,
+    idleLegendaryDragonsOwned: bkmpPlayerDragons.filter(d => {
+      const sp = bkmpDragonSpeciesById(d.species_id);
+      return sp && sp.rarity === 'legendaer';
+    }).length,
+    idleHasSteampunkSkin: bkmpPlayerVillageSkins.includes('steampunkdorf')
   };
   try { localStorage.setItem(BKMP_IDLE_ACHIEVEMENT_CACHE_KEY, JSON.stringify(fields)); } catch (e) {}
   return fields;
@@ -1219,6 +1239,10 @@ function bkmpIdleRenderDungeonPanel() {
   panel.innerHTML = `
     <div class="idle-dungeon-intro">
       <h4>🏛️ Dungeon-Herausforderung</h4>
+      ${bkmpDungeonEventWeekendActive() ? `
+      <div class="idle-dungeon-event-banner">
+        <p><strong>🎉 Event-Dungeon-Wochenende!</strong> Bis Sonntag hat jeder vollständige Dungeon-Sieg eine Extra-Chance auf ein seltenes Ei (Kora-, Haku-, Obsi- oder Kowalski-Drache).</p>
+      </div>` : ''}
       <div class="idle-dungeon-diff-row">${BKMP_DUNGEON_DIFFICULTIES.map(d => `
         <button type="button" class="idle-dungeon-diff-btn${d.id === selected.id ? ' active' : ''}" data-difficulty-id="${d.id}" ${bkmpDungeonActive ? 'disabled' : ''}>${d.icon} ${d.name}</button>
       `).join('')}</div>
@@ -1234,6 +1258,34 @@ function bkmpIdleRenderDungeonPanel() {
   }));
   const startBtn = document.getElementById('idleDungeonStartBtn');
   if (startBtn) startBtn.addEventListener('click', bkmpDungeonStart);
+}
+
+/* ---------------- Event-Dungeon-Wochenende (Spieler-Vorgabe 17.07.) ----------------
+   Fr-So (Europe/Berlin) gibt jeder VOLLSTAENDIGE Dungeon-Sieg eine 0,5%
+   Chance auf eines der 3 Episch-Event-Eier (Kora-/Haku-/Obsidrache) -
+   zufaellig gewaehlt, alle drei gleich gewichtet. Bewusst client-seitig
+   gewuerfelt (gleiches "Client-trusted"-Modell wie alle anderen Ei-Drops
+   in diesem System), kein Server-Aufruf noetig. Weekday-Check per
+   Intl.DateTimeFormat statt getDay() - sonst wuerde die Zeitzone des
+   jeweiligen Spielers entscheiden, nicht ein einheitlicher Server-Tag. */
+const BKMP_DUNGEON_EVENT_EGG_CHANCE = 0.005;
+const BKMP_DUNGEON_EVENT_EGG_SPECIES = ['koradrache', 'hakudrache', 'obsidrache', 'kowalski'];
+function bkmpDungeonEventWeekendActive() {
+  const weekday = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Berlin', weekday: 'short' }).format(new Date());
+  return weekday === 'Fri' || weekday === 'Sat' || weekday === 'Sun';
+}
+function bkmpDungeonMaybeGrantEventEgg() {
+  if (!bkmpDungeonEventWeekendActive() || !bkmpIdleState || Math.random() >= BKMP_DUNGEON_EVENT_EGG_CHANCE) return;
+  const speciesId = BKMP_DUNGEON_EVENT_EGG_SPECIES[Math.floor(Math.random() * BKMP_DUNGEON_EVENT_EGG_SPECIES.length)];
+  const species = bkmpDragonSpeciesById(speciesId);
+  if (!species || typeof insertPlayerDragonEgg !== 'function') return;
+  insertPlayerDragonEgg(bkmpIdleState.name_key, speciesId).then(row => {
+    if (!row) return;
+    bkmpPlayerDragonEggs.push(row);
+    if (typeof bkmpIdleRenderDragonsPanel === 'function') bkmpIdleRenderDragonsPanel();
+  }).catch(e => console.warn('Idle Dorf: Event-Ei konnte nicht gespeichert werden.', e));
+  bkmpIdleLog(`🎉 Event-Dungeon-Wochenende: Ein ${species.name}-Ei gefunden!`);
+  if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`🎉 Seltener Fund! Ein ${species.name}-Ei ist aus dem Dungeon gefallen!`, 5000);
 }
 
 function bkmpDungeonUpdateBanner() {
@@ -1348,6 +1400,7 @@ function bkmpDungeonStart() {
 }
 
 function bkmpDungeonHandleWaveCleared() {
+  bkmpDragonGrantCompanionBattleXp(6);
   if (bkmpDungeonWave >= bkmpDungeonActiveDifficulty.waves) {
     bkmpDungeonFinish(true);
     return;
@@ -1430,6 +1483,7 @@ function bkmpDungeonFinish(success) {
     totalXp = Math.round(totalXp * 1.2);
     gemBonus = Math.round(5 * difficulty.rewardMult);
     if (difficulty.id === BKMP_DUNGEON_DIFFICULTIES[BKMP_DUNGEON_DIFFICULTIES.length - 1].id) bkmpDungeonMarkAchievement();
+    bkmpDungeonMaybeGrantEventEgg();
   }
   bkmpIdleState.gold = Number(bkmpIdleState.gold || 0) + totalGold;
   bkmpIdleState.total_gold_earned = Number(bkmpIdleState.total_gold_earned || 0) + totalGold;
@@ -1485,6 +1539,8 @@ function bkmpIdleHandleDragonDefeated() {
     bkmpIdleCheckYakshasHeimatUnlock();
   }
   bkmpIdleMaybeDropRune(bkmpIdleCurrentDragon.isBoss ? 'boss' : 'normal');
+  bkmpIdleMaybeDropDragonEgg(bkmpIdleCurrentDragon);
+  bkmpDragonGrantCompanionBattleXp(bkmpIdleCurrentDragon.isBoss ? 25 : 4);
   const autoAdvance = bkmpIdleState.auto_advance !== false;
   if (autoAdvance) bkmpIdleState.current_dragon_index += 1;
   bkmpIdleState.highest_dragon_index = Math.max(Number(bkmpIdleState.highest_dragon_index || 0), bkmpIdleState.current_dragon_index);
@@ -2117,8 +2173,30 @@ function bkmpIdleRenderUpgradesPanel() {
           ${maxed ? 'Maximal' : `${bkmpIdleResourceEmoji(def.resource)} ${bkmpIdleFormatNumber(cost)}`}
         </button>
       </div>`;
-  }).join('')}</div>`;
+  }).join('')}</div>
+    <h4 class="idle-upgrade-section-title">🐉 Drachenzucht-Gebäude</h4>
+    <div class="idle-upgrade-grid">${[
+      { kind: 'fruit', levelKey: 'obstgarten_level', icon: '🌳', name: 'Obstgarten', unit: 'Früchte/Std.' },
+      { kind: 'meat', levelKey: 'jagdhuette_level', icon: '🥩', name: 'Jagdhütte', unit: 'Fleisch/Std.' }
+    ].map(b => {
+      const level = Number(bkmpIdleState[b.levelKey] || 0);
+      const maxed = level >= BKMP_DRAGON_BUILDING_MAX_LEVEL;
+      const cost = maxed ? 0 : bkmpDragonBuildingCost(level);
+      const affordable = !maxed && (bkmpIdleState.gold || 0) >= cost;
+      const rate = bkmpDragonResourceRatePerHour(b.kind, level);
+      const cap = bkmpDragonResourceCap(level);
+      return `
+        <div class="idle-upgrade-card">
+          <div class="idle-upgrade-icon">${b.icon}</div>
+          <div class="idle-upgrade-name">${b.name} <span class="idle-upgrade-level">Lv.${level}${maxed ? ' (Max)' : '/' + BKMP_DRAGON_BUILDING_MAX_LEVEL}</span></div>
+          <div class="idle-upgrade-desc">${bkmpIdleFormatNumber(rate)} ${b.unit} · Lager: ${bkmpIdleFormatNumber(cap)}</div>
+          <button type="button" class="btn-ja idle-dragon-building-upgrade" data-kind="${b.kind}" ${maxed || !affordable ? 'disabled' : ''}>
+            ${maxed ? 'Maximal' : `💰 ${bkmpIdleFormatNumber(cost)}`}
+          </button>
+        </div>`;
+    }).join('')}</div>`;
   panel.querySelectorAll('.idle-upgrade-buy').forEach(btn => btn.addEventListener('click', () => bkmpIdleBuyUpgrade(btn.dataset.upgradeId)));
+  panel.querySelectorAll('.idle-dragon-building-upgrade').forEach(btn => btn.addEventListener('click', () => bkmpDragonUpgradeBuilding(btn.dataset.kind)));
   const autoBuyToggle = document.getElementById('idleAutoBuyToggle');
   if (autoBuyToggle) {
     autoBuyToggle.addEventListener('change', () => {
@@ -3106,11 +3184,14 @@ async function bkmpIdleRenderGildePanel() {
   }
   if (bkmpGuildChatLoadedForGuildId !== g.id) {
     bkmpGuildChatLoadedForGuildId = g.id;
-    bkmpGuildGetChatMessages(g.id, 50).then(msgs => { bkmpGuildChatMessages = msgs; bkmpIdleRenderGildePanel(); }).catch(() => {});
+    bkmpGuildGetChatMessages(g.id, 50).then(msgs => { bkmpGuildChatMessages = msgs; bkmpIdleRenderGildePanel(); }).catch(e => console.warn('Idle Dorf: Gildenchat konnte nicht geladen werden.', e));
     /* Echter Realtime-Kanal (Spieler-Wunsch: "moderner wirken") - vorher
        lud der Chat neue Nachrichten anderer Mitglieder erst beim naechsten
        eigenen Rendern/Senden nach. Neue Zeile wird direkt lokal angehaengt
-       statt komplett neu zu laden (gleiches Prinzip wie beim Raid-HP-Sync). */
+       statt komplett neu zu laden (gleiches Prinzip wie beim Raid-HP-Sync).
+       Flag wird SOFORT gesetzt (nicht erst nach Erfolg) - der Realtime-Kanal
+       darf bei einem fehlgeschlagenen Erstladen nicht bei jedem Panel-Rerender
+       ein zweites Mal abonniert werden. */
     if (typeof bkmpSubscribeToGuildChat === 'function') {
       bkmpSubscribeToGuildChat(g.id, row => {
         if (bkmpGuildChatMessages.some(m => m.id === row.id)) return;
@@ -3124,12 +3205,17 @@ async function bkmpIdleRenderGildePanel() {
     }
   }
   if (bkmpGuildActivityLoadedForGuildId !== g.id) {
-    bkmpGuildActivityLoadedForGuildId = g.id;
-    bkmpGuildGetActivityLog(g.id, 30).then(log => { bkmpGuildActivityLog = log; bkmpIdleRenderGildePanel(); }).catch(() => {});
+    /* Flag erst NACH Erfolg setzen (anders als beim Chat oben, hier haengt
+       kein Realtime-Abo dran) - schlaegt der Abruf fehl (z.B. Session noch
+       nicht bereit), versucht es der naechste Panel-Rerender einfach erneut,
+       statt fuer immer auf dem leeren Zustand stehen zu bleiben. */
+    bkmpGuildGetActivityLog(g.id, 30).then(log => { bkmpGuildActivityLoadedForGuildId = g.id; bkmpGuildActivityLog = log; bkmpIdleRenderGildePanel(); }).catch(e => console.warn('Idle Dorf: Gildenaktivitaet konnte nicht geladen werden.', e));
   }
   if (bkmpGuildQuestsLoadedForGuildId !== g.id) {
-    bkmpGuildQuestsLoadedForGuildId = g.id;
-    bkmpGuildQuestEnsureToday().then(quests => { bkmpGuildQuests = quests; bkmpIdleRenderGildePanel(); }).catch(() => {});
+    /* Gleicher Grund wie oben beim Aktivitaetslog: Flag erst nach Erfolg
+       setzen, sonst blieb "⏳ Lade Quests..." bei jedem fehlgeschlagenen
+       ersten Versuch dauerhaft stehen (Spieler-Report per Screenshot). */
+    bkmpGuildQuestEnsureToday().then(quests => { bkmpGuildQuestsLoadedForGuildId = g.id; bkmpGuildQuests = quests; bkmpIdleRenderGildePanel(); }).catch(e => console.warn('Idle Dorf: Gildenquests konnten nicht geladen werden.', e));
   }
   if (Date.now() - bkmpGuildPresenceLoadedAt > 20000 && typeof bkmpLoadPresence === 'function') {
     bkmpGuildPresenceLoadedAt = Date.now();
@@ -4722,6 +4808,842 @@ let bkmpIdlePlayerRunes = [];
 let bkmpIdlePendingRuneDrops = [];
 let bkmpIdleRuneSyncTimer = null;
 
+/* ---------------- Drachenzucht (siehe supabase-dragon-breeding.sql) ----------------
+   Vertrauensmodell wie Runen: Client wuerfelt Chancen/Werte, RLS erzwingt
+   nur "eigene Zeile". Rollt/entwickelt nach demselben Muster wie Runen
+   (rolled_value/substats einmal wuerfeln, dauerhaft speichern) - siehe
+   bkmpIdleRollAdultDragonStats(). Nur die zwei Stellen mit echtem
+   Mehrspieler-/Wiederholungsrisiko (legendaere Ei-Wuerfe, Epic-Meilenstein)
+   laufen serverseitig (raid_finish/claim_epic_dragon_egg). */
+let bkmpDragonSpeciesCatalog = [];
+let bkmpPlayerDragonEggs = [];
+let bkmpPlayerDragonNests = [];
+let bkmpPlayerDragons = [];
+let bkmpDragonUiEggFilter = null;
+let bkmpDragonLagerFilter = { rarity: 'all', stage: 'all', favoritesOnly: false, sort: 'rarity' };
+
+/* Kosten fuer Nest 2-5 (Index 0 = Nest 1, immer 0/automatisch frei) -
+   deutlich steigend wie vom Spieler vorgegeben ("Nest 5: besonders teuer"). */
+const BKMP_DRAGON_NEST_GOLD_COSTS = [0, 150000, 600000, 2000000, 6000000];
+const BKMP_DRAGON_RARITY_META = {
+  standard: { name: 'Standard', color: '#9ca3af' },
+  selten: { name: 'Selten', color: '#38bdf8' },
+  episch: { name: 'Episch', color: '#a78bfa' },
+  legendaer: { name: 'Legendär', color: '#facc15' }
+};
+/* Sub-Stat-Pool: die ersten 8 Schluessel sind BEREITS an anderer Stelle
+   verdrahtete Effekt-Typen (siehe bkmpIdleRecomputeEffectiveStats/t()) -
+   ein aktiver erwachsener Begleitdrache speist sie einfach als weitere
+   Quelle in denselben Topf ein (bkmpIdleDragonCompanionEffectTotals).
+   Die letzten 4 (Fruechte/Fleisch/Drachen-EP-Bonus) werden NICHT ueber den
+   allgemeinen Stat-Topf gelesen, sondern direkt an ihrer jeweiligen Stelle
+   (Gebaeude-Produktion, Kampf-EP-Vergabe) - siehe bkmpDragonSubstatBonus(). */
+const BKMP_DRAGON_SUBSTAT_POOL = [
+  { key: 'attack_pct', label: 'Angriff', suffix: '%', min: 0.8, max: 2.4 },
+  { key: 'defense_pct', label: 'Verteidigung', suffix: '%', min: 0.8, max: 2.4 },
+  { key: 'hp_pct', label: 'Leben', suffix: '%', min: 0.8, max: 2.4 },
+  { key: 'crit_chance_pct', label: 'Krit-Chance', suffix: '%', min: 0.3, max: 1.0 },
+  { key: 'crit_damage_pct', label: 'Krit-Schaden', suffix: '%', min: 1.2, max: 3.5 },
+  { key: 'attack_speed_pct', label: 'Angriffsgeschwindigkeit', suffix: '%', min: 0.8, max: 2.2 },
+  { key: 'shield_regen', label: 'Schildstärke', suffix: '%', min: 0.8, max: 2.2 },
+  { key: 'gold_find_pct', label: 'Goldbonus', suffix: '%', min: 0.8, max: 2.4 },
+  { key: 'crystal_bonus_pct', label: 'Diamantenbonus', suffix: '%', min: 0.5, max: 1.5 },
+  { key: 'fruit_bonus_pct', label: 'Früchteproduktion', suffix: '%', min: 2, max: 6 },
+  { key: 'meat_bonus_pct', label: 'Fleischproduktion', suffix: '%', min: 2, max: 6 },
+  { key: 'dragon_xp_bonus_pct', label: 'Drachen-EP', suffix: '%', min: 2, max: 6 }
+];
+const BKMP_DRAGON_MAIN_STAT_KEYS = ['attack', 'defense', 'hp'];
+/* Basiswerte fuer die Hauptwert-Wuerfelung, skaliert mit Seltenheit
+   (mult uebernimmt die bestehende Runen-Raritaets-Skala 1/1.6/2.4/3.4,
+   Legendaer bekommt einen deutlich hoeheren eigenen Faktor statt der
+   Runen-5, damit "niemals schwaecher als normale Drachen" sicher gilt -
+   siehe Spieler-Vorgabe). */
+const BKMP_DRAGON_MAIN_STAT_BASE = { attack: 6, defense: 6, hp: 60 };
+const BKMP_DRAGON_RARITY_MULT = { standard: 1, selten: 1.7, episch: 2.8, legendaer: 6 };
+
+function bkmpDragonSpeciesById(id) {
+  return bkmpDragonSpeciesCatalog.find(s => s.id === id) || null;
+}
+function bkmpDragonRarityMeta(rarity) {
+  return BKMP_DRAGON_RARITY_META[rarity] || BKMP_DRAGON_RARITY_META.standard;
+}
+function bkmpDragonStageImage(species, stage) {
+  if (!species) return '';
+  if (stage === 'egg') return species.egg_image;
+  if (stage === 'baby') return species.baby_image;
+  if (stage === 'teen') return species.teen_image;
+  return species.adult_image;
+}
+
+/* ---------------- Laden (aus bkmpIdleLoadOrInitState aufgerufen) ---------------- */
+async function bkmpIdleLoadDragonBreedingState(name) {
+  bkmpDragonSpeciesCatalog = [];
+  bkmpPlayerDragonEggs = [];
+  bkmpPlayerDragonNests = [];
+  bkmpPlayerDragons = [];
+  try {
+    if (typeof loadDragonSpeciesCatalog === 'function' && !bkmpDragonSpeciesCatalog.length) {
+      /* Katalog ist reine Config (aendert sich nie pro Spieler) - global
+         zwischenspeichern statt bei jedem Laden neu abzufragen. */
+      window.__bkmpDragonSpeciesCache = window.__bkmpDragonSpeciesCache || await loadDragonSpeciesCatalog();
+      bkmpDragonSpeciesCatalog = window.__bkmpDragonSpeciesCache || [];
+    }
+    if (typeof ensureFirstDragonNest === 'function') await ensureFirstDragonNest(name);
+    const [eggs, nests, dragons] = await Promise.all([
+      typeof loadPlayerDragonEggs === 'function' ? loadPlayerDragonEggs(name) : [],
+      typeof loadPlayerDragonNests === 'function' ? loadPlayerDragonNests(name) : [],
+      typeof loadPlayerDragons === 'function' ? loadPlayerDragons(name) : []
+    ]);
+    bkmpPlayerDragonEggs = Array.isArray(eggs) ? eggs : [];
+    bkmpPlayerDragonNests = Array.isArray(nests) ? nests : [];
+    bkmpPlayerDragons = Array.isArray(dragons) ? dragons : [];
+  } catch (e) {
+    console.warn('Idle Dorf: Drachenzucht-Daten konnten nicht geladen werden (Migration evtl. noch nicht ausgefuehrt - siehe supabase-dragon-breeding.sql).', e);
+  }
+  bkmpIdleAccrueBuildingResources();
+}
+
+/* Liest einen Effekt-Typ aus dem Zucht-Skilltree-Zweig (siehe
+   supabase-guild-tech-tree.sql-Analogon supabase-dragon-breeding-
+   skilltree.sql) - gleiche Quelle wie die Kampfstats
+   (bkmpIdleSkillEffectTotals), nur fuer Drachenzucht-spezifische Effekte,
+   die NICHT in den allgemeinen Kampf-Stat-Topf gehoeren. */
+function bkmpDragonSkillBonus(key) {
+  if (!bkmpIdleState) return 0;
+  const totals = bkmpIdleSkillEffectTotals(bkmpIdleState.skill_allocations, bkmpIdleSkillDefs);
+  return totals[key] || 0;
+}
+
+/* ---------------- Ei-Drop bei Kaempfen (Standard/Selten) ----------------
+   Gleicher Aufruf-Ort wie bkmpIdleMaybeDropRune (bkmpIdleHandleDragonDefeated)
+   - jede Drachenart mit egg_source='combat' und passender source_dragon_id
+   wuerfelt unabhaengig, ob dieser eine Kill ein Ei droppt. */
+function bkmpIdleMaybeDropDragonEgg(dragon) {
+  if (!bkmpIdleState || !dragon || !dragon.id || !bkmpDragonSpeciesCatalog.length) return;
+  const nameKey = bkmpIdleState.name_key;
+  /* Ei-Fund-Pfad: relativer Bonus auf die bestehende Chance (Vorgabe:
+     "vorzugsweise multiplikativ... nicht einfach grosse Prozentpunkte
+     addieren") statt eines flachen Aufschlags - haelt seltene Eier auch
+     mit vollem Skilltree noch selten. */
+  const eggChanceMult = 1 + Math.min(100, bkmpDragonSkillBonus('egg_chance_pct')) / 100;
+  bkmpDragonSpeciesCatalog
+    .filter(sp => sp.egg_source === 'combat' && sp.source_dragon_id === dragon.id)
+    .forEach(sp => {
+      if (Math.random() >= Number(sp.egg_drop_chance || 0) * eggChanceMult) return;
+      if (typeof insertPlayerDragonEgg !== 'function') return;
+      insertPlayerDragonEgg(nameKey, sp.id).then(row => {
+        if (!row) return;
+        bkmpPlayerDragonEggs.push(row);
+        if (typeof bkmpIdleRenderDragonsPanel === 'function') bkmpIdleRenderDragonsPanel();
+      }).catch(e => console.warn('Idle Dorf: Ei-Drop konnte nicht gespeichert werden.', e));
+      bkmpIdleLog(`🥚 Ein ${sp.name}-Ei gefunden!`);
+      if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`🥚 Ein wildes ${sp.name}-Ei gefunden!`, 3600);
+    });
+}
+
+/* ---------------- Nester ---------------- */
+function bkmpDragonNestCost(slotIndex) {
+  const base = BKMP_DRAGON_NEST_GOLD_COSTS[slotIndex - 1] ?? (BKMP_DRAGON_NEST_GOLD_COSTS[BKMP_DRAGON_NEST_GOLD_COSTS.length - 1] * 4);
+  const reductionPct = Math.min(40, bkmpDragonSkillBonus('nest_cost_pct'));
+  return Math.round(base * (1 - reductionPct / 100));
+}
+
+async function bkmpDragonPurchaseNest() {
+  if (!bkmpIdleState) return;
+  const nextSlot = bkmpPlayerDragonNests.length + 1;
+  if (nextSlot > BKMP_DRAGON_NEST_GOLD_COSTS.length) return;
+  const cost = bkmpDragonNestCost(nextSlot);
+  if ((bkmpIdleState.gold || 0) < cost) {
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Nicht genug Gold für dieses Drachennest.', 2800);
+    return;
+  }
+  try {
+    const row = await purchaseDragonNestSlot(bkmpIdleState.name_key, nextSlot);
+    if (!row) return;
+    bkmpIdleState.gold -= cost;
+    bkmpPlayerDragonNests.push(row);
+    bkmpIdleRenderHud();
+    bkmpIdleQueueSync();
+    bkmpIdleRenderDragonsPanel();
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('🏠 Neues Drachennest freigeschaltet!', 3000);
+  } catch (e) {
+    console.warn('Idle Dorf: Drachennest konnte nicht gekauft werden.', e);
+  }
+}
+
+/* Legendaere Eier brauchen laut Vorgabe eine Opfergabe (Gold+Diamanten)
+   VOR dem Ausbrueten - reduziert um den "zucht_opfergabe"-Skillknoten
+   (sacrifice_cost_pct), gedeckelt bei 50% Ersparnis. */
+function bkmpDragonSacrificeCost(species) {
+  const reductionPct = Math.min(50, bkmpIdleSkillEffectTotals(bkmpIdleState ? bkmpIdleState.skill_allocations : null, bkmpIdleSkillDefs).sacrifice_cost_pct || 0);
+  const mult = 1 - reductionPct / 100;
+  return {
+    gold: Math.round((species.sacrifice_gold || 0) * mult),
+    crystals: Math.round((species.sacrifice_crystals || 0) * mult)
+  };
+}
+
+async function bkmpDragonAssignEggToNest(nestId, eggId) {
+  const egg = bkmpPlayerDragonEggs.find(e => e.id === eggId);
+  const species = egg ? bkmpDragonSpeciesById(egg.species_id) : null;
+  if (!species || !bkmpIdleState) return;
+  const sacrifice = bkmpDragonSacrificeCost(species);
+  if (sacrifice.gold > 0 || sacrifice.crystals > 0) {
+    const parts = [];
+    if (sacrifice.gold > 0) parts.push(`💰 ${bkmpIdleFormatNumber(sacrifice.gold)} Gold`);
+    if (sacrifice.crystals > 0) parts.push(`💎 ${bkmpIdleFormatNumber(sacrifice.crystals)} Diamanten`);
+    const body = `${species.name} ist ein legendäres Ei und verlangt eine Opfergabe, bevor die Brut beginnen kann:\n${parts.join(' + ')}`;
+    const confirmed = typeof bkmpConfirmDialog === 'function'
+      ? await bkmpConfirmDialog('🐲 Opfergabe erforderlich', body, 'Opfern und ausbrüten', 'Abbrechen')
+      : window.confirm(body);
+    if (!confirmed) return;
+    if ((bkmpIdleState.gold || 0) < sacrifice.gold || (bkmpIdleState.crystals || 0) < sacrifice.crystals) {
+      if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Nicht genug Gold/Diamanten für die Opfergabe.', 3000);
+      return;
+    }
+  }
+  try {
+    const ok = await assignEggToDragonNest(nestId, eggId);
+    if (!ok) {
+      if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Dieses Nest ist gerade nicht mehr frei.', 2600);
+      return;
+    }
+    if (sacrifice.gold > 0 || sacrifice.crystals > 0) {
+      bkmpIdleState.gold -= sacrifice.gold;
+      bkmpIdleState.crystals -= sacrifice.crystals;
+      bkmpIdleRenderHud();
+      bkmpIdleQueueSync();
+    }
+    const nest = bkmpPlayerDragonNests.find(n => n.id === nestId);
+    if (nest) { nest.egg_id = eggId; nest.started_at = new Date().toISOString(); }
+    bkmpIdleRenderDragonsPanel();
+  } catch (e) {
+    console.warn('Idle Dorf: Ei konnte nicht ins Nest gelegt werden.', e);
+  }
+}
+
+/* Brut-Pfad: Reduktion gedeckelt bei 40% (Vorgabe: "Brutzeit darf niemals
+   auf null reduziert werden... zentrale maximale Reduzierung"). */
+function bkmpDragonEffectiveBroodSeconds(species) {
+  const reductionPct = Math.min(40, bkmpDragonSkillBonus('brood_time_pct'));
+  return species.brood_seconds * (1 - reductionPct / 100);
+}
+function bkmpDragonNestReady(nest) {
+  if (!nest || !nest.egg_id || !nest.started_at) return false;
+  const egg = bkmpPlayerDragonEggs.find(e => e.id === nest.egg_id);
+  const species = egg ? bkmpDragonSpeciesById(egg.species_id) : null;
+  if (!species) return false;
+  return Date.now() >= Date.parse(nest.started_at) + bkmpDragonEffectiveBroodSeconds(species) * 1000;
+}
+
+async function bkmpDragonHatch(nestId) {
+  const nest = bkmpPlayerDragonNests.find(n => n.id === nestId);
+  if (!nest || !bkmpDragonNestReady(nest)) return;
+  const egg = bkmpPlayerDragonEggs.find(e => e.id === nest.egg_id);
+  if (!egg) return;
+  /* Lagerplatz-Check VOR dem Ausbrueten (Spieler-Vorgabe: "das Ausbrueten
+     eines neuen Eis darf nur gestartet werden, wenn sichergestellt ist,
+     dass der fertige Drache gespeichert werden kann" - der geschluepfte
+     Drache bleibt bei vollem Lager also einfach im Nest liegen, statt
+     verloren zu gehen). */
+  if (bkmpPlayerDragons.length >= bkmpDragonStorageCapacity()) {
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('🏠 Dein Drachenlager ist voll. Erweitere dein Lager oder lasse einen Drachen frei.', 4200);
+    return;
+  }
+  const foodPreference = Math.random() < 0.5 ? 'fruit' : 'meat';
+  try {
+    const dragon = await hatchDragonEgg(nest.id, egg.id, bkmpIdleState.name_key, egg.species_id, foodPreference);
+    if (!dragon) {
+      if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Dieses Ei wurde bereits geöffnet.', 2600);
+      return;
+    }
+    nest.egg_id = null;
+    nest.started_at = null;
+    bkmpPlayerDragonEggs = bkmpPlayerDragonEggs.filter(e => e.id !== egg.id);
+    bkmpPlayerDragons.push(dragon);
+    const species = bkmpDragonSpeciesById(egg.species_id);
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`🐣 Dein ${species ? species.name : 'Drache'} ist geschlüpft!`, 4200);
+    bkmpIdleGetAchievementContextFields();
+    bkmpIdleRenderDragonsPanel();
+  } catch (e) {
+    console.warn('Idle Dorf: Ei konnte nicht ausgebrütet werden.', e);
+  }
+}
+
+/* ---------------- Drachenlager (Kapazitaet) ---------------- */
+const BKMP_DRAGON_STORAGE_BASE = 20;
+const BKMP_DRAGON_STORAGE_EXPANSIONS = [
+  { addSlots: 5, cost: 50000 },
+  { addSlots: 5, cost: 150000 },
+  { addSlots: 10, cost: 400000 },
+  { addSlots: 10, cost: 1000000 },
+  { addSlots: 15, cost: 2500000 }
+];
+function bkmpDragonStorageExpansionsBought() {
+  try { return Number(localStorage.getItem('bkmp-dragon-storage-expansions') || 0); } catch (e) { return 0; }
+}
+function bkmpDragonStorageCapacity() {
+  const bought = bkmpDragonStorageExpansionsBought();
+  let cap = BKMP_DRAGON_STORAGE_BASE;
+  for (let i = 0; i < bought && i < BKMP_DRAGON_STORAGE_EXPANSIONS.length; i++) cap += BKMP_DRAGON_STORAGE_EXPANSIONS[i].addSlots;
+  return cap + Math.round(bkmpDragonSkillBonus('dragon_storage_flat'));
+}
+function bkmpDragonExpandStorage() {
+  const bought = bkmpDragonStorageExpansionsBought();
+  const next = BKMP_DRAGON_STORAGE_EXPANSIONS[bought];
+  if (!next || !bkmpIdleState) return;
+  if ((bkmpIdleState.gold || 0) < next.cost) {
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Nicht genug Gold für diese Lagererweiterung.', 2800);
+    return;
+  }
+  bkmpIdleState.gold -= next.cost;
+  try { localStorage.setItem('bkmp-dragon-storage-expansions', String(bought + 1)); } catch (e) {}
+  bkmpIdleRenderHud();
+  bkmpIdleQueueSync();
+  bkmpIdleRenderDragonsPanel();
+  if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`🏠 Drachenlager um ${next.addSlots} Plätze erweitert!`, 3000);
+}
+
+/* ---------------- Fuettern + Wachstum (Baby -> Jugendlich) ---------------- */
+async function bkmpDragonFeed(dragonId, amount) {
+  const dragon = bkmpPlayerDragons.find(d => d.id === dragonId);
+  const species = dragon ? bkmpDragonSpeciesById(dragon.species_id) : null;
+  if (!dragon || !species || dragon.stage !== 'baby') return;
+  const stock = Number(bkmpIdleState[dragon.food_preference] || 0);
+  const feedAmount = Math.min(amount, stock, species.growth_points_required - dragon.growth_points);
+  if (feedAmount <= 0) return;
+  bkmpIdleState[dragon.food_preference] -= feedAmount;
+  dragon.growth_points = Math.min(species.growth_points_required, dragon.growth_points + feedAmount);
+  bkmpIdleRenderHud();
+  bkmpIdleQueueSync();
+  try { await updatePlayerDragon(dragonId, { growth_points: dragon.growth_points }); } catch (e) { console.warn('Idle Dorf: Fuetterung konnte nicht gespeichert werden.', e); }
+  bkmpIdleRenderDragonsPanel();
+}
+
+async function bkmpDragonEvolveToTeen(dragonId) {
+  const dragon = bkmpPlayerDragons.find(d => d.id === dragonId);
+  const species = dragon ? bkmpDragonSpeciesById(dragon.species_id) : null;
+  if (!dragon || !species || dragon.stage !== 'baby' || dragon.growth_points < species.growth_points_required) return;
+  dragon.stage = 'teen';
+  try { await updatePlayerDragon(dragonId, { stage: 'teen' }); } catch (e) { console.warn('Idle Dorf: Entwicklung konnte nicht gespeichert werden.', e); }
+  if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`🐉 ${species.name} ist jetzt jugendlich!`, 3600);
+  bkmpIdleRenderDragonsPanel();
+}
+
+/* ---------------- Begleiter + Kampferfahrung (Jugendlich -> Erwachsen) ---------------- */
+async function bkmpDragonSetCompanion(dragonId) {
+  const current = bkmpPlayerDragons.find(d => d.is_companion);
+  if (current && current.id === dragonId) return;
+  try {
+    if (current) { current.is_companion = false; await updatePlayerDragon(current.id, { is_companion: false }); }
+    const dragon = bkmpPlayerDragons.find(d => d.id === dragonId);
+    if (dragon && (dragon.stage === 'teen' || dragon.stage === 'adult')) {
+      dragon.is_companion = true;
+      await updatePlayerDragon(dragon.id, { is_companion: true });
+    }
+    bkmpIdleRecomputeEffectiveStats();
+    bkmpIdleRenderHud();
+    bkmpIdleRenderDragonsPanel();
+  } catch (e) {
+    console.warn('Idle Dorf: Begleitdrache konnte nicht gesetzt werden.', e);
+  }
+}
+
+async function bkmpDragonUnsetCompanion() {
+  const current = bkmpPlayerDragons.find(d => d.is_companion);
+  if (!current) return;
+  current.is_companion = false;
+  try { await updatePlayerDragon(current.id, { is_companion: false }); } catch (e) {}
+  bkmpIdleRecomputeEffectiveStats();
+  bkmpIdleRenderHud();
+  bkmpIdleRenderDragonsPanel();
+}
+
+/* Von den Kampf-/Dungeon-/Raid-/Gildenboss-Erfolgsstellen aufgerufen -
+   vergibt Kampf-EP NUR an den aktuell aktiven jugendlichen Begleiter. Ein
+   erwachsener Begleiter braucht keine EP mehr (schon voll entwickelt),
+   sammelt aber weiterhin keine (bewusst kein Extra-Fortschritt danach). */
+let bkmpDragonEvolveReadyToastShown = {};
+function bkmpDragonGrantCompanionBattleXp(amount) {
+  if (!amount || amount <= 0) return;
+  const dragon = bkmpPlayerDragons.find(d => d.is_companion && d.stage === 'teen');
+  if (!dragon) return;
+  const species = bkmpDragonSpeciesById(dragon.species_id);
+  if (!species) return;
+  const bonusPct = bkmpDragonSubstatBonus('dragon_xp_bonus_pct') + bkmpDragonSkillBonus('dragon_xp_pct');
+  const gained = Math.round(amount * (1 + bonusPct / 100));
+  dragon.battle_xp = Math.min(species.battle_xp_required, dragon.battle_xp + gained);
+  updatePlayerDragon(dragon.id, { battle_xp: dragon.battle_xp }).catch(() => {});
+  if (dragon.battle_xp >= species.battle_xp_required && !bkmpDragonEvolveReadyToastShown[dragon.id]) {
+    bkmpDragonEvolveReadyToastShown[dragon.id] = true;
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`⭐ Dein ${species.name} ist bereit, erwachsen zu werden! Schau im Drachenlager vorbei.`, 5000);
+  }
+  if (typeof bkmpIdleRefreshLiveTabs === 'function') bkmpIdleRefreshLiveTabs();
+}
+
+/* Nebenwert-Bonus eines aktiven erwachsenen Begleiters fuer NICHT im
+   allgemeinen Stat-Topf gefuehrte Schluessel (Fruechte/Fleisch/Drachen-EP) -
+   die anderen 8 Sub-Stat-Typen laufen stattdessen ganz normal durch
+   bkmpIdleDragonCompanionEffectTotals()/t() wie Runen-Sub-Stats. */
+function bkmpDragonSubstatBonus(key) {
+  const dragon = bkmpPlayerDragons.find(d => d.is_companion && d.stage === 'adult');
+  if (!dragon) return 0;
+  const entry = (dragon.substats || []).find(s => s.stat === key);
+  return entry ? Number(entry.value || 0) : 0;
+}
+
+/* Einmalige Wuerfelung beim Erreichen der Erwachsenenform - exakt wie bei
+   Runen (bkmpIdleRollRuneValue/bkmpIdleRollInitialSubstats): Legendaer
+   bekommt ALLE drei Hauptwerte gleichzeitig, alle anderen genau einen
+   zufaellig gewaehlten. Werte danach dauerhaft in der DB-Zeile gespeichert,
+   ein Neuladen wuerfelt nie erneut (siehe hatchDragonEgg/updatePlayerDragon -
+   hier wird nur EINMAL beim Uebergang geschrieben). */
+function bkmpIdleRollAdultDragonStats(species) {
+  const mult = BKMP_DRAGON_RARITY_MULT[species.rarity] || 1;
+  const rollStat = key => {
+    const base = BKMP_DRAGON_MAIN_STAT_BASE[key] || 5;
+    const variance = 0.75 + Math.random() * 0.7; // 0.75x - 1.45x
+    return Math.round(base * mult * variance * 10) / 10;
+  };
+  const stats = { stat_attack: 0, stat_defense: 0, stat_hp: 0 };
+  let mainStatKey;
+  if (species.is_multi_stat) {
+    stats.stat_attack = rollStat('attack');
+    stats.stat_defense = rollStat('defense');
+    stats.stat_hp = rollStat('hp');
+    mainStatKey = 'multi';
+  } else {
+    mainStatKey = BKMP_DRAGON_MAIN_STAT_KEYS[Math.floor(Math.random() * BKMP_DRAGON_MAIN_STAT_KEYS.length)];
+    stats['stat_' + mainStatKey] = rollStat(mainStatKey);
+  }
+  const subCount = species.sub_stat_count_min + Math.floor(Math.random() * (species.sub_stat_count_max - species.sub_stat_count_min + 1));
+  const pool = BKMP_DRAGON_SUBSTAT_POOL.slice();
+  const substats = [];
+  for (let i = 0; i < subCount && pool.length; i++) {
+    const idx = Math.floor(Math.random() * pool.length);
+    const def = pool.splice(idx, 1)[0];
+    const value = Math.round((def.min + Math.random() * (def.max - def.min)) * mult * 10) / 10;
+    substats.push({ stat: def.key, value });
+  }
+  return { main_stat_key: mainStatKey, substats, ...stats };
+}
+
+async function bkmpDragonEvolveToAdult(dragonId) {
+  const dragon = bkmpPlayerDragons.find(d => d.id === dragonId);
+  const species = dragon ? bkmpDragonSpeciesById(dragon.species_id) : null;
+  if (!dragon || !species || dragon.stage !== 'teen' || dragon.battle_xp < species.battle_xp_required) return;
+  const rolled = bkmpIdleRollAdultDragonStats(species);
+  const patch = { stage: 'adult', adult_at: new Date().toISOString(), ...rolled };
+  try {
+    await updatePlayerDragon(dragonId, patch);
+    Object.assign(dragon, patch);
+    delete bkmpDragonEvolveReadyToastShown[dragonId];
+    bkmpIdleRecomputeEffectiveStats();
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`👑 Dein ${species.name} ist erwachsen geworden!`, 4400);
+    bkmpIdleGetAchievementContextFields();
+    bkmpIdleRenderDragonsPanel();
+  } catch (e) {
+    console.warn('Idle Dorf: Entwicklung zum erwachsenen Drachen konnte nicht gespeichert werden.', e);
+  }
+}
+
+/* ---------------- Freilassen ---------------- */
+async function bkmpDragonRelease(dragonId) {
+  const dragon = bkmpPlayerDragons.find(d => d.id === dragonId);
+  if (!dragon) return;
+  if (dragon.is_favorite) {
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Entferne zuerst die Favoriten-Markierung.', 2800);
+    return;
+  }
+  if (dragon.is_companion) {
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Entferne den Drachen zuerst als Begleiter.', 2800);
+    return;
+  }
+  try {
+    await releasePlayerDragon(dragonId);
+    bkmpPlayerDragons = bkmpPlayerDragons.filter(d => d.id !== dragonId);
+    /* Kleine Trostbelohnung (Spieler-Vorgabe) - bewusst niedrig, damit sich
+       gezieltes Farmen+Freilassen nicht lohnt. */
+    if (bkmpIdleState) { bkmpIdleState.gold = (bkmpIdleState.gold || 0) + 500; bkmpIdleQueueSync(); bkmpIdleRenderHud(); }
+    bkmpIdleRenderDragonsPanel();
+  } catch (e) {
+    console.warn('Idle Dorf: Drache konnte nicht freigelassen werden.', e);
+  }
+}
+
+async function bkmpDragonToggleFavorite(dragonId) {
+  const dragon = bkmpPlayerDragons.find(d => d.id === dragonId);
+  if (!dragon) return;
+  dragon.is_favorite = !dragon.is_favorite;
+  try { await updatePlayerDragon(dragonId, { is_favorite: dragon.is_favorite }); } catch (e) {}
+  bkmpIdleRenderDragonsPanel();
+}
+
+/* ---------------- Obstgarten/Jagdhuette: passive Produktion ----------------
+   Bewusst einfache zeitbasierte Ansammlung statt einer dedizierten
+   Gebaeude-UI/Upgrade-Kette (die folgt spaeter) - jeder Spieler hat schon
+   ab Level 0 eine kleine Grundproduktion, damit Fuettern sofort spielbar
+   ist; obstgarten_level/jagdhuette_level (schon in idle_player_state,
+   Standardwert 0) erhoehen die Rate spaeter ohne weitere Migration. */
+const BKMP_DRAGON_BASE_RESOURCE_PER_HOUR = 60;
+const BKMP_DRAGON_RESOURCE_CAP_BASE = 2000;
+const BKMP_DRAGON_BUILDING_MAX_LEVEL = 30;
+function bkmpDragonResourceRatePerHour(kind, level) {
+  const companionBonusPct = bkmpDragonSubstatBonus(kind === 'fruit' ? 'fruit_bonus_pct' : 'meat_bonus_pct');
+  const skillBonusPct = bkmpDragonSkillBonus(kind === 'fruit' ? 'fruit_prod_pct' : 'meat_prod_pct');
+  return BKMP_DRAGON_BASE_RESOURCE_PER_HOUR * (1 + Number(level || 0) * 0.5) * (1 + (companionBonusPct + skillBonusPct) / 100);
+}
+function bkmpDragonResourceCap(level) {
+  return BKMP_DRAGON_RESOURCE_CAP_BASE + Number(level || 0) * 500;
+}
+/* Obstgarten/Jagdhuette - eigene, dedizierte Spalten (obstgarten_level/
+   jagdhuette_level) statt des generischen upgrade_purchases-Systems, weil
+   ihr Effekt (Produktionsrate/Lagerkapazitaet) kein Kampf-Stat ist und
+   nicht in den gemeinsamen t()-Topf gehoert. Kostenkurve nutzt trotzdem
+   dieselbe bkmpIdleGrowthMult-Formel wie alle anderen Upgrades. */
+function bkmpDragonBuildingCost(level) {
+  return Math.round(2000 * bkmpIdleGrowthMult(0.28, 2.1, level));
+}
+async function bkmpDragonUpgradeBuilding(kind) {
+  if (!bkmpIdleState) return;
+  const levelKey = kind === 'fruit' ? 'obstgarten_level' : 'jagdhuette_level';
+  const level = Number(bkmpIdleState[levelKey] || 0);
+  if (level >= BKMP_DRAGON_BUILDING_MAX_LEVEL) return;
+  const cost = bkmpDragonBuildingCost(level);
+  if ((bkmpIdleState.gold || 0) < cost) {
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Nicht genug Gold für dieses Gebäude-Upgrade.', 2800);
+    return;
+  }
+  bkmpIdleState.gold -= cost;
+  bkmpIdleState[levelKey] = level + 1;
+  bkmpIdleRenderHud();
+  bkmpIdleQueueSync();
+  if (typeof bkmpIdleRenderUpgradesPanel === 'function') bkmpIdleRenderUpgradesPanel();
+  if (typeof bkmpIdleRenderDragonsPanel === 'function') bkmpIdleRenderDragonsPanel();
+}
+function bkmpIdleAccrueBuildingResources() {
+  if (!bkmpIdleState) return;
+  const now = Date.now();
+  ['fruit', 'meat'].forEach(kind => {
+    const levelKey = kind === 'fruit' ? 'obstgarten_level' : 'jagdhuette_level';
+    const tsKey = kind + '_collected_at';
+    const last = Date.parse(bkmpIdleState[tsKey] || now) || now;
+    const hoursElapsed = Math.max(0, (now - last) / 3600000);
+    if (hoursElapsed <= 0) return;
+    const gained = hoursElapsed * bkmpDragonResourceRatePerHour(kind, bkmpIdleState[levelKey]);
+    bkmpIdleState[kind] = Math.min(bkmpDragonResourceCap(bkmpIdleState[levelKey]), Number(bkmpIdleState[kind] || 0) + gained);
+    bkmpIdleState[tsKey] = new Date(now).toISOString();
+  });
+}
+
+/* ---------------- Effekt-Totals fuer bkmpIdleRecomputeEffectiveStats ---------------- */
+function bkmpIdleDragonCompanionEffectTotals() {
+  const totals = {};
+  const dragon = bkmpPlayerDragons.find(d => d.is_companion && d.stage === 'adult');
+  if (!dragon) return totals;
+  if (dragon.stat_attack) totals.attack_flat = (totals.attack_flat || 0) + Number(dragon.stat_attack);
+  if (dragon.stat_defense) totals.defense_flat = (totals.defense_flat || 0) + Number(dragon.stat_defense);
+  if (dragon.stat_hp) totals.hp_flat = (totals.hp_flat || 0) + Number(dragon.stat_hp);
+  (dragon.substats || []).forEach(s => {
+    if (['fruit_bonus_pct', 'meat_bonus_pct', 'dragon_xp_bonus_pct'].includes(s.stat)) return;
+    totals[s.stat] = (totals[s.stat] || 0) + Number(s.value || 0);
+  });
+  return totals;
+}
+
+/* ---------------- Rendering ---------------- */
+function bkmpDragonFormatDuration(ms) {
+  const total = Math.max(0, Math.round(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+function bkmpDragonSubstatLabel(key) {
+  const def = BKMP_DRAGON_SUBSTAT_POOL.find(d => d.key === key);
+  return def ? def.label : key;
+}
+function bkmpDragonSubstatSuffix(key) {
+  const def = BKMP_DRAGON_SUBSTAT_POOL.find(d => d.key === key);
+  return def ? def.suffix : '';
+}
+function bkmpDragonMainStatLine(dragon) {
+  const parts = [];
+  if (dragon.stat_attack) parts.push(`⚔️ +${bkmpIdleFormatNumber(dragon.stat_attack)}`);
+  if (dragon.stat_defense) parts.push(`🛡️ +${bkmpIdleFormatNumber(dragon.stat_defense)}`);
+  if (dragon.stat_hp) parts.push(`❤️ +${bkmpIdleFormatNumber(dragon.stat_hp)}`);
+  return parts.join(' ');
+}
+
+function bkmpIdleRenderDragonsPanel() {
+  const panel = document.getElementById('idlePanelDrachen');
+  if (!panel || !bkmpIdleState) return;
+  bkmpIdleAccrueBuildingResources();
+
+  const unassignedEggs = bkmpPlayerDragonEggs.filter(e => !bkmpPlayerDragonNests.some(n => n.egg_id === e.id));
+  const eggGroups = {};
+  unassignedEggs.forEach(e => { eggGroups[e.species_id] = (eggGroups[e.species_id] || 0) + 1; });
+
+  const eggsHtml = Object.keys(eggGroups).length
+    ? `<div class="idle-skin-grid">${Object.keys(eggGroups).map(speciesId => {
+        const species = bkmpDragonSpeciesById(speciesId);
+        if (!species) return '';
+        const rarity = bkmpDragonRarityMeta(species.rarity);
+        const eggId = unassignedEggs.find(e => e.species_id === speciesId).id;
+        return `
+          <div class="idle-skin-card" style="--dragon-rarity-color:${rarity.color}">
+            <img class="idle-dragon-thumb" src="${species.egg_image}" alt="${escapeHtml(species.name)}">
+            <div class="idle-skin-name">${escapeHtml(species.name)}-Ei</div>
+            <div class="idle-skin-desc">${rarity.name} &middot; x${eggGroups[speciesId]} &middot; ${bkmpDragonFormatDuration(bkmpDragonEffectiveBroodSeconds(species) * 1000)} Brutzeit</div>
+            <button type="button" class="btn-ja idle-skin-action idle-dragon-assign-btn" data-egg-id="${eggId}">In freies Nest legen</button>
+          </div>`;
+      }).join('')}</div>`
+    : `<p class="idle-skin-empty-hint">Noch keine Eier im Lager - besiege Drachen, gewinne Weltboss-Raids oder finde besondere Ereignisse.</p>`;
+
+  const nestsHtml = bkmpPlayerDragonNests.map(nest => {
+    if (nest.egg_id) {
+      const egg = bkmpPlayerDragonEggs.find(e => e.id === nest.egg_id);
+      const species = egg ? bkmpDragonSpeciesById(egg.species_id) : null;
+      if (!species) return `<div class="idle-dragon-nest-card"><div class="idle-skin-desc">Lädt…</div></div>`;
+      const ready = bkmpDragonNestReady(nest);
+      const msLeft = bkmpDragonEffectiveBroodSeconds(species) * 1000 - (Date.now() - Date.parse(nest.started_at));
+      return `
+        <div class="idle-dragon-nest-card ${ready ? 'is-ready' : ''}">
+          <img class="idle-dragon-thumb" src="${bkmpDragonStageImage(species, ready ? 'egg' : 'egg')}" alt="${escapeHtml(species.name)}">
+          <div class="idle-skin-name">${escapeHtml(species.name)}</div>
+          ${ready
+            ? `<button type="button" class="btn-ja idle-skin-action idle-dragon-hatch-btn" data-nest-id="${nest.id}">🐣 Drache ist geschlüpft!</button>`
+            : `<div class="idle-skin-desc">⏳ ${bkmpDragonFormatDuration(Math.max(0, msLeft))}</div>`}
+        </div>`;
+    }
+    return `
+      <div class="idle-dragon-nest-card idle-dragon-nest-empty">
+        <div class="idle-skin-icon">🏠</div>
+        <div class="idle-skin-desc">Nest ${nest.slot_index} · leer</div>
+      </div>`;
+  }).join('');
+  const nextSlot = bkmpPlayerDragonNests.length + 1;
+  const nestPurchaseHtml = nextSlot <= BKMP_DRAGON_NEST_GOLD_COSTS.length
+    ? `<div class="idle-dragon-nest-card idle-dragon-nest-buy">
+        <div class="idle-skin-icon">➕</div>
+        <div class="idle-skin-desc">Nest ${nextSlot}</div>
+        <button type="button" class="btn-ja idle-skin-action" id="idleDragonBuyNestBtn">${bkmpIdleFormatNumber(bkmpDragonNestCost(nextSlot))} 💰</button>
+      </div>`
+    : '';
+
+  const babies = bkmpPlayerDragons.filter(d => d.stage === 'baby');
+  const babiesHtml = babies.length
+    ? babies.map(d => {
+        const species = bkmpDragonSpeciesById(d.species_id);
+        if (!species) return '';
+        const pct = Math.min(100, Math.round((d.growth_points / species.growth_points_required) * 100));
+        const foodLabel = d.food_preference === 'fruit' ? '🍎 Früchte' : '🥩 Fleisch';
+        const canEvolve = d.growth_points >= species.growth_points_required;
+        return `
+          <div class="idle-dragon-baby-card">
+            <img class="idle-dragon-thumb" src="${species.baby_image}" alt="${escapeHtml(species.name)}">
+            <div class="idle-skin-name">${escapeHtml(species.name)} <small>(Baby)</small></div>
+            <div class="idle-skin-desc">Frisst am liebsten: ${foodLabel} · Vorrat: ${bkmpIdleFormatNumber(Math.floor(bkmpIdleState[d.food_preference] || 0))}</div>
+            <div class="idle-xp-bar"><div class="idle-xp-fill" style="width:${pct}%"></div><span>${d.growth_points}/${species.growth_points_required}</span></div>
+            ${canEvolve
+              ? `<button type="button" class="btn-ja idle-skin-action idle-dragon-evolve-teen-btn" data-dragon-id="${d.id}">Zum jugendlichen Drachen entwickeln</button>`
+              : `<div class="idle-dragon-feed-row">
+                  <button type="button" class="btn-ja idle-skin-action idle-dragon-feed-btn" data-dragon-id="${d.id}" data-amount="10">Füttern (+10)</button>
+                  <button type="button" class="btn-nein idle-skin-action idle-dragon-feed-btn" data-dragon-id="${d.id}" data-amount="100">Füttern (+100)</button>
+                </div>`}
+          </div>`;
+      }).join('')
+    : '';
+
+  let grown = bkmpPlayerDragons.filter(d => d.stage === 'teen' || d.stage === 'adult');
+  const companion = bkmpPlayerDragons.find(d => d.is_companion);
+  const grownTotalCount = grown.length;
+  const RARITY_ORDER = ['legendaer', 'episch', 'selten', 'standard'];
+  if (bkmpDragonLagerFilter.rarity !== 'all') {
+    grown = grown.filter(d => {
+      const sp = bkmpDragonSpeciesById(d.species_id);
+      return sp && sp.rarity === bkmpDragonLagerFilter.rarity;
+    });
+  }
+  if (bkmpDragonLagerFilter.stage !== 'all') grown = grown.filter(d => d.stage === bkmpDragonLagerFilter.stage);
+  if (bkmpDragonLagerFilter.favoritesOnly) grown = grown.filter(d => d.is_favorite);
+  const dragonStrength = d => Number(d.stat_attack || 0) + Number(d.stat_defense || 0) + Number(d.stat_hp || 0) / 10;
+  grown = grown.slice().sort((a, b) => {
+    const spA = bkmpDragonSpeciesById(a.species_id);
+    const spB = bkmpDragonSpeciesById(b.species_id);
+    switch (bkmpDragonLagerFilter.sort) {
+      case 'name': return (spA ? spA.name : '').localeCompare(spB ? spB.name : '');
+      case 'stage': return (b.stage === 'adult' ? 1 : 0) - (a.stage === 'adult' ? 1 : 0);
+      case 'strength': return dragonStrength(b) - dragonStrength(a);
+      case 'date': return Date.parse(b.hatched_at || 0) - Date.parse(a.hatched_at || 0);
+      case 'rarity':
+      default:
+        return RARITY_ORDER.indexOf(spA ? spA.rarity : 'standard') - RARITY_ORDER.indexOf(spB ? spB.rarity : 'standard');
+    }
+  });
+  const filterBarHtml = `
+    <div class="idle-dragon-filter-bar">
+      <select id="idleDragonFilterRarity">
+        <option value="all">Alle Seltenheiten</option>
+        <option value="standard">Standard</option>
+        <option value="selten">Selten</option>
+        <option value="episch">Episch</option>
+        <option value="legendaer">Legendär</option>
+      </select>
+      <select id="idleDragonFilterStage">
+        <option value="all">Alle Stufen</option>
+        <option value="teen">Jugendlich</option>
+        <option value="adult">Erwachsen</option>
+      </select>
+      <select id="idleDragonFilterSort">
+        <option value="rarity">Sortieren: Seltenheit</option>
+        <option value="stage">Sortieren: Entwicklungsstufe</option>
+        <option value="strength">Sortieren: Stärke</option>
+        <option value="name">Sortieren: Name</option>
+        <option value="date">Sortieren: Erhaltungsdatum</option>
+      </select>
+      <label class="idle-dragon-filter-fav"><input type="checkbox" id="idleDragonFilterFav" ${bkmpDragonLagerFilter.favoritesOnly ? 'checked' : ''}> ★ nur Favoriten</label>
+    </div>`;
+  const grownHtml = grown.length
+    ? `<div class="idle-skin-grid">${grown.map(d => {
+        const species = bkmpDragonSpeciesById(d.species_id);
+        if (!species) return '';
+        const rarity = bkmpDragonRarityMeta(species.rarity);
+        const isTeen = d.stage === 'teen';
+        const pct = isTeen ? Math.min(100, Math.round((d.battle_xp / species.battle_xp_required) * 100)) : 100;
+        const canEvolve = isTeen && d.battle_xp >= species.battle_xp_required;
+        const substatsHtml = !isTeen ? (d.substats || []).map(s => `<div>${bkmpDragonSubstatLabel(s.stat)} +${s.value}${bkmpDragonSubstatSuffix(s.stat)}</div>`).join('') : '';
+        return `
+          <div class="idle-skin-card idle-dragon-lager-card ${d.is_companion ? 'idle-skin-card-equipped' : ''}" style="--dragon-rarity-color:${rarity.color}" data-dragon-id="${d.id}">
+            ${d.is_favorite ? '<div class="idle-dragon-fav-badge">★</div>' : ''}
+            <img class="idle-dragon-thumb" src="${bkmpDragonStageImage(species, d.stage)}" alt="${escapeHtml(species.name)}">
+            <div class="idle-skin-name">${escapeHtml(species.name)} <small>(${isTeen ? 'Jugendlich' : 'Erwachsen'})</small></div>
+            <div class="idle-skin-desc">${rarity.name}</div>
+            ${isTeen
+              ? `<div class="idle-xp-bar"><div class="idle-xp-fill" style="width:${pct}%"></div><span>${d.battle_xp}/${species.battle_xp_required} Kampf-EP</span></div>`
+              : `<div class="idle-dragon-stats">${bkmpDragonMainStatLine(d)}<div class="idle-dragon-substats">${substatsHtml}</div></div>`}
+            ${canEvolve ? `<button type="button" class="btn-ja idle-skin-action idle-dragon-evolve-adult-btn" data-dragon-id="${d.id}">⭐ Erwachsen werden</button>` : ''}
+            <div class="idle-dragon-actions-row">
+              ${d.is_companion
+                ? `<button type="button" class="btn-nein idle-skin-action idle-dragon-uncompanion-btn" data-dragon-id="${d.id}">Ablegen</button>`
+                : `<button type="button" class="btn-ja idle-skin-action idle-dragon-companion-btn" data-dragon-id="${d.id}">Als Begleiter</button>`}
+              <button type="button" class="idle-dragon-fav-btn" data-dragon-id="${d.id}" title="Favorit">${d.is_favorite ? '★' : '☆'}</button>
+              <button type="button" class="idle-dragon-release-btn" data-dragon-id="${d.id}" title="Freilassen">🗑️</button>
+            </div>
+          </div>`;
+      }).join('')}</div>`
+    : grownTotalCount === 0
+      ? `<p class="idle-skin-empty-hint">Noch keine jugendlichen oder erwachsenen Drachen.</p>`
+      : `<p class="idle-skin-empty-hint">Kein Drache entspricht diesem Filter.</p>`;
+
+  panel.innerHTML = `
+    <div class="idle-dragon-section">
+      <h4>🍎🥩 Vorräte</h4>
+      <p class="idle-skin-desc">
+        🌳 Obstgarten Lv.${Number(bkmpIdleState.obstgarten_level || 0)}: ${bkmpIdleFormatNumber(Math.floor(bkmpIdleState.fruit || 0))} / ${bkmpIdleFormatNumber(bkmpDragonResourceCap(bkmpIdleState.obstgarten_level))} Früchte (+${bkmpIdleFormatNumber(bkmpDragonResourceRatePerHour('fruit', bkmpIdleState.obstgarten_level))}/Std.)<br>
+        🥩 Jagdhütte Lv.${Number(bkmpIdleState.jagdhuette_level || 0)}: ${bkmpIdleFormatNumber(Math.floor(bkmpIdleState.meat || 0))} / ${bkmpIdleFormatNumber(bkmpDragonResourceCap(bkmpIdleState.jagdhuette_level))} Fleisch (+${bkmpIdleFormatNumber(bkmpDragonResourceRatePerHour('meat', bkmpIdleState.jagdhuette_level))}/Std.)
+        ${companion ? `<br>Begleiter: ${escapeHtml((bkmpDragonSpeciesById(companion.species_id) || {}).name || '')}` : ''}
+      </p>
+      <p class="idle-skin-desc" style="margin-top:0.3rem;">Gebäude-Upgrades findest du im Tab "⬆️ Upgrades".</p>
+    </div>
+    <div class="idle-dragon-section">
+      <h4>🏠 Drachennester</h4>
+      <div class="idle-dragon-nest-grid">${nestsHtml}${nestPurchaseHtml}</div>
+    </div>
+    <div class="idle-dragon-section">
+      <h4>🥚 Eierlager</h4>
+      ${eggsHtml}
+    </div>
+    ${babies.length ? `<div class="idle-dragon-section"><h4>🐣 Fütterung</h4><div class="idle-skin-grid">${babiesHtml}</div></div>` : ''}
+    <div class="idle-dragon-section">
+      <h4>🐉 Drachenlager (${bkmpPlayerDragons.length}/${bkmpDragonStorageCapacity()})</h4>
+      ${grownTotalCount ? filterBarHtml : ''}
+      ${grownHtml}
+      <button type="button" class="btn-nein idle-skin-action" id="idleDragonExpandStorageBtn" style="max-width:260px;margin-top:0.6rem;">Lager erweitern (${bkmpDragonStorageExpansionsBought() < BKMP_DRAGON_STORAGE_EXPANSIONS.length ? bkmpIdleFormatNumber(BKMP_DRAGON_STORAGE_EXPANSIONS[bkmpDragonStorageExpansionsBought()].cost) + ' 💰' : 'Maximum erreicht'})</button>
+    </div>`;
+
+  panel.querySelectorAll('.idle-dragon-assign-btn').forEach(btn => btn.addEventListener('click', () => {
+    const freeNest = bkmpPlayerDragonNests.find(n => !n.egg_id);
+    if (!freeNest) { if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Kein Drachennest frei - kaufe ein weiteres oder warte, bis eins fertig ist.', 3200); return; }
+    bkmpDragonAssignEggToNest(freeNest.id, btn.dataset.eggId);
+  }));
+  panel.querySelectorAll('.idle-dragon-hatch-btn').forEach(btn => btn.addEventListener('click', () => bkmpDragonHatch(btn.dataset.nestId)));
+  const buyNestBtn = document.getElementById('idleDragonBuyNestBtn');
+  if (buyNestBtn) buyNestBtn.addEventListener('click', bkmpDragonPurchaseNest);
+  panel.querySelectorAll('.idle-dragon-feed-btn').forEach(btn => btn.addEventListener('click', () => bkmpDragonFeed(btn.dataset.dragonId, Number(btn.dataset.amount))));
+  panel.querySelectorAll('.idle-dragon-evolve-teen-btn').forEach(btn => btn.addEventListener('click', () => bkmpDragonEvolveToTeen(btn.dataset.dragonId)));
+  panel.querySelectorAll('.idle-dragon-evolve-adult-btn').forEach(btn => btn.addEventListener('click', () => bkmpDragonEvolveToAdult(btn.dataset.dragonId)));
+  panel.querySelectorAll('.idle-dragon-companion-btn').forEach(btn => btn.addEventListener('click', () => bkmpDragonSetCompanion(btn.dataset.dragonId)));
+  panel.querySelectorAll('.idle-dragon-uncompanion-btn').forEach(btn => btn.addEventListener('click', bkmpDragonUnsetCompanion));
+  panel.querySelectorAll('.idle-dragon-fav-btn').forEach(btn => btn.addEventListener('click', () => bkmpDragonToggleFavorite(btn.dataset.dragonId)));
+  panel.querySelectorAll('.idle-dragon-release-btn').forEach(btn => btn.addEventListener('click', async () => {
+    const dragon = bkmpPlayerDragons.find(d => d.id === btn.dataset.dragonId);
+    const species = dragon ? bkmpDragonSpeciesById(dragon.species_id) : null;
+    if (!dragon || !species) return;
+    const rarity = bkmpDragonRarityMeta(species.rarity);
+    const stats = bkmpDragonMainStatLine(dragon) || '';
+    const body = `${species.name} (${rarity.name}, ${dragon.stage === 'adult' ? 'Erwachsen' : dragon.stage === 'teen' ? 'Jugendlich' : 'Baby'}) ${stats}\n\nDiese Aktion kann nicht rückgängig gemacht werden.`;
+    const confirmed = typeof bkmpConfirmDialog === 'function'
+      ? await bkmpConfirmDialog('🏞️ Drachen freilassen?', body, 'Ja, freilassen', 'Abbrechen')
+      : window.confirm(body);
+    if (!confirmed) return;
+    const extraConfirm = species.rarity === 'episch' || species.rarity === 'legendaer';
+    if (extraConfirm) {
+      const doubleConfirmed = typeof bkmpConfirmDialog === 'function'
+        ? await bkmpConfirmDialog('⚠️ Wirklich sicher?', `${species.name} ist ${rarity.name.toLowerCase()} und geht dauerhaft verloren.`, 'Ja, endgültig freilassen', 'Abbrechen')
+        : window.confirm('Wirklich endgültig freilassen?');
+      if (!doubleConfirmed) return;
+    }
+    bkmpDragonRelease(dragon.id);
+  }));
+  const expandBtn = document.getElementById('idleDragonExpandStorageBtn');
+  if (expandBtn) expandBtn.addEventListener('click', bkmpDragonExpandStorage);
+
+  const filterRarity = document.getElementById('idleDragonFilterRarity');
+  const filterStage = document.getElementById('idleDragonFilterStage');
+  const filterSort = document.getElementById('idleDragonFilterSort');
+  const filterFav = document.getElementById('idleDragonFilterFav');
+  if (filterRarity) { filterRarity.value = bkmpDragonLagerFilter.rarity; filterRarity.addEventListener('change', () => { bkmpDragonLagerFilter.rarity = filterRarity.value; bkmpIdleRenderDragonsPanel(); }); }
+  if (filterStage) { filterStage.value = bkmpDragonLagerFilter.stage; filterStage.addEventListener('change', () => { bkmpDragonLagerFilter.stage = filterStage.value; bkmpIdleRenderDragonsPanel(); }); }
+  if (filterSort) { filterSort.value = bkmpDragonLagerFilter.sort; filterSort.addEventListener('change', () => { bkmpDragonLagerFilter.sort = filterSort.value; bkmpIdleRenderDragonsPanel(); }); }
+  if (filterFav) filterFav.addEventListener('change', () => { bkmpDragonLagerFilter.favoritesOnly = filterFav.checked; bkmpIdleRenderDragonsPanel(); });
+
+  /* Klick auf die Karte selbst (nicht auf einen der Aktions-Buttons)
+     oeffnet die Detailansicht - siehe bkmpDragonOpenDetail(). */
+  panel.querySelectorAll('.idle-dragon-lager-card').forEach(card => card.addEventListener('click', e => {
+    if (e.target.closest('button, select, label, input')) return;
+    bkmpDragonOpenDetail(card.dataset.dragonId);
+  }));
+}
+
+/* ---------------- Detailansicht ---------------- */
+function bkmpDragonOpenDetail(dragonId) {
+  const dragon = bkmpPlayerDragons.find(d => d.id === dragonId);
+  const species = dragon ? bkmpDragonSpeciesById(dragon.species_id) : null;
+  const overlay = document.getElementById('idleDragonDetailOverlay');
+  if (!dragon || !species || !overlay) return;
+  const rarity = bkmpDragonRarityMeta(species.rarity);
+  const isTeen = dragon.stage === 'teen';
+  const stageLabel = dragon.stage === 'baby' ? 'Baby' : (isTeen ? 'Jugendlich' : 'Erwachsen');
+  const substatsHtml = (dragon.substats || []).map(s => `<div>${bkmpDragonSubstatLabel(s.stat)} +${s.value}${bkmpDragonSubstatSuffix(s.stat)}</div>`).join('') || '<div class="idle-skin-desc">–</div>';
+  document.getElementById('idleDragonDetailImg').src = bkmpDragonStageImage(species, dragon.stage);
+  document.getElementById('idleDragonDetailName').textContent = `${species.name} (${stageLabel})`;
+  document.getElementById('idleDragonDetailRarity').textContent = rarity.name;
+  document.getElementById('idleDragonDetailRarity').style.color = rarity.color;
+  document.getElementById('idleDragonDetailFood').textContent = dragon.food_preference === 'fruit' ? '🍎 Früchte' : '🥩 Fleisch';
+  document.getElementById('idleDragonDetailHatched').textContent = dragon.hatched_at ? new Date(dragon.hatched_at).toLocaleDateString('de-DE') : '–';
+  document.getElementById('idleDragonDetailStats').innerHTML = dragon.stage === 'adult'
+    ? `<div>${bkmpDragonMainStatLine(dragon) || '–'}</div>${substatsHtml}`
+    : '<div class="idle-skin-desc">Werte werden erst als erwachsener Drache enthüllt.</div>';
+  document.getElementById('idleDragonDetailCompanion').textContent = dragon.is_companion ? '✅ Aktiver Begleiter' : '';
+  overlay.classList.add('visible');
+  document.body.classList.add('modal-open');
+  const closeBtn = document.getElementById('idleDragonDetailCloseBtn');
+  function close() { overlay.classList.remove('visible'); document.body.classList.remove('modal-open'); closeBtn.removeEventListener('click', close); }
+  closeBtn.addEventListener('click', close);
+}
+
 /* ---------------- Dorf-Skins ----------------
    Reskin nur fuers PERSOENLICHE Dorf-Sprite im Kampf-Tab
    (.idle-village-sprite) - die geteilte Raid-Stadt (.raid-city-sprite)
@@ -6040,7 +6962,8 @@ const bkmpIdleTabs = [
   { id: 'gilde', btn: 'idleTabBtnGilde', panel: 'idlePanelGilde', render: bkmpIdleRenderGildePanel },
   { id: 'gildetech', btn: 'idleTabBtnGildeTech', panel: 'idlePanelGildeTech', render: bkmpIdleRenderGildeTechPanel },
   { id: 'gildeboss', btn: 'idleTabBtnGildeBoss', panel: 'idlePanelGildeBoss', render: bkmpIdleRenderGildeBossPanel },
-  { id: 'bestenliste', btn: 'idleTabBtnBestenliste', panel: 'idlePanelBestenliste', render: bkmpIdleRenderBestenlistePanel }
+  { id: 'bestenliste', btn: 'idleTabBtnBestenliste', panel: 'idlePanelBestenliste', render: bkmpIdleRenderBestenlistePanel },
+  { id: 'drachen', btn: 'idleTabBtnDrachen', panel: 'idlePanelDrachen', render: bkmpIdleRenderDragonsPanel }
 ];
 let bkmpIdleActiveTab = 'kampf';
 
@@ -6083,6 +7006,7 @@ function bkmpIdleRefreshLiveTabs() {
   else if (bkmpIdleActiveTab === 'runen') bkmpIdleRenderRunenPanel();
   else if (bkmpIdleActiveTab === 'prestige') bkmpIdleRenderPrestigePanel();
   else if (bkmpIdleActiveTab === 'skins') bkmpIdleRenderSkinsPanel();
+  else if (bkmpIdleActiveTab === 'drachen') bkmpIdleRenderDragonsPanel();
 }
 
 function bkmpIdleInitTabs() {
@@ -6343,6 +7267,14 @@ async function bkmpIdleOpenModal() {
 function bkmpIdleCloseModal() {
   const overlay = document.getElementById('idleDorfOverlay');
   if (overlay) overlay.classList.remove('visible');
+  /* Spieler-Report (15.07.): "Das Fenster der Drachen ploppt noch im
+     Hintergrund auf" - Drachen-Detail-Popup (bkmpDragonOpenDetail) hatte
+     nur einen eigenen Schliessen-Button/ESC, war aber NICHT an den
+     Haupt-Schliessen-Button dieses Fensters gekoppelt. Blieb es offen und
+     wurde ueber diesen Button geschlossen statt ueber ESC, hing es danach
+     einsam ueber der normalen Seite (kein Idle-Dorf-Fenster mehr dahinter). */
+  const dragonDetailOverlay = document.getElementById('idleDragonDetailOverlay');
+  if (dragonDetailOverlay) dragonDetailOverlay.classList.remove('visible');
   document.body.classList.remove('modal-open');
   bkmpIdleModalOpen = false;
   bkmpRuneSyncDrawerVisibility();
@@ -6606,6 +7538,18 @@ function bkmpRaidGetPhaseInfo(now) {
   return { phase: 'fight', raidId: bkmpRaidCurrentId(fightStart), fightStartsAt: fightStart.getTime(), fightEndsAt: fightEnd, msUntilFightEnd: fightEnd - d.getTime() };
 }
 
+/* Spieler-Wunsch (17.07.): der staendliche Weltboss-Raid ueberschnitt sich
+   in der 20-Uhr-Stunde (Europe/Berlin) mit dem taeglich fest um 20 Uhr
+   laufenden Gildenboss (siehe bkmpGuildBossGetPhaseInfo) - beide buhlten
+   um dieselbe Aufmerksamkeit. Der Raid faellt jetzt genau in dieser einen
+   Stunde jeden Tag aus (alle anderen 23 Stunden laufen unveraendert
+   weiter), damit der Fokus auf dem Gildenboss liegt. Berlin-Stunde statt
+   UTC-Stunde, DST-sicher, gleiches Muster wie bkmpGuildBossBerlinDateAt. */
+function bkmpRaidIsGuildBossHourBerlin(now) {
+  const hour = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Berlin', hour12: false, hour: '2-digit' }).format(now || new Date()));
+  return hour === 20;
+}
+
 function bkmpRaidFormatCountdown(ms) {
   const total = Math.max(0, Math.round(ms / 1000));
   const m = Math.floor(total / 60);
@@ -6672,7 +7616,7 @@ function bkmpRaidUpdateButtonState() {
     bkmpRaidSyncJoinFlagFromServer(info.raidId);
   }
   if (btn) {
-    if (info.phase === 'prep') {
+    if (info.phase === 'prep' && !bkmpRaidIsGuildBossHourBerlin()) {
       btn.classList.add('raid-prep');
       if (countdownEl) { countdownEl.style.display = ''; countdownEl.textContent = '🔥 ' + bkmpRaidFormatCountdown(info.msUntilFightStart); }
     } else {
@@ -6731,6 +7675,11 @@ async function bkmpRaidRenderJoinBanner() {
   if (!banner) return;
   const info = bkmpRaidGetPhaseInfo();
   if (info.phase !== 'prep') { banner.style.display = 'none'; return; }
+  if (bkmpRaidIsGuildBossHourBerlin()) {
+    banner.style.display = '';
+    banner.innerHTML = `<div class="raid-join-banner-title">🛡️ Der Weltboss pausiert diese Stunde - Fokus liegt auf dem Gildenboss um 20 Uhr!</div>`;
+    return;
+  }
 
   const joined = bkmpRaidHasJoined(info.raidId);
   banner.style.display = '';
@@ -7483,7 +8432,31 @@ window.BKMP_IDLE_ACHIEVEMENTS_EXTRA = [
     id: `rune_equip_level_${n}`, category: 'Runen', title: label,
     desc: `Bringe alle 6 ausgerüsteten Runen gleichzeitig auf mindestens +${n}.`,
     check: ctx => ctx.idleAllEquippedMinLevel >= n
-  }))
+  })),
+  /* Drachenzucht (siehe supabase-dragon-breeding.sql) - Kategorie
+     "Drachenzucht", eigene Zaehler aus bkmpIdleGetAchievementContextFields. */
+  { id: 'dragon_first_egg', category: 'Drachenzucht', title: 'Das erste Ei', desc: 'Finde dein erstes Drachenei.', check: () => bkmpPlayerDragonEggs.length + bkmpPlayerDragons.length >= 1 },
+  { id: 'dragon_first_hatch', category: 'Drachenzucht', title: 'Geschlüpft!', desc: 'Brüte deinen ersten Drachen aus.', check: ctx => ctx.idleDragonsHatched >= 1 },
+  { id: 'dragon_hatch_5', category: 'Drachenzucht', title: 'Drachenzüchter', desc: 'Brüte 5 Drachen aus.', progress: ctx => [ctx.idleDragonsHatched, 5], check: ctx => ctx.idleDragonsHatched >= 5 },
+  { id: 'dragon_hatch_20', category: 'Drachenzucht', title: 'Drachenhort', desc: 'Brüte 20 Drachen aus.', progress: ctx => [ctx.idleDragonsHatched, 20], check: ctx => ctx.idleDragonsHatched >= 20 },
+  { id: 'dragon_first_adult', category: 'Drachenzucht', title: 'Erwachsen geworden', desc: 'Ziehe deinen ersten Drachen bis zur Erwachsenenform auf.', check: ctx => ctx.idleDragonsAdult >= 1 },
+  { id: 'dragon_adult_10', category: 'Drachenzucht', title: 'Drachenmeister', desc: 'Ziehe 10 erwachsene Drachen auf.', progress: ctx => [ctx.idleDragonsAdult, 10], check: ctx => ctx.idleDragonsAdult >= 10 },
+  { id: 'dragon_species_5', category: 'Drachenzucht', title: 'Vielfältige Zucht', desc: 'Besitze Drachen von 5 unterschiedlichen Arten.', progress: ctx => [ctx.idleDragonSpeciesOwned, 5], check: ctx => ctx.idleDragonSpeciesOwned >= 5 },
+  { id: 'dragon_species_all', category: 'Drachenzucht', title: 'Herr über alle Arten', desc: 'Besitze Drachen aller 11 Arten.', progress: ctx => [ctx.idleDragonSpeciesOwned, 11], check: ctx => ctx.idleDragonSpeciesOwned >= 11 },
+  { id: 'dragon_legendary_first', category: 'Drachenzucht', title: 'Legendäre Zucht', desc: 'Besitze deinen ersten legendären Drachen.', check: ctx => ctx.idleLegendaryDragonsOwned >= 1 },
+  { id: 'dragon_legendary_both', category: 'Drachenzucht', title: 'Meister beider Legenden', desc: 'Besitze sowohl einen Zerathor- als auch einen Yakshadrachen.', check: ctx => bkmpPlayerDragons.some(d => d.species_id === 'zerathor') && bkmpPlayerDragons.some(d => d.species_id === 'yakshadrache') },
+  { id: 'dragon_companion_first', category: 'Drachenzucht', title: 'Treuer Begleiter', desc: 'Ruste deinen ersten Begleitdrachen aus.', check: ctx => bkmpPlayerDragons.some(d => d.is_companion) },
+  { id: 'dragon_zucht_branch_maxed', category: 'Drachenzucht', title: 'Zuchtmeister', desc: 'Maximiere den kompletten Zucht-Skilltree-Zweig.', check: () => {
+    if (!bkmpIdleState || !bkmpIdleSkillDefs.length) return false;
+    const alloc = bkmpIdleState.skill_allocations || {};
+    const nodes = bkmpIdleSkillDefs.filter(n => n.branch === 'zucht');
+    return nodes.length > 0 && nodes.every(n => Number(alloc[n.id] || 0) >= n.max_rank);
+  } },
+  /* Login-Streak (rein clientseitig, siehe bkmpIdleCheckDailyStreak). */
+  { id: 'streak_3', category: 'Idle Dorf', title: 'Dranbleiber', desc: 'Logge dich 3 Tage in Folge ein.', progress: ctx => [ctx.idleLoginStreak, 3], check: ctx => ctx.idleLoginStreak >= 3 },
+  { id: 'streak_7', category: 'Idle Dorf', title: 'Wochentreue', desc: 'Logge dich 7 Tage in Folge ein.', progress: ctx => [ctx.idleLoginStreak, 7], check: ctx => ctx.idleLoginStreak >= 7 },
+  { id: 'streak_30', category: 'Idle Dorf', title: 'Ein Monat treu', desc: 'Logge dich 30 Tage in Folge ein.', progress: ctx => [ctx.idleLoginStreak, 30], check: ctx => ctx.idleLoginStreak >= 30 },
+  { id: 'steampunk_owner', category: 'Idle Dorf', title: 'Zahnrad-Sammler', desc: 'Besitze den Dorf-Skin "Steampunk Dorf".', check: ctx => ctx.idleHasSteampunkSkin }
 ];
 
 /* Frueher zeigten alle Tier-Titel auf "unlockAchievement"-IDs (z. B.
@@ -7559,7 +8532,41 @@ window.BKMP_IDLE_TITLES = [
      Auszeichnungs-Titel fuer diese beiden Easter-Egg-Kaempfe, kein
      zusaetzlicher Kampfbonus. */
   { id: 'idletitle_shenloss', name: 'DragonBall Herrscher', desc: 'Shenloss im Kampf besiegt.', unlockCustom: ctx => ctx.shenlossDefeated },
-  { id: 'idletitle_liber', name: 'Du hast ihn besiegt.', desc: 'Den Ganz Liber Drache im Kampf besiegt.', unlockCustom: ctx => ctx.liberDefeated }
+  { id: 'idletitle_liber', name: 'Du hast ihn besiegt.', desc: 'Den Ganz Liber Drache im Kampf besiegt.', unlockCustom: ctx => ctx.liberDefeated },
+  /* Gilde/Arena/Weltboss hatten bisher NUR Erfolge, keine passenden Titel
+     mit echtem Statbonus (Nutzerwunsch 16.07.: "viel mehr Erfolge/Titel...
+     Gilden Arena... Überrasche mich") - hier nachgeholt, gleiches
+     effectType/effectValue-Muster wie oben. ctx.guildLevel/arenaWins/
+     raidBossesDefeated usw. kommen aus dem gemeinsamen, zentral in
+     index.html zusammengebauten Kontext (siehe bkmpBuildAchievementContext),
+     genau wie bei den bereits bestehenden Gilde/Arena/Weltboss-ERFOLGEN. */
+  { id: 'idletitle_guild_member', name: 'Gildenmitglied', desc: 'Einer Gilde beigetreten.', unlockCustom: ctx => ctx.inGuild, effectType: 'defense_flat', effectValue: 2 },
+  { id: 'idletitle_guild_leader', name: 'Gildenanführer', desc: 'Anführer einer Gilde.', unlockCustom: ctx => ctx.guildRole === 'leader', effectType: 'attack_pct', effectValue: 3 },
+  { id: 'idletitle_guild_level10', name: 'Etablierte Gilde', desc: 'Gildenlevel 10 erreicht.', unlockCustom: ctx => ctx.guildLevel >= 10, effectType: 'gold_prod_pct', effectValue: 3 },
+  { id: 'idletitle_guild_level20', name: 'Gildenlegende', desc: 'Gildenlevel 20 erreicht.', unlockCustom: ctx => ctx.guildLevel >= 20, effectType: 'gold_prod_pct', effectValue: 6 },
+  { id: 'idletitle_guild_boss10', name: 'Gildenboss-Bezwinger', desc: '10 Gildenbosse besiegt.', unlockCustom: ctx => ctx.guildBossesDefeated >= 10, effectType: 'boss_dmg_pct', effectValue: 4 },
+  { id: 'idletitle_arena_win10', name: 'Arena-Kämpfer', desc: '10 Arena-Kämpfe gewonnen.', unlockCustom: ctx => ctx.arenaWins >= 10, effectType: 'crit_chance_flat', effectValue: 1 },
+  { id: 'idletitle_arena_win50', name: 'Arena-Veteran', desc: '50 Arena-Kämpfe gewonnen.', unlockCustom: ctx => ctx.arenaWins >= 50, effectType: 'crit_chance_flat', effectValue: 2 },
+  { id: 'idletitle_arena_win200', name: 'Arena-Champion', desc: '200 Arena-Kämpfe gewonnen.', unlockCustom: ctx => ctx.arenaWins >= 200, effectType: 'crit_damage_pct', effectValue: 8 },
+  { id: 'idletitle_arena_rating1500', name: 'Aufstrebender Kämpfer', desc: 'Arena-Rating 1500 erreicht.', unlockCustom: ctx => ctx.arenaRating >= 1500, effectType: 'attack_flat', effectValue: 3 },
+  { id: 'idletitle_raid_boss10', name: 'Bossbezwinger', desc: '10 Weltbosse besiegt.', unlockCustom: ctx => ctx.raidBossesDefeated >= 10, effectType: 'hp_flat', effectValue: 15 },
+  { id: 'idletitle_raid_boss100', name: 'Legendärer Drachenjäger', desc: '100 Weltbosse besiegt.', unlockCustom: ctx => ctx.raidBossesDefeated >= 100, effectType: 'boss_dmg_pct', effectValue: 8 },
+  { id: 'idletitle_raid_mvp', name: 'Raid-MVP', desc: 'Bester Schadensausteiler in einem Weltboss-Raid.', unlockCustom: ctx => ctx.raidMvpCount >= 1, effectType: 'crit_damage_pct', effectValue: 4 },
+  /* Drachenzucht (siehe supabase-dragon-breeding.sql). */
+  { id: 'idletitle_dragon_hatch1', name: 'Drachenzüchter', desc: 'Deinen ersten Drachen ausgebrütet.', unlockCustom: ctx => ctx.idleDragonsHatched >= 1, effectType: 'hp_flat', effectValue: 5 },
+  { id: 'idletitle_dragon_adult1', name: 'Drachenreiter', desc: 'Deinen ersten Drachen zur Erwachsenenform aufgezogen.', unlockCustom: ctx => ctx.idleDragonsAdult >= 1, effectType: 'attack_pct', effectValue: 4 },
+  { id: 'idletitle_dragon_species5', name: 'Vielfältiger Züchter', desc: 'Drachen von 5 verschiedenen Arten besessen.', unlockCustom: ctx => ctx.idleDragonSpeciesOwned >= 5, effectType: 'gold_prod_pct', effectValue: 4 },
+  { id: 'idletitle_dragon_speciesall', name: 'Herr aller Drachenarten', desc: 'Drachen aller 11 Arten besessen.', unlockCustom: ctx => ctx.idleDragonSpeciesOwned >= 11, effectType: 'xp_pct', effectValue: 10 },
+  { id: 'idletitle_dragon_legendary', name: 'Legendärer Züchter', desc: 'Einen legendären Drachen besessen.', unlockCustom: ctx => ctx.idleLegendaryDragonsOwned >= 1, effectType: 'crit_damage_pct', effectValue: 10 },
+  /* Login-Streak. */
+  { id: 'idletitle_streak7', name: 'Wochentreue', desc: '7 Tage in Folge eingeloggt.', unlockCustom: ctx => ctx.idleLoginStreak >= 7, effectType: 'xp_pct', effectValue: 3 },
+  { id: 'idletitle_streak30', name: 'Der Unermüdliche', desc: '30 Tage in Folge eingeloggt.', unlockCustom: ctx => ctx.idleLoginStreak >= 30, effectType: 'xp_pct', effectValue: 8 },
+  { id: 'idletitle_zuchtmeister', name: 'Zuchtmeister', desc: 'Den kompletten Zucht-Skilltree-Zweig maximiert.', unlockCustom: () => {
+    if (!bkmpIdleState || !bkmpIdleSkillDefs.length) return false;
+    const alloc = bkmpIdleState.skill_allocations || {};
+    const nodes = bkmpIdleSkillDefs.filter(n => n.branch === 'zucht');
+    return nodes.length > 0 && nodes.every(n => Number(alloc[n.id] || 0) >= n.max_rank);
+  }, effectType: 'gold_prod_pct', effectValue: 10 }
 ];
 
 /* Summiert die Boni aller FREIGESCHALTETEN (nicht nur des aktiv
@@ -7593,7 +8600,19 @@ window.BKMP_IDLE_COSMETICS = [
   { id: 'leuchtendgold', name: 'Leuchtend Gold', desc: 'Gold, das pulsierend leuchtet.', rarity: 'Legendär', unlockCustom: ctx => ctx.idleGoldEarned >= 1000000 },
   { id: 'drachenfeuer', name: 'Drachenfeuer', desc: 'Für echte Drachenbezwinger.', rarity: 'Legendär', unlockCustom: ctx => ctx.idleDragonKills >= 500 },
   { id: 'schatten_dunkel', name: 'Schatten-Dunkel', desc: 'Noch tiefere Schatten als zuvor.', rarity: 'Episch', unlockCustom: ctx => ctx.idleBossKills >= 15 },
-  { id: 'sternenstaub', name: 'Sternenstaub', desc: 'Glitzernder Staub aus fernen Galaxien.', rarity: 'Mythisch', unlockCustom: ctx => ctx.idleBranchesMaxed >= 5 }
+  { id: 'sternenstaub', name: 'Sternenstaub', desc: 'Glitzernder Staub aus fernen Galaxien.', rarity: 'Mythisch', unlockCustom: ctx => ctx.idleBranchesMaxed >= 5 },
+  /* Neue Kosmetiken 16.07. (Nutzerwunsch: "viel mehr... Präfixe... mit
+     Farbverläufen und Effekten... Gilden Arena... Überrasche mich") - je
+     ein eigenständiger visueller Stil pro großem Feature-Bereich des
+     heutigen Tages, gleiche Farbverlauf-Technik wie die bestehenden
+     Kosmetiken oben (siehe style.css .mc-cosmetic-*). */
+  { id: 'guild_heraldik', name: 'Gilden-Wappen', desc: 'Prunkvolles Gold-Burgunder-Wappen für Gildenanführer.', rarity: 'Episch', unlockCustom: ctx => ctx.guildRole === 'leader' },
+  { id: 'arena_blutrausch', name: 'Blutrausch', desc: 'Feurig pulsierendes Rot für Arena-Champions.', rarity: 'Legendär', unlockCustom: ctx => ctx.arenaWins >= 50 },
+  { id: 'weltenbezwinger', name: 'Weltenbezwinger', desc: 'Dunkler Purpur-Glanz für Weltboss-Veteranen.', rarity: 'Legendär', unlockCustom: ctx => ctx.raidBossesDefeated >= 25 },
+  { id: 'drachenschuppen', name: 'Drachenschuppen', desc: 'Schillernde Schuppenfarben für vielfältige Drachenzüchter.', rarity: 'Episch', unlockCustom: ctx => ctx.idleDragonSpeciesOwned >= 5 },
+  { id: 'legendaerer_hort', name: 'Legendärer Hort', desc: 'Opulentes Gold-Schwarz für Besitzer legendärer Drachen.', rarity: 'Mythisch', unlockCustom: ctx => ctx.idleLegendaryDragonsOwned >= 1 },
+  { id: 'gluetnfeuer', name: 'Glutfeuer', desc: 'Warmes Glühen für treue Dranbleiber.', rarity: 'Episch', unlockCustom: ctx => ctx.idleLoginStreak >= 30 },
+  { id: 'zahnradglanz', name: 'Zahnradglanz', desc: 'Bronze-Kupfer-Schimmer für Steampunk-Liebhaber.', rarity: 'Selten', unlockCustom: ctx => ctx.idleHasSteampunkSkin }
 ];
 
 /* ---------------- Weltboss/Raid: Erfolge (window.BKMP_RAID_ACHIEVEMENTS_EXTRA) ----------------

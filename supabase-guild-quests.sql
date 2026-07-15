@@ -87,7 +87,16 @@ begin
         end,
         v_tier
       )
-      on conflict (guild_id, quest_date, quest_type) do nothing;
+      /* Kein Spalten-Ziel angeben (nur "do nothing" statt
+         "on conflict (guild_id, quest_date, quest_type)") - die Tabelle hat
+         nur einen einzigen Unique-Constraint, Postgres findet ihn automatisch.
+         Mit explizitem Spalten-Ziel warf diese Funktion live
+         "column reference \"quest_type\" is ambiguous" (42702), weil
+         "returns table (..., quest_type text, ...)" quest_type zusaetzlich
+         als PL/pgSQL-Variable im gesamten Funktionsrumpf einfuehrt und das
+         mit der Tabellenspalte kollidiert - bestaetigt per Live-RPC-Aufruf
+         am 15.07. (Spieler-Report: "Lade Quests..." haengt fest). */
+      on conflict do nothing;
     end loop;
   end if;
 

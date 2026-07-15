@@ -55,7 +55,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260715-steampunk1">
+<link rel="stylesheet" href="style.css?v=20260717-kowalski1">
 </head>
 <body>
 
@@ -292,6 +292,21 @@
       <div class="joke-buttons">
         <button class="btn-nein" id="idleBuyFrameCancelBtn" type="button">Abbrechen</button>
         <button class="btn-ja" id="idleBuyFrameConfirmBtn" type="button" disabled>Weiter zu Stripe</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="joke-overlay" id="idleDragonDetailOverlay">
+    <div class="joke-card idle-dragon-detail-card">
+      <img id="idleDragonDetailImg" class="idle-dragon-detail-img" alt="">
+      <h3 id="idleDragonDetailName"></h3>
+      <p class="idle-skin-desc"><strong id="idleDragonDetailRarity"></strong></p>
+      <p class="idle-skin-desc">Nahrungsvorliebe: <span id="idleDragonDetailFood"></span></p>
+      <p class="idle-skin-desc">Geschlüpft am: <span id="idleDragonDetailHatched"></span></p>
+      <div id="idleDragonDetailStats" class="idle-dragon-stats"></div>
+      <p class="idle-skin-desc" id="idleDragonDetailCompanion"></p>
+      <div class="joke-buttons">
+        <button class="btn-ja" id="idleDragonDetailCloseBtn" type="button">Schließen</button>
       </div>
     </div>
   </div>
@@ -604,6 +619,7 @@
         <button type="button" class="idle-dorf-tab" id="idleTabBtnGildeTech">🌳 Gilden-Tech</button>
         <button type="button" class="idle-dorf-tab" id="idleTabBtnGildeBoss">🐲 Gildenboss</button>
         <button type="button" class="idle-dorf-tab" id="idleTabBtnBestenliste">&#128202; Bestenliste</button>
+        <button type="button" class="idle-dorf-tab" id="idleTabBtnDrachen">🐉 Drachenzucht</button>
       </div>
 
       <div class="idle-dorf-panel" id="idlePanelKampf">
@@ -641,6 +657,7 @@
       <div class="idle-dorf-panel" id="idlePanelGilde" style="display:none;"></div>
       <div class="idle-dorf-panel" id="idlePanelGildeTech" style="display:none;"></div>
       <div class="idle-dorf-panel" id="idlePanelGildeBoss" style="display:none;"></div>
+      <div class="idle-dorf-panel" id="idlePanelDrachen" style="display:none;"></div>
 
       <!-- Nutzerwunsch (15.07.): "Baust du das dann unten ein und im
            gleichen Design overlay wie den Rest?" - der Link stand vorher
@@ -1258,9 +1275,9 @@
 
   <script>window.BKMP_CLIENT_STORAGE_KEY = 'bkmp-customer-auth';</script>
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260715-steampunk1"></script>
+  <script src="supabase.js?v=20260717-kowalski1"></script>
   <script src="app.js?v=20260712-themefix1"></script>
-  <script src="idledorf.js?v=20260715-steampunk1"></script>
+  <script src="idledorf.js?v=20260717-kowalski1"></script>
   <script src="mapart.js?v=20260716-companyfix1"></script>
   <script>
     bkmpInitTheme();
@@ -5179,6 +5196,14 @@
         console.warn('Bestenliste konnte nicht geladen werden.', e);
       }
       renderLeaderboard();
+      /* Bug-Report (15.07.): laedt die Seite direkt auf dem Bestenliste-Tab
+         (sessionStorage-Wiederherstellung nach Reload), laeuft goTo() beim
+         initialen Laden VOR dieser echten Netzwerkantwort - .panels-viewport
+         bleibt dann auf der Hoehe der (fast leeren) Platzhalter-Liste
+         eingefroren, obwohl jetzt viel mehr Zeilen drin stehen ("klappt nach
+         unten nicht mehr auf"). Hoehe hier nochmal frisch nachziehen, sobald
+         die echten Daten wirklich da sind. */
+      if (typeof bkmpSyncPanelHeight === 'function') bkmpSyncPanelHeight();
     }
 
     document.querySelectorAll('.leaderboard-tab').forEach(btn => {

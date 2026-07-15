@@ -2898,7 +2898,8 @@ const BKMP_IDLE_PLAYER_STATE_COLUMNS = `name_key, display_name, level, xp, gold,
   total_gold_earned, attack, defense, hp, crit_chance, crit_damage, gold_bonus, xp_bonus, loot_bonus,
   skill_points_available, skill_points_spent, skill_allocations, upgrade_purchases, dragon_kills, boss_kills,
   current_dragon_index, highest_dragon_index, prestige_stage_offset, auto_advance, playtime_seconds, last_seen_at, last_offline_claim, last_skilltree_reset_at, updated_at,
-  rune_fuse_successes, rune_fuse_failures, rune_upgrade_successes, rune_upgrade_failures, village_defeats, yaksha_boss_kills, active_village_skin`;
+  rune_fuse_successes, rune_fuse_failures, rune_upgrade_successes, rune_upgrade_failures, village_defeats, yaksha_boss_kills, active_village_skin,
+  fruit, meat, obstgarten_level, jagdhuette_level, fruit_collected_at, meat_collected_at`;
 
 async function loadIdleDragons() {
   const client = bkmpGetSupabaseClient();
@@ -3178,6 +3179,188 @@ async function unlockPlayerVillageSkin(nameKey, skinId) {
     .limit(1);
   if (error) throw error;
   return Array.isArray(data) ? data[0] : null;
+}
+
+/* ---------------- Drachenzucht (siehe supabase-dragon-breeding.sql) ----------------
+   Gleiches Vertrauensmodell wie Runen: Client rollt Werte/Chancen und
+   schreibt sie direkt (RLS erzwingt nur "eigene Zeile"), keine
+   serverseitige Anti-Cheat-Pruefung - siehe Datei-Kommentar in der
+   SQL-Migration fuer die Begruendung. Nur legendaere Ei-Wuerfe (raid_finish)
+   und der Epic-Ei-Meilenstein-Claim laufen serverseitig. */
+
+async function loadDragonSpeciesCatalog() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from('dragon_species')
+    .select('id, name, rarity, egg_source, source_dragon_id, egg_drop_chance, brood_seconds, sacrifice_gold, sacrifice_crystals, growth_points_required, battle_xp_required, is_multi_stat, sub_stat_count_min, sub_stat_count_max, egg_image, baby_image, teen_image, adult_image, sort_order')
+    .eq('active', true)
+    .order('sort_order', { ascending: true });
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+}
+
+async function loadPlayerDragonEggs(name) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !name) return [];
+  const { data, error } = await client
+    .from('player_dragon_eggs')
+    .select('id, species_id, created_at')
+    .eq('name_key', String(name).trim().toLowerCase());
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+}
+
+async function insertPlayerDragonEgg(nameKey, speciesId) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return null;
+  const { data: sessionData } = await client.auth.getSession();
+  const userId = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
+  if (!userId) return null;
+  const { data, error } = await client
+    .from('player_dragon_eggs')
+    .insert({ name_key: String(nameKey).trim().toLowerCase(), auth_user_id: userId, species_id: speciesId })
+    .select('id, species_id, created_at')
+    .limit(1);
+  if (error) throw error;
+  return Array.isArray(data) ? data[0] : null;
+}
+
+async function loadPlayerDragonNests(name) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !name) return [];
+  const { data, error } = await client
+    .from('player_dragon_nests')
+    .select('id, slot_index, egg_id, started_at')
+    .eq('name_key', String(name).trim().toLowerCase())
+    .order('slot_index', { ascending: true });
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+}
+
+/* Slot 1 existiert lazy - beim ersten Laden anlegen, falls noch nicht
+   vorhanden ("on conflict do nothing", gleiches Prinzip wie
+   idle_claim_event_dragon_victory). */
+async function ensureFirstDragonNest(nameKey) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return;
+  const { data: sessionData } = await client.auth.getSession();
+  const userId = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
+  if (!userId) return;
+  await client
+    .from('player_dragon_nests')
+    .upsert({ name_key: String(nameKey).trim().toLowerCase(), auth_user_id: userId, slot_index: 1 }, { onConflict: 'auth_user_id,slot_index', ignoreDuplicates: true });
+}
+
+async function purchaseDragonNestSlot(nameKey, slotIndex) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return null;
+  const { data: sessionData } = await client.auth.getSession();
+  const userId = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
+  if (!userId) return null;
+  const { data, error } = await client
+    .from('player_dragon_nests')
+    .insert({ name_key: String(nameKey).trim().toLowerCase(), auth_user_id: userId, slot_index: slotIndex })
+    .select('id, slot_index, egg_id, started_at')
+    .limit(1);
+  if (error) throw error;
+  return Array.isArray(data) ? data[0] : null;
+}
+
+/* Guard: nur erfolgreich, wenn das Nest zum Zeitpunkt des Aufrufs noch
+   wirklich leer war (egg_id is null) - verhindert, dass zwei schnelle
+   Klicks dasselbe Nest doppelt belegen. */
+async function assignEggToDragonNest(nestId, eggId) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return false;
+  const { data, error } = await client
+    .from('player_dragon_nests')
+    .update({ egg_id: eggId, started_at: new Date().toISOString() })
+    .eq('id', nestId)
+    .is('egg_id', null)
+    .select('id');
+  if (error) throw error;
+  return Array.isArray(data) && data.length > 0;
+}
+
+async function loadPlayerDragons(name) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !name) return [];
+  const { data, error } = await client
+    .from('player_dragons')
+    .select('id, species_id, nickname, stage, food_preference, growth_points, battle_xp, is_companion, is_favorite, main_stat_key, stat_attack, stat_defense, stat_hp, substats, hatched_at, adult_at')
+    .eq('name_key', String(name).trim().toLowerCase());
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+}
+
+/* Ei oeffnen: Guard-Update ZUERST (leert das Nest nur, wenn dort noch
+   genau dieses Ei liegt) - gewinnt der Aufruf das Rennen, wird danach der
+   Baby-Drache angelegt und das Ei-Item geloescht. Verliert er (0 Zeilen
+   betroffen, z.B. zweiter Tab war schneller), bricht die Funktion ab, OHNE
+   einen zweiten Drachen anzulegen. */
+async function hatchDragonEgg(nestId, eggId, nameKey, speciesId, foodPreference) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return null;
+  const { data: sessionData } = await client.auth.getSession();
+  const userId = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
+  if (!userId) return null;
+
+  const { data: guardRows, error: guardError } = await client
+    .from('player_dragon_nests')
+    .update({ egg_id: null, started_at: null })
+    .eq('id', nestId)
+    .eq('egg_id', eggId)
+    .select('id');
+  if (guardError) throw guardError;
+  if (!Array.isArray(guardRows) || !guardRows.length) return null;
+
+  const { data, error } = await client
+    .from('player_dragons')
+    .insert({
+      name_key: String(nameKey).trim().toLowerCase(),
+      auth_user_id: userId,
+      species_id: speciesId,
+      food_preference: foodPreference,
+      stage: 'baby'
+    })
+    .select('id, species_id, nickname, stage, food_preference, growth_points, battle_xp, is_companion, is_favorite, main_stat_key, stat_attack, stat_defense, stat_hp, substats, hatched_at, adult_at')
+    .limit(1);
+  if (error) throw error;
+
+  await client.from('player_dragon_eggs').delete().eq('id', eggId);
+
+  return Array.isArray(data) ? data[0] : null;
+}
+
+async function updatePlayerDragon(dragonId, patch) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client || !dragonId || !patch) return false;
+  const { error } = await client.from('player_dragons').update(patch).eq('id', dragonId);
+  if (error) throw error;
+  return true;
+}
+
+async function releasePlayerDragon(dragonId) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client || !dragonId) return false;
+  const { error } = await client.from('player_dragons').delete().eq('id', dragonId);
+  if (error) throw error;
+  return true;
+}
+
+async function claimEpicDragonEgg(name, milestone, speciesId) {
+  const client = bkmpGetPlayerAuthClient() || bkmpGetSupabaseClient();
+  if (!client || !name) return null;
+  const { data, error } = await client.rpc('claim_epic_dragon_egg', {
+    p_name_key: String(name).trim().toLowerCase(),
+    p_display_name: name,
+    p_milestone: milestone,
+    p_species_id: speciesId
+  });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  return row || { already_claimed: false, newly_claimed: false };
 }
 
 /* ---------------- Echtgeld-Kaeufe (Stripe, siehe supabase-real-money-
@@ -4317,7 +4500,7 @@ async function bkmpGuildQuestEnsureToday() {
   const client = bkmpGetPlayerAuthClient();
   if (!client) return [];
   const { data, error } = await client.rpc('guild_quest_ensure_today');
-  if (error) return [];
+  if (error) { console.warn('guild_quest_ensure_today fehlgeschlagen:', error); return []; }
   return (data || []).map(row => ({
     id: row.id,
     questType: row.quest_type,

@@ -228,6 +228,15 @@ declare
 begin
   if v_uid is null then raise exception 'not_authenticated'; end if;
 
+  -- Spieler-Wunsch (17.07.): der staendliche Weltboss faellt in der 20-Uhr-
+  -- Stunde (Europe/Berlin) aus, weil dort taeglich der Gildenboss laeuft -
+  -- Client blendet den Beitritts-Button in dieser Stunde bereits aus, hier
+  -- zusaetzlich serverseitig abgesichert (Defense in Depth wie beim
+  -- Raid-Client-Muster ueblich).
+  if extract(hour from now() at time zone 'Europe/Berlin') = 20 then
+    raise exception 'raid_paused_guild_boss_hour';
+  end if;
+
   v_fight_starts := to_timestamp(p_raid_id, 'YYYYMMDDHH24') at time zone 'UTC';
   v_prep_starts := v_fight_starts - interval '5 minutes';
   if now() < v_prep_starts or now() >= v_fight_starts then
