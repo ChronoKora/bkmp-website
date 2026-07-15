@@ -1249,7 +1249,7 @@ function bkmpIdleRenderDungeonPanel() {
       <div class="idle-dungeon-diff-row">${BKMP_DUNGEON_DIFFICULTIES.map(d => `
         <button type="button" class="idle-dungeon-diff-btn${d.id === selected.id ? ' active' : ''}" data-difficulty-id="${d.id}" ${bkmpDungeonActive ? 'disabled' : ''}>${d.icon} ${d.name}</button>
       `).join('')}</div>
-      <p>${selected.waves} Gegner-Wellen direkt hintereinander, ohne Pause und ohne Heilung dazwischen - die Gegner werden mit jeder Welle gefährlicher. Die Belohnung richtet sich nach deinen eigenen Werten, die Herausforderung bleibt also fair, egal wie weit du normal schon bist. Belohnungs-Bonus dieser Stufe: ${selected.rewardMult}×. Schaffst du alle ${selected.waves}?</p>
+      <p>${selected.waves} Gegner-Wellen direkt hintereinander, ohne Pause - die Gegner werden mit jeder Welle gefährlicher. Die Belohnung richtet sich nach deinen eigenen Werten, die Herausforderung bleibt also fair, egal wie weit du normal schon bist. Belohnungs-Bonus dieser Stufe: ${selected.rewardMult}×. Schaffst du alle ${selected.waves}?</p>
       <p class="idle-dungeon-best">${bestText}</p>
       <button type="button" class="btn-ja idle-dungeon-start-btn" id="idleDungeonStartBtn" ${bkmpDungeonActive ? 'disabled' : ''}>${bkmpDungeonActive ? '⏳ Dungeon läuft...' : `${selected.icon} ${selected.name} starten`}</button>
     </div>
@@ -1660,13 +1660,9 @@ function bkmpIdleTick() {
 
   /* Schildgenerator/Reparaturtempo (Burg): passive Regeneration der
      Stadt-Lebenspunkte - vorher wirkungslos, effect_type wurde nie
-     ausgewertet. WAEHREND EINES DUNGEON-LAUFS bewusst deaktiviert
-     (Spieler-Meldung 17.07.: "Heilung deaktivieren von den Skills - beim
-     Dungeon-Boss schaffe ich das ganz ohne Gegenschaden") - das Dungeon-
-     Panel verspricht explizit "ohne Heilung dazwischen", diese passive
-     Regeneration hat genau das unterlaufen und den ganzen Risiko-Reiz des
-     Modus zunichte gemacht. */
-  if (!bkmpDungeonActive && stats.villageRegenPct > 0 && bkmpIdleVillageHp < stats.hp) {
+     ausgewertet. Frueher waehrend Dungeon-Laeufen deaktiviert, auf
+     Spielerwunsch (17.07.) wieder aktiviert - gilt jetzt auch im Dungeon. */
+  if (stats.villageRegenPct > 0 && bkmpIdleVillageHp < stats.hp) {
     bkmpIdleVillageHp = Math.min(stats.hp, bkmpIdleVillageHp + stats.hp * (stats.villageRegenPct / 100));
   }
 

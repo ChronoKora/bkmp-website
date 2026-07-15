@@ -1,0 +1,22 @@
+-- ============================================================
+-- Bkmp - Verwaisten "Aureliadrache"-Eintrag aus idle_dragons erneut
+-- entfernen (Spieler-Report 17.07.: "Es gibt immernoch als 'Normalen'
+-- Drachen einen Aurelia Drache").
+--
+-- supabase-dragon-roster-aurelia-rename.sql hatte diese Zeile bereits
+-- geloescht (der Miniboss "yakshas-drache" wurde zu "Aurelia Drache"
+-- umbenannt und dient seitdem als Ei-Quelle). Live per REST-API bestaetigt:
+-- die Zeile existiert wieder, mit spawn_rule='standard' statt 'rare' -
+-- vermutlich durch ein erneutes Ausfuehren von supabase-dragon-breeding.sql,
+-- dessen ON-CONFLICT-Upsert die geloeschte Zeile neu angelegt hat (die
+-- spawn_rule-Spalte war in diesem Insert nie enthalten, fiel also auf den
+-- Standardwert zurueck). supabase-dragon-breeding.sql wurde jetzt so
+-- angepasst, dass der Aureliadrache-Insert komplett entfaellt - dieser
+-- Fix hier raeumt nur den aktuell noch live vorhandenen Karteileichen-
+-- Eintrag weg.
+--
+-- Supabase Dashboard > SQL Editor > New query > diesen Inhalt ausfuehren.
+-- Idempotent (delete ohne Row = No-Op bei erneutem Ausfuehren).
+-- ============================================================
+
+delete from public.idle_dragons where id = 'aureliadrache';

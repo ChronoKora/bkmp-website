@@ -93,14 +93,19 @@ on conflict (id) do update set
   egg_image = excluded.egg_image, baby_image = excluded.baby_image, teen_image = excluded.teen_image,
   adult_image = excluded.adult_image, sort_order = excluded.sort_order;
 
-/* ---------------- idle_dragons: 2 neue Roster-Eintraege ----------------
-   Winddrache + Aureliadrache muessen im normalen Kampf-Roster existieren,
-   damit ihr Ei ueberhaupt eine Kill-Quelle hat (siehe egg_source='combat'
-   oben). Werte/Balance analog zu den bestehenden Nachbarn ihrer Stufe. */
+/* ---------------- idle_dragons: 1 neuer Roster-Eintrag ----------------
+   Winddrache muss im normalen Kampf-Roster existieren, damit sein Ei
+   ueberhaupt eine Kill-Quelle hat (siehe egg_source='combat' oben).
+   Aureliadrache hatte urspruenglich ebenfalls einen eigenen Eintrag hier,
+   wurde aber per supabase-dragon-roster-aurelia-rename.sql geloescht - der
+   Miniboss "yakshas-drache" (jetzt "Aurelia Drache") dient seitdem als
+   Ei-Quelle. Absichtlich NICHT mehr hier drin, sonst erweckt ein erneutes
+   Ausfuehren dieser Datei die geloeschte Zeile per ON CONFLICT wieder zum
+   Leben (genau das ist am 17.07. passiert, siehe
+   supabase-dragon-aureliadrache-cleanup.sql). */
 insert into public.idle_dragons (id, name, emoji, color_theme, tier_order, base_hp, base_attack, base_defense, gold_reward_base, xp_reward_base, wood_reward_base, stone_reward_base, crystal_reward_base, essence_reward_base, is_boss, active)
 values
-  ('winddrache', 'Winddrache', '🌪️', '#5eead4', 4, 130, 13, 3, 6, 6, 2, 2, 0, 0, false, true),
-  ('aureliadrache', 'Aureliadrache', '💫', '#fbbf24', 9, 260, 24, 8, 11, 11, 3, 3, 1, 0, false, true)
+  ('winddrache', 'Winddrache', '🌪️', '#5eead4', 4, 130, 13, 3, 6, 6, 2, 2, 0, 0, false, true)
 on conflict (id) do update set
   name = excluded.name, emoji = excluded.emoji, color_theme = excluded.color_theme,
   tier_order = excluded.tier_order, base_hp = excluded.base_hp, base_attack = excluded.base_attack,
