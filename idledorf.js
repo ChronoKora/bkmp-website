@@ -6241,7 +6241,10 @@ function bkmpRuneAscend(cid) {
   bkmpIdlePlayerRunes = bkmpIdlePlayerRunes.filter(r => r._cid !== fodder._cid);
   if (fodder.id && typeof deletePlayerRunes === 'function') deletePlayerRunes([fodder.id]).catch(() => {});
   rune.upgrade_level = Number(rune.upgrade_level || 0) + 1;
-  if (rune.id) updatePlayerRuneUpgrade(rune.id, rune.upgrade_level, rune.substats).catch(() => {});
+  if (rune.id) updatePlayerRuneUpgrade(rune.id, rune.upgrade_level, rune.substats).catch(err => {
+    console.error('bkmpRuneAscend: Speichern fehlgeschlagen, Aufstieg wird beim naechsten Laden zurueckgesetzt', err);
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('⚠️ Aufstieg konnte nicht gespeichert werden - bitte Seite neu laden und erneut versuchen.', 4000);
+  });
   bkmpIdleState.rune_upgrade_successes = Number(bkmpIdleState.rune_upgrade_successes || 0) + 1;
   bkmpIdleLog(`🌟 ${slot ? slot.name : 'Rune'} auf +${rune.upgrade_level} aufgestiegen! Eine zweite Legendäre wurde dafür verbraucht.`);
   if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`🌟 Aufstieg geglückt: +${rune.upgrade_level}!`, 3200);
