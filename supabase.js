@@ -3045,7 +3045,7 @@ async function loadIdlePlayerState(name) {
    Schreibfunktionen gedacht, nur fuer diesen einen Hot-Path relevant. */
 let bkmpIdlePlayerStateUserIdCache = null;
 
-async function upsertIdlePlayerState(state) {
+async function upsertIdlePlayerState(state, _isRetry) {
   const client = bkmpGetPlayerAuthClient();
   if (!client || !state || !state.name_key) return false;
   /* Bug-Report 17.07.: "Skillpunkte resetten nach Reload" - trat trotz des
@@ -3060,14 +3060,22 @@ async function upsertIdlePlayerState(state) {
      bereits vorhandenen Cache-Wert SOFORT synchron weiterspeichern (keine
      Wartezeit vor dem fetch), die Session dabei nur im Hintergrund
      auffrischen. Beim allerersten Aufruf einer Sitzung (Cache noch leer)
-     bleibt der normale await-Weg bestehen. */
-  let userId = bkmpIdlePlayerStateUserIdCache;
-  if (userId) {
-    client.auth.getSession().then(({ data }) => {
-      const freshId = data && data.session && data.session.user ? data.session.user.id : null;
-      if (freshId) bkmpIdlePlayerStateUserIdCache = freshId;
-    }).catch(() => {});
-  } else {
+     bleibt der normale await-Weg bestehen.
+
+     NACHBESSERUNG (Live-DB-Check 17.07. bei ChronoKora: updated_at ueber 1h
+     alt trotz aktivem Spielen - Speichern schlug also KOMPLETT fehl, nicht
+     nur beim Reload): der reine Cache-Wert kann veralten (Session lief ab/
+     wurde woanders invalidiert, Geraetewechsel) und wurde vorher NIE erneut
+     geprueft, wenn er einmal gesetzt war - jeder weitere Speicherversuch
+     haette dann fuer den Rest der Sitzung stillschweigend mit einer
+     veralteten ID gegen die RLS gelaufen (0 betroffene Zeilen -> Insert
+     scheitert am UNIQUE-Index auf name_key -> Fehler wird nur console.warn'd).
+     Deshalb jetzt selbstheilend: schlaegt ein Versuch MIT Cache-Wert fehl
+     (Fehler oder 0 betroffene Zeilen), wird der Cache verworfen und GENAU
+     EINMAL mit frisch aufgeloester Session erneut versucht. */
+  const usedCache = Boolean(bkmpIdlePlayerStateUserIdCache) && !_isRetry;
+  let userId = usedCache ? bkmpIdlePlayerStateUserIdCache : null;
+  if (!userId) {
     const { data: sessionData } = await client.auth.getSession();
     userId = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
     if (userId) bkmpIdlePlayerStateUserIdCache = userId;
@@ -3089,8 +3097,12 @@ async function upsertIdlePlayerState(state) {
     .update(statsPayload)
     .eq('auth_user_id', userId)
     .select('auth_user_id');
-  if (updateError) throw updateError;
+  if (updateError) {
+    if (usedCache) { bkmpIdlePlayerStateUserIdCache = null; return upsertIdlePlayerState(state, true); }
+    throw updateError;
+  }
   if (!Array.isArray(updated) || updated.length === 0) {
+    if (usedCache) { bkmpIdlePlayerStateUserIdCache = null; return upsertIdlePlayerState(state, true); }
     const { error: insertError } = await client.from('idle_player_state').insert({
       ...statsPayload,
       name_key,
@@ -3098,6 +3110,12 @@ async function upsertIdlePlayerState(state) {
       auth_user_id: userId
     });
     if (insertError) throw insertError;
+  }
+  if (usedCache) {
+    client.auth.getSession().then(({ data }) => {
+      const freshId = data && data.session && data.session.user ? data.session.user.id : null;
+      if (freshId) bkmpIdlePlayerStateUserIdCache = freshId;
+    }).catch(() => {});
   }
   return true;
 }

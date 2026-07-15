@@ -424,6 +424,7 @@ let bkmpIdleLoopTimerMs = 900;
 let bkmpIdleModalOpen = false;
 let bkmpIdleSyncPending = false;
 let bkmpIdleSyncTimer = null;
+let bkmpIdleLastSaveFailToastAt = 0;
 let bkmpIdleConfigLoaded = false;
 /* Sieg-Status der seltenen Event-Drachen (siehe supabase-idle-event-
    dragons.sql), unabhaengig von bkmpIdleState geladen (eigene Tabelle,
@@ -4278,6 +4279,17 @@ async function bkmpIdleFlushSync() {
     bkmpIdleSnapshotMergeBaseline();
   } catch (e) {
     console.warn('Idle Dorf: Speichern fehlgeschlagen.', e);
+    /* Bug-Report 17.07. (ChronoKora): Speichern schlug ueber laengere Zeit
+       komplett fehl, ohne dass der Spieler davon je etwas mitbekam - nur
+       console.warn, das niemand beim normalen Spielen offen hat. Jetzt
+       wenigstens EINMAL alle 60s sichtbar machen (kein Toast-Spam bei
+       laengeren Ausfaellen/Offline-Phasen, aber auch kein komplett stiller
+       Datenverlust mehr). */
+    const now = Date.now();
+    if (typeof bkmpShowJannikToast === 'function' && now - (bkmpIdleLastSaveFailToastAt || 0) > 60000) {
+      bkmpIdleLastSaveFailToastAt = now;
+      bkmpShowJannikToast('⚠️ Speichern fehlgeschlagen - dein Fortschritt der letzten Zeit ist evtl. nicht gesichert. Bitte Seite neu laden und prüfen.', 6000);
+    }
   }
 }
 
