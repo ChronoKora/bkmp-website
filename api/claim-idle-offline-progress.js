@@ -180,6 +180,17 @@ module.exports = async function handler(req, res) {
     let villageHp = Number(state.hp || 100);
     const villageMaxHp = villageHp;
 
+    /* Bug-Report 17.07. (ChronoKora): "Bleibt auf dieser Stufe" wird nach
+       einem Reload ignoriert, Spieler landet automatisch wieder auf der
+       hoechsten Stufe. Ursache: diese Offline-Simulation kannte
+       state.auto_advance gar nicht und hat killIndex bei jedem simulierten
+       Sieg/jeder Niederlage immer weitergeschoben - exakt wie der Live-Tick
+       es bei auto_advance=true tut (siehe bkmpIdleHandleDragonDefeated in
+       idledorf.js), aber eben auch dann, wenn der Spieler sich bewusst auf
+       einer Stufe festgesetzt hatte. Jetzt: bei auto_advance=false bleibt
+       killIndex fix, es wird einfach derselbe Drache wiederholt simuliert -
+       genau das Live-Verhalten von "Bleibt auf dieser Stufe". */
+    const autoAdvance = state.auto_advance !== false;
     let killIndex = Number(state.current_dragon_index || 0);
     let simulatedSeconds = 0;
     let kills = 0;
@@ -215,7 +226,7 @@ module.exports = async function handler(req, res) {
         const timeLost = ticksUntilDefeat * secondsPerTick;
         if (simulatedSeconds + timeLost > budgetSeconds) break;
         simulatedSeconds += timeLost;
-        killIndex = Math.max(0, killIndex - 1);
+        if (autoAdvance) killIndex = Math.max(0, killIndex - 1);
         villageHp = villageMaxHp;
         continue;
       }
@@ -235,7 +246,7 @@ module.exports = async function handler(req, res) {
       essenceGain += Math.round((dragon.archetype.essence_reward_base || 0) * (1 + lootBonus / 100));
       kills += 1;
       if (dragon.isBoss) bossKills += 1;
-      killIndex += 1;
+      if (autoAdvance) killIndex += 1;
     }
 
     let level = Number(state.level || 1);
