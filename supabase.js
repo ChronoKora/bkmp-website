@@ -4069,17 +4069,127 @@ async function bkmpGuildGetMine() {
   };
 }
 
+/* Spieler-Wunsch (16.07., Feedback-Eintrag: "wäre es Möglich das man
+   sieht wer in welcher Gilde drin ist... auch in der Gilden Liste die
+   anzeigen die Privat sind"): der is_public-Filter hier war der EINZIGE
+   Grund, warum private Gilden in der Uebersicht nie auftauchten - die
+   guilds-Tabelle selbst ist serverseitig laengst vollstaendig oeffentlich
+   lesbar (RLS "using (true)"), das war also reine Client-Filterung ohne
+   echten Datenschutz-Zweck. Jetzt liefert die Uebersicht alle Gilden,
+   bkmpIdleRenderGildePanel() in idledorf.js entscheidet anhand isPublic
+   nur noch ueber Sofort-Beitritt (oeffentlich) vs. Beitrittsanfrage
+   (privat), nicht mehr ueber Sichtbarkeit. */
 async function bkmpGuildBrowse(limit) {
   const client = bkmpGetSupabaseClient();
   if (!client) return [];
   const { data, error } = await client
     .from('guilds')
     .select(BKMP_GUILD_COLUMNS)
-    .eq('is_public', true)
     .order('treasury_gold', { ascending: false })
     .limit(limit || 50);
   if (error) throw error;
   return (data || []).map(bkmpGuildMapRow);
+}
+
+/* Fuer die aufklappbare Mitgliederliste in der Gilden-Uebersicht - bewusst
+   ohne contributed_gold/joined_at (nicht relevant fuer Nicht-Mitglieder,
+   guild_members ist zwar ohnehin oeffentlich lesbar, aber weniger
+   uebertragene Daten sind trotzdem besser). */
+async function bkmpGuildLoadMembersPublic(guildId) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !guildId) return [];
+  const { data, error } = await client
+    .from('guild_members')
+    .select('auth_user_id, display_name, role')
+    .eq('guild_id', guildId)
+    .order('role', { ascending: true });
+  if (error) return [];
+  return (data || []).map(row => ({ authUserId: row.auth_user_id, displayName: row.display_name, role: row.role }));
+}
+
+/* ---------------- Beitrittsanfragen (siehe supabase-guild-join-requests.sql) ----------------
+   Alternative zum Sofort-Beitritt/Code - vor allem fuer private Gilden
+   gedacht, funktioniert aber fuer beliebige Gilden. */
+function bkmpGuildMapJoinRequestRow(row) {
+  return {
+    id: row.id,
+    guildId: row.guild_id,
+    authUserId: row.auth_user_id,
+    displayName: row.display_name,
+    message: row.message || '',
+    status: row.status,
+    createdAt: row.created_at,
+    decidedAt: row.decided_at,
+    decidedByName: row.decided_by_name
+  };
+}
+
+async function bkmpGuildRequestJoin(guildId, message) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { error } = await client.rpc('request_guild_join', { p_guild_id: guildId, p_message: message || null });
+  if (error) {
+    const msg = String(error.message || '');
+    if (msg.includes('already_in_guild')) throw new Error('Du bist schon in einer Gilde. Verlasse sie zuerst.');
+    if (msg.includes('no_idle_state')) throw new Error('Spiele zuerst im Kampf-Tab, bevor du eine Beitrittsanfrage stellst.');
+    if (msg.includes('already_requested')) throw new Error('Du hast bei dieser Gilde bereits eine offene Anfrage.');
+    if (msg.includes('guild_not_found')) throw new Error('Diese Gilde gibt es nicht mehr.');
+    throw new Error('Anfrage konnte nicht gesendet werden. Bitte versuche es erneut.');
+  }
+}
+
+async function bkmpGuildCancelJoinRequest(requestId) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { error } = await client.rpc('cancel_guild_join_request', { p_request_id: requestId });
+  if (error) throw new Error('Anfrage konnte nicht zurückgezogen werden.');
+}
+
+async function bkmpGuildRespondJoinRequest(requestId, accept) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { error } = await client.rpc('respond_guild_join_request', { p_request_id: requestId, p_accept: accept });
+  if (error) {
+    const msg = String(error.message || '');
+    if (msg.includes('not_authorized')) throw new Error('Dafür brauchst du mindestens die Rolle Veteran.');
+    if (msg.includes('guild_full')) throw new Error('Die Gilde ist bereits voll (20 Mitglieder).');
+    if (msg.includes('requester_already_in_guild')) throw new Error('Der Spieler ist inzwischen schon in einer anderen Gilde.');
+    if (msg.includes('request_already_decided')) throw new Error('Über diese Anfrage wurde schon entschieden.');
+    throw new Error('Konnte nicht bearbeitet werden. Bitte versuche es erneut.');
+  }
+}
+
+/* Eigene offene Anfragen (koennen an mehrere Gilden gleichzeitig laufen) -
+   fuer die Browse-Liste, um pro Karte "Anfrage ausstehend" statt des
+   Buttons anzuzeigen. */
+async function bkmpGuildLoadMyJoinRequests() {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return [];
+  const { data: sessionData } = await client.auth.getSession();
+  const userId = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
+  if (!userId) return [];
+  const { data, error } = await client
+    .from('guild_join_requests')
+    .select('id, guild_id, auth_user_id, display_name, message, status, created_at, decided_at, decided_by_name')
+    .eq('auth_user_id', userId)
+    .eq('status', 'pending');
+  if (error) return [];
+  return (data || []).map(bkmpGuildMapJoinRequestRow);
+}
+
+/* Offene Anfragen AN die eigene Gilde - fuer den Anfuehrer/Stellvertreter/
+   Veteran-Posteingang. */
+async function bkmpGuildLoadJoinRequestsForMyGuild(guildId) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client || !guildId) return [];
+  const { data, error } = await client
+    .from('guild_join_requests')
+    .select('id, guild_id, auth_user_id, display_name, message, status, created_at, decided_at, decided_by_name')
+    .eq('guild_id', guildId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true });
+  if (error) return [];
+  return (data || []).map(bkmpGuildMapJoinRequestRow);
 }
 
 async function bkmpGuildUpdateSettings(description, isPublic) {

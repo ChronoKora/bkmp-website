@@ -5745,6 +5745,22 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 .idle-arena-attack-btn { margin-left: auto; font-size: 0.82rem; padding: 0.35rem 0.8rem; }
 .idle-arena-history .idle-dungeon-best { font-weight: 500; font-size: 0.85rem; margin-bottom: 0.3rem; }
 
+/* Gilden: Beitrittsanfragen (siehe supabase-guild-join-requests.sql) -
+   .idle-guild-browse-members braucht flex-basis:100%, weil die Karte
+   selbst display:flex ist (sonst wuerde die Mitgliederliste einfach als
+   weiteres Flex-Item in dieselbe Zeile gequetscht statt darunter
+   umzubrechen). */
+.idle-guild-request-pending { font-size: 0.8rem; color: var(--muted); font-weight: 600; }
+.idle-guild-browse-members { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.4rem; }
+.idle-guild-browse-member-chip {
+  font-size: 0.78rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+  color: var(--muted);
+}
+
 /* Gilden (siehe supabase-idle-guilds.sql) - Gruenden-/Beitrags-Formular. */
 .idle-guild-create-row { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; margin-top: 0.6rem; }
 .idle-guild-create-row input {

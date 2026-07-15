@@ -3116,6 +3116,15 @@ let bkmpGuildSettingsOpen = false;
 let bkmpGuildMyInviteCode = null;
 let bkmpGuildActivityLog = [];
 let bkmpGuildActivityLoadedForGuildId = null;
+/* ---------------- Beitrittsanfragen (siehe supabase-guild-join-requests.sql) ----------------
+   Spieler-Feedback (16.07.): Mitgliederlisten auch in der Durchsuchen-
+   Ansicht zeigen, private Gilden dort nicht mehr komplett ausblenden,
+   und eine Anfrage-Funktion als Alternative zum reinen Code-Beitritt. */
+let bkmpGuildMyJoinRequests = [];
+let bkmpGuildJoinRequests = [];
+let bkmpGuildJoinRequestsLoadedForGuildId = null;
+let bkmpGuildExpandedBrowseGuildId = null;
+let bkmpGuildBrowseMembersCache = {};
 let bkmpGuildTechLevels = {};
 let bkmpGuildTechLoadedForGuildId = null;
 let bkmpGuildQuests = [];
@@ -3211,6 +3220,7 @@ async function bkmpGuildLoadAll() {
   try {
     bkmpGuildState = uid ? await bkmpGuildGetMine() : null;
     bkmpGuildBrowseList = uid && !bkmpGuildState ? await bkmpGuildBrowse(30) : [];
+    bkmpGuildMyJoinRequests = uid && !bkmpGuildState && typeof bkmpGuildLoadMyJoinRequests === 'function' ? await bkmpGuildLoadMyJoinRequests() : [];
     if (!bkmpGuildLevelThresholds.length && typeof bkmpGuildGetLevelThresholds === 'function') {
       bkmpGuildLevelThresholds = await bkmpGuildGetLevelThresholds();
     }
@@ -3324,12 +3334,35 @@ async function bkmpIdleRenderGildePanel() {
         ${bkmpGuildBrowseList.length === 0 ? '<p class="empty-hint">Noch keine Gilden vorhanden. Gründe die erste!</p>' : bkmpGuildBrowseList.map(g => {
           const level = bkmpGuildLevelInfo(g.guildXp).level;
           const winRate = g.bossAttempts > 0 ? Math.round((g.bossesDefeated / g.bossAttempts) * 100) : null;
+          /* Spieler-Feedback (16.07.): private Gilden nicht mehr komplett
+             ausblenden (guilds/guild_members sind serverseitig ohnehin
+             oeffentlich lesbar, siehe Kommentar bei bkmpGuildBrowse in
+             supabase.js) - stattdessen mit 🔒 kennzeichnen und statt des
+             Sofort-Beitritts eine Anfrage anbieten, die Anfuehrer/
+             Stellvertreter/Veteran annehmen oder ablehnen koennen. */
+          const myRequest = bkmpGuildMyJoinRequests.find(r => r.guildId === g.id);
+          const isExpanded = bkmpGuildExpandedBrowseGuildId === g.id;
+          const members = bkmpGuildBrowseMembersCache[g.id];
+          let actionHtml;
+          if (g.isPublic) {
+            actionHtml = `<button type="button" class="btn-ja idle-guild-join-btn" ${bkmpGuildBusy || g.memberCount >= 20 ? 'disabled' : ''}>${g.memberCount >= 20 ? 'Voll' : 'Beitreten'}</button>`;
+          } else if (myRequest) {
+            actionHtml = `<span class="idle-guild-request-pending">🕓 Anfrage ausstehend</span><button type="button" class="btn-nein idle-guild-cancel-request-btn" data-request-id="${escapeHtml(myRequest.id)}" ${bkmpGuildBusy ? 'disabled' : ''}>Zurückziehen</button>`;
+          } else {
+            actionHtml = `<button type="button" class="btn-ja idle-guild-request-btn" ${bkmpGuildBusy || g.memberCount >= 20 ? 'disabled' : ''}>${g.memberCount >= 20 ? 'Voll' : 'Anfrage senden'}</button>`;
+          }
           return `
           <div class="idle-arena-opponent-card" data-guild-id="${escapeHtml(g.id)}">
-            <span class="idle-arena-opponent-name">${bkmpRenderGuildBanner(g.banner, 28)} [${escapeHtml(g.tag)}] ${escapeHtml(g.name)}</span>
+            <span class="idle-arena-opponent-name">${g.isPublic ? '🌐' : '🔒'} ${bkmpRenderGuildBanner(g.banner, 28)} [${escapeHtml(g.tag)}] ${escapeHtml(g.name)}</span>
             <span class="idle-arena-opponent-rating">💰 ${bkmpIdleFormatNumber(g.treasuryGold)}</span>
             <span class="idle-arena-opponent-record">🏰 Lvl ${level} &middot; ${g.memberCount}/20 Mitglieder${winRate !== null ? ` &middot; 🐲 ${g.bossesDefeated} (${winRate}%)` : ''}</span>
-            <button type="button" class="btn-ja idle-guild-join-btn" ${bkmpGuildBusy || g.memberCount >= 20 ? 'disabled' : ''}>${g.memberCount >= 20 ? 'Voll' : 'Beitreten'}</button>
+            <button type="button" class="btn-nein idle-guild-toggle-members-btn">${isExpanded ? 'Mitglieder ausblenden' : 'Mitglieder anzeigen'}</button>
+            ${actionHtml}
+            ${isExpanded ? `
+              <div class="idle-guild-browse-members">
+                ${!members ? '<p class="empty-hint">⏳ Lädt...</p>' : members.length === 0 ? '<p class="empty-hint">Keine Mitglieder.</p>' : members.map(m => `<span class="idle-guild-browse-member-chip">${escapeHtml(m.displayName)} &middot; ${BKMP_GUILD_ROLE_LABELS[m.role] || m.role}</span>`).join('')}
+              </div>
+            ` : ''}
           </div>
         `;
         }).join('')}
@@ -3364,6 +3397,55 @@ async function bkmpIdleRenderGildePanel() {
           await bkmpGuildJoin(guildId);
           bkmpGuildLoaded = false;
           bkmpGuildRefreshTreasuryBonusCache();
+        } catch (e) {
+          if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(e.message, 3400);
+        }
+        bkmpGuildBusy = false;
+        await bkmpIdleRenderGildePanel();
+      });
+    });
+    panel.querySelectorAll('.idle-guild-toggle-members-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const card = btn.closest('[data-guild-id]');
+        const guildId = card ? card.dataset.guildId : null;
+        if (!guildId) return;
+        if (bkmpGuildExpandedBrowseGuildId === guildId) {
+          bkmpGuildExpandedBrowseGuildId = null;
+          await bkmpIdleRenderGildePanel();
+          return;
+        }
+        bkmpGuildExpandedBrowseGuildId = guildId;
+        if (!bkmpGuildBrowseMembersCache[guildId] && typeof bkmpGuildLoadMembersPublic === 'function') {
+          await bkmpIdleRenderGildePanel();
+          bkmpGuildBrowseMembersCache[guildId] = await bkmpGuildLoadMembersPublic(guildId).catch(() => []);
+        }
+        await bkmpIdleRenderGildePanel();
+      });
+    });
+    panel.querySelectorAll('.idle-guild-request-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const card = btn.closest('[data-guild-id]');
+        const guildId = card ? card.dataset.guildId : null;
+        if (!guildId || bkmpGuildBusy) return;
+        bkmpGuildBusy = true;
+        try {
+          await bkmpGuildRequestJoin(guildId);
+          bkmpGuildMyJoinRequests = await bkmpGuildLoadMyJoinRequests().catch(() => bkmpGuildMyJoinRequests);
+          if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Beitrittsanfrage gesendet!', 3000);
+        } catch (e) {
+          if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(e.message, 3400);
+        }
+        bkmpGuildBusy = false;
+        await bkmpIdleRenderGildePanel();
+      });
+    });
+    panel.querySelectorAll('.idle-guild-cancel-request-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (bkmpGuildBusy) return;
+        bkmpGuildBusy = true;
+        try {
+          await bkmpGuildCancelJoinRequest(btn.dataset.requestId);
+          bkmpGuildMyJoinRequests = await bkmpGuildLoadMyJoinRequests().catch(() => bkmpGuildMyJoinRequests);
         } catch (e) {
           if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(e.message, 3400);
         }
@@ -3432,6 +3514,11 @@ async function bkmpIdleRenderGildePanel() {
        nicht bereit), versucht es der naechste Panel-Rerender einfach erneut,
        statt fuer immer auf dem leeren Zustand stehen zu bleiben. */
     bkmpGuildGetActivityLog(g.id, 30).then(log => { bkmpGuildActivityLoadedForGuildId = g.id; bkmpGuildActivityLog = log; bkmpIdleRenderGildePanel(); }).catch(e => console.warn('Idle Dorf: Gildenaktivitaet konnte nicht geladen werden.', e));
+  }
+  if (isModerator && bkmpGuildJoinRequestsLoadedForGuildId !== g.id) {
+    bkmpGuildLoadJoinRequestsForMyGuild(g.id).then(list => { bkmpGuildJoinRequestsLoadedForGuildId = g.id; bkmpGuildJoinRequests = list; bkmpIdleRenderGildePanel(); }).catch(e => console.warn('Idle Dorf: Beitrittsanfragen konnten nicht geladen werden.', e));
+  } else if (!isModerator) {
+    bkmpGuildJoinRequests = [];
   }
   if (bkmpGuildQuestsLoadedForGuildId !== g.id) {
     /* Gleicher Grund wie oben beim Aktivitaetslog: Flag erst nach Erfolg
@@ -3519,6 +3606,19 @@ async function bkmpIdleRenderGildePanel() {
         `;
       }).join('')}
     </div>
+    ${isModerator ? `
+    <div class="idle-arena-history">
+      <h4 style="margin-top:1rem;">📩 Beitrittsanfragen ${bkmpGuildJoinRequests.length ? `(${bkmpGuildJoinRequests.length})` : ''}</h4>
+      ${bkmpGuildJoinRequests.length === 0 ? '<p class="empty-hint">Keine offenen Anfragen.</p>' : bkmpGuildJoinRequests.map(r => `
+        <div class="idle-arena-opponent-card" data-request-id="${escapeHtml(r.id)}">
+          <span class="idle-arena-opponent-name">${escapeHtml(r.displayName)}</span>
+          <span class="idle-arena-opponent-record">${r.message ? escapeHtml(r.message) : ''}</span>
+          <button type="button" class="btn-ja idle-guild-request-accept-btn" ${g.memberCount >= 20 ? 'disabled title="Gilde ist voll"' : ''}>Annehmen</button>
+          <button type="button" class="btn-nein idle-guild-request-reject-btn">Ablehnen</button>
+        </div>
+      `).join('')}
+    </div>
+    ` : ''}
     <div class="idle-arena-history">
       <h4 style="margin-top:1rem;">Mitglieder</h4>
       ${bkmpGuildState.members.map(m => `
@@ -3652,6 +3752,26 @@ async function bkmpIdleRenderGildePanel() {
         await bkmpGuildSetMemberRole(targetUid, newRole);
         bkmpGuildLoaded = false;
         bkmpGuildRefreshTreasuryBonusCache();
+      } catch (e) {
+        if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(e.message, 3400);
+      }
+      bkmpGuildBusy = false;
+      await bkmpIdleRenderGildePanel();
+    });
+  });
+
+  panel.querySelectorAll('.idle-guild-request-accept-btn, .idle-guild-request-reject-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const card = btn.closest('[data-request-id]');
+      const requestId = card ? card.dataset.requestId : null;
+      if (!requestId || bkmpGuildBusy) return;
+      const accept = btn.classList.contains('idle-guild-request-accept-btn');
+      bkmpGuildBusy = true;
+      try {
+        await bkmpGuildRespondJoinRequest(requestId, accept);
+        bkmpGuildJoinRequestsLoadedForGuildId = null;
+        bkmpGuildLoaded = false;
+        if (accept) bkmpGuildRefreshTreasuryBonusCache();
       } catch (e) {
         if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(e.message, 3400);
       }
@@ -8240,8 +8360,23 @@ function bkmpRaidUpdateButtonState() {
      naechste Check unten brach dann sofort per early-return ab, ohne das
      Banner je zu erzeugen. Deshalb hier VOR diesem Check: beim Wechsel in
      die Vorbereitungsphase, waehrend das Fenster offen ist, aber das
-     Banner noch nicht gebaut wurde, einmalig nachholen. */
-  if (bkmpIdleModalOpen && info.phase === 'prep' && !document.getElementById('raidBannerCountdown')) {
+     Banner noch nicht gebaut wurde, einmalig nachholen.
+
+     NACHBESSERUNG (Spieler-Report 16.07.: "Das Banner kam erst nach dem
+     Reload der Seite - das soll wieder voll automatisch auftauchen"):
+     der urspruengliche Fix pruefte "existiert #raidBannerCountdown schon"
+     als Ersatz fuer "wurde das Banner fuer DIESE Vorbereitungsphase schon
+     gebaut" - das Element wird aber beim Phasenwechsel prep->fight weiter
+     unten nur versteckt (banner.style.display = 'none'), NIE aus dem DOM
+     entfernt. Ab der ZWEITEN Vorbereitungsphase in derselben Sitzung
+     existierte #raidBannerCountdown also bereits als Ueberbleibsel der
+     vorherigen Stunde - der Nachhol-Aufruf feuerte nie wieder, das Banner
+     blieb unsichtbar (nur der Countdown-Text lief im Verborgenen weiter,
+     siehe bannerCountdownEl.textContent unten). Jetzt direkt die
+     tatsaechliche Sichtbarkeit des Banners geprueft statt der Existenz
+     eines Kindelements, das den Phasenwechsel gar nicht ueberlebt. */
+  const raidBanner = document.getElementById('raidJoinBanner');
+  if (bkmpIdleModalOpen && info.phase === 'prep' && raidBanner && raidBanner.style.display === 'none') {
     bkmpRaidRenderJoinBanner();
   }
 
