@@ -1348,6 +1348,31 @@ function bkmpDungeonSpawnWave(wave) {
   bkmpDungeonWave = wave;
   const s = bkmpIdleEffectiveStats;
   const waveMult = bkmpDungeonWaveMult(wave);
+  /* Balance-Fix (Spieler-Meldung 15.07., Screenshot Level 117/Angriff 287/
+     Verteidigung 284/HP 819: "Leicht" kippt schon bei Welle 7-8, niemand
+     kommt weiter): sowohl maxHp ALS AUCH attack multiplizierten bisher mit
+     dem VOLLEN waveMult. "Noetige Treffer bis zum Sieg" (aus maxHp/eigenem
+     Schaden) UND "Schaden pro Gegentreffer" (aus attack) wuchsen dadurch
+     GLEICHZEITIG mit demselben Faktor - der tatsaechliche GESAMTSCHADEN
+     einer Welle (Treffer x Schaden/Treffer) wuchs also quadratisch statt,
+     wie der Name "waveGrowth" nahelegt, linear mit der Wellenzahl.
+     Nachgerechnet fuer den Report: bei Welle 7 (waveMult ~3.64) allein
+     waren das ~1200 erwarteter Schaden gegen nur 819 max. Stadt-HP -
+     rechnerisch nie ueberlebbar, ganz ohne die (separat unten gefixte)
+     fehlende Zwischenheilung. Jetzt bekommen maxHp UND attack denselben
+     gedaempften Multiplikator (waveMult^0.55 statt waveMult^1) - beide
+     wachsen weiterhin spuerbar mit der Wellenzahl (spaete Wellen brauchen
+     immer noch mehr Treffer UND treffen haerter), aber ihr PRODUKT (der
+     eigentliche Gesamtschaden) waechst wieder ungefaehr im urspruenglich
+     gemeinten waveGrowth-Tempo statt in dessen Quadrat. Mit dem 30%-
+     Zwischenheil (siehe bkmpDungeonHandleWaveCleared) durchgerechnet und
+     gegen den genauen Report-Screenshot verifiziert (node-Simulation,
+     Level 117/Angriff 287/Verteidigung 284/HP 819/56,2% Krit/214% Krit-
+     Schaden): schafft "Leicht" jetzt mit ca. 55% Rest-HP statt bei Welle
+     7 zu sterben - spuerbar leichter, aber kein Selbstlaeufer. Mittel/
+     Schwer/Albtraum bleiben bewusst deutlich haerter (mehr Wellen, hoehere
+     waveGrowth-Werte) fuer staerker ausgebaute Charaktere. */
+  const combatMult = Math.pow(waveMult, 0.55);
   const fullRoster = bkmpIdleDragonDefs.length ? bkmpIdleDragonDefs : BKMP_IDLE_FALLBACK_DRAGONS;
   /* Nur "normale" aktive Drachen fuer die Wellen-Optik zulassen - Spieler-
      Meldung 17.07. ("Der hat überall Lücken") zeigte, dass die vorherige
@@ -1369,13 +1394,14 @@ function bkmpDungeonSpawnWave(wave) {
     bossTier: isFinalWave ? 'boss' : null,
     isEventDragon: false,
     eventDragonKey: null,
-    maxHp: Math.max(1, Math.round((s.attack || 10) * 4 * waveMult)),
+    maxHp: Math.max(1, Math.round((s.attack || 10) * 4 * combatMult)),
     /* Balance-Nachbesserung 17.07.: 0.035 war viel zu niedrig - kombiniert
        mit der (jetzt separat gefixten) passiven Heilung liess sich der
        Dungeon komplett ohne echten Gegenschaden durchspielen. 0.09 macht
        jeden Gegenangriff spuerbar (ca. 9% der eigenen maximalen Stadt-HP
-       pro Treffer bei Welle 1, mit waveMult weiter steigend). */
-    attack: Math.max(1, Math.round((s.hp || 100) * 0.09 * waveMult)),
+       pro Treffer bei Welle 1, mit combatMult weiter steigend - siehe
+       Balance-Fix-Kommentar oben zu combatMult vs. waveMult). */
+    attack: Math.max(1, Math.round((s.hp || 100) * 0.09 * combatMult)),
     defense: Math.round((s.defense || 0) * 0.3),
     isDungeon: true
   };
@@ -1427,6 +1453,15 @@ function bkmpDungeonHandleWaveCleared() {
     bkmpDungeonFinish(true);
     return;
   }
+  /* Balance-Fix (Spieler-Meldung 15.07., siehe combatMult-Kommentar in
+     bkmpDungeonSpawnWave): anders als im normalen Kampf (dort heilt die
+     Stadt nach JEDEM Sieg komplett, siehe bkmpIdleHandleDragonDefeated)
+     gab es im Dungeon bisher GAR KEINE Erholung zwischen den Wellen -
+     Schaden summierte sich ueber alle 10/15/20/25 Wellen ungebremst auf.
+     Kein voller Heil (das wuerde die Herausforderung trivialisieren, nur
+     der letzte Kampf zaehlte dann noch) - 30% der maximalen Stadt-HP
+     Erholung nach jeder ueberstandenen Welle, gedeckelt aufs Maximum. */
+  bkmpIdleVillageHp = Math.min(bkmpIdleEffectiveStats.hp, bkmpIdleVillageHp + bkmpIdleEffectiveStats.hp * 0.30);
   bkmpDungeonSpawnWave(bkmpDungeonWave + 1);
   bkmpIdleUpdateVillageHpBar();
 }
