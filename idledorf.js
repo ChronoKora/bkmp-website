@@ -3897,6 +3897,19 @@ function bkmpGuildBossHitFlash() {
   el.classList.add('raid-hit-flash');
 }
 
+/* Bug-Fix (Spieler-Report per Screenshot 15.07.: "Kein Damage" ->
+   PostgREST-Fehler "Could not find the function ... in the schema
+   cache", dabei fehlte in der Fehlermeldung auffaellig der p_instance_id-
+   Parameter): bkmpGuildBossJoin() (siehe supabase.js) liefert ein Objekt
+   mit "instanceId" (camelCase), NICHT "id". An 4 Stellen wurde hier
+   trotzdem bkmpGuildBossState.id gelesen - existiert auf diesem Objekt
+   gar nicht, ergibt also immer "undefined". supabase-js laesst
+   undefined-Parameter beim Serialisieren des RPC-Aufrufs komplett weg,
+   PostgREST bekam dadurch nur 3 statt der 4 erwarteten Parameter und
+   fand keine passende Funktion mehr - kein Cache-Problem, ein simpler
+   Tippfehler. Der urspruengliche Beitritt (bkmpIdleRenderGildeBossPanel)
+   nutzt an den RICHTIGEN Stellen bereits korrekt "state.instanceId" -
+   nur diese 4 spaeteren Aufrufe hatten den falschen Feldnamen. */
 async function bkmpGuildBossOwnTick() {
   if (!bkmpGuildBossState || bkmpGuildBossState.status !== 'fighting' || !bkmpIdleEffectiveStats) return;
   const roll = bkmpIdleDamageRoll(bkmpIdleEffectiveStats.attack, bkmpIdleEffectiveStats.critChance, bkmpIdleEffectiveStats.critDamage, 0);
@@ -3904,7 +3917,7 @@ async function bkmpGuildBossOwnTick() {
   bkmpGuildBossSpawnFx(BKMP_RAID_ATTACK_FX[Math.floor(Math.random() * BKMP_RAID_ATTACK_FX.length)], roll.amount, roll.isCrit);
   bkmpGuildBossHitFlash();
   try {
-    const result = await bkmpGuildBossDealDamage(bkmpGuildBossState.id, roll.amount, roll.isCrit, false);
+    const result = await bkmpGuildBossDealDamage(bkmpGuildBossState.instanceId, roll.amount, roll.isCrit, false);
     if (result) {
       bkmpGuildBossState.bossHp = result.bossHp;
       bkmpGuildBossState.status = result.status;
@@ -3920,7 +3933,7 @@ function bkmpGuildBossHandleClick() {
   const clickDamage = bkmpIdleApplyBossDamageBonus(Math.max(1, Math.round(bkmpIdleEffectiveStats.attack * (0.12 + (bkmpIdleEffectiveStats.clickDamagePct || 0) / 100) * (isCrit ? Math.max(1, bkmpIdleEffectiveStats.critDamage / 100) : 1))));
   bkmpGuildBossSpawnFx('raid-fx-magic', clickDamage, isCrit);
   bkmpGuildBossHitFlash();
-  bkmpGuildBossDealDamage(bkmpGuildBossState.id, clickDamage, isCrit, true).then(result => {
+  bkmpGuildBossDealDamage(bkmpGuildBossState.instanceId, clickDamage, isCrit, true).then(result => {
     if (result) {
       bkmpGuildBossState.bossHp = result.bossHp;
       bkmpGuildBossState.status = result.status;
@@ -3934,7 +3947,7 @@ function bkmpGuildBossStartLoop() {
   bkmpGuildBossStopLoop();
   bkmpGuildBossLoopTimer = window.setInterval(bkmpGuildBossOwnTick, BKMP_GUILD_BOSS_TICK_MS);
   if (typeof bkmpSubscribeToGuildBossInstance === 'function') {
-    bkmpSubscribeToGuildBossInstance(bkmpGuildBossState.id, change => {
+    bkmpSubscribeToGuildBossInstance(bkmpGuildBossState.instanceId, change => {
       if (!bkmpGuildBossState) return;
       if (change.type === 'instance' && change.row) {
         bkmpGuildBossState.bossHp = Number(change.row.boss_hp);
@@ -3964,7 +3977,7 @@ function bkmpGuildBossCheckOutcome() {
   bkmpGuildBossStopLoop();
   bkmpGuildQuestsLoadedForGuildId = null; /* Aktivitaetslog zeigt jetzt "Boss besiegt" - naechster Panel-Load frisch laden */
   bkmpGuildActivityLoadedForGuildId = null;
-  loadGuildBossParticipants(bkmpGuildBossState.id).then(list => { bkmpGuildBossParticipants = list; bkmpIdleRenderGildeBossPanel(); }).catch(() => {});
+  loadGuildBossParticipants(bkmpGuildBossState.instanceId).then(list => { bkmpGuildBossParticipants = list; bkmpIdleRenderGildeBossPanel(); }).catch(() => {});
 }
 
 let bkmpGuildBossPanelRenderedForKey = null;
@@ -4059,7 +4072,10 @@ async function bkmpIdleRenderGildeBossPanel() {
 
   const g = bkmpGuildBossState;
   const isFinished = g.status === 'won' || g.status === 'expired';
-  const renderKey = g.id + '|' + isFinished;
+  /* g.id gibt es nicht (bkmpGuildBossJoin() liefert "instanceId", siehe
+     Bug-Fix-Kommentar bei bkmpGuildBossOwnTick) - hier selbst reingefallen
+     beim urspruenglichen Render-Throttle-Fix. */
+  const renderKey = g.instanceId + '|' + isFinished;
 
   if (bkmpGuildBossPanelRenderedForKey !== renderKey) {
     bkmpGuildBossPanelRenderedForKey = renderKey;
