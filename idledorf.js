@@ -8074,6 +8074,33 @@ async function bkmpRaidBossPoll() {
       }
       bkmpRaidRenderCombat();
       bkmpRaidCheckOutcome();
+      return;
+    }
+    /* Bug-Report 17.07. (ChronoKora): nach Raid-Ende dauerhaft wiederkehrendes
+       Ladesymbol + Netzwerk-Tab voller 400er auf raid_deal_damage/
+       raid_boss_attack_tick. Ursache per Live-DB-Check bestaetigt: die RPC
+       raid_deal_damage/raid_boss_attack_tick lehnt JEDEN Aufruf ab, sobald
+       status != 'fighting' ist (siehe supabase-raid-boss-balance-v4.sql) -
+       tickRaidBossAttack() schluckt diesen Fehler in supabase.js und gibt
+       einfach null zurueck. Normalerweise erfaehrt der Client vom Raid-Ende
+       ueber das Realtime-Abo auf raid_instances (bkmpRaidHandleRealtimeChange)
+       - faellt dieses Update aber aus (WS-Aussetzer o.ae.), gab es bisher
+       KEINEN Ausweg: beide Loops (Eigener-Schaden-Tick UND dieser Boss-Poll)
+       liefen fuer den Rest der Sitzung leer weiter, alle paar Sekunden ein
+       400 gegen Supabase, ohne dass der Spieler je das Ergebnis-Fenster sah.
+       Deshalb hier ein direkter Zeilen-Read (loadRaidState, kein RPC, kann
+       nicht an status='fighting' scheitern) als Fallback, sobald die RPC
+       einmal null liefert - erkennt so auch ohne Realtime-Update zuverlaessig,
+       dass der Raid vorbei ist, und beendet die Loops. */
+    if (typeof loadRaidState === 'function') {
+      const fallback = await loadRaidState(bkmpRaidState.id);
+      if (fallback && fallback.status !== 'fighting') {
+        bkmpRaidState.status = fallback.status;
+        bkmpRaidState.bossHp = fallback.bossHp;
+        bkmpRaidState.cityHp = fallback.cityHp;
+        bkmpRaidRenderCombat();
+        bkmpRaidCheckOutcome();
+      }
     }
   } catch (e) { /* naechster Poll versucht es erneut */ }
 }
