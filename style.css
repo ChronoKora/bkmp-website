@@ -6426,66 +6426,6 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   filter: drop-shadow(0 2px 10px rgba(255, 138, 76, 0.25));
 }
 
-/* Live-Sync-Hinweis (Nutzerwunsch, 15.07.: "Wird in Twitch angezeigt der
-   Kampf" - siehe bkmpIdleStreamApplyLockState in idledorf.js). Nur auf der
-   Hauptseite vorhanden (#idleStreamLiveBanner existiert nicht in
-   idle-stream.html/idle-stream-mini.html). */
-.idle-stream-live-banner {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: var(--gold);
-  background: color-mix(in srgb, var(--gold) 14%, var(--paper));
-  border: 1px solid color-mix(in srgb, var(--gold) 35%, var(--line));
-  border-radius: 12px;
-  padding: 0.55rem 0.9rem;
-  margin-bottom: 0.9rem;
-  animation: idleStreamBannerPulse 2.4s ease infinite;
-}
-@keyframes idleStreamBannerPulse {
-  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--gold) 35%, transparent); }
-  50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--gold) 0%, transparent); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .idle-stream-live-banner { animation: none; }
-}
-/* NACHBESSERUNG (Nutzerwunsch, 15.07.: "man muss trotzdem upgraden können
-   auf der Hauptseite") - urspruenglich wurde hier die KOMPLETTE Bedienung
-   gesperrt (Tabs + alle Panels + Runen-Lager), solange die Twitch-Seite
-   lief. Das ging zu weit: nur die laufende Kampf-Ansicht selbst kann nicht
-   sinnvoll von zwei Seiten gleichzeitig gesteuert werden (welcher Drache
-   gerade bekaempft wird/Stufensprung waeren ein echter Konflikt mit der
-   Twitch-Seite) - Upgrades/Skilltree/Runen/Prestige kaufen/verteilen ist
-   dagegen unproblematisch, SOLANGE idledorf.js beim Speichern verhindert,
-   dass die Twitch-Seite so einen Kauf beim naechsten eigenen Autosave
-   wieder ueberschreibt (siehe bkmpIdleMergeRemoteSpendableFields in
-   idledorf.js - der eigentliche Schutz vor Datenverlust sitzt DORT, nicht
-   hier in der CSS). Gesperrt bleibt deshalb NUR noch das Kampf-Panel
-   selbst (Drachen anklicken/Stufensprung/Auto-Aufstieg) - Tabs, alle
-   anderen Panels und das Runen-Lager sind jetzt frei bedienbar. */
-#idleDorfOverlay.idle-stream-locked #idlePanelKampf {
-  pointer-events: none;
-  opacity: 0.72;
-  filter: saturate(0.75);
-}
-/* NACHBESSERUNG (Streamer-Wunsch DerLiber, 13.07.: "ich kann jetzt diese
-   button nicht mehr anklicken... die button sollen auch gehen, das dann
-   live und automatisch der Drache wechselt im Twitch OBS") - die
-   Stufenleiste (Bleibt auf dieser Stufe/Zur besten Stufe springen/Zu
-   bestimmter Stufe wechseln) ist bewusst KEIN echter Kampf-Konflikt wie das
-   Drachen-anklicken/die laufende HP-Animation daneben: sie soll als
-   Fernsteuerung von der Hauptseite aus funktionieren, waehrend die
-   Twitch-Seite den eigentlichen Kampf zeigt. Deshalb hier gezielt wieder
-   entsperrt (siehe idledorf.js bkmpIdleMergeRemoteSpendableFields fuer den
-   Abgleich, der den Stufensprung auf der Twitch-Seite live nachzieht). */
-#idleDorfOverlay.idle-stream-locked #idlePanelKampf .idle-stage-bar {
-  pointer-events: auto;
-  opacity: 1;
-  filter: none;
-}
-
 /* ---- HUD: Level-Medaillon + XP/Ressourcen-Leiste statt Fliesstext ---- */
 .idle-dorf-hud { margin-bottom: 1.1rem; }
 .idle-hud-top { display: flex; align-items: center; gap: 0.9rem; margin-bottom: 0.6rem; }

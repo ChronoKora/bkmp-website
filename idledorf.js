@@ -1028,6 +1028,7 @@ function bkmpIdleSpawnDragon() {
   bkmpIdleUpdateDragonHpBar();
   bkmpIdleRenderStageBar();
   bkmpIdleMaybeShowEventDragonPopup();
+  bkmpIdleBroadcastCombatState();
 }
 
 /* ---------------- Vorbereitungs-Popup: seltene Event-Drachen ----------------
@@ -1702,6 +1703,7 @@ function bkmpIdleTick() {
   }
 
   bkmpIdleDragonCounterAttack(stats);
+  bkmpIdleBroadcastCombatState();
 }
 
 /* Gegenschlag des Drachen - eigene Funktion, damit Tick UND Klick
@@ -2933,9 +2935,7 @@ let bkmpGuildPresenceLoadedAt = 0;
    bekannt ist (nicht erst beim Oeffnen des Idle-Dorf-Fensters oder gar
    erst im Gilde-Tab) - der Kampf laeuft laut bkmpIdleCloseModal() auch
    im Hintergrund weiter, "online" soll also den ganzen Tab-Besuch
-   abdecken, nicht nur ein offenes Popup. Gleiches Intervall-Prinzip wie
-   der bestehende Twitch-Sync-Heartbeat (siehe BKMP_IDLE_STREAM_HEARTBEAT_MS),
-   nur global statt Stream-bezogen. */
+   abdecken, nicht nur ein offenes Popup. */
 const BKMP_GUILD_PRESENCE_HEARTBEAT_MS = 25000;
 const BKMP_GUILD_PRESENCE_STALE_MS = 45000;
 let bkmpGuildPresenceHeartbeatTimer = null;
@@ -4001,18 +4001,6 @@ function bkmpIdleShowOfflineCard(result) {
 
 function bkmpIdleQueueSync() {
   bkmpIdleSyncPending = true;
-  /* Nutzerwunsch (15.07.): "man muss trotzdem upgraden können auf der
-     Hauptseite" - waehrend hier (Zuschauer-Seite) gerade Ressourcen
-     ausgegeben werden, SOFORT statt erst nach 4s speichern. Verkuerzt das
-     Zeitfenster, in dem die Twitch-Seite mit ihrem eigenen naechsten
-     Autosave (siehe bkmpIdleMergeRemoteSpendableFields unten) noch einen
-     veralteten Stand haben und den gerade getaetigten Kauf ueberschreiben
-     koennte. */
-  if (bkmpIdleStreamLocked) {
-    if (bkmpIdleSyncTimer) { window.clearTimeout(bkmpIdleSyncTimer); bkmpIdleSyncTimer = null; }
-    bkmpIdleFlushSync();
-    return;
-  }
   if (bkmpIdleSyncTimer) return;
   bkmpIdleSyncTimer = window.setTimeout(() => { bkmpIdleSyncTimer = null; bkmpIdleFlushSync(); }, 4000);
 }
@@ -4420,16 +4408,6 @@ async function bkmpPrestigeMergeRemoteSpendable() {
 
 let bkmpPrestigeSaveTimer = null;
 function bkmpPrestigeQueueSave() {
-  /* Nutzerwunsch (15.07.): waehrend die Zuschauer-Seite gerade Prestige-
-     Punkte ausgibt, sofort speichern statt 1,5s zu warten - verkleinert
-     das Zeitfenster fuer die Twitch-Seite, mit ihrem eigenen naechsten
-     Autosave einen veralteten Stand zurueckzuschreiben (siehe
-     bkmpIdleQueueSync oben, gleiches Prinzip). */
-  if (bkmpIdleStreamLocked) {
-    if (bkmpPrestigeSaveTimer) { window.clearTimeout(bkmpPrestigeSaveTimer); bkmpPrestigeSaveTimer = null; }
-    bkmpPrestigeFlushSave();
-    return;
-  }
   if (bkmpPrestigeSaveTimer) return;
   bkmpPrestigeSaveTimer = window.setTimeout(() => { bkmpPrestigeSaveTimer = null; bkmpPrestigeFlushSave(); }, 1500);
 }
@@ -6309,6 +6287,95 @@ function bkmpRuneAscend(cid) {
   bkmpIdleQueueSync();
 }
 
+/* Auto-Aufstieg (Community-Wunsch DerJannikHase 15.07.: "wie das
+   Autoschmelzen nur fuer Legendäre Runen ... alle die schon auf lvl15 sind
+   nicht alle einzeln upgraden", von David 17.07. bestaetigt - nur Legendaer,
+   nur Runen ab +15). Findet alle aktuell moeglichen Aufstiegs-Paare (zwei
+   unausgeruestete ODER eine ausgeruestete + eine unausgeruestete Legendaere
+   derselben Stufe UND desselben Slots) und verarbeitet sie in einem Rutsch,
+   analog zu bkmpRuneAutoFuseAll. Bewusst EIN Durchgang ohne automatisches
+   Weiterverketten ueber mehrere Stufen im selben Klick - erzeugt dieser
+   Durchgang neue Paare auf der naechsthoeheren Stufe, reicht ein zweiter
+   Klick (macht die Vorschau/Bestaetigung deutlich einfacher, bei
+   vorhandenem Gold praktisch kein Mehraufwand). Innerhalb einer Gruppe wird
+   die Rune mit den meisten/staerksten Sub-Stats als Ueberlebende bevorzugt,
+   die "schwaechere" Kopie wird verbraucht. */
+function bkmpRuneAutoAscendPairs(candidateRunes) {
+  const eligible = (candidateRunes || []).filter(r => bkmpRuneCanAscend(r));
+  const byKey = {};
+  eligible.forEach(r => {
+    const key = r.rune_type + '|' + Number(r.upgrade_level || 0);
+    (byKey[key] = byKey[key] || []).push(r);
+  });
+  const pairs = [];
+  Object.values(byKey).forEach(list => {
+    const equipped = list.find(r => r.equipped) || null;
+    const unequipped = list.filter(r => !r.equipped).sort((a, b) => {
+      const subDiff = (b.substats || []).length - (a.substats || []).length;
+      if (subDiff !== 0) return subDiff;
+      return Number(b.rolled_value || 0) - Number(a.rolled_value || 0);
+    });
+    const pool = unequipped.slice();
+    /* Die ausgeruestete Rune bleibt IMMER Ueberlebende (nie Fodder, sonst
+       wird der Ausruestungs-Slot ungefragt leer) - verbraucht dafuer aber
+       bewusst die SCHWAECHSTE Dublette (pool.pop() statt shift()), damit die
+       staerkeren Dubletten fuer die reine Unter-sich-Paarung unten (wo immer
+       die bessere von zweien ueberlebt) erhalten bleiben. */
+    if (equipped && pool.length) pairs.push({ survivor: equipped, fodder: pool.pop() });
+    while (pool.length >= 2) {
+      const survivor = pool.shift();
+      const fodder = pool.shift();
+      pairs.push({ survivor, fodder });
+    }
+  });
+  return pairs;
+}
+async function bkmpRuneAutoAscendAll() {
+  const activeSlot = window.BKMP_RUNE_SLOTS.find(s => s.id === bkmpRuneActiveSlotTab);
+  if (!activeSlot || !bkmpIdleState) return;
+  const candidates = bkmpIdlePlayerRunes.filter(r => r.rune_type === activeSlot.id);
+  const pairs = bkmpRuneAutoAscendPairs(candidates);
+  if (!pairs.length) {
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`Keine passenden Legendäre-Paare (gleiche Stufe) bei ${activeSlot.name} zum Aufsteigen.`, 2800);
+    return;
+  }
+  const totalCost = pairs.reduce((sum, p) => sum + bkmpIdleRuneUpgradeCost(p.survivor), 0);
+  const confirmed = await bkmpConfirmDialog(
+    `🌟 Auto-Aufstieg: ${pairs.length}× Legendäre?`,
+    `Lässt bei ${activeSlot.name} alle ${pairs.length} aktuell passenden Legendäre-Paare (gleiche Stufe) automatisch aufsteigen, für insgesamt ${bkmpIdleFormatNumber(totalCost)} Gold. Jeweils eine zweite Legendäre wird dafür verbraucht.\n\n⚠️ Reicht das Gold nicht für alle Paare, werden nur so viele wie möglich verarbeitet.\n\nTrotzdem fortfahren?`,
+    'Ja, alle aufsteigen',
+    'Abbrechen'
+  );
+  if (!confirmed) return;
+  let succeeded = 0;
+  let skippedForGold = 0;
+  pairs.forEach(({ survivor, fodder }) => {
+    if (!bkmpIdleState || survivor.upgrade_level !== fodder.upgrade_level) return; // gleiche Rune kann nicht doppelt in zwei Paaren stecken
+    if (!bkmpIdlePlayerRunes.includes(survivor) || !bkmpIdlePlayerRunes.includes(fodder)) return;
+    const cost = bkmpIdleRuneUpgradeCost(survivor);
+    if (bkmpIdleState.gold < cost) { skippedForGold += 1; return; }
+    const slot = window.BKMP_RUNE_SLOTS.find(s => s.id === survivor.rune_type);
+    bkmpIdleState.gold -= cost;
+    bkmpIdlePlayerRunes = bkmpIdlePlayerRunes.filter(r => r._cid !== fodder._cid);
+    if (fodder.id) bkmpRuneDeleteRemote([fodder.id], 'Auto-Aufstieg-Fodder');
+    survivor.upgrade_level = Number(survivor.upgrade_level || 0) + 1;
+    if (survivor.id) updatePlayerRuneUpgrade(survivor.id, survivor.upgrade_level, survivor.substats).catch(err => {
+      console.error('bkmpRuneAutoAscendAll: Speichern fehlgeschlagen', err);
+    });
+    bkmpIdleState.rune_upgrade_successes = Number(bkmpIdleState.rune_upgrade_successes || 0) + 1;
+    succeeded += 1;
+  });
+  const summary = skippedForGold
+    ? `🌟 ${succeeded}× Legendäre aufgestiegen, ${skippedForGold}× mangels Gold übersprungen.`
+    : `🌟 Alle ${succeeded} Legendäre-Paare aufgestiegen!`;
+  bkmpIdleLog(summary);
+  if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(summary, 3800);
+  bkmpIdleRecomputeEffectiveStats();
+  bkmpIdleRenderRunenPanel();
+  bkmpIdleRenderHud();
+  bkmpIdleQueueSync();
+}
+
 /* Aggregiert alle AUSGERUESTETEN Runen (Hauptwert UND Sub-Stats) zu denselben
    Effekt-Schluesseln, die Skilltree/Upgrades/Titel/Prestige schon nutzen
    (attack_pct usw.) - flieszt dadurch ganz ohne Sonderbehandlung in
@@ -6983,12 +7050,16 @@ function bkmpIdleRenderRunenPanel() {
     const c = slotOwned.filter(r => r.rarity === rarity.id && !r.equipped).length;
     return sum + Math.floor(c / 3);
   }, 0);
+  const autoAscendPairCount = bkmpRuneAutoAscendPairs(slotOwned).length;
   drawerContent.innerHTML = `
     <div class="idle-runen-inventory-header">
       <h4 class="idle-sammlung-subheading">🎒 ${escapeHtml(activeSlot.name)}-Lager <span class="idle-sammlung-count">${slotOwned.length} von ${totalOwned} gesamt</span></h4>
       <div class="idle-runen-inventory-header-actions">
         <button type="button" class="btn-nein idle-runen-autofuse-btn" id="idleRuneAutoFuseBtn" ${autoFuseGroupCount ? '' : 'disabled'}>
           🔥 Auto-Schmelzen${autoFuseGroupCount ? ` (${autoFuseGroupCount})` : ''}
+        </button>
+        <button type="button" class="btn-nein idle-runen-autoascend-btn" id="idleRuneAutoAscendBtn" ${autoAscendPairCount ? '' : 'disabled'} title="Aufstieg für alle passenden Legendäre-Paare gleicher Stufe (ab +${BKMP_RUNE_MAX_LEVEL}) auf einmal.">
+          🌟 Auto-Aufstieg${autoAscendPairCount ? ` (${autoAscendPairCount})` : ''}
         </button>
         <button type="button" class="btn-nein idle-runen-sell-all-btn" id="idleRuneSellAllBtn" ${unequippedSlotCount ? '' : 'disabled'}>
           💰 Alle verkaufen${unequippedSlotCount ? ` (${unequippedSlotCount})` : ''}
@@ -7055,6 +7126,8 @@ function bkmpIdleRenderRunenPanel() {
   if (sellAllBtn) sellAllBtn.addEventListener('click', bkmpRuneSellAllDuplicates);
   const autoFuseBtn = document.getElementById('idleRuneAutoFuseBtn');
   if (autoFuseBtn) autoFuseBtn.addEventListener('click', bkmpRuneAutoFuseAll);
+  const autoAscendBtn = document.getElementById('idleRuneAutoAscendBtn');
+  if (autoAscendBtn) autoAscendBtn.addEventListener('click', bkmpRuneAutoAscendAll);
   const runenHelpBtn = document.getElementById('idleRunenHelpBtn');
   if (runenHelpBtn) runenHelpBtn.addEventListener('click', bkmpIdleOpenRunenHelp);
 }
@@ -7155,144 +7228,35 @@ function bkmpIdleInitTabs() {
   window.addEventListener('resize', bkmpRuneSyncDrawerPosition);
 }
 
-/* ---------------- Live-Sync zwischen Hauptseite und Twitch-Overlay ----------------
-   Nutzerwunsch (15.07.): "auf der Hauptseite geupgraded wird / oder Stufe
-   Skills etc / und hier im TwitchBrowser alles sync ist" - Fortschritt, der
-   auf der Twitch-Seite (idle-stream.html/idle-stream-mini.html) gespielt
-   wird, soll auf der Hauptseite live sichtbar sein. Um Konflikte durch
-   gleichzeitiges Spielen an zwei Stellen zu vermeiden (Entscheidung mit dem
-   Nutzer, 15.07.): die Twitch-Seite ist die aktive Instanz, die Hauptseite
-   wird waehrend die Twitch-Seite offen ist zu einer reinen Zuschauer-
-   Ansicht (Bedienung gesperrt, eigener Kampf-Loop pausiert, Stand kommt
-   stattdessen periodisch direkt aus der DB).
-
-   window.BKMP_IDLE_IS_STREAM_PAGE (gesetzt in idle-stream.html/idle-
-   stream-mini.html VOR dieser Datei, auf der Hauptseite nicht gesetzt)
-   entscheidet, welche der beiden Rollen eine Seite spielt:
-   - Twitch-Seite: sendet alle 20s einen Herzschlag (bkmpIdleStreamHeartbeat).
-   - Hauptseite: prueft alle 8s, ob ein frischer Herzschlag da ist
-     (loadIdleStreamPresence) und sperrt/entsperrt sich entsprechend.
-
-   WICHTIG (bewusste Grenze): nur der PERSISTENTE Fortschritt (Level/Gold/
-   Rohstoffe/Skillpunkte/Upgrades/Stufe/Prestige/Runen) wird gespiegelt -
-   der laufende Kampf selbst (aktuelle Drachen-HP/Dorf-HP) lebt nur lokal
-   im RAM der aktiven Seite und wird nirgends in der DB gespeichert, kann
-   also nicht mitgespiegelt werden. Die Zuschauer-Ansicht zeigt deshalb
-   immer einen neu gespawnten Drachen bei voller HP, aktualisiert aber
-   Level/Ressourcen/Skilltree/Runen alle paar Sekunden korrekt. */
-const BKMP_IDLE_STREAM_HEARTBEAT_MS = 20000;
-const BKMP_IDLE_STREAM_POLL_MS = 8000;
-const BKMP_IDLE_STREAM_STALE_MS = 35000; // > 1x Herzschlag-Intervall + Puffer
-let bkmpIdleStreamTimer = null;
-let bkmpIdleStreamLocked = false;
-
-function bkmpIdleStreamStartHeartbeat() {
-  if (bkmpIdleStreamTimer || !bkmpIdleState) return;
-  const send = () => {
-    if (typeof bkmpIdleStreamHeartbeat === 'function' && bkmpIdleState) bkmpIdleStreamHeartbeat(bkmpIdleState.name_key).catch(() => {});
-    /* Spieler-Frage (15.07.): "Habe gerade Leben upgraded, wann wird das
-       akkumuliert?" - der Abgleich lief bisher nur VOR dem naechsten
-       eigenen Autosave (bkmpIdleFlushSync), also erst wieder nach dem
-       naechsten Drachen-Kill. Stirbt gerade kein Drache (z.B. ein starker
-       Boss), war die Wartezeit unvorhersehbar lang. Im selben Takt wie der
-       Herzschlag (alle 20s) jetzt zusaetzlich unabhaengig davon abgleichen -
-       ein Kauf auf der Hauptseite ist damit spaetestens nach ~20s auf der
-       Twitch-Seite sichtbar, auch waehrend eines langen Kampfes. */
-    if (typeof bkmpIdleMergeRemoteSpendableFields === 'function' && bkmpIdleState) bkmpIdleMergeRemoteSpendableFields().catch(() => {});
-  };
-  send();
-  bkmpIdleStreamTimer = window.setInterval(send, BKMP_IDLE_STREAM_HEARTBEAT_MS);
-}
-
-function bkmpIdleStreamStartPresencePoll() {
-  if (bkmpIdleStreamTimer || !bkmpIdleState) return;
-  const check = async () => {
-    if (typeof loadIdleStreamPresence !== 'function' || !bkmpIdleState) return;
-    let lastSeen = null;
-    try { lastSeen = await loadIdleStreamPresence(bkmpIdleState.name_key); } catch (e) { return; }
-    const isLive = !!lastSeen && (Date.now() - new Date(lastSeen).getTime()) < BKMP_IDLE_STREAM_STALE_MS;
-    if (isLive !== bkmpIdleStreamLocked) {
-      await bkmpIdleStreamApplyLockState(isLive);
-    } else if (isLive) {
-      await bkmpIdleStreamRefreshRemoteState();
-    }
-  };
-  check();
-  bkmpIdleStreamTimer = window.setInterval(check, BKMP_IDLE_STREAM_POLL_MS);
-}
-
-function bkmpIdleStreamStopPolling() {
-  if (bkmpIdleStreamTimer) { window.clearInterval(bkmpIdleStreamTimer); bkmpIdleStreamTimer = null; }
-}
-
-/* Sperrt/entsperrt die Bedienung der Hauptseite je nachdem, ob die Twitch-
-   Seite gerade als "live" erkannt wurde. Nur auf der Hauptseite relevant -
-   #idleStreamLiveBanner existiert nur dort (null-sicher). */
-async function bkmpIdleStreamApplyLockState(isLive) {
-  bkmpIdleStreamLocked = isLive;
-  const overlay = document.getElementById('idleDorfOverlay');
-  if (overlay) overlay.classList.toggle('idle-stream-locked', isLive);
-  const banner = document.getElementById('idleStreamLiveBanner');
-  if (banner) banner.style.display = isLive ? '' : 'none';
-  if (isLive) {
-    bkmpIdleStopLoop();
-    await bkmpIdleStreamRefreshRemoteState();
-  } else {
-    /* Zurueck zur eigenen Kontrolle: einen wirklich frischen, eigenstaendigen
-       Stand laden statt mit dem zuletzt gespiegelten (evtl. veralteten)
-       Stand weiterzuspielen. bkmpIdleLoadOrInitState() hat einen Cache-
-       Kurzschluss fuer gleichbleibenden Namen - deshalb bkmpIdleState hier
-       bewusst erst leeren. */
-    const name = typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : (bkmpIdleState ? bkmpIdleState.name_key : '');
-    bkmpIdleState = null;
-    if (name) {
-      await bkmpIdleLoadOrInitState(name);
-      bkmpIdleRecomputeEffectiveStats();
-      if (!bkmpIdleCurrentDragon) bkmpIdleSpawnDragon();
-      bkmpIdleStartLoop();
-    }
-  }
-  bkmpIdleRenderHud();
-  bkmpIdleRenderStageBar();
-  bkmpIdleRenderActiveTabContent();
-}
-
-/* Holt den aktuellen, persistenten Stand direkt aus der DB und ersetzt
-   damit den lokalen Zuschauer-Stand - laesst den laufenden Kampf-Loop
-   bewusst aus (siehe Erklaerung oben, Drachen-HP wird nirgends
-   gespeichert). */
-async function bkmpIdleStreamRefreshRemoteState() {
-  if (!bkmpIdleState) return;
-  const name = bkmpIdleState.name_key;
-  try {
-    const remote = typeof loadIdlePlayerState === 'function' ? await loadIdlePlayerState(name) : null;
-    if (remote) {
-      bkmpIdleState = remote;
-      bkmpIdleCurrentDragon = null;
-      bkmpIdleSnapshotMergeBaseline();
-    }
-  } catch (e) { /* naechster Poll-Durchlauf versucht es erneut */ }
-  try {
-    const remotePrestige = typeof loadIdlePrestigeState === 'function' ? await loadIdlePrestigeState(name) : null;
-    if (remotePrestige) { bkmpPrestigeState = remotePrestige; bkmpPrestigeSnapshotMergeBaseline(); }
-  } catch (e) {}
-  try {
-    const remoteRunes = typeof loadPlayerRunes === 'function' ? await loadPlayerRunes(name) : null;
-    if (Array.isArray(remoteRunes)) bkmpIdlePlayerRunes = remoteRunes.map(r => ({ ...r, _cid: r.id }));
-  } catch (e) {}
-  bkmpIdleRecomputeEffectiveStats();
-  if (!bkmpIdleCurrentDragon) bkmpIdleSpawnDragon();
-  bkmpIdleVillageHp = bkmpIdleEffectiveStats ? bkmpIdleEffectiveStats.hp : bkmpIdleVillageHp;
-  bkmpIdleUpdateVillageHpBar();
-  bkmpIdleUpdateDragonHpBar();
-  bkmpIdleRenderHud();
-  bkmpIdleRenderStageBar();
-  /* Bewusst der generische Renderer statt bkmpIdleRefreshLiveTabs() (das
-     deckt nur Upgrades/Runen/Prestige ab) - beim Zuschauen soll JEDER
-     gerade offene Tab (auch Skilltree/Sammlung/Erfolge/Bestenliste) den
-     gespiegelten Stand zeigen, nicht nur die drei "live-relevanten" Tabs
-     aus dem normalen Eigenspiel-Betrieb. */
-  bkmpIdleRenderActiveTabContent();
+/* ---------------- Live-Kampf-Broadcast fuers OBS-Mini-Overlay ----------------
+   Umbau 17.07. (Nutzerwunsch: "das Große entfernen, das Kleine soll nur
+   noch visuell sein - Klicken/Interagieren nur noch Hauptseite... auf der
+   Hauptseite kämpft/klickert sie gegen einen Winddrache und das soll man im
+   OBS-Stream sehen"): loest das alte Herzschlag+Poll+Lock-System komplett
+   ab (zwei Seiten konnten dort unabhaengig voneinander kaempfen, siehe
+   Git-Historie). Jetzt gibt es nur noch EINE aktive Spiel-Instanz - die
+   Hauptseite - die ihren aktuellen Kampf-Zustand ueber einen reinen
+   Realtime-BROADCAST-Kanal sendet (keine Tabelle, keine Persistenz noetig,
+   Drachen-HP war noch nie gespeichert und muss es dafuer auch nicht werden -
+   ein Broadcast ist fluechtig und kostet quasi nichts). Das Mini-Overlay
+   (idle-stream-mini.html) hat KEINE eigene Spiellogik mehr, sondern
+   abonniert nur und zeichnet rein visuell nach. */
+function bkmpIdleBroadcastCombatState() {
+  if (window.BKMP_IDLE_IS_STREAM_PAGE || !bkmpIdleState || !bkmpIdleCurrentDragon || !bkmpIdleEffectiveStats) return;
+  if (typeof bkmpBroadcastCombatState !== 'function') return;
+  bkmpBroadcastCombatState(bkmpIdleState.name_key, {
+    dragonSpriteKey: bkmpIdleCurrentDragon.spriteKey,
+    dragonName: bkmpIdleCurrentDragon.name,
+    dragonHp: bkmpIdleCurrentDragon.hp,
+    dragonMaxHp: bkmpIdleCurrentDragon.maxHp,
+    isBoss: bkmpIdleCurrentDragon.bossTier === 'boss',
+    isMiniboss: bkmpIdleCurrentDragon.bossTier === 'miniboss',
+    isEventDragon: Boolean(bkmpIdleCurrentDragon.isEventDragon),
+    villageHp: bkmpIdleVillageHp,
+    villageMaxHp: bkmpIdleEffectiveStats.hp,
+    villageSkinId: typeof bkmpGetActiveVillageSkinId === 'function' ? bkmpGetActiveVillageSkinId() : null,
+    level: bkmpIdleState.level
+  });
 }
 
 async function bkmpIdleOpenModal() {
@@ -7356,8 +7320,6 @@ async function bkmpIdleOpenModal() {
   bkmpIdleStartLoop();
   bkmpIdleRenderActiveTabContent();
   if (typeof renderAchievementBadge === 'function') renderAchievementBadge();
-  if (window.BKMP_IDLE_IS_STREAM_PAGE) bkmpIdleStreamStartHeartbeat();
-  else bkmpIdleStreamStartPresencePoll();
 
   bkmpRaidRenderJoinBanner();
   if (bkmpRaidShouldShowCombatView()) {
@@ -7391,7 +7353,6 @@ function bkmpIdleCloseModal() {
   document.body.classList.remove('modal-open');
   bkmpIdleModalOpen = false;
   bkmpRuneSyncDrawerVisibility();
-  bkmpIdleStreamStopPolling();
   bkmpIdleQueueSync();
   bkmpIdleFlushSync();
   bkmpRaidStopCombatView();
@@ -7608,6 +7569,7 @@ function bkmpIdleHandleDragonClick(e) {
        zurueck - siehe bkmpIdleDragonCounterAttack. Nur der wirklich
        toedliche Treffer (oben) bleibt weiterhin gegenschlagfrei. */
     bkmpIdleDragonCounterAttack(bkmpIdleEffectiveStats);
+    bkmpIdleBroadcastCombatState();
   }
 }
 
@@ -8363,7 +8325,14 @@ function bkmpIdleInit() {
   const openBtn = document.getElementById('idleDorfButton');
   if (openBtn) openBtn.addEventListener('click', bkmpIdleOpenModal);
   bkmpIdleMaintenancePoll();
-  window.setInterval(bkmpIdleMaintenancePoll, 20000);
+  /* Egress/Performance-Fix 17.07.: dieser Poll laeuft UNCONDITIONAL fuer
+     JEDEN Besucher auf JEDER der 4 Seiten (idledorf.js wird ueberall
+     geladen) - 20s war fuer eine Sache, die der Admin realistisch nicht
+     minuetlich umschaltet, unnoetig aggressiv (1,79 Mio. API-Requests/24h
+     im Supabase-Dashboard beobachtet, siehe Projektnotizen). 90s statt 20s
+     senkt das Volumen auf ~22%, ohne dass ein echter Wartungsmodus-Wechsel
+     spuerbar langsamer erkannt wird. */
+  window.setInterval(bkmpIdleMaintenancePoll, 90000);
   const maintClose = document.getElementById('idleMaintenanceClose');
   if (maintClose) maintClose.addEventListener('click', () => {
     const el = document.getElementById('idleMaintenanceOverlay');

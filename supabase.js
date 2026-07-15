@@ -3476,31 +3476,6 @@ async function bkmpCreateStripeCheckoutSession(nameKey, skinId) {
    wird (siehe bkmpIdleStreamStartHeartbeat/-PresencePoll in idledorf.js).
    Bewusst eine eigene, winzige Tabelle statt eines Feldes in
    idle_player_state - reiner Praesenz-Signal, keine Spieldaten. */
-async function bkmpIdleStreamHeartbeat(nameKey) {
-  const client = bkmpGetPlayerAuthClient();
-  if (!client || !nameKey) return false;
-  const { data: sessionData } = await client.auth.getSession();
-  const userId = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
-  if (!userId) return false;
-  const { error } = await client
-    .from('idle_stream_presence')
-    .upsert({ name_key: String(nameKey).trim().toLowerCase(), auth_user_id: userId, last_seen_at: new Date().toISOString() }, { onConflict: 'name_key' });
-  if (error) throw error;
-  return true;
-}
-
-async function loadIdleStreamPresence(nameKey) {
-  const client = bkmpGetSupabaseClient();
-  if (!client || !nameKey) return null;
-  const { data, error } = await client
-    .from('idle_stream_presence')
-    .select('last_seen_at')
-    .eq('name_key', String(nameKey).trim().toLowerCase())
-    .limit(1);
-  if (error) throw error;
-  return Array.isArray(data) && data[0] ? data[0].last_seen_at : null;
-}
-
 async function loadIdleLeaderboardStats() {
   const client = bkmpGetSupabaseClient();
   if (!client) return null;
@@ -4823,6 +4798,43 @@ function bkmpSubscribeToRaidInstance(raidId, onChange) {
 }
 function bkmpUnsubscribeFromRaidInstance() {
   if (bkmpRaidChannel) { bkmpRaidChannel.unsubscribe(); bkmpRaidChannel = null; }
+}
+
+/* ---------------- OBS-Mini-Overlay: reiner Kampf-Zustands-Broadcast
+   (Umbau 17.07.: "das Große entfernen, das Kleine soll nur noch visuell
+   sein - Klicken/Interagieren nur noch Hauptseite"). Ersetzt das alte
+   Herzschlag+Poll+Lock-System (beide Seiten konnten vorher unabhaengig
+   voneinander kaempfen) komplett: die Hauptseite ist jetzt die EINZIGE
+   Quelle der Wahrheit fuer den laufenden Kampf und sendet ihren aktuellen
+   Zustand ueber einen reinen Realtime-BROADCAST-Kanal (kein postgres_changes,
+   keine Tabelle noetig - Drachen-HP war noch nie persistiert und muss es
+   dafuer auch nicht werden). Das Mini-Overlay abonniert nur und zeichnet
+   rein visuell nach, schickt selbst nie etwas. */
+let bkmpCombatSendChannel = null;
+let bkmpCombatSendChannelName = null;
+function bkmpBroadcastCombatState(nameKey, payload) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !nameKey) return;
+  if (!bkmpCombatSendChannel || bkmpCombatSendChannelName !== nameKey) {
+    if (bkmpCombatSendChannel) bkmpCombatSendChannel.unsubscribe();
+    bkmpCombatSendChannelName = nameKey;
+    bkmpCombatSendChannel = client.channel('combat-' + nameKey);
+    bkmpCombatSendChannel.subscribe();
+  }
+  bkmpCombatSendChannel.send({ type: 'broadcast', event: 'state', payload }).catch(() => {});
+}
+
+let bkmpCombatReceiveChannel = null;
+function bkmpSubscribeToCombatState(nameKey, onState) {
+  bkmpUnsubscribeFromCombatState();
+  const client = bkmpGetSupabaseClient();
+  if (!client || !nameKey) return;
+  bkmpCombatReceiveChannel = client.channel('combat-' + nameKey)
+    .on('broadcast', { event: 'state' }, ({ payload }) => onState(payload))
+    .subscribe();
+}
+function bkmpUnsubscribeFromCombatState() {
+  if (bkmpCombatReceiveChannel) { bkmpCombatReceiveChannel.unsubscribe(); bkmpCombatReceiveChannel = null; }
 }
 
 /* ---------------- Gildenchat-Realtime (Spieler-Wunsch: "Gildenchat

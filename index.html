@@ -55,7 +55,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260717-bannerpopup1">
+<link rel="stylesheet" href="style.css?v=20260717-obsvisual1">
 </head>
 <body>
 
@@ -513,19 +513,12 @@
       <p class="achievements-summary">So bindest du dein Idle-Dorf als Overlay in OBS ein.</p>
       <div class="skillhelp-list">
         <div>
-          <div class="skillhelp-branch-title">1. Die richtige Adresse waehlen</div>
-          <div class="skillhelp-row">
-            <span class="skillhelp-icon">🖼️</span>
-            <div class="skillhelp-body">
-              <div class="skillhelp-name">bkinvestment.de/idle-stream</div>
-              <div class="skillhelp-desc">Das komplette, spielbare Idle-Dorf-Fenster (alle Tabs: Upgrades, Skilltree, Runen usw.)</div>
-            </div>
-          </div>
+          <div class="skillhelp-branch-title">1. Die Adresse</div>
           <div class="skillhelp-row">
             <span class="skillhelp-icon">🐉</span>
             <div class="skillhelp-body">
               <div class="skillhelp-name">bkinvestment.de/idle-stream-mini</div>
-              <div class="skillhelp-desc">Nur Level-Leiste + Dorf/Drache, kompakt und transparent - als kleines Overlay-Element irgendwo im Stream-Layout</div>
+              <div class="skillhelp-desc">Rein visuelles Overlay: zeigt live mit, welchen Drachen du gerade auf der normalen Website bekämpfst - Dorf/Drache/HP-Balken, kompakt und transparent. Gesteuert/geklickt wird ausschließlich auf der Hauptseite.</div>
             </div>
           </div>
         </div>
@@ -537,15 +530,15 @@
           </div>
           <div class="skillhelp-row">
             <span class="skillhelp-icon">2️⃣</span>
-            <div class="skillhelp-body"><div class="skillhelp-desc">Eine der beiden Adressen oben als <strong>URL</strong> eintragen.</div></div>
+            <div class="skillhelp-body"><div class="skillhelp-desc">Die Adresse oben als <strong>URL</strong> eintragen.</div></div>
           </div>
           <div class="skillhelp-row">
             <span class="skillhelp-icon">3️⃣</span>
-            <div class="skillhelp-body"><div class="skillhelp-desc"><strong>Breite/Höhe</strong> nach Geschmack anpassen, z. B. 1000×750 (großes Fenster) oder 900×350 (schmales Mini-Banner) - beide Seiten passen sich automatisch an.</div></div>
+            <div class="skillhelp-body"><div class="skillhelp-desc"><strong>Breite/Höhe</strong> nach Geschmack anpassen, z. B. 900×350 - die Seite passt sich automatisch an.</div></div>
           </div>
           <div class="skillhelp-row">
             <span class="skillhelp-icon">4️⃣</span>
-            <div class="skillhelp-body"><div class="skillhelp-desc">Haken bei „Quelle herunterfahren, wenn nicht sichtbar" <strong>nicht</strong> setzen - sonst pausiert der Kampf, sobald die Szene nicht aktiv ist.</div></div>
+            <div class="skillhelp-body"><div class="skillhelp-desc">Haken bei „Quelle herunterfahren, wenn nicht sichtbar" <strong>nicht</strong> setzen - sonst pausiert die Anzeige, sobald die Szene nicht aktiv ist.</div></div>
           </div>
           <div class="skillhelp-row">
             <span class="skillhelp-icon">5️⃣</span>
@@ -556,7 +549,7 @@
           <div class="skillhelp-branch-title">3. Fertig!</div>
           <div class="skillhelp-row">
             <span class="skillhelp-icon">✅</span>
-            <div class="skillhelp-body"><div class="skillhelp-desc">Der Kampf läuft jetzt automatisch im Overlay mit. Auf der normalen Website kannst du währenddessen ganz normal Upgrades kaufen, Skillpunkte verteilen usw. - nur der Kampf selbst zeigt dort live mit, was gerade auf Twitch passiert.</div></div>
+            <div class="skillhelp-body"><div class="skillhelp-desc">Gekämpft/geklickt wird ganz normal auf der Hauptseite - das Overlay zeigt nur live mit, ohne dass man dort etwas anklicken kann.</div></div>
           </div>
         </div>
       </div>
@@ -579,16 +572,6 @@
       </picture>
       <div class="idle-dorf-offline-card" id="idleDorfOfflineCard" style="display:none;"></div>
       <div class="raid-join-banner" id="raidJoinBanner" style="display:none;"></div>
-      <!-- Nutzerwunsch (15.07.): "auf der Hauptseite dann stehen tut 'Wird
-           in Twitch angezeigt der Kampf' das alles sync ist" - erscheint
-           automatisch, sobald idledorf.js einen frischen Herzschlag von
-           idle-stream.html/idle-stream-mini.html erkennt (siehe
-           bkmpIdleStreamApplyLockState). Nachbesserung (15.07.): "man muss
-           trotzdem upgraden können auf der Hauptseite" - nur noch das
-           Kampf-Panel selbst ist gesperrt/gespiegelt, Text entsprechend
-           angepasst (vorher stand hier faelschlich "die Steuerung ist
-           gesperrt", das galt jetzt nur noch fuer den Kampf). -->
-      <div class="idle-stream-live-banner" id="idleStreamLiveBanner" style="display:none;">📡 Wird gerade auf Twitch gespielt – der Kampf läuft nur dort, hier siehst du live mit. Upgrades, Skilltree, Runen &amp; Co. kannst du hier trotzdem ganz normal nutzen.</div>
       <div class="idle-dorf-hud" id="idleDorfHud"></div>
 
       <div class="raid-combat-view idle-dorf-panel" id="raidCombatView" style="display:none;">
@@ -1284,9 +1267,9 @@
 
   <script>window.BKMP_CLIENT_STORAGE_KEY = 'bkmp-customer-auth';</script>
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260717-fruitmeatfix1"></script>
+  <script src="supabase.js?v=20260717-obsvisual1"></script>
   <script src="app.js?v=20260712-themefix1"></script>
-  <script src="idledorf.js?v=20260717-fruitmeatfix1"></script>
+  <script src="idledorf.js?v=20260717-obsvisual1"></script>
   <script src="mapart.js?v=20260716-companyfix1"></script>
   <script>
     bkmpInitTheme();
@@ -4890,7 +4873,11 @@
     function bkmpStartDailyEventPolling() {
       bkmpPollDailyEvent();
       clearInterval(bkmpDailyEventPollTimer);
-      bkmpDailyEventPollTimer = setInterval(bkmpPollDailyEvent, 15000);
+      /* Egress/Performance-Fix 17.07.: laeuft unconditional fuer jeden
+         Besucher der Hauptseite - 15s war fuer ein taegliches Event
+         unnoetig haeufig, 30s reicht (siehe bkmpIdleMaintenancePoll fuer
+         den gleichen Grund/dieselbe Aenderung). */
+      bkmpDailyEventPollTimer = setInterval(bkmpPollDailyEvent, 30000);
     }
 
     async function bkmpPollDailyEvent() {
