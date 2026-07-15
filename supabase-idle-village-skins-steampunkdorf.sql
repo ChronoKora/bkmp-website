@@ -10,6 +10,12 @@
 -- wie bei den anderen Video-Skins (siehe frame_aspect_w/h-Kommentar in
 -- supabase-idle-village-skins-midasstadt.sql).
 --
+-- 15.07.: Video gegen eine neue Animation ausgetauscht ("Steampunk 2.0.mp4",
+-- gleiches Seitenverhaeltnis 2200x942) - ?v=20260715-2 an den Dateinamen
+-- angehaengt, damit Browser/CDN nicht die alte, unter demselben Pfad
+-- gecachte Datei weiterzeigen (gleiches Cache-Busting-Muster wie bei
+-- pinguindorf.mp4?v=... in supabase-idle-village-skins-pinguindorf.sql).
+--
 -- Supabase Dashboard > SQL Editor > New query > diesen Inhalt ausfuehren.
 -- Idempotent.
 
@@ -25,7 +31,7 @@ values (
   'Ein Dorf voller Zahnraeder, Dampfmaschinen und messingglaenzender Technik.',
   '⚙️',
   '',
-  'assets/village/steampunkdorf.mp4',
+  'assets/village/steampunkdorf.mp4?v=20260715-2',
   'real_money',
   199,
   1,
