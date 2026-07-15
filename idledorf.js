@@ -4106,28 +4106,61 @@ async function bkmpIdleRenderGildeBossPanel() {
 
   if (bkmpGuildBossPanelRenderedForKey !== renderKey) {
     bkmpGuildBossPanelRenderedForKey = renderKey;
-    const hpPct = g.bossMaxHp > 0 ? Math.max(0, Math.min(100, (g.bossHp / g.bossMaxHp) * 100)) : 0;
-    panel.innerHTML = `
-      <div class="idle-dungeon-intro">
-        <h4>🐲 ${escapeHtml(g.bossName || 'Gildenboss')}</h4>
-        <p class="idle-dungeon-best" id="guildBossStatusText"></p>
-      </div>
-      <div class="raid-battlefield" id="guildBossBattlefield" style="justify-content:center;">
-        <div class="raid-boss ${isFinished ? '' : 'raid-clickable'}" id="guildBossCreature">
-          <video class="raid-boss-sprite raid-sprite-malthyros" id="guildBossSprite" src="assets/dragons/malthyros.mp4?v=20260715-2" autoplay muted loop playsinline></video>
-          <div class="raid-hp-bar"><div class="raid-hp-fill raid-hp-fill-boss" id="guildBossHpFill" style="width:${hpPct}%"></div></div>
-          <div class="raid-hp-label" id="guildBossHpLabel">${bkmpIdleFormatNumber(g.bossHp)} / ${bkmpIdleFormatNumber(g.bossMaxHp)}</div>
-          <div class="raid-boss-name" id="guildBossNameLabel">${escapeHtml(g.bossName || '')}</div>
+    if (isFinished) {
+      /* Spieler-Report (15.07., "der Drache ist auch einfach immernoch
+         da"): bisher wurde bei Sieg/Ablauf nur die "raid-clickable"-Klasse
+         entfernt und der Statustext geaendert - das lachend weiterlaufende
+         Drachenvideo aus der aktiven Kampfansicht blieb optisch komplett
+         unveraendert stehen, kein erkennbarer Sieg-/Ende-Zustand. Analog
+         zum bereits vorhandenen Raid-Ergebnisbildschirm (bkmpRaidShowResult)
+         jetzt eine eigene Ergebnisansicht statt der Kampfansicht - nutzt
+         dieselben raid-result-*-CSS-Klassen, die fuer den Raid schon
+         existieren. bkmpGuildBossUpdateCombatUI() unten haelt die Werte
+         hier zusaetzlich aktuell, da der spaetere Nachlade-Refresh in
+         bkmpGuildBossCheckOutcome() wegen desselben renderKey KEIN erneutes
+         Neubauen dieses Grundgeruests mehr ausloest. */
+      panel.innerHTML = `
+        <div class="idle-dungeon-intro">
+          <h4>🐲 ${escapeHtml(g.bossName || 'Gildenboss')}</h4>
         </div>
-      </div>
-      <p class="idle-guild-xp-pct" id="guildBossMyDamage"></p>
-      <div class="idle-arena-history">
-        <h4 style="margin-top:1rem;">🏆 Schadensrangliste</h4>
-        <div id="guildBossParticipantsList"></div>
-      </div>
-    `;
-    const creature = document.getElementById('guildBossCreature');
-    if (creature && !isFinished) creature.addEventListener('click', bkmpGuildBossHandleClick);
+        <div class="raid-result-title ${g.status === 'won' ? 'won' : 'lost'}">${g.status === 'won' ? '🏆 Gildenboss besiegt!' : '⌛ Zeit abgelaufen'}</div>
+        <div class="raid-result-stats">
+          <div class="raid-result-stat"><div class="raid-result-stat-label">Gesamtschaden</div><div class="raid-result-stat-value" id="guildBossResultTotalDmg">0</div></div>
+          <div class="raid-result-stat"><div class="raid-result-stat-label">Dein Schaden</div><div class="raid-result-stat-value" id="guildBossResultOwnDmg">0</div></div>
+          <div class="raid-result-stat"><div class="raid-result-stat-label">Dein Rang</div><div class="raid-result-stat-value" id="guildBossResultRank">-</div></div>
+          <div class="raid-result-stat"><div class="raid-result-stat-label">Teilnehmer</div><div class="raid-result-stat-value">${g.participantCount || bkmpGuildBossParticipants.length}</div></div>
+          <div class="raid-result-stat"><div class="raid-result-stat-label">MVP</div><div class="raid-result-stat-value raid-result-mvp" id="guildBossResultMvp">-</div></div>
+        </div>
+        ${g.status === 'won' ? '<div class="raid-result-rewards"><span>💰 Gold- und 💎 Kristall-Belohnung wurde anteilig nach Schaden gutgeschrieben.</span></div>' : ''}
+        <div class="idle-arena-history">
+          <h4 style="margin-top:1rem;">🏆 Schadensrangliste</h4>
+          <div id="guildBossParticipantsList"></div>
+        </div>
+      `;
+    } else {
+      const hpPct = g.bossMaxHp > 0 ? Math.max(0, Math.min(100, (g.bossHp / g.bossMaxHp) * 100)) : 0;
+      panel.innerHTML = `
+        <div class="idle-dungeon-intro">
+          <h4>🐲 ${escapeHtml(g.bossName || 'Gildenboss')}</h4>
+          <p class="idle-dungeon-best" id="guildBossStatusText"></p>
+        </div>
+        <div class="raid-battlefield" id="guildBossBattlefield" style="justify-content:center;">
+          <div class="raid-boss raid-clickable" id="guildBossCreature">
+            <video class="raid-boss-sprite raid-sprite-malthyros" id="guildBossSprite" src="assets/dragons/malthyros.mp4?v=20260715-2" autoplay muted loop playsinline></video>
+            <div class="raid-hp-bar"><div class="raid-hp-fill raid-hp-fill-boss" id="guildBossHpFill" style="width:${hpPct}%"></div></div>
+            <div class="raid-hp-label" id="guildBossHpLabel">${bkmpIdleFormatNumber(g.bossHp)} / ${bkmpIdleFormatNumber(g.bossMaxHp)}</div>
+            <div class="raid-boss-name" id="guildBossNameLabel">${escapeHtml(g.bossName || '')}</div>
+          </div>
+        </div>
+        <p class="idle-guild-xp-pct" id="guildBossMyDamage"></p>
+        <div class="idle-arena-history">
+          <h4 style="margin-top:1rem;">🏆 Schadensrangliste</h4>
+          <div id="guildBossParticipantsList"></div>
+        </div>
+      `;
+      const creature = document.getElementById('guildBossCreature');
+      if (creature) creature.addEventListener('click', bkmpGuildBossHandleClick);
+    }
   }
 
   bkmpGuildBossUpdateCombatUI();
@@ -4144,6 +4177,25 @@ function bkmpGuildBossUpdateCombatUI() {
   if (hpLabel) hpLabel.textContent = `${bkmpIdleFormatNumber(g.bossHp)} / ${bkmpIdleFormatNumber(g.bossMaxHp)}`;
   const statusText = document.getElementById('guildBossStatusText');
   if (statusText) statusText.textContent = `${isFinished ? (g.status === 'won' ? '🏆 Besiegt!' : '⌛ Zeit abgelaufen.') : `⏳ ${bkmpRaidFormatCountdown(bkmpGuildBossGetPhaseInfo().msUntilFightEnd || 0)} verbleiben`} · ${g.participantCount || bkmpGuildBossParticipants.length} Kämpfer`;
+  if (isFinished) {
+    /* Der Nachlade-Refresh in bkmpGuildBossCheckOutcome() (frische
+       Teilnehmerliste nach Kampfende) loest wegen des unveraenderten
+       renderKey KEIN Neubauen des Ergebnis-Grundgeruests mehr aus (siehe
+       Kommentar dort) - die Statistik-Werte muessen deshalb hier bei
+       jedem Aufruf aktuell gehalten werden, nicht nur einmalig beim Bau. */
+    const totalDamage = bkmpGuildBossParticipants.reduce((sum, p) => sum + p.damageDealt, 0);
+    const myDamage = bkmpGuildBossParticipants.find(p => p.authUserId === bkmpGuildMyAuthUserId);
+    const myRank = myDamage ? bkmpGuildBossParticipants.indexOf(myDamage) + 1 : 0;
+    const mvp = bkmpGuildBossParticipants[0];
+    const totalEl = document.getElementById('guildBossResultTotalDmg');
+    if (totalEl) totalEl.textContent = bkmpIdleFormatNumber(totalDamage);
+    const ownEl = document.getElementById('guildBossResultOwnDmg');
+    if (ownEl) ownEl.textContent = bkmpIdleFormatNumber(myDamage ? myDamage.damageDealt : 0);
+    const rankEl = document.getElementById('guildBossResultRank');
+    if (rankEl) rankEl.textContent = myRank ? '#' + myRank : '-';
+    const mvpEl = document.getElementById('guildBossResultMvp');
+    if (mvpEl) mvpEl.textContent = mvp ? mvp.displayName : '-';
+  }
   bkmpGuildBossRequestParticipantsRender();
 }
 
@@ -4155,18 +4207,27 @@ function bkmpGuildBossRequestParticipantsRender() {
   }, 400);
 }
 
+/* Spieler-Report (15.07., Schadenszahlen selbst korrekt, aber ueberall
+   "0% Anteil"): g.totalDamage kam nur ueber Realtime-postgres_changes auf
+   guild_boss_instances rein (siehe bkmpGuildBossStartLoop) - beim eigenen
+   Tick/Klick (viel haeufigerer, direkter Pfad seit dem Own-Damage-Sync-Fix
+   oben) wurde es nie gesetzt und blieb damit fuer die gesamte Kampfdauer
+   "undefined", die Prozentrechnung landete deshalb immer beim 0-Fallback.
+   Robuster: die Summe direkt aus den bereits vorhandenen Teilnehmer-
+   Schadenswerten bilden statt auf dieses separate Feld zu vertrauen. */
 function bkmpGuildBossRenderParticipants() {
   const g = bkmpGuildBossState;
   if (!g) return;
+  const totalDamage = bkmpGuildBossParticipants.reduce((sum, p) => sum + p.damageDealt, 0);
   const myDamage = bkmpGuildBossParticipants.find(p => p.authUserId === bkmpGuildMyAuthUserId);
   const myDmgEl = document.getElementById('guildBossMyDamage');
-  if (myDmgEl) myDmgEl.innerHTML = myDamage ? `Dein Schaden: ${bkmpIdleFormatNumber(myDamage.damageDealt)} (${g.totalDamage > 0 ? Math.round(myDamage.damageDealt / g.totalDamage * 100) : 0}% Anteil)` : '';
+  if (myDmgEl) myDmgEl.innerHTML = myDamage ? `Dein Schaden: ${bkmpIdleFormatNumber(myDamage.damageDealt)} (${totalDamage > 0 ? Math.round(myDamage.damageDealt / totalDamage * 100) : 0}% Anteil)` : '';
   const listEl = document.getElementById('guildBossParticipantsList');
   if (!listEl) return;
   listEl.innerHTML = bkmpGuildBossParticipants.length === 0 ? '<p class="empty-hint">Noch kein Schaden verursacht.</p>' : bkmpGuildBossParticipants.map((p, i) => `
     <div class="idle-arena-opponent-card">
       <span class="idle-arena-opponent-name">${BKMP_GUILD_MEDALS[i] || `${i + 1}.`} ${escapeHtml(p.displayName)}</span>
-      <span class="idle-arena-opponent-rating">${g.totalDamage > 0 ? Math.round(p.damageDealt / g.totalDamage * 100) : 0}%</span>
+      <span class="idle-arena-opponent-rating">${totalDamage > 0 ? Math.round(p.damageDealt / totalDamage * 100) : 0}%</span>
       <span class="idle-arena-opponent-record">${bkmpIdleFormatNumber(p.damageDealt)} Schaden</span>
     </div>
   `).join('');
