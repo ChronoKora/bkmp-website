@@ -5359,7 +5359,16 @@ function bkmpIdleAccrueBuildingResources() {
     const hoursElapsed = Math.max(0, (now - last) / 3600000);
     if (hoursElapsed <= 0) return;
     const gained = hoursElapsed * bkmpDragonResourceRatePerHour(kind, bkmpIdleState[levelKey]);
-    bkmpIdleState[kind] = Math.min(bkmpDragonResourceCap(bkmpIdleState[levelKey]), Number(bkmpIdleState[kind] || 0) + gained);
+    /* Bug-Report 17.07. (ChronoKora): "Speichern schlaegt IMMER fehl" -
+       Root Cause per Live-DB-Payload gefunden: fruit/meat sind bigint-
+       Spalten, gained war aber nie gerundet (hoursElapsed ist ein echter
+       Bruchteil einer Stunde) - JEDER Aufruf dieser Funktion (bei jedem
+       Rendern des Drachenzucht-Tabs) machte fruit/meat krumm und damit
+       JEDEN nachfolgenden Speicherversuch fuer den KOMPLETTEN Spielstand
+       kaputt (Postgres: "invalid input syntax for type bigint"), nicht nur
+       fuer diese beiden Felder. Math.floor statt round, damit die Obergrenze
+       (Cap) nie durch Aufrunden ueberschritten wird. */
+    bkmpIdleState[kind] = Math.floor(Math.min(bkmpDragonResourceCap(bkmpIdleState[levelKey]), Number(bkmpIdleState[kind] || 0) + gained));
     bkmpIdleState[tsKey] = new Date(now).toISOString();
   });
 }

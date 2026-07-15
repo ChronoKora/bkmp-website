@@ -3041,6 +3041,19 @@ async function loadIdlePlayerState(name) {
   return Array.isArray(data) && data[0] ? data[0] : null;
 }
 
+/* Alle integer/bigint-Spalten von idle_player_state (siehe
+   supabase-idle-dorf-schema.sql + Folge-Migrationen) - numeric-Spalten wie
+   attack/defense/hp/crit_chance/gold_bonus duerfen Nachkommastellen haben
+   und stehen bewusst NICHT in dieser Liste. */
+const BKMP_IDLE_STATE_INTEGER_COLUMNS = [
+  'level', 'xp', 'gold', 'wood', 'stone', 'crystals', 'essence', 'total_gold_earned',
+  'skill_points_available', 'skill_points_spent', 'dragon_kills', 'boss_kills',
+  'current_dragon_index', 'highest_dragon_index', 'playtime_seconds',
+  'rune_fuse_successes', 'rune_fuse_failures', 'rune_upgrade_successes', 'rune_upgrade_failures',
+  'village_defeats', 'yaksha_boss_kills', 'prestige_stage_offset',
+  'fruit', 'meat', 'obstgarten_level', 'jagdhuette_level'
+];
+
 /* Cache fuer upsertIdlePlayerState (siehe dort) - NICHT global fuer alle
    Schreibfunktionen gedacht, nur fuer diesen einen Hot-Path relevant. */
 let bkmpIdlePlayerStateUserIdCache = null;
@@ -3092,6 +3105,18 @@ async function upsertIdlePlayerState(state, _isRetry) {
      wirklich neuem Konto einfuegen. */
   const { name_key, display_name, ...stateWithoutIdentity } = state;
   const statsPayload = { ...stateWithoutIdentity, updated_at: new Date().toISOString() };
+  /* Absicherung gegen die Bug-Klasse von bkmpIdleAccrueBuildingResources
+     (siehe idledorf.js, Bug-Report 17.07. bei ChronoKora - fruit/meat waren
+     nie gerundet und haben dadurch JEDEN Speicherversuch mit "invalid input
+     syntax for type bigint" blockiert): alle bigint-Spalten hier nochmal
+     hart runden, direkt vor dem Request, statt darauf zu vertrauen, dass
+     jede einzelne Stelle im Client sie schon korrekt gerundet hat - ein
+     Kampf-Tick zwischen einer fruehen Rundung (z. B. playtime_seconds in
+     bkmpIdleFlushSync) und diesem Punkt reicht sonst schon wieder aus, um
+     den Wert erneut krumm zu machen. */
+  BKMP_IDLE_STATE_INTEGER_COLUMNS.forEach(col => {
+    if (typeof statsPayload[col] === 'number') statsPayload[col] = Math.round(statsPayload[col]);
+  });
   const { data: updated, error: updateError } = await client
     .from('idle_player_state')
     .update(statsPayload)
