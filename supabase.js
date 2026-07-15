@@ -4817,6 +4817,15 @@ function bkmpUnsubscribeFromRaidInstance() {
    keine Tabelle noetig - Drachen-HP war noch nie persistiert und muss es
    dafuer auch nicht werden). Das Mini-Overlay abonniert nur und zeichnet
    rein visuell nach, schickt selbst nie etwas. */
+/* Bug-Report 15.07. (Supabase-Logs: "UnknownErrorOnWebSocketMessage:
+   invalid byte 0xE4..." - viele tausend Fehler/Stunde): der Kanal-Name
+   wurde bisher direkt aus dem rohen Anzeigenamen gebaut. Bei Umlauten
+   (ä/ö/ü, z.B. Spieler "Bärli") schickt das die Realtime-WebSocket-
+   Verbindung als ungueltig kodierte Bytes - der Server lehnt die
+   Nachricht ab. encodeURIComponent() macht daraus eine garantiert
+   ASCII-sichere, aber weiterhin eindeutige/stabile Kanal-Kennung -
+   Sender (hier) und Empfaenger (bkmpSubscribeToCombatState) nutzen
+   beide dieselbe Umwandlung, landen also weiterhin im selben Kanal. */
 let bkmpCombatSendChannel = null;
 let bkmpCombatSendChannelName = null;
 function bkmpBroadcastCombatState(nameKey, payload) {
@@ -4825,7 +4834,7 @@ function bkmpBroadcastCombatState(nameKey, payload) {
   if (!bkmpCombatSendChannel || bkmpCombatSendChannelName !== nameKey) {
     if (bkmpCombatSendChannel) bkmpCombatSendChannel.unsubscribe();
     bkmpCombatSendChannelName = nameKey;
-    bkmpCombatSendChannel = client.channel('combat-' + nameKey);
+    bkmpCombatSendChannel = client.channel('combat-' + encodeURIComponent(nameKey));
     bkmpCombatSendChannel.subscribe();
   }
   bkmpCombatSendChannel.send({ type: 'broadcast', event: 'state', payload }).catch(() => {});
@@ -4836,7 +4845,7 @@ function bkmpSubscribeToCombatState(nameKey, onState) {
   bkmpUnsubscribeFromCombatState();
   const client = bkmpGetSupabaseClient();
   if (!client || !nameKey) return;
-  bkmpCombatReceiveChannel = client.channel('combat-' + nameKey)
+  bkmpCombatReceiveChannel = client.channel('combat-' + encodeURIComponent(nameKey))
     .on('broadcast', { event: 'state' }, ({ payload }) => onState(payload))
     .subscribe();
 }
