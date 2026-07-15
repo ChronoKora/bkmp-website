@@ -1239,7 +1239,10 @@ function bkmpIdleRenderDungeonPanel() {
   panel.innerHTML = `
     <div class="idle-dungeon-intro">
       <h4>🏛️ Dungeon-Herausforderung</h4>
-      ${bkmpDungeonEventWeekendActive() ? `
+      ${bkmpDungeonSpontaneousEventActive() ? `
+      <div class="idle-dungeon-event-banner">
+        <p><strong>⚡ Spontanes Event - nur bis Mitternacht heute!</strong> Jeder vollständige Dungeon-Sieg hat jetzt 2% Chance auf ein seltenes Ei (Kora-, Haku-, Obsi- oder Kowalski-Drache).</p>
+      </div>` : bkmpDungeonEventWeekendActive() ? `
       <div class="idle-dungeon-event-banner">
         <p><strong>🎉 Event-Dungeon-Wochenende!</strong> Bis Sonntag hat jeder vollständige Dungeon-Sieg eine Extra-Chance auf ein seltenes Ei (Kora-, Haku-, Obsi- oder Kowalski-Drache).</p>
       </div>` : ''}
@@ -1274,8 +1277,25 @@ function bkmpDungeonEventWeekendActive() {
   const weekday = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Berlin', weekday: 'short' }).format(new Date());
   return weekday === 'Fri' || weekday === 'Sat' || weekday === 'Sun';
 }
+
+/* Spontanes Einmal-Event (Spieler-Wunsch 17.07.): "bis 0 Uhr heute" - fest
+   verdrahteter Berlin-Zeitpunkt statt eines Wochentag-Checks, laeuft nach
+   dem 17.07. automatisch aus (kein manuelles Abschalten noetig). Nutzt
+   dieselbe DST-sichere Berlin-Zeit-Umrechnung wie der Gildenboss
+   (bkmpGuildBossBerlinDateAt), nur mit fest eingetragenem Datum statt
+   "heute" - der Endzeitpunkt aendert sich nicht mit dem Kalendertag. */
+const BKMP_DUNGEON_SPONTANEOUS_EVENT_END_UTC_MS = bkmpGuildBossBerlinDateAt(2026, 7, 16, 0, 0).getTime();
+const BKMP_DUNGEON_SPONTANEOUS_EVENT_EGG_CHANCE = 0.02;
+function bkmpDungeonSpontaneousEventActive() {
+  return Date.now() < BKMP_DUNGEON_SPONTANEOUS_EVENT_END_UTC_MS;
+}
+
 function bkmpDungeonMaybeGrantEventEgg() {
-  if (!bkmpDungeonEventWeekendActive() || !bkmpIdleState || Math.random() >= BKMP_DUNGEON_EVENT_EGG_CHANCE) return;
+  if (!bkmpIdleState) return;
+  const spontaneous = bkmpDungeonSpontaneousEventActive();
+  const chance = spontaneous ? BKMP_DUNGEON_SPONTANEOUS_EVENT_EGG_CHANCE
+    : (bkmpDungeonEventWeekendActive() ? BKMP_DUNGEON_EVENT_EGG_CHANCE : 0);
+  if (chance <= 0 || Math.random() >= chance) return;
   const speciesId = BKMP_DUNGEON_EVENT_EGG_SPECIES[Math.floor(Math.random() * BKMP_DUNGEON_EVENT_EGG_SPECIES.length)];
   const species = bkmpDragonSpeciesById(speciesId);
   if (!species || typeof insertPlayerDragonEgg !== 'function') return;
@@ -1284,7 +1304,7 @@ function bkmpDungeonMaybeGrantEventEgg() {
     bkmpPlayerDragonEggs.push(row);
     if (typeof bkmpIdleRenderDragonsPanel === 'function') bkmpIdleRenderDragonsPanel();
   }).catch(e => console.warn('Idle Dorf: Event-Ei konnte nicht gespeichert werden.', e));
-  bkmpIdleLog(`🎉 Event-Dungeon-Wochenende: Ein ${species.name}-Ei gefunden!`);
+  bkmpIdleLog(`🎉 ${spontaneous ? 'Spontan-Event' : 'Event-Dungeon-Wochenende'}: Ein ${species.name}-Ei gefunden!`);
   if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`🎉 Seltener Fund! Ein ${species.name}-Ei ist aus dem Dungeon gefallen!`, 5000);
 }
 

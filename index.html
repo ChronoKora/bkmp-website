@@ -55,7 +55,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260717-nestticker1">
+<link rel="stylesheet" href="style.css?v=20260717-bannerpopup1">
 </head>
 <body>
 
@@ -318,6 +318,15 @@
       <p class="map-code-value" id="mapCodeValue"></p>
       <div class="joke-buttons">
         <button class="btn-ja" id="mapCodeOverlayClose" type="button">Gespeichert, weiter</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="joke-overlay" id="spontanEventBannerOverlay">
+    <div class="joke-card spontan-event-banner-card">
+      <img src="assets/events/spontanevent-banner.png?v=20260717-1" alt="Limited Event! Jetzt bis 0 Uhr alle Event-Drachen im Dungeon bekommbar!" class="spontan-event-banner-img">
+      <div class="joke-buttons">
+        <button class="btn-ja" id="spontanEventBannerCloseBtn" type="button">Auf geht's!</button>
       </div>
     </div>
   </div>
@@ -1275,9 +1284,9 @@
 
   <script>window.BKMP_CLIENT_STORAGE_KEY = 'bkmp-customer-auth';</script>
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260717-nestticker1"></script>
+  <script src="supabase.js?v=20260717-bannerpopup1"></script>
   <script src="app.js?v=20260712-themefix1"></script>
-  <script src="idledorf.js?v=20260717-nestticker1"></script>
+  <script src="idledorf.js?v=20260717-bannerpopup1"></script>
   <script src="mapart.js?v=20260716-companyfix1"></script>
   <script>
     bkmpInitTheme();
@@ -5538,6 +5547,39 @@
       bkmpAdFreeGrantReward();
     });
     bkmpAdFreeSyncButton();
+
+    /* ---------------- Spontan-Event-Popup (17.07.) ----------------
+       Zeigt das Ankuendigungs-Banner (assets/events/spontanevent-banner.png)
+       einmal pro Tag, solange bkmpDungeonSpontaneousEventActive() (siehe
+       idledorf.js) true ist - localStorage statt sessionStorage, damit es
+       nicht bei jedem Tab-Neustart erneut nervt, aber trotzdem an jedem der
+       (aktuell nur einen) Event-Tage einmal auffaellt. Nur EIN einmaliges
+       Event mit fest eingetragenem Enddatum, kein wiederkehrender Mechanismus -
+       das Popup verschwindet nach dem 17.07. von selbst (die Bedingung wird
+       dann einfach nie mehr wahr). */
+    (function bkmpSpontanEventBannerInit() {
+      const overlay = document.getElementById('spontanEventBannerOverlay');
+      const closeBtn = document.getElementById('spontanEventBannerCloseBtn');
+      if (!overlay || !closeBtn) return;
+      const STORAGE_KEY = 'bkmp-spontanevent-banner-seen';
+      function todayBerlin() {
+        return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(new Date());
+      }
+      function maybeShow() {
+        if (typeof bkmpDungeonSpontaneousEventActive !== 'function' || !bkmpDungeonSpontaneousEventActive()) return;
+        let seenDate = null;
+        try { seenDate = localStorage.getItem(STORAGE_KEY); } catch (e) {}
+        if (seenDate === todayBerlin()) return;
+        overlay.classList.add('visible');
+        /* "Gesehen" gilt schon ab dem Anzeigen, nicht erst beim Schliessen -
+           sonst wuerde ein Schliessen per ESC (generischer Handler weiter
+           unten, kennt dieses Overlay nicht extra) den Flag nie setzen und
+           das Popup bei jedem Reload erneut aufploppen lassen. */
+        try { localStorage.setItem(STORAGE_KEY, todayBerlin()); } catch (e) {}
+      }
+      closeBtn.addEventListener('click', () => overlay.classList.remove('visible'));
+      maybeShow();
+    })();
 
     /* ---------------- Umfrage-Banner (oben mittig) ----------------
        Stimme ist ueber poll_votes (siehe supabase-polls-schema.sql) auf 1x

@@ -435,6 +435,13 @@ body.modal-open .bkmp-easter > span {
 .joke-overlay.visible .joke-card { transform: translateY(0) scale(1); }
 .joke-card p { font-size: 1.05rem; margin-bottom: 1.4rem; }
 .joke-buttons { display: flex; gap: 0.7rem; justify-content: center; }
+
+/* Spontan-Event-Ankuendigung (17.07.): eigene, breitere Karte statt der
+   schmalen 320px-Standardbreite - das Banner-Bild traegt die komplette
+   Botschaft selbst (Text bereits im Bild), die Karte ist hier nur noch ein
+   schmuckloser Rahmen drumherum. */
+.spontan-event-banner-card { max-width: 640px; padding: 1rem 1rem 1.2rem; }
+.spontan-event-banner-img { width: 100%; height: auto; border-radius: 12px; display: block; margin-bottom: 1rem; }
 .joke-buttons button {
   font-family: 'Inter', sans-serif; font-size: 0.85rem; font-weight: 500;
   padding: 0.55rem 1.2rem; border-radius: 999px; cursor: pointer;
