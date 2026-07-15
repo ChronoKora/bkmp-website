@@ -191,3 +191,12 @@ begin
 end;
 $$;
 grant execute on function public.guild_boss_deal_damage(text, numeric, boolean, boolean) to authenticated;
+
+-- Spieler-Report: "Could not find the function public.guild_boss_deal_damage
+-- (...) in the schema cache" - PostgREST (die REST-API-Schicht, die der
+-- Browser tatsaechlich anspricht) hatte nach dem Neuanlegen der Funktion
+-- oben noch den alten Stand im Cache, siehe bereits bestehende
+-- supabase-reload-schema-cache.sql fuer denselben Fix bei einem frueheren
+-- Vorfall. Zwingt PostgREST, sofort neu zu laden statt auf den naechsten
+-- automatischen Refresh zu warten.
+notify pgrst, 'reload schema';
