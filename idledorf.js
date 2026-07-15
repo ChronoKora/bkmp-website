@@ -7704,7 +7704,6 @@ function bkmpIdleInitTabs() {
   });
   const drawerToggle = document.getElementById('idleRuneDrawerToggle');
   if (drawerToggle) drawerToggle.addEventListener('click', bkmpRuneToggleDrawer);
-  window.addEventListener('resize', bkmpRuneSyncDrawerPosition);
 }
 
 /* ---------------- Live-Kampf-Broadcast fuers OBS-Mini-Overlay ----------------
@@ -8947,6 +8946,21 @@ function bkmpIdleInit() {
   bkmpIdleWireStagePicker();
   const eventDragonReadyBtn = document.getElementById('idleEventDragonReadyBtn');
   if (eventDragonReadyBtn) eventDragonReadyBtn.addEventListener('click', bkmpIdleConfirmEventDragonReady);
+  /* Bug-Fund (autonome Fehlersuche 15.07.): bkmpIdleRenderRunenPanel()
+     haengte diesen Resize-Listener bisher bei JEDEM eigenen Aufruf neu an
+     window - und diese Funktion laeuft nach buchstaeblich jeder Runen-
+     Aktion (Aufwerten, Verkaufen, Fusionieren, Ausruesten, Auto-Fusion/
+     -Aufwertung, ueber 15 Aufrufstellen), niemals nur einmal. window wird
+     nie aufgeraeumt - ueber eine laengere Spielsitzung sammelten sich so
+     unbegrenzt viele identische Resize-Listener an (jeder einzelne feuert
+     bkmpRuneSyncDrawerPosition() erneut bei jedem Browser-Resize). Gleiches
+     Leck-Muster wie der bereits gefixte Donut-Chart-Listener, hier aber
+     unentdeckt geblieben. Jetzt wie alle anderen globalen Listener
+     (keydown/beforeunload/visibilitychange) nur EINMAL hier in der Init
+     angehaengt - bkmpRuneSyncDrawerPosition() ist ohnehin intern bereits
+     dagegen abgesichert, wenn der Rahmen (Lager-Balken) gerade unsichtbar
+     ist, braucht also keinen weiteren Enable/Disable-Mechanismus. */
+  window.addEventListener('resize', bkmpRuneSyncDrawerPosition);
   /* Leertaste als Alternative zum Maus-Klick auf den Drachen/Weltboss -
      Autoklicker-Schutz greift ueber dieselben Handler-Funktionen genauso,
      da hier nur der jeweilige Klick-Handler aufgerufen wird, keine eigene
