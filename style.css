@@ -6714,7 +6714,13 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
    "border: 1.5px solid transparent"-Kurzschrift. */
 #idleDorfOverlay .idle-dorf-card.idle-window-frame-drachenrahmen {
   border-style: solid;
-  border-width: 100px 58px 40px 58px;
+  /* Seiten bewusst deutlich breiter als oben/unten: die Saeulen-Grafik
+     (Slice-Breite 163-165px) wird sonst auf 58px zusammengequetscht
+     (Faktor ~0.35), waehrend die Fensterhoehe die 731px hohe Slice kaum
+     staucht (Faktor ~0.9-1.0) - dieses Auseinanderlaufen von x-/y-Skalierung
+     liess die Saeulen schmal und "verzerrt" wirken (Spieler-Feedback
+     15.07.). Breitere Seiten bringen beide Faktoren naeher zusammen. */
+  border-width: 100px 95px 40px 95px;
   border-image-source: url('assets/frames/drachenrahmen.png?v=20260715-2');
   border-image-slice: 279 163 112 165;
   border-image-repeat: stretch;
@@ -6722,7 +6728,7 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 }
 @media (max-width: 720px) {
   #idleDorfOverlay .idle-dorf-card.idle-window-frame-drachenrahmen {
-    border-width: 58px 34px 24px 34px;
+    border-width: 58px 50px 24px 50px;
   }
 }
 /* Der Rahmen traegt oben bereits den "IDLE DRACHEN DORF"-Schriftzug -
