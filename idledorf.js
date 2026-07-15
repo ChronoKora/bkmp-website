@@ -27,6 +27,15 @@
    ein kaputtes Spiel freigeben. */
 const BKMP_IDLE_MAINTENANCE_FALLBACK_MESSAGE = 'Das Idle Drachen Dorf ist gerade kurz für Wartungsarbeiten pausiert. Es geht bald weiter, bitte versuch es später nochmal.';
 let bkmpIdleMaintenanceKnown = false;
+
+/* Echtgeld-Kaeufe (Drachenrahmen etc.) auf "gesperrt" halten, bis die
+   Stripe-Live-Konfiguration wirklich fertig ist (STRIPE_SECRET_KEY +
+   STRIPE_WEBHOOK_SECRET in Vercel, Live-Webhook eingerichtet) - bis dahin
+   wuerde ein Klick entweder in einen Server-Fehler laufen oder (schlimmer)
+   Geld nehmen ohne dass der Webhook zuverlaessig freischaltet. Auf true
+   stellen, sobald ein echter Test-Kauf im Sandbox- UND Live-Modus
+   durchgelaufen ist. */
+const BKMP_REAL_MONEY_PURCHASES_ENABLED = false;
 let bkmpIdleMaintenanceActive = true;
 let bkmpIdleMaintenanceMessage = BKMP_IDLE_MAINTENANCE_FALLBACK_MESSAGE;
 
@@ -5008,7 +5017,9 @@ function bkmpIdleRenderSkinsPanel() {
       actionHtml = `<button type="button" class="btn-ja idle-skin-action idle-skin-buy" data-skin-id="${def.id}" ${affordable ? '' : 'disabled'}>${priceParts.join(' + ') || 'Kaufen'}</button>`;
     } else if (def.unlock_type === 'real_money') {
       const priceEur = (Number(def.price_eur_cents || 0) / 100).toFixed(2).replace('.', ',');
-      actionHtml = `<button type="button" class="btn-ja idle-skin-action idle-skin-buy-real-money" data-skin-id="${def.id}">🔒 Kaufen (${priceEur} €)</button>`;
+      actionHtml = BKMP_REAL_MONEY_PURCHASES_ENABLED
+        ? `<button type="button" class="btn-ja idle-skin-action idle-skin-buy-real-money" data-skin-id="${def.id}">Kaufen (${priceEur} €)</button>`
+        : `<button type="button" class="btn-ja idle-skin-action idle-skin-buy-real-money-locked" disabled title="Käufe sind noch nicht freigeschaltet">🔒 Kaufen (${priceEur} €)</button>`;
     } else {
       actionHtml = `<div class="idle-skin-locked-hint">🔒 ${escapeHtml(def.unlock_hint || (def.unlock_type === 'achievement' ? 'Über einen Erfolg freischaltbar' : 'Seltener Boss-Drop'))}</div>`;
     }

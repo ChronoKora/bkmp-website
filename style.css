@@ -5612,6 +5612,7 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
    abgesetzt, damit sofort klar ist "das ist eine andere Waehrung". */
 .idle-skin-card-premium { border-color: color-mix(in srgb, var(--gold) 55%, var(--line)); background: linear-gradient(180deg, color-mix(in srgb, var(--gold) 6%, var(--paper)), var(--paper)); }
 .idle-skin-buy-real-money { background: linear-gradient(135deg, #fbbf24, #b45309); border: none; color: #1a1206; font-weight: 700; }
+.idle-skin-buy-real-money-locked { background: var(--paper-2); border: 1px dashed var(--line); color: var(--muted); font-weight: 700; cursor: not-allowed; opacity: 0.85; }
 .idle-skin-locked-hint { font-size: 0.72rem; color: var(--muted); padding: 0.4rem 0.2rem; margin-top: auto; }
 .idle-skin-empty-hint { color: var(--muted); font-size: 0.85rem; text-align: center; padding: 1.2rem 0.6rem; }
 
