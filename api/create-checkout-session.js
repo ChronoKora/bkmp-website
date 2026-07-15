@@ -1,6 +1,6 @@
 /* ============================================================
    Bkmp - Startet eine Stripe-Checkout-Sitzung fuer einen echten
-   Geld-Kauf (aktuell: Drachenrahmen, 1,99 EUR).
+   Geld-Kauf (aktuell: Dorf-Skin "Steampunk Dorf", 1,99 EUR).
 
    WICHTIG - Sicherheitsprinzip: der Preis und die Berechtigung ("besitzt
    der Spieler das schon?") werden HIER, serverseitig, aus der Datenbank

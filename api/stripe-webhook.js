@@ -128,17 +128,13 @@ module.exports = async function handler(req, res) {
     const existing = Array.isArray(existingRows) ? existingRows[0] : null;
     if (existing && existing.status === 'paid') return send(res, 200, { received: true, note: 'already_processed' });
 
+    // Nur Besitz eintragen - Ausruesten bleibt wie bei jedem anderen
+    // Dorf-Skin (Gold-/Kristall-Kauf) eine bewusste, manuelle Aktion des
+    // Spielers im Dorf-Skins-Tab, kein automatisches Umschalten.
     await sbFetch(serviceKey, 'idle_player_village_skins', {
       method: 'POST',
       headers: { Prefer: 'resolution=ignore-duplicates' },
       body: JSON.stringify({ name_key: metadata.name_key || '', auth_user_id: authUserId, skin_id: skinId })
-    });
-
-    // Spieler-Wunsch: "wechselt automatisch das Banner gegen diesen Rahmen
-    // aus" - direkt nach erfolgreichem Kauf ausruesten.
-    await sbFetch(serviceKey, `idle_player_state?auth_user_id=eq.${encodeURIComponent(authUserId)}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ active_window_frame: skinId })
     });
 
     await sbFetch(serviceKey, `real_money_purchases?id=eq.${encodeURIComponent(purchaseId)}`, {

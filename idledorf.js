@@ -28,7 +28,7 @@
 const BKMP_IDLE_MAINTENANCE_FALLBACK_MESSAGE = 'Das Idle Drachen Dorf ist gerade kurz für Wartungsarbeiten pausiert. Es geht bald weiter, bitte versuch es später nochmal.';
 let bkmpIdleMaintenanceKnown = false;
 
-/* Echtgeld-Kaeufe (Drachenrahmen etc.) auf "gesperrt" halten, bis die
+/* Echtgeld-Kaeufe (Steampunk Dorf etc.) auf "gesperrt" halten, bis die
    Stripe-Live-Konfiguration wirklich fertig ist (STRIPE_SECRET_KEY +
    STRIPE_WEBHOOK_SECRET in Vercel, Live-Webhook eingerichtet) - bis dahin
    wuerde ein Klick entweder in einen Server-Fehler laufen oder (schlimmer)
@@ -530,12 +530,6 @@ async function bkmpIdleLoadOrInitState(name) {
   if (bkmpIdleState && bkmpIdleState.active_village_skin) {
     bkmpSetActiveVillageSkinId(bkmpIdleState.active_village_skin);
   }
-  /* Gleiches Prinzip fuer den (optionalen) Fenster-Rahmen - wird nach
-     einem Echtgeld-Kauf serverseitig vom Stripe-Webhook gesetzt (siehe
-     api/stripe-webhook.js), hier beim naechsten Laden uebernommen. */
-  if (bkmpIdleState && bkmpIdleState.active_window_frame) {
-    bkmpSetActiveWindowFrameId(bkmpIdleState.active_window_frame);
-  }
   bkmpIdleVillageHp = null;
   bkmpIdleCurrentDragon = null;
   /* Komplett eigenstaendiger Ladevorgang (eigene Tabelle, eigenes
@@ -607,7 +601,6 @@ async function bkmpIdleLoadOrInitState(name) {
     bkmpPlayerVillageSkins = [];
   }
   bkmpApplyVillageSkin();
-  bkmpApplyWindowFrame();
   bkmpIdleSnapshotMergeBaseline();
 }
 
@@ -4755,21 +4748,6 @@ function bkmpSetActiveVillageSkinId(skinId) {
   try { localStorage.setItem(BKMP_ACTIVE_VILLAGE_SKIN_KEY, skinId); } catch (e) { /* localStorage evtl. nicht verfuegbar (Privatmodus) - Auswahl gilt dann nur fuer diese Sitzung */ }
 }
 
-/* Fenster-Rahmen (z.B. Drachenrahmen, siehe supabase-real-money-
-   purchases.sql) - bewusst UNABHAENGIG von active_village_skin: ein Rahmen
-   legt sich um das GESAMTE Idle-Dorf-Fenster, waehrend active_village_skin
-   nur die Dorf-Hintergrund-Szene im Kampf-Tab ersetzt - beides kann
-   gleichzeitig aktiv sein. Leerer String/null = kein Rahmen (Fenster-Rahmen
-   sind rein optionale Deko, im Gegensatz zu Dorf-Skins gibt es hier keinen
-   Pflicht-Standard). */
-const BKMP_ACTIVE_WINDOW_FRAME_KEY = 'bkmp-active-window-frame';
-function bkmpGetActiveWindowFrameId() {
-  try { return localStorage.getItem(BKMP_ACTIVE_WINDOW_FRAME_KEY) || ''; } catch (e) { return ''; }
-}
-function bkmpSetActiveWindowFrameId(skinId) {
-  try { localStorage.setItem(BKMP_ACTIVE_WINDOW_FRAME_KEY, skinId || ''); } catch (e) { /* localStorage evtl. nicht verfuegbar */ }
-}
-
 function bkmpVillageSkinOwned(skinId) {
   const def = bkmpVillageSkinsCatalog.find(s => s.id === skinId);
   if (!def) return false;
@@ -4893,52 +4871,6 @@ function bkmpApplyVillageSkin() {
   bkmpApplyVillageSkinToElement(document.getElementById('idleVillageSprite'), bkmpGetActiveVillageSkinId());
 }
 
-/* Legt/entfernt die border-image-Rahmen-Klasse am gesamten Idle-Dorf-
-   Fenster (.idle-dorf-card), unabhaengig von der Dorf-Hintergrund-Skin.
-   Jeder Fenster-Rahmen-Artikel bekommt eine eigene CSS-Klasse
-   "idle-window-frame-<id>" (siehe style.css) - so kann es spaeter mehr als
-   nur den Drachenrahmen geben, ohne dass diese Funktion angepasst werden
-   muss. */
-function bkmpApplyWindowFrame() {
-  /* NICHT ".idle-dorf-overlay .idle-dorf-card" verwenden - #mapWorkspaceOverlay
-     (Kartenauftraege-Arbeitsbereich) traegt aus Styling-Gruenden ebenfalls
-     die Klasse "idle-dorf-overlay" und kaeme in DOM-Reihenfolge VOR dem
-     echten Idle-Dorf-Fenster, wodurch der Rahmen sonst am falschen Modal
-     landen wuerde. #idleDorfOverlay ist eindeutig. */
-  const overlay = document.getElementById('idleDorfOverlay');
-  const card = overlay ? overlay.querySelector('.idle-dorf-card') : null;
-  if (!card) return;
-  Array.from(card.classList).forEach(cls => {
-    if (cls.indexOf('idle-window-frame-') === 0) card.classList.remove(cls);
-  });
-  const activeId = bkmpGetActiveWindowFrameId();
-  if (!activeId) return;
-  const def = bkmpVillageSkinsCatalog.find(s => s.id === activeId && s.apply_scope === 'window_frame');
-  if (!def || !bkmpVillageSkinOwned(activeId)) return;
-  card.classList.add('idle-window-frame-' + activeId);
-}
-
-function bkmpIdleEquipWindowFrame(skinId) {
-  if (!bkmpVillageSkinOwned(skinId)) return;
-  bkmpSetActiveWindowFrameId(skinId);
-  bkmpApplyWindowFrame();
-  bkmpIdleRenderSkinsPanel();
-  if (bkmpIdleState) {
-    bkmpIdleState.active_window_frame = skinId;
-    bkmpIdleQueueSync();
-  }
-}
-
-function bkmpIdleUnequipWindowFrame() {
-  bkmpSetActiveWindowFrameId('');
-  bkmpApplyWindowFrame();
-  bkmpIdleRenderSkinsPanel();
-  if (bkmpIdleState) {
-    bkmpIdleState.active_window_frame = null;
-    bkmpIdleQueueSync();
-  }
-}
-
 function bkmpIdleBuyVillageSkin(skinId) {
   const def = bkmpVillageSkinsCatalog.find(s => s.id === skinId);
   if (!def || def.unlock_type !== 'purchase' || !bkmpIdleState) return;
@@ -4988,25 +4920,18 @@ function bkmpIdleRenderSkinsPanel() {
   const panel = document.getElementById('idlePanelSkins');
   if (!panel || !bkmpIdleState) return;
   const activeVillageId = bkmpGetActiveVillageSkinId();
-  const activeFrameId = bkmpGetActiveWindowFrameId();
   if (!bkmpVillageSkinsCatalog.length) {
     panel.innerHTML = `<p class="idle-skin-empty-hint">Noch keine Dorf-Skins verfuegbar - schau bald wieder vorbei.</p>`;
     return;
   }
   panel.innerHTML = `<div class="idle-skin-grid">${bkmpVillageSkinsCatalog.map(def => {
-    const isFrame = def.apply_scope === 'window_frame';
     const owned = bkmpVillageSkinOwned(def.id);
-    const isEquipped = owned && (isFrame ? activeFrameId === def.id : activeVillageId === def.id);
+    const isEquipped = owned && activeVillageId === def.id;
     let actionHtml;
     if (isEquipped) {
-      /* Fenster-Rahmen sind rein optionale Deko (im Gegensatz zu Dorf-
-         Skins, die immer EINE aktive Wahl brauchen) - deshalb zusaetzlich
-         ablegbar statt nur "Ausgeruestet". */
-      actionHtml = isFrame
-        ? `<button type="button" class="btn-nein idle-skin-action idle-skin-unequip-frame" data-skin-id="${def.id}">Ablegen</button>`
-        : `<button type="button" class="btn-ja idle-skin-action" disabled>Ausgerüstet</button>`;
+      actionHtml = `<button type="button" class="btn-ja idle-skin-action" disabled>Ausgerüstet</button>`;
     } else if (owned) {
-      actionHtml = `<button type="button" class="btn-ja idle-skin-action ${isFrame ? 'idle-skin-equip-frame' : 'idle-skin-equip'}" data-skin-id="${def.id}">Ausrüsten</button>`;
+      actionHtml = `<button type="button" class="btn-ja idle-skin-action idle-skin-equip" data-skin-id="${def.id}">Ausrüsten</button>`;
     } else if (def.unlock_type === 'purchase') {
       const goldCost = Number(def.price_gold || 0);
       const crystalCost = Number(def.price_crystals || 0);
@@ -5019,7 +4944,7 @@ function bkmpIdleRenderSkinsPanel() {
       const priceEur = (Number(def.price_eur_cents || 0) / 100).toFixed(2).replace('.', ',');
       actionHtml = BKMP_REAL_MONEY_PURCHASES_ENABLED
         ? `<button type="button" class="btn-ja idle-skin-action idle-skin-buy-real-money" data-skin-id="${def.id}">Kaufen (${priceEur} €)</button>`
-        : `<button type="button" class="btn-ja idle-skin-action idle-skin-buy-real-money-locked" disabled title="Käufe sind noch nicht freigeschaltet">🔒 Kaufen (${priceEur} €)</button>`;
+        : `<button type="button" class="btn-ja idle-skin-action idle-skin-buy-real-money-locked" data-skin-id="${def.id}" disabled title="Käufe sind noch nicht freigeschaltet">🔒 Kaufen (${priceEur} €)</button>`;
     } else {
       actionHtml = `<div class="idle-skin-locked-hint">🔒 ${escapeHtml(def.unlock_hint || (def.unlock_type === 'achievement' ? 'Über einen Erfolg freischaltbar' : 'Seltener Boss-Drop'))}</div>`;
     }
@@ -5033,12 +4958,10 @@ function bkmpIdleRenderSkinsPanel() {
   }).join('')}</div>`;
   panel.querySelectorAll('.idle-skin-buy').forEach(btn => btn.addEventListener('click', () => bkmpIdleBuyVillageSkin(btn.dataset.skinId)));
   panel.querySelectorAll('.idle-skin-equip').forEach(btn => btn.addEventListener('click', () => bkmpIdleEquipVillageSkin(btn.dataset.skinId)));
-  panel.querySelectorAll('.idle-skin-equip-frame').forEach(btn => btn.addEventListener('click', () => bkmpIdleEquipWindowFrame(btn.dataset.skinId)));
-  panel.querySelectorAll('.idle-skin-unequip-frame').forEach(btn => btn.addEventListener('click', () => bkmpIdleUnequipWindowFrame()));
   panel.querySelectorAll('.idle-skin-buy-real-money').forEach(btn => btn.addEventListener('click', () => bkmpIdleOpenBuyFrameModal(btn.dataset.skinId)));
 }
 
-/* ---------------- Echtgeld-Kauf-Dialog (Drachenrahmen etc.) ----------------
+/* ---------------- Echtgeld-Kauf-Dialog (Steampunk Dorf etc.) ----------------
    Eigenes, kleines Modal statt des generischen bkmpConfirmDialog - braucht
    eine echte Checkbox fuer die gesetzlich vorgeschriebene ausdrueckliche
    Zustimmung zum sofortigen Beginn der Vertragsausfuehrung (§ 356 Abs. 5
@@ -5101,15 +5024,15 @@ function bkmpIdleHandleStripeReturn() {
   if (purchase !== 'success') return;
   const name = typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : '';
   if (!name) return;
+  const ownedBefore = bkmpPlayerVillageSkins.length;
   let attempts = 0;
   const poll = () => {
     attempts += 1;
     Promise.resolve(bkmpIdleLoadOrInitState(name))
       .then(() => {
-        bkmpApplyWindowFrame();
         if (typeof bkmpIdleRenderSkinsPanel === 'function') bkmpIdleRenderSkinsPanel();
-        if (bkmpIdleState && bkmpIdleState.active_window_frame) {
-          if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('🐲 Danke für deinen Kauf! Der Drachenrahmen ist freigeschaltet.', 4000);
+        if (bkmpPlayerVillageSkins.length > ownedBefore) {
+          if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('🎉 Danke für deinen Kauf! Der neue Dorf-Skin ist freigeschaltet - im Dorf-Skins-Tab ausruestbar.', 4200);
         } else if (attempts < 4) {
           window.setTimeout(poll, 2000);
         } else if (typeof bkmpShowJannikToast === 'function') {
