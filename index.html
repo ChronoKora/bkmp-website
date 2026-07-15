@@ -311,17 +311,6 @@
     </div>
   </div>
 
-  <div class="joke-overlay" id="mapCodeOverlay">
-    <div class="joke-card">
-      <h3>Dein Zugangscode</h3>
-      <p>Speichere diesen Code gut &ndash; er ist dein Zugang zu deinen Aufträgen, falls du das Gerät oder den Browser wechselst. Es gibt kein Passwort, nur diesen Code.</p>
-      <p class="map-code-value" id="mapCodeValue"></p>
-      <div class="joke-buttons">
-        <button class="btn-ja" id="mapCodeOverlayClose" type="button">Gespeichert, weiter</button>
-      </div>
-    </div>
-  </div>
-
   <div class="joke-overlay" id="spontanEventBannerOverlay">
     <div class="joke-card spontan-event-banner-card">
       <img src="assets/events/spontanevent-banner.png?v=20260717-1" alt="Limited Event! Jetzt bis 0 Uhr alle Event-Drachen im Dungeon bekommbar!" class="spontan-event-banner-img">
@@ -358,56 +347,6 @@
       <p>Du wolltest unbedingt etwas kostenlos haben...<br>Dann bekommst du eben ein Auto!<br><em>(Zumindest als Plüshie. Mehr Budget war leider nicht drin.)</em></p>
       <div class="joke-buttons">
         <button class="btn-ja" id="adFreeCarConfirmBtn" type="button">JAAAA!</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="joke-overlay idle-dorf-overlay" id="mapWorkspaceOverlay">
-    <div class="joke-card idle-dorf-card map-workspace-card">
-      <button type="button" class="idle-dorf-close" id="mapWorkspaceClose" aria-label="Schließen">&times;</button>
-      <h3 id="mapWorkspaceTitle">Auftrag</h3>
-      <div id="mapWorkspaceInfo" class="map-workspace-info"></div>
-      <div id="mapWorkspaceStatusRow" class="map-workspace-status-row" style="display:none;"></div>
-
-      <div class="map-chat">
-        <div class="map-chat-messages" id="mapChatMessages"></div>
-        <div class="map-chat-composer">
-          <textarea id="mapChatInput" rows="2" placeholder="Nachricht schreiben..."></textarea>
-          <div class="map-chat-composer-actions">
-            <label class="map-chat-attach-btn" for="mapChatFileInput">📎<input type="file" id="mapChatFileInput" style="display:none;"></label>
-            <span class="map-chat-file-name" id="mapChatFileName"></span>
-            <button type="button" class="btn-ja" id="mapChatSendBtn">Senden</button>
-          </div>
-        </div>
-      </div>
-
-      <details class="map-workspace-details">
-        <summary>Dateien</summary>
-        <div id="mapWorkspaceFilesList" class="map-workspace-files-list"></div>
-      </details>
-      <details class="map-workspace-details">
-        <summary>Verlauf</summary>
-        <div id="mapWorkspaceHistoryList" class="map-workspace-history-list"></div>
-      </details>
-    </div>
-  </div>
-
-  <div class="joke-overlay idle-dorf-overlay" id="mapCompanyDetailOverlay">
-    <div class="joke-card idle-dorf-card map-workspace-card">
-      <button type="button" class="idle-dorf-close" id="mapCompanyDetailClose" aria-label="Schließen">&times;</button>
-      <div id="mapCompanyDetailContent"></div>
-    </div>
-  </div>
-
-  <div class="joke-overlay" id="mapAccessCodeOverlay">
-    <div class="joke-card">
-      <h3>Zugangscode eingeben</h3>
-      <p>Trag deinen Zugangscode ein, um deine Aufträge auf diesem Gerät wiederherzustellen.</p>
-      <input type="text" id="mapAccessCodeInput" placeholder="XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false">
-      <p class="map-order-submit-msg" id="mapAccessCodeMsg"></p>
-      <div class="joke-buttons">
-        <button class="btn-nein" id="mapAccessCodeCancel" type="button">Abbrechen</button>
-        <button class="btn-ja" id="mapAccessCodeConfirm" type="button">Bestätigen</button>
       </div>
     </div>
   </div>
@@ -748,7 +687,7 @@
         <button class="tab-btn" data-index="6">Karten Verkaufen</button>
         <button class="tab-btn" data-index="7">Kartendatenbank</button>
         <button class="tab-btn" data-index="8">Bestenliste</button>
-        <button class="tab-btn" data-index="9">Kartenaufträge</button>
+        <button class="tab-btn" data-index="9">Kartenfirmen</button>
       </div>
       <button class="tab-arrow" id="nextTab" aria-label="Nächster Bereich">
         <svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
@@ -882,15 +821,15 @@
         <div class="leaderboard-list" id="leaderboardList"></div>
       </section>
 
-      <!-- ================= Kartenaufträge ================= -->
-      <section class="panel" id="panel-orders">
-        <h2 class="panel-title">Kartenaufträge</h2>
-        <p class="leaderboard-intro">Auftrag veröffentlichen, offene Aufträge einsehen, eigene Aufträge verfolgen oder Kartenbaufirmen kennenlernen.</p>
+      <!-- ================= Kartenfirmen ================= -->
+      <section class="panel" id="panel-mapcompanies">
+        <h2 class="panel-title">Kartenfirmen</h2>
+        <p class="leaderboard-intro">Firmen, die auf dem Server Kartenaufträge für dich umsetzen &ndash; Kontakt, Spezialisierung und Preisspanne findest du direkt bei jeder Firma.</p>
 
         <div class="company-apply-cta">
           <div class="company-apply-cta-text">
             <h3>🏗️ Bist du eine Kartenbaufirma? Bewirb dich hier!</h3>
-            <p>Werde Teil unseres Firmenverzeichnisses, erscheine bei den Firmenprofilen und übernimm Kartenaufträge.</p>
+            <p>Werde Teil unseres Firmenverzeichnisses und erscheine hier mit deinem Profil.</p>
           </div>
           <button type="button" class="btn-ja" id="companyApplyToggleBtn">Jetzt bewerben</button>
         </div>
@@ -924,98 +863,8 @@
           <p class="map-order-submit-msg" id="companyApplySubmitMsg"></p>
         </form>
 
-        <div class="orders-header-row">
-          <button type="button" class="btn-nein" id="mapAccessCodeOpenBtn">Zugangscode eingeben</button>
-        </div>
-        <div class="achievements-subtabs orders-subtabs">
-          <button type="button" class="achievements-subtab active" id="ordersSubtabCreate">Auftrag erstellen</button>
-          <button type="button" class="achievements-subtab" id="ordersSubtabOpen">Offene Aufträge</button>
-          <button type="button" class="achievements-subtab" id="ordersSubtabMine">Meine Aufträge</button>
-          <button type="button" class="achievements-subtab" id="ordersSubtabCompanies">Firmenprofile</button>
-        </div>
-
-        <!-- Auftrag erstellen -->
-        <div id="ordersSubtabCreatePanel">
-          <form id="mapOrderForm" class="map-order-form" onsubmit="return false;">
-            <h3 class="map-form-section-title">👤 Deine Angaben</h3>
-            <div class="form-grid form-grid-2">
-              <div><label for="mapOrderMcName">Minecraft-Name</label><input type="text" id="mapOrderMcName" maxlength="32" required></div>
-              <div><label for="mapOrderDiscord">Discord-Name (optional)</label><input type="text" id="mapOrderDiscord" maxlength="40"></div>
-            </div>
-
-            <h3 class="map-form-section-title">🗺️ Auftragsdetails</h3>
-            <label for="mapOrderTitle">Titel</label>
-            <input type="text" id="mapOrderTitle" maxlength="80" required>
-            <label for="mapOrderDescription">Beschreibung</label>
-            <textarea id="mapOrderDescription" rows="4" required></textarea>
-
-            <label>Kategorie</label>
-            <div class="partner-filter" id="mapOrderCategoryFilter"></div>
-
-            <h3 class="map-form-section-title">📐 Kartengröße</h3>
-            <div class="partner-filter">
-              <button type="button" class="active" id="mapOrderSizeKnownBtn">Größe bekannt</button>
-              <button type="button" id="mapOrderSizeUnsureBtn">Noch unsicher / Beratungsbedarf</button>
-            </div>
-            <div id="mapOrderSizeKnownFields" class="form-grid form-grid-3">
-              <div><label for="mapOrderWidth">Breite</label><input type="number" id="mapOrderWidth" min="1"></div>
-              <div><label for="mapOrderHeight">Höhe</label><input type="number" id="mapOrderHeight" min="1"></div>
-              <div><label for="mapOrderParts">Kartenteile</label><input type="number" id="mapOrderParts" min="1"></div>
-            </div>
-            <div id="mapOrderSizeUnsureFields" style="display:none;">
-              <label for="mapOrderSizeNotes">Was schwebt dir vor? (hilft der Firma bei der Beratung)</label>
-              <textarea id="mapOrderSizeNotes" rows="2"></textarea>
-            </div>
-
-            <h3 class="map-form-section-title">💰 Budget &amp; Priorität</h3>
-            <label>Budget pro Kartenteil</label>
-            <div class="partner-filter" id="mapOrderBudgetFilter"></div>
-            <label class="admin-checkbox-label"><input type="checkbox" id="mapOrderBudgetCustomToggle"> Eigenes Budget innerhalb dieses Bereiches</label>
-            <input type="number" id="mapOrderBudgetCustomInput" min="250000" max="500000" step="1000" style="display:none;" placeholder="250.000 – 500.000">
-            <p class="map-order-total-preview" id="mapOrderTotalPreview"></p>
-
-            <label>Priorität</label>
-            <div class="partner-filter" id="mapOrderPriorityFilter"></div>
-
-            <h3 class="map-form-section-title">📎 Referenzen &amp; Hinweise</h3>
-            <label for="mapOrderReferenceImages">Referenzbilder (optional)</label>
-            <input type="file" id="mapOrderReferenceImages" accept="image/*" multiple>
-            <div class="map-ref-preview" id="mapOrderReferencePreview"></div>
-
-            <label for="mapOrderNotes">Zusätzliche Hinweise</label>
-            <textarea id="mapOrderNotes" rows="3"></textarea>
-
-            <label class="admin-checkbox-label"><input type="checkbox" id="mapOrderConsent"> Ich akzeptiere, dass Kartenbaufirmen meinen Auftrag prüfen und übernehmen können.</label>
-
-            <button type="button" class="btn-ja" id="mapOrderSubmitBtn">Auftrag veröffentlichen</button>
-            <p class="map-order-submit-msg" id="mapOrderSubmitMsg"></p>
-          </form>
-        </div>
-
-        <!-- Offene Aufträge -->
-        <div id="ordersSubtabOpenPanel" style="display:none;">
-          <div class="map-search-row">
-            <input type="text" id="mapOpenOrdersSearch" placeholder="Suche nach Titel, Name, Auftragsnummer...">
-          </div>
-          <div class="partner-filter" id="mapOpenOrdersCategoryFilter"></div>
-          <div class="map-order-grid" id="mapOpenOrdersList"></div>
-        </div>
-
-        <!-- Meine Aufträge -->
-        <div id="ordersSubtabMinePanel" style="display:none;">
-          <div id="mapMyOrdersEmpty" class="empty-hint" style="display:none;">
-            Noch keine Aufträge auf diesem Gerät gefunden. <button type="button" class="btn-nein" id="mapMyOrdersEmptyCreateBtn">Auftrag erstellen</button>
-          </div>
-          <div class="map-search-row">
-            <input type="text" id="mapMyOrdersSearch" placeholder="Suche nach Titel, Auftragsnummer...">
-          </div>
-          <div class="map-order-grid" id="mapMyOrdersList"></div>
-        </div>
-
-        <!-- Firmenprofile -->
-        <div id="ordersSubtabCompaniesPanel" style="display:none;">
-          <div class="map-company-grid" id="mapCompaniesList"></div>
-        </div>
+        <div class="partner-filter" id="mapCompaniesFilter"></div>
+        <div class="partner-grid" id="mapCompaniesList"></div>
       </section>
 
     </div>
@@ -1265,12 +1114,11 @@
     </div>
   </div>
 
-  <script>window.BKMP_CLIENT_STORAGE_KEY = 'bkmp-customer-auth';</script>
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260717-raidbossaudit1"></script>
+  <script src="supabase.js?v=20260717-kartenfirmen1"></script>
   <script src="app.js?v=20260712-themefix1"></script>
   <script src="idledorf.js?v=20260717-runeresizeleakfix1"></script>
-  <script src="mapart.js?v=20260717-budgetfix1"></script>
+  <script src="mapart.js?v=20260717-kartenfirmen1"></script>
   <script>
     bkmpInitTheme();
     bkmpInitAccentColor();
@@ -6084,18 +5932,13 @@
       idleStagePickerOverlay: () => { if (typeof bkmpIdleCloseStagePicker === 'function') bkmpIdleCloseStagePicker(); },
       /* Bug-Report 17.07. (ChronoKora): "Streamer-Ticker bewegt sich nicht
          mehr", ueberlebte sogar einen Reload. Ursache: idleSkillHelpOverlay/
-         idleRunenHelpOverlay/mapCodeOverlay setzen beim Oeffnen zusaetzlich
-         body.modal-open (pausiert u.a. den Ticker per CSS), hatten hier aber
-         KEINEN Eintrag - der generische Fallback unten entfernte nur die
-         "visible"-Klasse des jeweiligen Popups, nie modal-open selbst. Bei
-         den beiden Hilfe-Popups faellt das i. d. R. nicht auf (idleDorfOverlay
-         ist waehrenddessen ebenfalls sichtbar und raeumt ueber seinen eigenen
-         Closer oben modal-open korrekt mit auf) - mapCodeOverlay
-         (Wiederherstellungscode nach anonymem Kartenauftrag) erscheint aber
-         STANDALONE, ganz ohne ein anderes offenes Overlay. Mit ESC statt dem
-         eigenen Schliessen-Button verlassen, blieb modal-open dadurch fuer
-         den Rest der Sitzung haengen - auch nach einem Reload, sobald erneut
-         ein Popup per ESC statt Klick verlassen wurde. */
+         idleRunenHelpOverlay setzen beim Oeffnen zusaetzlich body.modal-open
+         (pausiert u.a. den Ticker per CSS), hatten hier aber KEINEN Eintrag -
+         der generische Fallback unten entfernte nur die "visible"-Klasse des
+         jeweiligen Popups, nie modal-open selbst. idleDorfOverlay ist
+         waehrenddessen ebenfalls sichtbar und raeumt ueber seinen eigenen
+         Closer oben modal-open korrekt mit auf, faellt also i. d. R. nicht
+         auf - trotzdem hier explizit abgesichert. */
       idleSkillHelpOverlay: () => {
         const overlay = document.getElementById('idleSkillHelpOverlay');
         if (overlay) overlay.classList.remove('visible');
@@ -6103,11 +5946,6 @@
       },
       idleRunenHelpOverlay: () => {
         const overlay = document.getElementById('idleRunenHelpOverlay');
-        if (overlay) overlay.classList.remove('visible');
-        document.body.classList.remove('modal-open');
-      },
-      mapCodeOverlay: () => {
-        const overlay = document.getElementById('mapCodeOverlay');
         if (overlay) overlay.classList.remove('visible');
         document.body.classList.remove('modal-open');
       },
@@ -6121,8 +5959,6 @@
       /* Grimbold-Dialogszene: gleicher Grund wie beim Event-Drachen-Popup
          oben - nur ueber den Weiter/Willkommen-Button verlassbar. */
       idleMeisterDialogOverlay: () => {},
-      mapWorkspaceOverlay: () => { if (typeof bkmpMapCloseWorkspace === 'function') bkmpMapCloseWorkspace(); },
-      mapCompanyDetailOverlay: () => { if (typeof bkmpMapCloseCompanyDetail === 'function') bkmpMapCloseCompanyDetail(); },
       /* Ohne diesen Eintrag wuerde der ESC-Sweep nur die "visible"-Klasse
          entfernen, der laufende 10s-Bedenkzeit-Countdown-Timer aber
          unbemerkt im Hintergrund weiterlaufen. */

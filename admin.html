@@ -119,10 +119,6 @@
 
     <div class="admin-layout">
       <nav class="admin-sidebar" id="adminSidebar">
-        <button class="admin-nav-btn" data-page="companydashboard" data-role="company">
-          <svg viewBox="0 0 24 24"><path d="M4 21V10l8-6 8 6v11"/><path d="M9 21v-6h6v6"/></svg>
-          Firmen-Dashboard
-        </button>
         <button class="admin-nav-btn" data-page="sheepeditor" data-role="sheep_editor">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M9 10h.01M15 10h.01M9 15c1 1 5 1 6 0"/></svg>
           Zitat des Tages
@@ -199,10 +195,6 @@
           <svg viewBox="0 0 24 24"><path d="M4 8h16v11H4z"/><path d="M7 8V5h10v3"/><path d="M8 13h8"/></svg>
           Kartenfirmen
         </button>
-        <button class="admin-nav-btn" data-page="mapartorders">
-          <svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>
-          Kartenaufträge
-        </button>
         <button class="admin-nav-btn" data-page="feedback">
           <svg viewBox="0 0 24 24"><path d="M4 4h16v13H8l-4 4V4z"/></svg>
           Feedback
@@ -226,24 +218,6 @@
 
         <!-- Einnahmen -->
         <!-- Uebersicht -->
-        <section class="admin-page" id="page-companydashboard">
-          <div class="admin-section">
-            <h2>Firmen-Dashboard</h2>
-            <p class="admin-help-text" id="companyDashboardName"></p>
-            <div class="map-search-row">
-              <input type="text" id="companyOrdersSearch" placeholder="Suche nach Titel, Kunde, Auftragsnummer...">
-            </div>
-
-            <h3>Neue Aufträge <span class="cardcatalog-admin-count" id="companyNewOrdersCount"></span></h3>
-            <div class="map-order-grid" id="companyNewOrdersList"></div>
-
-            <h3 style="margin-top:1.4rem;">Laufende Aufträge <span class="cardcatalog-admin-count" id="companyRunningOrdersCount"></span></h3>
-            <div class="map-order-grid" id="companyRunningOrdersList"></div>
-
-            <h3 style="margin-top:1.4rem;">Abgeschlossene Aufträge <span class="cardcatalog-admin-count" id="companyDoneOrdersCount"></span></h3>
-            <div class="map-order-grid" id="companyDoneOrdersList"></div>
-          </div>
-        </section>
 
         <!-- Eingeschraenktes Konto: NUR Zitat des Tages, sonst nichts sichtbar -->
         <section class="admin-page" id="page-sheepeditor">
@@ -884,7 +858,7 @@
 
           <div class="admin-section">
             <h2>Kartenfirmen</h2>
-            <p class="admin-help-text">Firmen, die im &ouml;ffentlichen Firmenprofil-Verzeichnis erscheinen und Auftr&auml;ge &uuml;bernehmen d&uuml;rfen. Zugang f&uuml;r Mitarbeiter wird unter "Zug&auml;nge" vergeben.</p>
+            <p class="admin-help-text">Firmen, die im &ouml;ffentlichen Verzeichnis unter "Kartenfirmen" erscheinen.</p>
             <div class="entry-table-wrapper"><div class="entry-list" id="mapartCompaniesList"></div></div>
             <button class="btn btn-primary" id="mapartCompanyAddNew" type="button" style="margin-top:0.8rem;">+ Neue Firma</button>
 
@@ -912,20 +886,6 @@
                 <button class="btn" id="mapartCompanyCancel" type="button">Abbrechen</button>
               </div>
             </div>
-          </div>
-        </section>
-
-        <!-- Kartenaufträge Übersicht -->
-        <section class="admin-page" id="page-mapartorders">
-          <div class="admin-section">
-            <h2>Kartenaufträge</h2>
-            <p class="admin-help-text">Alle Aufträge, unabh&auml;ngig vom Status. Klick auf eine Karte &ouml;ffnet Chat/Dateien/Verlauf.</p>
-            <div class="map-search-row">
-              <input type="text" id="mapartOrdersSearch" placeholder="Suche nach Name, Titel, Auftragsnummer, Firma...">
-              <select id="mapartOrdersStatusFilter"></select>
-            </div>
-            <div class="partner-filter" id="mapartOrdersCategoryFilter"></div>
-            <div class="map-order-grid" id="mapartOrdersOverviewList"></div>
           </div>
         </section>
 
@@ -964,14 +924,9 @@
                 <select id="accessRole">
                   <option value="admin">Admin</option>
                   <option value="editor">Editor</option>
-                  <option value="company">Kartenbaufirma-Mitarbeiter</option>
                   <option value="sheep_editor">Schaf-Zitat-Editor (nur Zitat des Tages)</option>
                 </select>
               </div>
-            </div>
-            <div class="form-grid form-grid-2" id="accessCompanyRow" style="display:none;">
-              <div><label for="accessCompany">Firma</label><select id="accessCompany"></select></div>
-              <div><label class="admin-checkbox-label" style="margin-top:1.6rem;"><input type="checkbox" id="accessCanEditProfile"> Darf eigenes Firmenprofil bearbeiten</label></div>
             </div>
             <p class="admin-help-text">Zug&auml;nge werden &uuml;ber Supabase Auth erstellt. Der Name wird intern als Login-Adresse gespeichert.</p>
             <button class="btn btn-primary" id="addAccess">+ Zugang erstellen</button>
@@ -1011,10 +966,10 @@
   </div>
 
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260717-raidbossaudit1"></script>
+  <script src="supabase.js?v=20260717-kartenfirmen1"></script>
   <script src="app.js?v=20260712-themefix1"></script>
   <script src="idledorf.js?v=20260717-runeresizeleakfix1"></script>
-  <script src="mapart.js?v=20260717-budgetfix1"></script>
+  <script src="mapart.js?v=20260717-kartenfirmen1"></script>
   <script>
     bkmpInitTheme();
 
@@ -1150,18 +1105,8 @@
     function showAdmin(profile) {
       loginCard.style.display = 'none';
       adminWrap.style.display = 'block';
-      const isCompany = Boolean(profile && profile.role === 'company');
-      document.body.classList.toggle('admin-mode-company', isCompany);
-      if (isCompany) {
-        document.querySelectorAll('.admin-nav-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.page === 'companydashboard'));
-        document.querySelectorAll('.admin-page').forEach(section => section.classList.toggle('active', section.id === 'page-companydashboard'));
-        if (typeof bkmpMapRenderCompanyDashboard === 'function') bkmpMapRenderCompanyDashboard(profile);
-        return;
-      }
       /* Eingeschraenktes Konto (z.B. SheepMasterLP): sieht wirklich NUR die
-         "Zitat des Tages"-Seite, keine Navigation, keine anderen Daten -
-         gleiches Muster wie oben bei Firmen-Accounts, nur mit einer noch
-         kleineren, eigenen Seite statt eines ganzen Dashboards. */
+         "Zitat des Tages"-Seite, keine Navigation, keine anderen Daten. */
       const isSheepEditor = Boolean(profile && profile.role === 'sheep_editor');
       document.body.classList.toggle('admin-mode-sheepeditor', isSheepEditor);
       if (isSheepEditor) {
@@ -1260,9 +1205,7 @@
         if (page === 'polls') refreshPollsAdmin();
         if (page === 'idledorf') refreshIdleDorfAdmin();
         if (page === 'access') refreshAdminAccessList();
-        if (page === 'companydashboard' && window.bkmpCurrentCompanyProfile) bkmpMapRenderCompanyDashboard(window.bkmpCurrentCompanyProfile);
         if (page === 'mapartcompanies') refreshMapartCompaniesAdmin();
-        if (page === 'mapartorders') refreshMapartOrdersOverview();
       });
     });
 
@@ -3707,27 +3650,7 @@
     const accessNameInput = document.getElementById('accessName');
     const accessPasswordInput = document.getElementById('accessPassword');
     const accessRoleInput = document.getElementById('accessRole');
-    const accessCompanyRow = document.getElementById('accessCompanyRow');
-    const accessCompanySelect = document.getElementById('accessCompany');
-    const accessCanEditProfileInput = document.getElementById('accessCanEditProfile');
     let adminProfiles = [];
-    let accessCompaniesCache = [];
-
-    async function populateAccessCompanySelect() {
-      if (!accessCompanySelect) return;
-      try {
-        accessCompaniesCache = (typeof loadCompaniesAdmin === 'function' ? await loadCompaniesAdmin() : []) || [];
-      } catch (e) { accessCompaniesCache = []; }
-      accessCompanySelect.innerHTML = accessCompaniesCache.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('') || '<option value="">Keine Firmen angelegt</option>';
-    }
-
-    if (accessRoleInput && accessCompanyRow) {
-      accessRoleInput.addEventListener('change', () => {
-        const isCompany = accessRoleInput.value === 'company';
-        accessCompanyRow.style.display = isCompany ? '' : 'none';
-        if (isCompany) populateAccessCompanySelect();
-      });
-    }
 
     function renderAdminAccessList() {
       const el = document.getElementById('adminAccessList');
@@ -3740,11 +3663,10 @@
       adminProfiles.forEach(profile => {
         const row = document.createElement('div');
         row.className = 'entry-row';
-        const companyName = profile.role === 'company' ? (accessCompaniesCache.find(c => c.id === profile.company_id) || {}).name : '';
         row.innerHTML = `
           <div class="desc">
             <span class="name">${escapeHtml(profile.display_name || profile.login_name)}</span>
-            <span class="meta">${escapeHtml(profile.role || 'admin')}${companyName ? ' · ' + escapeHtml(companyName) : ''} &middot; ${profile.active ? 'Aktiv' : 'Inaktiv'} &middot; ${escapeHtml(profile.login_name || '')}</span>
+            <span class="meta">${escapeHtml(profile.role || 'admin')} &middot; ${profile.active ? 'Aktiv' : 'Inaktiv'} &middot; ${escapeHtml(profile.login_name || '')}</span>
           </div>
           <div class="entry-actions">
             <button class="edit-btn toggle-access" type="button">${profile.active ? 'Deaktivieren' : 'Aktivieren'}</button>
@@ -3770,7 +3692,7 @@
       const el = document.getElementById('adminAccessList');
       if (el) el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Zug&auml;nge werden geladen...</p>';
       try {
-        [adminProfiles] = await Promise.all([loadAdminProfiles(), populateAccessCompanySelect()]);
+        adminProfiles = await loadAdminProfiles();
       } catch (e) {
         console.warn('Admin-Zugaenge konnten nicht geladen werden.', e);
         adminProfiles = [];
@@ -3784,19 +3706,15 @@
       const name = accessNameInput.value.trim();
       const password = accessPasswordInput.value;
       const role = accessRoleInput.value || 'admin';
-      const companyId = role === 'company' ? (accessCompanySelect ? accessCompanySelect.value : '') : null;
-      const canEditProfile = accessCanEditProfileInput ? accessCanEditProfileInput.checked : false;
       if (!name) { accessNameInput.reportValidity(); return; }
       if (!password) { accessPasswordInput.reportValidity(); return; }
       addAccessBtn.disabled = true;
       addAccessBtn.textContent = 'Zugang wird erstellt...';
       try {
-        await createAdminAccess(name, password, role, companyId, canEditProfile);
+        await createAdminAccess(name, password, role, null, false);
         accessNameInput.value = '';
         accessPasswordInput.value = '';
         accessRoleInput.value = 'admin';
-        if (accessCompanyRow) accessCompanyRow.style.display = 'none';
-        if (accessCanEditProfileInput) accessCanEditProfileInput.checked = false;
         refreshAdminAccessList();
         showAdminToast('Zugang erstellt. Neue Zugänge müssen noch freigeschaltet werden.', 'success');
       } catch (e) {

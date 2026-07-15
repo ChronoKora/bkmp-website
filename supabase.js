@@ -28,19 +28,7 @@ function bkmpGetSupabaseClient() {
     return null;
   }
   if (!bkmpSupabaseClient) {
-    /* index.html setzt vor dem Laden dieses Scripts window.BKMP_CLIENT_STORAGE_KEY
-       = 'bkmp-customer-auth', damit eine Kunden-Session dort NICHT dieselbe
-       localStorage-Session wie ein gleichzeitig in admin.html eingeloggter
-       Admin/Firmen-Account teilt (beide Seiten sind dieselbe Origin, teilen sich
-       also standardmaessig denselben Supabase-Auth-Storage-Key). admin.html
-       setzt die Variable bewusst NICHT, damit bestehende Admin-Sessions durch
-       dieses Update nicht ungueltig werden. */
-    const options = window.BKMP_CLIENT_STORAGE_KEY
-      ? { auth: { storageKey: window.BKMP_CLIENT_STORAGE_KEY } }
-      : undefined;
-    bkmpSupabaseClient = options
-      ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, options)
-      : window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    bkmpSupabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   }
   return bkmpSupabaseClient;
 }
@@ -314,77 +302,6 @@ async function bkmpGetValidAdminProfile() {
   }
   await client.auth.signOut();
   return null;
-}
-
-/* ---------------- Kunden-Konto fuer den MapArt Marketplace ----------------
-   Unsichtbares Supabase-Auth-Konto: der Nutzer sieht nie ein Passwortfeld,
-   nur einen einmalig angezeigten Wiederherstellungs-Code (gleiche Optik wie
-   die bestehenden Pluschie-Codes). Der Code IST das Passwort - so reicht ein
-   einziger Wert zum Wiederherstellen auf einem neuen Geraet, ganz ohne
-   E-Mail-Adresse. Siehe supabase-mapart-marketplace-schema.sql fuer die
-   zugehoerige customer_profiles-Tabelle/RLS. */
-const BKMP_CUSTOMER_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // ohne 0/O/1/I/L
-
-function bkmpGenerateCustomerCode() {
-  const seg = len => {
-    const bytes = new Uint8Array(len);
-    crypto.getRandomValues(bytes);
-    return Array.from(bytes, b => BKMP_CUSTOMER_CODE_CHARS[b % BKMP_CUSTOMER_CODE_CHARS.length]).join('');
-  };
-  return `${seg(4)}-${seg(4)}-${seg(4)}`;
-}
-
-function bkmpCustomerEmailFromCode(code) {
-  /* Siehe Kommentar in bkmpAdminEmailFromName - ".local" wird von Supabase
-     als "invalid email" abgelehnt, ".com" nicht. */
-  return String(code || '').trim().toLowerCase() + '@bkmp-customer-accounts.com';
-}
-
-async function bkmpCustomerSignUp(displayName, discord) {
-  const client = bkmpGetSupabaseClient();
-  if (!client) throw new Error('Supabase ist nicht verbunden.');
-  const code = bkmpGenerateCustomerCode();
-  const email = bkmpCustomerEmailFromCode(code);
-  const { data, error } = await client.auth.signUp({ email, password: code });
-  if (error) throw error;
-  const userId = data && data.user ? data.user.id : null;
-  if (!userId) throw new Error('Konto konnte nicht erstellt werden.');
-  const { error: profileError } = await client
-    .from('customer_profiles')
-    .insert({ id: userId, display_name: String(displayName || '').trim(), discord: discord ? String(discord).trim() : null });
-  if (profileError) throw profileError;
-  return { code, userId };
-}
-
-async function bkmpCustomerRestoreByCode(code) {
-  const client = bkmpGetSupabaseClient();
-  if (!client) throw new Error('Supabase ist nicht verbunden.');
-  const cleanCode = String(code || '').trim();
-  const email = bkmpCustomerEmailFromCode(cleanCode);
-  const { data, error } = await client.auth.signInWithPassword({ email, password: cleanCode });
-  if (error) throw error;
-  return data;
-}
-
-async function bkmpGetCustomerSession() {
-  const client = bkmpGetSupabaseClient();
-  if (!client) return null;
-  const { data, error } = await client.auth.getSession();
-  if (error) return null;
-  return data && data.session ? data.session : null;
-}
-
-async function bkmpGetCustomerProfile() {
-  const client = bkmpGetSupabaseClient();
-  const session = await bkmpGetCustomerSession();
-  if (!client || !session) return null;
-  const { data, error } = await client
-    .from('customer_profiles')
-    .select('id, display_name, discord')
-    .eq('id', session.user.id)
-    .limit(1);
-  if (error) return null;
-  return Array.isArray(data) && data[0] ? data[0] : null;
 }
 
 /* ---------------- Spieler-Konto (Name + Passwort, "Wer bist du?") ----------------
@@ -3579,184 +3496,13 @@ async function resetIdlePlayerState(nameKey) {
   return true;
 }
 
-/* ---------------- MapArt Marketplace ---------------- */
-
-const BKMP_MAP_ORDER_COLUMNS = `id, order_number, customer_auth_id, customer_display_name, customer_discord,
-  title, description, category, size_known, size_width, size_height, size_parts, size_notes,
-  budget_per_part, budget_is_custom, budget_total, desired_completion_date, priority,
-  reference_image_urls, additional_notes, status, assigned_company_id, assigned_at, completed_at, created_at`;
-
-async function loadOpenMapOrders() {
-  const client = bkmpGetSupabaseClient();
-  if (!client) return null;
-  const { data, error } = await client
-    .from('map_orders')
-    .select(BKMP_MAP_ORDER_COLUMNS)
-    .eq('status', 'offen')
-    .is('assigned_company_id', null)
-    .order('created_at', { ascending: false });
-  if (error) throw error;
-  return data || [];
-}
-
-async function loadMyMapOrders() {
-  const client = bkmpGetSupabaseClient();
-  const session = await bkmpGetCustomerSession();
-  if (!client || !session) return [];
-  const { data, error } = await client
-    .from('map_orders')
-    .select(BKMP_MAP_ORDER_COLUMNS)
-    .eq('customer_auth_id', session.user.id)
-    .order('created_at', { ascending: false });
-  if (error) throw error;
-  return data || [];
-}
-
-async function loadMapOrderById(orderId) {
-  const client = bkmpGetSupabaseClient();
-  if (!client) return null;
-  const { data, error } = await client
-    .from('map_orders')
-    .select(BKMP_MAP_ORDER_COLUMNS)
-    .eq('id', orderId)
-    .limit(1);
-  if (error) throw error;
-  return Array.isArray(data) && data[0] ? data[0] : null;
-}
-
-async function createMapOrder(order) {
-  const client = bkmpGetSupabaseClient();
-  if (!client) throw new Error('Supabase ist nicht verbunden.');
-  const { data, error } = await client
-    .from('map_orders')
-    .insert(order)
-    .select(BKMP_MAP_ORDER_COLUMNS)
-    .limit(1);
-  if (error) throw error;
-  return Array.isArray(data) ? data[0] : null;
-}
-
-async function updateMapOrderStatus(orderId, status, completedAt) {
-  const client = bkmpGetSupabaseClient();
-  if (!client) throw new Error('Supabase ist nicht verbunden.');
-  const patch = { status };
-  if (completedAt !== undefined) patch.completed_at = completedAt;
-  const { error } = await client.from('map_orders').update(patch).eq('id', orderId);
-  if (error) throw error;
-  return true;
-}
-
-async function withdrawMapOrder(orderId) {
-  const client = bkmpGetSupabaseClient();
-  if (!client) throw new Error('Supabase ist nicht verbunden.');
-  const { error } = await client
-    .from('map_orders')
-    .update({ status: 'abgebrochen' })
-    .eq('id', orderId)
-    .eq('status', 'offen');
-  if (error) throw error;
-  return true;
-}
-
-async function uploadOrderFile(orderId, file, uploaderType, uploaderDisplayName) {
-  const client = bkmpGetSupabaseClient();
-  const session = await bkmpGetCustomerSession();
-  if (!client) throw new Error('Supabase ist nicht verbunden.');
-  const path = `${orderId}/${crypto.randomUUID()}-${file.name}`;
-  const { error: uploadError } = await client.storage.from('order-files').upload(path, file);
-  if (uploadError) throw uploadError;
-  const { data, error } = await client
-    .from('order_files')
-    .insert({
-      order_id: orderId,
-      uploaded_by_auth_id: session ? session.user.id : null,
-      uploaded_by_display_name: uploaderDisplayName || '',
-      uploaded_by_type: uploaderType || 'customer',
-      file_name: file.name,
-      storage_path: path,
-      file_type: file.type || '',
-      file_size: file.size || 0
-    })
-    .select('id, order_id, uploaded_by_display_name, uploaded_by_type, file_name, storage_path, file_type, file_size, created_at')
-    .limit(1);
-  if (error) throw error;
-  return Array.isArray(data) ? data[0] : null;
-}
-
-async function getOrderFileSignedUrl(storagePath) {
-  const client = bkmpGetSupabaseClient();
-  if (!client) return null;
-  const { data, error } = await client.storage.from('order-files').createSignedUrl(storagePath, 3600);
-  if (error) return null;
-  return data ? data.signedUrl : null;
-}
-
-async function loadOrderMessages(orderId) {
-  const client = bkmpGetSupabaseClient();
-  if (!client) return [];
-  const { data, error } = await client
-    .from('order_messages')
-    .select('id, order_id, sender_type, sender_auth_id, sender_display_name, body, attachment_file_id, created_at')
-    .eq('order_id', orderId)
-    .order('created_at', { ascending: true });
-  if (error) throw error;
-  return data || [];
-}
-
-async function sendOrderMessage(message) {
-  const client = bkmpGetSupabaseClient();
-  if (!client) throw new Error('Supabase ist nicht verbunden.');
-  const { data, error } = await client
-    .from('order_messages')
-    .insert(message)
-    .select('id, order_id, sender_type, sender_auth_id, sender_display_name, body, attachment_file_id, created_at')
-    .limit(1);
-  if (error) throw error;
-  return Array.isArray(data) ? data[0] : null;
-}
-
-async function loadOrderFiles(orderId) {
-  const client = bkmpGetSupabaseClient();
-  if (!client) return [];
-  const { data, error } = await client
-    .from('order_files')
-    .select('id, order_id, uploaded_by_display_name, uploaded_by_type, file_name, storage_path, file_type, file_size, created_at')
-    .eq('order_id', orderId)
-    .order('created_at', { ascending: true });
-  if (error) throw error;
-  return data || [];
-}
-
-async function loadOrderEvents(orderId) {
-  const client = bkmpGetSupabaseClient();
-  if (!client) return [];
-  const { data, error } = await client
-    .from('order_events')
-    .select('id, order_id, event_type, actor_type, actor_display_name, from_status, to_status, detail, created_at')
-    .eq('order_id', orderId)
-    .order('created_at', { ascending: true });
-  if (error) throw error;
-  return data || [];
-}
-
-async function logOrderEvent(event) {
-  const client = bkmpGetSupabaseClient();
-  if (!client) return null;
-  const { error } = await client.from('order_events').insert(event);
-  if (error) console.warn('Auftrags-Verlauf konnte nicht gespeichert werden.', error);
-  return true;
-}
-
-async function markOrderRead(orderId) {
-  const client = bkmpGetSupabaseClient();
-  const session = await bkmpGetCustomerSession();
-  if (!client || !session) return false;
-  const { error } = await client
-    .from('order_read_state')
-    .upsert({ order_id: orderId, reader_auth_id: session.user.id, last_read_at: new Date().toISOString() }, { onConflict: 'order_id,reader_auth_id' });
-  if (error) console.warn('Lesestatus konnte nicht gespeichert werden.', error);
-  return true;
-}
+/* ---------------- Kartenfirmen (siehe supabase-mapart-marketplace-schema.sql
+   + supabase-company-applications.sql) ----------------
+   Reine Firmenpraesentation nach dem PartnerShop-Vorbild: oeffentliche
+   Bewerbung -> Admin-Freigabe -> Verzeichnis. Das fruehere Auftrags-/Chat-/
+   Kunden-Konto-System ("Kartenauftraege") wurde komplett entfernt (siehe
+   supabase-mapart-orders-teardown.sql) - kein separates Kunden-Login mehr
+   noetig, deshalb faellt auch bkmpGetCustomerSession() etc. weg. */
 
 async function loadCompanies() {
   const client = bkmpGetSupabaseClient();
@@ -3832,37 +3578,6 @@ async function deleteCompanyApplication(id) {
   const client = bkmpGetSupabaseClient();
   if (!client) return false;
   const { error } = await client.from('company_applications').delete().eq('id', id);
-  if (error) throw error;
-  return true;
-}
-
-async function loadCompanyOrders(companyId) {
-  const client = bkmpGetSupabaseClient();
-  if (!client || !companyId) return [];
-  const { data, error } = await client
-    .from('map_orders')
-    .select(BKMP_MAP_ORDER_COLUMNS)
-    .eq('assigned_company_id', companyId)
-    .order('assigned_at', { ascending: false });
-  if (error) throw error;
-  return data || [];
-}
-
-async function loadAllMapOrdersAdmin() {
-  const client = bkmpGetSupabaseClient();
-  if (!client) return [];
-  const { data, error } = await client
-    .from('map_orders')
-    .select(BKMP_MAP_ORDER_COLUMNS)
-    .order('created_at', { ascending: false });
-  if (error) throw error;
-  return data || [];
-}
-
-async function adminReassignOrder(orderId, companyId) {
-  const client = bkmpGetSupabaseClient();
-  if (!client) throw new Error('Supabase ist nicht verbunden.');
-  const { error } = await client.rpc('admin_reassign_order', { p_order_id: orderId, p_company_id: companyId });
   if (error) throw error;
   return true;
 }
