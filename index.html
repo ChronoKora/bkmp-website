@@ -6026,6 +6026,35 @@
     const BKMP_OVERLAY_CLOSERS = {
       idleDorfOverlay: () => { if (typeof bkmpIdleCloseModal === 'function') bkmpIdleCloseModal(); },
       idleStagePickerOverlay: () => { if (typeof bkmpIdleCloseStagePicker === 'function') bkmpIdleCloseStagePicker(); },
+      /* Bug-Report 17.07. (ChronoKora): "Streamer-Ticker bewegt sich nicht
+         mehr", ueberlebte sogar einen Reload. Ursache: idleSkillHelpOverlay/
+         idleRunenHelpOverlay/mapCodeOverlay setzen beim Oeffnen zusaetzlich
+         body.modal-open (pausiert u.a. den Ticker per CSS), hatten hier aber
+         KEINEN Eintrag - der generische Fallback unten entfernte nur die
+         "visible"-Klasse des jeweiligen Popups, nie modal-open selbst. Bei
+         den beiden Hilfe-Popups faellt das i. d. R. nicht auf (idleDorfOverlay
+         ist waehrenddessen ebenfalls sichtbar und raeumt ueber seinen eigenen
+         Closer oben modal-open korrekt mit auf) - mapCodeOverlay
+         (Wiederherstellungscode nach anonymem Kartenauftrag) erscheint aber
+         STANDALONE, ganz ohne ein anderes offenes Overlay. Mit ESC statt dem
+         eigenen Schliessen-Button verlassen, blieb modal-open dadurch fuer
+         den Rest der Sitzung haengen - auch nach einem Reload, sobald erneut
+         ein Popup per ESC statt Klick verlassen wurde. */
+      idleSkillHelpOverlay: () => {
+        const overlay = document.getElementById('idleSkillHelpOverlay');
+        if (overlay) overlay.classList.remove('visible');
+        document.body.classList.remove('modal-open');
+      },
+      idleRunenHelpOverlay: () => {
+        const overlay = document.getElementById('idleRunenHelpOverlay');
+        if (overlay) overlay.classList.remove('visible');
+        document.body.classList.remove('modal-open');
+      },
+      mapCodeOverlay: () => {
+        const overlay = document.getElementById('mapCodeOverlay');
+        if (overlay) overlay.classList.remove('visible');
+        document.body.classList.remove('modal-open');
+      },
       /* Bewusst ein No-op: das Event-Drachen-Vorbereitungs-Popup darf NUR
          ueber den "Ich bin bereit"-Button verlassen werden, nicht per ESC -
          siehe Auftrag Abschnitt 3 ("Das Popup darf erst geschlossen werden,
