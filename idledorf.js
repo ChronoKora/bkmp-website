@@ -4005,6 +4005,21 @@ function bkmpGuildBossCheckOutcome() {
   bkmpGuildQuestsLoadedForGuildId = null; /* Aktivitaetslog zeigt jetzt "Boss besiegt" - naechster Panel-Load frisch laden */
   bkmpGuildActivityLoadedForGuildId = null;
   loadGuildBossParticipants(bkmpGuildBossState.instanceId).then(list => { bkmpGuildBossParticipants = list; bkmpIdleRenderGildeBossPanel(); }).catch(() => {});
+  /* Spieler-Wunsch (15.07., "Wieviel kriegt man denn? Ruhig anzeigen
+     lassen"): weder guild_boss_join() noch guild_boss_deal_damage()
+     liefern die Belohnungs-Poolgroesse zurueck (anders als beim Raid, wo
+     loadRaidState() das schon erledigt). Dieselbe frische Instanz-Abfrage
+     holt jetzt zusaetzlich gold_reward/gem_reward vom verknuepften
+     Gildenboss sowie den serverseitig gepflegten participant_count nach -
+     letzteres behebt nebenbei "Teilnehmer: 0" in der Ergebnisansicht, da
+     dieses Feld sonst nirgends gesetzt wurde. */
+  loadGuildBossInstance(bkmpGuildBossState.instanceId).then(info => {
+    if (!info || !bkmpGuildBossState) return;
+    bkmpGuildBossState.participantCount = info.participantCount;
+    bkmpGuildBossState.goldReward = info.goldReward;
+    bkmpGuildBossState.gemReward = info.gemReward;
+    bkmpGuildBossUpdateCombatUI();
+  }).catch(() => {});
 }
 
 let bkmpGuildBossPanelRenderedForKey = null;
@@ -4128,10 +4143,10 @@ async function bkmpIdleRenderGildeBossPanel() {
           <div class="raid-result-stat"><div class="raid-result-stat-label">Gesamtschaden</div><div class="raid-result-stat-value" id="guildBossResultTotalDmg">0</div></div>
           <div class="raid-result-stat"><div class="raid-result-stat-label">Dein Schaden</div><div class="raid-result-stat-value" id="guildBossResultOwnDmg">0</div></div>
           <div class="raid-result-stat"><div class="raid-result-stat-label">Dein Rang</div><div class="raid-result-stat-value" id="guildBossResultRank">-</div></div>
-          <div class="raid-result-stat"><div class="raid-result-stat-label">Teilnehmer</div><div class="raid-result-stat-value">${g.participantCount || bkmpGuildBossParticipants.length}</div></div>
+          <div class="raid-result-stat"><div class="raid-result-stat-label">Teilnehmer</div><div class="raid-result-stat-value" id="guildBossResultParticipantCount">${g.participantCount || bkmpGuildBossParticipants.length}</div></div>
           <div class="raid-result-stat"><div class="raid-result-stat-label">MVP</div><div class="raid-result-stat-value raid-result-mvp" id="guildBossResultMvp">-</div></div>
         </div>
-        ${g.status === 'won' ? '<div class="raid-result-rewards"><span>💰 Gold- und 💎 Kristall-Belohnung wurde anteilig nach Schaden gutgeschrieben.</span></div>' : ''}
+        ${g.status === 'won' ? '<div class="raid-result-rewards"><span>💰 +<span id="guildBossResultGold">0</span></span><span>💎 +<span id="guildBossResultGems">0</span></span></div>' : ''}
         <div class="idle-arena-history">
           <h4 style="margin-top:1rem;">🏆 Schadensrangliste</h4>
           <div id="guildBossParticipantsList"></div>
@@ -4195,6 +4210,20 @@ function bkmpGuildBossUpdateCombatUI() {
     if (rankEl) rankEl.textContent = myRank ? '#' + myRank : '-';
     const mvpEl = document.getElementById('guildBossResultMvp');
     if (mvpEl) mvpEl.textContent = mvp ? mvp.displayName : '-';
+    const participantCountEl = document.getElementById('guildBossResultParticipantCount');
+    if (participantCountEl) participantCountEl.textContent = g.participantCount || bkmpGuildBossParticipants.length;
+    if (g.status === 'won') {
+      /* Eigener Anteil exakt wie guild_boss_finish() serverseitig rechnet
+         (Schaden-Anteil * Belohnungs-Pool, siehe supabase-guild-boss.sql) -
+         g.goldReward/gemReward kommen aus dem Nachlade-Refresh in
+         bkmpGuildBossCheckOutcome() (loadGuildBossInstance()), da die
+         Beitritts-/Schadens-RPCs die Pool-Groesse nicht zurueckliefern. */
+      const myShare = myDamage && totalDamage > 0 ? myDamage.damageDealt / totalDamage : 0;
+      const goldEl = document.getElementById('guildBossResultGold');
+      if (goldEl) goldEl.textContent = bkmpIdleFormatNumber(Math.round((g.goldReward || 0) * myShare));
+      const gemsEl = document.getElementById('guildBossResultGems');
+      if (gemsEl) gemsEl.textContent = bkmpIdleFormatNumber(Math.round((g.gemReward || 0) * myShare));
+    }
   }
   bkmpGuildBossRequestParticipantsRender();
 }
@@ -8052,6 +8081,18 @@ function bkmpRaidGetPhaseInfo(now) {
    Jetzt ueber Minuten-des-Tages verglichen (19:55 bis 21:00), exakt
    deckungsgleich mit dem tatsaechlichen Gildenboss-Fenster (prep+fight)
    statt nur dessen Kampf-Phase. */
+/* Spieler-Report (15.07., "Warum kommt die Meldung eigentlich jetzt? Die
+   haette um 19:55->20:00 kommen sollen"): beide Aufrufer unten riefen
+   diese Funktion bisher OHNE Argument auf, sie prüfte also immer die
+   AKTUELLE Uhrzeit. Beide Aufrufer laufen aber ausschliesslich waehrend
+   der Vorbereitungsphase (info.phase === 'prep', taeglich jeweils :55-:59
+   JEDER Stunde) - um 20:55-20:59 (Vorbereitung fuer den ganz normalen
+   21-Uhr-Raid) liegt "jetzt" ebenfalls noch im 19:55-21:00-Fenster, die
+   Funktion lieferte also faelschlich true und unterdrueckte Button-Glow
+   und zeigte das "Weltboss pausiert"-Banner fuer einen Raid, der gar
+   nicht pausiert. Jetzt uebergeben beide Aufrufer stattdessen den
+   Start-Zeitpunkt DES RAIDS, fuer den gerade vorbereitet wird
+   (info.fightStartsAt) - nur DESSEN Stunde entscheidet, nicht "jetzt". */
 function bkmpRaidIsGuildBossHourBerlin(now) {
   const parts = {};
   new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Berlin', hour12: false, hour: '2-digit', minute: '2-digit' })
@@ -8126,7 +8167,7 @@ function bkmpRaidUpdateButtonState() {
     bkmpRaidSyncJoinFlagFromServer(info.raidId);
   }
   if (btn) {
-    if (info.phase === 'prep' && !bkmpRaidIsGuildBossHourBerlin()) {
+    if (info.phase === 'prep' && !bkmpRaidIsGuildBossHourBerlin(new Date(info.fightStartsAt))) {
       btn.classList.add('raid-prep');
       if (countdownEl) { countdownEl.style.display = ''; countdownEl.textContent = '🔥 ' + bkmpRaidFormatCountdown(info.msUntilFightStart); }
     } else {
@@ -8185,7 +8226,7 @@ async function bkmpRaidRenderJoinBanner() {
   if (!banner) return;
   const info = bkmpRaidGetPhaseInfo();
   if (info.phase !== 'prep') { banner.style.display = 'none'; return; }
-  if (bkmpRaidIsGuildBossHourBerlin()) {
+  if (bkmpRaidIsGuildBossHourBerlin(new Date(info.fightStartsAt))) {
     banner.style.display = '';
     banner.innerHTML = `<div class="raid-join-banner-title">🛡️ Der Weltboss pausiert diese Stunde - Fokus liegt auf dem Gildenboss um 20 Uhr!</div>`;
     return;

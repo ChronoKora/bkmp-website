@@ -4649,12 +4649,12 @@ async function loadGuildBossInstance(instanceId) {
   if (!client || !instanceId) return null;
   const { data, error } = await client
     .from('guild_boss_instances')
-    .select('id, guild_id, boss_id, boss_max_hp, boss_hp, status, fight_starts_at, fight_ends_at, participant_count, total_damage, guild_bosses(name, sprite_key)')
+    .select('id, guild_id, boss_id, boss_max_hp, boss_hp, status, fight_starts_at, fight_ends_at, participant_count, total_damage, guild_bosses(name, sprite_key, gold_reward, gem_reward)')
     .eq('id', instanceId)
     .maybeSingle();
   if (error || !data) return null;
   return {
-    id: data.id,
+    instanceId: data.id,
     guildId: data.guild_id,
     bossMaxHp: Number(data.boss_max_hp),
     bossHp: Number(data.boss_hp),
@@ -4664,7 +4664,9 @@ async function loadGuildBossInstance(instanceId) {
     participantCount: Number(data.participant_count || 0),
     totalDamage: Number(data.total_damage || 0),
     bossName: data.guild_bosses ? data.guild_bosses.name : '',
-    spriteKey: data.guild_bosses ? data.guild_bosses.sprite_key : ''
+    spriteKey: data.guild_bosses ? data.guild_bosses.sprite_key : '',
+    goldReward: Number(data.guild_bosses ? data.guild_bosses.gold_reward : 0) || 0,
+    gemReward: Number(data.guild_bosses ? data.guild_bosses.gem_reward : 0) || 0
   };
 }
 
