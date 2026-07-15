@@ -5414,7 +5414,7 @@ function bkmpIdleRenderDragonsPanel() {
           <div class="idle-skin-name">${escapeHtml(species.name)}</div>
           ${ready
             ? `<button type="button" class="btn-ja idle-skin-action idle-dragon-hatch-btn" data-nest-id="${nest.id}">🐣 Drache ist geschlüpft!</button>`
-            : `<div class="idle-skin-desc">⏳ ${bkmpDragonFormatDuration(Math.max(0, msLeft))}</div>`}
+            : `<div class="idle-skin-desc idle-dragon-nest-countdown" data-nest-id="${nest.id}">⏳ ${bkmpDragonFormatDuration(Math.max(0, msLeft))}</div>`}
         </div>`;
     }
     return `
@@ -5615,6 +5615,41 @@ function bkmpIdleRenderDragonsPanel() {
     if (e.target.closest('button, select, label, input')) return;
     bkmpDragonOpenDetail(card.dataset.dragonId);
   }));
+
+  bkmpDragonStartNestCountdownTicker();
+}
+
+/* Spieler-Report (17.07.): "Die Zeit läuft nur hackend runter" - der
+   Brutzeit-Countdown im Nest wurde bisher NUR bei jedem Drachen-Kill neu
+   gezeichnet (bkmpIdleRefreshLiveTabs, komplettes innerHTML-Neubauen),
+   nicht auf einem eigenen Sekundentakt - je nach Angriffsgeschwindigkeit
+   sprang die Anzeige dadurch in unregelmaessigen, teils grossen Schritten
+   statt gleichmaessig runterzuzaehlen. Eigener leichter 1s-Takt, der NUR
+   die Countdown-Textknoten aktualisiert (kein komplettes Neu-Rendern noetig -
+   gleiches Prinzip wie bkmpDungeonUpdateBanner/bkmpRaidUpdateButtonState).
+   Wird ein Nest waehrend des Tickens fertig, uebernimmt EIN vollstaendiges
+   Neu-Rendern den Wechsel zum "Geschluepft"-Button. */
+let bkmpDragonNestCountdownInterval = null;
+function bkmpDragonStartNestCountdownTicker() {
+  if (bkmpDragonNestCountdownInterval) return;
+  bkmpDragonNestCountdownInterval = setInterval(bkmpDragonTickNestCountdowns, 1000);
+}
+function bkmpDragonStopNestCountdownTicker() {
+  if (bkmpDragonNestCountdownInterval) { clearInterval(bkmpDragonNestCountdownInterval); bkmpDragonNestCountdownInterval = null; }
+}
+function bkmpDragonTickNestCountdowns() {
+  const els = document.querySelectorAll('.idle-dragon-nest-countdown');
+  if (!els.length) { bkmpDragonStopNestCountdownTicker(); return; }
+  els.forEach(el => {
+    const nest = bkmpPlayerDragonNests.find(n => n.id === el.dataset.nestId);
+    if (!nest || !nest.egg_id) return;
+    if (bkmpDragonNestReady(nest)) { bkmpIdleRenderDragonsPanel(); return; }
+    const egg = bkmpPlayerDragonEggs.find(e => e.id === nest.egg_id);
+    const species = egg ? bkmpDragonSpeciesById(egg.species_id) : null;
+    if (!species) return;
+    const msLeft = bkmpDragonEffectiveBroodSeconds(species) * 1000 - (Date.now() - Date.parse(nest.started_at));
+    el.textContent = `⏳ ${bkmpDragonFormatDuration(Math.max(0, msLeft))}`;
+  });
 }
 
 /* ---------------- Detailansicht ---------------- */
@@ -7275,6 +7310,7 @@ function bkmpIdleCloseModal() {
      einsam ueber der normalen Seite (kein Idle-Dorf-Fenster mehr dahinter). */
   const dragonDetailOverlay = document.getElementById('idleDragonDetailOverlay');
   if (dragonDetailOverlay) dragonDetailOverlay.classList.remove('visible');
+  bkmpDragonStopNestCountdownTicker();
   document.body.classList.remove('modal-open');
   bkmpIdleModalOpen = false;
   bkmpRuneSyncDrawerVisibility();
