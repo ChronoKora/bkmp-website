@@ -1,30 +1,38 @@
 -- ============================================================
 -- Live-Bug-Fix 15.07. (Spieler-Report per Screenshot: "Beitritt zum
--- Gildenboss fehlgeschlagen: column reference 'status' is ambiguous").
+-- Gildenboss fehlgeschlagen: column reference 'status' is ambiguous",
+-- danach nach Anwenden des ersten Fixes: "... 'instance_id' is
+-- ambiguous").
 --
--- Ursache: guild_boss_join() gibt per RETURNS TABLE(...) unter anderem
--- Spalten namens "status", "instance_id", "boss_hp", "boss_max_hp",
--- "fight_starts_at"/"fight_ends_at" zurueck - PL/pgSQL legt dafuer
--- intern gleichnamige Variablen an. Die Tabellen guild_boss_instances
--- (Spalten status/boss_hp/boss_max_hp/fight_starts_at/fight_ends_at)
--- und guild_boss_participants (Spalte instance_id) haben ECHTE Spalten
--- mit denselben Namen. Ueberall dort, wo diese Namen OHNE Tabellen-Alias
--- verwendet wurden, konnte Postgres nicht entscheiden, ob die
--- RETURNS-TABLE-Variable oder die echte Tabellenspalte gemeint ist -
--- deshalb "ambiguous". Bestaetigt per Live-Check: guild_boss_instances/
--- guild_boss_participants/guild_boss_player_stats waren fuer ALLE
--- Gilden komplett leer (boss_attempts=0 ueberall) - der Fehler trat also
--- bei JEDEM allerersten Beitrittsversuch auf, nicht nur bei diesem einen
--- Spieler.
+-- Ursache: guild_boss_join()/guild_boss_deal_damage() geben per
+-- RETURNS TABLE(...) Spalten namens "status"/"instance_id"/"boss_hp"/
+-- "boss_max_hp"/"fight_starts_at"/"fight_ends_at" zurueck - PL/pgSQL
+-- legt dafuer intern gleichnamige Variablen an. guild_boss_instances/
+-- guild_boss_participants haben ECHTE Tabellenspalten mit denselben
+-- Namen. Ueberall dort, wo ein Name OHNE Tabellen-Alias verwendet
+-- wurde, konnte Postgres nicht entscheiden, ob die RETURNS-TABLE-
+-- Variable oder die Tabellenspalte gemeint ist - "ambiguous".
 --
--- Zwei betroffene Stellen gefunden (nicht nur die eine, die den Fehler
--- ausgeloest hat - die zweite waere beim naechsten Versuch als
--- naechstes gescheitert):
---   1) "update ... where id = v_instance_id and status = 'prep'"
---   2) "select count(*) from guild_boss_participants where instance_id = v_instance_id"
--- Fix: beide UPDATE-Anweisungen bekommen einen Tabellen-Alias, jede
--- betroffene Spaltenreferenz wird darueber eindeutig qualifiziert. Sonst
--- 1:1 identisch zu supabase-guild-boss.sql.
+-- Bestaetigt per Live-Check: guild_boss_instances/-participants/
+-- -player_stats waren fuer ALLE Gilden komplett leer (boss_attempts=0
+-- ueberall) - betraf also jeden allerersten Beitrittsversuch, nicht nur
+-- einen Spieler.
+--
+-- Der erste Patch-Versuch behob nur guild_boss_join() (2 Stellen dort).
+-- Sobald der Beitritt klappt, ruft der Client aber SOFORT bei jedem
+-- Kampf-Tick guild_boss_deal_damage() auf - und DIESE Funktion (eigene
+-- RETURNS TABLE(boss_hp, status)) hat DIESELBE Fehlerklasse an zwei
+-- weiteren, bisher ungepatchten Stellen. Das urspruengliche Vorbild
+-- raid_deal_damage() (siehe supabase-raid-damage-sync-fix.sql) qualifiziert
+-- konsequent alles ueber den "ri."-Alias - beim Kopieren fuer den
+-- Gildenboss ist das an diesen zwei Stellen verlorengegangen:
+--   1) "select status, fight_ends_at into ... where id = p_instance_id"
+--   2) "set boss_hp = greatest(0, boss_hp - v_amount) ... returning boss_hp"
+--
+-- Diese Datei enthaelt jetzt BEIDE Funktionen komplett (den bereits
+-- funktionierenden guild_boss_join()-Fix erneut plus den neuen
+-- guild_boss_deal_damage()-Fix), damit ein einziger Lauf alles abdeckt.
+-- Sonst 1:1 identisch zu supabase-guild-boss.sql.
 --
 -- Supabase Dashboard > SQL Editor > New query > diesen Inhalt ausfuehren.
 -- Idempotent (create or replace function).
@@ -108,3 +116,59 @@ begin
 end;
 $$;
 grant execute on function public.guild_boss_join() to authenticated;
+
+create or replace function public.guild_boss_deal_damage(p_instance_id text, p_amount numeric, p_is_crit boolean default false, p_is_click boolean default false)
+returns table (boss_hp bigint, status text)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_amount bigint := greatest(0, round(p_amount));
+  v_status text;
+  v_fight_ends timestamptz;
+  v_new_hp bigint;
+  v_own_damage bigint;
+begin
+  if v_uid is null then raise exception 'not_authenticated'; end if;
+  if v_amount <= 0 or v_amount > 200000 then raise exception 'invalid_amount'; end if;
+  if not exists (select 1 from public.guild_boss_participants where instance_id = p_instance_id and auth_user_id = v_uid) then
+    raise exception 'not_a_participant';
+  end if;
+
+  select gbi.status, gbi.fight_ends_at into v_status, v_fight_ends from public.guild_boss_instances gbi where gbi.id = p_instance_id for update;
+  if v_status is null then raise exception 'boss_not_found'; end if;
+  if v_status <> 'fighting' then raise exception 'boss_not_active'; end if;
+
+  if now() >= v_fight_ends then
+    perform public.guild_boss_finish(p_instance_id, 'expired');
+    return query select gbi.boss_hp, gbi.status from public.guild_boss_instances gbi where gbi.id = p_instance_id;
+    return;
+  end if;
+
+  update public.guild_boss_instances gbi
+  set boss_hp = greatest(0, gbi.boss_hp - v_amount), total_damage = gbi.total_damage + v_amount
+  where gbi.id = p_instance_id
+  returning gbi.boss_hp into v_new_hp;
+
+  update public.guild_boss_participants
+  set damage_dealt = damage_dealt + v_amount,
+      crits_landed = crits_landed + (case when p_is_crit then 1 else 0 end),
+      clicks_landed = clicks_landed + (case when p_is_click then 1 else 0 end)
+  where instance_id = p_instance_id and auth_user_id = v_uid
+  returning damage_dealt into v_own_damage;
+
+  update public.guild_boss_player_stats
+  set total_damage_dealt = total_damage_dealt + v_amount,
+      best_single_fight_damage = greatest(best_single_fight_damage, v_own_damage)
+  where auth_user_id = v_uid;
+
+  if v_new_hp <= 0 then
+    perform public.guild_boss_finish(p_instance_id, 'won');
+  end if;
+
+  return query select gbi.boss_hp, gbi.status from public.guild_boss_instances gbi where gbi.id = p_instance_id;
+end;
+$$;
+grant execute on function public.guild_boss_deal_damage(text, numeric, boolean, boolean) to authenticated;
