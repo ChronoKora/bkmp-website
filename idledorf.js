@@ -5008,7 +5008,7 @@ function bkmpIdleRenderSkinsPanel() {
       actionHtml = `<button type="button" class="btn-ja idle-skin-action idle-skin-buy" data-skin-id="${def.id}" ${affordable ? '' : 'disabled'}>${priceParts.join(' + ') || 'Kaufen'}</button>`;
     } else if (def.unlock_type === 'real_money') {
       const priceEur = (Number(def.price_eur_cents || 0) / 100).toFixed(2).replace('.', ',');
-      actionHtml = `<button type="button" class="btn-ja idle-skin-action idle-skin-buy-real-money" data-skin-id="${def.id}">💳 Kaufen (${priceEur} €)</button>`;
+      actionHtml = `<button type="button" class="btn-ja idle-skin-action idle-skin-buy-real-money" data-skin-id="${def.id}">🔒 Kaufen (${priceEur} €)</button>`;
     } else {
       actionHtml = `<div class="idle-skin-locked-hint">🔒 ${escapeHtml(def.unlock_hint || (def.unlock_type === 'achievement' ? 'Über einen Erfolg freischaltbar' : 'Seltener Boss-Drop'))}</div>`;
     }
