@@ -2834,7 +2834,11 @@ const BKMP_IDLE_PLAYER_STATE_COLUMNS = `name_key, display_name, level, xp, gold,
   skill_points_available, skill_points_spent, skill_allocations, upgrade_purchases, dragon_kills, boss_kills,
   current_dragon_index, highest_dragon_index, prestige_stage_offset, auto_advance, playtime_seconds, last_seen_at, last_offline_claim, last_skilltree_reset_at, updated_at,
   rune_fuse_successes, rune_fuse_failures, rune_upgrade_successes, rune_upgrade_failures, village_defeats, yaksha_boss_kills, active_village_skin,
-  fruit, meat, obstgarten_level, jagdhuette_level, fruit_collected_at, meat_collected_at`;
+  fruit, meat, obstgarten_level, jagdhuette_level, fruit_collected_at, meat_collected_at,
+  boost_gold_until, boost_exp_until, mana,
+  holzfaeller_level, holzfaeller_collected_at, steinbruch_level, steinbruch_collected_at,
+  goldmine_level, goldmine_collected_at, kristallmine_level, kristallmine_collected_at,
+  manaquelle_level, manaquelle_collected_at, magierakademie_level, magierakademie_collected_at`;
 
 async function loadIdleDragons() {
   const client = bkmpGetSupabaseClient();
@@ -2975,7 +2979,9 @@ const BKMP_IDLE_STATE_INTEGER_COLUMNS = [
   'current_dragon_index', 'highest_dragon_index', 'playtime_seconds',
   'rune_fuse_successes', 'rune_fuse_failures', 'rune_upgrade_successes', 'rune_upgrade_failures',
   'village_defeats', 'yaksha_boss_kills', 'prestige_stage_offset',
-  'fruit', 'meat', 'obstgarten_level', 'jagdhuette_level'
+  'fruit', 'meat', 'obstgarten_level', 'jagdhuette_level',
+  'mana', 'holzfaeller_level', 'steinbruch_level', 'goldmine_level',
+  'kristallmine_level', 'manaquelle_level', 'magierakademie_level'
 ];
 
 /* Cache fuer upsertIdlePlayerState (siehe dort) - NICHT global fuer alle
@@ -3724,12 +3730,14 @@ async function loadRaidLeaderboard() {
   }));
 }
 
-/* Dungeon-Bestenliste (siehe supabase-idle-dungeon-leaderboard.sql) - ein
-   Aufruf pro Spieler+Schwierigkeit, nur wenn bkmpDungeonFinish() (idledorf.js)
-   tatsaechlich einen NEUEN persoenlichen Bestwert erkannt hat (kein Aufruf
-   bei jedem Versuch), daher reicht ein simples upsert ohne serverseitigen
-   "nur wenn besser"-Check. */
-async function submitDungeonResult(nameKey, displayName, difficultyId, wavesCleared, timeMs) {
+/* Dungeon-Bestenliste (siehe supabase-idle-dungeon-leaderboard.sql,
+   erweitert um dungeon_type in supabase-dungeon-system-v2.sql - alte
+   Zeilen ohne dungeon_type zaehlen automatisch als 'gold') - ein
+   Aufruf pro Spieler+Typ+Schwierigkeit, nur wenn bkmpDungeonFinish()
+   (idledorf.js) tatsaechlich einen NEUEN persoenlichen Bestwert erkannt
+   hat (kein Aufruf bei jedem Versuch), daher reicht ein simples upsert
+   ohne serverseitigen "nur wenn besser"-Check. */
+async function submitDungeonResult(nameKey, displayName, dungeonType, difficultyId, wavesCleared, timeMs) {
   const client = bkmpGetSupabaseClient();
   if (!client) return null;
   const { error } = await client
@@ -3737,26 +3745,82 @@ async function submitDungeonResult(nameKey, displayName, difficultyId, wavesClea
     .upsert({
       name_key: nameKey,
       display_name: displayName,
+      dungeon_type: dungeonType,
       difficulty_id: difficultyId,
       waves_cleared: wavesCleared,
       time_ms: timeMs,
       achieved_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
-    }, { onConflict: 'name_key,difficulty_id' });
+    }, { onConflict: 'name_key,dungeon_type,difficulty_id' });
   if (error) throw error;
 }
 
-async function loadDungeonLeaderboard(difficultyId) {
+async function loadDungeonLeaderboard(dungeonType, difficultyId) {
   const client = bkmpGetSupabaseClient();
   if (!client) return [];
   const { data, error } = await client
     .from('idle_dungeon_results')
     .select('name_key, display_name, waves_cleared, time_ms, achieved_at')
+    .eq('dungeon_type', dungeonType)
     .eq('difficulty_id', difficultyId)
     .order('waves_cleared', { ascending: false })
     .limit(100);
   if (error) throw error;
   return data || [];
+}
+
+/* ---------------- Dungeon-System 2.0: Schluessel/Tagesbonus/Fortschritt
+   (siehe supabase-dungeon-system-v2.sql) - alle vier RPCs sind security
+   definer + now()-basiert, damit Schluessel-Regeneration und Tagesbonus
+   nicht per Client-Uhr manipuliert oder per Reload dupliziert werden
+   koennen (gleiches Muster wie bkmpArenaAttack). */
+async function bkmpDungeonGetAllStatus() {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return [];
+  const { data, error } = await client.rpc('dungeon_get_all_status');
+  if (error) throw error;
+  return (data || []).map(row => ({
+    dungeonType: row.dungeon_type,
+    keys: Number(row.keys || 0),
+    secondsToNext: Number(row.seconds_to_next || 0),
+    dailyBonusAvailable: !!row.daily_bonus_available,
+    highestDifficulty: row.highest_difficulty || 'leicht',
+    totalCompletions: Number(row.total_completions || 0),
+    totalDefeats: Number(row.total_defeats || 0),
+    totalKeysSpent: Number(row.total_keys_spent || 0)
+  }));
+}
+
+async function bkmpDungeonConsumeKey(dungeonType) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { data, error } = await client.rpc('dungeon_consume_key', { p_dungeon_type: dungeonType });
+  if (error) {
+    const msg = String(error.message || '');
+    if (msg.includes('no_keys_available')) throw new Error('no_keys_available');
+    throw new Error('Der Dungeon konnte nicht gestartet werden. Bitte versuche es erneut.');
+  }
+  return Number(data || 0);
+}
+
+async function bkmpDungeonClaimDailyBonus(dungeonType) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return false;
+  const { data, error } = await client.rpc('dungeon_claim_daily_bonus', { p_dungeon_type: dungeonType });
+  if (error) throw error;
+  return !!data;
+}
+
+async function bkmpDungeonMarkProgress(dungeonType, success, difficultyId) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return null;
+  const { data, error } = await client.rpc('dungeon_mark_progress', {
+    p_dungeon_type: dungeonType,
+    p_success: success,
+    p_difficulty_id: difficultyId
+  });
+  if (error) throw error;
+  return data || null;
 }
 
 /* ---------------- PvP-Arena (siehe supabase-idle-arena.sql) ----------------

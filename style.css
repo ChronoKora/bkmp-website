@@ -436,12 +436,6 @@ body.modal-open .bkmp-easter > span {
 .joke-card p { font-size: 1.05rem; margin-bottom: 1.4rem; }
 .joke-buttons { display: flex; gap: 0.7rem; justify-content: center; }
 
-/* Spontan-Event-Ankuendigung (17.07.): eigene, breitere Karte statt der
-   schmalen 320px-Standardbreite - das Banner-Bild traegt die komplette
-   Botschaft selbst (Text bereits im Bild), die Karte ist hier nur noch ein
-   schmuckloser Rahmen drumherum. */
-.spontan-event-banner-card { max-width: 640px; padding: 1rem 1rem 1.2rem; }
-.spontan-event-banner-img { width: 100%; height: auto; border-radius: 12px; display: block; margin-bottom: 1rem; }
 .joke-buttons button {
   font-family: 'Inter', sans-serif; font-size: 0.85rem; font-weight: 500;
   padding: 0.55rem 1.2rem; border-radius: 999px; cursor: pointer;
@@ -5725,6 +5719,54 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 .idle-dungeon-auto-row { margin-top: 0.9rem; padding-top: 0.8rem; border-top: 1px dashed color-mix(in srgb, #f97316 30%, var(--line)); }
 .idle-dungeon-auto-label { display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 0.5rem; }
 .idle-dungeon-auto-btn { min-width: 3.6rem; }
+
+/* Dungeon-System 2.0 (Spieler-Vorgabe 17.07.): 7 Karten statt einem
+   einzigen Panel - Ei-/Runen-Dungeon bekommen eine dezent hervorgehobene
+   Optik (Spieler-Vorgabe: "sollte auch optisch etwas besonders/magisch
+   wirken"), alle anderen teilen sich den bestehenden .idle-dungeon-diff-*/
+   .idle-dungeon-auto-*-Look von oben. */
+.idle-dungeon-type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 1rem;
+  margin-top: 1.1rem;
+}
+.idle-dungeon-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1rem 1.1rem;
+  background: var(--paper-2);
+}
+.idle-dungeon-card-head { display: flex; align-items: center; gap: 0.65rem; }
+.idle-dungeon-card-icon { font-size: 1.9rem; line-height: 1; }
+.idle-dungeon-card-head strong { display: block; font-size: 1rem; color: var(--ink); }
+.idle-dungeon-card-head small { display: block; font-size: 0.78rem; color: var(--muted); }
+.idle-dungeon-card-highlight {
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 0.3rem 0.6rem;
+  border-radius: 8px;
+  text-align: center;
+  background: color-mix(in srgb, #facc15 22%, var(--paper));
+  color: #b45309;
+}
+.idle-dungeon-card-keys { font-size: 0.82rem; color: var(--ink); line-height: 1.55; }
+.idle-dungeon-card-bonus { font-size: 0.8rem; font-weight: 600; color: var(--muted); }
+.idle-dungeon-card-bonus.available { color: #16a34a; }
+.idle-dungeon-card-meta { font-size: 0.76rem; color: var(--muted); margin: 0; }
+.idle-dungeon-card .idle-dungeon-diff-row { justify-content: flex-start; margin-bottom: 0; }
+.idle-dungeon-card .idle-dungeon-auto-row { margin-top: 0.3rem; padding-top: 0.6rem; }
+.idle-dungeon-card-special { border-color: color-mix(in srgb, #facc15 45%, var(--line)); }
+.idle-dungeon-card-egg {
+  background: linear-gradient(135deg, color-mix(in srgb, #fb923c 14%, var(--paper-2)), var(--paper-2));
+}
+.idle-dungeon-card-rune {
+  background: linear-gradient(135deg, color-mix(in srgb, #a78bfa 18%, var(--paper-2)), var(--paper-2));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #a78bfa 35%, transparent);
+}
 
 /* PvP-Arena (siehe supabase-idle-arena.sql) - Gegner-Reihen im gleichen
    Karten-Look wie der Rest des Idle-Dorfs. */

@@ -464,7 +464,6 @@ const BKMP_DUNGEON_DIFFICULTIES = [
   { id: 'schwer', name: 'Schwer', icon: '🟠', waves: 20, waveGrowth: 1.36, rewardMult: 1.7 },
   { id: 'albtraum', name: 'Albtraum', icon: '🔴', waves: 25, waveGrowth: 1.42, rewardMult: 2.2 }
 ];
-let bkmpDungeonSelectedDifficultyId = BKMP_DUNGEON_DIFFICULTIES[0].id;
 let bkmpDungeonActiveDifficulty = null;
 let bkmpDungeonStartTime = 0;
 /* ---------------- Auto-Lauf (Spieler-Wunsch 15.07.: "10x 20x 30x Auto
@@ -492,6 +491,246 @@ let bkmpDungeonPrevDragon = null;
 let bkmpDungeonPrevVillageHp = null;
 let bkmpDungeonTimerInterval = null;
 
+/* ---------------- Dungeon-System 2.0 (Spieler-Vorgabe 17.07.) ----------------
+   7 spezialisierte Dungeon-Typen statt einem einzigen - jeder Typ nutzt
+   dieselben Schwierigkeitsstufen/Wellen-Strukturen (BKMP_DUNGEON_DIFFICULTIES
+   oben), hat aber eigene Belohnungen, ein eigenes Schluessel-Kontingent (siehe
+   supabase-dungeon-system-v2.sql, max. 5, +1 alle 4h, serverseitig/now()-
+   basiert damit die Client-Uhr keinen Einfluss hat) und eigene Fortschritts-
+   Statistiken/Freischaltungen. Der Ei-Dungeon ist ab jetzt die alleinige
+   Quelle fuer reguläre Dracheneier (Normalkampf droppt keine Eier mehr, siehe
+   bkmpIdleMaybeDropTreasure weiter unten, die den frueheren Ei-Drop ersetzt;
+   raid_finish() wurde separat in SQL angepasst), der Runen-Dungeon liefert
+   gezielt bessere Runen als der Normalkampf (Fokus Episch/Legendaer). */
+const BKMP_DUNGEON_TYPES = [
+  { id: 'gold', icon: '💰', name: 'Gold-Dungeon', short: 'Gold, Goldsäckchen & -truhen', highlight: null },
+  { id: 'exp', icon: '⭐', name: 'EXP-Dungeon', short: 'Spieler-EXP & EXP-Säckchen', highlight: null },
+  { id: 'egg', icon: '🥚', name: 'Ei-Dungeon', short: 'Dracheneier aller Seltenheiten', highlight: 'Hauptquelle für Dracheneier' },
+  { id: 'meat', icon: '🍖', name: 'Fleisch-Dungeon', short: 'Fleisch für deine Drachen', highlight: null },
+  { id: 'fruit', icon: '🍎', name: 'Früchte-Dungeon', short: 'Früchte für deine Drachen', highlight: null },
+  { id: 'gem', icon: '💎', name: 'Edelstein-Dungeon', short: 'Diamanten & Edelsteine', highlight: null },
+  { id: 'rune', icon: '🔮', name: 'Runen-Dungeon', short: 'Hochwertige Runen', highlight: 'Hochwertige Runen: Episch bis Legendär' }
+];
+function bkmpDungeonTypeById(id) {
+  return BKMP_DUNGEON_TYPES.find(t => t.id === id) || BKMP_DUNGEON_TYPES[0];
+}
+function bkmpDungeonDifficultyIndex(difficultyId) {
+  const idx = BKMP_DUNGEON_DIFFICULTIES.findIndex(d => d.id === difficultyId);
+  return idx >= 0 ? idx : 0;
+}
+const BKMP_DUNGEON_KEY_MAX = 5;
+
+/* Serverseitiger Status (Schluessel/Tagesbonus/Freischaltung/Statistik, siehe
+   dungeon_get_all_status() in supabase-dungeon-system-v2.sql) pro Typ - wird
+   beim Oeffnen des Dungeon-Tabs geladen; Schluessel-Countdown/Freischaltung
+   sind damit tamper-sicher (now()-basiert serverseitig), Belohnungs-BETRAEGE
+   bleiben wie im Rest des Spiels client-seitig berechnet. */
+let bkmpDungeonStatusByType = {};
+let bkmpDungeonStatusLoadedAt = 0;
+let bkmpDungeonStatusLoadFailed = false;
+let bkmpDungeonStatusLoading = false;
+let bkmpDungeonCountdownInterval = null;
+let bkmpDungeonSelectedDifficultyByType = {};
+let bkmpDungeonActiveType = null;
+let bkmpDungeonStarting = false;
+
+/* ---------------- Belohnungstabellen pro Dungeon-Typ ---------------- */
+const BKMP_DUNGEON_POUCH_CHANCE = [0.15, 0.25, 0.35, 0.45];
+const BKMP_DUNGEON_CHEST_CHANCE = [0.02, 0.05, 0.09, 0.14];
+const BKMP_DUNGEON_BOOSTER_CHANCE = [0, 0.03, 0.06, 0.10];
+
+/* Ei-Rarität je Schwierigkeit (Index = BKMP_DUNGEON_DIFFICULTIES-Index) -
+   Gewichte fuer [standard, selten, episch, legendaer]. Legendaer bleibt bei
+   JEDER Schwierigkeit einstellig (%) - der Schluessel-Deckel (max. 5, +1/4h)
+   begrenzt zusaetzlich, wie oft ueberhaupt gewuerfelt werden kann, damit
+   Legendär "extrem selten, nicht regelmäßig farmbar" bleibt (Spieler-Vorgabe). */
+const BKMP_DUNGEON_EGG_RARITY_WEIGHTS = [
+  { standard: 80, selten: 19, episch: 1, legendaer: 0 },
+  { standard: 55, selten: 35, episch: 9.5, legendaer: 0.5 },
+  { standard: 30, selten: 40, episch: 27, legendaer: 3 },
+  { standard: 10, selten: 35, episch: 50, legendaer: 5 }
+];
+
+/* Runen-Raritaet je Schwierigkeit - Gewichte fuer [blue(selten), purple
+   (episch), gold(legendaer)]. gray/green tauchen im Runen-Dungeon bewusst
+   NIE als volle Rune auf (Spieler-Vorgabe: "sollen entweder gar nicht als
+   volle Runen erscheinen oder nur sehr selten"). Albtraum garantiert
+   mindestens eine episch-oder-besser Rune (siehe bkmpDungeonGrantReward),
+   aber KEINE feste Legendär-Garantie (Spieler-Vorgabe: "nicht garantiert
+   jeden Lauf"). */
+const BKMP_DUNGEON_RUNE_RARITY_WEIGHTS = [
+  { blue: 80, purple: 19, gold: 1 },
+  { blue: 55, purple: 40, gold: 5 },
+  { blue: 40, purple: 50, gold: 10 },
+  { blue: 15, purple: 55, gold: 30 }
+];
+const BKMP_DUNGEON_RUNE_COUNT = [1, 1, 2, 2];
+
+function bkmpDungeonWeightedPick(weights) {
+  const entries = Object.entries(weights).filter(([, w]) => w > 0);
+  const total = entries.reduce((sum, [, w]) => sum + w, 0);
+  if (total <= 0) return entries.length ? entries[0][0] : null;
+  let roll = Math.random() * total;
+  for (const [key, w] of entries) {
+    if (roll < w) return key;
+    roll -= w;
+  }
+  return entries[entries.length - 1][0];
+}
+
+/* Basis-Geldformel (unveraendert aus dem alten Dungeon uebernommen, siehe
+   Balance-Kommentar weiter unten) - linear pro Welle wachsend, mit
+   rewardMult skaliert, +20% bei vollstaendigem Erfolg. Wird fuer alle
+   "kontinuierlichen" Belohnungstypen (Gold/EXP/Fleisch/Frucht/Edelstein) als
+   Basis genutzt, nur der per-Welle-Basiswert unterscheidet sich je Typ. */
+function bkmpDungeonBaseAmount(perWaveBase, wavesCleared, rewardMult, success) {
+  let total = 0;
+  for (let w = 1; w <= wavesCleared; w++) total += Math.round(perWaveBase * (1 + 0.08 * (w - 1)));
+  total = Math.round(total * rewardMult);
+  if (success) total = Math.round(total * 1.2);
+  return total;
+}
+
+/* Goldrausch/Wissensschub-Booster (Spieler-Vorgabe: "zeitlich begrenzter
+   Booster") - es gab im Spiel bisher gar kein Buff-System (Audit bestaetigt:
+   keine Zeile mit "booster"/"buff"). Zwei Zeitstempel-Spalten auf
+   idle_player_state (boost_gold_until/boost_exp_until, siehe
+   supabase-dungeon-system-v2.sql), gleiches Muster wie fruit/meat - Anwendung
+   erfolgt beim Gutschreiben von Gold/EXP ueber bkmpDungeonBoostMultiplier(),
+   selber Client-Trust-Level wie der Rest der Wirtschaft in diesem Spiel. */
+function bkmpDungeonGrantBoost(kind) {
+  if (!bkmpIdleState) return;
+  const key = kind === 'gold' ? 'boost_gold_until' : 'boost_exp_until';
+  const now = Date.now();
+  const current = Date.parse(bkmpIdleState[key] || 0) || now;
+  bkmpIdleState[key] = new Date(Math.max(current, now) + 30 * 60 * 1000).toISOString();
+}
+function bkmpDungeonBoostMultiplier(kind) {
+  if (!bkmpIdleState) return 1;
+  const key = kind === 'gold' ? 'boost_gold_until' : 'boost_exp_until';
+  const until = Date.parse(bkmpIdleState[key] || 0);
+  return (Number.isFinite(until) && until > Date.now()) ? 1.25 : 1;
+}
+
+function bkmpDungeonRollEgg(difficultyIdx) {
+  const weights = BKMP_DUNGEON_EGG_RARITY_WEIGHTS[difficultyIdx] || BKMP_DUNGEON_EGG_RARITY_WEIGHTS[0];
+  const rarity = bkmpDungeonWeightedPick(weights) || 'standard';
+  const pool = bkmpDragonSpeciesCatalog.filter(sp => sp.active !== false && sp.rarity === rarity);
+  const species = pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
+  return species ? { speciesId: species.id, name: species.name, rarity } : null;
+}
+function bkmpDungeonPersistEgg(egg) {
+  if (!egg || !bkmpIdleState || typeof insertPlayerDragonEgg !== 'function') return;
+  insertPlayerDragonEgg(bkmpIdleState.name_key, egg.speciesId).then(row => {
+    if (!row) return;
+    bkmpPlayerDragonEggs.push(row);
+    if (typeof bkmpIdleRenderDragonsPanel === 'function') bkmpIdleRenderDragonsPanel();
+  }).catch(e => console.warn('Idle Dorf: Dungeon-Ei konnte nicht gespeichert werden.', e));
+}
+function bkmpDungeonRollRune(difficultyIdx, forceRarityId) {
+  const weights = BKMP_DUNGEON_RUNE_RARITY_WEIGHTS[difficultyIdx] || BKMP_DUNGEON_RUNE_RARITY_WEIGHTS[0];
+  const rarityId = forceRarityId || bkmpDungeonWeightedPick(weights) || 'blue';
+  const slot = window.BKMP_RUNE_SLOTS[Math.floor(Math.random() * window.BKMP_RUNE_SLOTS.length)];
+  const rolledValue = bkmpIdleRollRuneValue(slot.id, rarityId);
+  return { id: null, _cid: bkmpRuneNewLocalId(), rune_type: slot.id, rarity: rarityId, rolled_value: rolledValue, equipped: false, upgrade_level: 0, substats: bkmpIdleRollInitialSubstats(slot.stat, rarityId), created_at: new Date().toISOString() };
+}
+function bkmpDungeonPersistRunes(runes) {
+  runes.forEach(rune => {
+    bkmpIdlePlayerRunes.push(rune);
+    bkmpIdlePendingRuneDrops.push(rune);
+  });
+  if (typeof bkmpIdleQueueRuneSync === 'function') bkmpIdleQueueRuneSync();
+}
+
+/* Zentrale Belohnungs-Vergabe fuer einen abgeschlossenen (oder verlorenen)
+   Lauf - liest/schreibt bkmpIdleState direkt, genau wie es der alte Dungeon
+   und der normale Kampf schon immer getan haben (gleicher Trust-Level).
+   dailyBonusGranted kommt IMMER vom serverseitigen dungeon_claim_daily_bonus-
+   Ergebnis (siehe bkmpDungeonFinish), nie von der lokalen Anzeige-Kopie.
+   Bei kontinuierlichen Belohnungen (Gold/EXP/Fleisch/Frucht/Edelstein) wird
+   der Tagesbonus als exaktes x1.5 angewendet; bei stueckigen Belohnungen
+   (Ei/Rune, "keine halben Eier") stattdessen als GARANTIERTER Extra-Wurf -
+   siehe Spezifikation. */
+function bkmpDungeonGrantReward(type, difficulty, wavesCleared, success, dailyBonusGranted) {
+  const s = bkmpIdleEffectiveStats || {};
+  const idx = bkmpDungeonDifficultyIndex(difficulty.id);
+  const dailyMult = dailyBonusGranted ? 1.5 : 1;
+  const summary = { type, gold: 0, xp: 0, gems: 0, meat: 0, fruit: 0, eggs: [], runes: [], boosterGold: false, boosterExp: false, pouchBonus: false, chestBonus: false, dailyBonusApplied: dailyBonusGranted };
+
+  if (type === 'gold') {
+    let gold = bkmpDungeonBaseAmount(Math.round((s.attack || 10) * 2.4), wavesCleared, difficulty.rewardMult, success);
+    gold = Math.round(gold * dailyMult);
+    if (success && Math.random() < BKMP_DUNGEON_POUCH_CHANCE[idx]) { gold = Math.round(gold * 1.15); summary.pouchBonus = true; }
+    if (success && Math.random() < BKMP_DUNGEON_CHEST_CHANCE[idx]) { gold = Math.round(gold * 1.4); summary.chestBonus = true; }
+    if (success && Math.random() < BKMP_DUNGEON_BOOSTER_CHANCE[idx]) { bkmpDungeonGrantBoost('gold'); summary.boosterGold = true; }
+    summary.gold = gold;
+    summary.xp = Math.round(gold / 4);
+  } else if (type === 'exp') {
+    let xp = bkmpDungeonBaseAmount(Math.round((s.attack || 10) * 1.4), wavesCleared, difficulty.rewardMult, success);
+    xp = Math.round(xp * dailyMult);
+    if (success && Math.random() < BKMP_DUNGEON_BOOSTER_CHANCE[idx]) { bkmpDungeonGrantBoost('exp'); summary.boosterExp = true; }
+    summary.xp = xp;
+    summary.gold = Math.round(xp / 3);
+  } else if (type === 'meat' || type === 'fruit') {
+    let amount = bkmpDungeonBaseAmount(Math.round((s.attack || 10) * 0.5), wavesCleared, difficulty.rewardMult, success);
+    amount = Math.round(amount * dailyMult);
+    summary[type] = amount;
+    summary.gold = bkmpDungeonBaseAmount(Math.round((s.attack || 10) * 0.6), wavesCleared, difficulty.rewardMult, success);
+  } else if (type === 'gem') {
+    summary.gems = success ? Math.round(8 * difficulty.rewardMult * dailyMult) : 0;
+    summary.gold = bkmpDungeonBaseAmount(Math.round((s.attack || 10) * 1.2), wavesCleared, difficulty.rewardMult, success);
+  } else if (type === 'egg') {
+    summary.gold = bkmpDungeonBaseAmount(Math.round((s.attack || 10) * 1.2), wavesCleared, difficulty.rewardMult, success);
+    if (success) {
+      const egg1 = bkmpDungeonRollEgg(idx);
+      if (egg1) summary.eggs.push(egg1);
+      if (dailyBonusGranted) {
+        const egg2 = bkmpDungeonRollEgg(idx);
+        if (egg2) summary.eggs.push(egg2);
+      }
+    }
+  } else if (type === 'rune') {
+    summary.gold = bkmpDungeonBaseAmount(Math.round((s.attack || 10) * 1.2), wavesCleared, difficulty.rewardMult, success);
+    if (success) {
+      const count = BKMP_DUNGEON_RUNE_COUNT[idx] + (dailyBonusGranted ? 1 : 0);
+      const runes = [];
+      for (let i = 0; i < count; i++) runes.push(bkmpDungeonRollRune(idx));
+      if (idx === BKMP_DUNGEON_DIFFICULTIES.length - 1 && !runes.some(r => r.rarity === 'purple' || r.rarity === 'gold')) {
+        runes[runes.length - 1] = bkmpDungeonRollRune(idx, 'purple');
+      }
+      summary.runes = runes;
+    }
+  }
+
+  /* Goldrausch/Wissensschub anwenden, falls gerade aktiv - gilt fuer JEDEN
+     Dungeon-Typ (nicht nur Gold-/EXP-Dungeon selbst), da der Booster
+     allgemein auf "Goldproduktion"/"erhaltene EXP" wirkt. */
+  const goldBoost = bkmpDungeonBoostMultiplier('gold');
+  const xpBoost = bkmpDungeonBoostMultiplier('exp');
+  if (goldBoost > 1 && summary.gold > 0) summary.gold = Math.round(summary.gold * goldBoost);
+  if (xpBoost > 1 && summary.xp > 0) summary.xp = Math.round(summary.xp * xpBoost);
+
+  if (summary.gold > 0) {
+    bkmpIdleState.gold = Number(bkmpIdleState.gold || 0) + summary.gold;
+    bkmpIdleState.total_gold_earned = Number(bkmpIdleState.total_gold_earned || 0) + summary.gold;
+  }
+  if (summary.gems > 0) bkmpIdleState.crystals = Number(bkmpIdleState.crystals || 0) + summary.gems;
+  if (summary.meat > 0) {
+    const cap = bkmpDragonResourceCap(bkmpIdleState.jagdhuette_level || 0);
+    bkmpIdleState.meat = Math.min(cap, Number(bkmpIdleState.meat || 0) + summary.meat);
+  }
+  if (summary.fruit > 0) {
+    const cap = bkmpDragonResourceCap(bkmpIdleState.obstgarten_level || 0);
+    bkmpIdleState.fruit = Math.min(cap, Number(bkmpIdleState.fruit || 0) + summary.fruit);
+  }
+  if (summary.xp > 0) bkmpIdleAddXp(summary.xp);
+
+  summary.eggs.forEach(egg => bkmpDungeonPersistEgg(egg));
+  if (summary.runes.length) bkmpDungeonPersistRunes(summary.runes);
+
+  return summary;
+}
+
 function bkmpIdleDefaultState(name) {
   return {
     name_key: String(name).trim().toLowerCase(),
@@ -511,7 +750,15 @@ function bkmpIdleDefaultState(name) {
     rune_upgrade_successes: 0, rune_upgrade_failures: 0,
     village_defeats: 0, yaksha_boss_kills: 0,
     fruit: 0, meat: 0, obstgarten_level: 0, jagdhuette_level: 0,
-    fruit_collected_at: new Date().toISOString(), meat_collected_at: new Date().toISOString()
+    fruit_collected_at: new Date().toISOString(), meat_collected_at: new Date().toISOString(),
+    boost_gold_until: null, boost_exp_until: null,
+    mana: 0,
+    holzfaeller_level: 0, holzfaeller_collected_at: new Date().toISOString(),
+    steinbruch_level: 0, steinbruch_collected_at: new Date().toISOString(),
+    goldmine_level: 0, goldmine_collected_at: new Date().toISOString(),
+    kristallmine_level: 0, kristallmine_collected_at: new Date().toISOString(),
+    manaquelle_level: 0, manaquelle_collected_at: new Date().toISOString(),
+    magierakademie_level: 0, magierakademie_collected_at: new Date().toISOString()
   };
 }
 
@@ -633,6 +880,10 @@ async function bkmpIdleLoadOrInitState(name) {
   }
   bkmpApplyVillageSkin();
   await bkmpIdleLoadDragonBreedingState(name);
+  /* Neue Produktionsgebäude (17.07. nachts) - Prestige-Status ist an dieser
+     Stelle schon geladen (siehe oben), daher greift der Prestige-Stufen-
+     Bonus auf die Offline-Aufholung korrekt schon beim allerersten Laden. */
+  bkmpIdleAccrueProductionBuildings();
   bkmpIdleSnapshotMergeBaseline();
 }
 
@@ -1156,30 +1407,36 @@ async function bkmpIdleClaimEventDragonVictory(defeatedDragon) {
 /* ---------------- Dungeon-Modus ---------------- */
 
 const BKMP_DUNGEON_BEST_KEY = 'bkmp-idle-dungeon-best';
-/* Bestwert-Speicher jetzt PRO Schwierigkeitsstufe (Map difficultyId ->
-   {waves,timeMs}) statt einem einzigen Wert - migriert das alte
-   Einzel-Format (vor den Schwierigkeitsstufen, 17.07.) automatisch als
-   "leicht"-Eintrag, damit bereits gespeicherte Bestwerte nicht verloren
-   gehen. */
+/* Bestwert-Speicher jetzt PRO Dungeon-Typ UND Schwierigkeitsstufe (Map
+   type -> difficultyId -> {waves,timeMs}) - migriert das alte reine
+   Schwierigkeits-Format (vor Dungeon-System 2.0, 17.07.) automatisch unter
+   'gold' (der direkte Nachfolger des alten Einzel-Dungeons: Gold war dort
+   die Haupt-Belohnung, und die Bestenliste defaultet ebenfalls auf 'gold'),
+   damit bereits gespeicherte Bestwerte nicht verloren gehen. */
 function bkmpDungeonGetAllBests() {
   try {
     const raw = JSON.parse(localStorage.getItem(BKMP_DUNGEON_BEST_KEY) || 'null');
     if (!raw || typeof raw !== 'object') return {};
-    if ('waves' in raw) return { leicht: raw };
+    if ('waves' in raw) return { gold: { leicht: raw } };
+    const typeIds = BKMP_DUNGEON_TYPES.map(t => t.id);
+    const looksLikeOldFlatFormat = Object.keys(raw).length > 0 && Object.keys(raw).every(k => !typeIds.includes(k));
+    if (looksLikeOldFlatFormat) return { gold: raw };
     return raw;
   } catch (e) { return {}; }
 }
-function bkmpDungeonGetBest(difficultyId) {
-  return bkmpDungeonGetAllBests()[difficultyId] || { waves: 0, timeMs: 0 };
-}
-function bkmpDungeonSaveBest(difficultyId, data) {
+function bkmpDungeonGetBest(type, difficultyId) {
   const all = bkmpDungeonGetAllBests();
-  all[difficultyId] = data;
+  return (all[type] && all[type][difficultyId]) || { waves: 0, timeMs: 0 };
+}
+function bkmpDungeonSaveBest(type, difficultyId, data) {
+  const all = bkmpDungeonGetAllBests();
+  if (!all[type]) all[type] = {};
+  all[type][difficultyId] = data;
   try { localStorage.setItem(BKMP_DUNGEON_BEST_KEY, JSON.stringify(all)); } catch (e) {}
 }
 function bkmpDungeonIsHardestCleared() {
   const hardest = BKMP_DUNGEON_DIFFICULTIES[BKMP_DUNGEON_DIFFICULTIES.length - 1];
-  return bkmpDungeonGetBest(hardest.id).waves >= hardest.waves;
+  return bkmpDungeonGetBest('gold', hardest.id).waves >= hardest.waves;
 }
 
 /* Sortierung fuer die Bestenliste: vollstaendige Laeufe (alle Wellen
@@ -1199,24 +1456,33 @@ function bkmpDungeonSortLeaderboardRows(rows, totalWaves) {
   });
 }
 
+let bkmpDungeonLeaderboardTypeId = BKMP_DUNGEON_TYPES[0].id;
 let bkmpDungeonLeaderboardDifficultyId = BKMP_DUNGEON_DIFFICULTIES[0].id;
 async function bkmpDungeonRenderLeaderboard() {
   const listEl = document.getElementById('idleLeaderboardList');
   if (!listEl) return;
+  const type = bkmpDungeonTypeById(bkmpDungeonLeaderboardTypeId);
   const difficulty = BKMP_DUNGEON_DIFFICULTIES.find(d => d.id === bkmpDungeonLeaderboardDifficultyId) || BKMP_DUNGEON_DIFFICULTIES[0];
   listEl.innerHTML = `
+    <div class="idle-dungeon-diff-row">${BKMP_DUNGEON_TYPES.map(t => `
+      <button type="button" class="idle-dungeon-diff-btn${t.id === type.id ? ' active' : ''}" data-lb-type-id="${t.id}">${t.icon} ${t.name}</button>
+    `).join('')}</div>
     <div class="idle-dungeon-diff-row">${BKMP_DUNGEON_DIFFICULTIES.map(d => `
       <button type="button" class="idle-dungeon-diff-btn${d.id === difficulty.id ? ' active' : ''}" data-lb-difficulty-id="${d.id}">${d.icon} ${d.name}</button>
     `).join('')}</div>
     <div id="idleDungeonLeaderboardRows"><p class="empty-hint">Lädt...</p></div>
   `;
-  listEl.querySelectorAll('.idle-dungeon-diff-btn').forEach(btn => btn.addEventListener('click', () => {
+  listEl.querySelectorAll('[data-lb-type-id]').forEach(btn => btn.addEventListener('click', () => {
+    bkmpDungeonLeaderboardTypeId = btn.dataset.lbTypeId;
+    bkmpDungeonRenderLeaderboard();
+  }));
+  listEl.querySelectorAll('[data-lb-difficulty-id]').forEach(btn => btn.addEventListener('click', () => {
     bkmpDungeonLeaderboardDifficultyId = btn.dataset.lbDifficultyId;
     bkmpDungeonRenderLeaderboard();
   }));
   let rows = [];
   try {
-    rows = typeof loadDungeonLeaderboard === 'function' ? (await loadDungeonLeaderboard(difficulty.id)) || [] : [];
+    rows = typeof loadDungeonLeaderboard === 'function' ? (await loadDungeonLeaderboard(type.id, difficulty.id)) || [] : [];
     rows = rows.filter(r => !bkmpIsHiddenTestAccount(r.name_key));
   } catch (e) { console.warn('Dungeon: Bestenliste konnte nicht geladen werden.', e); }
   /* Tab kann waehrend des Ladens gewechselt worden sein - dann existiert
@@ -1239,6 +1505,13 @@ function bkmpDungeonFormatTime(ms) {
   const sec = totalSec % 60;
   return `${min}:${String(sec).padStart(2, '0')}`;
 }
+function bkmpDungeonFormatCountdown(seconds) {
+  const s = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+}
 /* Skalierung IMMER relativ zu den eigenen effektiven Werten (nicht zur
    normalen Fortschritts-Stufe) - dadurch bleibt die Herausforderung fair,
    egal wie weit jemand in der normalen Progression schon ist, und die
@@ -1249,93 +1522,166 @@ function bkmpDungeonWaveMult(wave) {
   return Math.pow(growth, wave - 1);
 }
 
+/* Laedt den serverseitigen Schluessel-/Tagesbonus-/Fortschritts-Status fuer
+   alle 7 Typen in EINEM RPC-Aufruf (siehe dungeon_get_all_status() in
+   supabase-dungeon-system-v2.sql) und rendert danach neu, falls der
+   Dungeon-Tab noch offen ist. */
+async function bkmpDungeonRefreshStatus() {
+  /* Bug-Fix (Spieler-Meldung 18.07., Screenshot "Lädt Dungeon-Status..."
+     haengt fest): bei einem Fehlschlag (z.B. weil supabase-dungeon-system-
+     v2.sql noch nicht ausgefuehrt wurde und die RPC serverseitig noch gar
+     nicht existiert) blieb bkmpDungeonStatusLoadedAt auf 0 stehen - jedes
+     Rendern des Panels sah dadurch weiterhin "nicht geladen", zeigte den
+     Ladetext und stiess SOFORT wieder einen neuen (wieder scheiternden)
+     Aufruf an: eine stille Endlosschleife ohne jede Rueckmeldung fuer den
+     Spieler. Jetzt: ein eigenes Fehlgeschlagen-Flag, das eine klare
+     Fehlermeldung mit Wiederholen-Knopf zeigt statt endlos weiterzuladen,
+     plus ein Lauf-Schutz gegen ueberlappende parallele Aufrufe. */
+  if (bkmpDungeonStatusLoading) return;
+  bkmpDungeonStatusLoading = true;
+  try {
+    const rows = typeof bkmpDungeonGetAllStatus === 'function' ? await bkmpDungeonGetAllStatus() : [];
+    const map = {};
+    rows.forEach(r => { map[r.dungeonType] = r; });
+    bkmpDungeonStatusByType = map;
+    bkmpDungeonStatusLoadedAt = Date.now();
+    bkmpDungeonStatusLoadFailed = false;
+  } catch (e) {
+    console.warn('Dungeon: Status konnte nicht geladen werden (Migration evtl. noch nicht ausgefuehrt - siehe supabase-dungeon-system-v2.sql).', e);
+    bkmpDungeonStatusLoadFailed = true;
+  }
+  bkmpDungeonStatusLoading = false;
+  if (bkmpIdleActiveTab === 'dungeon') bkmpIdleRenderDungeonPanel();
+}
+
 function bkmpIdleRenderDungeonPanel() {
   const panel = document.getElementById('idlePanelDungeon');
   if (!panel || !bkmpIdleState) return;
-  const selected = BKMP_DUNGEON_DIFFICULTIES.find(d => d.id === bkmpDungeonSelectedDifficultyId) || BKMP_DUNGEON_DIFFICULTIES[0];
-  const best = bkmpDungeonGetBest(selected.id);
-  const bestText = best.waves > 0
-    ? (best.waves >= selected.waves
-        ? `🏆 Bestzeit: ${bkmpDungeonFormatTime(best.timeMs)} (alle ${selected.waves} Wellen)`
-        : `Bestleistung: Welle ${best.waves} / ${selected.waves} erreicht`)
-    : 'Noch kein Versuch gestartet.';
+  if (bkmpDungeonStatusLoadFailed) {
+    panel.innerHTML = `
+      <p class="empty-hint">⚠️ Dungeon-Status konnte nicht geladen werden. Bitte versuche es gleich noch einmal.</p>
+      <button type="button" class="btn-ja" id="idleDungeonRetryBtn">🔄 Erneut versuchen</button>
+    `;
+    const retryBtn = document.getElementById('idleDungeonRetryBtn');
+    if (retryBtn) retryBtn.addEventListener('click', () => { bkmpDungeonStatusLoadFailed = false; bkmpDungeonRefreshStatus(); });
+    return;
+  }
+  if (!bkmpDungeonStatusLoadedAt) {
+    panel.innerHTML = '<p class="empty-hint">Lädt Dungeon-Status...</p>';
+    bkmpDungeonRefreshStatus();
+    return;
+  }
+  const busy = bkmpDungeonActive || bkmpDungeonAutoActive();
   panel.innerHTML = `
     <div class="idle-dungeon-intro">
-      <h4>🏛️ Dungeon-Herausforderung</h4>
-      ${bkmpDungeonSpontaneousEventActive() ? `
-      <div class="idle-dungeon-event-banner">
-        <p><strong>⚡ Spontanes Event - nur bis Mitternacht heute!</strong> Jeder vollständige Dungeon-Sieg hat jetzt 2% Chance auf ein seltenes Ei (Kora-, Haku-, Obsi- oder Kowalski-Drache).</p>
-      </div>` : bkmpDungeonEventWeekendActive() ? `
-      <div class="idle-dungeon-event-banner">
-        <p><strong>🎉 Event-Dungeon-Wochenende!</strong> Bis Sonntag hat jeder vollständige Dungeon-Sieg eine Extra-Chance auf ein seltenes Ei (Kora-, Haku-, Obsi- oder Kowalski-Drache).</p>
-      </div>` : ''}
-      <div class="idle-dungeon-diff-row">${BKMP_DUNGEON_DIFFICULTIES.map(d => `
-        <button type="button" class="idle-dungeon-diff-btn${d.id === selected.id ? ' active' : ''}" data-difficulty-id="${d.id}" ${bkmpDungeonActive || bkmpDungeonAutoActive() ? 'disabled' : ''}>${d.icon} ${d.name}</button>
+      <h4>🏛️ Dungeon-System</h4>
+      <p>7 spezialisierte Dungeons, jeder mit eigenem Schlüssel-Vorrat (max. ${BKMP_DUNGEON_KEY_MAX}, +1 alle 4 Stunden - läuft auch offline korrekt weiter) und eigenem Tagesbonus (+50% auf die erste erfolgreiche Runde pro Tag). Wähle einen Dungeon und eine Schwierigkeit - jede Schwierigkeit schaltet sich erst nach dem Meistern der vorherigen frei.</p>
+    </div>
+    <div class="idle-dungeon-type-grid">
+      ${BKMP_DUNGEON_TYPES.map(t => bkmpDungeonRenderCard(t, busy)).join('')}
+    </div>
+  `;
+  BKMP_DUNGEON_TYPES.forEach(t => bkmpDungeonWireCard(t));
+  bkmpDungeonStartCountdownTicker();
+}
+
+function bkmpDungeonKeyLineHtml(status) {
+  const keysFull = status.keys >= BKMP_DUNGEON_KEY_MAX;
+  return keysFull
+    ? `🔑 Schlüssel: ${status.keys}/${BKMP_DUNGEON_KEY_MAX}<br>✓ Schlüssel vollständig aufgeladen`
+    : `🔑 Schlüssel: ${status.keys}/${BKMP_DUNGEON_KEY_MAX}<br>Nächster Schlüssel in: ${bkmpDungeonFormatCountdown(status.secondsToNext)}`;
+}
+
+/* Bug-Fix (Spieler-Meldung 18.07., Screenshot "Nächster Schlüssel in:
+   00:00:00" trotz nur 4/5 Schlüsseln): der Countdown wurde bisher NUR beim
+   (Neu-)Rendern des Panels einmalig vom Server geholt und danach nie mehr
+   aktualisiert - stand die Karte einfach offen, tickte die Zahl nie
+   sichtbar herunter und sah dadurch bei kleinen Restzeiten wie
+   "hängengeblieben bei 0" aus, obwohl der Server-Wert an sich korrekt war.
+   Jetzt: ein echter 1-Sekunden-Tick, der NUR die Countdown-Textzeile lokal
+   herunterzaehlt (kein Server-Roundtrip pro Sekunde, kein Neu-Rendern der
+   ganzen Karte/Listener). Erreicht ein Countdown 0, wird EINMALIG ein
+   echter Status-Refresh angestossen, damit der neue Schluessel-Stand
+   serverseitig (now()-basiert, nicht per lokaler Uhr) bestaetigt wird.
+   Selbst-beendend: bricht ab, sobald der Dungeon-Tab nicht mehr aktiv ist,
+   kein manuelles Aufraeumen an anderer Stelle noetig. */
+function bkmpDungeonStartCountdownTicker() {
+  if (bkmpDungeonCountdownInterval) { clearInterval(bkmpDungeonCountdownInterval); bkmpDungeonCountdownInterval = null; }
+  bkmpDungeonCountdownInterval = setInterval(() => {
+    if (bkmpIdleActiveTab !== 'dungeon' || bkmpDungeonStatusLoadFailed || !bkmpDungeonStatusLoadedAt) {
+      clearInterval(bkmpDungeonCountdownInterval);
+      bkmpDungeonCountdownInterval = null;
+      return;
+    }
+    let anyReachedZero = false;
+    BKMP_DUNGEON_TYPES.forEach(type => {
+      const status = bkmpDungeonStatusByType[type.id];
+      if (!status || status.keys >= BKMP_DUNGEON_KEY_MAX) return;
+      status.secondsToNext = Math.max(0, Number(status.secondsToNext || 0) - 1);
+      if (status.secondsToNext <= 0) { anyReachedZero = true; return; }
+      const el = document.getElementById('idle-dungeon-keys-' + type.id);
+      if (el) el.innerHTML = bkmpDungeonKeyLineHtml(status);
+    });
+    if (anyReachedZero) bkmpDungeonRefreshStatus();
+  }, 1000);
+}
+
+function bkmpDungeonRenderCard(type, busy) {
+  const status = bkmpDungeonStatusByType[type.id] || { keys: BKMP_DUNGEON_KEY_MAX, secondsToNext: 0, dailyBonusAvailable: true, highestDifficulty: 'leicht', totalCompletions: 0, totalDefeats: 0 };
+  const selectedId = bkmpDungeonSelectedDifficultyByType[type.id] || 'leicht';
+  const unlockedIdx = bkmpDungeonDifficultyIndex(status.highestDifficulty);
+  const selected = BKMP_DUNGEON_DIFFICULTIES.find(d => d.id === selectedId) || BKMP_DUNGEON_DIFFICULTIES[0];
+  const best = bkmpDungeonGetBest(type.id, selected.id);
+  const bestText = best.waves > 0
+    ? (best.waves >= selected.waves ? `🏆 ${bkmpDungeonFormatTime(best.timeMs)}` : `Welle ${best.waves}/${selected.waves}`)
+    : '—';
+  const isRunningHere = bkmpDungeonActiveType === type.id && busy;
+  const keyLine = bkmpDungeonKeyLineHtml(status);
+  const bonusLine = status.dailyBonusAvailable
+    ? '🎁 Tagesbonus verfügbar: +50 %'
+    : '✓ Tagesbonus heute bereits erhalten';
+  return `
+    <div class="idle-dungeon-card${type.highlight ? ' idle-dungeon-card-special' : ''}${type.id === 'egg' ? ' idle-dungeon-card-egg' : ''}${type.id === 'rune' ? ' idle-dungeon-card-rune' : ''}" data-dungeon-type="${type.id}">
+      <div class="idle-dungeon-card-head">
+        <span class="idle-dungeon-card-icon">${type.icon}</span>
+        <div>
+          <strong>${type.name}</strong>
+          <small>${type.short}</small>
+        </div>
+      </div>
+      ${type.highlight ? `<div class="idle-dungeon-card-highlight">${type.highlight}</div>` : ''}
+      <div class="idle-dungeon-card-keys" id="idle-dungeon-keys-${type.id}">${keyLine}</div>
+      <div class="idle-dungeon-card-bonus${status.dailyBonusAvailable ? ' available' : ''}">${bonusLine}</div>
+      <div class="idle-dungeon-diff-row">${BKMP_DUNGEON_DIFFICULTIES.map((d, i) => `
+        <button type="button" class="idle-dungeon-diff-btn${d.id === selected.id ? ' active' : ''}" data-difficulty-id="${d.id}" ${busy || i > unlockedIdx ? 'disabled' : ''} title="${i > unlockedIdx ? 'Erst nach Abschluss der vorherigen Stufe freigeschaltet' : ''}">${d.icon} ${d.name}</button>
       `).join('')}</div>
-      <p>${selected.waves} Gegner-Wellen direkt hintereinander, ohne Pause - die Gegner werden mit jeder Welle gefährlicher. Die Belohnung richtet sich nach deinen eigenen Werten, die Herausforderung bleibt also fair, egal wie weit du normal schon bist. Belohnungs-Bonus dieser Stufe: ${selected.rewardMult}×. Schaffst du alle ${selected.waves}?</p>
-      <p class="idle-dungeon-best">${bestText}</p>
-      <button type="button" class="btn-ja idle-dungeon-start-btn" id="idleDungeonStartBtn" ${bkmpDungeonActive || bkmpDungeonAutoActive() ? 'disabled' : ''}>${bkmpDungeonActive || bkmpDungeonAutoActive() ? '⏳ Dungeon läuft...' : `${selected.icon} ${selected.name} starten`}</button>
+      <p class="idle-dungeon-card-meta">${selected.waves} Wellen &middot; Bestleistung: ${bestText} &middot; ${status.totalCompletions}× geschafft, ${status.totalDefeats}× gescheitert</p>
+      <button type="button" class="btn-ja idle-dungeon-start-btn" data-start-type="${type.id}" ${busy || status.keys < 1 ? 'disabled' : ''}>${isRunningHere ? '⏳ Läuft...' : status.keys < 1 ? '🔒 Keine Schlüssel' : `${selected.icon} Starten`}</button>
       <div class="idle-dungeon-auto-row">
-        <span class="idle-dungeon-auto-label">🔁 Auto-Lauf (stoppt automatisch bei der ersten Niederlage):</span>
+        <span class="idle-dungeon-auto-label">🔁 Auto-Lauf:</span>
         <div class="idle-dungeon-diff-row">
-          ${[10, 20, 30].map(n => `<button type="button" class="btn-nein idle-dungeon-auto-btn" data-auto-count="${n}" ${bkmpDungeonActive || bkmpDungeonAutoActive() ? 'disabled' : ''}>${n}×</button>`).join('')}
+          ${[1, 5].map(n => `<button type="button" class="btn-nein idle-dungeon-auto-btn" data-auto-type="${type.id}" data-auto-count="${n}" ${busy || status.keys < 1 ? 'disabled' : ''}>${n}×</button>`).join('')}
+          <button type="button" class="btn-nein idle-dungeon-auto-btn" data-auto-type="${type.id}" data-auto-count="-1" ${busy || status.keys < 1 ? 'disabled' : ''}>Bis Schlüssel leer</button>
         </div>
       </div>
     </div>
   `;
-  panel.querySelectorAll('.idle-dungeon-diff-btn').forEach(btn => btn.addEventListener('click', () => {
+}
+
+function bkmpDungeonWireCard(type) {
+  const card = document.querySelector(`.idle-dungeon-card[data-dungeon-type="${type.id}"]`);
+  if (!card) return;
+  card.querySelectorAll('.idle-dungeon-diff-btn').forEach(btn => btn.addEventListener('click', () => {
     if (bkmpDungeonActive || bkmpDungeonAutoActive()) return;
-    bkmpDungeonSelectedDifficultyId = btn.dataset.difficultyId;
+    bkmpDungeonSelectedDifficultyByType[type.id] = btn.dataset.difficultyId;
     bkmpIdleRenderDungeonPanel();
   }));
-  const startBtn = document.getElementById('idleDungeonStartBtn');
-  if (startBtn) startBtn.addEventListener('click', bkmpDungeonStart);
-  panel.querySelectorAll('.idle-dungeon-auto-btn').forEach(btn => btn.addEventListener('click', () => bkmpDungeonStartAuto(Number(btn.dataset.autoCount))));
-}
-
-/* ---------------- Event-Dungeon-Wochenende (Spieler-Vorgabe 17.07.) ----------------
-   Fr-So (Europe/Berlin) gibt jeder VOLLSTAENDIGE Dungeon-Sieg eine 0,5%
-   Chance auf eines der 3 Episch-Event-Eier (Kora-/Haku-/Obsidrache) -
-   zufaellig gewaehlt, alle drei gleich gewichtet. Bewusst client-seitig
-   gewuerfelt (gleiches "Client-trusted"-Modell wie alle anderen Ei-Drops
-   in diesem System), kein Server-Aufruf noetig. Weekday-Check per
-   Intl.DateTimeFormat statt getDay() - sonst wuerde die Zeitzone des
-   jeweiligen Spielers entscheiden, nicht ein einheitlicher Server-Tag. */
-const BKMP_DUNGEON_EVENT_EGG_CHANCE = 0.005;
-const BKMP_DUNGEON_EVENT_EGG_SPECIES = ['koradrache', 'hakudrache', 'obsidrache', 'kowalski'];
-function bkmpDungeonEventWeekendActive() {
-  const weekday = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Berlin', weekday: 'short' }).format(new Date());
-  return weekday === 'Fri' || weekday === 'Sat' || weekday === 'Sun';
-}
-
-/* Spontanes Einmal-Event (Spieler-Wunsch 17.07.): "bis 0 Uhr heute" - fest
-   verdrahteter Berlin-Zeitpunkt statt eines Wochentag-Checks, laeuft nach
-   dem 17.07. automatisch aus (kein manuelles Abschalten noetig). Nutzt
-   dieselbe DST-sichere Berlin-Zeit-Umrechnung wie der Gildenboss
-   (bkmpGuildBossBerlinDateAt), nur mit fest eingetragenem Datum statt
-   "heute" - der Endzeitpunkt aendert sich nicht mit dem Kalendertag. */
-const BKMP_DUNGEON_SPONTANEOUS_EVENT_END_UTC_MS = bkmpGuildBossBerlinDateAt(2026, 7, 16, 0, 0).getTime();
-const BKMP_DUNGEON_SPONTANEOUS_EVENT_EGG_CHANCE = 0.02;
-function bkmpDungeonSpontaneousEventActive() {
-  return Date.now() < BKMP_DUNGEON_SPONTANEOUS_EVENT_END_UTC_MS;
-}
-
-function bkmpDungeonMaybeGrantEventEgg() {
-  if (!bkmpIdleState) return;
-  const spontaneous = bkmpDungeonSpontaneousEventActive();
-  const chance = spontaneous ? BKMP_DUNGEON_SPONTANEOUS_EVENT_EGG_CHANCE
-    : (bkmpDungeonEventWeekendActive() ? BKMP_DUNGEON_EVENT_EGG_CHANCE : 0);
-  if (chance <= 0 || Math.random() >= chance) return;
-  const speciesId = BKMP_DUNGEON_EVENT_EGG_SPECIES[Math.floor(Math.random() * BKMP_DUNGEON_EVENT_EGG_SPECIES.length)];
-  const species = bkmpDragonSpeciesById(speciesId);
-  if (!species || typeof insertPlayerDragonEgg !== 'function') return;
-  insertPlayerDragonEgg(bkmpIdleState.name_key, speciesId).then(row => {
-    if (!row) return;
-    bkmpPlayerDragonEggs.push(row);
-    if (typeof bkmpIdleRenderDragonsPanel === 'function') bkmpIdleRenderDragonsPanel();
-  }).catch(e => console.warn('Idle Dorf: Event-Ei konnte nicht gespeichert werden.', e));
-  bkmpIdleLog(`🎉 ${spontaneous ? 'Spontan-Event' : 'Event-Dungeon-Wochenende'}: Ein ${species.name}-Ei gefunden!`);
-  if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`🎉 Seltener Fund! Ein ${species.name}-Ei ist aus dem Dungeon gefallen!`, 5000);
+  const startBtn = card.querySelector('.idle-dungeon-start-btn');
+  if (startBtn) startBtn.addEventListener('click', () => bkmpDungeonStart(type.id));
+  card.querySelectorAll('.idle-dungeon-auto-btn').forEach(btn => btn.addEventListener('click', () => {
+    const count = Number(btn.dataset.autoCount);
+    bkmpDungeonStartAuto(type.id, count === -1 ? Infinity : count);
+  }));
 }
 
 /* Spieler-Report (15.07., "Der Abbrechen Knopf geht nicht", Screenshot
@@ -1352,13 +1698,15 @@ function bkmpDungeonMaybeGrantEventEgg() {
 function bkmpDungeonUpdateBanner() {
   const banner = document.getElementById('idleDungeonBanner');
   if (!banner || !bkmpDungeonActive || !bkmpDungeonActiveDifficulty) return;
+  const dungeonType = bkmpDungeonTypeById(bkmpDungeonActiveType);
   const elapsed = Date.now() - bkmpDungeonStartTime;
+  const totalLabel = bkmpDungeonAutoRunsTotal === Infinity ? '∞' : bkmpDungeonAutoRunsTotal;
   const autoSuffix = bkmpDungeonAutoActive()
     ? (bkmpDungeonAutoCancelled
-        ? ` &middot; 🔁 Auto ${bkmpDungeonAutoRunsDone + 1}/${bkmpDungeonAutoRunsTotal} &middot; ⏹️ Wird nach dieser Welle beendet...`
-        : ` &middot; 🔁 Auto ${bkmpDungeonAutoRunsDone + 1}/${bkmpDungeonAutoRunsTotal} <button type="button" class="idle-dungeon-auto-cancel-btn" id="idleDungeonAutoCancelBtn">Abbrechen</button>`)
+        ? ` &middot; 🔁 Auto ${bkmpDungeonAutoRunsDone + 1}/${totalLabel} &middot; ⏹️ Wird nach dieser Welle beendet...`
+        : ` &middot; 🔁 Auto ${bkmpDungeonAutoRunsDone + 1}/${totalLabel} <button type="button" class="idle-dungeon-auto-cancel-btn" id="idleDungeonAutoCancelBtn">Abbrechen</button>`)
     : '';
-  banner.innerHTML = `🏛️ Dungeon (${bkmpDungeonActiveDifficulty.icon} ${bkmpDungeonActiveDifficulty.name}) &middot; Welle ${bkmpDungeonWave} / ${bkmpDungeonActiveDifficulty.waves} &middot; ⏱ ${bkmpDungeonFormatTime(elapsed)}${autoSuffix}`;
+  banner.innerHTML = `${dungeonType.icon} ${dungeonType.name} (${bkmpDungeonActiveDifficulty.icon} ${bkmpDungeonActiveDifficulty.name}) &middot; Welle ${bkmpDungeonWave} / ${bkmpDungeonActiveDifficulty.waves} &middot; ⏱ ${bkmpDungeonFormatTime(elapsed)}${autoSuffix}`;
   if (bkmpDungeonAutoActive() && !bkmpDungeonAutoCancelled) {
     const cancelBtn = document.getElementById('idleDungeonAutoCancelBtn');
     if (cancelBtn) cancelBtn.addEventListener('click', bkmpDungeonCancelAuto);
@@ -1432,24 +1780,30 @@ function bkmpDungeonSpawnWave(wave) {
   const safeRoster = roster.length ? roster : fullRoster;
   const archetype = safeRoster[(wave - 1) % safeRoster.length] || {};
   const isFinalWave = wave === bkmpDungeonActiveDifficulty.waves;
+  /* Dungeon-System 2.0 (Spieler-Vorgabe: "ein Mini-Boss/stärkerer Gegner bei
+     Welle 5"): bei jeder Schwierigkeit auf halbem Weg (aufgerundet) ein
+     spuerbar staerkerer Zwischen-Gegner, zusaetzlich zum bestehenden
+     Endboss auf der letzten Welle. */
+  const isMinibossWave = !isFinalWave && wave === Math.ceil(bkmpDungeonActiveDifficulty.waves / 2);
+  const bossBump = isFinalWave ? 1 : (isMinibossWave ? 1.15 : 1);
   bkmpIdleCurrentDragon = {
     id: 'dungeon-wave-' + wave,
-    name: isFinalWave ? 'Dungeon-Champion' : `Wellen-Wächter (Welle ${wave})`,
+    name: isFinalWave ? 'Dungeon-Champion' : (isMinibossWave ? 'Wellen-Elite' : `Wellen-Wächter (Welle ${wave})`),
     emoji: archetype.emoji || '🐉',
     spriteKey: archetype.sprite_key || archetype.id || 'standard',
     killIndex: 0,
     isBoss: isFinalWave,
-    bossTier: isFinalWave ? 'boss' : null,
+    bossTier: isFinalWave ? 'boss' : (isMinibossWave ? 'miniboss' : null),
     isEventDragon: false,
     eventDragonKey: null,
-    maxHp: Math.max(1, Math.round((s.attack || 10) * 4 * combatMult)),
+    maxHp: Math.max(1, Math.round((s.attack || 10) * 4 * combatMult * bossBump)),
     /* Balance-Nachbesserung 17.07.: 0.035 war viel zu niedrig - kombiniert
        mit der (jetzt separat gefixten) passiven Heilung liess sich der
        Dungeon komplett ohne echten Gegenschaden durchspielen. 0.09 macht
        jeden Gegenangriff spuerbar (ca. 9% der eigenen maximalen Stadt-HP
        pro Treffer bei Welle 1, mit combatMult weiter steigend - siehe
        Balance-Fix-Kommentar oben zu combatMult vs. waveMult). */
-    attack: Math.max(1, Math.round((s.hp || 100) * 0.09 * combatMult)),
+    attack: Math.max(1, Math.round((s.hp || 100) * 0.09 * combatMult * bossBump)),
     defense: Math.round((s.defense || 0) * 0.3),
     isDungeon: true
   };
@@ -1459,16 +1813,16 @@ function bkmpDungeonSpawnWave(wave) {
   bkmpDungeonUpdateBanner();
 }
 
-function bkmpDungeonStartAuto(count) {
-  if (bkmpDungeonActive || bkmpDungeonAutoActive() || !Number.isFinite(count) || count <= 0) return;
+async function bkmpDungeonStartAuto(type, count) {
+  if (bkmpDungeonActive || bkmpDungeonAutoActive() || !count || count <= 0) return;
   bkmpDungeonAutoRunsTotal = count;
   bkmpDungeonAutoRunsDone = 0;
   bkmpDungeonAutoCancelled = false;
-  bkmpDungeonAutoStats = { wins: 0, losses: 0, gold: 0, xp: 0, gems: 0 };
+  bkmpDungeonAutoStats = { wins: 0, losses: 0, gold: 0, xp: 0, gems: 0, meat: 0, fruit: 0, eggs: 0, runes: 0 };
   /* bkmpDungeonStart() zeigt bei einer Blockade (Event-Pause/laufender
-     Raid) selbst schon einen erklaerenden Toast - hier nur sauber
-     zuruecksetzen, kein zweiter Hinweis noetig. */
-  if (!bkmpDungeonStart()) {
+     Raid/keine Schluessel) selbst schon einen erklaerenden Toast - hier nur
+     sauber zuruecksetzen, kein zweiter Hinweis noetig. */
+  if (!(await bkmpDungeonStart(type))) {
     bkmpDungeonAutoRunsTotal = 0;
     bkmpDungeonAutoStats = null;
   }
@@ -1500,7 +1854,7 @@ function bkmpDungeonAutoFinishSequence() {
   if (stats) {
     bkmpDungeonShowAutoSummary(stats, done, total);
   }
-  if (bkmpIdleActiveTab === 'dungeon') bkmpIdleRenderDungeonPanel();
+  if (bkmpIdleActiveTab === 'dungeon') bkmpDungeonRefreshStatus();
 }
 
 function bkmpDungeonShowAutoSummary(stats, done, total) {
@@ -1508,11 +1862,17 @@ function bkmpDungeonShowAutoSummary(stats, done, total) {
   const overlay = document.createElement('div');
   overlay.className = 'bkmp-easter';
   overlay.id = 'bkmpDungeonResultOverlay';
+  const parts = [`+${bkmpIdleFormatNumber(stats.gold)} 💰`, `+${bkmpIdleFormatNumber(stats.xp)} XP`];
+  if (stats.gems > 0) parts.push(`+${stats.gems} 💎`);
+  if (stats.meat > 0) parts.push(`+${bkmpIdleFormatNumber(stats.meat)} 🍖`);
+  if (stats.fruit > 0) parts.push(`+${bkmpIdleFormatNumber(stats.fruit)} 🍎`);
+  if (stats.eggs > 0) parts.push(`${stats.eggs}× 🥚`);
+  if (stats.runes > 0) parts.push(`${stats.runes}× 🔮`);
   overlay.innerHTML = `
     <div class="bkmp-easter-card idle-dungeon-result-card">
-      <small>Auto-Lauf beendet &middot; ${done} / ${total} Versuche</small>
+      <small>Auto-Lauf beendet &middot; ${done} / ${total === Infinity ? '∞' : total} Versuche</small>
       <strong>${stats.wins} 🏆 &middot; ${stats.losses} 💀</strong>
-      <p>Gesamt-Belohnung: +${bkmpIdleFormatNumber(stats.gold)} 💰 +${bkmpIdleFormatNumber(stats.xp)} XP${stats.gems > 0 ? ` +${stats.gems} 💎` : ''}</p>
+      <p>Gesamt-Belohnung: ${parts.join(' &middot; ')}</p>
     </div>
   `;
   document.body.appendChild(overlay);
@@ -1527,9 +1887,13 @@ function bkmpDungeonShowAutoSummary(stats, done, total) {
    (bkmpDungeonStartAuto/bkmpDungeonFinish) braucht das, um sich sauber
    zu beenden statt haengen zu bleiben, falls ein Start (Erst-Aufruf ODER
    ein automatisch nachgeschobener Folgelauf) an einer dieser Bedingungen
-   scheitert. */
-function bkmpDungeonStart() {
-  if (bkmpDungeonActive || !bkmpIdleState || !bkmpIdleEffectiveStats) return false;
+   scheitert. Jetzt async: der Schluessel-Verbrauch laeuft ueber die
+   serverseitige, now()-basierte RPC dungeon_consume_key (siehe
+   supabase-dungeon-system-v2.sql) - erst wenn die einen Schluessel
+   erfolgreich abgezogen hat, startet die eigentliche (weiterhin rein
+   clientseitige) Kampf-Simulation. */
+async function bkmpDungeonStart(type) {
+  if (bkmpDungeonActive || bkmpDungeonStarting || !bkmpIdleState || !bkmpIdleEffectiveStats) return false;
   if (bkmpIdleEventPauseActive) {
     if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Erst den Event-Drachen bestätigen, bevor der Dungeon startet.', 3200);
     return false;
@@ -1538,9 +1902,49 @@ function bkmpDungeonStart() {
     if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Während eines laufenden Raids kann der Dungeon nicht gestartet werden.', 3200);
     return false;
   }
+  const dungeonType = bkmpDungeonTypeById(type);
+  const difficultyId = bkmpDungeonSelectedDifficultyByType[type] || 'leicht';
+  const status = bkmpDungeonStatusByType[type];
+  const unlockedIdx = bkmpDungeonDifficultyIndex(status ? status.highestDifficulty : 'leicht');
+  if (bkmpDungeonDifficultyIndex(difficultyId) > unlockedIdx) {
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Diese Schwierigkeit ist noch nicht freigeschaltet.', 3200);
+    return false;
+  }
+  /* Lager-voll-Warnung (Spieler-Vorgabe: "Spieler muss VOR dem Start
+     gewarnt werden") - Fleisch/Frucht sind die einzigen Belohnungstypen
+     dieses Systems mit einem ECHTEN Kapazitaets-Deckel (bestehendes
+     Gebaeude-Limit, siehe bkmpDragonResourceCap); Eier und Runen haben im
+     gesamten restlichen Spiel gar kein Limit, ein Start-Block dafuer waere
+     erfunden statt real - siehe Projektnotiz zur Dungeon-System-2.0-Analyse. */
+  if (dungeonType.id === 'meat' || dungeonType.id === 'fruit') {
+    const cap = bkmpDragonResourceCap(bkmpIdleState[dungeonType.id === 'meat' ? 'jagdhuette_level' : 'obstgarten_level'] || 0);
+    if (Number(bkmpIdleState[dungeonType.id] || 0) >= cap && typeof bkmpShowJannikToast === 'function') {
+      bkmpShowJannikToast(`⚠️ Dein ${dungeonType.id === 'meat' ? 'Fleisch' : 'Frucht'}-Lager ist bereits voll - die Belohnung wird trotzdem gutgeschrieben, sobald wieder Platz ist.`, 4200);
+    }
+  }
+
+  bkmpDungeonStarting = true;
+  let remainingKeys;
+  try {
+    remainingKeys = typeof bkmpDungeonConsumeKey === 'function' ? await bkmpDungeonConsumeKey(type) : 0;
+  } catch (e) {
+    bkmpDungeonStarting = false;
+    if (String(e && e.message) === 'no_keys_available') {
+      if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`🔒 Keine Schlüssel mehr für ${dungeonType.name}. Warte auf die Regeneration.`, 3600);
+    } else {
+      console.warn('Dungeon: Schluessel konnten nicht verbraucht werden.', e);
+      if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Der Dungeon konnte nicht gestartet werden. Bitte versuche es erneut.', 3600);
+    }
+    bkmpDungeonRefreshStatus();
+    return false;
+  }
+  bkmpDungeonStarting = false;
+  if (bkmpDungeonStatusByType[type]) bkmpDungeonStatusByType[type].keys = remainingKeys;
+
   bkmpDungeonActive = true;
+  bkmpDungeonActiveType = type;
   bkmpDungeonWave = 0;
-  bkmpDungeonActiveDifficulty = BKMP_DUNGEON_DIFFICULTIES.find(d => d.id === bkmpDungeonSelectedDifficultyId) || BKMP_DUNGEON_DIFFICULTIES[0];
+  bkmpDungeonActiveDifficulty = BKMP_DUNGEON_DIFFICULTIES.find(d => d.id === difficultyId) || BKMP_DUNGEON_DIFFICULTIES[0];
   bkmpDungeonStartTime = Date.now();
   bkmpDungeonPrevDragon = bkmpIdleCurrentDragon;
   bkmpDungeonPrevVillageHp = bkmpIdleVillageHp;
@@ -1588,16 +1992,29 @@ function bkmpDungeonHandleFailure() {
   bkmpDungeonFinish(false);
 }
 
-function bkmpDungeonShowResult(success, wavesCleared, totalWaves, elapsedMs, gold, xp, gems, difficulty) {
+function bkmpDungeonShowResult(success, wavesCleared, totalWaves, elapsedMs, summary, difficulty, dungeonType, dailyBonusGranted) {
   if (document.getElementById('bkmpDungeonResultOverlay')) return;
   const overlay = document.createElement('div');
   overlay.className = 'bkmp-easter';
   overlay.id = 'bkmpDungeonResultOverlay';
+  const parts = [];
+  if (summary.gold > 0) parts.push(`+${bkmpIdleFormatNumber(summary.gold)} 💰`);
+  if (summary.xp > 0) parts.push(`+${bkmpIdleFormatNumber(summary.xp)} XP`);
+  if (summary.gems > 0) parts.push(`+${summary.gems} 💎`);
+  if (summary.meat > 0) parts.push(`+${bkmpIdleFormatNumber(summary.meat)} 🍖`);
+  if (summary.fruit > 0) parts.push(`+${bkmpIdleFormatNumber(summary.fruit)} 🍎`);
+  summary.eggs.forEach(egg => { if (egg) parts.push(`🥚 ${egg.name}`); });
+  summary.runes.forEach(rune => {
+    const rarityDef = window.BKMP_RUNE_RARITIES.find(r => r.id === rune.rarity);
+    parts.push(`🔮 ${rarityDef ? rarityDef.name : rune.rarity} Rune`);
+  });
+  if (summary.boosterGold) parts.push('⚡ Goldrausch (+25% Gold, 30 Min.)');
+  if (summary.boosterExp) parts.push('⚡ Wissensschub (+25% EXP, 30 Min.)');
   overlay.innerHTML = `
     <div class="bkmp-easter-card idle-dungeon-result-card">
-      <small>Dungeon-Ergebnis &middot; ${difficulty.icon} ${difficulty.name}</small>
+      <small>${dungeonType.icon} ${dungeonType.name} &middot; ${difficulty.icon} ${difficulty.name}</small>
       <strong>${success ? '🏆 Dungeon gemeistert!' : `💀 Bei Welle ${wavesCleared + 1} gescheitert`}</strong>
-      <p>${success ? `Alle ${totalWaves} Wellen in ${bkmpDungeonFormatTime(elapsedMs)} geschafft!` : `${wavesCleared} von ${totalWaves} Wellen überstanden.`}<br>Belohnung: +${bkmpIdleFormatNumber(gold)} 💰 +${bkmpIdleFormatNumber(xp)} XP${gems > 0 ? ` +${gems} 💎` : ''}</p>
+      <p>${success ? `Alle ${totalWaves} Wellen in ${bkmpDungeonFormatTime(elapsedMs)} geschafft!` : `${wavesCleared} von ${totalWaves} Wellen überstanden.`}${dailyBonusGranted ? '<br>🎁 Tagesbonus angewendet!' : ''}<br>Belohnung: ${parts.join(' &middot; ') || '—'}</p>
     </div>
   `;
   document.body.appendChild(overlay);
@@ -1616,8 +2033,10 @@ function bkmpDungeonMarkAchievement() {
   } catch (e) {}
 }
 
-function bkmpDungeonFinish(success) {
+async function bkmpDungeonFinish(success) {
   const difficulty = bkmpDungeonActiveDifficulty;
+  const type = bkmpDungeonActiveType;
+  const dungeonType = bkmpDungeonTypeById(type);
   const elapsedMs = Date.now() - bkmpDungeonStartTime;
   const wavesCleared = success ? difficulty.waves : Math.max(0, bkmpDungeonWave - 1);
   bkmpDungeonActive = false;
@@ -1649,33 +2068,47 @@ function bkmpDungeonFinish(success) {
   bkmpIdleUpdateVillageHpBar();
   bkmpIdleRenderStageBar();
 
-  const s = bkmpIdleEffectiveStats;
-  /* Balance-Nachbesserung 17.07. ("Sind die Belohnungen ... nicht bisschen
-     zu heftig?"): die alte Formel summierte pro Welle denselben
-     EXPONENTIELLEN waveMult wie die Kampf-Skalierung - bei 25 Wellen
-     Albtraum (waveGrowth hoch 24) explodierte die Summe dadurch auf
-     zweistellige Millionenbetraege. Belohnung jetzt bewusst von der
-     Kampf-Skalierung ENTKOPPELT und nur noch LINEAR pro Welle steigend
-     (+8% je Welle), Basiswert deutlich gesenkt (8 -> 2). */
-  const goldPerWaveBase = Math.round((s.attack || 10) * 2);
-  let totalGold = 0;
-  for (let w = 1; w <= wavesCleared; w++) totalGold += Math.round(goldPerWaveBase * (1 + 0.08 * (w - 1)));
-  totalGold = Math.round(totalGold * difficulty.rewardMult);
-  let totalXp = Math.round(totalGold / 4);
-  let gemBonus = 0;
+  /* Tagesbonus IMMER ueber die serverseitige, idempotente RPC pruefen/
+     beanspruchen (siehe dungeon_claim_daily_bonus in
+     supabase-dungeon-system-v2.sql) - nie ueber die lokale Anzeige-Kopie
+     entscheiden, sonst waere der Bonus per Reload/Mehrfachklick erneut
+     ausloesbar. Nur bei vollstaendigem Erfolg ueberhaupt versucht. */
+  let dailyBonusGranted = false;
   if (success) {
-    totalGold = Math.round(totalGold * 1.2);
-    totalXp = Math.round(totalXp * 1.2);
-    gemBonus = Math.round(5 * difficulty.rewardMult);
-    if (difficulty.id === BKMP_DUNGEON_DIFFICULTIES[BKMP_DUNGEON_DIFFICULTIES.length - 1].id) bkmpDungeonMarkAchievement();
-    bkmpDungeonMaybeGrantEventEgg();
+    try {
+      dailyBonusGranted = typeof bkmpDungeonClaimDailyBonus === 'function' ? await bkmpDungeonClaimDailyBonus(type) : false;
+    } catch (e) {
+      console.warn('Dungeon: Tagesbonus konnte nicht geprueft werden.', e);
+    }
   }
-  bkmpIdleState.gold = Number(bkmpIdleState.gold || 0) + totalGold;
-  bkmpIdleState.total_gold_earned = Number(bkmpIdleState.total_gold_earned || 0) + totalGold;
-  if (gemBonus > 0) bkmpIdleState.crystals = Number(bkmpIdleState.crystals || 0) + gemBonus;
-  if (totalXp > 0) bkmpIdleAddXp(totalXp);
 
-  const best = bkmpDungeonGetBest(difficulty.id);
+  const summary = bkmpDungeonGrantReward(type, difficulty, wavesCleared, success, dailyBonusGranted);
+
+  if (success && type === 'gold' && difficulty.id === BKMP_DUNGEON_DIFFICULTIES[BKMP_DUNGEON_DIFFICULTIES.length - 1].id) {
+    bkmpDungeonMarkAchievement();
+  }
+
+  /* Schwierigkeits-Freischaltung + Lifetime-Statistik serverseitig fuehren
+     (siehe dungeon_mark_progress in supabase-dungeon-system-v2.sql) -
+     nicht fatal, falls es fehlschlaegt (Netzwerk-Hoppler): der Lauf/die
+     Belohnung ist zu diesem Zeitpunkt schon vergeben, nur die Statistik-
+     Zeile bliebe dann bis zum naechsten Erfolg auf altem Stand. */
+  try {
+    if (typeof bkmpDungeonMarkProgress === 'function') {
+      const newHighest = await bkmpDungeonMarkProgress(type, success, difficulty.id);
+      const st = bkmpDungeonStatusByType[type];
+      if (st) {
+        st.highestDifficulty = newHighest || st.highestDifficulty;
+        st.totalCompletions += success ? 1 : 0;
+        st.totalDefeats += success ? 0 : 1;
+        if (dailyBonusGranted) st.dailyBonusAvailable = false;
+      }
+    }
+  } catch (e) {
+    console.warn('Dungeon: Fortschritt konnte nicht gespeichert werden.', e);
+  }
+
+  const best = bkmpDungeonGetBest(type, difficulty.id);
   const newBest = { ...best };
   let improved = false;
   if (wavesCleared > best.waves) {
@@ -1686,13 +2119,13 @@ function bkmpDungeonFinish(success) {
     newBest.timeMs = elapsedMs;
     improved = true;
   }
-  bkmpDungeonSaveBest(difficulty.id, newBest);
+  bkmpDungeonSaveBest(type, difficulty.id, newBest);
   /* Nur bei ECHTER Verbesserung ans Bestenlisten-Backend melden (Spieler-
      Meldung 17.07.: "Wo ist die Bestenliste dafuer?") - kein Aufruf bei
      jedem Versuch, spart unnoetige Schreibzugriffe. */
   if (improved && bkmpIdleState && bkmpIdleState.name_key && typeof submitDungeonResult === 'function') {
     const displayName = typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : bkmpIdleState.name_key;
-    submitDungeonResult(bkmpIdleState.name_key, displayName, difficulty.id, newBest.waves, newBest.timeMs)
+    submitDungeonResult(bkmpIdleState.name_key, displayName, type, difficulty.id, newBest.waves, newBest.timeMs)
       .catch(e => console.warn('Dungeon: Bestwert konnte nicht ans Leaderboard gemeldet werden.', e));
   }
 
@@ -1701,27 +2134,32 @@ function bkmpDungeonFinish(success) {
 
   if (bkmpDungeonAutoActive()) {
     /* Kein Vollbild-Overlay pro Einzelversuch waehrend eines Auto-Laufs
-       (bei 30 Versuchen sonst 30x ein 4,8s-Popup) - stattdessen eine
-       Zeile im ohnehin schon offenen Kampf-Log, plus am Ende (Ziel
+       (bei vielen Versuchen sonst wiederholtes Popup-Spam) - stattdessen
+       eine Zeile im ohnehin schon offenen Kampf-Log, plus am Ende (Ziel
        erreicht/Niederlage/Abbruch) EINE zusammengefasste Meldung, siehe
        bkmpDungeonShowAutoSummary. */
     bkmpDungeonAutoRunsDone += 1;
     bkmpDungeonAutoStats.wins += success ? 1 : 0;
     bkmpDungeonAutoStats.losses += success ? 0 : 1;
-    bkmpDungeonAutoStats.gold += totalGold;
-    bkmpDungeonAutoStats.xp += totalXp;
-    bkmpDungeonAutoStats.gems += gemBonus;
-    bkmpIdleLog(`${success ? '🏆' : '💀'} Auto-Lauf ${bkmpDungeonAutoRunsDone}/${bkmpDungeonAutoRunsTotal} (${difficulty.icon} ${difficulty.name}): ${success ? 'Sieg' : `Niederlage bei Welle ${wavesCleared + 1}`} - +${bkmpIdleFormatNumber(totalGold)} 💰`);
+    bkmpDungeonAutoStats.gold += summary.gold;
+    bkmpDungeonAutoStats.xp += summary.xp;
+    bkmpDungeonAutoStats.gems += summary.gems;
+    bkmpDungeonAutoStats.meat += summary.meat;
+    bkmpDungeonAutoStats.fruit += summary.fruit;
+    bkmpDungeonAutoStats.eggs += summary.eggs.length;
+    bkmpDungeonAutoStats.runes += summary.runes.length;
+    const totalLabel = bkmpDungeonAutoRunsTotal === Infinity ? '∞' : bkmpDungeonAutoRunsTotal;
+    bkmpIdleLog(`${success ? '🏆' : '💀'} Auto-Lauf ${bkmpDungeonAutoRunsDone}/${totalLabel} (${dungeonType.icon} ${dungeonType.name}, ${difficulty.icon} ${difficulty.name}): ${success ? 'Sieg' : `Niederlage bei Welle ${wavesCleared + 1}`} - +${bkmpIdleFormatNumber(summary.gold)} 💰`);
 
     if (willContinueAuto) {
       if (banner) {
-        banner.innerHTML = `🔁 Auto-Lauf ${bkmpDungeonAutoRunsDone}/${bkmpDungeonAutoRunsTotal} &middot; naechster Versuch startet gleich... <button type="button" class="idle-dungeon-auto-cancel-btn" id="idleDungeonAutoCancelBtn">Abbrechen</button>`;
+        banner.innerHTML = `🔁 Auto-Lauf ${bkmpDungeonAutoRunsDone}/${totalLabel} &middot; naechster Versuch startet gleich... <button type="button" class="idle-dungeon-auto-cancel-btn" id="idleDungeonAutoCancelBtn">Abbrechen</button>`;
         const cancelBtn = document.getElementById('idleDungeonAutoCancelBtn');
         if (cancelBtn) cancelBtn.addEventListener('click', bkmpDungeonCancelAuto);
       }
-      bkmpDungeonAutoNextRunTimer = window.setTimeout(() => {
+      bkmpDungeonAutoNextRunTimer = window.setTimeout(async () => {
         bkmpDungeonAutoNextRunTimer = null;
-        if (!bkmpDungeonStart()) bkmpDungeonAutoFinishSequence();
+        if (!(await bkmpDungeonStart(type))) bkmpDungeonAutoFinishSequence();
       }, 1600);
     } else {
       bkmpDungeonAutoFinishSequence();
@@ -1729,22 +2167,29 @@ function bkmpDungeonFinish(success) {
     return;
   }
 
-  bkmpDungeonShowResult(success, wavesCleared, difficulty.waves, elapsedMs, totalGold, totalXp, gemBonus, difficulty);
-  if (bkmpIdleActiveTab === 'dungeon') bkmpIdleRenderDungeonPanel();
+  bkmpDungeonShowResult(success, wavesCleared, difficulty.waves, elapsedMs, summary, difficulty, dungeonType, dailyBonusGranted);
+  if (bkmpIdleActiveTab === 'dungeon') bkmpDungeonRefreshStatus();
 }
 
 function bkmpIdleHandleDragonDefeated() {
   if (bkmpDungeonActive) { bkmpDungeonHandleWaveCleared(); return; }
   const defeatedEventDragon = bkmpIdleCurrentDragon && bkmpIdleCurrentDragon.isEventDragon ? bkmpIdleCurrentDragon : null;
   const rewards = bkmpIdleRewardsAt(bkmpIdleCurrentDragon, bkmpIdleEffectiveStats, bkmpIdleGetMergedRewardScalingCfg());
-  bkmpIdleState.gold += rewards.gold;
-  bkmpIdleState.total_gold_earned += rewards.gold;
+  /* Goldrausch/Wissensschub (siehe bkmpDungeonGrantBoost) wirkt auf JEDE
+     Gold-/EXP-Quelle, nicht nur Dungeon-Laeufe selbst - hier der zweite
+     (neben dem Dungeon) der beiden Haupt-Einkommenspfade. */
+  const goldBoost = typeof bkmpDungeonBoostMultiplier === 'function' ? bkmpDungeonBoostMultiplier('gold') : 1;
+  const xpBoost = typeof bkmpDungeonBoostMultiplier === 'function' ? bkmpDungeonBoostMultiplier('exp') : 1;
+  const boostedGold = goldBoost > 1 ? Math.round(rewards.gold * goldBoost) : rewards.gold;
+  const boostedXp = xpBoost > 1 ? Math.round(rewards.xp * xpBoost) : rewards.xp;
+  bkmpIdleState.gold += boostedGold;
+  bkmpIdleState.total_gold_earned += boostedGold;
   bkmpIdleState.wood += rewards.wood;
   bkmpIdleState.stone += rewards.stone;
   bkmpIdleState.crystals += rewards.crystals;
   bkmpIdleState.essence += rewards.essence;
   bkmpIdleState.dragon_kills += 1;
-  bkmpGuildQuestAddDelta('gold_earned', rewards.gold);
+  bkmpGuildQuestAddDelta('gold_earned', boostedGold);
   bkmpGuildQuestAddDelta('dragon_kills', 1);
   if (bkmpIdleCurrentDragon.isBoss) bkmpIdleState.boss_kills += 1;
   /* Yakshas-Heimat-Skin braucht Siege GENAU gegen diesen einen Boss
@@ -1755,12 +2200,12 @@ function bkmpIdleHandleDragonDefeated() {
     bkmpIdleCheckYakshasHeimatUnlock();
   }
   bkmpIdleMaybeDropRune(bkmpIdleCurrentDragon.isBoss ? 'boss' : 'normal');
-  bkmpIdleMaybeDropDragonEgg(bkmpIdleCurrentDragon);
+  bkmpIdleMaybeDropTreasure(bkmpIdleCurrentDragon);
   bkmpDragonGrantCompanionBattleXp(bkmpIdleCurrentDragon.isBoss ? 25 : 4);
   const autoAdvance = bkmpIdleState.auto_advance !== false;
   if (autoAdvance) bkmpIdleState.current_dragon_index += 1;
   bkmpIdleState.highest_dragon_index = Math.max(Number(bkmpIdleState.highest_dragon_index || 0), bkmpIdleState.current_dragon_index);
-  bkmpIdleAddXp(rewards.xp);
+  bkmpIdleAddXp(boostedXp);
   bkmpIdleVillageHp = bkmpIdleEffectiveStats.hp;
   /* Nutzerwunsch (15.07.): "wo dieses Geld und XP hochploppt gerne auch so
      Standard mäßig machen, anstatt dadrunter so ein Scroll Fenster" - die
@@ -1774,7 +2219,7 @@ function bkmpIdleHandleDragonDefeated() {
      Niederlage, Aufstieg) bleiben ueber bkmpIdleLog erhalten (jetzt
      zusaetzlich als Toast, siehe dort), damit nichts Wichtiges verloren
      geht. */
-  document.dispatchEvent(new CustomEvent('bkmpIdleRewardGained', { detail: { gold: rewards.gold, xp: rewards.xp, isBoss: !!bkmpIdleCurrentDragon.isBoss } }));
+  document.dispatchEvent(new CustomEvent('bkmpIdleRewardGained', { detail: { gold: boostedGold, xp: boostedXp, isBoss: !!bkmpIdleCurrentDragon.isBoss } }));
   bkmpIdleSpawnDragon();
   bkmpIdleUpdateVillageHpBar();
   bkmpIdleRenderHud();
@@ -2365,6 +2810,11 @@ function bkmpIdleBuyUpgrade(id) {
 function bkmpIdleRenderUpgradesPanel() {
   const panel = document.getElementById('idlePanelUpgrades');
   if (!panel || !bkmpIdleState) return;
+  /* Gleiches Prinzip wie bkmpIdleRenderDragonsPanel (Obstgarten/Jagdhütte):
+     jedes Oeffnen/Neurendern dieses Panels holt zuerst noch ausstehende
+     Produktion seit dem letzten Checkpoint nach, damit die angezeigten
+     Lv./Rate-Werte nicht veraltet wirken, waehrend der Spieler zuschaut. */
+  bkmpIdleAccrueProductionBuildings();
   const purchases = bkmpIdleState.upgrade_purchases || {};
   const autoBuyOn = bkmpIdleGetAutoBuy();
   panel.innerHTML = `
@@ -2407,9 +2857,27 @@ function bkmpIdleRenderUpgradesPanel() {
             ${maxed ? 'Maximal' : `💰 ${bkmpIdleFormatNumber(cost)}`}
           </button>
         </div>`;
+    }).join('')}</div>
+    <h4 class="idle-upgrade-section-title">🏗️ Produktionsgebäude</h4>
+    <div class="idle-upgrade-grid">${BKMP_IDLE_PRODUCTION_BUILDINGS.map(def => {
+      const level = Number(bkmpIdleState[def.levelKey] || 0);
+      const maxed = level >= BKMP_IDLE_PRODUCTION_BUILDING_MAX_LEVEL;
+      const cost = maxed ? 0 : bkmpIdleProductionBuildingCost(def, level);
+      const affordable = !maxed && (bkmpIdleState.gold || 0) >= cost;
+      const rate = bkmpIdleProductionBuildingRatePerHour(def, level);
+      return `
+        <div class="idle-upgrade-card">
+          <div class="idle-upgrade-icon">${def.icon}</div>
+          <div class="idle-upgrade-name">${escapeHtml(def.name)} <span class="idle-upgrade-level">Lv.${level}${maxed ? ' (Max)' : '/' + BKMP_IDLE_PRODUCTION_BUILDING_MAX_LEVEL}</span></div>
+          <div class="idle-upgrade-desc">${escapeHtml(def.desc)}<br>${bkmpIdleFormatNumber(rate)} ${def.unit}</div>
+          <button type="button" class="btn-ja idle-production-building-buy" data-building-id="${def.id}" ${maxed || !affordable ? 'disabled' : ''}>
+            ${maxed ? 'Maximal' : `💰 ${bkmpIdleFormatNumber(cost)}`}
+          </button>
+        </div>`;
     }).join('')}</div>`;
   panel.querySelectorAll('.idle-upgrade-buy').forEach(btn => btn.addEventListener('click', () => bkmpIdleBuyUpgrade(btn.dataset.upgradeId)));
   panel.querySelectorAll('.idle-dragon-building-upgrade').forEach(btn => btn.addEventListener('click', () => bkmpDragonUpgradeBuilding(btn.dataset.kind)));
+  panel.querySelectorAll('.idle-production-building-buy').forEach(btn => btn.addEventListener('click', () => bkmpIdleBuyProductionBuilding(btn.dataset.buildingId)));
   const autoBuyToggle = document.getElementById('idleAutoBuyToggle');
   if (autoBuyToggle) {
     autoBuyToggle.addEventListener('change', () => {
@@ -5483,30 +5951,31 @@ function bkmpDragonSkillBonus(key) {
   return totals[key] || 0;
 }
 
-/* ---------------- Ei-Drop bei Kaempfen (Standard/Selten) ----------------
-   Gleicher Aufruf-Ort wie bkmpIdleMaybeDropRune (bkmpIdleHandleDragonDefeated)
-   - jede Drachenart mit egg_source='combat' und passender source_dragon_id
-   wuerfelt unabhaengig, ob dieser eine Kill ein Ei droppt. */
-function bkmpIdleMaybeDropDragonEgg(dragon) {
+/* ---------------- Fundschatz bei Kaempfen (ehemals Ei-Drop) ----------------
+   Dungeon-System 2.0 (Spieler-Vorgabe 17.07.): der Ei-Dungeon ist ab jetzt
+   die alleinige Quelle fuer reguläre Dracheneier - Normalkampf droppt keine
+   Eier mehr. Gleicher Aufruf-Ort/gleiche Trigger-Bedingung wie zuvor
+   bkmpIdleMaybeDropDragonEgg (bkmpIdleHandleDragonDefeated, jede Drachenart
+   mit egg_source='combat' und passender source_dragon_id wuerfelt weiterhin
+   unabhaengig mit derselben 0,1%-Chance x Skilltree-Bonus) - statt eines
+   Eis gibt es jetzt einen kleinen Fundschatz (Gold + Kristalle, nach
+   Seltenheit der betroffenen Drachenart gestaffelt), damit der Kampf-Loop
+   sich nicht "leerer" anfuehlt. */
+function bkmpIdleMaybeDropTreasure(dragon) {
   if (!bkmpIdleState || !dragon || !dragon.id || !bkmpDragonSpeciesCatalog.length) return;
-  const nameKey = bkmpIdleState.name_key;
-  /* Ei-Fund-Pfad: relativer Bonus auf die bestehende Chance (Vorgabe:
-     "vorzugsweise multiplikativ... nicht einfach grosse Prozentpunkte
-     addieren") statt eines flachen Aufschlags - haelt seltene Eier auch
-     mit vollem Skilltree noch selten. */
-  const eggChanceMult = 1 + Math.min(100, bkmpDragonSkillBonus('egg_chance_pct')) / 100;
+  const chanceMult = 1 + Math.min(100, bkmpDragonSkillBonus('egg_chance_pct')) / 100;
   bkmpDragonSpeciesCatalog
     .filter(sp => sp.egg_source === 'combat' && sp.source_dragon_id === dragon.id)
     .forEach(sp => {
-      if (Math.random() >= Number(sp.egg_drop_chance || 0) * eggChanceMult) return;
-      if (typeof insertPlayerDragonEgg !== 'function') return;
-      insertPlayerDragonEgg(nameKey, sp.id).then(row => {
-        if (!row) return;
-        bkmpPlayerDragonEggs.push(row);
-        if (typeof bkmpIdleRenderDragonsPanel === 'function') bkmpIdleRenderDragonsPanel();
-      }).catch(e => console.warn('Idle Dorf: Ei-Drop konnte nicht gespeichert werden.', e));
-      bkmpIdleLog(`🥚 Ein ${sp.name}-Ei gefunden!`);
-      if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`🥚 Ein wildes ${sp.name}-Ei gefunden!`, 3600);
+      if (Math.random() >= Number(sp.egg_drop_chance || 0) * chanceMult) return;
+      const rarityMult = sp.rarity === 'selten' ? 3 : 1;
+      const gold = Math.round((bkmpIdleEffectiveStats ? bkmpIdleEffectiveStats.attack : 10) * 40 * rarityMult);
+      const crystals = 2 * rarityMult;
+      bkmpIdleState.gold = Number(bkmpIdleState.gold || 0) + gold;
+      bkmpIdleState.total_gold_earned = Number(bkmpIdleState.total_gold_earned || 0) + gold;
+      bkmpIdleState.crystals = Number(bkmpIdleState.crystals || 0) + crystals;
+      bkmpIdleLog(`💰 Einen Fundschatz entdeckt! +${bkmpIdleFormatNumber(gold)} 💰 +${crystals} 💎`);
+      if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`💰 Fundschatz entdeckt! +${bkmpIdleFormatNumber(gold)} 💰`, 3600);
     });
 }
 
@@ -5876,7 +6345,13 @@ const BKMP_DRAGON_BUILDING_MAX_LEVEL = 30;
 function bkmpDragonResourceRatePerHour(kind, level) {
   const companionBonusPct = bkmpDragonSubstatBonus(kind === 'fruit' ? 'fruit_bonus_pct' : 'meat_bonus_pct');
   const skillBonusPct = bkmpDragonSkillBonus(kind === 'fruit' ? 'fruit_prod_pct' : 'meat_prod_pct');
-  return BKMP_DRAGON_BASE_RESOURCE_PER_HOUR * (1 + Number(level || 0) * 0.5) * (1 + (companionBonusPct + skillBonusPct) / 100);
+  /* Spieler-Vorgabe 17.07. nachts ("Spätere Prestige-Stufen erhöhen
+     zusätzlich sämtliche Produktionsgebäude prozentual"): Obstgarten/
+     Jagdhütte zaehlen als Produktionsgebaeude genau wie die neuen 6
+     (siehe bkmpIdleBuildingPrestigeBonusPct weiter unten), deshalb hier
+     mit-nachgezogen statt nur bei den neuen Gebaeuden. */
+  const prestigeBonusPct = typeof bkmpIdleBuildingPrestigeBonusPct === 'function' ? bkmpIdleBuildingPrestigeBonusPct() : 0;
+  return BKMP_DRAGON_BASE_RESOURCE_PER_HOUR * (1 + Number(level || 0) * 0.5) * (1 + (companionBonusPct + skillBonusPct + prestigeBonusPct) / 100);
 }
 function bkmpDragonResourceCap(level) {
   return BKMP_DRAGON_RESOURCE_CAP_BASE + Number(level || 0) * 500;
@@ -5928,6 +6403,91 @@ function bkmpIdleAccrueBuildingResources() {
     bkmpIdleState[kind] = Math.floor(Math.min(bkmpDragonResourceCap(bkmpIdleState[levelKey]), Number(bkmpIdleState[kind] || 0) + gained));
     bkmpIdleState[tsKey] = new Date(now).toISOString();
   });
+}
+
+/* ---------------- Produktionsgebäude (Spieler-Vorgabe 17.07. nachts) ----------------
+   6 neue dauerhaft-produzierende Gebäude fürs Upgrade-Menü - gleiches
+   Muster wie Obstgarten/Jagdhütte oben (eigene Level-Spalte + eigene
+   _collected_at-Spalte pro Gebäude, zeitbasierte Ansammlung statt
+   Tick-Loop, damit Offline-Produktion "gratis" funktioniert), aber
+   data-driven als EIN Array statt 6 einzelner Funktionspaare, weil sich
+   nur Zahlenwerte (nicht die Mechanik) zwischen den Gebäuden unterscheiden.
+   Kostenkurve pro Gebäude bewusst unterschiedlich (Spieler-Vorgabe:
+   "unterschiedliche Kostenkurven, sodass nicht alle gleichzeitig
+   maximiert werden können") - alle kosten Gold (wie Obstgarten/Jagdhütte),
+   da es im ganzen Spiel noch keinen Mehrfach-Ressourcen-Kaufpreis gibt und
+   das hier nicht neu erfunden werden soll. Gold/Holz/Stein/Kristalle/Essenz
+   haben bewusst KEINEN Lager-Deckel (im Gegensatz zu Obstgarten/Jagdhütte)
+   - sie fliessen in dieselben bereits heute ungedeckelten Konten wie
+   Kampf-Beute. */
+const BKMP_IDLE_PRODUCTION_BUILDINGS = [
+  { id: 'holzfaeller', name: 'Holzfällerlager', icon: '🪓', resource: 'wood', levelKey: 'holzfaeller_level', tsKey: 'holzfaeller_collected_at', baseCost: 800, costRate: 0.25, costExponent: 2.0, baseRate: 60, rateCoef: 0.5, unit: 'Holz/Std.', desc: 'Produziert Holz pro Stunde, auch offline. Holz wird für spätere Gebäude und Upgrades benötigt.' },
+  { id: 'steinbruch', name: 'Steinbruch', icon: '⛏️', resource: 'stone', levelKey: 'steinbruch_level', tsKey: 'steinbruch_collected_at', baseCost: 800, costRate: 0.25, costExponent: 2.0, baseRate: 60, rateCoef: 0.5, unit: 'Stein/Std.', desc: 'Produziert Stein pro Stunde, auch offline. Wird für Verteidigungsgebäude und Mauern verwendet.' },
+  { id: 'goldmine', name: 'Goldmine', icon: '🥇', resource: 'gold', levelKey: 'goldmine_level', tsKey: 'goldmine_collected_at', baseCost: 3000, costRate: 0.30, costExponent: 2.15, baseRate: 400, rateCoef: 0.8, unit: 'Gold/Std.', desc: 'Produziert Gold pro Stunde - hohe Level steigern die Goldproduktion massiv.' },
+  { id: 'kristallmine', name: 'Kristallmine', icon: '💎', resource: 'crystals', levelKey: 'kristallmine_level', tsKey: 'kristallmine_collected_at', baseCost: 6000, costRate: 0.32, costExponent: 2.2, baseRate: 3, rateCoef: 0.4, unit: 'Kristalle/Std.', desc: 'Produziert Kristalle pro Stunde - seltene Ressource für hochwertige Upgrades.' },
+  /* Spieler-Korrektur 18.07.: "Manaquelle" ist KEINE neue Ressource,
+     sondern produziert die bereits bestehende Essenz (dasselbe Fläschchen-
+     Icon 🧪, das essence im Rest des Spiels schon hat) - kein neues
+     mana-Feld mehr im Einsatz (die DB-Spalte bleibt inert bestehen, siehe
+     supabase-idle-production-buildings.sql, wird aber nirgends mehr
+     befuellt). */
+  { id: 'manaquelle', name: 'Manaquelle', icon: '🧪', resource: 'essence', levelKey: 'manaquelle_level', tsKey: 'manaquelle_collected_at', baseCost: 10000, costRate: 0.34, costExponent: 2.25, baseRate: 4, rateCoef: 0.4, unit: 'Essenz/Std.', desc: 'Produziert Essenz pro Stunde, auch offline.' },
+  { id: 'magierakademie', name: 'Magierakademie', icon: '🧙', resource: 'xp', levelKey: 'magierakademie_level', tsKey: 'magierakademie_collected_at', baseCost: 5000, costRate: 0.30, costExponent: 2.15, baseRate: 50, rateCoef: 0.5, unit: 'EXP/Std.', desc: 'Produziert Spieler-EXP pro Stunde, auch offline.' }
+];
+const BKMP_IDLE_PRODUCTION_BUILDING_MAX_LEVEL = 30;
+
+/* Flacher Bonus pro Prestige-STUFE (nicht Prestige-Baumrang) - dieselbe
+   Formel wie prestigeLevelBonusPct in bkmpIdleRecomputeEffectiveStats
+   (+5%/Stufe), hier als eigene Funktion, damit sowohl die neuen Gebäude
+   als auch (siehe Retrofit oben) Obstgarten/Jagdhütte sie lesen können,
+   ohne von der Kampf-Stat-Berechnung abzuhängen. */
+function bkmpIdleBuildingPrestigeBonusPct() {
+  return bkmpPrestigeState ? Number(bkmpPrestigeState.prestige_level || 0) * 5 : 0;
+}
+function bkmpIdleProductionBuildingRatePerHour(def, level) {
+  const prestigeBonusPct = bkmpIdleBuildingPrestigeBonusPct();
+  return def.baseRate * (1 + Number(level || 0) * def.rateCoef) * (1 + prestigeBonusPct / 100);
+}
+function bkmpIdleProductionBuildingCost(def, level) {
+  return Math.round(def.baseCost * bkmpIdleGrowthMult(def.costRate, def.costExponent, level));
+}
+function bkmpIdleAccrueProductionBuildings() {
+  if (!bkmpIdleState) return;
+  const now = Date.now();
+  BKMP_IDLE_PRODUCTION_BUILDINGS.forEach(def => {
+    const level = Number(bkmpIdleState[def.levelKey] || 0);
+    const last = Date.parse(bkmpIdleState[def.tsKey] || now) || now;
+    const hoursElapsed = Math.max(0, (now - last) / 3600000);
+    if (hoursElapsed <= 0) return;
+    const gained = hoursElapsed * bkmpIdleProductionBuildingRatePerHour(def, level);
+    if (def.resource === 'xp') {
+      if (gained >= 1) bkmpIdleAddXp(Math.floor(gained));
+    } else {
+      /* Math.floor wie bei fruit/meat oben - gold/wood/stone/crystals/essence
+         sind ebenfalls bigint-Spalten, ein Bruchteil wuerde denselben
+         "kompletter Speicherversuch schlaegt fehl"-Bug ausloesen (siehe
+         Kommentar bei bkmpIdleAccrueBuildingResources). */
+      bkmpIdleState[def.resource] = Math.floor(Number(bkmpIdleState[def.resource] || 0) + gained);
+      if (def.resource === 'gold') bkmpIdleState.total_gold_earned = Number(bkmpIdleState.total_gold_earned || 0) + Math.floor(gained);
+    }
+    bkmpIdleState[def.tsKey] = new Date(now).toISOString();
+  });
+}
+function bkmpIdleBuyProductionBuilding(id) {
+  const def = BKMP_IDLE_PRODUCTION_BUILDINGS.find(d => d.id === id);
+  if (!def || !bkmpIdleState) return;
+  const level = Number(bkmpIdleState[def.levelKey] || 0);
+  if (level >= BKMP_IDLE_PRODUCTION_BUILDING_MAX_LEVEL) return;
+  const cost = bkmpIdleProductionBuildingCost(def, level);
+  if ((bkmpIdleState.gold || 0) < cost) {
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Nicht genug Gold für dieses Gebäude-Upgrade.', 2800);
+    return;
+  }
+  bkmpIdleState.gold -= cost;
+  bkmpIdleState[def.levelKey] = level + 1;
+  bkmpIdleRenderHud();
+  bkmpIdleQueueSync();
+  if (typeof bkmpIdleRenderUpgradesPanel === 'function') bkmpIdleRenderUpgradesPanel();
 }
 
 /* ---------------- Effekt-Totals fuer bkmpIdleRecomputeEffectiveStats ---------------- */
@@ -8188,6 +8748,18 @@ function bkmpIdleHandleDragonClick(e) {
 const BKMP_RAID_JOINED_KEY_PREFIX = 'bkmp-raid-joined-';
 const BKMP_RAID_TICK_MS = 2500;
 const BKMP_RAID_BOSS_POLL_MS = 1500;
+/* Spieler-Meldung 18.07.: "Ich will auch zwischendurch Infos haben wieviel
+   Damage jeder macht.. Eine dauerhafte Live-Anzeige von Anfang bis Ende" -
+   bisher aktualisierten sich die Schaden-Zahlen ANDERER Spieler nur beim
+   Oeffnen der Kampfansicht und kurz vorm Sieg/Niederlage-Ergebnis, dazwischen
+   ausschliesslich ueber das Realtime-Abo auf raid_participants (siehe
+   bkmpSubscribeToRaidInstance) - das liefert offenbar nicht zuverlaessig
+   genug. Gleiches Prinzip wie der bereits bestehende bkmpRaidBossPoll-
+   Fallback fuer raid_instances (dessen eigener Kommentar das bereits als
+   bekanntes Realtime-Aussetzer-Muster beschreibt): ein simpler Zeit-Poll
+   als garantierte Grundlage, Realtime bleibt zusaetzlich fuer schnelleres
+   Update aktiv, wenn es funktioniert. */
+const BKMP_RAID_PARTICIPANTS_POLL_MS = 3000;
 
 let bkmpRaidState = null;
 let bkmpRaidParticipants = [];
@@ -8221,6 +8793,7 @@ async function bkmpRaidEnsureMyAuthUserId() {
 let bkmpRaidButtonTimer = null;
 let bkmpRaidLoopTimer = null;
 let bkmpRaidBossPollTimer = null;
+let bkmpRaidParticipantsPollTimer = null;
 let bkmpRaidResultShown = false;
 let bkmpRaidClickTimestamps = bkmpAutoclickLoadTimestamps(BKMP_RAID_CLICK_HISTORY_KEY);
 let bkmpRaidClickLockedUntil = bkmpAutoclickLoadNumber(BKMP_RAID_CLICK_LOCK_KEY);
@@ -8814,14 +9387,32 @@ function bkmpRaidHandleBossClick() {
   }).catch(() => {});
 }
 
+/* Garantierte Grundlage fuer die Live-Anzeige ANDERER Spieler (siehe
+   Kommentar bei BKMP_RAID_PARTICIPANTS_POLL_MS oben) - unabhaengig davon,
+   ob das Realtime-Abo gerade zuverlaessig liefert. Einfacher lesender
+   Select (loadRaidParticipants), kein RPC, daher kein Interaktions-Risiko
+   mit dem parallel laufenden bkmpRaidBossPoll (eigener Timer, eigener
+   Fehlerfall - ein Fehlschlag hier blockiert den naechsten Boss-Poll
+   nicht und umgekehrt). */
+async function bkmpRaidParticipantsPoll() {
+  if (!bkmpRaidState) return;
+  try {
+    const rows = await loadRaidParticipants(bkmpRaidState.id);
+    bkmpRaidParticipants = rows;
+    bkmpRaidRequestParticipantsRender();
+  } catch (e) { /* naechster Poll versucht es erneut */ }
+}
+
 function bkmpRaidStartLoops(raidId) {
   bkmpRaidStopLoops();
   bkmpRaidLoopTimer = window.setInterval(bkmpRaidOwnTick, BKMP_RAID_TICK_MS);
   bkmpRaidBossPollTimer = window.setInterval(bkmpRaidBossPoll, BKMP_RAID_BOSS_POLL_MS);
+  bkmpRaidParticipantsPollTimer = window.setInterval(bkmpRaidParticipantsPoll, BKMP_RAID_PARTICIPANTS_POLL_MS);
 }
 function bkmpRaidStopLoops() {
   if (bkmpRaidLoopTimer) { window.clearInterval(bkmpRaidLoopTimer); bkmpRaidLoopTimer = null; }
   if (bkmpRaidBossPollTimer) { window.clearInterval(bkmpRaidBossPollTimer); bkmpRaidBossPollTimer = null; }
+  if (bkmpRaidParticipantsPollTimer) { window.clearInterval(bkmpRaidParticipantsPollTimer); bkmpRaidParticipantsPollTimer = null; }
 }
 
 /* raid_finish() vergibt Gold/Kristalle/XP serverseitig atomar direkt in
