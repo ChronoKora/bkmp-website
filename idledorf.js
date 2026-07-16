@@ -1992,11 +1992,14 @@ function bkmpDungeonHandleFailure() {
   bkmpDungeonFinish(false);
 }
 
-function bkmpDungeonShowResult(success, wavesCleared, totalWaves, elapsedMs, summary, difficulty, dungeonType, dailyBonusGranted) {
-  if (document.getElementById('bkmpDungeonResultOverlay')) return;
-  const overlay = document.createElement('div');
-  overlay.className = 'bkmp-easter';
-  overlay.id = 'bkmpDungeonResultOverlay';
+/* Gemeinsame Belohnungs-Liste fuer die Einzelergebnis-Karte UND die Auto-
+   Lauf-Log-Zeile (siehe bkmpDungeonFinish) - vorher zeigte die Log-Zeile
+   IMMER nur Gold, auch bei Dungeon-Typen, deren Hauptbelohnung etwas ganz
+   anderes ist (z.B. EXP-Dungeon: Gold ist dort nur die Nebenbelohnung,
+   die eigentliche XP fehlte komplett in der Zeile - Spieler-Meldung 18.07.,
+   Screenshot "Auto-Lauf ... EXP-Dungeon ... Sieg - +5.1K 💰" ohne jede
+   XP-Angabe). */
+function bkmpDungeonRewardParts(summary) {
   const parts = [];
   if (summary.gold > 0) parts.push(`+${bkmpIdleFormatNumber(summary.gold)} 💰`);
   if (summary.xp > 0) parts.push(`+${bkmpIdleFormatNumber(summary.xp)} XP`);
@@ -2010,6 +2013,15 @@ function bkmpDungeonShowResult(success, wavesCleared, totalWaves, elapsedMs, sum
   });
   if (summary.boosterGold) parts.push('⚡ Goldrausch (+25% Gold, 30 Min.)');
   if (summary.boosterExp) parts.push('⚡ Wissensschub (+25% EXP, 30 Min.)');
+  return parts;
+}
+
+function bkmpDungeonShowResult(success, wavesCleared, totalWaves, elapsedMs, summary, difficulty, dungeonType, dailyBonusGranted) {
+  if (document.getElementById('bkmpDungeonResultOverlay')) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'bkmp-easter';
+  overlay.id = 'bkmpDungeonResultOverlay';
+  const parts = bkmpDungeonRewardParts(summary);
   overlay.innerHTML = `
     <div class="bkmp-easter-card idle-dungeon-result-card">
       <small>${dungeonType.icon} ${dungeonType.name} &middot; ${difficulty.icon} ${difficulty.name}</small>
@@ -2149,7 +2161,8 @@ async function bkmpDungeonFinish(success) {
     bkmpDungeonAutoStats.eggs += summary.eggs.length;
     bkmpDungeonAutoStats.runes += summary.runes.length;
     const totalLabel = bkmpDungeonAutoRunsTotal === Infinity ? '∞' : bkmpDungeonAutoRunsTotal;
-    bkmpIdleLog(`${success ? '🏆' : '💀'} Auto-Lauf ${bkmpDungeonAutoRunsDone}/${totalLabel} (${dungeonType.icon} ${dungeonType.name}, ${difficulty.icon} ${difficulty.name}): ${success ? 'Sieg' : `Niederlage bei Welle ${wavesCleared + 1}`} - +${bkmpIdleFormatNumber(summary.gold)} 💰`);
+    const rewardText = bkmpDungeonRewardParts(summary).join(' · ') || '—';
+    bkmpIdleLog(`${success ? '🏆' : '💀'} Auto-Lauf ${bkmpDungeonAutoRunsDone}/${totalLabel} (${dungeonType.icon} ${dungeonType.name}, ${difficulty.icon} ${difficulty.name}): ${success ? 'Sieg' : `Niederlage bei Welle ${wavesCleared + 1}`} - ${rewardText}`);
 
     if (willContinueAuto) {
       if (banner) {
