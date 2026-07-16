@@ -5554,6 +5554,15 @@ async function bkmpIdlePerformPrestige() {
     bkmpIdleState.jagdhuette_level = 0;
     bkmpIdleState.fruit = 0;
     bkmpIdleState.meat = 0;
+    /* Spieler-Vorgabe 18.07. (Folgeanfrage direkt danach): die 6 Produktions-
+       gebaeude (siehe BKMP_IDLE_PRODUCTION_BUILDINGS) sollen beim Prestige
+       ebenfalls zurueckgesetzt werden, analog zu Obstgarten/Jagdhuette oben.
+       Nur die Level muessen hier genullt werden - die zugehoerigen
+       Ressourcen (gold/wood/stone/crystals/essence) sind bereits oben in
+       diesem Block generell auf 0 gesetzt; *_collected_at bleibt bewusst
+       unangetastet (gleiches Muster wie bei fruit/meat: die naechste
+       Ansammlung rechnet einfach ab jetzt mit Level 0 weiter). */
+    BKMP_IDLE_PRODUCTION_BUILDINGS.forEach(def => { bkmpIdleState[def.levelKey] = 0; });
     /* dragon_kills/boss_kills bleiben ab sofort ueber Prestige-Auffstiege
        hinweg erhalten (nicht mehr zurueckgesetzt) - vorher liess das die
        Bestenliste (loadIdleLeaderboardStats liest dragon_kills direkt)
