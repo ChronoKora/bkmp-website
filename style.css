@@ -8228,6 +8228,8 @@ html.bkmp-app-mode .idle-battlefield::before {
   html.bkmp-app-mode .idle-hud-streak-badge,
   html.bkmp-app-mode .idle-hud-stats span,
   html.bkmp-app-mode .idle-hud-resources span,
+  html.bkmp-app-mode .idle-hud-app-resources span,
+  html.bkmp-app-mode .idle-hud-app-stats span,
   html.bkmp-app-mode .idle-battlefield,
   html.bkmp-app-mode .raid-join-banner.raid-urgent,
   html.bkmp-app-mode .raid-join-banner.raid-urgent .raid-join-banner-countdown {
@@ -8238,3 +8240,94 @@ html.bkmp-app-mode .idle-battlefield::before {
     transition: none !important;
   }
 }
+
+/* ============================================================
+   APP-MODUS REDESIGN, PHASE 5 (Top-Bar mit Spieler-Portrait)
+   ============================================================
+   Referenzbild-Wunsch: Portrait+Name+Level oben, Ressourcen als eigene
+   Reihe. Passend dazu liefert bkmpIdleRenderHud() in idledorf.js im
+   App-Modus jetzt eine eigene Vorlage mit eigenen Klassennamen
+   (idle-hud-app-*) - die Website-Vorlage/-Klassen bleiben unveraendert
+   bestehen, hier wird nichts von der alten HUD-Optik ueberschrieben. */
+html.bkmp-app-mode .idle-hud-app-top {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  margin-bottom: .6rem;
+}
+html.bkmp-app-mode .idle-hud-app-portrait {
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 35% 30%, var(--app-purple-light), var(--app-purple-deep));
+  border: 2px solid var(--app-gold);
+  box-shadow: var(--app-glow-gold);
+}
+html.bkmp-app-mode .idle-hud-app-portrait-icon { font-size: 1.6rem; }
+html.bkmp-app-mode .idle-hud-app-portrait-level {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 22px;
+  padding: 0 .3rem;
+  text-align: center;
+  font-size: .68rem;
+  font-weight: 800;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--app-gold), var(--app-orange));
+  color: #2b1600;
+  border: 2px solid var(--app-void);
+}
+html.bkmp-app-mode .idle-hud-app-identity { flex: 1; min-width: 0; }
+html.bkmp-app-mode .idle-hud-app-name {
+  font-family: 'Fraunces', serif;
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--app-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+html.bkmp-app-mode .idle-hud-app-sub {
+  font-size: .7rem;
+  color: var(--app-cyan);
+  font-weight: 600;
+  min-height: 1em;
+  text-shadow: 0 0 8px color-mix(in srgb, var(--app-cyan) 55%, transparent);
+}
+html.bkmp-app-mode .idle-hud-app-resources,
+html.bkmp-app-mode .idle-hud-app-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+  margin-bottom: .5rem;
+}
+html.bkmp-app-mode .idle-hud-app-resources span,
+html.bkmp-app-mode .idle-hud-app-stats span {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  padding: .32rem .6rem;
+  border-radius: 999px;
+  font-size: .72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  animation: appHudPop .3s ease;
+}
+html.bkmp-app-mode .idle-hud-app-resources span {
+  background: linear-gradient(135deg, rgba(255, 215, 106, .16), rgba(255, 140, 61, .08));
+  border: 1px solid color-mix(in srgb, var(--app-gold) 40%, transparent);
+  color: var(--app-ink);
+}
+html.bkmp-app-mode .idle-hud-app-stats span {
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid rgba(255, 255, 255, .09);
+  color: var(--app-muted);
+}
+html.bkmp-app-mode .idle-hud-app-xp { margin-top: .1rem; }

@@ -2587,6 +2587,51 @@ function bkmpIdleRenderHud() {
   const xpPct = Math.max(0, Math.min(100, (bkmpIdleState.xp / xpNeeded) * 100));
   const s = bkmpIdleEffectiveStats;
   const streakCount = bkmpIdleGetStreakData().count;
+
+  /* App-Modus (siehe /app, window.BKMP_APP_MODE) bekommt eine eigene HUD-
+     Vorlage (Spieler-Name+Portrait-Kachel oben, Ressourcen als eigene
+     Zeile) - auf der normalen Website aendert sich NICHTS, dort greift
+     unveraendert die bestehende Vorlage weiter unten. Eigene Klassen-
+     Namen (idle-hud-app-*), damit hier nichts mit dem Website-Styling
+     kollidiert. */
+  if (window.BKMP_APP_MODE) {
+    const playerName = (typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : '') || bkmpIdleState.name_key || 'Spieler';
+    hud.innerHTML = `
+      <div class="idle-hud-app-top">
+        <div class="idle-hud-app-portrait">
+          <span class="idle-hud-app-portrait-icon">🐉</span>
+          <span class="idle-hud-app-portrait-level">${bkmpIdleState.level}</span>
+        </div>
+        <div class="idle-hud-app-identity">
+          <div class="idle-hud-app-name">${escapeHtml(playerName)}</div>
+          <div class="idle-hud-app-sub">
+            ${streakCount > 0 ? `🔥 ${streakCount} Tage Serie` : ''}
+            ${bkmpIdleState.skill_points_available > 0 ? ` · 🔹 ${bkmpIdleState.skill_points_available} Skillpunkte` : ''}
+          </div>
+        </div>
+      </div>
+      <div class="idle-hud-app-resources">
+        <span>💰 ${bkmpIdleFormatNumber(bkmpIdleState.gold)}</span>
+        <span>🌳 ${bkmpIdleFormatNumber(bkmpIdleState.wood)}</span>
+        <span>🗿 ${bkmpIdleFormatNumber(bkmpIdleState.stone)}</span>
+        <span>💎 ${bkmpIdleFormatNumber(bkmpIdleState.crystals)}</span>
+        <span>🧪 ${bkmpIdleFormatNumber(bkmpIdleState.essence)}</span>
+      </div>
+      ${s ? `
+      <div class="idle-hud-app-stats">
+        <span title="Maximale Leben">❤️ ${bkmpIdleFormatNumber(Math.round(s.hp))}</span>
+        <span title="Angriff">⚔️ ${bkmpIdleFormatNumber(Math.round(s.attack))}</span>
+        <span title="Verteidigung">🛡️ ${bkmpIdleFormatNumber(Math.round(s.defense))}</span>
+        <span title="Level">⭐ ${bkmpIdleState.level}</span>
+      </div>` : ''}
+      <div class="idle-hud-app-xp">
+        <div class="idle-xp-bar"><div class="idle-xp-fill" style="width:${xpPct}%"></div></div>
+        <div class="idle-xp-label">${Math.floor(bkmpIdleState.xp)} / ${xpNeeded} XP</div>
+      </div>
+    `;
+    return;
+  }
+
   hud.innerHTML = `
     <div class="idle-hud-top">
       <div class="idle-hud-level-badge"><span class="idle-hud-level-num">${bkmpIdleState.level}</span><span class="idle-hud-level-tag">Level</span></div>
