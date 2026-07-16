@@ -658,7 +658,7 @@ function bkmpDungeonGrantReward(type, difficulty, wavesCleared, success, dailyBo
   const summary = { type, gold: 0, xp: 0, gems: 0, meat: 0, fruit: 0, eggs: [], runes: [], boosterGold: false, boosterExp: false, pouchBonus: false, chestBonus: false, dailyBonusApplied: dailyBonusGranted };
 
   if (type === 'gold') {
-    let gold = bkmpDungeonBaseAmount(Math.round((s.attack || 10) * 2.4), wavesCleared, difficulty.rewardMult, success);
+    let gold = bkmpDungeonBaseAmount(Math.round((s.attack || 10) * 5), wavesCleared, difficulty.rewardMult, success);
     gold = Math.round(gold * dailyMult);
     if (success && Math.random() < BKMP_DUNGEON_POUCH_CHANCE[idx]) { gold = Math.round(gold * 1.15); summary.pouchBonus = true; }
     if (success && Math.random() < BKMP_DUNGEON_CHEST_CHANCE[idx]) { gold = Math.round(gold * 1.4); summary.chestBonus = true; }
@@ -666,7 +666,7 @@ function bkmpDungeonGrantReward(type, difficulty, wavesCleared, success, dailyBo
     summary.gold = gold;
     summary.xp = Math.round(gold / 4);
   } else if (type === 'exp') {
-    let xp = bkmpDungeonBaseAmount(Math.round((s.attack || 10) * 1.4), wavesCleared, difficulty.rewardMult, success);
+    let xp = bkmpDungeonBaseAmount(Math.round((s.attack || 10) * 3), wavesCleared, difficulty.rewardMult, success);
     xp = Math.round(xp * dailyMult);
     if (success && Math.random() < BKMP_DUNGEON_BOOSTER_CHANCE[idx]) { bkmpDungeonGrantBoost('exp'); summary.boosterExp = true; }
     summary.xp = xp;
