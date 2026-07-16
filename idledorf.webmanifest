@@ -3,7 +3,7 @@
   "short_name": "Idle Dorf",
   "description": "Baue dein Dorf auf, ziehe Drachen groß und besiege Weltbosse – das Idle-Spiel von BKMP.",
   "start_url": "/app",
-  "scope": "/app",
+  "scope": "/",
   "id": "/app",
   "display": "standalone",
   "orientation": "portrait",

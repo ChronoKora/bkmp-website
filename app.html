@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Idle Drachen Dorf</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #08070A; }
+</style>
+<script>
+  /* /app ist die feste, kurze Adresse fuers Idle-Dorf (App-Icon, TWA-
+     Verpackung fuer den Play Store, "Zum Startbildschirm hinzufuegen").
+     Die eigentliche Seite bleibt index.html - dieselbe Logik, derselbe
+     Spielstand, kein zweiter Code-Pfad. location.replace() (statt href)
+     haengt keinen zusaetzlichen Verlaufseintrag an, die Weiterleitung ist
+     fuer Nutzer also unsichtbar (kein Zurueck-Klick landet auf dieser
+     Zwischenseite). */
+  location.replace('/?app=idledorf');
+</script>
+</head>
+<body></body>
+</html>

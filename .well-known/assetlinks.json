@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "de.bkinvestment.idledorf",
+      "sha256_cert_fingerprints": [
+        "DB:92:2C:6A:52:C9:EF:34:6A:EB:64:04:7B:99:03:B2:F8:23:7C:3F:59:34:45:47:E7:0E:EC:45:2F:F4:99:0D"
+      ]
+    }
+  }
+]
