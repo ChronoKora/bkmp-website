@@ -85,7 +85,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260718-appmodephase34">
+<link rel="stylesheet" href="style.css?v=20260718-moremenu1">
 </head>
 <body>
 
@@ -599,6 +599,21 @@
         <button type="button" class="idle-dorf-tab" id="idleTabBtnGildeBoss">🐲 Gildenboss</button>
         <button type="button" class="idle-dorf-tab" id="idleTabBtnBestenliste">&#128202; Bestenliste</button>
         <button type="button" class="idle-dorf-tab" id="idleTabBtnDrachen">🐉 Drachenzucht</button>
+      </div>
+
+      <!-- "Mehr"-Ausklappmenue fuer die Bottom Navigation im App-Modus
+           (Nutzerwunsch: nur 5 grosse Haupt-Buttons unten, Rest dahinter).
+           Auf der normalen Website unsichtbar/wirkungslos - siehe
+           style.css html.bkmp-app-mode .idle-app-more-sheet. Die
+           tatsaechlichen restlichen idle-dorf-tab-Buttons werden vom
+           App-Modus-Bootstrap-Skript (unten im body) per appendChild HIER
+           HINEIN VERSCHOBEN (nicht kopiert) - Klick-Listener aus
+           bkmpIdleInitTabs bleiben dadurch erhalten. -->
+      <div class="idle-app-more-sheet" id="idleAppMoreSheet" aria-hidden="true">
+        <div class="idle-app-more-sheet-card">
+          <div class="idle-app-more-sheet-handle"></div>
+          <div class="idle-app-more-sheet-grid" id="idleAppMoreSheetGrid"></div>
+        </div>
       </div>
 
       <div class="idle-dorf-panel" id="idlePanelKampf">
@@ -6083,6 +6098,58 @@
             '<span class="idle-dorf-tab-label">' + match[2] + '</span>';
         });
 
+        /* Bottom-Navigation "Mehr"-Menue (Nutzerwunsch nach dem ersten
+           Live-Test: "Buttons unten muessen viel groesser, die wichtigsten
+           gross, ein Mehr-Button fuer den Rest"). Nur 5 Haupt-Tabs bleiben
+           unten, der Rest wandert per appendChild (verschiebt die
+           ECHTEN Button-Elemente, keine Kopie) in ein ausklappbares
+           Menue - die Klick-Listener aus bkmpIdleInitTabs bleiben dadurch
+           unveraendert erhalten, idledorf.js wird nicht angefasst. */
+        (function setupMoreMenu() {
+          var PRIMARY_TAB_IDS = ['idleTabBtnKampf', 'idleTabBtnDrachen', 'idleTabBtnDungeon', 'idleTabBtnGilde', 'idleTabBtnSkins'];
+          var tabsBar = document.getElementById('idleDorfTabs');
+          var moreSheet = document.getElementById('idleAppMoreSheet');
+          var moreSheetGrid = document.getElementById('idleAppMoreSheetGrid');
+          if (!tabsBar || !moreSheet || !moreSheetGrid) return;
+
+          var allTabs = Array.prototype.slice.call(tabsBar.querySelectorAll('.idle-dorf-tab'));
+          allTabs.forEach(function (btn) {
+            if (PRIMARY_TAB_IDS.indexOf(btn.id) === -1) moreSheetGrid.appendChild(btn);
+          });
+
+          var moreBtn = document.createElement('button');
+          moreBtn.type = 'button';
+          moreBtn.id = 'idleAppMoreBtn';
+          moreBtn.className = 'idle-dorf-tab';
+          moreBtn.innerHTML = '<span class="idle-dorf-tab-icon">☰</span><span class="idle-dorf-tab-label">Mehr</span>';
+          tabsBar.appendChild(moreBtn);
+
+          function closeMoreSheet() { moreSheet.classList.remove('open'); }
+          function toggleMoreSheet() { moreSheet.classList.toggle('open'); }
+          window.__bkmpCloseAppMoreSheet = closeMoreSheet;
+          window.__bkmpAppMoreSheetOpen = function () { return moreSheet.classList.contains('open'); };
+
+          moreBtn.addEventListener('click', toggleMoreSheet);
+          moreSheetGrid.addEventListener('click', function (e) {
+            if (e.target.closest('.idle-dorf-tab')) closeMoreSheet();
+          });
+          moreSheet.addEventListener('click', function (e) {
+            if (e.target === moreSheet) closeMoreSheet();
+          });
+
+          /* "Mehr"-Button leuchtet mit, solange der aktuell aktive Tab
+             einer der verschobenen (jetzt im Menue liegenden) ist - sonst
+             saehe es nach dem Schliessen so aus, als waere gar nichts
+             mehr ausgewaehlt. */
+          new MutationObserver(function () {
+            var activeInMenu = Array.prototype.some.call(
+              moreSheetGrid.querySelectorAll('.idle-dorf-tab'),
+              function (btn) { return btn.classList.contains('active'); }
+            );
+            moreBtn.classList.toggle('active', activeInMenu);
+          }).observe(moreSheetGrid, { attributes: true, attributeFilter: ['class'], subtree: true });
+        })();
+
         async function boot() {
           if (typeof bkmpIdleOpenModal === 'function') {
             await bkmpIdleOpenModal();
@@ -6121,15 +6188,21 @@
           return true;
         }
         window.addEventListener('popstate', function () {
+          if (window.__bkmpAppMoreSheetOpen && window.__bkmpAppMoreSheetOpen()) {
+            window.__bkmpCloseAppMoreSheet();
+            history.pushState({ bkmpAppGuard: true }, '');
+            return;
+          }
           if (closeTopOverlay()) history.pushState({ bkmpAppGuard: true }, '');
         });
         /* Statt jeden einzelnen .classList.add('visible')-Aufruf im Code
            aufzuspueren (dutzende Stellen), beobachtet ein MutationObserver
-           einfach, ob GERADE ein Unter-Dialog sichtbar ist, und haelt per
-           pushState() genau EINEN "Puffer"-Eintrag in der History bereit,
-           solange das der Fall ist. */
+           einfach, ob GERADE ein Unter-Dialog (oder das "Mehr"-Menue)
+           sichtbar ist, und haelt per pushState() genau EINEN "Puffer"-
+           Eintrag in der History bereit, solange das der Fall ist. */
         new MutationObserver(function () {
-          var hasSub = visibleSubOverlays().length > 0;
+          var moreOpen = window.__bkmpAppMoreSheetOpen && window.__bkmpAppMoreSheetOpen();
+          var hasSub = visibleSubOverlays().length > 0 || moreOpen;
           if (hasSub && !guardPushed) {
             guardPushed = true;
             history.pushState({ bkmpAppGuard: true }, '');
