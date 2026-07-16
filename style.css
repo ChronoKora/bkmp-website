@@ -8374,3 +8374,390 @@ html.bkmp-app-mode .idle-dorf-panel {
   overflow-y: visible;
   overflow-x: visible;
 }
+
+/* ============================================================
+   APP-MODUS REDESIGN, PHASE 7 (vollstaendiger Panel-Audit)
+   ============================================================
+   Nutzer-Feedback: einzelne Nachbesserungen reichten nicht, "alles" wirkt
+   noch klein. Diesmal komplett: jede Button-/Text-Klasse aus allen 14
+   Panels (Upgrades, Skilltree, Erfolge, Prestige, Runen, Skins, Dungeon,
+   Arena, Gilde, Gilden-Tech, Gildenboss, Bestenliste, Drachenzucht)
+   einzeln durchgegangen und explizit vergroessert - keine generische
+   Sammelregel mehr, die irgendwo von einer spezifischeren alten
+   Website-Regel unbemerkt ueberstimmt wird (genau das ist beim Dungeon-
+   Start-Button passiert). !important auf den Groessen-Eigenschaften,
+   damit das diesmal zuverlaessig gewinnt, unabhaengig von Spezifitaet.
+   ============================================================ */
+
+/* ---- Cross-Panel-Grundregeln (Sicherheitsnetz + gemeinsam genutzte
+   Klassen, siehe Recherche: dieselben Klassen tauchen in mehreren
+   Panels auf, hier je EINMAL gestylt) ---- */
+html.bkmp-app-mode .idle-dorf-panel h4,
+html.bkmp-app-mode .idle-dorf-panel .idle-upgrade-section-title,
+html.bkmp-app-mode .idle-dorf-panel .idle-dragon-section {
+  font-size: 1.05rem !important;
+  font-family: 'Fraunces', serif;
+}
+html.bkmp-app-mode .idle-dorf-panel .empty-hint,
+html.bkmp-app-mode .idle-dorf-panel .idle-panel-hint {
+  font-size: .88rem !important;
+  line-height: 1.5;
+}
+
+/* Karten-Raster (Upgrades/Prestige, Skins/Drachen) - groessere Karten,
+   groesserer Text, breitere Mindestspalten fuer bessere Lesbarkeit. */
+html.bkmp-app-mode .idle-dorf-panel .idle-upgrade-grid,
+html.bkmp-app-mode .idle-dorf-panel .idle-skin-grid {
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)) !important;
+  gap: .7rem !important;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-upgrade-card,
+html.bkmp-app-mode .idle-dorf-panel .idle-skin-card {
+  padding: 1rem !important;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-upgrade-icon,
+html.bkmp-app-mode .idle-dorf-panel .idle-skin-icon {
+  font-size: 2rem !important;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-upgrade-name,
+html.bkmp-app-mode .idle-dorf-panel .idle-skin-name {
+  font-size: 1rem !important;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-upgrade-level {
+  font-size: .8rem !important;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-upgrade-desc,
+html.bkmp-app-mode .idle-dorf-panel .idle-skin-desc {
+  font-size: .84rem !important;
+  line-height: 1.4;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-upgrade-buy,
+html.bkmp-app-mode .idle-dorf-panel .idle-dragon-building-upgrade,
+html.bkmp-app-mode .idle-dorf-panel .idle-production-building-buy,
+html.bkmp-app-mode .idle-dorf-panel .idle-skin-action {
+  width: 100% !important;
+  padding: .75rem .8rem !important;
+  font-size: .88rem !important;
+  min-height: 46px !important;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-autobuy-toggle {
+  padding: .8rem 1rem !important;
+  font-size: .95rem !important;
+  min-height: 46px;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-skin-locked-hint,
+html.bkmp-app-mode .idle-dorf-panel .idle-skin-empty-hint,
+html.bkmp-app-mode .idle-dorf-panel .idle-dragon-nest-countdown {
+  font-size: .82rem !important;
+}
+
+/* "Kurzinfo + Liste"-Muster (Dungeon-Intro, Arena, Gilde-Uebersicht,
+   Gildenboss) - dieselben Klassen ueberall, einmal gross gemacht. */
+html.bkmp-app-mode .idle-dorf-panel .idle-dungeon-intro { padding: 1.2rem 1.3rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-dungeon-intro h4 { font-size: 1.2rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-dungeon-intro p,
+html.bkmp-app-mode .idle-dorf-panel .idle-dungeon-best {
+  font-size: .92rem !important;
+  line-height: 1.5;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-arena-opponent-card,
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-quest-card,
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-activity-log,
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-chat-log {
+  padding: .9rem 1rem !important;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-arena-opponent-name,
+html.bkmp-app-mode .idle-dorf-panel .idle-arena-opponent-rating {
+  font-size: .95rem !important;
+  font-weight: 700;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-arena-opponent-record,
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-activity-entry,
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-chat-msg,
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-request-pending,
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-browse-members {
+  font-size: .86rem !important;
+  line-height: 1.5;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-arena-attack-btn,
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-boss-join-btn {
+  width: 100% !important;
+  padding: .9rem !important;
+  font-size: .95rem !important;
+  min-height: 50px !important;
+}
+
+/* Erfolge/Sammlung (auch im Runen-Panel-Kopf genutzt) - bewusst auf
+   .idle-dorf-panel beschraenkt, damit das Achievement-Popup ausserhalb
+   des Idle-Dorfs unangetastet bleibt. */
+html.bkmp-app-mode .idle-dorf-panel .idle-sammlung-subheading { font-size: 1.05rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-sammlung-count { font-size: .82rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .achievement-row { padding: .8rem .9rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .achievement-icon { font-size: 1.3rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .achievement-title { font-size: .95rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .achievement-desc { font-size: .82rem !important; line-height: 1.4; }
+html.bkmp-app-mode .idle-dorf-panel .idle-title-bonus { font-size: .8rem !important; padding: .3rem .7rem !important; }
+html.bkmp-app-mode .idle-dorf-panel #idleOpenAchievementsBtn,
+html.bkmp-app-mode .idle-dorf-panel #idleOpenCosmeticsBtn {
+  padding: .85rem 1.1rem !important;
+  font-size: .92rem !important;
+  min-height: 48px !important;
+}
+
+/* ---- Skilltree ---- */
+html.bkmp-app-mode .idle-dorf-panel .idle-skilltree-help-btn,
+html.bkmp-app-mode .idle-dorf-panel .idle-skilltree-reset-btn {
+  padding: .7rem 1rem !important;
+  font-size: .85rem !important;
+  min-height: 44px !important;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-skillpoints-hint { font-size: .95rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-skill-branch-header { padding: 1rem 1.1rem !important; min-height: 52px; }
+html.bkmp-app-mode .idle-dorf-panel .idle-skill-branch-name { font-size: 1.15rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-skill-branch-progress { font-size: .84rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-skill-branch-lock,
+html.bkmp-app-mode .idle-dorf-panel .idle-skill-branch-chevron {
+  font-size: 1.15rem !important;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-skill-node {
+  width: 168px !important;
+  padding: 1rem .9rem .9rem !important;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-skill-node-icon { width: 46px !important; height: 46px !important; font-size: 1.5rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-skill-node-name { font-size: .92rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-skill-node-desc { font-size: .78rem !important; line-height: 1.4; }
+html.bkmp-app-mode .idle-dorf-panel .idle-skill-node-requires { font-size: .72rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-skill-node-rank { font-size: .78rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-skill-node-btn {
+  padding: .6rem .7rem !important;
+  font-size: .84rem !important;
+  min-height: 42px !important;
+}
+/* Skill-/Runen-Hilfe-Popup (dasselbe Markup fuer beide) */
+html.bkmp-app-mode .skillhelp-name { font-size: .98rem !important; }
+html.bkmp-app-mode .skillhelp-desc { font-size: .88rem !important; line-height: 1.5; }
+html.bkmp-app-mode .skillhelp-icon { font-size: 1.2rem !important; }
+html.bkmp-app-mode .skillhelp-cost { font-size: .8rem !important; }
+
+/* ---- Prestige ---- */
+html.bkmp-app-mode .idle-dorf-panel .idle-prestige-summary,
+html.bkmp-app-mode .idle-dorf-panel .idle-prestige-progress-card {
+  padding: 1.1rem 1.2rem !important;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-prestige-level { font-size: 1.2rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-prestige-points { font-size: .95rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-prestige-bonus-note,
+html.bkmp-app-mode .idle-dorf-panel .idle-prestige-hint {
+  font-size: .86rem !important;
+  line-height: 1.5;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-prestige-progress-label { font-size: .9rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-prestige-progress-hint { font-size: .78rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-prestige-btn,
+html.bkmp-app-mode .idle-dorf-panel .idle-prestige-buy {
+  width: 100% !important;
+  padding: .9rem !important;
+  font-size: .95rem !important;
+  min-height: 50px !important;
+}
+
+/* ---- Runen (viele kleine Elemente, hier am dringendsten) ---- */
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-help-btn { padding: .7rem 1rem !important; font-size: .85rem !important; min-height: 44px !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-slot-tab {
+  padding: .65rem .8rem !important;
+  font-size: .88rem !important;
+  min-height: 44px !important;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-slot-tab-icon { font-size: 1.15rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-slot-tab-name { font-size: .8rem !important; display: inline !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-slot-tab-count { font-size: .74rem !important; }
+/* Ausruestungs-Slots auf dem Runen-Kreis sind auf der Website bewusst
+   winzig (Prozent-Positionierung auf einem Bild) - im App-Modus
+   trotzdem ein spuerbares Mindestmass, sonst kaum treffbar. */
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-equip-slot {
+  min-width: 40px !important;
+  min-height: 40px !important;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-slot-level { font-size: .7rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-item {
+  min-height: 56px !important;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-stat-box { padding: 1rem 1.1rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-stat-name { font-size: 1.02rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-stat-level,
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-stat-rarity { font-size: .86rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-stat-primary { font-size: .96rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-stat-note { font-size: .8rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-substat-list { font-size: .88rem !important; line-height: 1.6; }
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-equip-btn,
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-upgrade-btn,
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-ascend-btn,
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-autofuse-btn,
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-sell-all-btn,
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-autoascend-btn,
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-fuse-confirm-btn,
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-fuse-cancel-btn {
+  padding: .75rem .9rem !important;
+  font-size: .88rem !important;
+  min-height: 46px !important;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-fuse-btn,
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-sell-btn,
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-fuse-quick-btn {
+  padding: .55rem .6rem !important;
+  font-size: .8rem !important;
+  min-height: 40px !important;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-fuse-panel { padding: 1.1rem 1.2rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-fuse-title { font-size: 1.05rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-fuse-hint,
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-fuse-progress { font-size: .9rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-fuse-warn { font-size: .84rem !important; }
+
+/* ---- Gilde / Gilden-Tech / Gildenboss ---- */
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-create-btn,
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-join-code-btn,
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-join-btn,
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-cancel-request-btn,
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-request-btn,
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-toggle-members-btn,
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-contribute-btn,
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-request-accept-btn,
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-request-reject-btn,
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-role-btn,
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-kick-btn,
+html.bkmp-app-mode .idle-dorf-panel #idleGuildSettingsToggleBtn,
+html.bkmp-app-mode .idle-dorf-panel #idleGuildLeaveBtn,
+html.bkmp-app-mode .idle-dorf-panel #idleGuildRegenCodeBtn,
+html.bkmp-app-mode .idle-dorf-panel #idleGuildSaveSettingsBtn,
+html.bkmp-app-mode .idle-dorf-panel #idleGuildChatSendBtn,
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-tech-upgrade-btn {
+  padding: .8rem 1.1rem !important;
+  font-size: .9rem !important;
+  min-height: 46px !important;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-banner-color-btn {
+  width: 40px !important;
+  height: 40px !important;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-banner-symbol-btn {
+  width: 46px !important;
+  height: 46px !important;
+  font-size: 1.3rem !important;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-chat-delete-btn {
+  font-size: 1rem !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+  opacity: .7 !important;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-level-badge { font-size: 1rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-level-xp,
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-xp-pct { font-size: .84rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-quest-title { font-size: .96rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-quest-progress,
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-quest-reward { font-size: .82rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-chat-time { font-size: .74rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-tech-card { padding: .95rem .8rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-tech-icon { font-size: 1.6rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-tech-name { font-size: .92rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-tech-level { font-size: .8rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-tech-bonus { font-size: 1.05rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-tech-maxed { font-size: .86rem !important; }
+/* Gildenboss/Weltboss-Kampfergebnis - bewusst auf beide Kontexte
+   angewendet (dieselben raid-*-Klassen), damit auch der Weltboss-Kampf
+   von der groesseren Optik profitiert statt nur die Gildenboss-Ansicht.
+   BEIDE Selektoren an html.bkmp-app-mode gebunden - #raidCombatView lebt
+   auch auf der normalen Website (Weltboss-Kampf ausserhalb des Idle-Dorf-
+   Kontexts), die soll unangetastet bleiben. */
+html.bkmp-app-mode #raidCombatView .raid-result-title,
+html.bkmp-app-mode #idlePanelGildeBoss .raid-result-title {
+  font-size: 1.7rem !important;
+}
+html.bkmp-app-mode #raidCombatView .raid-result-stat-label,
+html.bkmp-app-mode #idlePanelGildeBoss .raid-result-stat-label { font-size: .8rem !important; }
+html.bkmp-app-mode #raidCombatView .raid-result-stat-value,
+html.bkmp-app-mode #idlePanelGildeBoss .raid-result-stat-value { font-size: 1.3rem !important; }
+html.bkmp-app-mode #raidCombatView .raid-result-mvp,
+html.bkmp-app-mode #idlePanelGildeBoss .raid-result-mvp { font-size: 1.05rem !important; }
+html.bkmp-app-mode #raidCombatView .raid-boss-name,
+html.bkmp-app-mode #idlePanelGildeBoss .raid-boss-name { font-size: 1rem !important; }
+html.bkmp-app-mode #raidCombatView .raid-hp-label,
+html.bkmp-app-mode #idlePanelGildeBoss .raid-hp-label { font-size: .8rem !important; }
+html.bkmp-app-mode #guildBossCreature { min-height: 140px; }
+
+/* ---- Bestenliste ---- */
+/* Kritischer Fund im Audit: .idle-dorf-tab wird HIER als reine
+   Unterkategorie-Filterleiste wiederverwendet (nicht als Navigation!) -
+   ohne diese Ausnahme haette sie faelschlich dieselbe grosse
+   Icon-ueber-Text-Kachel-Optik wie die Bottom Navigation bekommen. */
+html.bkmp-app-mode .idle-dorf-leaderboard-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  position: static;
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: 0 0 .8rem;
+  margin: 0;
+}
+html.bkmp-app-mode .idle-dorf-leaderboard-tabs .idle-dorf-tab {
+  flex: none;
+  flex-direction: row;
+  min-width: 0;
+  padding: .6rem 1rem !important;
+  font-size: .85rem !important;
+  transform: none !important;
+}
+html.bkmp-app-mode .idle-dorf-leaderboard-tabs .idle-dorf-tab-icon,
+html.bkmp-app-mode .idle-dorf-leaderboard-tabs .idle-dorf-tab-label {
+  font-size: .85rem !important;
+}
+html.bkmp-app-mode .idle-dorf-panel .leaderboard-row { padding: .8rem .9rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .leaderboard-rank { font-size: 1.15rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .leaderboard-name-text { font-size: .95rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .leaderboard-value { font-size: .98rem !important; }
+
+/* ---- Drachenzucht ---- */
+html.bkmp-app-mode .idle-dorf-panel .idle-dragon-nest-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-dragon-nest-card,
+html.bkmp-app-mode .idle-dorf-panel .idle-dragon-baby-card { padding: 1rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-dragon-stats { font-size: .86rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-dragon-substats { font-size: .78rem !important; line-height: 1.5; }
+html.bkmp-app-mode .idle-dorf-panel .idle-dragon-fav-btn,
+html.bkmp-app-mode .idle-dorf-panel .idle-dragon-release-btn {
+  font-size: 1.15rem !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  padding: .4rem !important;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-dragon-fav-badge { font-size: 1.3rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-dragon-filter-fav,
+html.bkmp-app-mode .idle-dorf-panel .idle-dragon-filter-bar select {
+  font-size: .86rem !important;
+  min-height: 40px;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-dragon-assign-btn,
+html.bkmp-app-mode .idle-dorf-panel .idle-dragon-hatch-btn,
+html.bkmp-app-mode .idle-dorf-panel #idleDragonBuyNestBtn,
+html.bkmp-app-mode .idle-dorf-panel .idle-dragon-evolve-teen-btn,
+html.bkmp-app-mode .idle-dorf-panel .idle-dragon-feed-btn,
+html.bkmp-app-mode .idle-dorf-panel .idle-dragon-evolve-adult-btn,
+html.bkmp-app-mode .idle-dorf-panel .idle-dragon-uncompanion-btn,
+html.bkmp-app-mode .idle-dorf-panel .idle-dragon-companion-btn,
+html.bkmp-app-mode .idle-dorf-panel #idleDragonExpandStorageBtn {
+  padding: .7rem .8rem !important;
+  font-size: .86rem !important;
+  min-height: 44px !important;
+}
+
+/* ---- Statische Nebenfenster, die aus Panels heraus geoeffnet werden
+   (Drachen-Detail, Rahmen-Kauf) - eigene Karten in index.html, keine
+   .idle-dorf-panel-Vorfahren, deshalb eigene Regeln. ---- */
+html.bkmp-app-mode #idleDragonDetailOverlay .idle-dragon-detail-card {
+  max-width: 92vw;
+}
+html.bkmp-app-mode #idleDragonDetailOverlay .idle-skin-desc {
+  font-size: .9rem !important;
+}
