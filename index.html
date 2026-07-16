@@ -85,7 +85,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260718-prestigebuild1">
+<link rel="stylesheet" href="style.css?v=20260718-appmodephase34">
 </head>
 <body>
 
@@ -6069,6 +6069,20 @@
     if (window.BKMP_APP_MODE) {
       (function () {
         document.title = 'Idle Drachen Dorf';
+
+        /* Bottom-Navigation-Optik (Phase 3): teilt "⚔️ Kampf" einmalig in
+           Icon-Zeile + Label-Zeile auf, rein fuer die Darstellung. Das
+           Button-Element selbst (ID, Klick-Listener aus bkmpIdleInitTabs)
+           bleibt unangetastet - nur sein Inhalt wird umstrukturiert. */
+        document.querySelectorAll('.idle-dorf-tab').forEach(function (btn) {
+          var text = btn.textContent.trim();
+          var match = text.match(/^(\S+)\s*(.*)$/);
+          if (!match || !match[2]) return;
+          btn.innerHTML =
+            '<span class="idle-dorf-tab-icon">' + match[1] + '</span>' +
+            '<span class="idle-dorf-tab-label">' + match[2] + '</span>';
+        });
+
         async function boot() {
           if (typeof bkmpIdleOpenModal === 'function') {
             await bkmpIdleOpenModal();
@@ -6155,6 +6169,19 @@
           if (installBanner) installBanner.classList.remove('visible');
           deferredInstallPrompt = null;
         });
+
+        /* Raidboss-Beitritts-Banner (Phase 2 des App-Redesigns): puls/
+           blinkt in den letzten 5 Minuten. Liest dafuer nur rein lesend
+           bkmpRaidGetPhaseInfo() aus idledorf.js aus (bereits global,
+           unveraendert) - idledorf.js selbst bleibt unangetastet. */
+        setInterval(function () {
+          if (typeof bkmpRaidGetPhaseInfo !== 'function') return;
+          var banner = document.getElementById('raidJoinBanner');
+          if (!banner) return;
+          var info = bkmpRaidGetPhaseInfo();
+          var urgent = info.phase === 'prep' && info.msUntilFightStart <= 5 * 60 * 1000;
+          banner.classList.toggle('raid-urgent', urgent);
+        }, 1000);
       })();
     }
   </script>
