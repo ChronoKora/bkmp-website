@@ -2332,6 +2332,8 @@ let bkmpTowerTimerInterval = null;
 let bkmpTowerRunGold = 0;
 let bkmpTowerRunXp = 0;
 let bkmpTowerRunCrystals = 0;
+let bkmpTowerRunRunes = 0;
+let bkmpTowerRunEggs = 0;
 
 function bkmpTowerWaveMult(wave) {
   return Math.pow(BKMP_TOWER_CONFIG.waveGrowth, wave - 1);
@@ -2406,6 +2408,8 @@ async function bkmpTowerStart() {
   bkmpTowerRunGold = 0;
   bkmpTowerRunXp = 0;
   bkmpTowerRunCrystals = 0;
+  bkmpTowerRunRunes = 0;
+  bkmpTowerRunEggs = 0;
   bkmpTowerPrevDragon = bkmpIdleCurrentDragon;
   bkmpTowerPrevVillageHp = bkmpIdleVillageHp;
   bkmpIdleVillageHp = bkmpIdleEffectiveStats.hp;
@@ -2430,6 +2434,24 @@ async function bkmpTowerStart() {
   if (typeof bkmpRuneSyncDrawerVisibility === 'function') bkmpRuneSyncDrawerVisibility();
   return true;
 }
+/* Meilenstein-Rasterung fuer die Turm-Belohnungen (Nachbesserung 16.07.,
+   Spieler-Nachfrage "was bekommt man konkret bei Stufe 5/10/15?") - vorher
+   gab es nur alle 10 Stufen ueberhaupt etwas ueber Gold/EXP hinaus, und
+   auch dann nur Kristalle. Jetzt alle 5 Stufen ein Meilenstein, mit
+   steigender Guete je nach Groesse der erreichten Schwelle (5/10/15/...
+   nur Kristalle, 25/75/125/... zusaetzlich eine Rune, 50/100/150/...
+   zusaetzlich Rune+Ei) - dieselbe Eskalationslogik wie beim bestehenden
+   Dungeon-Tagesbonus (kontinuierlich = Multiplikator, stueckig = Extra-
+   Gewaehrung), nur auf Wellen-Vielfache statt auf "einmal pro Tag"
+   bezogen. Rarität skaliert mit der erreichten Stufe (nutzt dieselben
+   Raritaets-Gewichtungen wie die Dungeon-Schwierigkeiten leicht/mittel/
+   schwer/albtraum) - je weiter man klettert, desto besser die Beute. */
+function bkmpTowerMilestoneDifficultyIdx(wave) {
+  if (wave >= 100) return 3;
+  if (wave >= 50) return 2;
+  if (wave >= 25) return 1;
+  return 0;
+}
 function bkmpTowerHandleWaveCleared() {
   bkmpDragonGrantCompanionBattleXp(6);
   const s = bkmpIdleEffectiveStats;
@@ -2441,14 +2463,26 @@ function bkmpTowerHandleWaveCleared() {
   bkmpTowerRunGold += goldGain;
   bkmpTowerRunXp += xpGain;
   if (typeof bkmpIdleAddXp === 'function') bkmpIdleAddXp(xpGain);
-  /* Meilenstein alle 10 Stufen - eigener Kristall-Bonus statt eines
-     weiteren Gold/XP-Sprungs, damit der Turm auch die (sonst nur ueber
-     Kristallmine/Dungeon erreichbare) Premium-Ressource fuettert. */
-  if (wave % 10 === 0) {
-    const milestoneCrystals = Math.ceil(wave / 10) * 2;
+  if (wave % 5 === 0) {
+    const idx = bkmpTowerMilestoneDifficultyIdx(wave);
+    const milestoneCrystals = Math.ceil(wave / 5) * 2;
     bkmpIdleState.crystals = Math.floor((bkmpIdleState.crystals || 0) + milestoneCrystals);
     bkmpTowerRunCrystals += milestoneCrystals;
-    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`🗼 Stufe ${wave} erreicht! +${milestoneCrystals} 💎`, 3200);
+    const parts = [`+${milestoneCrystals} 💎`];
+    if (wave % 50 === 0) {
+      const rune = bkmpDungeonRollRune(idx);
+      bkmpDungeonPersistRunes([rune]);
+      bkmpTowerRunRunes += 1;
+      parts.push('🔮 Rune');
+      const egg = bkmpDungeonRollEgg(idx);
+      if (egg) { bkmpDungeonPersistEgg(egg); bkmpTowerRunEggs += 1; parts.push('🥚 Ei'); }
+    } else if (wave % 25 === 0) {
+      const rune = bkmpDungeonRollRune(idx);
+      bkmpDungeonPersistRunes([rune]);
+      bkmpTowerRunRunes += 1;
+      parts.push('🔮 Rune');
+    }
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`🗼 Stufe ${wave} erreicht! ${parts.join(' · ')}`, 3600);
   }
   /* Gleiche 30%-Zwischenheilung wie im Dungeon (siehe
      bkmpDungeonHandleWaveCleared) - kein Voll-Heil, sonst zaehlt am Ende
@@ -2488,6 +2522,8 @@ function bkmpTowerFinish(reachedWave) {
   if (bkmpTowerRunGold > 0) rewardParts.push(`+${bkmpIdleFormatNumber(bkmpTowerRunGold)} 💰`);
   if (bkmpTowerRunXp > 0) rewardParts.push(`+${bkmpIdleFormatNumber(bkmpTowerRunXp)} XP`);
   if (bkmpTowerRunCrystals > 0) rewardParts.push(`+${bkmpTowerRunCrystals} 💎`);
+  if (bkmpTowerRunRunes > 0) rewardParts.push(`${bkmpTowerRunRunes}× 🔮`);
+  if (bkmpTowerRunEggs > 0) rewardParts.push(`${bkmpTowerRunEggs}× 🥚`);
   const rewardText = rewardParts.length ? rewardParts.join(' · ') : '—';
   if (typeof bkmpShowJannikToast === 'function') {
     bkmpShowJannikToast(
@@ -2518,7 +2554,8 @@ function bkmpIdleRenderTurmPanel() {
   panel.innerHTML = `
     <div class="idle-dungeon-intro">
       <h4>🗼 Endloser Turm</h4>
-      <p>Wellen ohne Ende - keine Schwierigkeitsstufe, kein Limit. Jede Stufe wird härter als die letzte, bis dein Dorf fällt. Alle 10 Stufen gibt's einen Kristall-Bonus, jede besiegte Welle bringt Gold und EXP. Ein Versuch alle 24 Stunden.</p>
+      <p>Wellen ohne Ende - keine Schwierigkeitsstufe, kein Limit. Jede Stufe wird härter als die letzte, bis dein Dorf fällt. Ein Versuch alle 24 Stunden.</p>
+      <p class="idle-dungeon-seasonal-hint">🎁 Belohnungen: jede besiegte Welle Gold + EXP · alle 5 Stufen (5, 10, 15, ...) zusätzlich Kristalle · alle 25 Stufen (25, 75, 125, ...) zusätzlich eine Rune · alle 50 Stufen (50, 100, 150, ...) zusätzlich Rune + Drachenei. Je höher die Stufe, desto besser die Rune-/Ei-Rarität.</p>
     </div>
     <div class="idle-dungeon-type-grid">
       <div class="idle-dungeon-card">
