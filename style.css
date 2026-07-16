@@ -7962,9 +7962,31 @@ html.bkmp-app-mode .idle-dorf-log {
 html.bkmp-app-mode .idle-dorf-panel button {
   border-radius: 14px;
   font-weight: 700;
+  padding: .75rem 1rem;
+  font-size: .88rem;
+  min-height: 46px;
   transition: transform .15s ease, box-shadow .2s ease;
 }
 html.bkmp-app-mode .idle-dorf-panel button:active { transform: scale(.95); }
+/* Kleine Pillen-Reihen (Dungeon-Schwierigkeit, Auto-Lauf-Anzahl, ...) -
+   duerfen etwas kompakter bleiben als grosse Aktions-Buttons, aber immer
+   noch deutlich groesser als die urspruengliche 0.4rem-Kernel-Groesse
+   (Nutzer-Feedback: "muss ich durch eine Lupe gucken"). flex-wrap auf dem
+   Elternelement (schon in der Basis-Seite vorhanden) faengt auf, wenn
+   dadurch eine Zeile zu breit wird. */
+html.bkmp-app-mode .idle-dungeon-diff-row button {
+  flex: 1 1 auto;
+  padding: .65rem .7rem;
+  font-size: .82rem;
+  min-height: 42px;
+  min-width: 0;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-dungeon-start-btn {
+  width: 100%;
+  padding: 1rem;
+  font-size: 1rem;
+  min-height: 54px;
+}
 html.bkmp-app-mode .idle-dorf-card .joke-buttons .btn-ja,
 html.bkmp-app-mode .idle-dorf-panel .btn-ja {
   background: linear-gradient(135deg, var(--app-gold), var(--app-orange)) !important;
@@ -8331,3 +8353,24 @@ html.bkmp-app-mode .idle-hud-app-stats span {
   color: var(--app-muted);
 }
 html.bkmp-app-mode .idle-hud-app-xp { margin-top: .1rem; }
+
+/* ============================================================
+   APP-MODUS REDESIGN, PHASE 6 (unnoetiges Verschachtel-Scrollen weg)
+   ============================================================
+   Nutzer-Feedback nach Live-Test: riesige leere schwarze Flaeche unter
+   kurzen Panels (z.B. Dungeon) + man musste scrollen, obwohl kaum Inhalt
+   da war. Ursache: .idle-dorf-panel bekommt auf der normalen Website
+   bewusst eine FESTE Rahmenhoehe (min(58vh,560px)) mit eigenem
+   Innen-Scrollbereich, damit die Karte beim Tab-Wechsel nie springt (das
+   ist fuer die Website-Ansicht mit Investment-Dashboard drumrum sinnvoll,
+   dort bleibt es unveraendert). Im App-Modus gibt es dieses "Nachbar-
+   Layout" nicht, und verschachteltes Scrollen (Panel scrollt UND die
+   Karte drumrum scrollt) ist ohnehin kein Muster, das handelsuebliche
+   Mobile-Games verwenden - ein Panel ist dort immer genau so hoch wie
+   sein Inhalt, die Karte selbst scrollt bei Bedarf als Ganzes. */
+html.bkmp-app-mode .idle-dorf-panel {
+  height: auto;
+  max-height: none;
+  overflow-y: visible;
+  overflow-x: visible;
+}
