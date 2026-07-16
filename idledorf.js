@@ -2675,18 +2675,18 @@ function bkmpIdleRenderHud() {
         </div>
       </div>
       <div class="idle-hud-app-resources">
-        <span data-app-tab="idleTabBtnUpgrades">💰 ${bkmpIdleFormatNumber(bkmpIdleState.gold)}</span>
-        <span data-app-tab="idleTabBtnUpgrades">🌳 ${bkmpIdleFormatNumber(bkmpIdleState.wood)}</span>
-        <span data-app-tab="idleTabBtnUpgrades">🗿 ${bkmpIdleFormatNumber(bkmpIdleState.stone)}</span>
-        <span data-app-tab="idleTabBtnUpgrades">💎 ${bkmpIdleFormatNumber(bkmpIdleState.crystals)}</span>
-        <span data-app-tab="idleTabBtnRunen">🧪 ${bkmpIdleFormatNumber(bkmpIdleState.essence)}</span>
+        <span class="idle-res-chip idle-res-gold" data-app-tab="idleTabBtnUpgrades"><i class="idle-res-icon">💰</i><b class="idle-res-val">${bkmpIdleFormatNumber(bkmpIdleState.gold)}</b></span>
+        <span class="idle-res-chip idle-res-wood" data-app-tab="idleTabBtnUpgrades"><i class="idle-res-icon">🌳</i><b class="idle-res-val">${bkmpIdleFormatNumber(bkmpIdleState.wood)}</b></span>
+        <span class="idle-res-chip idle-res-stone" data-app-tab="idleTabBtnUpgrades"><i class="idle-res-icon">🗿</i><b class="idle-res-val">${bkmpIdleFormatNumber(bkmpIdleState.stone)}</b></span>
+        <span class="idle-res-chip idle-res-crystal" data-app-tab="idleTabBtnUpgrades"><i class="idle-res-icon">💎</i><b class="idle-res-val">${bkmpIdleFormatNumber(bkmpIdleState.crystals)}</b></span>
+        <span class="idle-res-chip idle-res-essence" data-app-tab="idleTabBtnRunen"><i class="idle-res-icon">🧪</i><b class="idle-res-val">${bkmpIdleFormatNumber(bkmpIdleState.essence)}</b></span>
       </div>
       ${s ? `
       <div class="idle-hud-app-stats">
-        <span title="Maximale Leben">❤️ ${bkmpIdleFormatNumber(Math.round(s.hp))}</span>
-        <span title="Angriff">⚔️ ${bkmpIdleFormatNumber(Math.round(s.attack))}</span>
-        <span title="Verteidigung">🛡️ ${bkmpIdleFormatNumber(Math.round(s.defense))}</span>
-        <span title="Level">⭐ ${bkmpIdleState.level}</span>
+        <span class="idle-res-chip idle-res-hp" title="Maximale Leben"><i class="idle-res-icon">❤️</i><b class="idle-res-val">${bkmpIdleFormatNumber(Math.round(s.hp))}</b></span>
+        <span class="idle-res-chip idle-res-atk" title="Angriff"><i class="idle-res-icon">⚔️</i><b class="idle-res-val">${bkmpIdleFormatNumber(Math.round(s.attack))}</b></span>
+        <span class="idle-res-chip idle-res-def" title="Verteidigung"><i class="idle-res-icon">🛡️</i><b class="idle-res-val">${bkmpIdleFormatNumber(Math.round(s.defense))}</b></span>
+        <span class="idle-res-chip idle-res-lvl" title="Level"><i class="idle-res-icon">⭐</i><b class="idle-res-val">${bkmpIdleState.level}</b></span>
       </div>` : ''}
       <div class="idle-hud-app-xp">
         <div class="idle-xp-bar"><div class="idle-xp-fill" style="width:${xpPct}%"></div></div>

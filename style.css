@@ -8293,8 +8293,7 @@ html.bkmp-app-mode .idle-battlefield::before {
   html.bkmp-app-mode .idle-hud-streak-badge,
   html.bkmp-app-mode .idle-hud-stats span,
   html.bkmp-app-mode .idle-hud-resources span,
-  html.bkmp-app-mode .idle-hud-app-resources span,
-  html.bkmp-app-mode .idle-hud-app-stats span,
+  html.bkmp-app-mode .idle-res-chip,
   html.bkmp-app-mode .idle-battlefield,
   html.bkmp-app-mode .raid-join-banner.raid-urgent,
   html.bkmp-app-mode .raid-join-banner.raid-urgent .raid-join-banner-countdown {
@@ -8373,29 +8372,121 @@ html.bkmp-app-mode .idle-hud-app-stats {
   gap: .35rem;
   margin-bottom: .5rem;
 }
-html.bkmp-app-mode .idle-hud-app-resources span,
-html.bkmp-app-mode .idle-hud-app-stats span {
+html.bkmp-app-mode .idle-hud-app-xp { margin-top: .1rem; }
+
+/* ============================================================
+   APP-MODUS REDESIGN, PHASE 15 (fest verankerter Top-Bar-Rahmen +
+   groesserer Name + hochwertigere Ressourcen-Anzeige)
+   ============================================================
+   Nutzerwunsch: "Namen größer.. Rohstoffe viel Schöner.. Fest
+   eingebauter Rahmen oben?" Recherche (Game UI Database / Page Flows
+   Game-HUD-Guide / Sunstrike Studios HUD-Guide, siehe Chat-Quellen)
+   liefert dafuer drei uebereinstimmende Prinzipien echter Mobile-RPGs
+   (AFK Arena, RAID: Shadow Legends, Summoners War):
+   1) Das HUD ist ein "Dashboard": ein konstanter, immer sichtbarer
+      Rahmen, in dem sich nur die Werte aendern - kein loser Text auf
+      dem Hintergrund. Deshalb bekommt die Leiste jetzt einen eigenen,
+      randvollen ("full-bleed") Panel-Hintergrund mit klarer Kante zum
+      Schlachtfeld darunter, bleibt beim Scrollen fixiert oben (die
+      Karte selbst ist der Scroll-Container, siehe .idle-dorf-card
+      "overflow-y:auto" weiter oben in dieser Datei).
+   2) Ressourcen brauchen IMMER Icon + Zahl zusammen mit klarer
+      Farbcodierung pro Ressourcentyp (nicht nur Emoji im Fliesstext) -
+      deshalb jetzt eigene Icon-Kachel je Ressource statt reinem Text.
+   3) Kontrast/Lesbarkeit zuerst: dickere Textschatten, klare
+      Rahmenfarbe pro Kachel, getestet auf hellstem Hintergrund-Effekt
+      (Sternenfeld/Nebel). */
+html.bkmp-app-mode #idleDorfHud {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  /* Randvoll bis an die wahre Kartenkante ziehen (negative Margins
+     heben genau das Karten-Padding von Phase 1 auf), dann innen das
+     gleiche Polster wieder aufbauen - Inhalt landet optisch an
+     derselben Stelle wie vorher, nur mit eigenem Panel-Hintergrund
+     darunter statt direkt auf dem Karten-Hintergrund. */
+  margin: calc(-1.4rem - env(safe-area-inset-top)) calc(-1rem - env(safe-area-inset-right)) .7rem calc(-1rem - env(safe-area-inset-left));
+  padding: calc(1.1rem + env(safe-area-inset-top)) calc(1rem + env(safe-area-inset-right)) .85rem calc(1rem + env(safe-area-inset-left));
+  background:
+    radial-gradient(circle at 15% 0%, color-mix(in srgb, var(--app-purple-light) 30%, transparent), transparent 60%),
+    linear-gradient(180deg, color-mix(in srgb, var(--app-purple-deep) 96%, black) 0%, color-mix(in srgb, var(--app-void) 97%, black) 100%);
+  border-bottom: 1px solid color-mix(in srgb, var(--app-gold) 30%, transparent);
+  box-shadow: 0 10px 24px -8px rgba(0, 0, 0, .7), inset 0 1px 0 rgba(255, 255, 255, .05);
+}
+html.bkmp-app-mode #idleDorfHud::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--app-gold), var(--app-cyan), var(--app-gold), transparent);
+  opacity: .65;
+  pointer-events: none;
+}
+/* Groesserer, praesenterer Name (Nutzerwunsch), mit Gold-Schimmer
+   statt reinem Fliesstext - Namen ist die "Identitaet" oben in jedem
+   Referenzspiel, entsprechend darf er mehr Gewicht haben als Level-
+   Zahl oder Ressourcen. */
+html.bkmp-app-mode .idle-hud-app-name {
+  font-size: 1.42rem;
+  font-weight: 800;
+  letter-spacing: .01em;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, .55), 0 0 16px color-mix(in srgb, var(--app-gold) 30%, transparent);
+}
+/* Ressourcen-/Stats-Kacheln: Icon-Chip + fetter Zahlenwert getrennt
+   (idledorf.js liefert <i class="idle-res-icon"> + <b class="idle-res-val">
+   statt reinem Text), jede Ressource mit eigener Rahmen-/Icon-Farbe -
+   macht die Leiste vom "Text mit Emoji davor" zu echten grafischen
+   Wert-Kacheln, wie in der Recherche gefordert ("graphic + number"). */
+html.bkmp-app-mode .idle-res-chip {
   display: inline-flex;
   align-items: center;
-  gap: .25rem;
-  padding: .32rem .6rem;
+  gap: .32rem;
+  padding: .22rem .62rem .22rem .22rem;
   border-radius: 999px;
-  font-size: .72rem;
-  font-weight: 700;
+  font-size: .74rem;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
+  color: var(--app-ink);
+  background: linear-gradient(180deg, rgba(255, 255, 255, .07), rgba(0, 0, 0, .22));
+  border: 1px solid rgba(255, 255, 255, .1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 2px 6px rgba(0, 0, 0, .35);
   animation: appHudPop .3s ease;
 }
-html.bkmp-app-mode .idle-hud-app-resources span {
-  background: linear-gradient(135deg, rgba(255, 215, 106, .16), rgba(255, 140, 61, .08));
-  border: 1px solid color-mix(in srgb, var(--app-gold) 40%, transparent);
-  color: var(--app-ink);
+html.bkmp-app-mode .idle-res-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 1.5em;
+  height: 1.5em;
+  border-radius: 50%;
+  font-size: .92em;
+  font-style: normal;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .12) inset;
 }
-html.bkmp-app-mode .idle-hud-app-stats span {
+html.bkmp-app-mode .idle-res-val { color: var(--app-ink); }
+html.bkmp-app-mode .idle-hud-app-stats .idle-res-chip {
   background: rgba(255, 255, 255, .05);
-  border: 1px solid rgba(255, 255, 255, .09);
+  border-color: rgba(255, 255, 255, .1);
   color: var(--app-muted);
 }
-html.bkmp-app-mode .idle-hud-app-xp { margin-top: .1rem; }
+html.bkmp-app-mode .idle-hud-app-stats .idle-res-val { color: var(--app-muted); }
+/* Farbthemen pro Ressource, angelehnt an bestehende App-Farbtoken -
+   Gold=Gold, Holz=Gruen, Stein=Silber/Lavendel, Kristalle=Cyan,
+   Essenz=Violett (bewusst anders als Kristall-Cyan, damit beide auf
+   einen Blick unterscheidbar bleiben). */
+html.bkmp-app-mode .idle-res-gold { border-color: color-mix(in srgb, var(--app-gold) 45%, transparent); }
+html.bkmp-app-mode .idle-res-gold .idle-res-icon { background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--app-gold) 75%, white), var(--app-gold-deep)); box-shadow: 0 0 7px color-mix(in srgb, var(--app-gold) 65%, transparent), 0 0 0 1px rgba(255, 255, 255, .12) inset; }
+html.bkmp-app-mode .idle-res-wood { border-color: color-mix(in srgb, var(--app-green) 45%, transparent); }
+html.bkmp-app-mode .idle-res-wood .idle-res-icon { background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--app-green) 70%, white), #1e7a44); box-shadow: 0 0 7px color-mix(in srgb, var(--app-green) 55%, transparent), 0 0 0 1px rgba(255, 255, 255, .12) inset; }
+html.bkmp-app-mode .idle-res-stone { border-color: rgba(210, 205, 225, .4); }
+html.bkmp-app-mode .idle-res-stone .idle-res-icon { background: radial-gradient(circle at 35% 30%, #e8e4f2, #8b84a0); box-shadow: 0 0 6px rgba(210, 205, 225, .4), 0 0 0 1px rgba(255, 255, 255, .12) inset; }
+html.bkmp-app-mode .idle-res-crystal { border-color: color-mix(in srgb, var(--app-cyan) 45%, transparent); }
+html.bkmp-app-mode .idle-res-crystal .idle-res-icon { background: radial-gradient(circle at 35% 30%, #baf9f6, var(--app-cyan)); box-shadow: 0 0 7px color-mix(in srgb, var(--app-cyan) 60%, transparent), 0 0 0 1px rgba(255, 255, 255, .12) inset; }
+html.bkmp-app-mode .idle-res-essence { border-color: rgba(192, 132, 252, .45); }
+html.bkmp-app-mode .idle-res-essence .idle-res-icon { background: radial-gradient(circle at 35% 30%, #e4c9ff, #a855f7); box-shadow: 0 0 7px rgba(192, 132, 252, .55), 0 0 0 1px rgba(255, 255, 255, .12) inset; }
 
 /* ============================================================
    APP-MODUS REDESIGN, PHASE 6 (unnoetiges Verschachtel-Scrollen weg)
@@ -8880,11 +8971,11 @@ html.bkmp-app-mode .joke-card .btn-nein {
    die Leiste vom reinen Anzeige-Streifen zu einem echten Shortcut, wie es
    in guten Mobile-RPGs ueblich ist (Ressource antippen = direkt zur
    Ausgabe-Moeglichkeit). */
-html.bkmp-app-mode .idle-hud-app-resources span {
+html.bkmp-app-mode .idle-hud-app-resources .idle-res-chip {
   cursor: pointer;
   transition: transform .12s ease;
 }
-html.bkmp-app-mode .idle-hud-app-resources span:active { transform: scale(.93); }
+html.bkmp-app-mode .idle-hud-app-resources .idle-res-chip:active { transform: scale(.93); }
 /* Chamfered-Ecken-Look (angeschraegte Ecken statt rund) fuer das
    Portrait-Level-Abzeichen - typisches "Gaming-HUD"-Detail statt eines
    reinen Kreises, siehe Recherche zu Chamfer-Corner-HUD-Rahmen. */
