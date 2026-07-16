@@ -2611,11 +2611,11 @@ function bkmpIdleRenderHud() {
         </div>
       </div>
       <div class="idle-hud-app-resources">
-        <span>💰 ${bkmpIdleFormatNumber(bkmpIdleState.gold)}</span>
-        <span>🌳 ${bkmpIdleFormatNumber(bkmpIdleState.wood)}</span>
-        <span>🗿 ${bkmpIdleFormatNumber(bkmpIdleState.stone)}</span>
-        <span>💎 ${bkmpIdleFormatNumber(bkmpIdleState.crystals)}</span>
-        <span>🧪 ${bkmpIdleFormatNumber(bkmpIdleState.essence)}</span>
+        <span data-app-tab="idleTabBtnUpgrades">💰 ${bkmpIdleFormatNumber(bkmpIdleState.gold)}</span>
+        <span data-app-tab="idleTabBtnUpgrades">🌳 ${bkmpIdleFormatNumber(bkmpIdleState.wood)}</span>
+        <span data-app-tab="idleTabBtnUpgrades">🗿 ${bkmpIdleFormatNumber(bkmpIdleState.stone)}</span>
+        <span data-app-tab="idleTabBtnUpgrades">💎 ${bkmpIdleFormatNumber(bkmpIdleState.crystals)}</span>
+        <span data-app-tab="idleTabBtnRunen">🧪 ${bkmpIdleFormatNumber(bkmpIdleState.essence)}</span>
       </div>
       ${s ? `
       <div class="idle-hud-app-stats">

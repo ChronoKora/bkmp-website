@@ -85,7 +85,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260718-touchtargets1">
+<link rel="stylesheet" href="style.css?v=20260718-raidview1">
 </head>
 <body>
 
@@ -1181,7 +1181,7 @@
   <script src="assets/vendor/supabase-js.min.js"></script>
   <script src="supabase.js?v=20260717-prestigebuild1"></script>
   <script src="app.js?v=20260712-themefix1"></script>
-  <script src="idledorf.js?v=20260718-apphudredesign1"></script>
+  <script src="idledorf.js?v=20260718-huddatatab1"></script>
   <script src="mapart.js?v=20260717-kartenfirmen1"></script>
   <script>
     bkmpInitTheme();
@@ -6149,6 +6149,24 @@
             moreBtn.classList.toggle('active', activeInMenu);
           }).observe(moreSheetGrid, { attributes: true, attributeFilter: ['class'], subtree: true });
         })();
+
+        /* Ressourcen-Kacheln in der Top-Bar antippen = direkt zum
+           passenden Tab springen (Nutzer-Wunsch nach mehr Recherche:
+           Ressourcenleiste soll mehr als reine Anzeige sein). Nutzt
+           Event-Delegation auf #idleDorfHud (der Inhalt wird bei jedem
+           Update per innerHTML neu erzeugt, siehe bkmpIdleRenderHud) und
+           die data-app-tab-Attribute, die dort im App-Modus-Zweig
+           mitgeliefert werden - loest einfach einen echten Klick auf den
+           schon vorhandenen Tab-Button aus, keine neue Navigations-Logik. */
+        var hud = document.getElementById('idleDorfHud');
+        if (hud) {
+          hud.addEventListener('click', function (e) {
+            var target = e.target.closest('[data-app-tab]');
+            if (!target) return;
+            var btn = document.getElementById(target.getAttribute('data-app-tab'));
+            if (btn) btn.click();
+          });
+        }
 
         async function boot() {
           if (typeof bkmpIdleOpenModal === 'function') {

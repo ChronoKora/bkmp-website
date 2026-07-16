@@ -8794,3 +8794,160 @@ html.bkmp-app-mode #idleDragonDetailOverlay .idle-dragon-detail-card {
 html.bkmp-app-mode #idleDragonDetailOverlay .idle-skin-desc {
   font-size: .9rem !important;
 }
+
+/* ============================================================
+   APP-MODUS REDESIGN, PHASE 10 (Recherche-Runde: Fenster + Top-Bar)
+   ============================================================
+   Nutzerwunsch: "hol dir noch mehr Tipps, auch fuer die Top-Bar" - Recherche
+   zu echten Mobile-Game-Referenzen ergab zwei konkret umsetzbare Punkte:
+   1) Zonen-Modell (Ecken=Dauerinfo, Mitte=Kampf-Feedback, unten=Daumenzone)
+      bestaetigt die bestehende Struktur, kein Neubau noetig.
+   2) Fenster/Popups in guten Mobile-RPGs nutzen durchgehend einen
+      Gold-Verlaufsrahmen-Look statt schlichter Rechtecke (Technik: zwei
+      Hintergrundebenen, eine deckende als padding-box, eine als
+      Farbverlauf als border-box - dieselbe Technik wie die grosse
+      Idle-Dorf-Karte selbst, jetzt konsistent auf ALLE Popups uebertragen,
+      die im App-Modus ueberhaupt erreichbar sind (Login, Bestaetigungen,
+      Skill-/Runen-Hilfe, Event-Popups, Account-Einstellungen, ...).
+   ============================================================ */
+
+/* ---- Alle Popup-Fenster (.joke-card) im App-Modus einheitlich im
+   Fantasy-Look, nicht nur die grosse Idle-Dorf-Karte. ---- */
+html.bkmp-app-mode .joke-card {
+  position: relative;
+  border-radius: 20px;
+  border-color: transparent;
+  background:
+    linear-gradient(180deg, var(--app-purple-deep), var(--app-void)) padding-box,
+    linear-gradient(135deg, var(--app-gold), var(--app-cyan), var(--app-purple-light), var(--app-gold)) border-box;
+  border: 1.5px solid transparent;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .6), 0 0 40px color-mix(in srgb, var(--app-gold) 18%, transparent);
+  color: var(--app-ink);
+}
+html.bkmp-app-mode .joke-card h3 {
+  font-family: 'Fraunces', serif;
+  font-weight: 700;
+  color: var(--app-gold);
+  text-shadow: 0 0 12px color-mix(in srgb, var(--app-gold) 45%, transparent);
+}
+html.bkmp-app-mode .joke-card p,
+html.bkmp-app-mode .joke-card label {
+  color: var(--app-muted);
+}
+html.bkmp-app-mode .joke-card input[type="text"],
+html.bkmp-app-mode .joke-card input[type="password"],
+html.bkmp-app-mode .joke-card input[type="number"],
+html.bkmp-app-mode .joke-card select,
+html.bkmp-app-mode .joke-card textarea {
+  background: rgba(0, 0, 0, .3);
+  border: 1px solid rgba(255, 255, 255, .14);
+  color: var(--app-ink);
+  border-radius: 12px;
+  min-height: 44px;
+}
+html.bkmp-app-mode .joke-card .btn-ja,
+html.bkmp-app-mode .joke-card .btn-nein {
+  min-height: 44px;
+  padding: .7rem 1.2rem;
+  border-radius: 12px;
+  font-weight: 700;
+}
+html.bkmp-app-mode .joke-card .btn-ja {
+  background: linear-gradient(135deg, var(--app-gold), var(--app-orange)) !important;
+  border: none !important;
+  color: #2b1600 !important;
+  box-shadow: var(--app-glow-gold);
+}
+html.bkmp-app-mode .joke-card .btn-nein {
+  background: rgba(255, 255, 255, .06);
+  border-color: rgba(255, 255, 255, .16);
+}
+
+/* ---- Top-Bar-Feinschliff: Ressourcen-Kacheln fuehren jetzt direkt zum
+   passenden Bereich (Gold/Holz/Stein/Kristalle -> Upgrades, Kills ->
+   Drachenzucht) - nutzt ausschliesslich die schon vorhandenen, echten
+   Tab-Buttons (per .click()), keine neue Navigation/Logik noetig. Macht
+   die Leiste vom reinen Anzeige-Streifen zu einem echten Shortcut, wie es
+   in guten Mobile-RPGs ueblich ist (Ressource antippen = direkt zur
+   Ausgabe-Moeglichkeit). */
+html.bkmp-app-mode .idle-hud-app-resources span {
+  cursor: pointer;
+  transition: transform .12s ease;
+}
+html.bkmp-app-mode .idle-hud-app-resources span:active { transform: scale(.93); }
+/* Chamfered-Ecken-Look (angeschraegte Ecken statt rund) fuer das
+   Portrait-Level-Abzeichen - typisches "Gaming-HUD"-Detail statt eines
+   reinen Kreises, siehe Recherche zu Chamfer-Corner-HUD-Rahmen. */
+html.bkmp-app-mode .idle-hud-app-portrait {
+  clip-path: polygon(20% 0%, 80% 0%, 100% 20%, 100% 80%, 80% 100%, 20% 100%, 0% 80%, 0% 20%);
+  border-radius: 0;
+}
+
+/* ---- Weitere Kampf-"Juice" (Nutzerwunsch: Partikel/Funken/Explosion bei
+   Kritischen Treffern) - reiner CSS-Funkenausbruch, gekoppelt an die
+   schon bestehende .idle-dmg-crit-Klasse aus idledorf.js, kein neuer
+   JS-Hook noetig. */
+html.bkmp-app-mode .idle-dmg-crit::after {
+  content: '';
+  position: absolute;
+  inset: -30px;
+  background:
+    radial-gradient(circle, var(--app-gold) 0%, transparent 8%) 20% 30%,
+    radial-gradient(circle, var(--app-orange) 0%, transparent 8%) 75% 20%,
+    radial-gradient(circle, var(--app-gold) 0%, transparent 8%) 60% 75%,
+    radial-gradient(circle, var(--app-orange) 0%, transparent 8%) 15% 70%,
+    radial-gradient(circle, var(--app-red) 0%, transparent 8%) 85% 65%;
+  background-size: 12px 12px;
+  background-repeat: no-repeat;
+  opacity: 0;
+  animation: appCritBurst .5s ease-out;
+  pointer-events: none;
+}
+@keyframes appCritBurst {
+  0% { opacity: 1; transform: scale(.3); }
+  100% { opacity: 0; transform: scale(1.6); }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.bkmp-app-mode .idle-dmg-crit::after { animation: none !important; display: none; }
+}
+
+/* ---- Weltboss-Raid-Kampfansicht (#raidCombatView) - dieselbe
+   Arena-Optik wie der Haupt-Kampf-Tab, konsistent statt eine zweite,
+   unbehandelte Kampfansicht im alten Look zu lassen. ---- */
+html.bkmp-app-mode .raid-combat-header {
+  padding: .8rem 1rem !important;
+  border-radius: 16px;
+  background: linear-gradient(120deg, rgba(255, 59, 92, .18), rgba(74, 42, 122, .18));
+  border: 1px solid color-mix(in srgb, var(--app-red) 40%, transparent);
+}
+html.bkmp-app-mode .raid-combat-header span:first-child {
+  font-size: 1rem !important;
+  font-weight: 800;
+}
+html.bkmp-app-mode .raid-timer {
+  font-size: 1.1rem !important;
+  color: var(--app-gold) !important;
+  text-shadow: var(--app-glow-gold);
+}
+html.bkmp-app-mode .raid-battlefield {
+  min-height: 38vh;
+  padding: 1.4rem 1rem;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--app-red) 18%, transparent), transparent 55%),
+    linear-gradient(180deg, rgba(255, 255, 255, .04), rgba(0, 0, 0, .3));
+  border: 1px solid rgba(255, 255, 255, .1);
+}
+html.bkmp-app-mode .raid-city,
+html.bkmp-app-mode .raid-boss {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(0, 0, 0, .32));
+  border: 1.5px solid color-mix(in srgb, var(--app-gold) 45%, transparent);
+  border-radius: 18px;
+}
+html.bkmp-app-mode .raid-boss-name {
+  font-size: 1.02rem !important;
+  color: var(--app-gold) !important;
+  text-shadow: var(--app-glow-gold) !important;
+}
+html.bkmp-app-mode .raid-city-stats { font-size: .82rem !important; }
+html.bkmp-app-mode .raid-participants-list { font-size: .88rem !important; line-height: 1.6; }
