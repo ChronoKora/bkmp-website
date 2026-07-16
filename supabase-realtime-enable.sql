@@ -23,7 +23,15 @@ declare
     -- der Schaden anderer Mitspieler war aber immer ausschliesslich auf
     -- dieses (bisher tote) Realtime-Event angewiesen.
     'guild_boss_instances',
-    'guild_boss_participants'
+    'guild_boss_participants',
+    -- Spieler-Wunsch 16.07. ("wenn Gold eingezahlt wird das es gleich
+    -- für alle angezeigt wird, ohne reloaden zu müssen"): guilds/
+    -- guild_members hingen bisher aus demselben Grund wie oben (kein
+    -- Publication-Eintrag = fuer NIEMANDEN Realtime-Events) komplett tot -
+    -- bkmpSubscribeToGuildState() in supabase.js haette sonst ebenfalls
+    -- fuer alle Mitspieler wirkungslos im Leeren gelauscht.
+    'guilds',
+    'guild_members'
   ];
 begin
   foreach table_name in array tables loop

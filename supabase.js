@@ -4011,8 +4011,13 @@ async function bkmpAdminDeletePlayerAccount(authUserId) {
    Befoerdern) laufen ausschliesslich ueber die dort definierten
    security-definer-RPCs, gleiche Vorsicht wie beim Weltboss-Raid - die
    Tabellen selbst sind fuer Clients nur lesbar. */
-const BKMP_GUILD_COLUMNS = 'id, name, name_key, tag, description, leader_auth_user_id, treasury_gold, member_count, created_at, is_public, guild_xp, current_goal, banner, bosses_defeated, boss_attempts';
+const BKMP_GUILD_COLUMNS = 'id, name, name_key, tag, description, leader_auth_user_id, treasury_gold, member_count, created_at, is_public, guild_xp, current_goal, banner, bosses_defeated, boss_attempts, bonus_member_slots';
 
+/* maxMembers = 20 (fester Basis-Deckel, siehe join_guild() in
+   supabase-idle-guilds.sql) + bonusMemberSlots (siehe buy_guild_slot() in
+   supabase-guild-extra-slots.sql, Spieler-Wunsch 16.07.: "Funktion fuer
+   Gilden mehr Platz dazu zukaufen") - hier einmal zentral berechnet statt
+   an jeder Anzeigestelle in idledorf.js erneut. */
 function bkmpGuildMapRow(row) {
   return {
     id: row.id,
@@ -4029,7 +4034,9 @@ function bkmpGuildMapRow(row) {
     currentGoal: row.current_goal || '',
     banner: row.banner && typeof row.banner === 'object' ? row.banner : {},
     bossesDefeated: Number(row.bosses_defeated || 0),
-    bossAttempts: Number(row.boss_attempts || 0)
+    bossAttempts: Number(row.boss_attempts || 0),
+    bonusMemberSlots: Number(row.bonus_member_slots || 0),
+    maxMembers: 20 + Number(row.bonus_member_slots || 0)
   };
 }
 
@@ -4220,7 +4227,7 @@ async function bkmpGuildRespondJoinRequest(requestId, accept) {
   if (error) {
     const msg = String(error.message || '');
     if (msg.includes('not_authorized')) throw new Error('Dafür brauchst du mindestens die Rolle Veteran.');
-    if (msg.includes('guild_full')) throw new Error('Die Gilde ist bereits voll (20 Mitglieder).');
+    if (msg.includes('guild_full')) throw new Error('Die Gilde ist bereits voll.');
     if (msg.includes('requester_already_in_guild')) throw new Error('Der Spieler ist inzwischen schon in einer anderen Gilde.');
     if (msg.includes('request_already_decided')) throw new Error('Über diese Anfrage wurde schon entschieden.');
     throw new Error('Konnte nicht bearbeitet werden. Bitte versuche es erneut.');
@@ -4306,7 +4313,7 @@ async function bkmpGuildJoinByCode(code) {
     const msg = String(error.message || '');
     if (msg.includes('invalid_code')) throw new Error('Dieser Einladungscode ist ungültig.');
     if (msg.includes('already_in_guild')) throw new Error('Du bist schon in einer Gilde. Verlasse sie zuerst.');
-    if (msg.includes('guild_full')) throw new Error('Diese Gilde ist bereits voll (20 Mitglieder).');
+    if (msg.includes('guild_full')) throw new Error('Diese Gilde ist bereits voll.');
     if (msg.includes('no_idle_state')) throw new Error('Spiele zuerst im Kampf-Tab, bevor du einer Gilde beitrittst.');
     throw new Error('Beitritt fehlgeschlagen. Bitte versuche es erneut.');
   }
@@ -4368,7 +4375,7 @@ async function bkmpGuildJoin(guildId) {
   if (error) {
     const msg = String(error.message || '');
     if (msg.includes('already_in_guild')) throw new Error('Du bist schon in einer Gilde. Verlasse sie zuerst.');
-    if (msg.includes('guild_full')) throw new Error('Diese Gilde ist bereits voll (20 Mitglieder).');
+    if (msg.includes('guild_full')) throw new Error('Diese Gilde ist bereits voll.');
     if (msg.includes('no_idle_state')) throw new Error('Spiele zuerst im Kampf-Tab, bevor du einer Gilde beitrittst.');
     throw new Error('Beitritt fehlgeschlagen. Bitte versuche es erneut.');
   }
@@ -4417,6 +4424,27 @@ async function bkmpGuildDeleteChatMessage(messageId) {
   if (!client) throw new Error('Supabase ist nicht verbunden.');
   const { error } = await client.rpc('delete_guild_chat_message', { p_message_id: messageId });
   if (error) throw new Error('Nachricht konnte nicht gelöscht werden. Dafür fehlt dir die Berechtigung.');
+}
+
+/* ---------------- Gildenplätze dazukaufen (siehe buy_guild_slot() in
+   supabase-guild-extra-slots.sql - Spieler-Wunsch 16.07.: "Die Gilde ist
+   voll wir brauchen mehr Platz... So eine Funktion für Gilden mehr Platz
+   dazu zukaufen"). Gleiches Rechte-/Kosten-Prinzip wie guild_tech_upgrade
+   unten (nur Anführer/Stellvertreter, kostet die ausgebbare Kasse). */
+async function bkmpGuildBuySlot() {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { data, error } = await client.rpc('buy_guild_slot');
+  if (error) {
+    const msg = String(error.message || '');
+    if (msg.includes('insufficient_treasury')) throw new Error('Nicht genug Gold in der Gildenkasse.');
+    if (msg.includes('max_slots')) throw new Error('Diese Gilde hat die maximale Erweiterung bereits erreicht.');
+    if (msg.includes('not_authorized')) throw new Error('Nur Anführer oder Stellvertreter dürfen Gildenplätze dazukaufen.');
+    if (msg.includes('not_authenticated')) throw new Error('Du bist nicht eingeloggt (Sitzung abgelaufen?). Bitte neu einloggen.');
+    throw new Error('Erweiterung fehlgeschlagen: ' + (msg || 'unbekannter Fehler') + '. Bitte versuche es erneut.');
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  return row ? { newBonusSlots: Number(row.new_bonus_slots), treasuryGold: Number(row.treasury_gold) } : null;
 }
 
 /* ---------------- Gilden-Technologie (siehe guild_tech_levels in
@@ -4822,6 +4850,48 @@ function bkmpSubscribeToGuildChat(guildId, onInsert) {
 }
 function bkmpUnsubscribeFromGuildChat() {
   if (bkmpGuildChatChannel) { bkmpGuildChatChannel.unsubscribe(); bkmpGuildChatChannel = null; }
+}
+
+/* ---------------- Gilden-Status-Realtime (Spieler-Wunsch 16.07.: "wenn
+   Gold eingezahlt wird das es gleich für alle angezeigt wird, ohne
+   reloaden zu müssen") ----------------
+   Bisher aktualisierte ein Beitrag/Levelaufstieg/Technologie-Kauf/
+   Platzkauf nur die Ansicht des HANDELNDEN Spielers selbst (lokaler
+   State-Patch + bkmpGuildLoaded = false), alle anderen Mitglieder mit
+   offenem Gilde-Tab sahen den neuen Kassenstand erst nach eigenem
+   Neuladen. Gleiches Kanal-Prinzip wie beim Gildenchat/Raid-HP-Sync oben
+   (beide Tabellen muessen in supabase-realtime-enable.sql stehen, sonst
+   feuert Postgres fuer NIEMANDEN ein Event, siehe Kommentar dort):
+   - guilds (id=eq.guildId, Primärschlüssel-Filter): Kasse/XP/Mitglieder-
+     zahl/Bonus-Plaetze/Banner/Ziel usw. bei jeder Aenderung komplett neu.
+   - guild_members (guild_id=eq.guildId): NUR INSERT/UPDATE (neuer
+     Beitritt bzw. veraenderter contributed_gold-/role-Wert) - DELETE
+     (Austritt/Kick) wird bewusst NICHT mitgehoert: ohne REPLICA IDENTITY
+     FULL auf dieser Tabelle liefert Postgres bei DELETE nur die
+     Primärschlüssel-Spalte (auth_user_id) im alten Datensatz, der
+     Realtime-Server kann den Spalten-Filter "guild_id=eq...." fuer
+     DELETE-Events dann gar nicht auswerten - ein trotzdem registrierter
+     Handler wuerde also nie feuern (irrefuehrender toter Code) statt nur
+     "nice to have, aber noch nicht live" zu bleiben wie bisher. */
+let bkmpGuildStateChannel = null;
+function bkmpSubscribeToGuildState(guildId, onGuildRow, onMemberChange) {
+  bkmpUnsubscribeFromGuildState();
+  const client = bkmpGetSupabaseClient();
+  if (!client || !guildId) return;
+  bkmpGuildStateChannel = client.channel('guildstate-' + guildId)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'guilds', filter: `id=eq.${guildId}` }, payload => {
+      onGuildRow(payload.new);
+    })
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'guild_members', filter: `guild_id=eq.${guildId}` }, payload => {
+      onMemberChange(payload.new);
+    })
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'guild_members', filter: `guild_id=eq.${guildId}` }, payload => {
+      onMemberChange(payload.new);
+    })
+    .subscribe();
+}
+function bkmpUnsubscribeFromGuildState() {
+  if (bkmpGuildStateChannel) { bkmpGuildStateChannel.unsubscribe(); bkmpGuildStateChannel = null; }
 }
 
 window.importLocalExpensesToSupabase = importLocalExpensesToSupabase;

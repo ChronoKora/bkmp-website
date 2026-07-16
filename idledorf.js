@@ -1010,6 +1010,21 @@ function bkmpIdleGetGuildTechCache() {
   try { return JSON.parse(localStorage.getItem(BKMP_GUILD_TECH_CACHE_KEY) || '{}'); } catch (e) { return {}; }
 }
 
+/* ---------------- Gildenplätze dazukaufen (siehe supabase-guild-extra-
+   slots.sql) ----------------
+   Spieler-Wunsch (16.07., Discord: "Die Gilde ist voll wir brauchen mehr
+   Platz... So eine Funktion für Gilden mehr Platz dazu zukaufen"). Fester
+   Basis-Deckel von 20 Mitgliedern (siehe join_guild() in
+   supabase-idle-guilds.sql) lässt sich um bis zu BKMP_GUILD_SLOT_MAX_BONUS
+   weitere Plätze erweitern. Kostenkurve MUSS exakt mit der serverseitigen
+   Formel in buy_guild_slot() uebereinstimmen (400.000 * 1,5^bereits
+   gekaufte Plätze) - hier nur fuer die Anzeige, bezahlt/geprueft wird
+   ausschliesslich serverseitig. */
+const BKMP_GUILD_SLOT_MAX_BONUS = 10;
+function bkmpGuildSlotCost(currentBonusSlots) {
+  return Math.round(400000 * Math.pow(1.5, currentBonusSlots));
+}
+
 /* ---------------- Gilden-Erfolge: Kontextfelder (window.BKMP_GUILD_ACHIEVEMENTS_EXTRA
    weiter unten) ----------------
    Gleiches Cache-Muster wie bkmpRaidGetAchievementContextFields, aber ohne
@@ -1957,6 +1972,22 @@ function bkmpDungeonAutoFinishSequence() {
   bkmpDungeonAutoRunsDone = 0;
   bkmpDungeonAutoStats = null;
   bkmpDungeonAutoCancelled = false;
+  /* Bug-Fix (Spieler-Report 16.07., "der Autokampf ist nicht abbrechbar"):
+     wird waehrend der kurzen Pause zwischen zwei Auto-Laeufen auf
+     Abbrechen geklickt (oder schlaegt der naechste Versuch dort fehl,
+     z.B. weil zwischenzeitlich die Schluessel ausgingen), landet man
+     HIER, OHNE vorher durch bkmpDungeonFinish() gelaufen zu sein - und
+     nur DORT wurden Banner/Stage-Leiste bisher aufgeraeumt. Der Auto-Lauf
+     stoppte technisch zwar sofort korrekt (kein weiterer Versuch startete
+     mehr), das "naechster Versuch startet gleich..."-Banner samt totem
+     Abbrechen-Button blieb aber fuer immer sichtbar stehen - fuer den
+     Spieler sah das exakt wie ein wirkungsloser Klick aus. Jetzt raeumt
+     diese Funktion die Anzeige selbst auf (idempotent, falls sie ueber
+     bkmpDungeonFinish() bereits erledigt wurde). */
+  const banner = document.getElementById('idleDungeonBanner');
+  const stageBar = document.getElementById('idleStageBar');
+  if (banner) banner.style.display = 'none';
+  if (stageBar) stageBar.style.display = '';
   if (stats) {
     bkmpDungeonShowAutoSummary(stats, done, total);
   }
@@ -4072,6 +4103,7 @@ let bkmpGuildLoading = false;
 let bkmpGuildBusy = false;
 let bkmpGuildChatMessages = [];
 let bkmpGuildChatLoadedForGuildId = null;
+let bkmpGuildStateSubscribedForGuildId = null;
 let bkmpGuildSettingsOpen = false;
 let bkmpGuildMyInviteCode = null;
 let bkmpGuildActivityLog = [];
@@ -4146,6 +4178,7 @@ function bkmpGuildFormatActivityEntry(entry) {
     case 'leave': return `➖ ${name} hat die Gilde verlassen.`;
     case 'kick': return `🚫 ${name} wurde aus der Gilde entfernt.`;
     case 'level_up': return `🏰 Gildenlevel ${entry.value} erreicht!`;
+    case 'slot_purchase': return `🏗️ ${name} hat einen Gildenplatz dazugekauft (jetzt ${entry.value} Plätze).`;
     case 'promote': return `⭐ ${name} wurde befördert.`;
     case 'demote': return `⬇️ ${name} wurde degradiert.`;
     case 'boss_defeated': return `🐉 Gildenboss${entry.extra ? ' ' + escapeHtml(entry.extra) : ''} besiegt!`;
@@ -4262,6 +4295,7 @@ async function bkmpIdleRenderGildePanel() {
   const uid = bkmpGuildMyAuthUserId;
   if (!uid) {
     if (typeof bkmpUnsubscribeFromGuildChat === 'function') bkmpUnsubscribeFromGuildChat();
+    if (typeof bkmpUnsubscribeFromGuildState === 'function') bkmpUnsubscribeFromGuildState();
     panel.innerHTML = `
       <div class="idle-dungeon-intro">
         <h4>🛡️ Gilde</h4>
@@ -4272,7 +4306,9 @@ async function bkmpIdleRenderGildePanel() {
 
   if (!bkmpGuildState) {
     if (typeof bkmpUnsubscribeFromGuildChat === 'function') bkmpUnsubscribeFromGuildChat();
+    if (typeof bkmpUnsubscribeFromGuildState === 'function') bkmpUnsubscribeFromGuildState();
     bkmpGuildChatLoadedForGuildId = null;
+    bkmpGuildStateSubscribedForGuildId = null;
     bkmpGuildActivityLoadedForGuildId = null;
     panel.innerHTML = `
       <div class="idle-dungeon-intro">
@@ -4305,17 +4341,17 @@ async function bkmpIdleRenderGildePanel() {
           const members = bkmpGuildBrowseMembersCache[g.id];
           let actionHtml;
           if (g.isPublic) {
-            actionHtml = `<button type="button" class="btn-ja idle-guild-join-btn" ${bkmpGuildBusy || g.memberCount >= 20 ? 'disabled' : ''}>${g.memberCount >= 20 ? 'Voll' : 'Beitreten'}</button>`;
+            actionHtml = `<button type="button" class="btn-ja idle-guild-join-btn" ${bkmpGuildBusy || g.memberCount >= g.maxMembers ? 'disabled' : ''}>${g.memberCount >= g.maxMembers ? 'Voll' : 'Beitreten'}</button>`;
           } else if (myRequest) {
             actionHtml = `<span class="idle-guild-request-pending">🕓 Anfrage ausstehend</span><button type="button" class="btn-nein idle-guild-cancel-request-btn" data-request-id="${escapeHtml(myRequest.id)}" ${bkmpGuildBusy ? 'disabled' : ''}>Zurückziehen</button>`;
           } else {
-            actionHtml = `<button type="button" class="btn-ja idle-guild-request-btn" ${bkmpGuildBusy || g.memberCount >= 20 ? 'disabled' : ''}>${g.memberCount >= 20 ? 'Voll' : 'Anfrage senden'}</button>`;
+            actionHtml = `<button type="button" class="btn-ja idle-guild-request-btn" ${bkmpGuildBusy || g.memberCount >= g.maxMembers ? 'disabled' : ''}>${g.memberCount >= g.maxMembers ? 'Voll' : 'Anfrage senden'}</button>`;
           }
           return `
           <div class="idle-arena-opponent-card" data-guild-id="${escapeHtml(g.id)}">
             <span class="idle-arena-opponent-name">${g.isPublic ? '🌐' : '🔒'} ${bkmpRenderGuildBanner(g.banner, 28)} [${escapeHtml(g.tag)}] ${escapeHtml(g.name)}</span>
             <span class="idle-arena-opponent-rating">💰 ${bkmpIdleFormatNumber(g.treasuryGold)}</span>
-            <span class="idle-arena-opponent-record">🏰 Lvl ${level} &middot; ${g.memberCount}/20 Mitglieder${winRate !== null ? ` &middot; 🐲 ${g.bossesDefeated} (${winRate}%)` : ''}</span>
+            <span class="idle-arena-opponent-record">🏰 Lvl ${level} &middot; ${g.memberCount}/${g.maxMembers} Mitglieder${winRate !== null ? ` &middot; 🐲 ${g.bossesDefeated} (${winRate}%)` : ''}</span>
             <button type="button" class="btn-nein idle-guild-toggle-members-btn">${isExpanded ? 'Mitglieder ausblenden' : 'Mitglieder anzeigen'}</button>
             ${actionHtml}
             ${isExpanded ? `
@@ -4442,6 +4478,8 @@ async function bkmpIdleRenderGildePanel() {
   const bonusPct = typeof bkmpIdleGuildTreasuryBonusPct === 'function' ? bkmpIdleGuildTreasuryBonusPct(g.treasuryGold) : 0;
   const nextMilestone = typeof bkmpIdleGuildNextTreasuryMilestone === 'function' ? bkmpIdleGuildNextTreasuryMilestone(g.treasuryGold) : null;
   const levelInfo = bkmpGuildLevelInfo(g.guildXp);
+  const slotsMaxed = g.bonusMemberSlots >= BKMP_GUILD_SLOT_MAX_BONUS;
+  const nextSlotCost = bkmpGuildSlotCost(g.bonusMemberSlots);
 
   if (isLeader && bkmpGuildMyInviteCode === null && !g.isPublic) {
     bkmpGuildGetMyInviteCode().then(code => { bkmpGuildMyInviteCode = code || ''; bkmpIdleRenderGildePanel(); });
@@ -4466,6 +4504,39 @@ async function bkmpIdleRenderGildePanel() {
         if (bkmpGuildChatMessages.length > 50) bkmpGuildChatMessages.shift();
         bkmpIdleRenderGildePanel();
       });
+    }
+  }
+  if (bkmpGuildStateSubscribedForGuildId !== g.id) {
+    bkmpGuildStateSubscribedForGuildId = g.id;
+    /* Spieler-Wunsch (16.07.): "wenn Gold eingezahlt wird das es gleich
+       für alle angezeigt wird, ohne reloaden zu müssen" - bisher patchte
+       jede Gilden-Aktion (Beitrag/Levelaufstieg/Technologie/Platzkauf)
+       nur den lokalen State des HANDELNDEN Spielers, alle anderen mit
+       offenem Gilde-Tab sahen die Aenderung erst nach eigenem Neuladen.
+       Siehe bkmpSubscribeToGuildState() in supabase.js fuer die genaue
+       Kanal-/Filter-Begruendung. */
+    if (typeof bkmpSubscribeToGuildState === 'function') {
+      bkmpSubscribeToGuildState(g.id,
+        row => {
+          if (!bkmpGuildState || typeof bkmpGuildMapRow !== 'function') return;
+          bkmpGuildState.guild = bkmpGuildMapRow(row);
+          bkmpIdleRenderGildePanel();
+        },
+        row => {
+          if (!bkmpGuildState) return;
+          const mapped = {
+            authUserId: row.auth_user_id,
+            displayName: row.display_name,
+            role: row.role,
+            contributedGold: Number(row.contributed_gold || 0),
+            joinedAt: row.joined_at
+          };
+          const idx = bkmpGuildState.members.findIndex(m => m.authUserId === mapped.authUserId);
+          if (idx >= 0) bkmpGuildState.members[idx] = mapped;
+          else bkmpGuildState.members.push(mapped);
+          bkmpIdleRenderGildePanel();
+        }
+      );
     }
   }
   if (bkmpGuildActivityLoadedForGuildId !== g.id) {
@@ -4506,7 +4577,10 @@ async function bkmpIdleRenderGildePanel() {
         <h4>${g.isPublic ? '🌐' : '🔒'} [${escapeHtml(g.tag)}] ${escapeHtml(g.name)}</h4>
       </div>
       ${g.description ? `<p>${escapeHtml(g.description)}</p>` : ''}
-      <p>${g.memberCount}/20 Mitglieder &middot; Deine Rolle: ${BKMP_GUILD_ROLE_LABELS[bkmpGuildState.myRole] || bkmpGuildState.myRole} &middot; ${g.isPublic ? 'Öffentlich' : 'Privat'}</p>
+      <p>${g.memberCount}/${g.maxMembers} Mitglieder &middot; Deine Rolle: ${BKMP_GUILD_ROLE_LABELS[bkmpGuildState.myRole] || bkmpGuildState.myRole} &middot; ${g.isPublic ? 'Öffentlich' : 'Privat'}</p>
+      ${isLeaderOrOfficer ? `<p class="idle-dungeon-best">🏗️ Gildenplätze: ${g.bonusMemberSlots > 0 ? `+${g.bonusMemberSlots} dazugekauft` : 'noch keine dazugekauft'}${slotsMaxed
+        ? ' &middot; ✅ Maximale Erweiterung erreicht'
+        : ` &middot; <button type="button" class="btn-nein idle-guild-buy-slot-btn" id="idleGuildBuySlotBtn" ${bkmpGuildBusy || g.treasuryGold < nextSlotCost ? 'disabled' : ''}>+1 Platz (${bkmpIdleFormatNumber(nextSlotCost)} 💰)</button>`}</p>` : ''}
       <div class="idle-guild-level-row">
         <span class="idle-guild-level-badge">🏰 Level ${levelInfo.level}</span>
         <span class="idle-guild-level-xp">${bkmpIdleFormatNumber(levelInfo.xpIntoLevel)} / ${levelInfo.nextLevelXp !== null ? bkmpIdleFormatNumber(levelInfo.xpForLevel) : '—'} Erfahrung</span>
@@ -4573,7 +4647,7 @@ async function bkmpIdleRenderGildePanel() {
         <div class="idle-arena-opponent-card" data-request-id="${escapeHtml(r.id)}">
           <span class="idle-arena-opponent-name">${escapeHtml(r.displayName)}</span>
           <span class="idle-arena-opponent-record">${r.message ? escapeHtml(r.message) : ''}</span>
-          <button type="button" class="btn-ja idle-guild-request-accept-btn" ${g.memberCount >= 20 ? 'disabled title="Gilde ist voll"' : ''}>Annehmen</button>
+          <button type="button" class="btn-ja idle-guild-request-accept-btn" ${g.memberCount >= g.maxMembers ? 'disabled title="Gilde ist voll"' : ''}>Annehmen</button>
           <button type="button" class="btn-nein idle-guild-request-reject-btn">Ablehnen</button>
         </div>
       `).join('')}
@@ -4676,6 +4750,21 @@ async function bkmpIdleRenderGildePanel() {
       await bkmpGuildLeave();
       bkmpGuildLoaded = false;
       bkmpGuildRefreshTreasuryBonusCache();
+    } catch (e) {
+      if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(e.message, 3400);
+    }
+    bkmpGuildBusy = false;
+    await bkmpIdleRenderGildePanel();
+  });
+
+  const buySlotBtn = document.getElementById('idleGuildBuySlotBtn');
+  if (buySlotBtn) buySlotBtn.addEventListener('click', async () => {
+    if (bkmpGuildBusy) return;
+    bkmpGuildBusy = true;
+    try {
+      await bkmpGuildBuySlot();
+      bkmpGuildLoaded = false;
+      if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('🏗️ Gildenplatz dazugekauft!', 3200);
     } catch (e) {
       if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(e.message, 3400);
     }
@@ -5577,6 +5666,41 @@ function bkmpIdleShowOfflineCard(result) {
   card.style.display = '';
   const closeBtn = document.getElementById('idleOfflineCardClose');
   if (closeBtn) closeBtn.addEventListener('click', () => { card.style.display = 'none'; });
+}
+
+/* Spieler-Report (16.07., Screenshot Kampf-Tab): "Habe ich das Gefühl,
+   dass es pausiert", wenn laenger ein anderer Tab/ein anderes Fenster
+   darueber liegt. Kein Bug im eigentlichen Sinn - Browser drosseln
+   setInterval in nicht sichtbaren/verdeckten Tabs GRUNDSAETZLICH (Standard-
+   Verhalten JEDER Webseite, Akku-/CPU-Schutz), der Live-Tick (bkmpIdleTick,
+   alle ~900ms) laeuft dadurch effektiv kaum noch. Bisher fing nur ein
+   Neuladen/erneutes Oeffnen des Dorf-Fensters die Luecke ueber das
+   serverseitige Offline-Fortschritts-Modell ab (bkmpIdleClaimOfflineProgress,
+   siehe bkmpIdleOpenModal) - blieb das Fenster die ganze Zeit offen und nur
+   der TAB verdeckt/im Hintergrund, gab es GAR KEINEN Ausgleich, das Dorf sah
+   dann tatsaechlich wie pausiert aus. Jetzt: sobald der Tab wieder sichtbar
+   wird, wird derselbe, bereits serverseitig abgesicherte Abgleich (inkl.
+   dessen eigener 60-Sekunden-Mindestschwelle in api/claim-idle-offline-
+   progress.js - kurzes Wegschauen loest also von selbst nichts aus) erneut
+   angestossen. Bewusst NUR bei normalem Dorf-Kampf (Dorf-Fenster offen, kein
+   Dungeon-/Turm-/Raid-Sonderkampf aktiv) - das Offline-Modell simuliert
+   ausschliesslich die normale Drachen-Stufen-Kletterei, nicht diese
+   instanzierten Sonderkaempfe. */
+async function bkmpIdleCatchUpAfterHidden() {
+  if (!bkmpIdleModalOpen || !bkmpIdleState) return;
+  if (bkmpDungeonActive || bkmpDungeonAutoActive() || bkmpTowerActive) return;
+  if (typeof bkmpRaidShouldShowCombatView === 'function' && bkmpRaidShouldShowCombatView()) return;
+  const name = typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : '';
+  if (!name) return;
+  const offlineResult = await bkmpIdleClaimOfflineProgress(name);
+  if (offlineResult) bkmpIdleApplyOfflineResult(offlineResult);
+  bkmpIdleShowOfflineCard(offlineResult);
+  if (offlineResult && offlineResult.newTotals) {
+    bkmpIdleRecomputeEffectiveStats();
+    bkmpIdleRenderHud();
+    bkmpIdleUpdateVillageHpBar();
+    bkmpIdleUpdateDragonHpBar();
+  }
 }
 
 /* ---------------- Sync ---------------- */
@@ -10493,10 +10617,13 @@ function bkmpIdleInit() {
     bkmpIdleFlushRuneSyncNow();
   });
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) return;
-    bkmpIdleQueueSync(); bkmpIdleFlushSync();
-    bkmpPrestigeFlushSyncNow();
-    bkmpIdleFlushRuneSyncNow();
+    if (document.hidden) {
+      bkmpIdleQueueSync(); bkmpIdleFlushSync();
+      bkmpPrestigeFlushSyncNow();
+      bkmpIdleFlushRuneSyncNow();
+      return;
+    }
+    bkmpIdleCatchUpAfterHidden();
   });
   window.setTimeout(bkmpIdlePreloadStateIfNamed, 0);
 }
