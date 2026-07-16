@@ -5001,12 +5001,21 @@ async function bkmpIdleClaimOfflineProgress(name) {
        Offline-Fortschritt klaut. */
     const session = typeof bkmpGetPlayerSession === 'function' ? await bkmpGetPlayerSession() : null;
     const accessToken = session ? session.access_token : null;
-    if (!accessToken) return null;
+    /* Bug-Fix (Spieler-Meldung FlinkerBoy7289, 16.07.: "bekomme ich z.B.
+       ueber Nacht keine Offline Sachen"): ein fehlendes/abgelaufenes Token
+       (z.B. durch den separat gefixten Session-Rauswurf-Bug) und ein 401
+       vom Server wurden bisher identisch zu "return null" wie ein simples
+       "nichts zu holen" behandelt - der Spieler bekam nie einen Hinweis,
+       WARUM kein Offline-Fortschritt ankam. Jetzt ein eigenes, erkennbares
+       Ergebnis (authError), damit bkmpIdleShowOfflineCard einen echten
+       Hinweis statt stiller Nichtanzeige geben kann. */
+    if (!accessToken) return { authError: true };
     const res = await fetch('/api/claim-idle-offline-progress', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
       body: JSON.stringify({ playerName: name })
     });
+    if (res.status === 401) return { authError: true };
     if (!res.ok) return null;
     const data = await res.json();
     return data && data.ok ? data : null;
@@ -5024,6 +5033,16 @@ function bkmpIdleApplyOfflineResult(result) {
 function bkmpIdleShowOfflineCard(result) {
   const card = document.getElementById('idleDorfOfflineCard');
   if (!card) return;
+  if (result && result.authError) {
+    card.innerHTML = `
+      <button type="button" class="idle-offline-close" id="idleOfflineCardClose" aria-label="Schließen">&times;</button>
+      <strong>⚠️ Offline-Fortschritt konnte nicht abgerufen werden</strong>
+      <div class="idle-offline-rewards"><span>Deine Sitzung war beim Laden nicht mehr gültig. Falls das öfter passiert: einmal aus- und wieder einloggen.</span></div>`;
+    card.style.display = '';
+    const closeErrBtn = document.getElementById('idleOfflineCardClose');
+    if (closeErrBtn) closeErrBtn.addEventListener('click', () => { card.style.display = 'none'; });
+    return;
+  }
   if (!result || !result.rewards || !result.elapsedSeconds || result.elapsedSeconds < 60) { card.style.display = 'none'; return; }
   const r = result.rewards;
   const mins = Math.round(result.elapsedSeconds / 60);

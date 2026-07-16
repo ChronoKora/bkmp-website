@@ -85,7 +85,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260718-stickytitles1">
+<link rel="stylesheet" href="style.css?v=20260718-sessionfix1">
 </head>
 <body>
 
@@ -1150,9 +1150,9 @@
   </div>
 
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260717-stickytitles1"></script>
+  <script src="supabase.js?v=20260717-sessionfix1"></script>
   <script src="app.js?v=20260712-themefix1"></script>
-  <script src="idledorf.js?v=20260717-stickytitles1"></script>
+  <script src="idledorf.js?v=20260717-sessionfix1"></script>
   <script src="mapart.js?v=20260717-kartenfirmen1"></script>
   <script>
     bkmpInitTheme();
@@ -4099,16 +4099,54 @@
        inzwischen anderswo eingeloggt wurde, hat der Server eine NEUE
        Kennung, dieses Geraet erkennt den Unterschied und loggt sich selbst
        aus ("neuestes Login gewinnt", kein Blockieren des neuen Geraets). */
+    /* Bug-Fix (Spieler-Meldung FlinkerBoy7289, 16.07.: "Ich werde die ganze
+       Zeit ausgeloggt ohne dass ich Cookies loesche"): bkmpClaimAndWatchSession
+       wurde bisher bei JEDEM Seiten-Laden aufgerufen, das eine bestehende
+       Session wiederherstellt (nicht nur bei einem echten Neu-Login) - jeder
+       Aufruf hat die geteilte player_stats.active_session_token-Spalte
+       unbedingt ueberschrieben. Da die Player-Auth-Session in einem einzigen,
+       browserweit geteilten localStorage-Schluessel liegt (siehe
+       bkmpGetPlayerAuthClient), fuehrte JEDES zweite Tab/ein vom Betriebs-
+       system neu geladenes Hintergrund-Tab desselben Geraets zu einem
+       Wettlauf: beide beanspruchten abwechselnd dieselbe Kennung neu, das
+       jeweils "verlierende" Tab erkannte die eigene (gerade ueberschriebene)
+       Kennung als veraltet und warf sich selbst per GLOBALEM signOut() raus -
+       das loescht die Session serverseitig UND im geteilten localStorage,
+       reisst also auch andere, eigentlich noch gueltige Tabs mit. Jetzt: nur
+       ein ECHTER Neu-Login (isNewLogin=true) beansprucht die Kennung serverseitig
+       neu; eine reine Session-Wiederherstellung uebernimmt stattdessen die
+       bereits lokal gemerkte eigene Kennung (bkmp-my-session-token, derselbe
+       geteilte localStorage wie die Auth-Session selbst) - alle Tabs/Reloads
+       desselben Geraets landen so auf derselben Kennung und stossen sich nie
+       gegenseitig aus. Ein WIRKLICH anderes Geraet ueberschreibt die Server-
+       Kennung weiterhin korrekt und loest den Rauswurf wie gewollt aus. */
+    const BKMP_MY_SESSION_TOKEN_KEY = 'bkmp-my-session-token';
+    function bkmpGetStoredSessionToken() {
+      try { return localStorage.getItem(BKMP_MY_SESSION_TOKEN_KEY) || null; } catch (e) { return null; }
+    }
+    function bkmpSetStoredSessionToken(token) {
+      try {
+        if (token) localStorage.setItem(BKMP_MY_SESSION_TOKEN_KEY, token);
+        else localStorage.removeItem(BKMP_MY_SESSION_TOKEN_KEY);
+      } catch (e) {}
+    }
     let bkmpMySessionToken = null;
     let bkmpSessionWatchInterval = null;
     function bkmpStopSessionWatch() {
       if (bkmpSessionWatchInterval) { window.clearInterval(bkmpSessionWatchInterval); bkmpSessionWatchInterval = null; }
       bkmpMySessionToken = null;
+      bkmpSetStoredSessionToken(null);
     }
-    async function bkmpClaimAndWatchSession(name) {
-      if (!name || typeof claimActiveSession !== 'function') return;
+    async function bkmpClaimAndWatchSession(name, isNewLogin) {
+      if (!name) return;
       try {
-        bkmpMySessionToken = await claimActiveSession(name);
+        if (isNewLogin || !bkmpGetStoredSessionToken()) {
+          if (typeof claimActiveSession !== 'function') return;
+          bkmpMySessionToken = await claimActiveSession(name);
+          bkmpSetStoredSessionToken(bkmpMySessionToken);
+        } else {
+          bkmpMySessionToken = bkmpGetStoredSessionToken();
+        }
       } catch (e) {
         console.warn('Sitzungs-Kennung konnte nicht gesetzt werden (Migration evtl. noch nicht ausgefuehrt).', e);
         return;
@@ -5389,7 +5427,7 @@
         }
         bkmpAchievementNotifyReady = false;
         bkmpSetMcName(canonicalName);
-        bkmpClaimAndWatchSession(canonicalName);
+        bkmpClaimAndWatchSession(canonicalName, true);
         mcNameOverlay.classList.remove('visible');
         renderAchievementBadge();
         bkmpRefreshOwnedPlushies();
