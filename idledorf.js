@@ -330,8 +330,17 @@ function bkmpIdleSkillEffectTotals(skillAllocations, skillDefs) {
 const BKMP_IDLE_UPGRADES = [
   { id: 'atk', name: 'Waffenschmiede', desc: '+1 Angriff pro Stufe.', icon: '⚔️', resource: 'gold', baseCost: 35, costRate: 0.25, costExponent: 2.3, effectType: 'attack_flat', effectPerLevel: 1, maxLevel: 500 },
   { id: 'def', name: 'Rüstkammer', desc: '+1 Verteidigung pro Stufe.', icon: '🛡️', resource: 'gold', baseCost: 35, costRate: 0.25, costExponent: 2.3, effectType: 'defense_flat', effectPerLevel: 1, maxLevel: 500 },
-  { id: 'hp', name: 'Vorratshaus', desc: '+5 Leben pro Stufe.', icon: '❤️', resource: 'wood', baseCost: 25, costRate: 0.22, costExponent: 2.2, effectType: 'hp_flat', effectPerLevel: 5, maxLevel: 500 },
-  { id: 'walls', name: 'Steinmauern', desc: '+1 Verteidigung pro Stufe.', icon: '🧱', resource: 'stone', baseCost: 25, costRate: 0.22, costExponent: 2.2, effectType: 'defense_flat', effectPerLevel: 1, maxLevel: 500 },
+  /* maxLevel 500 -> 5000 (Balance-Audit-Fix 16.07.): hp_flat/defense_flat
+     sind FLACHE Boni ohne gemeinsamen Prozent-Deckel (im Unterschied zu
+     z.B. crit_chance/loot_chance_pct weiter unten) - ihr relativer Nutzen
+     sinkt von selbst, je hoeher die Basiswerte wachsen, sie koennen also
+     gefahrlos immer weiter gekauft werden. Vorher bei Level 500 das Ende
+     der Fahnenstange: Holz/Stein hatten danach ueberhaupt keinen
+     Verwendungszweck mehr, wurden aber von den Produktionsgebaeuden
+     weiter unbegrenzt nachproduziert - jetzt ein echtes Langzeitziel statt
+     einer toten Ressource. */
+  { id: 'hp', name: 'Vorratshaus', desc: '+5 Leben pro Stufe.', icon: '❤️', resource: 'wood', baseCost: 25, costRate: 0.22, costExponent: 2.2, effectType: 'hp_flat', effectPerLevel: 5, maxLevel: 5000 },
+  { id: 'walls', name: 'Steinmauern', desc: '+1 Verteidigung pro Stufe.', icon: '🧱', resource: 'stone', baseCost: 25, costRate: 0.22, costExponent: 2.2, effectType: 'defense_flat', effectPerLevel: 1, maxLevel: 5000 },
   { id: 'crit', name: 'Zielübung', desc: '+1 Krit-Chance pro Stufe.', icon: '🎯', resource: 'essence', baseCost: 6, costRate: 0.2, costExponent: 1.8, effectType: 'crit_chance_flat', effectPerLevel: 1, maxLevel: 100 },
   /* NACHBESSERUNG (Spieler-Report 13.07.: "ich bin schon bei 🍀 +49% obwohl
      ich noch keine Runen habe, das muss runter skaliert werden") - maxLevel
@@ -340,7 +349,15 @@ const BKMP_IDLE_UPGRADES = [
      'crit' oben gebracht (maxLevel 100 x 1%/Stufe = max +100% pro Upgrade) -
      zusaetzlich zur harten Gesamt-Obergrenze in bkmpIdleRecomputeEffectiveStats. */
   { id: 'crystal_gold', name: 'Kristallschliff', desc: '+1% Gold-Ausbeute pro Stufe.', icon: '💎', resource: 'crystals', baseCost: 5, costRate: 0.22, costExponent: 2, effectType: 'gold_prod_pct', effectPerLevel: 1, maxLevel: 100 },
-  { id: 'essence_loot', name: 'Essenzbindung', desc: '+1% Lootchance pro Stufe.', icon: '🧪', resource: 'essence', baseCost: 4, costRate: 0.22, costExponent: 2, effectType: 'loot_chance_pct', effectPerLevel: 1, maxLevel: 100 }
+  { id: 'essence_loot', name: 'Essenzbindung', desc: '+1% Lootchance pro Stufe.', icon: '🧪', resource: 'essence', baseCost: 4, costRate: 0.22, costExponent: 2, effectType: 'loot_chance_pct', effectPerLevel: 1, maxLevel: 100 },
+  /* Neu (Balance-Audit-Fix 16.07.): 'crit' und 'essence_loot' oben sind
+     Essenz's einzige bisherige Sinks, fuettern aber beide einen gedeckelten
+     Pott (crit_chance absolut auf 75, loot_chance_pct auf 300% - siehe
+     bkmpIdleRecomputeEffectiveStats) und sind damit irgendwann "fertig".
+     Essenzkern schliesst dieselbe Luecke wie 'hp'/'walls' oben, nur fuer
+     Essenz statt Holz/Stein - flacher, ungedeckelter Angriffsbonus als
+     echtes Langzeitziel. */
+  { id: 'essence_core', name: 'Essenzkern', desc: '+2 Angriff pro Stufe.', icon: '🔮', resource: 'essence', baseCost: 8, costRate: 0.22, costExponent: 2.0, effectType: 'attack_flat', effectPerLevel: 2, maxLevel: 5000 }
 ];
 
 function bkmpIdleUpgradeCost(def, currentLevel) {
@@ -758,7 +775,8 @@ function bkmpIdleDefaultState(name) {
     goldmine_level: 0, goldmine_collected_at: new Date().toISOString(),
     kristallmine_level: 0, kristallmine_collected_at: new Date().toISOString(),
     manaquelle_level: 0, manaquelle_collected_at: new Date().toISOString(),
-    magierakademie_level: 0, magierakademie_collected_at: new Date().toISOString()
+    magierakademie_level: 0, magierakademie_collected_at: new Date().toISOString(),
+    titles_unlocked_at: {}, cosmetics_unlocked_at: {}
   };
 }
 
@@ -1069,7 +1087,15 @@ function bkmpIdleRecomputeEffectiveStats() {
   const attackFlatTotal = t('attack_flat') + t('ballista_unlock') * 8;
   bkmpIdleEffectiveStats = {
     attack: (base.attack + attackFlatTotal) * (1 + attackPctTotal / 100),
-    defense: (base.defense + t('defense_flat')) * (1 + (t('defense_pct') + guildBonusPct + gt('defensePct')) / 100),
+    /* Deckel ergaenzt (Dungeon-Balance-Analyse 16.07.): defense_pct war der
+       einzige Sammel-Pott ohne die Obergrenze aus der NACHBESSERUNG oben
+       (attack_pct/hp_pct/gold_prod_pct/xp_pct/loot_chance_pct/crit_chance
+       sind alle gedeckelt, dieser hier war es nicht) - da Schaden im Kampf
+       als FESTER Abzug (0.5 * defense) statt prozentual gerechnet wird,
+       haette unbegrenztes defense_pct jeden Kampf (inkl. Dungeon) trivial
+       machen koennen. 400 spiegelt den bestehenden Deckel von hp_pct/
+       goldBonus/xpBonus weiter unten. */
+    defense: (base.defense + t('defense_flat')) * (1 + Math.min(400, t('defense_pct') + guildBonusPct + gt('defensePct')) / 100),
     hp: Math.round((base.hp + t('hp_flat')) * (1 + (t('hp_pct') + prestigeLevelBonusPct + guildPrestigeBonusPct) / 100)),
     critChance: Math.min(75, base.critChance + t('crit_chance_flat') + t('crit_chance_pct') + gt('critChancePct')),
     critDamage: base.critDamage + Math.min(300, t('crit_damage_flat') + t('crit_damage_pct') + gt('critDamagePct')),
@@ -1767,8 +1793,26 @@ function bkmpDungeonSpawnWave(wave) {
      Schaden): schafft "Leicht" jetzt mit ca. 55% Rest-HP statt bei Welle
      7 zu sterben - spuerbar leichter, aber kein Selbstlaeufer. Mittel/
      Schwer/Albtraum bleiben bewusst deutlich haerter (mehr Wellen, hoehere
-     waveGrowth-Werte) fuer staerker ausgebaute Charaktere. */
-  const combatMult = Math.pow(waveMult, 0.55);
+     waveGrowth-Werte) fuer staerker ausgebaute Charaktere.
+
+     Balance-Fix (Spieler-Meldung 16.07.: "keiner schafft Mittel/Schwer/
+     Albtraum"): combatMult wuchs oben trotz Daempfung (^0.55) ueber die
+     GROESSERE Wellenzahl dieser drei Stufen weiter ungebremst exponentiell
+     (bei Albtraum Welle 25 z.B. auf das ~100-fache von Welle 1). Da sowohl
+     maxHp als auch attack mit combatMult skalieren, wuchs der GESAMTSCHADEN
+     einer einzelnen Welle dadurch quadratisch mit combatMult - eine
+     Simulation (node, alle vier Schwierigkeiten, mehrere realistische
+     Spieler-Profile inkl. des obigen Report-Spielers) zeigte 0% Siegrate
+     auf Mittel/Schwer/Albtraum unabhaengig vom Ausbaustand, weil KEIN
+     Spieler-Stat (die sind alle ueber die Sammel-Pools weiter oben
+     gedeckelt, siehe attack_pct/hp_pct/crit_chance-Caps) mit einem
+     unbegrenzt wachsenden Gegner mithalten kann. Deckel auf 3.0 (per
+     Simulation verifiziert: macht alle vier Schwierigkeiten fuer normal
+     ausgebaute Charaktere zuverlaessig schaffbar, haelt Schwer/Albtraum
+     durch die schiere Wellenzahl trotzdem spuerbar zaeher als Leicht/
+     Mittel) - ab dem Zeitpunkt, an dem eine Welle das Cap erreicht, bleibt
+     die Pro-Welle-Gefahr konstant statt weiter zu eskalieren. */
+  const combatMult = Math.min(3.0, Math.pow(waveMult, 0.55));
   const fullRoster = bkmpIdleDragonDefs.length ? bkmpIdleDragonDefs : BKMP_IDLE_FALLBACK_DRAGONS;
   /* Nur "normale" aktive Drachen fuer die Wellen-Optik zulassen - Spieler-
      Meldung 17.07. ("Der hat überall Lücken") zeigte, dass die vorherige
@@ -1785,7 +1829,15 @@ function bkmpDungeonSpawnWave(wave) {
      spuerbar staerkerer Zwischen-Gegner, zusaetzlich zum bestehenden
      Endboss auf der letzten Welle. */
   const isMinibossWave = !isFinalWave && wave === Math.ceil(bkmpDungeonActiveDifficulty.waves / 2);
-  const bossBump = isFinalWave ? 1 : (isMinibossWave ? 1.15 : 1);
+  /* Balance-Audit-Fix (16.07.): der als "Dungeon-Champion" benannte Endboss
+     bekam bisher GAR KEINEN eigenen Bonus (bossBump 1) - mechanisch schwaecher
+     beworben als der Miniboss auf halber Strecke (1.15). 1.3 gewaehlt und
+     gegen den frisch eingefuehrten combatMult-Cap simuliert (node, dieselben
+     fuenf Spieler-Profile wie beim combatMult-Fix oben): bleibt fuer jeden
+     normal ausgebauten Charakter zuverlaessig schaffbar (>=98% Siegrate ueber
+     alle vier Schwierigkeiten), macht den eigentlichen Endkampf aber wieder
+     spuerbar haerter als eine gewoehnliche Welle. */
+  const bossBump = isFinalWave ? 1.3 : (isMinibossWave ? 1.15 : 1);
   bkmpIdleCurrentDragon = {
     id: 'dungeon-wave-' + wave,
     name: isFinalWave ? 'Dungeon-Champion' : (isMinibossWave ? 'Wellen-Elite' : `Wellen-Wächter (Welle ${wave})`),
@@ -1802,8 +1854,20 @@ function bkmpDungeonSpawnWave(wave) {
        Dungeon komplett ohne echten Gegenschaden durchspielen. 0.09 macht
        jeden Gegenangriff spuerbar (ca. 9% der eigenen maximalen Stadt-HP
        pro Treffer bei Welle 1, mit combatMult weiter steigend - siehe
-       Balance-Fix-Kommentar oben zu combatMult vs. waveMult). */
-    attack: Math.max(1, Math.round((s.hp || 100) * 0.09 * combatMult * bossBump)),
+       Balance-Fix-Kommentar oben zu combatMult vs. waveMult).
+
+       Balance-Fix (Spieler-Meldung 16.07., siehe combatMult-Cap oben): der
+       Gegenangriff skaliert bewusst mit der EIGENEN Stadt-HP (nicht dem
+       eigenen Angriff), damit er unabhaengig vom Spiel-Baustil spuerbar
+       bleibt - das bestrafte in der Simulation aber gerade HP-lastig
+       ausgebaute Charaktere doppelt (mehr eigene HP = haertere Gegner-
+       treffer, ohne dass mehr eigener Schaden dem etwas entgegensetzt).
+       0.09 kombiniert mit dem jetzt gedeckelten combatMult war fuer solche
+       Builds immer noch toedlich; 0.06 (simulationsgeprueft gegen einen
+       schwachen, einen HP-lastigen [genau das Report-Profil oben], einen
+       reinen Tank- und einen Glaskanonen-Build) macht alle vier
+       Schwierigkeiten fuer jeden davon zuverlaessig schaffbar. */
+    attack: Math.max(1, Math.round((s.hp || 100) * 0.06 * combatMult * bossBump)),
     defense: Math.round((s.defense || 0) * 0.3),
     isDungeon: true
   };
@@ -6491,6 +6555,21 @@ async function bkmpDragonUpgradeBuilding(kind) {
   if (typeof bkmpIdleRenderUpgradesPanel === 'function') bkmpIdleRenderUpgradesPanel();
   if (typeof bkmpIdleRenderDragonsPanel === 'function') bkmpIdleRenderDragonsPanel();
 }
+/* Balance-Audit-Fix (16.07.): passive Gebaeude-Produktion (hier und bei
+   BKMP_IDLE_PRODUCTION_BUILDINGS unten) lief bisher komplett ungedeckelt -
+   anders als der Kampf-Offline-Fortschritt (server-seitig auf 12h begrenzt,
+   siehe api/claim-idle-offline-progress.js) konnte hier "Zeit seit letztem
+   Abholen" beliebig gross werden (ein simpler Systemuhr-Trick, aber auch
+   einfach ein Spieler, der zwei Monate nicht reinschaut, haette bei der
+   Rueckkehr einen einzigen Ressourcen-Batzen bekommen, der jede normale
+   Progression sprengt). 72h (3 Tage) statt der knapperen 12h beim Kampf,
+   weil "auch offline produzieren" hier explizit das beworbene Feature ist
+   (nicht nur eine Kulanz-Regelung) - im Unterschied zum Kampfsystem gibt es
+   bewusst KEINEN Effizienz-Abschlag (waere ein Bruch mit genau diesem
+   Verkaufsversprechen), nur eine Obergrenze fuer die anrechenbare Zeit.
+   Ungenutzte Zeit darueber hinaus verfaellt (kein Nachtrag beim naechsten
+   Besuch), _collected_at wird trotzdem auf "jetzt" gesetzt. */
+const BKMP_IDLE_PRODUCTION_MAX_OFFLINE_HOURS = 72;
 function bkmpIdleAccrueBuildingResources() {
   if (!bkmpIdleState) return;
   const now = Date.now();
@@ -6498,7 +6577,7 @@ function bkmpIdleAccrueBuildingResources() {
     const levelKey = kind === 'fruit' ? 'obstgarten_level' : 'jagdhuette_level';
     const tsKey = kind + '_collected_at';
     const last = Date.parse(bkmpIdleState[tsKey] || now) || now;
-    const hoursElapsed = Math.max(0, (now - last) / 3600000);
+    const hoursElapsed = Math.min(BKMP_IDLE_PRODUCTION_MAX_OFFLINE_HOURS, Math.max(0, (now - last) / 3600000));
     if (hoursElapsed <= 0) return;
     const gained = hoursElapsed * bkmpDragonResourceRatePerHour(kind, bkmpIdleState[levelKey]);
     /* Bug-Report 17.07. (ChronoKora): "Speichern schlaegt IMMER fehl" -
@@ -6567,7 +6646,7 @@ function bkmpIdleAccrueProductionBuildings() {
   BKMP_IDLE_PRODUCTION_BUILDINGS.forEach(def => {
     const level = Number(bkmpIdleState[def.levelKey] || 0);
     const last = Date.parse(bkmpIdleState[def.tsKey] || now) || now;
-    const hoursElapsed = Math.max(0, (now - last) / 3600000);
+    const hoursElapsed = Math.min(BKMP_IDLE_PRODUCTION_MAX_OFFLINE_HOURS, Math.max(0, (now - last) / 3600000));
     if (hoursElapsed <= 0) return;
     const gained = hoursElapsed * bkmpIdleProductionBuildingRatePerHour(def, level);
     if (def.resource === 'xp') {
@@ -9572,6 +9651,27 @@ async function bkmpRaidCheckOutcome() {
   if (bkmpIdleModalOpen) bkmpIdleStartLoop();
 }
 
+/* Eigener Anteil exakt wie raid_finish() serverseitig rechnet (Schaden-
+   Anteil * Belohnungs-Pool, siehe supabase-raid-boss-reward-share.sql) -
+   gleiches Prinzip wie beim Gildenboss (bkmpGuildBossRenderParticipants).
+   Nur Ressourcen mit einem Pool > 0 werden angezeigt (analog zu
+   bkmpDungeonRewardParts). */
+function bkmpRaidRewardSpans(state, mine, totalDamage) {
+  const share = mine && totalDamage > 0 ? mine.damageDealt / totalDamage : 0;
+  const parts = [];
+  const add = (icon, pool) => {
+    const amount = Math.round((pool || 0) * share);
+    if (pool > 0) parts.push(`<span>${icon} +${bkmpIdleFormatNumber(amount)}</span>`);
+  };
+  add('💰', state.goldReward);
+  add('💎', state.gemReward);
+  add('✨', state.xpReward);
+  add('🌳', state.woodReward);
+  add('🗿', state.stoneReward);
+  add('🧪', state.essenceReward);
+  return parts.join('');
+}
+
 async function bkmpRaidShowResult() {
   const resultCard = document.getElementById('raidResultCard');
   const battlefield = document.getElementById('raidBattlefield');
@@ -9630,7 +9730,7 @@ async function bkmpRaidShowResult() {
       <div class="raid-result-stat"><div class="raid-result-stat-label">MVP</div><div class="raid-result-stat-value raid-result-mvp">${mvp ? escapeHtml(mvp.displayName) : '-'}</div></div>
       <div class="raid-result-stat"><div class="raid-result-stat-label">${won ? 'Stadt-HP übrig' : 'Boss-HP übrig'}</div><div class="raid-result-stat-value">${bkmpIdleFormatNumber(won ? bkmpRaidState.cityHp : bkmpRaidState.bossHp)}</div></div>
     </div>
-    ${won ? `<div class="raid-result-rewards"><span>💰 +${bkmpIdleFormatNumber(bkmpRaidState.goldReward || 5000)}</span><span>💎 +${bkmpIdleFormatNumber(bkmpRaidState.gemReward || 25)}</span><span>✨ +${bkmpIdleFormatNumber(bkmpRaidState.xpReward || 2000)}</span></div>` : ''}
+    ${won ? `<div class="raid-result-rewards">${bkmpRaidRewardSpans(bkmpRaidState, mine, totalDamage)}</div><p class="admin-help-text" style="margin-top:-0.3rem;">Belohnung nach Schadensanteil (${totalDamage > 0 && mine ? ((mine.damageDealt / totalDamage) * 100).toFixed(1) : '0'}% des Gesamtschadens).</p>` : ''}
     ${rewardCode ? `
     <div class="raid-result-zerator-code">
       <div class="raid-result-zerator-title">🎁 Plushie! Hier ist dein Code:</div>
@@ -10111,15 +10211,39 @@ window.BKMP_IDLE_TITLES = [
    bewusst in idledorf.js statt index.html, weil bkmpIdleTitleEffectTotals
    echte Kampf-Stats beeinflusst und auch auf idle-stream-mini.html
    (laedt index.html's Inline-Script NICHT) korrekt funktionieren muss. */
+/* Balance-Audit-Fix (16.07., "kritischer Fund"): vorher lag die Merkliste
+   NUR in localStorage - echter Datenverlust bei Geraetewechsel/Cache-Leeren
+   (die Dauerboni aus bkmpIdleTitleEffectTotals unten verschwanden dann
+   ersatzlos, obwohl Level/Kills/... laengst auf dem Server standen), UND
+   mit einem einzigen localStorage-Eintrag im Browser faelschbar, OHNE die
+   App je zu beruehren - ein deutlich niedrigerer Aufwand als jede andere
+   Manipulation in dieser Wirtschaft. localStorage bleibt als synchroner
+   Fast-Cache bestehen (diese Funktion wird sehr haeufig aufgerufen, u.a.
+   bei jedem Stat-Rebuild, noch bevor bkmpIdleState immer sicher gesetzt
+   ist), der eigentliche Speicherort ist jetzt aber bkmpIdleState.
+   titles_unlocked_at (neue Spalte, siehe supabase-idle-title-unlock-
+   persist.sql) - der ganz normal ueber upsertIdlePlayerState() mitgesichert
+   wird wie der Rest des Spielstands. Alte, nur lokal bekannte
+   Freischaltungen (Sessions von vor diesem Fix) werden beim ersten Lesen
+   einmalig in bkmpIdleState uebernommen, damit niemand seine bereits
+   erspielten Titel-Boni durch dieses Update verliert. */
 const BKMP_IDLE_TITLE_UNLOCKED_AT_KEY = 'bkmp-idle-title-unlocked-at';
 function bkmpIdleGetTitleUnlockedAtMap() {
-  try { return JSON.parse(localStorage.getItem(BKMP_IDLE_TITLE_UNLOCKED_AT_KEY) || '{}'); } catch (e) { return {}; }
+  let local = {};
+  try { local = JSON.parse(localStorage.getItem(BKMP_IDLE_TITLE_UNLOCKED_AT_KEY) || '{}'); } catch (e) {}
+  const server = (bkmpIdleState && bkmpIdleState.titles_unlocked_at) || {};
+  const merged = { ...local, ...server };
+  if (bkmpIdleState && Object.keys(merged).length !== Object.keys(server).length) {
+    bkmpIdleState.titles_unlocked_at = merged;
+  }
+  return merged;
 }
 function bkmpIdleSetTitleUnlockedAt(id) {
   const map = bkmpIdleGetTitleUnlockedAtMap();
   if (map[id]) return;
   map[id] = new Date().toISOString();
   try { localStorage.setItem(BKMP_IDLE_TITLE_UNLOCKED_AT_KEY, JSON.stringify(map)); } catch (e) {}
+  if (bkmpIdleState) bkmpIdleState.titles_unlocked_at = map;
 }
 function bkmpIdleTitleUnlockedSticky(title, ctx) {
   if (!title.unlockCustom) return false;
@@ -10127,15 +10251,26 @@ function bkmpIdleTitleUnlockedSticky(title, ctx) {
   return Boolean(bkmpIdleGetTitleUnlockedAtMap()[title.id]);
 }
 
+/* Gleicher Fix wie bkmpIdleGetTitleUnlockedAtMap oben - siehe Kommentar
+   dort. Kosmetiken haben keinen Kampf-Bonus, aber denselben Datenverlust-
+   Bug (Freischaltungen verschwanden bei Geraetewechsel/Cache-Leeren). */
 const BKMP_IDLE_COSMETIC_UNLOCKED_AT_KEY = 'bkmp-idle-cosmetic-unlocked-at';
 function bkmpIdleGetCosmeticUnlockedAtMap() {
-  try { return JSON.parse(localStorage.getItem(BKMP_IDLE_COSMETIC_UNLOCKED_AT_KEY) || '{}'); } catch (e) { return {}; }
+  let local = {};
+  try { local = JSON.parse(localStorage.getItem(BKMP_IDLE_COSMETIC_UNLOCKED_AT_KEY) || '{}'); } catch (e) {}
+  const server = (bkmpIdleState && bkmpIdleState.cosmetics_unlocked_at) || {};
+  const merged = { ...local, ...server };
+  if (bkmpIdleState && Object.keys(merged).length !== Object.keys(server).length) {
+    bkmpIdleState.cosmetics_unlocked_at = merged;
+  }
+  return merged;
 }
 function bkmpIdleSetCosmeticUnlockedAt(id) {
   const map = bkmpIdleGetCosmeticUnlockedAtMap();
   if (map[id]) return;
   map[id] = new Date().toISOString();
   try { localStorage.setItem(BKMP_IDLE_COSMETIC_UNLOCKED_AT_KEY, JSON.stringify(map)); } catch (e) {}
+  if (bkmpIdleState) bkmpIdleState.cosmetics_unlocked_at = map;
 }
 function bkmpIdleCosmeticUnlockedSticky(cosmetic, ctx) {
   if (!cosmetic.unlockCustom) return false;

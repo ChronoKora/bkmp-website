@@ -7666,6 +7666,13 @@ html.bkmp-app-mode .idle-dorf-overlay .idle-dorf-card {
   background:
     radial-gradient(circle at 50% -10%, color-mix(in srgb, var(--app-purple-light) 45%, transparent), transparent 55%),
     linear-gradient(180deg, var(--app-purple-deep) 0%, var(--app-void) 68%);
+  /* Flex-Spalte statt normalem Blockfluss: der Kampf-Tab kann sich damit
+     ueber den ganzen verbleibenden Platz strecken (siehe Phase 13 weiter
+     unten), waehrend alle anderen Panels weiterhin nur so hoch sind wie
+     ihr Inhalt (kein display:none-Element nimmt an Flex-Layout teil, also
+     stoert das andere, gerade unsichtbare Panels nicht). */
+  display: flex;
+  flex-direction: column;
 }
 html.bkmp-app-mode .idle-dorf-overlay .idle-dorf-card::before {
   background:
@@ -8156,9 +8163,12 @@ html.bkmp-app-mode .idle-dorf-tab {
   padding: .6rem .2rem .55rem;
   border-radius: 16px;
 }
-html.bkmp-app-mode .idle-dorf-tab-icon { font-size: 1.5rem; line-height: 1; }
+/* Nur noch 4 Kacheln (3 Haupt-Tabs + Mehr) statt 6 - jede bekommt dadurch
+   automatisch mehr Breite (flex:1 auf .idle-dorf-tab), Schrift/Icon hier
+   zusaetzlich vergroessert, damit der gewonnene Platz auch genutzt wird. */
+html.bkmp-app-mode .idle-dorf-tab-icon { font-size: 1.9rem; line-height: 1; }
 html.bkmp-app-mode .idle-dorf-tab-label {
-  font-size: .64rem;
+  font-size: .74rem;
   line-height: 1;
   white-space: nowrap;
   font-weight: 700;
@@ -9059,4 +9069,102 @@ html.bkmp-app-mode .achievements-subtab {
   padding: .7rem .9rem !important;
   font-size: .88rem !important;
   min-height: 44px !important;
+}
+
+/* ============================================================
+   APP-MODUS REDESIGN, PHASE 13 (echte Ursache der Leerflaeche)
+   ============================================================
+   Nutzer-Video/-Bild zeigte eine riesige leere Flaeche unter der
+   Kampf-Szene. Ursache gefunden: die Website-Grundregel
+   (#idlePanelKampf, siehe weiter oben in dieser Datei) laesst bewusst
+   NICHT das Schlachtfeld wachsen, sondern .idle-dorf-log (Kampf-Log) -
+   das Log war zu diesem Zeitpunkt aber leer, wodurch der gesamte
+   gewonnene Platz einfach als schwarze Flaeche wirkte. Im App-Modus wird
+   das umgedreht: das Schlachtfeld waechst (passend zum urspruenglichen
+   Wunsch "Kampf soll mindestens 70% der Bildschirmhoehe einnehmen"), das
+   Log wird zu einem kleinen, fest begrenzten Streifen am unteren Rand. */
+html.bkmp-app-mode #idlePanelKampf {
+  /* Nur DIESES Panel darf im Flex-Layout der Karte (siehe oben)
+     wachsen - alle anderen Panels bleiben bei ihrer Phase-6-Regel
+     (Hoehe = Inhalt, kein Wachsen), damit deren Leerflaechen-Fix nicht
+     wieder rueckgaengig gemacht wird. */
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+}
+html.bkmp-app-mode .idle-dorf-panel:not(#idlePanelKampf) {
+  flex: 0 0 auto !important;
+}
+html.bkmp-app-mode #idlePanelKampf .idle-battlefield {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+}
+html.bkmp-app-mode #idlePanelKampf .idle-dorf-log {
+  flex: 0 0 auto !important;
+  max-height: 13vh;
+  margin-top: .6rem;
+}
+
+/* Bottom-Navigation auf 3 Haupt-Tabs + Mehr reduziert (Nutzer-Wunsch) -
+   automatisch breitere Kacheln durch flex:1, hier die Ziffer explizit
+   erwaehnt fuer Wartbarkeit: PRIMARY_TAB_IDS in index.html hat jetzt nur
+   noch 3 Eintraege statt 5. */
+
+/* ============================================================
+   APP-MODUS REDESIGN, PHASE 14 (weitere Recherche-Runde)
+   ============================================================
+   1) "Welcome back"-Screens sind in etablierten Idle-Games (Cookie
+      Clicker, Melvor Idle) ein zentrales, eigens gestaltetes Element -
+      unsere Variante (#idleDorfOfflineCard) gab es schon (guter Fund:
+      Bug-Report von dir "Offline-Fortschritt konnte nicht abgerufen
+      werden" zeigte sie schon fruehen im Video), war aber optisch noch
+      nicht an den neuen Look angepasst.
+   2) "Prioritaet+"-Muster (wenige Haupt-Punkte + Rest gruppiert) ist
+      offizielle UX-Praxis ab 5-6 Elementen - bestaetigt den 3+Mehr-Umbau.
+      Ergaenzung: Elemente INNERHALB von "Mehr" sollen nach Kategorie
+      gruppiert werden statt als eine flache Liste (Quelle: NN/g-Muster).
+      Umgesetzt in index.html (setupMoreMenu erzeugt jetzt 4 Gruppen statt
+      eines flachen Rasters), hier nur die Gruppen-Kopfzeilen gestylt.
+   ============================================================ */
+html.bkmp-app-mode .idle-dorf-offline-card {
+  background: linear-gradient(120deg, rgba(255, 215, 106, .16), rgba(56, 189, 248, .1)) !important;
+  border: 1px dashed color-mix(in srgb, var(--app-gold) 60%, transparent) !important;
+  border-radius: 16px !important;
+  padding: .9rem 1.1rem !important;
+}
+html.bkmp-app-mode .idle-dorf-offline-card strong {
+  font-family: 'Fraunces', serif;
+  font-size: 1rem !important;
+  color: var(--app-gold);
+}
+html.bkmp-app-mode .idle-offline-rewards span {
+  display: inline-flex;
+  align-items: center;
+  padding: .28rem .55rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, .25);
+  font-size: .84rem !important;
+  font-variant-numeric: tabular-nums;
+}
+html.bkmp-app-mode .idle-offline-close {
+  width: 32px !important;
+  height: 32px !important;
+  font-size: 1.1rem !important;
+}
+
+/* "Mehr"-Menue-Gruppen (siehe setupMoreMenu in index.html) */
+html.bkmp-app-mode .idle-app-more-sheet-group-title {
+  grid-column: 1 / -1;
+  font-size: .72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--app-muted);
+  margin: .7rem 0 -.1rem;
+  padding-top: .5rem;
+  border-top: 1px solid rgba(255, 255, 255, .08);
+}
+html.bkmp-app-mode .idle-app-more-sheet-group-title:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
 }

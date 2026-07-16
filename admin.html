@@ -20,7 +20,7 @@
 <title>BKMP — Admin</title>
 
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
-<link rel="stylesheet" href="style.css?v=20260718-subtabsfix1">
+<link rel="stylesheet" href="style.css?v=20260718-groupedmenu1">
 </head>
 <body>
 
@@ -966,9 +966,9 @@
   </div>
 
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260717-prestigebuild1"></script>
+  <script src="supabase.js?v=20260718-raidshare1"></script>
   <script src="app.js?v=20260712-themefix1"></script>
-  <script src="idledorf.js?v=20260718-huddatatab1"></script>
+  <script src="idledorf.js?v=20260718-raidshare1"></script>
   <script src="mapart.js?v=20260717-kartenfirmen1"></script>
   <script>
     bkmpInitTheme();
@@ -4555,12 +4555,15 @@
             <div><label>Boss-Leben (Untergrenze)</label><input type="number" min="1" class="raid-boss-field" data-field="base_hp" value="${boss.base_hp}"></div>
             <div><label>Boss-Angriff</label><input type="number" min="1" class="raid-boss-field" data-field="base_attack" value="${boss.base_attack}"></div>
             <div><label>Angriffs-Intervall (Sek.)</label><input type="number" min="1" class="raid-boss-field" data-field="attack_interval_seconds" value="${boss.attack_interval_seconds}"></div>
-            <div><label>Gold-Belohnung</label><input type="number" min="0" class="raid-boss-field" data-field="gold_reward" value="${boss.gold_reward}"></div>
-            <div><label>Edelstein-Belohnung</label><input type="number" min="0" class="raid-boss-field" data-field="gem_reward" value="${boss.gem_reward}"></div>
-            <div><label>XP-Belohnung</label><input type="number" min="0" class="raid-boss-field" data-field="xp_reward" value="${boss.xp_reward}"></div>
+            <div><label>Gold-Belohnung (Pool)</label><input type="number" min="0" class="raid-boss-field" data-field="gold_reward" value="${boss.gold_reward}"></div>
+            <div><label>Edelstein-Belohnung (Pool)</label><input type="number" min="0" class="raid-boss-field" data-field="gem_reward" value="${boss.gem_reward}"></div>
+            <div><label>XP-Belohnung (Pool)</label><input type="number" min="0" class="raid-boss-field" data-field="xp_reward" value="${boss.xp_reward}"></div>
+            <div><label>Holz-Belohnung (Pool)</label><input type="number" min="0" class="raid-boss-field" data-field="wood_reward" value="${boss.wood_reward}"></div>
+            <div><label>Stein-Belohnung (Pool)</label><input type="number" min="0" class="raid-boss-field" data-field="stone_reward" value="${boss.stone_reward}"></div>
+            <div><label>Essenz-Belohnung (Pool)</label><input type="number" min="0" class="raid-boss-field" data-field="essence_reward" value="${boss.essence_reward}"></div>
             <div><label>HP-Skalierung pro Angriffskraft</label><input type="number" min="0" step="1" class="raid-boss-field" data-field="hp_scale_per_attack" value="${boss.hp_scale_per_attack}"></div>
           </div>
-          <p class="admin-help-text">Boss-Leben = max(Boss-Leben-Untergrenze, Summe der Angriffskraft aller Teilnehmer × HP-Skalierung). Wird bei jedem Beitritt waehrend der Vorbereitungsphase neu berechnet - mehr/staerkere Spieler ergeben automatisch einen zaeheren Boss.</p>
+          <p class="admin-help-text">Boss-Leben = max(Boss-Leben-Untergrenze, Summe der Angriffskraft aller Teilnehmer × HP-Skalierung). Wird bei jedem Beitritt waehrend der Vorbereitungsphase neu berechnet - mehr/staerkere Spieler ergeben automatisch einen zaeheren Boss. Die Belohnungsfelder sind der GESAMT-Pool bei Sieg - er wird proportional zum Schadensanteil jedes Teilnehmers aufgeteilt (0 Schaden = 0 Anteil), nicht mehr an jeden pauschal ausgezahlt.</p>
           <label class="admin-checkbox-label"><input type="checkbox" class="raid-boss-field" data-field="active" ${boss.active ? 'checked' : ''}> Aktiv (wird fuer den naechsten Raid ausgewaehlt)</label>
           <button type="button" class="btn btn-primary raid-boss-save-btn" style="margin-top:0.6rem;">Speichern</button>
           <p class="admin-help-text raid-boss-save-status"></p>

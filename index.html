@@ -85,7 +85,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260718-subtabsfix1">
+<link rel="stylesheet" href="style.css?v=20260718-groupedmenu1">
 </head>
 <body>
 
@@ -1179,9 +1179,9 @@
   </div>
 
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260717-prestigebuild1"></script>
+  <script src="supabase.js?v=20260718-raidshare1"></script>
   <script src="app.js?v=20260712-themefix1"></script>
-  <script src="idledorf.js?v=20260718-huddatatab1"></script>
+  <script src="idledorf.js?v=20260718-raidshare1"></script>
   <script src="mapart.js?v=20260717-kartenfirmen1"></script>
   <script>
     bkmpInitTheme();
@@ -6106,15 +6106,46 @@
            Menue - die Klick-Listener aus bkmpIdleInitTabs bleiben dadurch
            unveraendert erhalten, idledorf.js wird nicht angefasst. */
         (function setupMoreMenu() {
-          var PRIMARY_TAB_IDS = ['idleTabBtnKampf', 'idleTabBtnDrachen', 'idleTabBtnDungeon', 'idleTabBtnGilde', 'idleTabBtnSkins'];
+          /* Nutzer-Wunsch nach Live-Test: nur noch 3 grosse Haupt-Tabs
+             statt 5 - Kampf (Kernschleife), Dungeon (haeufigste
+             Progression/Schluessel-Ressource), Gilde (sozial + Gildenboss).
+             Dorf-Skins/Drachenzucht wandern zu den anderen 9 ins
+             Mehr-Menue - seltener gecheckte Sammel-/Kosmetik-Bereiche. */
+          var PRIMARY_TAB_IDS = ['idleTabBtnKampf', 'idleTabBtnDungeon', 'idleTabBtnGilde'];
           var tabsBar = document.getElementById('idleDorfTabs');
           var moreSheet = document.getElementById('idleAppMoreSheet');
           var moreSheetGrid = document.getElementById('idleAppMoreSheetGrid');
           if (!tabsBar || !moreSheet || !moreSheetGrid) return;
 
+          /* Recherche-Ergaenzung: verwandte Punkte im "Mehr"-Menue nach
+             Kategorie gruppieren statt als eine flache 3x3-Liste (siehe
+             NN/g-Subnavigations-Muster) - macht 9 Eintraege deutlich
+             schneller erfassbar. */
+          var MORE_GROUPS = [
+            { title: '📈 Fortschritt', ids: ['idleTabBtnUpgrades', 'idleTabBtnSkilltree', 'idleTabBtnPrestige', 'idleTabBtnRunen'] },
+            { title: '⚔️ Kampf & Rang', ids: ['idleTabBtnArena', 'idleTabBtnBestenliste'] },
+            { title: '🛡️ Gilde', ids: ['idleTabBtnGildeTech', 'idleTabBtnGildeBoss'] },
+            { title: '🏆 Sammlung', ids: ['idleTabBtnErfolge', 'idleTabBtnSkins', 'idleTabBtnDrachen'] }
+          ];
           var allTabs = Array.prototype.slice.call(tabsBar.querySelectorAll('.idle-dorf-tab'));
+          var byId = {};
+          allTabs.forEach(function (btn) { byId[btn.id] = btn; });
+          MORE_GROUPS.forEach(function (group) {
+            var present = group.ids.filter(function (id) { return byId[id] && PRIMARY_TAB_IDS.indexOf(id) === -1; });
+            if (!present.length) return;
+            var heading = document.createElement('div');
+            heading.className = 'idle-app-more-sheet-group-title';
+            heading.textContent = group.title;
+            moreSheetGrid.appendChild(heading);
+            present.forEach(function (id) { moreSheetGrid.appendChild(byId[id]); });
+          });
+          /* Sicherheitsnetz: jeder Tab, der aus irgendeinem Grund in
+             keiner Gruppe oben gelistet ist, landet trotzdem im Menue
+             (ungruppiert am Ende) statt spurlos zu verschwinden. */
           allTabs.forEach(function (btn) {
-            if (PRIMARY_TAB_IDS.indexOf(btn.id) === -1) moreSheetGrid.appendChild(btn);
+            if (PRIMARY_TAB_IDS.indexOf(btn.id) === -1 && !moreSheetGrid.contains(btn)) {
+              moreSheetGrid.appendChild(btn);
+            }
           });
 
           var moreBtn = document.createElement('button');

@@ -2838,7 +2838,8 @@ const BKMP_IDLE_PLAYER_STATE_COLUMNS = `name_key, display_name, level, xp, gold,
   boost_gold_until, boost_exp_until, mana,
   holzfaeller_level, holzfaeller_collected_at, steinbruch_level, steinbruch_collected_at,
   goldmine_level, goldmine_collected_at, kristallmine_level, kristallmine_collected_at,
-  manaquelle_level, manaquelle_collected_at, magierakademie_level, magierakademie_collected_at`;
+  manaquelle_level, manaquelle_collected_at, magierakademie_level, magierakademie_collected_at,
+  titles_unlocked_at, cosmetics_unlocked_at`;
 
 async function loadIdleDragons() {
   const client = bkmpGetSupabaseClient();
@@ -3605,7 +3606,7 @@ async function loadRaidState(raidId) {
   if (!client) return null;
   const { data, error } = await client
     .from('raid_instances')
-    .select('id, boss_id, boss_max_hp, boss_hp, city_max_hp, city_hp, city_attack, city_defense, status, next_boss_attack_at, fight_starts_at, fight_ends_at, participant_count, total_damage, raid_bosses(name, sprite_key, gold_reward, gem_reward, xp_reward)')
+    .select('id, boss_id, boss_max_hp, boss_hp, city_max_hp, city_hp, city_attack, city_defense, status, next_boss_attack_at, fight_starts_at, fight_ends_at, participant_count, total_damage, raid_bosses(name, sprite_key, gold_reward, gem_reward, xp_reward, wood_reward, stone_reward, essence_reward)')
     .eq('id', raidId)
     .limit(1);
   if (error) throw error;
@@ -3619,6 +3620,9 @@ async function loadRaidState(raidId) {
     goldReward: Number(row.raid_bosses ? row.raid_bosses.gold_reward : 0) || 0,
     gemReward: Number(row.raid_bosses ? row.raid_bosses.gem_reward : 0) || 0,
     xpReward: Number(row.raid_bosses ? row.raid_bosses.xp_reward : 0) || 0,
+    woodReward: Number(row.raid_bosses ? row.raid_bosses.wood_reward : 0) || 0,
+    stoneReward: Number(row.raid_bosses ? row.raid_bosses.stone_reward : 0) || 0,
+    essenceReward: Number(row.raid_bosses ? row.raid_bosses.essence_reward : 0) || 0,
     bossMaxHp: Number(row.boss_max_hp || 0),
     bossHp: Number(row.boss_hp || 0),
     cityMaxHp: Number(row.city_max_hp || 0),
@@ -4645,7 +4649,7 @@ async function loadRaidBossesAdmin() {
   if (!client) return [];
   const { data, error } = await client
     .from('raid_bosses')
-    .select('id, name, sprite_key, base_hp, base_attack, attack_interval_seconds, gold_reward, gem_reward, xp_reward, active, hp_scale_per_attack')
+    .select('id, name, sprite_key, base_hp, base_attack, attack_interval_seconds, gold_reward, gem_reward, xp_reward, wood_reward, stone_reward, essence_reward, active, hp_scale_per_attack')
     .order('created_at', { ascending: true });
   if (error) throw error;
   return data || [];
@@ -4658,7 +4662,7 @@ async function updateRaidBoss(id, patch) {
     .from('raid_bosses')
     .update(patch)
     .eq('id', id)
-    .select('id, name, sprite_key, base_hp, base_attack, attack_interval_seconds, gold_reward, gem_reward, xp_reward, active, hp_scale_per_attack')
+    .select('id, name, sprite_key, base_hp, base_attack, attack_interval_seconds, gold_reward, gem_reward, xp_reward, wood_reward, stone_reward, essence_reward, active, hp_scale_per_attack')
     .limit(1);
   if (error) throw error;
   return Array.isArray(data) ? data[0] : null;
