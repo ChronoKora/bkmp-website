@@ -122,7 +122,7 @@
     box-shadow: none;
   }
   .idle-village-sprite { max-width: 280px; }
-  .idle-dragon-sprite { max-width: 210px; }
+  .idle-dragon-sprite, .idle-dragon-sprite-video { max-width: 210px; }
 
   /* Nutzerwunsch (Screenshot 15.07.): die Schadenszahl (-252 usw., normale
      style.css-Regel: top:-6px) hing hier nur 6px ueber dem Dorf-/Drachen-
@@ -535,11 +535,14 @@
       if (dragonChanged) {
         const nameEl = document.getElementById('idleDragonName');
         if (nameEl) nameEl.textContent = `${payload.isBoss ? '👑 BOSS: ' : ''}${payload.isEventDragon ? '✨ ' : ''}${payload.dragonName || ''}`;
-        const sprite = document.getElementById('idleDragonSprite');
-        if (sprite) {
-          [...sprite.classList].filter(c => c.startsWith('idle-sprite-')).forEach(c => sprite.classList.remove(c));
-          sprite.classList.remove('idle-sprite-attacking');
-          if (payload.dragonSpriteKey) sprite.classList.add('idle-sprite-' + payload.dragonSpriteKey);
+        /* Nutzt dieselbe Sprite-Zuweisung wie die Hauptseite (siehe
+           bkmpIdleApplyDragonSprite in idledorf.js, Phase 35 des
+           Video-Umstiegs) statt einer eigenen Kopie hier - sonst wuerden
+           die inzwischen auf Video umgestellten Drachen im OBS-Overlay
+           weiterhin die alte PNG-Sprite-Klasse zeigen (Nutzer-Nachfrage
+           "Obs auch alles eingepflegt?" - war es bis hierher NICHT). */
+        if (payload.dragonSpriteKey && typeof bkmpIdleApplyDragonSprite === 'function') {
+          bkmpIdleApplyDragonSprite(document.getElementById('idleDragonSprite'), payload.dragonSpriteKey);
         }
         const dragonEl = document.getElementById('idleDragon');
         if (dragonEl) {
