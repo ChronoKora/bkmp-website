@@ -2839,7 +2839,7 @@ const BKMP_IDLE_PLAYER_STATE_COLUMNS = `name_key, display_name, level, xp, gold,
   holzfaeller_level, holzfaeller_collected_at, steinbruch_level, steinbruch_collected_at,
   goldmine_level, goldmine_collected_at, kristallmine_level, kristallmine_collected_at,
   manaquelle_level, manaquelle_collected_at, magierakademie_level, magierakademie_collected_at,
-  titles_unlocked_at, cosmetics_unlocked_at, turm_highest_wave, turm_last_attempt_at`;
+  titles_unlocked_at, cosmetics_unlocked_at, turm_highest_wave, turm_last_attempt_at, dragon_species_discovered_at`;
 
 async function loadIdleDragons() {
   const client = bkmpGetSupabaseClient();

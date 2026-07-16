@@ -824,7 +824,8 @@ function bkmpIdleDefaultState(name) {
     manaquelle_level: 0, manaquelle_collected_at: new Date().toISOString(),
     magierakademie_level: 0, magierakademie_collected_at: new Date().toISOString(),
     titles_unlocked_at: {}, cosmetics_unlocked_at: {},
-    turm_highest_wave: 0, turm_last_attempt_at: null
+    turm_highest_wave: 0, turm_last_attempt_at: null,
+    dragon_species_discovered_at: {}
   };
 }
 
@@ -6665,6 +6666,34 @@ function bkmpDragonStageImage(species, stage) {
   return species.adult_image;
 }
 
+/* ---------------- Lexikon (Spieler-Wunsch 17.07.) ----------------
+   Dauerhafter "schon mal besessen"-Merker pro Art (dragon_species_
+   discovered_at, siehe supabase-idle-dragon-species-discovered.sql) -
+   bewusst NICHT aus der aktuellen Live-Sammlung (bkmpPlayerDragons/
+   bkmpPlayerDragonEggs) abgeleitet, denn die verliert Eintraege, sobald
+   der letzte Vertreter einer Art freigelassen oder fuer einen Aufstieg
+   verbraucht wird - ein Lexikon-Eintrag soll aber wie bei einem echten
+   Pokedex fuer immer entdeckt bleiben, sobald er einmal aufgetaucht ist.
+   Reconciliation laeuft rein additiv (nie entfernen) bei jedem Laden der
+   Zucht-Daten - das faengt sowohl neue Eier/Drachen als auch den
+   Alt-Bestand ab, den Spieler schon VOR Einfuehrung dieses Features
+   hatten. */
+function bkmpDragonReconcileDiscovered() {
+  if (!bkmpIdleState) return false;
+  if (!bkmpIdleState.dragon_species_discovered_at) bkmpIdleState.dragon_species_discovered_at = {};
+  const map = bkmpIdleState.dragon_species_discovered_at;
+  const ownedIds = new Set([
+    ...bkmpPlayerDragonEggs.map(e => e.species_id),
+    ...bkmpPlayerDragons.map(d => d.species_id)
+  ]);
+  let changed = false;
+  ownedIds.forEach(id => {
+    if (id && !map[id]) { map[id] = new Date().toISOString(); changed = true; }
+  });
+  if (changed) bkmpIdleQueueSync();
+  return changed;
+}
+
 /* ---------------- Laden (aus bkmpIdleLoadOrInitState aufgerufen) ---------------- */
 async function bkmpIdleLoadDragonBreedingState(name) {
   bkmpDragonSpeciesCatalog = [];
@@ -6687,6 +6716,7 @@ async function bkmpIdleLoadDragonBreedingState(name) {
     bkmpPlayerDragonEggs = Array.isArray(eggs) ? eggs : [];
     bkmpPlayerDragonNests = Array.isArray(nests) ? nests : [];
     bkmpPlayerDragons = Array.isArray(dragons) ? dragons : [];
+    bkmpDragonReconcileDiscovered();
   } catch (e) {
     console.warn('Idle Dorf: Drachenzucht-Daten konnten nicht geladen werden (Migration evtl. noch nicht ausgefuehrt - siehe supabase-dragon-breeding.sql).', e);
   }
@@ -7559,7 +7589,8 @@ function bkmpIdleRenderDragonsPanel() {
       ${grownTotalCount ? filterBarHtml : ''}
       ${grownHtml}
       <button type="button" class="btn-nein idle-skin-action" id="idleDragonExpandStorageBtn" style="max-width:260px;margin-top:0.6rem;">Lager erweitern (${bkmpDragonStorageExpansionsBought() < BKMP_DRAGON_STORAGE_EXPANSIONS.length ? bkmpIdleFormatNumber(BKMP_DRAGON_STORAGE_EXPANSIONS[bkmpDragonStorageExpansionsBought()].cost) + ' 💰' : 'Maximum erreicht'})</button>
-    </div>`;
+    </div>
+    ${bkmpDragonRenderLexikonSection()}`;
 
   panel.querySelectorAll('.idle-dragon-assign-btn').forEach(btn => btn.addEventListener('click', () => {
     const freeNest = bkmpPlayerDragonNests.find(n => !n.egg_id);
@@ -7614,8 +7645,122 @@ function bkmpIdleRenderDragonsPanel() {
     if (e.target.closest('button, select, label, input')) return;
     bkmpDragonOpenDetail(card.dataset.dragonId);
   }));
+  panel.querySelectorAll('.idle-dragon-dex-card').forEach(card => card.addEventListener('click', () => {
+    bkmpDragonOpenDexDetail(card.dataset.speciesId);
+  }));
 
   bkmpDragonStartNestCountdownTicker();
+}
+
+/* ---------------- Lexikon-Raster + 4-Seiten-Detailansicht ----------------
+   Nutzerwunsch (17.07.): "Lexikon von den Drachen der Drachenzucht... was
+   man schon hat und was nicht... 4 Seiten zum blaettern EGG -> Baby ->
+   Jugendlich -> Erwachsen... Alle Schwarz ausgeblendet die man noch nicht
+   hat... sobald dann in Voller Farbe". Nutzt bkmpDragonSpeciesCatalog (ALLE
+   bekannten Arten, nicht nur besessene) + dragon_species_discovered_at
+   (siehe bkmpDragonReconcileDiscovered) fuer den Besitz-Status. */
+function bkmpDragonRenderLexikonSection() {
+  bkmpDragonReconcileDiscovered();
+  const discovered = (bkmpIdleState && bkmpIdleState.dragon_species_discovered_at) || {};
+  const species = bkmpDragonSpeciesCatalog.slice().sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
+  const discoveredCount = species.filter(s => discovered[s.id]).length;
+  const cardsHtml = species.length
+    ? species.map(sp => {
+        const isDiscovered = Boolean(discovered[sp.id]);
+        const rarity = bkmpDragonRarityMeta(sp.rarity);
+        return `
+          <div class="idle-skin-card idle-dragon-dex-card ${isDiscovered ? 'is-discovered' : 'is-locked'}" data-species-id="${sp.id}" style="--dragon-rarity-color:${rarity.color}">
+            <img class="idle-dragon-thumb" src="${sp.adult_image}" alt="${isDiscovered ? escapeHtml(sp.name) : 'Unentdeckte Art'}">
+            <div class="idle-skin-name">${isDiscovered ? escapeHtml(sp.name) : '???'}</div>
+            <div class="idle-skin-desc">${isDiscovered ? rarity.name : 'Noch nicht entdeckt'}</div>
+          </div>`;
+      }).join('')
+    : `<p class="idle-skin-empty-hint">Lexikon konnte nicht geladen werden - Migration evtl. noch nicht ausgefuehrt.</p>`;
+  return `
+    <div class="idle-dragon-section">
+      <h4>📖 Drachen-Lexikon (${discoveredCount}/${species.length})</h4>
+      <div class="idle-skin-grid idle-dragon-dex-grid">${cardsHtml}</div>
+    </div>`;
+}
+
+const BKMP_DRAGON_DEX_STAGES = ['egg', 'baby', 'teen', 'adult'];
+const BKMP_DRAGON_DEX_STAGE_LABELS = { egg: 'Ei', baby: 'Baby', teen: 'Jugendlich', adult: 'Erwachsen' };
+let bkmpDragonDexPageIndex = 0;
+
+function bkmpDragonOpenDexDetail(speciesId) {
+  const species = bkmpDragonSpeciesById(speciesId);
+  const overlay = document.getElementById('idleDragonDexOverlay');
+  if (!species || !overlay) return;
+  const discovered = Boolean(bkmpIdleState && bkmpIdleState.dragon_species_discovered_at && bkmpIdleState.dragon_species_discovered_at[speciesId]);
+  bkmpDragonDexPageIndex = 0;
+  overlay.dataset.speciesId = speciesId;
+  overlay.dataset.discovered = discovered ? '1' : '0';
+  /* .onclick statt addEventListener: haelt pro Element garantiert genau
+     EINEN Handler, kein manuelles removeEventListener-Bookkeeping noetig,
+     obwohl dieses Overlay (anders als die generierten Lager-Karten) bei
+     jedem Oeffnen dieselben statischen Buttons wiederverwendet. */
+  const prevBtn = document.getElementById('idleDragonDexPrevBtn');
+  const nextBtn = document.getElementById('idleDragonDexNextBtn');
+  const closeBtn = document.getElementById('idleDragonDexCloseBtn');
+  if (prevBtn) prevBtn.onclick = () => bkmpDragonDexPage(-1);
+  if (nextBtn) nextBtn.onclick = () => bkmpDragonDexPage(1);
+  if (closeBtn) closeBtn.onclick = bkmpDragonCloseDexDetail;
+  document.querySelectorAll('.idle-dragon-dex-dot').forEach((dot, i) => { dot.onclick = () => bkmpDragonDexGoToPage(i); });
+  /* Sichtbar machen VOR dem ersten Render - bkmpDragonRenderDexPage()
+     verweigert bei einem noch nicht sichtbaren Overlay (Schutz gegen
+     Schreiben auf ein bereits geschlossenes Fenster bei einer verzoegerten
+     Zwischenaktualisierung), sonst blieb die allererste Seite leer. */
+  overlay.classList.add('visible');
+  document.body.classList.add('modal-open');
+  bkmpDragonRenderDexPage();
+}
+
+function bkmpDragonRenderDexPage() {
+  const overlay = document.getElementById('idleDragonDexOverlay');
+  if (!overlay || !overlay.classList.contains('visible')) return;
+  const species = bkmpDragonSpeciesById(overlay.dataset.speciesId);
+  if (!species) return;
+  const discovered = overlay.dataset.discovered === '1';
+  const rarity = bkmpDragonRarityMeta(species.rarity);
+  const stage = BKMP_DRAGON_DEX_STAGES[bkmpDragonDexPageIndex];
+  const img = document.getElementById('idleDragonDexImg');
+  if (img) {
+    img.src = bkmpDragonStageImage(species, stage) || '';
+    img.classList.toggle('idle-dragon-dex-img-locked', !discovered);
+  }
+  const nameEl = document.getElementById('idleDragonDexName');
+  if (nameEl) nameEl.textContent = discovered ? species.name : '???';
+  const stageEl = document.getElementById('idleDragonDexStage');
+  if (stageEl) stageEl.textContent = BKMP_DRAGON_DEX_STAGE_LABELS[stage];
+  const rarityEl = document.getElementById('idleDragonDexRarity');
+  if (rarityEl) { rarityEl.textContent = discovered ? rarity.name : ''; rarityEl.style.color = rarity.color; }
+  const descEl = document.getElementById('idleDragonDexDesc');
+  if (descEl) {
+    descEl.textContent = discovered
+      ? `${bkmpDragonFormatDuration(bkmpDragonEffectiveBroodSeconds(species) * 1000)} Brutzeit`
+      : 'Noch nicht entdeckt - besiege Drachen, gewinne Weltboss-Raids oder finde besondere Ereignisse.';
+  }
+  document.querySelectorAll('.idle-dragon-dex-dot').forEach((dot, i) => dot.classList.toggle('is-active', i === bkmpDragonDexPageIndex));
+  const prevBtn = document.getElementById('idleDragonDexPrevBtn');
+  const nextBtn = document.getElementById('idleDragonDexNextBtn');
+  if (prevBtn) prevBtn.disabled = bkmpDragonDexPageIndex === 0;
+  if (nextBtn) nextBtn.disabled = bkmpDragonDexPageIndex === BKMP_DRAGON_DEX_STAGES.length - 1;
+}
+
+function bkmpDragonDexPage(delta) {
+  bkmpDragonDexPageIndex = Math.max(0, Math.min(BKMP_DRAGON_DEX_STAGES.length - 1, bkmpDragonDexPageIndex + delta));
+  bkmpDragonRenderDexPage();
+}
+
+function bkmpDragonDexGoToPage(index) {
+  bkmpDragonDexPageIndex = Math.max(0, Math.min(BKMP_DRAGON_DEX_STAGES.length - 1, index));
+  bkmpDragonRenderDexPage();
+}
+
+function bkmpDragonCloseDexDetail() {
+  const overlay = document.getElementById('idleDragonDexOverlay');
+  if (overlay) overlay.classList.remove('visible');
+  document.body.classList.remove('modal-open');
 }
 
 /* Spieler-Report (17.07.): "Die Zeit läuft nur hackend runter" - der

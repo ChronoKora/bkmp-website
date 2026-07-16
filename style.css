@@ -5722,6 +5722,41 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 .idle-dragon-detail-card { max-width: 360px; text-align: center; }
 .idle-dragon-detail-img { width: 100%; max-width: 160px; margin: 0 auto 0.6rem; display: block; }
 
+/* ---- Drachen-Lexikon (Spieler-Wunsch 17.07.) ----
+   Raster ueber ALLE bekannten Arten (nicht nur besessene), silhouettiert
+   solange nicht entdeckt, in voller Farbe sobald doch (siehe
+   bkmpDragonRenderLexikonSection/bkmpDragonReconcileDiscovered). Der
+   Silhouetten-Look kommt rein per CSS-Filter (brightness(0) macht jedes
+   nicht-transparente Pixel schwarz) - funktioniert nur sauber, weil die
+   Drachen-Sprites bereits transparente Hintergruende haben (siehe
+   Zucht-SQL-Kommentare "Hintergrund per Flood-Fill transparent gemacht"). */
+.idle-dragon-dex-grid { }
+.idle-dragon-dex-card { cursor: pointer; transition: transform 0.15s ease; }
+.idle-dragon-dex-card:hover { transform: translateY(-2px); }
+.idle-dragon-dex-card:active { transform: translateY(0); }
+.idle-dragon-dex-card .idle-dragon-thumb { transition: filter 0.3s ease; }
+.idle-dragon-dex-card.is-locked { opacity: 0.82; }
+.idle-dragon-dex-card.is-locked .idle-dragon-thumb { filter: brightness(0) opacity(0.8); }
+.idle-dragon-dex-card.is-locked .idle-skin-name { color: var(--muted); }
+.idle-dragon-dex-card.is-discovered { border-color: color-mix(in srgb, var(--dragon-rarity-color, var(--gold)) 55%, var(--line)); }
+
+/* ---- Lexikon-Detailansicht: 4-Seiten-Pager (Ei/Baby/Jugendlich/Erwachsen) ---- */
+.idle-dragon-dex-detail-card { max-width: 360px; text-align: center; }
+.idle-dragon-dex-pager { display: flex; align-items: center; justify-content: center; gap: 0.6rem; margin-bottom: 0.5rem; }
+.idle-dragon-dex-img { width: 100%; max-width: 160px; margin: 0; display: block; transition: filter 0.3s ease; }
+.idle-dragon-dex-img-locked { filter: brightness(0) opacity(0.85); }
+.idle-dragon-dex-nav {
+  flex: none; width: 40px; height: 40px; border-radius: 50%;
+  border: 1px solid var(--line); background: var(--paper); color: var(--ink);
+  font-size: 1.3rem; line-height: 1; cursor: pointer;
+}
+.idle-dragon-dex-nav:hover:not(:disabled) { border-color: var(--gold); }
+.idle-dragon-dex-nav:disabled { opacity: 0.3; cursor: default; }
+.idle-dragon-dex-dots { display: flex; justify-content: center; gap: 0.4rem; margin-bottom: 0.5rem; }
+.idle-dragon-dex-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line); cursor: pointer; transition: background 0.15s ease, transform 0.15s ease; }
+.idle-dragon-dex-dot.is-active { background: var(--gold); transform: scale(1.25); }
+.idle-dragon-dex-stage-label { display: block; font-size: 0.72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.3rem; }
+
 /* ---- Prestige ---- */
 .idle-prestige-summary {
   display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.6rem 1rem;
@@ -6183,6 +6218,10 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
    sich dahinter" - nicht ein Schliessen-Problem, sondern fehlender
    z-index beim OEFFNEN). */
 #idleDragonDetailOverlay { z-index: 60; }
+/* Gleiches z-index-Muster wie #idleDragonDetailOverlay direkt darueber -
+   sonst genau derselbe "Fenster oeffnet sich dahinter"-Bug (16.07.), da
+   auch das Lexikon aus dem schon offenen idleDorfOverlay heraus oeffnet. */
+#idleDragonDexOverlay { z-index: 60; }
 /* NACHBESSERUNG (Nutzerwunsch 15.07.: "Baust du das dann unten ein und im
    gleichen Design overlay wie den Rest?") - vorher ein separater Text-Link
    direkt neben dem Titel oben, der optisch mit dem Live-Sync-Banner
@@ -9048,6 +9087,22 @@ html.bkmp-app-mode #idleDragonDetailOverlay .idle-dragon-detail-card {
 html.bkmp-app-mode #idleDragonDetailOverlay .idle-skin-desc {
   font-size: .9rem !important;
 }
+html.bkmp-app-mode #idleDragonDexOverlay .idle-dragon-dex-detail-card {
+  max-width: 92vw;
+}
+html.bkmp-app-mode #idleDragonDexOverlay .idle-skin-desc {
+  font-size: .9rem !important;
+}
+html.bkmp-app-mode #idleDragonDexOverlay .idle-dragon-dex-nav {
+  width: 48px !important;
+  height: 48px !important;
+  font-size: 1.6rem !important;
+}
+html.bkmp-app-mode #idleDragonDexOverlay .idle-dragon-dex-dot {
+  width: 12px !important;
+  height: 12px !important;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-dragon-dex-grid .idle-skin-name { font-size: .92rem !important; }
 
 /* ============================================================
    APP-MODUS REDESIGN, PHASE 10 (Recherche-Runde: Fenster + Top-Bar)

@@ -85,7 +85,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260718-feuerdrachevideo1">
+<link rel="stylesheet" href="style.css?v=20260718-dragondex1">
 </head>
 <body>
 
@@ -346,6 +346,29 @@
       <p class="idle-skin-desc" id="idleDragonDetailCompanion"></p>
       <div class="joke-buttons">
         <button class="btn-ja" id="idleDragonDetailCloseBtn" type="button">Schließen</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="joke-overlay" id="idleDragonDexOverlay">
+    <div class="joke-card idle-dragon-detail-card idle-dragon-dex-detail-card">
+      <div class="idle-dragon-dex-pager">
+        <button type="button" class="idle-dragon-dex-nav" id="idleDragonDexPrevBtn" aria-label="Vorherige Stufe">‹</button>
+        <img id="idleDragonDexImg" class="idle-dragon-detail-img idle-dragon-dex-img" alt="">
+        <button type="button" class="idle-dragon-dex-nav" id="idleDragonDexNextBtn" aria-label="Nächste Stufe">›</button>
+      </div>
+      <div class="idle-dragon-dex-dots">
+        <span class="idle-dragon-dex-dot" data-stage="egg" title="Ei"></span>
+        <span class="idle-dragon-dex-dot" data-stage="baby" title="Baby"></span>
+        <span class="idle-dragon-dex-dot" data-stage="teen" title="Jugendlich"></span>
+        <span class="idle-dragon-dex-dot" data-stage="adult" title="Erwachsen"></span>
+      </div>
+      <span class="idle-dragon-dex-stage-label" id="idleDragonDexStage"></span>
+      <h3 id="idleDragonDexName"></h3>
+      <p class="idle-skin-desc"><strong id="idleDragonDexRarity"></strong></p>
+      <p class="idle-skin-desc" id="idleDragonDexDesc"></p>
+      <div class="joke-buttons">
+        <button class="btn-ja" id="idleDragonDexCloseBtn" type="button">Schließen</button>
       </div>
     </div>
   </div>
@@ -1189,9 +1212,9 @@
   </div>
 
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260718-guildrealtime1"></script>
+  <script src="supabase.js?v=20260718-dragondex1"></script>
   <script src="app.js?v=20260718-selbstverdient1"></script>
-  <script src="idledorf.js?v=20260718-lastdragons1"></script>
+  <script src="idledorf.js?v=20260718-dragondex1"></script>
   <script src="mapart.js?v=20260717-kartenfirmen1"></script>
   <script>
     bkmpInitTheme();
