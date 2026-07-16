@@ -7557,4 +7557,38 @@ html.bkmp-app-mode #idleDorfOverlay > .idle-dorf-card > .idle-dorf-close,
 html.bkmp-app-mode #idleDorfOverlay > .idle-dorf-card > .joke-buttons {
   display: none !important;
 }
+
+/* "Als App installieren"-Link in der normalen Website-Ansicht des
+   Idle-Dorfs (nicht im App-Modus selbst - siehe Ausblendregel oben, die
+   dort den ganzen .joke-buttons-Block betrifft). */
+.idle-dorf-card .joke-buttons a.idle-app-link-btn {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+.idle-app-install-banner {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-bottom: 0.8rem;
+  padding: 0.7rem 1rem;
+  border-radius: 14px;
+  background: linear-gradient(120deg, rgba(167, 139, 250, 0.16), rgba(56, 189, 248, 0.1));
+  border: 1px dashed color-mix(in srgb, var(--gold) 55%, var(--line));
+  font-size: 0.85rem;
+}
+.idle-app-install-banner.visible { display: flex; }
+.idle-app-install-banner button {
+  flex: none;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.45rem 1rem;
+  border-radius: 999px;
+  border: none;
+  background: var(--gold);
+  color: #0A0A0F;
+  cursor: pointer;
+}
 .map-search-row select { padding: 0.5rem 0.7rem; border-radius: 999px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); font: inherit; font-size: 0.82rem; }

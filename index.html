@@ -85,7 +85,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260717-appmode1">
+<link rel="stylesheet" href="style.css?v=20260718-stickytitles1">
 </head>
 <body>
 
@@ -539,6 +539,10 @@
         <source srcset="assets/idle-dorf-banner.webp?v=20260715-2" type="image/webp">
         <img class="idle-dorf-banner-img" src="assets/idle-dorf-banner.png?v=20260715-2" width="2141" height="568" alt="Idle Drachen Dorf – Baue. Verbessere. Besiege. Werde zur Legende!" loading="lazy" decoding="async">
       </picture>
+      <div class="idle-app-install-banner" id="idleAppInstallBanner">
+        <span>📲 Auf den Startbildschirm holen, damit es sich wie eine echte App anfühlt.</span>
+        <button type="button" id="idleAppInstallBtn">Installieren</button>
+      </div>
       <div class="idle-dorf-offline-card" id="idleDorfOfflineCard" style="display:none;"></div>
       <div class="raid-join-banner" id="raidJoinBanner" style="display:none;"></div>
       <div class="idle-dorf-hud" id="idleDorfHud"></div>
@@ -628,6 +632,7 @@
            gleiches Muster wie ueberall sonst auf der Seite (z.B. die
            "❓ Hilfe"-Buttons), statt eines separaten Text-Links. -->
       <div class="joke-buttons">
+        <a class="btn-nein idle-app-link-btn" id="idleAppLinkBtn" href="/app">📲 Als App installieren</a>
         <button class="btn-nein idle-stream-help-btn" id="idleStreamHelpBtn" type="button">📡 Für Streamer</button>
         <button class="btn-ja" id="idleDorfClose" type="button">Schlie&szlig;en</button>
       </div>
@@ -1145,9 +1150,9 @@
   </div>
 
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260717-libercutout2"></script>
+  <script src="supabase.js?v=20260717-stickytitles1"></script>
   <script src="app.js?v=20260712-themefix1"></script>
-  <script src="idledorf.js?v=20260717-libercutout2"></script>
+  <script src="idledorf.js?v=20260717-stickytitles1"></script>
   <script src="mapart.js?v=20260717-kartenfirmen1"></script>
   <script>
     bkmpInitTheme();
@@ -4432,7 +4437,13 @@
       renderAchievementBadge();
     }
     function bkmpCosmeticUnlocked(cosmetic, unlockedCount, ctx) {
-      if (cosmetic.unlockCustom) return Boolean(cosmetic.unlockCustom(ctx));
+      /* Bug-Fix 18.07. (siehe bkmpIdleCosmeticUnlockedSticky in idledorf.js
+         fuer den vollen Kommentar): nicht-monotone unlockCustom-Bedingungen
+         (z.B. "alle Skilltree-Zweige maximiert") fielen bisher wieder auf
+         "gesperrt" zurueck, sobald sich der Zustand seither aenderte. */
+      if (cosmetic.unlockCustom) {
+        return typeof bkmpIdleCosmeticUnlockedSticky === 'function' ? bkmpIdleCosmeticUnlockedSticky(cosmetic, ctx) : Boolean(cosmetic.unlockCustom(ctx));
+      }
       if (cosmetic.unlockEgg) return ctx.eggsFound.includes(cosmetic.unlockEgg);
       if (cosmetic.unlockAchievement) {
         const ach = BKMP_ACHIEVEMENTS.find(a => a.id === cosmetic.unlockAchievement);
@@ -4586,7 +4597,14 @@
     }
     function bkmpTitleUnlocked(title, unlockedCount, ctx) {
       if (title.unlockAlways) return true;
-      if (title.unlockCustom) return Boolean(title.unlockCustom(ctx));
+      /* Bug-Fix 18.07. (Spieler-Meldung Kaledoss - siehe bkmpIdleTitleUnlockedSticky
+         in idledorf.js fuer den vollen Kommentar): nicht-monotone unlockCustom-
+         Bedingungen (z.B. "alle 6 Runen-Plaetze gleiche Raritaet ausgeruestet")
+         fielen bisher wieder auf "gesperrt" zurueck, sobald sich der Zustand
+         seither aenderte, obwohl der Titel dauerhaft bleiben sollte. */
+      if (title.unlockCustom) {
+        return typeof bkmpIdleTitleUnlockedSticky === 'function' ? bkmpIdleTitleUnlockedSticky(title, ctx) : Boolean(title.unlockCustom(ctx));
+      }
       if (title.unlockAchievement) {
         const ach = BKMP_ACHIEVEMENTS.find(a => a.id === title.unlockAchievement);
         return ach ? bkmpAchievementUnlocked(ach, ctx) : false;
@@ -6053,6 +6071,38 @@
             guardPushed = false;
           }
         }).observe(document.body, { attributes: true, attributeFilter: ['class'], subtree: true });
+
+        /* "Auf den Startbildschirm holen" - Chrome verlangt fuer den
+           eigenen Installations-Dialog (beforeinstallprompt) einen
+           registrierten Service Worker (siehe sw.js, reines Passthrough,
+           kein Caching). Banner erscheint nur, wenn der Browser das
+           Event tatsaechlich feuert (heisst: Installations-Kriterien
+           erfuellt UND noch nicht installiert) - auf Browsern ohne diese
+           API (z.B. Safari/iOS) bleibt es einfach unsichtbar, dort bleibt
+           nur "Zum Home-Bildschirm" ueber das Browser-eigene Teilen-Menue. */
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.register('/sw.js').catch(function () {});
+        }
+        var deferredInstallPrompt = null;
+        var installBanner = document.getElementById('idleAppInstallBanner');
+        var installBtn = document.getElementById('idleAppInstallBtn');
+        window.addEventListener('beforeinstallprompt', function (e) {
+          e.preventDefault();
+          deferredInstallPrompt = e;
+          if (installBanner) installBanner.classList.add('visible');
+        });
+        if (installBtn) {
+          installBtn.addEventListener('click', function () {
+            if (installBanner) installBanner.classList.remove('visible');
+            if (!deferredInstallPrompt) return;
+            deferredInstallPrompt.prompt();
+            deferredInstallPrompt = null;
+          });
+        }
+        window.addEventListener('appinstalled', function () {
+          if (installBanner) installBanner.classList.remove('visible');
+          deferredInstallPrompt = null;
+        });
       })();
     }
   </script>

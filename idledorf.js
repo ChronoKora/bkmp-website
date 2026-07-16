@@ -3294,10 +3294,10 @@ function bkmpIdleFormatTitleBonus(title) {
 function bkmpIdleBuildTitleBonusListHtml() {
   const ctx = bkmpIdleGetAchievementContextFields();
   const bonusTitles = window.BKMP_IDLE_TITLES.filter(t => t.effectType);
-  const unlockedCount = bonusTitles.filter(t => t.unlockCustom(ctx)).length;
+  const unlockedCount = bonusTitles.filter(t => bkmpIdleTitleUnlockedSticky(t, ctx)).length;
   const newBadge = typeof bkmpNewBadgeChecker === 'function' ? bkmpNewBadgeChecker('idletitles') : () => '';
   const rows = bonusTitles.map(title => {
-    const unlocked = title.unlockCustom(ctx);
+    const unlocked = bkmpIdleTitleUnlockedSticky(title, ctx);
     return `
       <div class="achievement-row ${unlocked ? 'unlocked' : 'locked'}">
         ${newBadge(title.id)}
@@ -5523,6 +5523,18 @@ async function bkmpIdlePerformPrestige() {
     bkmpIdleState.skill_points_spent = 0;
     bkmpIdleState.skill_allocations = {};
     bkmpIdleState.upgrade_purchases = {};
+    /* Spieler-Vorgabe 18.07. (im Zuge der Drachenzwinger-Entfernung, siehe
+       supabase-remove-zucht-lagerplaetze.sql): Obstgarten/Jagdhuette
+       sollten bisher bewusst NICHT zurueckgesetzt werden - jetzt auf
+       ausdruecklichen Wunsch doch, damit die komplette Zucht-Wirtschaft
+       (Skilltree UND Gebaeude) beim Aufstieg einheitlich zurueckgesetzt
+       wird, genau wie Gold/Holz/Stein/Kristalle/Essenz. Level 0 produziert
+       weiterhin die Grundrate (kein Totalstillstand), nur der Ausbau-
+       Fortschritt geht verloren. */
+    bkmpIdleState.obstgarten_level = 0;
+    bkmpIdleState.jagdhuette_level = 0;
+    bkmpIdleState.fruit = 0;
+    bkmpIdleState.meat = 0;
     /* dragon_kills/boss_kills bleiben ab sofort ueber Prestige-Auffstiege
        hinweg erhalten (nicht mehr zurueckgesetzt) - vorher liess das die
        Bestenliste (loadIdleLeaderboardStats liest dragon_kills direkt)
@@ -10007,6 +10019,57 @@ window.BKMP_IDLE_TITLES = [
   }, effectType: 'gold_prod_pct', effectValue: 10 }
 ];
 
+/* Bug-Fix (Spieler-Meldung Kaledoss 18.07., "Purist"/"Grüner Daumen"/
+   "Blaues Blut"/"Violette Vorherrschaft" - Runen-Raritaet-Titel: "wird auf
+   der Seite gezaehlt, aber nicht im Game selbst"): Titel UND Kosmetiken
+   pruefen ihre unlockCustom-Bedingung bisher IMMER live gegen den
+   aktuellen Kontext - bei nicht-monotonen Bedingungen (z.B. "alle 6
+   Runen-Plaetze gleiche Raritaet ausgeruestet", "alle Skilltree-Zweige
+   maximiert") faellt der Titel/die Kosmetik faelschlich wieder auf
+   "gesperrt" zurueck, sobald sich der Zustand seither aendert (Rune
+   getauscht, Prestige-Reset) - obwohl sowohl der Hinweistext ("Jeder
+   freigeschaltete Titel gibt einen dauerhaften Bonus... Freigeschaltet
+   bleibt freigeschaltet.") als auch der Funktionskommentar bei
+   bkmpIdleTitleEffectTotals das Gegenteil versprechen. GENAU dasselbe
+   Bug-Muster wurde fuer Erfolge (BKMP_ACHIEVEMENTS) bereits am 13.07.
+   behoben (siehe bkmpAchievementUnlocked in index.html) - hier dieselbe
+   Loesung (localStorage-Merkliste "wurde je erreicht") fuer die beiden
+   bisher uebersehenen Parallel-Systeme Titel/Kosmetik nachgezogen. Liegt
+   bewusst in idledorf.js statt index.html, weil bkmpIdleTitleEffectTotals
+   echte Kampf-Stats beeinflusst und auch auf idle-stream-mini.html
+   (laedt index.html's Inline-Script NICHT) korrekt funktionieren muss. */
+const BKMP_IDLE_TITLE_UNLOCKED_AT_KEY = 'bkmp-idle-title-unlocked-at';
+function bkmpIdleGetTitleUnlockedAtMap() {
+  try { return JSON.parse(localStorage.getItem(BKMP_IDLE_TITLE_UNLOCKED_AT_KEY) || '{}'); } catch (e) { return {}; }
+}
+function bkmpIdleSetTitleUnlockedAt(id) {
+  const map = bkmpIdleGetTitleUnlockedAtMap();
+  if (map[id]) return;
+  map[id] = new Date().toISOString();
+  try { localStorage.setItem(BKMP_IDLE_TITLE_UNLOCKED_AT_KEY, JSON.stringify(map)); } catch (e) {}
+}
+function bkmpIdleTitleUnlockedSticky(title, ctx) {
+  if (!title.unlockCustom) return false;
+  if (Boolean(title.unlockCustom(ctx))) { bkmpIdleSetTitleUnlockedAt(title.id); return true; }
+  return Boolean(bkmpIdleGetTitleUnlockedAtMap()[title.id]);
+}
+
+const BKMP_IDLE_COSMETIC_UNLOCKED_AT_KEY = 'bkmp-idle-cosmetic-unlocked-at';
+function bkmpIdleGetCosmeticUnlockedAtMap() {
+  try { return JSON.parse(localStorage.getItem(BKMP_IDLE_COSMETIC_UNLOCKED_AT_KEY) || '{}'); } catch (e) { return {}; }
+}
+function bkmpIdleSetCosmeticUnlockedAt(id) {
+  const map = bkmpIdleGetCosmeticUnlockedAtMap();
+  if (map[id]) return;
+  map[id] = new Date().toISOString();
+  try { localStorage.setItem(BKMP_IDLE_COSMETIC_UNLOCKED_AT_KEY, JSON.stringify(map)); } catch (e) {}
+}
+function bkmpIdleCosmeticUnlockedSticky(cosmetic, ctx) {
+  if (!cosmetic.unlockCustom) return false;
+  if (Boolean(cosmetic.unlockCustom(ctx))) { bkmpIdleSetCosmeticUnlockedAt(cosmetic.id); return true; }
+  return Boolean(bkmpIdleGetCosmeticUnlockedAtMap()[cosmetic.id]);
+}
+
 /* Summiert die Boni aller FREIGESCHALTETEN (nicht nur des aktiv
    getragenen) Idle-Dorf-Titel - Sammlung-Prinzip: was du erreicht hast,
    bleibt dauerhaft wirksam, unabhaengig davon welchen Titel du gerade als
@@ -10014,7 +10077,7 @@ window.BKMP_IDLE_TITLES = [
 function bkmpIdleTitleEffectTotals(ctx) {
   const totals = {};
   window.BKMP_IDLE_TITLES.forEach(title => {
-    if (!title.effectType || !title.unlockCustom || !title.unlockCustom(ctx)) return;
+    if (!title.effectType || !bkmpIdleTitleUnlockedSticky(title, ctx)) return;
     totals[title.effectType] = (totals[title.effectType] || 0) + (title.effectValue || 0);
   });
   return totals;
