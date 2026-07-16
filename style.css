@@ -6821,6 +6821,17 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 .raid-clickable { cursor: pointer; }
 .raid-clickable:active .raid-boss-sprite { transform: scale(0.95); }
 
+/* .raid-vs-badge / .raid-action-bar / .idle-res-strip sind Teil des
+   App-Modus-Redesigns (Phase 15/16, style.css weiter unten) und stehen
+   fest im HTML (index.html) - auf der normalen Website standardmaessig
+   ausgeblendet, damit dort exakt nichts Neues zu sehen ist ("Website
+   bleibt Website"). Erst html.bkmp-app-mode schaltet sie sichtbar. */
+.raid-vs-badge,
+.raid-action-bar,
+.idle-res-strip {
+  display: none;
+}
+
 /* ---- Epischere Kampf-Animationen ---- */
 .raid-fx { position: absolute; pointer-events: none; }
 .raid-fx-arrow { top: 45%; left: 42%; width: 30px; height: 4px; background: linear-gradient(90deg, transparent, #f5d58a, var(--gold)); border-radius: 2px; animation: raidArrowFly 0.45s ease forwards; }
@@ -9052,6 +9063,150 @@ html.bkmp-app-mode .raid-boss-name {
 }
 html.bkmp-app-mode .raid-city-stats { font-size: .82rem !important; }
 html.bkmp-app-mode .raid-participants-list { font-size: .88rem !important; line-height: 1.6; }
+
+/* ============================================================
+   APP-MODUS REDESIGN, PHASE 16 (Raid-Kampfansicht nach Referenzbild)
+   ============================================================
+   Nutzer schickte ein Referenzbild mit Wunsch-Optik fuer die
+   Raid-Ansicht (VS-Badge, Icon-Rahmen an HP-Balken, Belohnungs-Leiste,
+   grosser Angriff-Button, Auto-Status, Tap-Schaden-Zaehler). Zwei
+   Elemente darin gibt es im echten Spiel nicht (Boss-Faehigkeits-
+   Cooldown-Leiste, Fantasie-Belohnungs-Icons wie Fleisch/Apfel/Ei) -
+   nach Rueckfrage im Chat bewusst NICHT nachgebaut. Alles andere hier
+   ist derselbe Look, aber mit echten Daten/echter Mechanik dahinter
+   (siehe bkmpRaidRenderCombat/bkmpRaidHandleBossClick in idledorf.js):
+   der Angriff-Button loest denselben bestehenden Klick-Handler aus wie
+   ein Tipp auf den Boss selbst, "Auto-Kampf aktiv" stimmt immer
+   waehrend die Ansicht sichtbar ist (die passive Tick-Schaden-Runde
+   laeuft waehrend eines Kampfes ohnehin durch), der Tap-Schaden-Wert
+   ist die echte Summe der eigenen Tipp-Treffer, die Ressourcen-Leiste
+   zeigt die echten 5 Ressourcen statt erfundener Icons. */
+html.bkmp-app-mode .raid-vs-badge {
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+  width: 2.3rem;
+  height: 2.3rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Fraunces', serif;
+  font-weight: 800;
+  font-size: .78rem;
+  color: var(--app-void);
+  background: radial-gradient(circle at 35% 30%, #fff6d8, var(--app-gold));
+  border: 2px solid var(--app-void);
+  box-shadow: var(--app-glow-gold), 0 4px 10px rgba(0, 0, 0, .5);
+}
+/* Schild-/Kronen-Abzeichen ueber den HP-Balken wie im Referenzbild -
+   reines CSS-Generated-Content, kein neues Bild-Asset, keine
+   JS-Aenderung noetig. */
+html.bkmp-app-mode .raid-city,
+html.bkmp-app-mode .raid-boss {
+  position: relative;
+  overflow: visible;
+}
+html.bkmp-app-mode .raid-city::before,
+html.bkmp-app-mode .raid-boss::before {
+  content: '🛡️';
+  position: absolute;
+  top: -.65rem;
+  left: .6rem;
+  width: 1.9rem;
+  height: 1.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--app-purple-light), var(--app-purple-deep));
+  border: 2px solid var(--app-gold);
+  box-shadow: var(--app-glow-gold);
+  z-index: 2;
+}
+html.bkmp-app-mode .raid-boss::before { content: '👑'; }
+html.bkmp-app-mode .raid-hp-bar {
+  height: 10px !important;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, .4) !important;
+  border: 1px solid rgba(255, 255, 255, .12) !important;
+  overflow: hidden;
+}
+html.bkmp-app-mode .raid-hp-fill-city { background: linear-gradient(90deg, var(--app-green), #22c55e) !important; box-shadow: 0 0 8px color-mix(in srgb, var(--app-green) 60%, transparent); }
+html.bkmp-app-mode .raid-hp-fill-boss { background: linear-gradient(90deg, var(--app-red), #b91c1c) !important; box-shadow: 0 0 8px color-mix(in srgb, var(--app-red) 60%, transparent); }
+html.bkmp-app-mode .raid-hp-label { color: var(--app-ink) !important; font-weight: 700; }
+
+/* Ressourcen-Leiste unter dem Schlachtfeld: gleicher "Belohnungen"-Look
+   wie im Referenzbild, aber mit den echten 5 Ressourcen-Kacheln aus
+   Phase 15 (idle-res-chip) statt erfundener Icons. */
+html.bkmp-app-mode .idle-res-strip {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: .4rem;
+  margin: .7rem 0;
+  padding: .6rem .5rem .5rem;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(0, 0, 0, .22));
+  border: 1px dashed color-mix(in srgb, var(--app-gold) 45%, transparent);
+}
+
+/* Action-Bar: Auto-Status (links, immer wahr solange sichtbar) +
+   grosser Angriff-Button (Mitte, echter Klick-Handler) + Tap-Schaden
+   (rechts, echte Summe) - wie im Referenzbild, aber alle drei Werte
+   echt. */
+html.bkmp-app-mode .raid-action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  margin-bottom: .8rem;
+}
+html.bkmp-app-mode .raid-auto-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .3rem;
+  padding: .5rem .5rem;
+  border-radius: 999px;
+  font-size: .66rem;
+  font-weight: 800;
+  text-align: center;
+  color: var(--app-green);
+  background: rgba(74, 222, 128, .12);
+  border: 1px solid color-mix(in srgb, var(--app-green) 45%, transparent);
+  flex: 1 1 0;
+  min-width: 0;
+}
+html.bkmp-app-mode .raid-attack-btn {
+  flex: none;
+  width: 4.6rem;
+  height: 4.6rem;
+  border-radius: 50%;
+  font-size: 1.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 35% 25%, var(--app-red), #7a0f22 75%);
+  border: 3px solid var(--app-gold);
+  color: var(--app-ink);
+  box-shadow: var(--app-glow-gold), 0 8px 20px rgba(0, 0, 0, .5);
+  transition: transform .12s ease;
+}
+html.bkmp-app-mode .raid-attack-btn:active { transform: scale(.9); }
+html.bkmp-app-mode .idle-res-tap {
+  flex: 1 1 0;
+  min-width: 0;
+  justify-content: center;
+  border-color: color-mix(in srgb, var(--app-blue) 45%, transparent);
+}
+html.bkmp-app-mode .idle-res-tap .idle-res-icon {
+  background: radial-gradient(circle at 35% 30%, #bcd7ff, var(--app-blue));
+  box-shadow: 0 0 7px color-mix(in srgb, var(--app-blue) 55%, transparent), 0 0 0 1px rgba(255, 255, 255, .12) inset;
+}
 
 /* ============================================================
    APP-MODUS REDESIGN, PHASE 11 (weitere Recherche-Runde: Game-Feel/Juice,

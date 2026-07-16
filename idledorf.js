@@ -776,7 +776,8 @@ function bkmpIdleDefaultState(name) {
     kristallmine_level: 0, kristallmine_collected_at: new Date().toISOString(),
     manaquelle_level: 0, manaquelle_collected_at: new Date().toISOString(),
     magierakademie_level: 0, magierakademie_collected_at: new Date().toISOString(),
-    titles_unlocked_at: {}, cosmetics_unlocked_at: {}
+    titles_unlocked_at: {}, cosmetics_unlocked_at: {},
+    turm_highest_wave: 0, turm_last_attempt_at: null
   };
 }
 
@@ -1967,7 +1968,7 @@ function bkmpDungeonShowAutoSummary(stats, done, total) {
    erfolgreich abgezogen hat, startet die eigentliche (weiterhin rein
    clientseitige) Kampf-Simulation. */
 async function bkmpDungeonStart(type) {
-  if (bkmpDungeonActive || bkmpDungeonStarting || !bkmpIdleState || !bkmpIdleEffectiveStats) return false;
+  if (bkmpDungeonActive || bkmpDungeonStarting || bkmpTowerActive || !bkmpIdleState || !bkmpIdleEffectiveStats) return false;
   if (bkmpIdleEventPauseActive) {
     if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Erst den Event-Drachen bestätigen, bevor der Dungeon startet.', 3200);
     return false;
@@ -2260,8 +2261,248 @@ async function bkmpDungeonFinish(success) {
   if (bkmpIdleActiveTab === 'dungeon') bkmpDungeonRefreshStatus();
 }
 
+/* ---------------- Endloser Turm (Lategame-Content, Spieler-Vorgabe 16.07.:
+   "Langzeit-fesselnder Content") ----------------
+   Bewusster Gegenentwurf zum Dungeon-System: dort MUSS jede Schwierigkeit
+   fuer jeden ausgebauten Charakter schaffbar sein (siehe die Balance-Fixes
+   vom 16.07. weiter oben bei bkmpDungeonSpawnWave) - hier ist das genaue
+   Gegenteil Absicht. Kein Cap auf combatMult, keine Sieg-Bedingung: man
+   klettert, bis das Dorf faellt, die erreichte Stufe selbst ist die
+   Bestenlisten-Wertung. Loest genau das Problem, das die Dungeon-Analyse
+   vom 16.07. aufgedeckt hat (ein 75%-Krit-Build raeumt Albtraum ohne jedes
+   Risiko durch) - hier gibt es keinen Deckel, den ein guter Build je
+   "aussitzen" koennte, die Herausforderung waechst garantiert schneller als
+   jeder gedeckelte Spieler-Stat mithalten kann.
+
+   Wellen-Wachstum bewusst deutlich gedaempfter als beim Dungeon (1.05 statt
+   1.24-1.42) - ohne Cap braucht es hier einen sehr flachen Anstieg, damit
+   die Kurve ueber 50-100+ Wellen hinweg (statt nur 10-25) nicht sofort
+   explodiert. Simulationsgeprueft (node, dieselben Spieler-Profile wie bei
+   den Dungeon-Fixes): schwache Builds erreichen Stufe ~30-45, gut
+   ausgebaute (insbesondere mit Heilungs-/Resistenz-Investition, nicht nur
+   Krit) Stufe ~80-95 - echte, gleitende Differenzierung statt des binaeren
+   Kipppunkts, den dieselbe Simulation beim Hochdrehen des Dungeon-Caps
+   gezeigt hat. */
+const BKMP_TOWER_CONFIG = {
+  waveGrowth: 1.05,
+  dampingExponent: 0.55,
+  hpCoef: 0.06,
+  miniBossEvery: 5,
+  miniBossBump: 1.2,
+  cooldownHours: 24
+};
+let bkmpTowerActive = false;
+let bkmpTowerWave = 0;
+let bkmpTowerStartTime = 0;
+let bkmpTowerPrevDragon = null;
+let bkmpTowerPrevVillageHp = null;
+let bkmpTowerTimerInterval = null;
+let bkmpTowerRunGold = 0;
+let bkmpTowerRunXp = 0;
+let bkmpTowerRunCrystals = 0;
+
+function bkmpTowerWaveMult(wave) {
+  return Math.pow(BKMP_TOWER_CONFIG.waveGrowth, wave - 1);
+}
+function bkmpTowerCombatMult(wave) {
+  /* Absichtlich OHNE Math.min-Deckel - siehe Modul-Kommentar oben. */
+  return Math.pow(bkmpTowerWaveMult(wave), BKMP_TOWER_CONFIG.dampingExponent);
+}
+function bkmpTowerSpawnWave(wave) {
+  bkmpTowerWave = wave;
+  const s = bkmpIdleEffectiveStats;
+  const M = bkmpTowerCombatMult(wave);
+  const isMiniboss = wave % BKMP_TOWER_CONFIG.miniBossEvery === 0;
+  const bossBump = isMiniboss ? BKMP_TOWER_CONFIG.miniBossBump : 1;
+  const fullRoster = bkmpIdleDragonDefs.length ? bkmpIdleDragonDefs : BKMP_IDLE_FALLBACK_DRAGONS;
+  const roster = fullRoster.filter(d => d.active !== false && d.spawn_rule === 'standard');
+  const safeRoster = roster.length ? roster : fullRoster;
+  const archetype = safeRoster[(wave - 1) % safeRoster.length] || {};
+  bkmpIdleCurrentDragon = {
+    id: 'turm-wave-' + wave,
+    name: isMiniboss ? `👑 Turmwächter (Stufe ${wave})` : `Turmgeist (Stufe ${wave})`,
+    emoji: archetype.emoji || '🐉',
+    spriteKey: archetype.sprite_key || archetype.id || 'standard',
+    killIndex: 0,
+    isBoss: false,
+    bossTier: isMiniboss ? 'miniboss' : null,
+    isEventDragon: false,
+    eventDragonKey: null,
+    /* isDungeon=true nur fuer die geteilte Visuals-Funktion (Namens-/Sprite-
+       Anzeige, siehe bkmpDungeonApplyDragonVisuals) - Dispatch/Belohnung
+       laufen ueber das eigene bkmpTowerActive-Flag, nicht ueber diese. */
+    isDungeon: true,
+    isTower: true,
+    maxHp: Math.max(1, Math.round((s.attack || 10) * 4 * M * bossBump)),
+    attack: Math.max(1, Math.round((s.hp || 100) * BKMP_TOWER_CONFIG.hpCoef * M * bossBump)),
+    defense: Math.round((s.defense || 0) * 0.3)
+  };
+  bkmpIdleCurrentDragon.hp = bkmpIdleCurrentDragon.maxHp;
+  bkmpDungeonApplyDragonVisuals(bkmpIdleCurrentDragon);
+  bkmpIdleUpdateDragonHpBar();
+  bkmpTowerUpdateBanner();
+}
+function bkmpTowerUpdateBanner() {
+  const banner = document.getElementById('idleTurmBanner');
+  if (!banner || !bkmpTowerActive) return;
+  const elapsed = Date.now() - bkmpTowerStartTime;
+  const best = Number((bkmpIdleState && bkmpIdleState.turm_highest_wave) || 0);
+  banner.innerHTML = `🗼 Endloser Turm &middot; Stufe ${bkmpTowerWave} &middot; Rekord: ${best} &middot; ⏱ ${bkmpDungeonFormatTime(elapsed)} <button type="button" class="idle-dungeon-auto-cancel-btn" id="idleTowerGiveUpBtn">Aufgeben</button>`;
+  const giveUpBtn = document.getElementById('idleTowerGiveUpBtn');
+  if (giveUpBtn) giveUpBtn.addEventListener('click', bkmpTowerGiveUp);
+}
+async function bkmpTowerStart() {
+  if (bkmpTowerActive || bkmpDungeonActive || bkmpDungeonStarting || !bkmpIdleState || !bkmpIdleEffectiveStats) return false;
+  if (bkmpIdleEventPauseActive) {
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Erst den Event-Drachen bestätigen, bevor der Turm startet.', 3200);
+    return false;
+  }
+  if (typeof bkmpRaidShouldShowCombatView === 'function' && bkmpRaidShouldShowCombatView()) {
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Während eines laufenden Raids kann der Turm nicht gestartet werden.', 3200);
+    return false;
+  }
+  const cooldownMs = BKMP_TOWER_CONFIG.cooldownHours * 3600 * 1000;
+  const last = Date.parse(bkmpIdleState.turm_last_attempt_at || '') || 0;
+  if (Date.now() - last < cooldownMs) {
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('🗼 Der Turm regeneriert noch - versuch es später erneut.', 3200);
+    return false;
+  }
+
+  bkmpTowerActive = true;
+  bkmpTowerWave = 0;
+  bkmpTowerStartTime = Date.now();
+  bkmpTowerRunGold = 0;
+  bkmpTowerRunXp = 0;
+  bkmpTowerRunCrystals = 0;
+  bkmpTowerPrevDragon = bkmpIdleCurrentDragon;
+  bkmpTowerPrevVillageHp = bkmpIdleVillageHp;
+  bkmpIdleVillageHp = bkmpIdleEffectiveStats.hp;
+  bkmpIdleState.turm_last_attempt_at = new Date().toISOString();
+
+  bkmpIdleActiveTab = 'kampf';
+  bkmpIdleTabs.forEach(t => {
+    const b = document.getElementById(t.btn);
+    const p = document.getElementById(t.panel);
+    if (b) b.classList.toggle('active', t.id === 'kampf');
+    if (p) p.style.display = t.id === 'kampf' ? '' : 'none';
+  });
+  const stageBar = document.getElementById('idleStageBar');
+  if (stageBar) stageBar.style.display = 'none';
+  const banner = document.getElementById('idleTurmBanner');
+  if (banner) banner.style.display = '';
+  if (bkmpTowerTimerInterval) clearInterval(bkmpTowerTimerInterval);
+  bkmpTowerTimerInterval = setInterval(bkmpTowerUpdateBanner, 500);
+  bkmpTowerSpawnWave(1);
+  bkmpIdleUpdateVillageHpBar();
+  bkmpIdleQueueSync();
+  if (typeof bkmpRuneSyncDrawerVisibility === 'function') bkmpRuneSyncDrawerVisibility();
+  return true;
+}
+function bkmpTowerHandleWaveCleared() {
+  bkmpDragonGrantCompanionBattleXp(6);
+  const s = bkmpIdleEffectiveStats;
+  const wave = bkmpTowerWave;
+  const goldGain = Math.round(s.attack * 0.8);
+  const xpGain = Math.round(s.attack * 0.4);
+  bkmpIdleState.gold = Math.floor((bkmpIdleState.gold || 0) + goldGain);
+  bkmpIdleState.total_gold_earned = Math.floor((bkmpIdleState.total_gold_earned || 0) + goldGain);
+  bkmpTowerRunGold += goldGain;
+  bkmpTowerRunXp += xpGain;
+  if (typeof bkmpIdleAddXp === 'function') bkmpIdleAddXp(xpGain);
+  /* Meilenstein alle 10 Stufen - eigener Kristall-Bonus statt eines
+     weiteren Gold/XP-Sprungs, damit der Turm auch die (sonst nur ueber
+     Kristallmine/Dungeon erreichbare) Premium-Ressource fuettert. */
+  if (wave % 10 === 0) {
+    const milestoneCrystals = Math.ceil(wave / 10) * 2;
+    bkmpIdleState.crystals = Math.floor((bkmpIdleState.crystals || 0) + milestoneCrystals);
+    bkmpTowerRunCrystals += milestoneCrystals;
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`🗼 Stufe ${wave} erreicht! +${milestoneCrystals} 💎`, 3200);
+  }
+  /* Gleiche 30%-Zwischenheilung wie im Dungeon (siehe
+     bkmpDungeonHandleWaveCleared) - kein Voll-Heil, sonst zaehlt am Ende
+     nur noch die letzte Welle. */
+  bkmpIdleVillageHp = Math.min(s.hp, bkmpIdleVillageHp + s.hp * 0.30);
+  bkmpTowerSpawnWave(wave + 1);
+  bkmpIdleUpdateVillageHpBar();
+  bkmpIdleRenderHud();
+  bkmpIdleQueueSync();
+}
+function bkmpTowerFinish(reachedWave) {
+  bkmpTowerActive = false;
+  if (bkmpTowerTimerInterval) { clearInterval(bkmpTowerTimerInterval); bkmpTowerTimerInterval = null; }
+  const banner = document.getElementById('idleTurmBanner');
+  if (banner) banner.style.display = 'none';
+  const stageBar = document.getElementById('idleStageBar');
+  if (stageBar) stageBar.style.display = '';
+
+  bkmpIdleCurrentDragon = bkmpTowerPrevDragon;
+  bkmpIdleVillageHp = bkmpTowerPrevVillageHp;
+  if (bkmpIdleCurrentDragon) {
+    bkmpDungeonApplyDragonVisuals(bkmpIdleCurrentDragon);
+  } else if (typeof bkmpIdleSpawnDragon === 'function') {
+    bkmpIdleSpawnDragon();
+  }
+  bkmpIdleUpdateDragonHpBar();
+  bkmpIdleUpdateVillageHpBar();
+  if (typeof bkmpIdleRenderStageBar === 'function') bkmpIdleRenderStageBar();
+
+  const prevBest = Number(bkmpIdleState.turm_highest_wave || 0);
+  const isNewBest = reachedWave > prevBest;
+  if (isNewBest) bkmpIdleState.turm_highest_wave = reachedWave;
+  bkmpIdleRenderHud();
+  bkmpIdleQueueSync();
+
+  const rewardParts = [];
+  if (bkmpTowerRunGold > 0) rewardParts.push(`+${bkmpIdleFormatNumber(bkmpTowerRunGold)} 💰`);
+  if (bkmpTowerRunXp > 0) rewardParts.push(`+${bkmpIdleFormatNumber(bkmpTowerRunXp)} XP`);
+  if (bkmpTowerRunCrystals > 0) rewardParts.push(`+${bkmpTowerRunCrystals} 💎`);
+  const rewardText = rewardParts.length ? rewardParts.join(' · ') : '—';
+  if (typeof bkmpShowJannikToast === 'function') {
+    bkmpShowJannikToast(
+      `🗼 Turmlauf beendet bei Stufe ${reachedWave}${isNewBest ? ' - 🏆 Neuer Rekord!' : ` (Rekord: ${prevBest})`} &middot; ${rewardText}`,
+      5200
+    );
+  }
+  if (bkmpIdleActiveTab === 'turm' && typeof bkmpIdleRenderTurmPanel === 'function') bkmpIdleRenderTurmPanel();
+}
+function bkmpTowerHandleDefeat() {
+  /* bkmpTowerWave ist die Welle, an der man gestorben ist - die wurde
+     NICHT ueberstanden, siehe wavesCleared-Logik in bkmpDungeonFinish fuer
+     dasselbe Muster. */
+  bkmpTowerFinish(Math.max(0, bkmpTowerWave - 1));
+}
+function bkmpTowerGiveUp() {
+  if (!bkmpTowerActive) return;
+  bkmpTowerFinish(Math.max(0, bkmpTowerWave - 1));
+}
+function bkmpIdleRenderTurmPanel() {
+  const panel = document.getElementById('idlePanelTurm');
+  if (!panel || !bkmpIdleState) return;
+  const best = Number(bkmpIdleState.turm_highest_wave || 0);
+  const cooldownMs = BKMP_TOWER_CONFIG.cooldownHours * 3600 * 1000;
+  const last = Date.parse(bkmpIdleState.turm_last_attempt_at || '') || 0;
+  const remainingMs = Math.max(0, cooldownMs - (Date.now() - last));
+  const ready = remainingMs <= 0 && !bkmpTowerActive && !bkmpDungeonActive;
+  panel.innerHTML = `
+    <div class="idle-dungeon-intro">
+      <h4>🗼 Endloser Turm</h4>
+      <p>Wellen ohne Ende - keine Schwierigkeitsstufe, kein Limit. Jede Stufe wird härter als die letzte, bis dein Dorf fällt. Alle 10 Stufen gibt's einen Kristall-Bonus, jede besiegte Welle bringt Gold und EXP. Ein Versuch alle 24 Stunden.</p>
+    </div>
+    <div class="idle-dungeon-type-grid">
+      <div class="idle-dungeon-card">
+        <p>🏆 Aktueller Rekord: <b>Stufe ${best}</b></p>
+        <p>${ready ? '✅ Bereit für einen Versuch' : bkmpTowerActive ? '⚔️ Lauf aktiv...' : `⏳ Nächster Versuch in ${bkmpDungeonFormatCountdown(Math.ceil(remainingMs / 1000))}`}</p>
+        <button type="button" class="btn-ja" id="idleTurmStartBtn" ${ready ? '' : 'disabled'}>🗼 Turm betreten</button>
+      </div>
+    </div>
+  `;
+  const btn = document.getElementById('idleTurmStartBtn');
+  if (btn) btn.addEventListener('click', bkmpTowerStart);
+}
+
 function bkmpIdleHandleDragonDefeated() {
   if (bkmpDungeonActive) { bkmpDungeonHandleWaveCleared(); return; }
+  if (bkmpTowerActive) { bkmpTowerHandleWaveCleared(); return; }
   const defeatedEventDragon = bkmpIdleCurrentDragon && bkmpIdleCurrentDragon.isEventDragon ? bkmpIdleCurrentDragon : null;
   const rewards = bkmpIdleRewardsAt(bkmpIdleCurrentDragon, bkmpIdleEffectiveStats, bkmpIdleGetMergedRewardScalingCfg());
   /* Goldrausch/Wissensschub (siehe bkmpDungeonGrantBoost) wirkt auf JEDE
@@ -2370,6 +2611,7 @@ function bkmpIdleCheckYakshasHeimatUnlock() {
 
 function bkmpIdleHandleDefeat() {
   if (bkmpDungeonActive) { bkmpDungeonHandleFailure(); return; }
+  if (bkmpTowerActive) { bkmpTowerHandleDefeat(); return; }
   bkmpIdleLog(`💀 Niederlage gegen ${bkmpIdleCurrentDragon.emoji} ${bkmpIdleCurrentDragon.name}! Du fällst eine Stufe zurück.`);
   bkmpIdleState.current_dragon_index = Math.max(0, Number(bkmpIdleState.current_dragon_index || 0) - 1);
   bkmpIdleState.village_defeats = Number(bkmpIdleState.village_defeats || 0) + 1;
@@ -5052,7 +5294,8 @@ const BKMP_IDLE_LEADERBOARD_TABS = [
   { id: 'raid_bosses', label: '🐉 Raid-Bosse', isRaid: true },
   { id: 'raid_joined', label: '🐉 Raid-Teilnahmen', isRaid: true },
   { id: 'raid_best', label: '🐉 Bester Raid', isRaid: true },
-  { id: 'dungeon', label: '🏛️ Dungeon', isDungeon: true }
+  { id: 'dungeon', label: '🏛️ Dungeon', isDungeon: true },
+  { id: 'turm', label: '🗼 Turm', field: 'turm_highest_wave', format: v => 'Stufe ' + v }
 ];
 let bkmpIdleActiveLeaderboardTab = 'level';
 let bkmpIdleLeaderboardStats = [];
@@ -6507,6 +6750,61 @@ async function bkmpDragonToggleFavorite(dragonId) {
   bkmpIdleRenderDragonsPanel();
 }
 
+/* Legendaeren-Aufstieg (Lategame-Content, Spieler-Vorgabe 16.07.):
+   Zerathor/Yakshadrache droppen ohne Besitz-Limit (siehe raid_finish, 1%
+   Chance pro Weltboss-Sieg, unabhaengig davon wie viele man schon hat) -
+   Dubletten waren bisher reiner Ballast, nur zum Freilassen fuer eine
+   kleine Trostbelohnung gut. Exakt dasselbe Prinzip wie der bestehende
+   Runen-Aufstieg (BKMP_RUNE_ASCEND_MAX_LEVEL, siehe bkmpRuneAscend): eine
+   zweite Legendaere DERSELBEN Art wird komplett verbraucht (Fodder), die
+   behaltene steigt eine Stufe. Bewusst OHNE Fehlschlagchance (der Preis ist
+   bereits eine ganze zweite Legendaere plus Gold) und mit niedrigem Deckel
+   (5 Stufen) - das soll ein spuerbarer Bonus fuer Vielspieler sein, kein
+   neuer unbegrenzter Powercreep-Weg. */
+const BKMP_DRAGON_ASCEND_MAX_LEVEL = 5;
+const BKMP_DRAGON_ASCEND_BONUS_PCT = 10;
+const BKMP_DRAGON_ASCEND_COST_GOLD = 150000;
+function bkmpDragonAscendedMainStat(dragon, rawValue) {
+  const level = Number(dragon.ascension_level || 0);
+  return Math.round(Number(rawValue || 0) * (1 + level * BKMP_DRAGON_ASCEND_BONUS_PCT / 100) * 10) / 10;
+}
+function bkmpDragonCanAscend(dragon) {
+  const species = bkmpDragonSpeciesById(dragon.species_id);
+  return Boolean(species) && species.rarity === 'legendaer' && dragon.stage === 'adult' && Number(dragon.ascension_level || 0) < BKMP_DRAGON_ASCEND_MAX_LEVEL;
+}
+function bkmpDragonFindAscendFodder(dragon) {
+  return bkmpPlayerDragons.find(d => d.id !== dragon.id && d.species_id === dragon.species_id && d.stage === 'adult' && !d.is_favorite && !d.is_companion);
+}
+async function bkmpDragonAscend(dragonId) {
+  const dragon = bkmpPlayerDragons.find(d => d.id === dragonId);
+  if (!dragon || !bkmpIdleState || !bkmpDragonCanAscend(dragon)) return;
+  const species = bkmpDragonSpeciesById(dragon.species_id);
+  const fodder = bkmpDragonFindAscendFodder(dragon);
+  if (!fodder) {
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`🐉 Du brauchst eine zweite erwachsene ${species.name} (nicht favorisiert, nicht als Begleiter aktiv) als Opfer.`, 3800);
+    return;
+  }
+  if ((bkmpIdleState.gold || 0) < BKMP_DRAGON_ASCEND_COST_GOLD) {
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`💰 Nicht genug Gold für den Aufstieg (${bkmpIdleFormatNumber(BKMP_DRAGON_ASCEND_COST_GOLD)} nötig).`, 3200);
+    return;
+  }
+  try {
+    await releasePlayerDragon(fodder.id);
+    bkmpPlayerDragons = bkmpPlayerDragons.filter(d => d.id !== fodder.id);
+    bkmpIdleState.gold -= BKMP_DRAGON_ASCEND_COST_GOLD;
+    dragon.ascension_level = Number(dragon.ascension_level || 0) + 1;
+    await updatePlayerDragon(dragonId, { ascension_level: dragon.ascension_level });
+    bkmpIdleRecomputeEffectiveStats();
+    bkmpIdleRenderHud();
+    bkmpIdleQueueSync();
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`🌟 ${species.name} auf Aufstiegsstufe ${dragon.ascension_level}/${BKMP_DRAGON_ASCEND_MAX_LEVEL}!`, 3800);
+    bkmpIdleRenderDragonsPanel();
+  } catch (e) {
+    console.warn('Idle Dorf: Drache konnte nicht aufgestiegen werden.', e);
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Aufstieg fehlgeschlagen. Bitte versuche es erneut.', 3200);
+  }
+}
+
 /* ---------------- Obstgarten/Jagdhuette: passive Produktion ----------------
    Bewusst einfache zeitbasierte Ansammlung statt einer dedizierten
    Gebaeude-UI/Upgrade-Kette (die folgt spaeter) - jeder Spieler hat schon
@@ -6684,9 +6982,9 @@ function bkmpIdleDragonCompanionEffectTotals() {
   const totals = {};
   const dragon = bkmpPlayerDragons.find(d => d.is_companion && d.stage === 'adult');
   if (!dragon) return totals;
-  if (dragon.stat_attack) totals.attack_flat = (totals.attack_flat || 0) + Number(dragon.stat_attack);
-  if (dragon.stat_defense) totals.defense_flat = (totals.defense_flat || 0) + Number(dragon.stat_defense);
-  if (dragon.stat_hp) totals.hp_flat = (totals.hp_flat || 0) + Number(dragon.stat_hp);
+  if (dragon.stat_attack) totals.attack_flat = (totals.attack_flat || 0) + bkmpDragonAscendedMainStat(dragon, dragon.stat_attack);
+  if (dragon.stat_defense) totals.defense_flat = (totals.defense_flat || 0) + bkmpDragonAscendedMainStat(dragon, dragon.stat_defense);
+  if (dragon.stat_hp) totals.hp_flat = (totals.hp_flat || 0) + bkmpDragonAscendedMainStat(dragon, dragon.stat_hp);
   (dragon.substats || []).forEach(s => {
     if (['fruit_bonus_pct', 'meat_bonus_pct', 'dragon_xp_bonus_pct'].includes(s.stat)) return;
     totals[s.stat] = (totals[s.stat] || 0) + Number(s.value || 0);
@@ -6713,9 +7011,10 @@ function bkmpDragonSubstatSuffix(key) {
 }
 function bkmpDragonMainStatLine(dragon) {
   const parts = [];
-  if (dragon.stat_attack) parts.push(`⚔️ +${bkmpIdleFormatNumber(dragon.stat_attack)}`);
-  if (dragon.stat_defense) parts.push(`🛡️ +${bkmpIdleFormatNumber(dragon.stat_defense)}`);
-  if (dragon.stat_hp) parts.push(`❤️ +${bkmpIdleFormatNumber(dragon.stat_hp)}`);
+  if (dragon.stat_attack) parts.push(`⚔️ +${bkmpIdleFormatNumber(bkmpDragonAscendedMainStat(dragon, dragon.stat_attack))}`);
+  if (dragon.stat_defense) parts.push(`🛡️ +${bkmpIdleFormatNumber(bkmpDragonAscendedMainStat(dragon, dragon.stat_defense))}`);
+  if (dragon.stat_hp) parts.push(`❤️ +${bkmpIdleFormatNumber(bkmpDragonAscendedMainStat(dragon, dragon.stat_hp))}`);
+  if (Number(dragon.ascension_level || 0) > 0) parts.push(`🌟+${dragon.ascension_level}`);
   return parts.join(' ');
 }
 
@@ -6867,6 +7166,7 @@ function bkmpIdleRenderDragonsPanel() {
               ? `<div class="idle-xp-bar"><div class="idle-xp-fill" style="width:${pct}%"></div><span>${d.battle_xp}/${species.battle_xp_required} Kampf-EP</span></div>`
               : `<div class="idle-dragon-stats">${bkmpDragonMainStatLine(d)}<div class="idle-dragon-substats">${substatsHtml}</div></div>`}
             ${canEvolve ? `<button type="button" class="btn-ja idle-skin-action idle-dragon-evolve-adult-btn" data-dragon-id="${d.id}">⭐ Erwachsen werden</button>` : ''}
+            ${!isTeen && bkmpDragonCanAscend(d) ? `<button type="button" class="btn-ja idle-skin-action idle-dragon-ascend-btn" data-dragon-id="${d.id}" title="Verbraucht eine zweite erwachsene ${escapeHtml(species.name)} (nicht favorisiert/Begleiter) + ${bkmpIdleFormatNumber(BKMP_DRAGON_ASCEND_COST_GOLD)} Gold für +${BKMP_DRAGON_ASCEND_BONUS_PCT}% Hauptwerte.">🌟 Aufsteigen (${Number(d.ascension_level || 0)}/${BKMP_DRAGON_ASCEND_MAX_LEVEL})</button>` : ''}
             <div class="idle-dragon-actions-row">
               ${d.is_companion
                 ? `<button type="button" class="btn-nein idle-skin-action idle-dragon-uncompanion-btn" data-dragon-id="${d.id}">Ablegen</button>`
@@ -6917,6 +7217,7 @@ function bkmpIdleRenderDragonsPanel() {
   panel.querySelectorAll('.idle-dragon-feed-btn').forEach(btn => btn.addEventListener('click', () => bkmpDragonFeed(btn.dataset.dragonId, Number(btn.dataset.amount))));
   panel.querySelectorAll('.idle-dragon-evolve-teen-btn').forEach(btn => btn.addEventListener('click', () => bkmpDragonEvolveToTeen(btn.dataset.dragonId)));
   panel.querySelectorAll('.idle-dragon-evolve-adult-btn').forEach(btn => btn.addEventListener('click', () => bkmpDragonEvolveToAdult(btn.dataset.dragonId)));
+  panel.querySelectorAll('.idle-dragon-ascend-btn').forEach(btn => btn.addEventListener('click', () => bkmpDragonAscend(btn.dataset.dragonId)));
   panel.querySelectorAll('.idle-dragon-companion-btn').forEach(btn => btn.addEventListener('click', () => bkmpDragonSetCompanion(btn.dataset.dragonId)));
   panel.querySelectorAll('.idle-dragon-uncompanion-btn').forEach(btn => btn.addEventListener('click', bkmpDragonUnsetCompanion));
   panel.querySelectorAll('.idle-dragon-fav-btn').forEach(btn => btn.addEventListener('click', () => bkmpDragonToggleFavorite(btn.dataset.dragonId)));
@@ -7570,6 +7871,47 @@ function bkmpRuneUpgrade(cid) {
   bkmpIdleQueueSync();
 }
 
+/* Substat-Reroll (Lategame-Content, Spieler-Vorgabe 16.07.): bisher gab es
+   KEINERLEI Moeglichkeit, einen bereits vorhandenen Sub-Stat neu zu wuerfeln
+   - einmal (bei Drop/Verschmelzung/Meilenstein) gewuerfelt, fuer immer so.
+   Klassischer "perfekte Rune jagen"-Sog fuer genau die Spieler, die
+   Skilltree/Prestige/Dungeons schon ausgereizt haben, UND eine neue
+   Kristall-Senke. Wuerfelt bewusst nur den WERT neu (dieselbe Range wie
+   beim urspruenglichen Wurf, siehe bkmpIdleRollSubstatValue), nicht den
+   Stat-Typ selbst - das waere ein anderes, viel staerkeres Feature
+   ("Stat tauschen") und wuerde die Substat-Gewichtung aus
+   BKMP_RUNE_SUBSTAT_WEIGHTS aushebeln. */
+function bkmpRuneRerollSubstatCost(rune) {
+  const rarity = window.BKMP_RUNE_RARITIES.find(r => r.id === rune.rarity);
+  const mult = rarity ? rarity.mult : 1;
+  return Math.max(1, Math.round(5 * mult * (1 + Number(rune.upgrade_level || 0) * 0.15)));
+}
+function bkmpRuneRerollSubstat(cid, statIndex) {
+  const rune = bkmpIdlePlayerRunes.find(r => r._cid === cid);
+  if (!rune || !bkmpIdleState) return;
+  const substats = Array.isArray(rune.substats) ? rune.substats : [];
+  const entry = substats[statIndex];
+  if (!entry) return;
+  const cost = bkmpRuneRerollSubstatCost(rune);
+  if (Number(bkmpIdleState.crystals || 0) < cost) {
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('💎 Nicht genug Kristalle zum Neuwürfeln.', 2400);
+    return;
+  }
+  bkmpIdleState.crystals -= cost;
+  const oldValue = entry.value;
+  entry.value = bkmpIdleRollSubstatValue(entry.stat, rune.rarity);
+  const meta = bkmpRuneStatMeta(entry.stat);
+  const subUnit = entry.stat.endsWith('_flat') ? '' : '%';
+  const better = entry.value > oldValue;
+  bkmpIdleLog(`🎲 Sub-Stat neu gewürfelt: ${meta.icon} ${meta.desc} +${oldValue}${subUnit} → +${entry.value}${subUnit}${better ? ' (besser!)' : ''}`);
+  if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`🎲 ${meta.icon} ${meta.desc}: +${entry.value}${subUnit}${better ? ' 📈' : ''}`, 2800);
+  if (rune.id) updatePlayerRuneUpgrade(rune.id, rune.upgrade_level, rune.substats).catch(() => {});
+  bkmpIdleRecomputeEffectiveStats();
+  bkmpIdleRenderRunenPanel();
+  bkmpIdleRenderHud();
+  bkmpIdleQueueSync();
+}
+
 function bkmpRuneCanAscend(rune) {
   const level = Number(rune.upgrade_level || 0);
   return rune.rarity === 'gold' && level >= BKMP_RUNE_MAX_LEVEL && level < BKMP_RUNE_ASCEND_MAX_LEVEL;
@@ -7951,10 +8293,12 @@ function bkmpRuneStatBoxHTML(slot, rune) {
     </div>
     <p class="idle-runen-stat-line idle-runen-stat-primary">+${effectiveValue}${unit} ${escapeHtml(slot.desc)}</p>
     ${rune.substats && rune.substats.length ? `<ul class="idle-runen-substat-list">
-      ${rune.substats.map(s => {
+      ${rune.substats.map((s, i) => {
         const meta = bkmpRuneStatMeta(s.stat);
         const subUnit = s.stat.endsWith('_flat') ? '' : '%';
-        return `<li>${meta.icon} +${s.value}${subUnit} ${escapeHtml(meta.desc)}</li>`;
+        const rerollCost = bkmpRuneRerollSubstatCost(rune);
+        const canAffordReroll = bkmpIdleState && Number(bkmpIdleState.crystals || 0) >= rerollCost;
+        return `<li>${meta.icon} +${s.value}${subUnit} ${escapeHtml(meta.desc)} <button type="button" class="idle-runen-reroll-btn" data-cid="${rune._cid}" data-index="${i}" ${canAffordReroll ? '' : 'disabled'} title="Diesen Sub-Stat neu würfeln (gleicher Bereich wie beim ursprünglichen Fund)">🎲 ${rerollCost} 💎</button></li>`;
       }).join('')}
     </ul>` : '<p class="idle-runen-stat-note">Noch keine Sub-Stats - bei +3/+6/+9/+12 kommt bis zu insgesamt 4 jeweils einer dazu.</p>'}
     <div class="idle-runen-stat-actions">
@@ -8439,6 +8783,7 @@ function bkmpIdleRenderRunenPanel() {
   if (upgradeBtn) upgradeBtn.addEventListener('click', () => bkmpRuneUpgrade(upgradeBtn.dataset.cid));
   const ascendBtn = document.getElementById('idleRuneAscendBtn');
   if (ascendBtn) ascendBtn.addEventListener('click', () => bkmpRuneAscend(ascendBtn.dataset.cid));
+  panel.querySelectorAll('.idle-runen-reroll-btn').forEach(btn => btn.addEventListener('click', () => bkmpRuneRerollSubstat(btn.dataset.cid, Number(btn.dataset.index))));
   const fuseBtn = document.getElementById('idleRuneFuseBtn');
   if (fuseBtn) fuseBtn.addEventListener('click', () => bkmpRuneStartFuseSelection(fuseBtn.dataset.rarity));
   const sellBtn = document.getElementById('idleRuneSellBtn');
@@ -8471,6 +8816,7 @@ const bkmpIdleTabs = [
   { id: 'runen', btn: 'idleTabBtnRunen', panel: 'idlePanelRunen', render: bkmpIdleRenderRunenPanel },
   { id: 'skins', btn: 'idleTabBtnSkins', panel: 'idlePanelSkins', render: bkmpIdleRenderSkinsPanel },
   { id: 'dungeon', btn: 'idleTabBtnDungeon', panel: 'idlePanelDungeon', render: bkmpIdleRenderDungeonPanel },
+  { id: 'turm', btn: 'idleTabBtnTurm', panel: 'idlePanelTurm', render: bkmpIdleRenderTurmPanel },
   { id: 'arena', btn: 'idleTabBtnArena', panel: 'idlePanelArena', render: bkmpIdleRenderArenaPanel },
   { id: 'gilde', btn: 'idleTabBtnGilde', panel: 'idlePanelGilde', render: bkmpIdleRenderGildePanel },
   { id: 'gildetech', btn: 'idleTabBtnGildeTech', panel: 'idlePanelGildeTech', render: bkmpIdleRenderGildeTechPanel },
@@ -8783,6 +9129,15 @@ const BKMP_AUTOCLICK_TOAST = 'Deine Klicks wirken verdächtig gleichmäßig – 
 const BKMP_CLICK_RATE_CAP_MS = 100;
 let bkmpIdleLastClickAt = 0;
 let bkmpRaidLastClickAt = 0;
+/* App-Modus (Phase 16): echter Tap-Schaden-Zaehler fuer die aktuelle
+   Raid-Teilnahme (kein Fake-Wert - Summe der tatsaechlich per Tipp auf
+   den Boss ausgeteilten clickDamage-Betraege, siehe
+   bkmpRaidHandleBossClick weiter unten). Setzt sich automatisch zurueck,
+   sobald bkmpRaidRenderCombat() eine neue Raid-Id sieht (naechster Raid
+   = neue Zaehlung). Auf der normalen Website ungenutzt (kein Element mit
+   diesen IDs vorhanden), daher folgenlos. */
+let bkmpRaidTapDamageSession = 0;
+let bkmpRaidTapDamageSessionId = null;
 
 /* Sofort-Sperre bei eindeutigem Extrem-Ausbruch: 20+ Klick-VERSUCHE
    innerhalb einer Sekunde (auch die vom 100ms-Ratenlimit ohnehin
@@ -9371,6 +9726,28 @@ function bkmpRaidRenderCombat() {
     const info = bkmpRaidGetPhaseInfo();
     timerEl.textContent = info.phase === 'fight' ? '⏳ ' + bkmpRaidFormatCountdown(info.msUntilFightEnd) : '';
   }
+  /* App-Modus (Phase 16): Tap-Schaden-Zaehler pro Raid zuruecksetzen
+     (neue Raid-Id seit letztem Render = neuer Kampf) und zusammen mit
+     der Ressourcen-Leiste rendern - beides rein lesend aus bereits
+     vorhandenem State, auf der Website ohne Wirkung (Elemente existieren
+     dort nicht). */
+  if (window.BKMP_APP_MODE) {
+    if (bkmpRaidState.id !== bkmpRaidTapDamageSessionId) {
+      bkmpRaidTapDamageSessionId = bkmpRaidState.id;
+      bkmpRaidTapDamageSession = 0;
+    }
+    const tapVal = document.querySelector('#raidTapDamagePill .idle-res-val');
+    if (tapVal) tapVal.textContent = bkmpIdleFormatNumber(bkmpRaidTapDamageSession);
+    const strip = document.getElementById('raidRewardsStrip');
+    if (strip && bkmpIdleState) {
+      strip.innerHTML = `
+        <span class="idle-res-chip idle-res-gold"><i class="idle-res-icon">💰</i><b class="idle-res-val">${bkmpIdleFormatNumber(bkmpIdleState.gold)}</b></span>
+        <span class="idle-res-chip idle-res-wood"><i class="idle-res-icon">🌳</i><b class="idle-res-val">${bkmpIdleFormatNumber(bkmpIdleState.wood)}</b></span>
+        <span class="idle-res-chip idle-res-stone"><i class="idle-res-icon">🗿</i><b class="idle-res-val">${bkmpIdleFormatNumber(bkmpIdleState.stone)}</b></span>
+        <span class="idle-res-chip idle-res-crystal"><i class="idle-res-icon">💎</i><b class="idle-res-val">${bkmpIdleFormatNumber(bkmpIdleState.crystals)}</b></span>
+        <span class="idle-res-chip idle-res-essence"><i class="idle-res-icon">🧪</i><b class="idle-res-val">${bkmpIdleFormatNumber(bkmpIdleState.essence)}</b></span>`;
+    }
+  }
   /* Ueber den Throttle statt direkt - bkmpRaidRenderCombat wird bei jedem
      eigenen Tick (2.5s), jedem Boss-Poll (1.5s) UND jedem Realtime-Update
      von ANDEREN Mitspielern aufgerufen. Ohne Throttle wurde die komplette
@@ -9569,6 +9946,7 @@ function bkmpRaidHandleBossClick() {
 
   const isCrit = Math.random() * 100 < bkmpIdleEffectiveStats.critChance;
   const clickDamage = bkmpIdleApplyBossDamageBonus(Math.max(1, Math.round(bkmpIdleEffectiveStats.attack * (0.12 + (bkmpIdleEffectiveStats.clickDamagePct || 0) / 100) * (isCrit ? Math.max(1, bkmpIdleEffectiveStats.critDamage / 100) : 1))));
+  bkmpRaidTapDamageSession += clickDamage;
   bkmpRaidSpawnFx('raid-fx-magic', 'raidBoss', clickDamage, isCrit);
   bkmpRaidHitFlash('raidBoss');
   submitRaidDamage(bkmpRaidState.id, clickDamage, isCrit, true).then(result => {
@@ -10065,7 +10443,7 @@ window.BKMP_IDLE_ACHIEVEMENTS_EXTRA = [
   { id: 'dragon_first_adult', category: 'Drachenzucht', title: 'Erwachsen geworden', desc: 'Ziehe deinen ersten Drachen bis zur Erwachsenenform auf.', check: ctx => ctx.idleDragonsAdult >= 1 },
   { id: 'dragon_adult_10', category: 'Drachenzucht', title: 'Drachenmeister', desc: 'Ziehe 10 erwachsene Drachen auf.', progress: ctx => [ctx.idleDragonsAdult, 10], check: ctx => ctx.idleDragonsAdult >= 10 },
   { id: 'dragon_species_5', category: 'Drachenzucht', title: 'Vielfältige Zucht', desc: 'Besitze Drachen von 5 unterschiedlichen Arten.', progress: ctx => [ctx.idleDragonSpeciesOwned, 5], check: ctx => ctx.idleDragonSpeciesOwned >= 5 },
-  { id: 'dragon_species_all', category: 'Drachenzucht', title: 'Herr über alle Arten', desc: 'Besitze Drachen aller 11 Arten.', progress: ctx => [ctx.idleDragonSpeciesOwned, 11], check: ctx => ctx.idleDragonSpeciesOwned >= 11 },
+  { id: 'dragon_species_all', category: 'Drachenzucht', title: 'Herr über alle Arten', desc: 'Besitze Drachen aller 17 Arten.', progress: ctx => [ctx.idleDragonSpeciesOwned, 17], check: ctx => ctx.idleDragonSpeciesOwned >= 17 },
   { id: 'dragon_legendary_first', category: 'Drachenzucht', title: 'Legendäre Zucht', desc: 'Besitze deinen ersten legendären Drachen.', check: ctx => ctx.idleLegendaryDragonsOwned >= 1 },
   { id: 'dragon_legendary_both', category: 'Drachenzucht', title: 'Meister beider Legenden', desc: 'Besitze sowohl einen Zerathor- als auch einen Yakshadrachen.', check: ctx => bkmpPlayerDragons.some(d => d.species_id === 'zerathor') && bkmpPlayerDragons.some(d => d.species_id === 'yakshadrache') },
   { id: 'dragon_companion_first', category: 'Drachenzucht', title: 'Treuer Begleiter', desc: 'Ruste deinen ersten Begleitdrachen aus.', check: ctx => bkmpPlayerDragons.some(d => d.is_companion) },
@@ -10179,7 +10557,7 @@ window.BKMP_IDLE_TITLES = [
   { id: 'idletitle_dragon_hatch1', name: 'Drachenzüchter', desc: 'Deinen ersten Drachen ausgebrütet.', unlockCustom: ctx => ctx.idleDragonsHatched >= 1, effectType: 'hp_flat', effectValue: 5 },
   { id: 'idletitle_dragon_adult1', name: 'Drachenreiter', desc: 'Deinen ersten Drachen zur Erwachsenenform aufgezogen.', unlockCustom: ctx => ctx.idleDragonsAdult >= 1, effectType: 'attack_pct', effectValue: 4 },
   { id: 'idletitle_dragon_species5', name: 'Vielfältiger Züchter', desc: 'Drachen von 5 verschiedenen Arten besessen.', unlockCustom: ctx => ctx.idleDragonSpeciesOwned >= 5, effectType: 'gold_prod_pct', effectValue: 4 },
-  { id: 'idletitle_dragon_speciesall', name: 'Herr aller Drachenarten', desc: 'Drachen aller 11 Arten besessen.', unlockCustom: ctx => ctx.idleDragonSpeciesOwned >= 11, effectType: 'xp_pct', effectValue: 10 },
+  { id: 'idletitle_dragon_speciesall', name: 'Herr aller Drachenarten', desc: 'Drachen aller 17 Arten besessen.', unlockCustom: ctx => ctx.idleDragonSpeciesOwned >= 17, effectType: 'xp_pct', effectValue: 10 },
   { id: 'idletitle_dragon_legendary', name: 'Legendärer Züchter', desc: 'Einen legendären Drachen besessen.', unlockCustom: ctx => ctx.idleLegendaryDragonsOwned >= 1, effectType: 'crit_damage_pct', effectValue: 10 },
   /* Login-Streak. */
   { id: 'idletitle_streak7', name: 'Wochentreue', desc: '7 Tage in Folge eingeloggt.', unlockCustom: ctx => ctx.idleLoginStreak >= 7, effectType: 'xp_pct', effectValue: 3 },
