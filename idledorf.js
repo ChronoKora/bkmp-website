@@ -657,7 +657,16 @@ function bkmpDungeonPersistEgg(egg) {
     if (!row) return;
     bkmpPlayerDragonEggs.push(row);
     if (typeof bkmpIdleRenderDragonsPanel === 'function') bkmpIdleRenderDragonsPanel();
-  }).catch(e => console.warn('Idle Dorf: Dungeon-Ei konnte nicht gespeichert werden.', e));
+  }).catch(e => {
+    /* Bug-Fix (Spieler-Meldung 16.07., "neue Drachen-Eier werden nicht
+       angezeigt"): schlug das Speichern fehl (z.B. weil die Spezies zum
+       Zeitpunkt des Wurfs noch nicht/nicht mehr in der DB existierte),
+       verschwand das Ei bisher SPURLOS - der Sieg-Popup hatte den Namen
+       schon angezeigt, das Ei landete aber nie im Eierlager, und niemand
+       ausser der Browser-Konsole erfuhr je davon. */
+    console.warn('Idle Dorf: Dungeon-Ei konnte nicht gespeichert werden.', e);
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`⚠️ ${egg.name}-Ei konnte nicht gespeichert werden - bitte melden.`, 4200);
+  });
 }
 function bkmpDungeonRollRune(difficultyIdx, forceRarityId) {
   const weights = BKMP_DUNGEON_RUNE_RARITY_WEIGHTS[difficultyIdx] || BKMP_DUNGEON_RUNE_RARITY_WEIGHTS[0];
@@ -2489,6 +2498,16 @@ function bkmpTowerHandleWaveCleared() {
   bkmpTowerRunGold += goldGain;
   bkmpTowerRunXp += xpGain;
   if (typeof bkmpIdleAddXp === 'function') bkmpIdleAddXp(xpGain);
+  /* Bug-Fix (Spieler-Meldung 16.07., "beim Abschliessen einer Stufe soll
+     auch die Belohnung angezeigt werden"): vorher gab es pro Welle nur
+     bei jeder 5. Stufe ueberhaupt eine sichtbare Rueckmeldung (den
+     Meilenstein-Toast weiter unten) - das laufende Gold/EXP jeder
+     einzelnen Welle wurde nur still ins Konto gebucht, ohne jede
+     Anzeige. Gleiches bkmpIdleRewardGained-Event wie beim normalen
+     Drachen-Kill (siehe bkmpIdleHandleDragonDefeated) - der bereits
+     bestehende, seitenweite "+Gold +XP"-Hochschweb-Listener greift
+     dadurch automatisch auch hier, ohne eigene Anzeige-Logik. */
+  document.dispatchEvent(new CustomEvent('bkmpIdleRewardGained', { detail: { gold: goldGain, xp: xpGain, isBoss: wave % BKMP_TOWER_CONFIG.miniBossEvery === 0 } }));
   if (wave % 5 === 0) {
     const idx = bkmpTowerMilestoneDifficultyIdx(wave);
     const milestoneCrystals = Math.ceil(wave / 5) * 2;
@@ -7177,9 +7196,28 @@ function bkmpIdleRenderDragonsPanel() {
   const eggsHtml = Object.keys(eggGroups).length
     ? `<div class="idle-skin-grid">${Object.keys(eggGroups).map(speciesId => {
         const species = bkmpDragonSpeciesById(speciesId);
-        if (!species) return '';
-        const rarity = bkmpDragonRarityMeta(species.rarity);
         const eggId = unassignedEggs.find(e => e.species_id === speciesId).id;
+        /* Bug-Fix (Spieler-Meldung 16.07., "neue Drachen-Eier werden nicht
+           angezeigt"): fehlte die Spezies im gerade im Browser geladenen
+           Katalog (z.B. eine neu hinzugekommene Art, bevor ein harter
+           Reload den einmal pro Tab-Lebensdauer gecachten Katalog neu
+           laedt - siehe window.__bkmpDragonSpeciesCache in
+           bkmpIdleLoadDragonBreedingState), verschwand das Ei bisher
+           KOMPLETT und kommentarlos aus dem Eierlager, obwohl die Zeile
+           laengst in der Datenbank lag - fuer den Spieler ununterscheidbar
+           von verlorener Beute. Zeigt jetzt einen Platzhalter statt gar
+           nichts; "In Nest legen" bleibt moeglich (braucht nur die Ei-ID,
+           keine Spezies-Metadaten). */
+        if (!species) {
+          return `
+            <div class="idle-skin-card">
+              <div class="idle-dragon-thumb idle-dragon-thumb-unknown">🥚</div>
+              <div class="idle-skin-name">${escapeHtml(speciesId)}-Ei</div>
+              <div class="idle-skin-desc">x${eggGroups[speciesId]} &middot; Art wird geladen - bitte Seite neu laden, falls das bestehen bleibt.</div>
+              <button type="button" class="btn-ja idle-skin-action idle-dragon-assign-btn" data-egg-id="${eggId}">In freies Nest legen</button>
+            </div>`;
+        }
+        const rarity = bkmpDragonRarityMeta(species.rarity);
         return `
           <div class="idle-skin-card" style="--dragon-rarity-color:${rarity.color}">
             <img class="idle-dragon-thumb" src="${species.egg_image}" alt="${escapeHtml(species.name)}">

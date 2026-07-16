@@ -5629,6 +5629,7 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 .idle-dragon-section { margin-bottom: 1.4rem; }
 .idle-dragon-section h4 { font-size: 0.95rem; margin-bottom: 0.5rem; }
 .idle-dragon-thumb { width: 100%; max-width: 96px; aspect-ratio: 1 / 1; object-fit: contain; margin: 0 auto 0.4rem; display: block; }
+.idle-dragon-thumb-unknown { display: flex; align-items: center; justify-content: center; font-size: 2.2rem; background: var(--paper-2); border-radius: 12px; opacity: 0.85; }
 .idle-dragon-nest-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0.7rem; }
 .idle-dragon-nest-card { display: flex; flex-direction: column; align-items: center; border: 1px solid var(--line); border-radius: 14px; padding: 0.7rem; background: var(--paper); text-align: center; }
 .idle-dragon-nest-card.is-ready { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; animation: bkmpDragonNestReadyPulse 1.6s ease-in-out infinite; }
