@@ -7613,6 +7613,17 @@ html.bkmp-app-mode #idleDorfOverlay > .idle-dorf-card > .joke-buttons {
    (Skilltree/Dungeon/Gilde/...) im Detail folgen in spaeteren Phasen.
    ============================================================ */
 
+/* Nutzerwunsch: "vergroesser doch mal ALLES" - statt jedes einzelne
+   Element weiter einzeln zu jagen, hier der eine grosse Hebel: fast der
+   gesamte App-Modus-Umbau (Phasen 1-7) ist bewusst in rem statt px
+   geschrieben, also relativ zur Basis-Schriftgroesse von <html>. Diese
+   hier um ~18% anzuheben skaliert automatisch JEDEN Text, jedes Padding,
+   jeden Abstand im ganzen App-Modus gleichzeitig mit, statt nur einzelne
+   Klassen zu treffen. Nur auf html.bkmp-app-mode selbst - betrifft nie
+   die normale Website (dort bleibt die Basis-Schriftgroesse 16px). */
+html.bkmp-app-mode {
+  font-size: 18.5px;
+}
 html.bkmp-app-mode {
   --app-void: #0a0518;
   --app-purple-deep: #170b30;
