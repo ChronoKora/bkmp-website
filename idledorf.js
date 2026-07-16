@@ -1818,7 +1818,7 @@ async function bkmpDungeonStartAuto(type, count) {
   bkmpDungeonAutoRunsTotal = count;
   bkmpDungeonAutoRunsDone = 0;
   bkmpDungeonAutoCancelled = false;
-  bkmpDungeonAutoStats = { wins: 0, losses: 0, gold: 0, xp: 0, gems: 0, meat: 0, fruit: 0, eggs: 0, runes: 0 };
+  bkmpDungeonAutoStats = { wins: 0, losses: 0, gold: 0, xp: 0, gems: 0, meat: 0, fruit: 0, eggs: 0, runes: 0, boostersGold: 0, boostersExp: 0 };
   /* bkmpDungeonStart() zeigt bei einer Blockade (Event-Pause/laufender
      Raid/keine Schluessel) selbst schon einen erklaerenden Toast - hier nur
      sauber zuruecksetzen, kein zweiter Hinweis noetig. */
@@ -1862,12 +1862,22 @@ function bkmpDungeonShowAutoSummary(stats, done, total) {
   const overlay = document.createElement('div');
   overlay.className = 'bkmp-easter';
   overlay.id = 'bkmpDungeonResultOverlay';
-  const parts = [`+${bkmpIdleFormatNumber(stats.gold)} 💰`, `+${bkmpIdleFormatNumber(stats.xp)} XP`];
+  /* Bug-Fix (Spieler-Meldung 18.07., "genau das gleiche" wie die bereits
+     gefixte Pro-Lauf-Log-Zeile): Gold und XP standen hier bisher IMMER in
+     der Liste, egal ob der gelaufene Dungeon-Typ ueberhaupt XP vergibt
+     (z.B. Ei-/Fleisch-/Frucht-/Edelstein-/Runen-Dungeon geben nie XP) -
+     zeigte dann verwirrend "+0 XP" an. Jetzt wie bei den Nebenbelohnungen
+     unten: nur anzeigen, was tatsaechlich > 0 ist. */
+  const parts = [];
+  if (stats.gold > 0) parts.push(`+${bkmpIdleFormatNumber(stats.gold)} 💰`);
+  if (stats.xp > 0) parts.push(`+${bkmpIdleFormatNumber(stats.xp)} XP`);
   if (stats.gems > 0) parts.push(`+${stats.gems} 💎`);
   if (stats.meat > 0) parts.push(`+${bkmpIdleFormatNumber(stats.meat)} 🍖`);
   if (stats.fruit > 0) parts.push(`+${bkmpIdleFormatNumber(stats.fruit)} 🍎`);
   if (stats.eggs > 0) parts.push(`${stats.eggs}× 🥚`);
   if (stats.runes > 0) parts.push(`${stats.runes}× 🔮`);
+  if (stats.boostersGold > 0) parts.push(`⚡ Goldrausch ${stats.boostersGold}×`);
+  if (stats.boostersExp > 0) parts.push(`⚡ Wissensschub ${stats.boostersExp}×`);
   overlay.innerHTML = `
     <div class="bkmp-easter-card idle-dungeon-result-card">
       <small>Auto-Lauf beendet &middot; ${done} / ${total === Infinity ? '∞' : total} Versuche</small>
@@ -2160,6 +2170,8 @@ async function bkmpDungeonFinish(success) {
     bkmpDungeonAutoStats.fruit += summary.fruit;
     bkmpDungeonAutoStats.eggs += summary.eggs.length;
     bkmpDungeonAutoStats.runes += summary.runes.length;
+    if (summary.boosterGold) bkmpDungeonAutoStats.boostersGold += 1;
+    if (summary.boosterExp) bkmpDungeonAutoStats.boostersExp += 1;
     const totalLabel = bkmpDungeonAutoRunsTotal === Infinity ? '∞' : bkmpDungeonAutoRunsTotal;
     const rewardText = bkmpDungeonRewardParts(summary).join(' · ') || '—';
     bkmpIdleLog(`${success ? '🏆' : '💀'} Auto-Lauf ${bkmpDungeonAutoRunsDone}/${totalLabel} (${dungeonType.icon} ${dungeonType.name}, ${difficulty.icon} ${difficulty.name}): ${success ? 'Sieg' : `Niederlage bei Welle ${wavesCleared + 1}`} - ${rewardText}`);
