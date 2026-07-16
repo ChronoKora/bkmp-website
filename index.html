@@ -1191,7 +1191,7 @@
   <script src="assets/vendor/supabase-js.min.js"></script>
   <script src="supabase.js?v=20260718-lategame1"></script>
   <script src="app.js?v=20260712-themefix1"></script>
-  <script src="idledorf.js?v=20260718-lategame1"></script>
+  <script src="idledorf.js?v=20260718-lategame2"></script>
   <script src="mapart.js?v=20260717-kartenfirmen1"></script>
   <script>
     bkmpInitTheme();
@@ -4460,6 +4460,7 @@
       ...(Array.isArray(window.BKMP_IDLE_GOLD_TIERS) ? bkmpTieredAchievements('idlegold', 'Idle Dorf', 'idleGoldEarned', window.BKMP_IDLE_GOLD_TIERS, n => `Sammle insgesamt ${n} Gold im Idle Dorf.`) : []),
       ...(Array.isArray(window.BKMP_IDLE_SKILLPOINTS_TIERS) ? bkmpTieredAchievements('idleskill', 'Idle Dorf', 'idleSkillPointsSpent', window.BKMP_IDLE_SKILLPOINTS_TIERS, n => `Investiere ${n} Skillpunkte im Idle Dorf.`) : []),
       ...(Array.isArray(window.BKMP_IDLE_PRESTIGE_TIERS) ? bkmpTieredAchievements('idleprestige', 'Idle Dorf', 'idlePrestigeLevel', window.BKMP_IDLE_PRESTIGE_TIERS, n => `Steige ${n}x im Idle Dorf auf (Prestige).`) : []),
+      ...(Array.isArray(window.BKMP_IDLE_TOWER_TIERS) ? bkmpTieredAchievements('idletower', 'Idle Dorf', 'idleTowerHighestWave', window.BKMP_IDLE_TOWER_TIERS, n => `Erreiche Stufe ${n} im Endlosen Turm.`) : []),
       { id: 'idle_dungeon_cleared', category: 'Idle Dorf', title: '???', revealName: 'Dungeon-Meister', desc: 'Meistere die Dungeon-Herausforderung auf der Schwierigkeit "Albtraum".', check: ctx => ctx.idleDungeonCleared },
       ...(Array.isArray(window.BKMP_RUNE_FUSE_SUCCESS_TIERS) ? bkmpTieredAchievements('runefuse', 'Runen', 'idleRuneFuseSuccesses', window.BKMP_RUNE_FUSE_SUCCESS_TIERS, n => `Verschmelze ${n} Rune${n === 1 ? '' : 'n'} erfolgreich.`) : []),
       ...(Array.isArray(window.BKMP_RUNE_FUSE_FAIL_TIERS) ? bkmpTieredAchievements('runefusefail', 'Runen', 'idleRuneFuseFailures', window.BKMP_RUNE_FUSE_FAIL_TIERS, n => `Erlebe ${n} fehlgeschlagene Runen-Verschmelzung${n === 1 ? '' : 'en'}.`) : []),

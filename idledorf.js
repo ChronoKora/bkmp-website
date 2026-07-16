@@ -1317,7 +1317,8 @@ function bkmpIdleGetAchievementContextFields() {
       const sp = bkmpDragonSpeciesById(d.species_id);
       return sp && sp.rarity === 'legendaer';
     }).length,
-    idleHasSteampunkSkin: bkmpPlayerVillageSkins.includes('steampunkdorf')
+    idleHasSteampunkSkin: bkmpPlayerVillageSkins.includes('steampunkdorf'),
+    idleTowerHighestWave: Number(s.turm_highest_wave || 0)
   };
   try { localStorage.setItem(BKMP_IDLE_ACHIEVEMENT_CACHE_KEY, JSON.stringify(fields)); } catch (e) {}
   return fields;
@@ -10418,6 +10419,18 @@ window.BKMP_IDLE_PRESTIGE_TITLE_NAMES = [
   'Zeitloser', 'Unsterblicher', 'Kosmischer Wanderer', 'Universums-Architekt', 'Multiversum-Meister',
   'Jenseits der Sterne', 'Schöpfer neuer Welten', 'Der Ewige Kreislauf', 'Wächter der Unendlichkeit', 'Der Unendliche'
 ];
+/* Turm-Erfolge/Titel (Nachtrag 16.07., Spieler-Frage "was ist mit
+   Belohnungen vom Endlosen Turm?"): der Turm selbst gibt zwar schon
+   laufend Gold/EXP pro Welle + Kristalle alle 10 Stufen (siehe
+   bkmpTowerHandleWaveCleared), hatte aber als einziges System im ganzen
+   Spiel KEINE eigene Erfolgs-/Titel-Reihe - jedes andere System (Dungeon,
+   Zucht, Gilde, Arena, Raid, Prestige) hat welche. Gleiches Tier-Array-
+   Muster wie ueberall sonst, gekoppelt an ctx.idleTowerHighestWave
+   (persoenlicher Rekord). */
+window.BKMP_IDLE_TOWER_TIERS = [
+  [10, 'Turmkletterer'], [20, 'Turmläufer'], [35, 'Turmbezwinger'], [50, 'Turmveteran'], [75, 'Turmmeister'],
+  [100, 'Turmchampion'], [150, 'Turmlegende'], [200, 'Turmtitan'], [300, 'Turmgott'], [500, 'Der Unaufhaltsame']
+];
 
 /* Runen-Erfolge (Kategorie "Runen"). Vier Tier-Reihen fuer Verschmelzen/
    Aufwerten, je Erfolg UND Misserfolg - die Misserfolgs-Reihen sind
@@ -10536,6 +10549,10 @@ window.BKMP_IDLE_TITLES = [
   ...window.BKMP_IDLE_PRESTIGE_TIERS.map(([n], i) => ({
     id: `idletitle_prestige_${n}`, name: window.BKMP_IDLE_PRESTIGE_TITLE_NAMES[i], desc: `Erreiche Prestige-Stufe ${n} im Idle Dorf.`,
     unlockCustom: ctx => ctx.idlePrestigeLevel >= n, effectType: 'attack_pct', effectValue: i + 1
+  })),
+  ...window.BKMP_IDLE_TOWER_TIERS.map(([n, label], i) => ({
+    id: `idletitle_turm_${n}`, name: label, desc: `Erreiche Stufe ${n} im Endlosen Turm.`,
+    unlockCustom: ctx => ctx.idleTowerHighestWave >= n, effectType: 'hp_pct', effectValue: i + 1
   })),
   ...window.BKMP_RUNE_FUSE_SUCCESS_TIERS.map(([n, label], i) => ({
     id: `runetitle_fuse_${n}`, name: label, desc: `Verschmelze ${n} Runen erfolgreich.`,
