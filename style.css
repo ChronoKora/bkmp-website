@@ -4970,6 +4970,37 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 }
 .idle-dorf-card h3 { font-family: 'Fraunces', serif; font-size: 1.4rem; text-align: center; margin-bottom: 0.9rem; }
 
+/* Bug-Fix (Nutzer-Meldung: "laggt kurz, dann springen Bilder vom Raidboss
+   fuer Millisekunden durch"): siehe bkmpIdleOpenModal() in idledorf.js -
+   das Fenster wurde bisher sichtbar, WAEHREND im Hintergrund noch Daten
+   nachgeladen wurden, wodurch kurz der Stand von der letzten Sitzung (z.B.
+   noch der Raid-Kampf-Tab) durchschimmerte, bevor die frischen Daten den
+   richtigen Tab zeigten. .idle-dorf-loading blendet HUD/Stufenleiste/
+   Tableiste/alle Panels/Beitritts-Banner/Willkommen-zurueck-Karte per
+   visibility (NICHT display) aus, damit beim Aufdecken kein Layout-Sprung
+   entsteht - betrifft Website UND App-Modus gleichermassen, da der Bug in
+   der gemeinsamen Oeffnen-Logik liegt, nicht im Redesign. */
+.idle-dorf-card.idle-dorf-loading #idleDorfHud,
+.idle-dorf-card.idle-dorf-loading #idleStageBar,
+.idle-dorf-card.idle-dorf-loading #idleDorfTabs,
+.idle-dorf-card.idle-dorf-loading .idle-dorf-panel,
+.idle-dorf-card.idle-dorf-loading .raid-join-banner,
+.idle-dorf-card.idle-dorf-loading .idle-dorf-offline-card {
+  visibility: hidden;
+}
+.idle-dorf-card.idle-dorf-loading::after {
+  content: '⏳ Lädt…';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--muted);
+  opacity: .85;
+  pointer-events: none;
+}
+
 .idle-dorf-close {
   position: absolute;
   top: 0.8rem;

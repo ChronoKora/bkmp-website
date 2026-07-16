@@ -9284,6 +9284,21 @@ async function bkmpIdleOpenModal() {
   overlay.classList.add('visible');
   document.body.classList.add('modal-open');
   bkmpIdleModalOpen = true;
+  /* Nutzer-Meldung: "laggt kurz, dann springen Bilder vom Raidboss fuer
+     Millisekunden durch". Ursache gefunden: das Fenster wird HIER schon
+     sichtbar, bevor auch nur ein einziger Render-Aufruf unten gelaufen ist
+     - bis dahin muessen erst 2-3 Netzwerk-Aufrufe durchlaufen
+     (bkmpIdleEnsureConfigLoaded/bkmpIdleLoadOrInitState/
+     bkmpIdleClaimOfflineProgress). In dieser Luecke zeigt das Fenster
+     genau das, was seit dem letzten Oeffnen noch im DOM stand (z.B. noch
+     der Raid-Kampf-Tab von einer frueheren Sitzung) - das ist das
+     "Durchspringen". Fix: HUD/Stufenleiste/Tableiste/alle Panels bleiben
+     unsichtbar (visibility, kein display - kein Layout-Sprung beim
+     Wiedererscheinen), bis unten wirklich alles neu gerendert UND die
+     Raid-Ansicht-Entscheidung (bkmpRaidShouldShowCombatView) getroffen
+     wurde. */
+  const idleDorfCard = overlay.querySelector('.idle-dorf-card');
+  if (idleDorfCard) idleDorfCard.classList.add('idle-dorf-loading');
 
   await bkmpIdleEnsureConfigLoaded();
   await bkmpIdleLoadOrInitState(name);
@@ -9294,6 +9309,7 @@ async function bkmpIdleOpenModal() {
     overlay.classList.remove('visible');
     document.body.classList.remove('modal-open');
     bkmpIdleModalOpen = false;
+    if (idleDorfCard) idleDorfCard.classList.remove('idle-dorf-loading');
     if (typeof bkmpShowJannikToast === 'function') {
       bkmpShowJannikToast('Dein Spielstand konnte nicht geladen werden (Verbindungsproblem). Bitte versuche es gleich nochmal, damit nichts überschrieben wird.', 6000);
     }
@@ -9328,6 +9344,13 @@ async function bkmpIdleOpenModal() {
     bkmpIdleStopLoop();
     bkmpRaidStartCombatView(bkmpRaidGetPhaseInfo().raidId);
   }
+  /* Ab hier hat bkmpRaidToggleCombatView() (synchroner Teil ganz am Anfang
+     von bkmpRaidStartCombatView) bereits entschieden, welches Panel
+     tatsaechlich sichtbar sein soll - jetzt erst aufdecken. Die reinen
+     Zahlen im Raid-Panel selbst (bossHp usw.) koennen noch einen Moment
+     nachladen, das ist ein normales, kleines Live-Update wie beim
+     Mini-Widget auch - kein falsches Panel mehr, das war der gemeldete Bug. */
+  if (idleDorfCard) idleDorfCard.classList.remove('idle-dorf-loading');
 }
 
 /* NACHBESSERUNG (Spieler-Wunsch): frueher stoppte das Schliessen des
