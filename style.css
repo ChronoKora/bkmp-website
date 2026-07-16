@@ -5402,6 +5402,44 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 }
 .idle-sprite-attacking { animation: idleSpriteAttackFrames 0.75s steps(3) 1 forwards; }
 
+/* Schrittweiser Umstieg von PNG-Spritesheets auf echte Videos (siehe
+   BKMP_IDLE_VIDEO_DRAGON_SPRITES/bkmpIdleApplyDragonSprite in idledorf.js,
+   Nutzerwunsch 18.07. "wir wechseln jetzt nach und nach die PNG Frame
+   Drachen aus"). Anders als die PNG-Klassen unten braucht das Video keinen
+   80%-Kropf-Trick (kein eingebrannter Beschriftungsrand) und keine feste
+   aspect-ratio (die echten Video-Massse bestimmen die Groesse von selbst,
+   passt sich automatisch an, egal welches Seitenverhaeltnis ein spaeter
+   getauschtes Video mitbringt). */
+.idle-dragon-sprite-video {
+  position: relative;
+  display: block;
+  width: 100%;
+  max-width: 260px;
+  margin: 0 auto;
+  border-radius: 6px;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35));
+  transition: transform 0.15s ease;
+}
+.idle-dragon-boss .idle-dragon-sprite-video { max-width: 340px; }
+.idle-dragon-miniboss .idle-dragon-sprite-video { max-width: 300px; }
+/* Der Angriffs-Frame-Zyklus (idleSpriteAttackFrames oben) wirkt nur auf
+   background-position und haette auf ein <video> keinen Effekt - hier
+   stattdessen derselbe Skalier-/Aufhell-Puls, den Weltboss/Gildenboss
+   schon fuer ihre Video-Sprites nutzen (raidBossSpriteAttackPulse), nur
+   mit den Drachen-eigenen Schattenfarben statt Rot. bkmpIdlePlaySpriteAttack()
+   selbst brauchte dafuer keine Aenderung - sie setzt weiterhin nur die
+   Klasse .idle-sprite-attacking auf den (jetzt ggf. video-haltigen)
+   #idleDragonSprite-Container. */
+@keyframes idleDragonVideoAttackPulse {
+  0% { filter: brightness(1) drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35)); transform: scale(1); }
+  30% { filter: brightness(1.6) drop-shadow(0 6px 18px rgba(249, 115, 22, 0.75)); transform: scale(1.04); }
+  100% { filter: brightness(1) drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35)); transform: scale(1); }
+}
+.idle-sprite-attacking > .idle-dragon-sprite-video { animation: idleDragonVideoAttackPulse 0.75s ease-out 1; }
+@media (prefers-reduced-motion: reduce) {
+  .idle-sprite-attacking > .idle-dragon-sprite-video { animation: none; }
+}
+
 /* aspect-ratio = 0.8 * (Frame-Breite / Frame-Hoehe) je Sheet - siehe
    Kommentar oben, muss zum 80%-Ausschnitt passen, sonst Verzerrung.
    Alle 8 Sheets (ausser den beiden Event-Drachen unten) wurden neu
@@ -8015,7 +8053,8 @@ html.bkmp-app-mode .idle-dragon {
   border-radius: 18px;
 }
 html.bkmp-app-mode .idle-village-sprite,
-html.bkmp-app-mode .idle-dragon-sprite {
+html.bkmp-app-mode .idle-dragon-sprite,
+html.bkmp-app-mode .idle-dragon-sprite-video {
   filter: drop-shadow(0 10px 14px rgba(0, 0, 0, .5)) drop-shadow(0 0 18px rgba(255, 140, 61, .25));
 }
 html.bkmp-app-mode .idle-hp-bar {
@@ -8373,7 +8412,10 @@ html.bkmp-app-mode .idle-dragon {
 html.bkmp-app-mode .idle-village-sprite { max-width: 100%; }
 html.bkmp-app-mode .idle-dragon-sprite,
 html.bkmp-app-mode .idle-dragon-boss .idle-dragon-sprite,
-html.bkmp-app-mode .idle-dragon-miniboss .idle-dragon-sprite {
+html.bkmp-app-mode .idle-dragon-miniboss .idle-dragon-sprite,
+html.bkmp-app-mode .idle-dragon-sprite-video,
+html.bkmp-app-mode .idle-dragon-boss .idle-dragon-sprite-video,
+html.bkmp-app-mode .idle-dragon-miniboss .idle-dragon-sprite-video {
   max-width: 100%;
 }
 html.bkmp-app-mode .idle-dragon-name {

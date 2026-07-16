@@ -419,7 +419,17 @@ const BKMP_IDLE_FALLBACK_DRAGONS = [
      eigenen Kampf-Eintrag mehr - der Miniboss "yakshas-drache" wurde zu
      "Aurelia Drache" umbenannt und dient jetzt als dessen Ei-Quelle (siehe
      supabase-dragon-roster-aurelia-rename.sql, Spieler-Wunsch 15.07.). */
-  { id: 'winddrache', name: 'Winddrache', emoji: '🌪️', sprite_key: 'winddrache', spawn_rule: 'standard', color_theme: '#7dd3fc', tier_order: 10, base_hp: 68, base_attack: 7, base_defense: 2, gold_reward_base: 6, xp_reward_base: 6, wood_reward_base: 2, stone_reward_base: 1, crystal_reward_base: 0, essence_reward_base: 0, is_boss: false, active: true }
+  { id: 'winddrache', name: 'Winddrache', emoji: '🌪️', sprite_key: 'winddrache', spawn_rule: 'standard', color_theme: '#7dd3fc', tier_order: 10, base_hp: 68, base_attack: 7, base_defense: 2, gold_reward_base: 6, xp_reward_base: 6, wood_reward_base: 2, stone_reward_base: 1, crystal_reward_base: 0, essence_reward_base: 0, is_boss: false, active: true },
+  /* Neue Art (Spieler-Wunsch 18.07.): "soll wie die anderen Drachen normal
+     auftauchen" - spawn_rule 'standard' reiht sie einfach in denselben
+     Zufallspool wie Feuer-/Blitz-/Erd-/Wasser-/Winddrache ein (siehe
+     bkmpIdleSelectDragonKindId - tier_order beeinflusst dort NICHTS, nur
+     die Sortierung in Admin/Uebersichten). Werte an den Mittelwert der
+     bestehenden Standarddrachen angelehnt, keine neue Balance-Idee.
+     Echte Datenquelle ist die idle_dragons-Tabelle in Supabase, dieser
+     Eintrag hier ist nur der Offline-/Fallback-Stand - siehe
+     supabase-dragon-species-cyberdrache.sql fuer die echte Migration. */
+  { id: 'cyberdrache', name: 'Cyberdrache', emoji: '🔷', sprite_key: 'cyberdrache', spawn_rule: 'standard', color_theme: '#22d3ee', tier_order: 11, base_hp: 62, base_attack: 7, base_defense: 2, gold_reward_base: 6, xp_reward_base: 6, wood_reward_base: 2, stone_reward_base: 1, crystal_reward_base: 0, essence_reward_base: 0, is_boss: false, active: true }
 ];
 
 /* ---------------- State ---------------- */
@@ -1352,6 +1362,52 @@ function bkmpIdleGetAchievementContextFields() {
 
 const BKMP_IDLE_SPRITE_CLASS_PREFIX = 'idle-sprite-';
 
+/* Nutzerwunsch (18.07.): "wir wechseln jetzt nach und nach die PNG Frame
+   Drachen aus" - schrittweiser Umstieg von den bisherigen 4-Frame-PNG-
+   Spritesheets (siehe .idle-sprite-<key> Klassen in style.css) auf echte
+   Videos, wie es fuer Weltboss/Gildenboss (zerathor.mp4/malthyros.mp4)
+   schon laenger funktioniert. Einfach hier eintragen, sobald ein
+   Drache ein Video bekommt - alles andere (Spawn, Dungeon-Wellen,
+   Angriffs-Puls) lesen automatisch aus dieser Liste, kein Sonderfall
+   noetig. Nicht eingetragene Drachen laufen unveraendert ueber die
+   PNG-Klasse weiter. */
+const BKMP_IDLE_VIDEO_DRAGON_SPRITES = {
+  feuerdrache: 'assets/dragons/feuerdrache.mp4?v=20260718-feuerdrachevideo1',
+  erddrache: 'assets/dragons/erddrache.mp4?v=20260718-dragonvideos2',
+  blitzdrache: 'assets/dragons/blitzdrache.mp4?v=20260718-dragonvideos2',
+  winddrache: 'assets/dragons/winddrache.mp4?v=20260718-dragonvideos2',
+  cyberdrache: 'assets/dragons/cyberdrache.mp4?v=20260718-cyberdrache1',
+  'yaksha-boss': 'assets/dragons/yaksha-boss.mp4?v=20260718-yakshavideos1',
+  'yakshas-drache': 'assets/dragons/yakshas-drache.mp4?v=20260718-yakshavideos1',
+  wuffdrache: 'assets/dragons/wuffdrache.mp4?v=20260718-lastdragons1',
+  schattendrache: 'assets/dragons/schattendrache.mp4?v=20260718-lastdragons1',
+  wasserdrache: 'assets/dragons/wasserdrache.mp4?v=20260718-lastdragons1'
+};
+
+/* Gemeinsame Sprite-Zuweisung fuer #idleDragonSprite - vorher an zwei
+   Stellen (bkmpIdleSpawnDragon, bkmpDungeonApplyDragonVisuals) fast
+   identisch dupliziert. Entscheidet pro Drache, ob ein Video
+   (BKMP_IDLE_VIDEO_DRAGON_SPRITES) oder die klassische PNG-Sprite-Klasse
+   zum Einsatz kommt. */
+function bkmpIdleApplyDragonSprite(sprite, spriteKey) {
+  if (!sprite) return;
+  [...sprite.classList].filter(c => c.startsWith(BKMP_IDLE_SPRITE_CLASS_PREFIX)).forEach(c => sprite.classList.remove(c));
+  sprite.classList.remove('idle-sprite-attacking');
+  const videoSrc = BKMP_IDLE_VIDEO_DRAGON_SPRITES[spriteKey];
+  if (videoSrc) {
+    const existingVideo = sprite.querySelector('video');
+    /* Nur neu aufbauen, wenn sich der Drache tatsaechlich geaendert hat -
+       sonst wuerde das Video bei jedem Render (z.B. jedem Tick) neu
+       gestartet/neu geladen werden und nie richtig durchlaufen. */
+    if (!existingVideo || existingVideo.dataset.spriteKey !== spriteKey) {
+      sprite.innerHTML = `<video class="idle-dragon-sprite-video" src="${videoSrc}" data-sprite-key="${spriteKey}" autoplay muted loop playsinline></video>`;
+    }
+  } else {
+    sprite.innerHTML = '';
+    sprite.classList.add(BKMP_IDLE_SPRITE_CLASS_PREFIX + spriteKey);
+  }
+}
+
 function bkmpIdleSpawnDragon() {
   bkmpIdleCurrentDragon = bkmpIdleDragonStatsAt(
     bkmpIdleState.current_dragon_index,
@@ -1365,12 +1421,7 @@ function bkmpIdleSpawnDragon() {
   bkmpIdleCurrentDragon.hp = bkmpIdleCurrentDragon.maxHp;
   const nameEl = document.getElementById('idleDragonName');
   if (nameEl) nameEl.textContent = `${bkmpIdleCurrentDragon.isBoss ? '👑 BOSS: ' : ''}${bkmpIdleCurrentDragon.isEventDragon ? '✨ ' : ''}${bkmpIdleCurrentDragon.name} (Stufe ${bkmpIdleFormatStage(bkmpIdleCurrentDragon.killIndex)})`;
-  const sprite = document.getElementById('idleDragonSprite');
-  if (sprite) {
-    [...sprite.classList].filter(c => c.startsWith(BKMP_IDLE_SPRITE_CLASS_PREFIX)).forEach(c => sprite.classList.remove(c));
-    sprite.classList.remove('idle-sprite-attacking');
-    sprite.classList.add(BKMP_IDLE_SPRITE_CLASS_PREFIX + bkmpIdleCurrentDragon.spriteKey);
-  }
+  bkmpIdleApplyDragonSprite(document.getElementById('idleDragonSprite'), bkmpIdleCurrentDragon.spriteKey);
   const dragonEl = document.getElementById('idleDragon');
   if (dragonEl) {
     dragonEl.classList.toggle('idle-dragon-boss', bkmpIdleCurrentDragon.bossTier === 'boss');
@@ -1809,12 +1860,7 @@ function bkmpDungeonApplyDragonVisuals(dragon) {
       ? `${dragon.isBoss ? '👑 ' : ''}${dragon.name}`
       : `${dragon.isBoss ? '👑 BOSS: ' : ''}${dragon.isEventDragon ? '✨ ' : ''}${dragon.name} (Stufe ${bkmpIdleFormatStage(dragon.killIndex)})`;
   }
-  const sprite = document.getElementById('idleDragonSprite');
-  if (sprite) {
-    [...sprite.classList].filter(c => c.startsWith(BKMP_IDLE_SPRITE_CLASS_PREFIX)).forEach(c => sprite.classList.remove(c));
-    sprite.classList.remove('idle-sprite-attacking');
-    sprite.classList.add(BKMP_IDLE_SPRITE_CLASS_PREFIX + dragon.spriteKey);
-  }
+  bkmpIdleApplyDragonSprite(document.getElementById('idleDragonSprite'), dragon.spriteKey);
   const dragonEl = document.getElementById('idleDragon');
   if (dragonEl) {
     dragonEl.classList.toggle('idle-dragon-boss', dragon.bossTier === 'boss');
