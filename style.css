@@ -6037,6 +6037,31 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   50% { box-shadow: 0 0 16px rgba(249, 115, 22, 0.35); }
 }
 .idle-dungeon-result-card strong { color: #fb923c; }
+/* Spieler-Vorgabe 16.07.: "feste Popups mit den Belohnungen, die man
+   wegklicken kann" - .bkmp-easter hat bewusst pointer-events:none (reine
+   Deko-Ebene fuer die spark-Animation, blockiert absichtlich keine Klicks
+   auf darunterliegende UI bei den uebrigen Easter-Egg-Popups). Fuer die
+   Dungeon-/Turm-Ergebnis-Karten hier gezielt wieder aktiviert, plus ein
+   echter Schliessen-Button - vorher verschwanden diese Karten nach 4.8s/
+   5.4s von selbst, was bei AFK/nicht-hinschauen genau das Problem war
+   ("man weiss nicht, was man bekommen hat"). */
+.bkmp-easter-dismissible { pointer-events: auto; cursor: pointer; }
+.bkmp-easter-dismissible .bkmp-easter-card { cursor: default; position: relative; }
+.idle-result-close-btn {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.65rem;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(201, 165, 106, 0.35);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f3ecff;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.idle-result-close-btn:hover { background: rgba(255, 255, 255, 0.14); }
 .idle-dungeon-auto-cancel-btn {
   padding: 0.15rem 0.6rem;
   border-radius: 999px;
@@ -9263,15 +9288,12 @@ html.bkmp-app-mode .idle-res-icon {
   clip-path: polygon(20% 0%, 80% 0%, 100% 20%, 100% 80%, 80% 100%, 20% 100%, 0% 80%, 0% 20%);
   border-radius: 0;
 }
-/* Gold-Eckabschnitte am HUD-Rahmen selbst - kleine, dezente Chamfer-
-   Schnitte an den oberen Ecken statt rechter Winkel, wie es die
-   "Praesentationsschicht" ornamentaler Gaming-HUDs typischerweise
-   zeigt (siehe Rocketbrush-HUD-Guide, bereits zitiert). Bewusst klein
-   (14px), damit Portrait/Name in der Polsterung nie angeschnitten
-   werden. */
-html.bkmp-app-mode #idleDorfHud {
-  clip-path: polygon(14px 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%, 0 14px);
-}
+/* (Gold-Eckabschnitte am HUD-Rahmen selbst per clip-path wurden hier
+   probiert, dann wieder verworfen: clip-path haette auch den
+   Drop-Shadow und die Gold/Cyan-Trennlinie der Leiste aus Phase 15
+   mit weggeschnitten - Regression zugunsten einer kleinen Deko-Ecke
+   waere ein schlechter Tausch. Bewusst weggelassen statt fehlerhaft
+   gebaut.) */
 /* Namensplatte: der Name bekommt jetzt einen eigenen umrandeten
    "Schild" statt lose auf dem Hintergrund zu stehen, wie die leere
    Namens-Plakette im Referenzbild. */

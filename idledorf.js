@@ -1955,10 +1955,6 @@ function bkmpDungeonAutoFinishSequence() {
 }
 
 function bkmpDungeonShowAutoSummary(stats, done, total) {
-  if (document.getElementById('bkmpDungeonResultOverlay')) return;
-  const overlay = document.createElement('div');
-  overlay.className = 'bkmp-easter';
-  overlay.id = 'bkmpDungeonResultOverlay';
   /* Bug-Fix (Spieler-Meldung 18.07., "genau das gleiche" wie die bereits
      gefixte Pro-Lauf-Log-Zeile): Gold und XP standen hier bisher IMMER in
      der Liste, egal ob der gelaufene Dungeon-Typ ueberhaupt XP vergibt
@@ -1975,19 +1971,11 @@ function bkmpDungeonShowAutoSummary(stats, done, total) {
   if (stats.runes > 0) parts.push(`${stats.runes}× 🔮`);
   if (stats.boostersGold > 0) parts.push(`⚡ Goldrausch ${stats.boostersGold}×`);
   if (stats.boostersExp > 0) parts.push(`⚡ Wissensschub ${stats.boostersExp}×`);
-  overlay.innerHTML = `
-    <div class="bkmp-easter-card idle-dungeon-result-card">
-      <small>Auto-Lauf beendet &middot; ${done} / ${total === Infinity ? '∞' : total} Versuche</small>
-      <strong>${stats.wins} 🏆 &middot; ${stats.losses} 💀</strong>
-      <p>Gesamt-Belohnung: ${parts.join(' &middot; ')}</p>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-  requestAnimationFrame(() => overlay.classList.add('visible'));
-  setTimeout(() => {
-    overlay.classList.remove('visible');
-    setTimeout(() => overlay.remove(), 450);
-  }, 5400);
+  bkmpIdleShowDismissibleResultCard('bkmpDungeonResultOverlay', `
+    <small>Auto-Lauf beendet &middot; ${done} / ${total === Infinity ? '∞' : total} Versuche</small>
+    <strong>${stats.wins} 🏆 &middot; ${stats.losses} 💀</strong>
+    <p>Gesamt-Belohnung: ${parts.join(' &middot; ')}</p>
+  `);
 }
 
 /* Gibt zurueck, ob der Lauf wirklich gestartet wurde - der Auto-Modus
@@ -2123,25 +2111,42 @@ function bkmpDungeonRewardParts(summary) {
   return parts;
 }
 
-function bkmpDungeonShowResult(success, wavesCleared, totalWaves, elapsedMs, summary, difficulty, dungeonType, dailyBonusGranted) {
-  if (document.getElementById('bkmpDungeonResultOverlay')) return;
+/* Erstellt/verdrahtet eine schliessbare Ergebnis-Karte (Spieler-Vorgabe
+   16.07.: "feste Popups mit den Belohnungen, die man wegklicken kann...
+   dass man auch mal weiss was man bekommen hat wenn man nicht
+   hingeguckt hat") - bewusst OHNE Auto-Timeout mehr (die alte Version
+   verschwand nach 4.8-5.4s von selbst, was bei AFK/nicht-hinschauen genau
+   das gemeldete Problem war). Schliesst per X-Button ODER Klick auf den
+   abgedunkelten Hintergrund (nicht auf die Karte selbst). Gemeinsam von
+   Dungeon- und Turm-Ergebnis genutzt. */
+function bkmpIdleShowDismissibleResultCard(id, innerHtml) {
+  const existing = document.getElementById(id);
+  if (existing) existing.remove();
   const overlay = document.createElement('div');
-  overlay.className = 'bkmp-easter';
-  overlay.id = 'bkmpDungeonResultOverlay';
-  const parts = bkmpDungeonRewardParts(summary);
+  overlay.className = 'bkmp-easter bkmp-easter-dismissible';
+  overlay.id = id;
   overlay.innerHTML = `
     <div class="bkmp-easter-card idle-dungeon-result-card">
-      <small>${dungeonType.icon} ${dungeonType.name} &middot; ${difficulty.icon} ${difficulty.name}</small>
-      <strong>${success ? '🏆 Dungeon gemeistert!' : `💀 Bei Welle ${wavesCleared + 1} gescheitert`}</strong>
-      <p>${success ? `Alle ${totalWaves} Wellen in ${bkmpDungeonFormatTime(elapsedMs)} geschafft!` : `${wavesCleared} von ${totalWaves} Wellen überstanden.`}${dailyBonusGranted ? '<br>🎁 Tagesbonus angewendet!' : ''}<br>Belohnung: ${parts.join(' &middot; ') || '—'}</p>
+      <button type="button" class="idle-result-close-btn" aria-label="Schließen">✕</button>
+      ${innerHtml}
     </div>
   `;
-  document.body.appendChild(overlay);
-  requestAnimationFrame(() => overlay.classList.add('visible'));
-  setTimeout(() => {
+  const close = () => {
     overlay.classList.remove('visible');
     setTimeout(() => overlay.remove(), 450);
-  }, 4800);
+  };
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+  overlay.querySelector('.idle-result-close-btn').addEventListener('click', close);
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('visible'));
+}
+function bkmpDungeonShowResult(success, wavesCleared, totalWaves, elapsedMs, summary, difficulty, dungeonType, dailyBonusGranted) {
+  const parts = bkmpDungeonRewardParts(summary);
+  bkmpIdleShowDismissibleResultCard('bkmpDungeonResultOverlay', `
+    <small>${dungeonType.icon} ${dungeonType.name} &middot; ${difficulty.icon} ${difficulty.name}</small>
+    <strong>${success ? '🏆 Dungeon gemeistert!' : `💀 Bei Welle ${wavesCleared + 1} gescheitert`}</strong>
+    <p>${success ? `Alle ${totalWaves} Wellen in ${bkmpDungeonFormatTime(elapsedMs)} geschafft!` : `${wavesCleared} von ${totalWaves} Wellen überstanden.`}${dailyBonusGranted ? '<br>🎁 Tagesbonus angewendet!' : ''}<br>Belohnung: ${parts.join(' &middot; ') || '—'}</p>
+  `);
 }
 
 const BKMP_DUNGEON_ACHIEVEMENT_KEY = 'bkmp-idle-dungeon-cleared';
@@ -2545,13 +2550,15 @@ function bkmpTowerFinish(reachedWave) {
   if (bkmpTowerRunCrystals > 0) rewardParts.push(`+${bkmpTowerRunCrystals} 💎`);
   if (bkmpTowerRunRunes > 0) rewardParts.push(`${bkmpTowerRunRunes}× 🔮`);
   if (bkmpTowerRunEggs > 0) rewardParts.push(`${bkmpTowerRunEggs}× 🥚`);
-  const rewardText = rewardParts.length ? rewardParts.join(' · ') : '—';
-  if (typeof bkmpShowJannikToast === 'function') {
-    bkmpShowJannikToast(
-      `🗼 Turmlauf beendet bei Stufe ${reachedWave}${isNewBest ? ' - 🏆 Neuer Rekord!' : ` (Rekord: ${prevBest})`} &middot; ${rewardText}`,
-      5200
-    );
-  }
+  const rewardText = rewardParts.length ? rewardParts.join(' &middot; ') : '—';
+  /* Schliessbare Karte statt Toast (Spieler-Vorgabe 16.07.) - ein Toast
+     verschwindet von selbst, genau das war das gemeldete Problem, wenn man
+     beim Fallen des Dorfes gerade nicht hingeschaut hat. */
+  bkmpIdleShowDismissibleResultCard('bkmpTowerResultOverlay', `
+    <small>🗼 Endloser Turm</small>
+    <strong>${isNewBest ? '🏆 Neuer Rekord!' : `💀 Stufe ${reachedWave}`}</strong>
+    <p>${isNewBest ? `Neue Bestmarke: Stufe ${reachedWave} (vorher ${prevBest}).` : `Stufe ${reachedWave} erreicht (Rekord bleibt Stufe ${prevBest}).`}<br>Belohnung: ${rewardText}</p>
+  `);
   if (bkmpIdleActiveTab === 'turm' && typeof bkmpIdleRenderTurmPanel === 'function') bkmpIdleRenderTurmPanel();
 }
 function bkmpTowerHandleDefeat() {
