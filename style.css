@@ -8464,7 +8464,7 @@ html.bkmp-app-mode #idleDorfHud::after {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: -1px;
+  bottom: 0;
   height: 2px;
   background: linear-gradient(90deg, transparent, var(--app-gold), var(--app-cyan), var(--app-gold), transparent);
   opacity: .65;
@@ -9242,6 +9242,92 @@ html.bkmp-app-mode .idle-res-tap .idle-res-icon {
   background: radial-gradient(circle at 35% 30%, #bcd7ff, var(--app-blue));
   box-shadow: 0 0 7px color-mix(in srgb, var(--app-blue) 55%, transparent), 0 0 0 1px rgba(255, 255, 255, .12) inset;
 }
+
+/* ============================================================
+   APP-MODUS REDESIGN, PHASE 17 (Ornate-Fantasy-HUD-Sprache, rein CSS)
+   ============================================================
+   Nutzer schickte ein KI-generiertes Referenzbild eines premium
+   Fantasy-HUD-Rahmens (Chamfer-/Oktagon-Icon-Slots, Gold-Eckornamente,
+   Diamant-Akzente, umrandete Namensplatte). Auf Nachfrage bestaetigt:
+   kein lizenziertes Asset, nur Stil-Inspiration - deshalb HIER kein
+   Bild eingebunden, sondern dieselbe Bildsprache rein per CSS
+   (clip-path/Gradienten) weitergebaut, die schon beim Portrait-Level-
+   Abzeichen begonnen wurde (Chamfer-Ecken statt Kreis). Kein neues
+   Bild-Asset = keine zusaetzliche Ladezeit/App-Groesse, skaliert mit
+   der rem-Basis wie der Rest des Redesigns. */
+/* Oktagon- statt Kreis-Icon-Slots (identisches Chamfer-Polygon wie das
+   Portrait-Level-Abzeichen, Phase 10) - deckt sich mit der "Icon +
+   Zahl in klarer Kachel"-Empfehlung aus Phase 15 und wirkt naeher am
+   Referenzbild als runde Icons. */
+html.bkmp-app-mode .idle-res-icon {
+  clip-path: polygon(20% 0%, 80% 0%, 100% 20%, 100% 80%, 80% 100%, 20% 100%, 0% 80%, 0% 20%);
+  border-radius: 0;
+}
+/* Gold-Eckabschnitte am HUD-Rahmen selbst - kleine, dezente Chamfer-
+   Schnitte an den oberen Ecken statt rechter Winkel, wie es die
+   "Praesentationsschicht" ornamentaler Gaming-HUDs typischerweise
+   zeigt (siehe Rocketbrush-HUD-Guide, bereits zitiert). Bewusst klein
+   (14px), damit Portrait/Name in der Polsterung nie angeschnitten
+   werden. */
+html.bkmp-app-mode #idleDorfHud {
+  clip-path: polygon(14px 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%, 0 14px);
+}
+/* Namensplatte: der Name bekommt jetzt einen eigenen umrandeten
+   "Schild" statt lose auf dem Hintergrund zu stehen, wie die leere
+   Namens-Plakette im Referenzbild. */
+html.bkmp-app-mode .idle-hud-app-name {
+  display: inline-block;
+  padding: .18rem .6rem;
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(0, 0, 0, .25));
+  border: 1px solid color-mix(in srgb, var(--app-gold) 35%, transparent);
+  max-width: 100%;
+}
+/* Diamant-Kappe am linken Ende der XP-Leiste - kleines, um 45 Grad
+   gedrehtes Gold-Quadrat, ueberlappt den Balkenanfang. Rein dekorativ,
+   keine neue Information. Sitzt bewusst auf dem Wrapper
+   (.idle-hud-app-xp), NICHT auf .idle-xp-bar selbst: die Leiste hat
+   "overflow:hidden" (noetig, damit die Fuellung nie ueber die runden
+   Ecken hinaussteht) und wuerde die Kappe sonst genauso abschneiden
+   wie das Portrait-clip-path oben die Ring-Diamanten. */
+html.bkmp-app-mode .idle-hud-app-xp { position: relative; }
+html.bkmp-app-mode .idle-xp-bar { margin-left: .35rem; }
+html.bkmp-app-mode .idle-hud-app-xp::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 5px;
+  width: .55rem;
+  height: .55rem;
+  transform: translateY(-50%) rotate(45deg);
+  background: radial-gradient(circle at 35% 30%, #fff6d8, var(--app-gold));
+  border: 1px solid var(--app-void);
+  box-shadow: var(--app-glow-gold);
+  z-index: 1;
+}
+/* Portrait-Ring-Akzente: zwei kleine Gold-Diamanten links/rechts am
+   Portrait-Rahmen, wie die Kristall-Zacken im Referenzbild - nutzt die
+   zwei verfuegbaren Pseudo-Elemente des Portraits (::before/::after),
+   die bisher dort ungenutzt waren. Bewusst INNERHALB der eigenen Box
+   positioniert (nicht per negativem Versatz herausragend): das
+   Portrait selbst hat ein Oktagon-clip-path (Phase 10) - das schneidet
+   auch ueberstehende Pseudo-Elemente ab, ein negativer Versatz waere
+   also unsichtbar gewesen. */
+html.bkmp-app-mode .idle-hud-app-portrait::before,
+html.bkmp-app-mode .idle-hud-app-portrait::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: .4rem;
+  height: .4rem;
+  transform: translateY(-50%) rotate(45deg);
+  background: radial-gradient(circle at 35% 30%, #fff6d8, var(--app-gold));
+  border: 1px solid var(--app-void);
+  box-shadow: var(--app-glow-gold);
+  z-index: 1;
+}
+html.bkmp-app-mode .idle-hud-app-portrait::before { left: 2px; }
+html.bkmp-app-mode .idle-hud-app-portrait::after { right: 2px; }
 
 /* ============================================================
    APP-MODUS REDESIGN, PHASE 11 (weitere Recherche-Runde: Game-Feel/Juice,

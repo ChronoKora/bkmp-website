@@ -1632,7 +1632,7 @@ function bkmpIdleRenderDungeonPanel() {
   panel.innerHTML = `
     <div class="idle-dungeon-intro">
       <h4>🏛️ Dungeon-System</h4>
-      <p>7 spezialisierte Dungeons, jeder mit eigenem Schlüssel-Vorrat (max. ${BKMP_DUNGEON_KEY_MAX}, +1 alle 4 Stunden - läuft auch offline korrekt weiter) und eigenem Tagesbonus (+50% auf die erste erfolgreiche Runde pro Tag). Wähle einen Dungeon und eine Schwierigkeit - jede Schwierigkeit schaltet sich erst nach dem Meistern der vorherigen frei.</p>
+      <p>7 spezialisierte Dungeons, jeder mit eigenem Schlüssel-Vorrat (max. ${BKMP_DUNGEON_KEY_MAX}, +1 zu festen Uhrzeiten: 0, 4, 8, 12, 16 und 20 Uhr - läuft auch offline korrekt weiter) und eigenem Tagesbonus (+50% auf die erste erfolgreiche Runde pro Tag). Wähle einen Dungeon und eine Schwierigkeit - jede Schwierigkeit schaltet sich erst nach dem Meistern der vorherigen frei.</p>
       <p class="idle-dungeon-seasonal-hint">⭐ Diese Woche im Rampenlicht: <b>${seasonalType.icon} ${seasonalType.name}</b> - +${Math.round((BKMP_DUNGEON_SEASONAL_BONUS_MULT - 1) * 100)}% auf Gold/EXP/Fleisch/Frucht/Edelsteine bei Erfolg.</p>
     </div>
     <div class="idle-dungeon-type-grid">
@@ -2320,9 +2320,31 @@ const BKMP_TOWER_CONFIG = {
   dampingExponent: 0.55,
   hpCoef: 0.06,
   miniBossEvery: 5,
-  miniBossBump: 1.2,
-  cooldownHours: 24
+  miniBossBump: 1.2
 };
+/* Fester Mitternachts-Reset (Spieler-Vorgabe 16.07.: "soll bitte immer um
+   0 Uhr reseten... alles auf 0 Uhr skaliert") statt des vorherigen
+   rollierenden 24h-Cooldowns - ein Versuch um 23:50 Uhr und einer um
+   00:10 Uhr am naechsten Tag waren vorher fast 24h auseinander, jetzt ist
+   um Mitternacht (Europe/Berlin) IMMER wieder ein Versuch faellig, egal
+   wann genau der letzte war. bkmpBerlinDateKey liefert dafuer denselben
+   DST-sicheren Tages-Schluessel (YYYYMMDD in Europe/Berlin) wie an anderer
+   Stelle im Spiel bereits fuer den Gildenboss verwendet (siehe
+   bkmpGuildBossGetPhaseInfo) - zwei Zeitpunkte sind "derselbe Tag" genau
+   dann, wenn ihre Schluessel uebereinstimmen. */
+function bkmpBerlinDateKey(date) {
+  const parts = {};
+  new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Berlin', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit' })
+    .formatToParts(date || new Date()).forEach(p => { if (p.type !== 'literal') parts[p.type] = p.value; });
+  return `${parts.year}${parts.month}${parts.day}`;
+}
+function bkmpBerlinNextMidnight(date) {
+  const d = date || new Date();
+  const parts = {};
+  new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Berlin', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit' })
+    .formatToParts(d).forEach(p => { if (p.type !== 'literal') parts[p.type] = p.value; });
+  return bkmpGuildBossBerlinDateAt(Number(parts.year), Number(parts.month), Number(parts.day) + 1, 0, 0);
+}
 let bkmpTowerActive = false;
 let bkmpTowerWave = 0;
 let bkmpTowerStartTime = 0;
@@ -2395,10 +2417,9 @@ async function bkmpTowerStart() {
     if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Während eines laufenden Raids kann der Turm nicht gestartet werden.', 3200);
     return false;
   }
-  const cooldownMs = BKMP_TOWER_CONFIG.cooldownHours * 3600 * 1000;
-  const last = Date.parse(bkmpIdleState.turm_last_attempt_at || '') || 0;
-  if (Date.now() - last < cooldownMs) {
-    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('🗼 Der Turm regeneriert noch - versuch es später erneut.', 3200);
+  const lastAttempt = Date.parse(bkmpIdleState.turm_last_attempt_at || '');
+  if (Number.isFinite(lastAttempt) && bkmpBerlinDateKey(new Date(lastAttempt)) === bkmpBerlinDateKey(new Date())) {
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('🗼 Der Turm ist heute schon erklommen - komm nach Mitternacht wieder.', 3200);
     return false;
   }
 
@@ -2547,20 +2568,20 @@ function bkmpIdleRenderTurmPanel() {
   const panel = document.getElementById('idlePanelTurm');
   if (!panel || !bkmpIdleState) return;
   const best = Number(bkmpIdleState.turm_highest_wave || 0);
-  const cooldownMs = BKMP_TOWER_CONFIG.cooldownHours * 3600 * 1000;
-  const last = Date.parse(bkmpIdleState.turm_last_attempt_at || '') || 0;
-  const remainingMs = Math.max(0, cooldownMs - (Date.now() - last));
-  const ready = remainingMs <= 0 && !bkmpTowerActive && !bkmpDungeonActive;
+  const lastAttempt = Date.parse(bkmpIdleState.turm_last_attempt_at || '');
+  const attemptedToday = Number.isFinite(lastAttempt) && bkmpBerlinDateKey(new Date(lastAttempt)) === bkmpBerlinDateKey(new Date());
+  const remainingMs = attemptedToday ? Math.max(0, bkmpBerlinNextMidnight().getTime() - Date.now()) : 0;
+  const ready = !attemptedToday && !bkmpTowerActive && !bkmpDungeonActive;
   panel.innerHTML = `
     <div class="idle-dungeon-intro">
       <h4>🗼 Endloser Turm</h4>
-      <p>Wellen ohne Ende - keine Schwierigkeitsstufe, kein Limit. Jede Stufe wird härter als die letzte, bis dein Dorf fällt. Ein Versuch alle 24 Stunden.</p>
+      <p>Wellen ohne Ende - keine Schwierigkeitsstufe, kein Limit. Jede Stufe wird härter als die letzte, bis dein Dorf fällt. Ein Versuch pro Tag, Reset immer um Mitternacht (Europe/Berlin).</p>
       <p class="idle-dungeon-seasonal-hint">🎁 Belohnungen: jede besiegte Welle Gold + EXP · alle 5 Stufen (5, 10, 15, ...) zusätzlich Kristalle · alle 25 Stufen (25, 75, 125, ...) zusätzlich eine Rune · alle 50 Stufen (50, 100, 150, ...) zusätzlich Rune + Drachenei. Je höher die Stufe, desto besser die Rune-/Ei-Rarität.</p>
     </div>
     <div class="idle-dungeon-type-grid">
       <div class="idle-dungeon-card">
         <p>🏆 Aktueller Rekord: <b>Stufe ${best}</b></p>
-        <p>${ready ? '✅ Bereit für einen Versuch' : bkmpTowerActive ? '⚔️ Lauf aktiv...' : `⏳ Nächster Versuch in ${bkmpDungeonFormatCountdown(Math.ceil(remainingMs / 1000))}`}</p>
+        <p>${ready ? '✅ Bereit für einen Versuch' : bkmpTowerActive ? '⚔️ Lauf aktiv...' : `⏳ Nächster Versuch um Mitternacht (in ${bkmpDungeonFormatCountdown(Math.ceil(remainingMs / 1000))})`}</p>
         <button type="button" class="btn-ja" id="idleTurmStartBtn" ${ready ? '' : 'disabled'}>🗼 Turm betreten</button>
       </div>
     </div>
