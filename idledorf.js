@@ -4915,6 +4915,7 @@ let bkmpGuildBossState = null;
 let bkmpGuildBossParticipants = [];
 let bkmpGuildBossJoinedId = null;
 let bkmpGuildBossLoopTimer = null;
+let bkmpGuildBossPrepCountdownInterval = null;
 let bkmpGuildBossResultShown = false;
 let bkmpGuildBossBusy = false;
 
@@ -5107,6 +5108,23 @@ function bkmpGuildBossCheckOutcome() {
   if (bkmpGuildBossState.status !== 'won' && bkmpGuildBossState.status !== 'expired') return;
   bkmpGuildBossResultShown = true;
   bkmpGuildBossStopLoop();
+  /* Bug-Fix (Spieler-Frage 16.07., "wann werden die Belohnungen
+     ausgezahlt?"): guild_boss_finish() schreibt Gold/Kristalle bei einem
+     Sieg SOFORT serverseitig direkt in idle_player_state (siehe
+     supabase-guild-boss.sql) - die lokale bkmpIdleState-Kopie im Browser
+     erfaehrt davon aber nie. Ohne diesen Abgleich hier ueberschreibt der
+     naechste ganz normale Autosave (bkmpIdleFlushSync, spaetestens 4s
+     spaeter) den frisch gutgeschriebenen Server-Stand postwendend wieder
+     mit dem eigenen, noch alten lokalen Wert - die Belohnung wurde also
+     ausgezahlt UND im selben Atemzug durchs eigene Speichern wieder
+     geloescht. bkmpIdleMergeRemoteSpendableFields() (bisher nur auf der
+     Stream-Seite als Schutz vor Mehrfach-Tab-Konflikten aktiv) macht
+     genau das richtig: server_wert + eigener_lokaler_delta_seit_baseline,
+     bewahrt also sowohl die externe Gutschrift als auch eigenen
+     zwischenzeitlichen Fortschritt. */
+  if (bkmpGuildBossState.status === 'won' && typeof bkmpIdleMergeRemoteSpendableFields === 'function') {
+    bkmpIdleMergeRemoteSpendableFields().then(() => bkmpIdleRenderHud()).catch(() => {});
+  }
   bkmpGuildQuestsLoadedForGuildId = null; /* Aktivitaetslog zeigt jetzt "Boss besiegt" - naechster Panel-Load frisch laden */
   bkmpGuildActivityLoadedForGuildId = null;
   loadGuildBossParticipants(bkmpGuildBossState.instanceId).then(list => { bkmpGuildBossParticipants = list; bkmpIdleRenderGildeBossPanel(); }).catch(() => {});
@@ -5142,6 +5160,37 @@ let bkmpGuildBossUpdateRenderTimer = null;
    Boss-Instanz gebaut; Folge-Updates schreiben nur noch in bestehende
    Knoten (textContent/style.width) bzw. drosseln den Rangliste-Rebuild
    auf max. alle 400ms. */
+/* Bug-Fix (Spieler-Meldung 16.07., "Timer läuft nicht runter, nur nach
+   Reload"): der "Vorbereitung - Kampf startet in..."-Text wurde bisher NUR
+   einmal beim (Neu-)Rendern des Panels aus info.msUntilFightStart berechnet
+   und danach nie wieder aktualisiert - stand die Karte einfach offen,
+   blieb die Zahl fuer immer auf dem Stand des letzten Renders stehen.
+   Gleiches Muster wie bkmpDungeonStartCountdownTicker: ein echter
+   1-Sekunden-Tick, der NUR die Countdown-Textzeile lokal aktualisiert
+   (kein Server-Roundtrip, kein Neu-Rendern der ganzen Karte/Listener).
+   Wechselt die Phase (Vorbereitung vorbei, Kampf beginnt), wird EINMALIG
+   ein echter Panel-Re-Render angestossen, damit der "Jetzt kaempfen"-
+   Zustand korrekt uebernommen wird. Selbst-beendend: bricht ab, sobald der
+   Gildenboss-Tab nicht mehr aktiv ist. */
+function bkmpGuildBossStartPrepCountdownTicker() {
+  if (bkmpGuildBossPrepCountdownInterval) { clearInterval(bkmpGuildBossPrepCountdownInterval); bkmpGuildBossPrepCountdownInterval = null; }
+  bkmpGuildBossPrepCountdownInterval = setInterval(() => {
+    if (bkmpIdleActiveTab !== 'gildeboss') {
+      clearInterval(bkmpGuildBossPrepCountdownInterval);
+      bkmpGuildBossPrepCountdownInterval = null;
+      return;
+    }
+    const info = bkmpGuildBossGetPhaseInfo();
+    if (info.phase !== 'prep') {
+      clearInterval(bkmpGuildBossPrepCountdownInterval);
+      bkmpGuildBossPrepCountdownInterval = null;
+      bkmpIdleRenderGildeBossPanel();
+      return;
+    }
+    const el = document.getElementById('idleGuildBossPrepCountdown');
+    if (el) el.textContent = `⏳ Vorbereitung - Kampf startet in ${bkmpRaidFormatCountdown(info.msUntilFightStart)}.`;
+  }, 1000);
+}
 async function bkmpIdleRenderGildeBossPanel() {
   const panel = document.getElementById('idlePanelGildeBoss');
   if (!panel) return;
@@ -5186,7 +5235,7 @@ async function bkmpIdleRenderGildeBossPanel() {
     bkmpGuildBossPanelRenderedForKey = null;
     let bodyHtml = '';
     if (info.phase === 'prep') {
-      bodyHtml = `<p class="idle-dungeon-best">⏳ Vorbereitung - Kampf startet in ${bkmpRaidFormatCountdown(info.msUntilFightStart)}.</p>`;
+      bodyHtml = `<p class="idle-dungeon-best" id="idleGuildBossPrepCountdown">⏳ Vorbereitung - Kampf startet in ${bkmpRaidFormatCountdown(info.msUntilFightStart)}.</p>`;
     } else if (info.phase === 'fight') {
       bodyHtml = `
         <p class="idle-dungeon-best">🐲 ${bkmpRaidFormatCountdown(info.msUntilFightEnd)} verbleiben!</p>
@@ -5205,6 +5254,7 @@ async function bkmpIdleRenderGildeBossPanel() {
         ${bodyHtml}
       </div>
     `;
+    if (info.phase === 'prep') bkmpGuildBossStartPrepCountdownTicker();
     const joinBtn = document.getElementById('idleGuildBossJoinBtn');
     if (joinBtn) joinBtn.addEventListener('click', async () => {
       if (bkmpGuildBossBusy) return;
