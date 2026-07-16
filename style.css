@@ -8951,3 +8951,112 @@ html.bkmp-app-mode .raid-boss-name {
 }
 html.bkmp-app-mode .raid-city-stats { font-size: .82rem !important; }
 html.bkmp-app-mode .raid-participants-list { font-size: .88rem !important; line-height: 1.6; }
+
+/* ============================================================
+   APP-MODUS REDESIGN, PHASE 11 (weitere Recherche-Runde: Game-Feel/Juice,
+   Karten-Rarity-Glow, Dungeon-Karten-Chrome)
+   ============================================================
+   Recherche zu "Game Juice"-Prinzipien (Disneys 12-Animationsprinzipien
+   als Basis fast aller Spiel-"Juice"): Screen-Shake + Partikel allein
+   reichen nicht, Bildschirm-Aufblitzen bei starken Treffern ist die
+   dritte uebliche Schicht (kurzer heller Flash = zusaetzliches Gewicht).
+   Rarity-Farbcodierung (Bronze/Silber/Gold-Prinzip aus Sammelkarten-UI)
+   ist im Spiel ueber --rune-color schon vorhanden - hier nur fuer die
+   hoechste Stufe (Gold/Legendaer) im App-Modus verstaerkt (Puls-Glow),
+   statt ein Farbsystem neu zu erfinden. */
+html.bkmp-app-mode .idle-battlefield:has(.idle-dmg-crit)::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--app-gold) 35%, transparent);
+  animation: appCritFlash .28s ease-out;
+  pointer-events: none;
+}
+@keyframes appCritFlash {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.bkmp-app-mode .idle-battlefield:has(.idle-dmg-crit)::before { animation: none !important; display: none; }
+}
+
+/* Legendaere Runen (--rune-color: #facc15, Gold-Rarity) pulsieren leicht
+   im Lager - hebt die seltenste Stufe zusaetzlich zur schon vorhandenen
+   Farbe/Glow-Kante hervor, ohne das bestehende Rarity-Farbsystem
+   anzufassen. */
+html.bkmp-app-mode .idle-runen-item[style*="facc15"] {
+  animation: appLegendaryPulse 2.2s ease-in-out infinite;
+}
+@keyframes appLegendaryPulse {
+  0%, 100% { box-shadow: 0 0 0 rgba(250, 204, 21, 0); }
+  50% { box-shadow: 0 0 16px 2px rgba(250, 204, 21, .55); }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.bkmp-app-mode .idle-runen-item[style*="facc15"] { animation: none !important; }
+}
+
+/* ---- Dungeon-Karten bekamen in Phase 6 nur groessere Buttons - jetzt
+   auch die Karten-Umrandung selbst im einheitlichen Fantasy-Look. ---- */
+html.bkmp-app-mode .idle-dorf-panel .idle-dungeon-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(0, 0, 0, .28)) !important;
+  border: 1.5px solid color-mix(in srgb, var(--app-gold) 40%, transparent) !important;
+  border-radius: 18px !important;
+  padding: 1.1rem !important;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-dungeon-card-icon { font-size: 2.1rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-dungeon-card-head strong { font-size: 1.02rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-dungeon-card-head small { font-size: .8rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-dungeon-card-keys,
+html.bkmp-app-mode .idle-dorf-panel .idle-dungeon-card-bonus { font-size: .84rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-dungeon-card-meta { font-size: .78rem !important; }
+
+/* ---- Erfolge-Popup (#achievementsOverlay, eigene Unter-Tabs Erfolge/
+   Kosmetik/Titel/Pluschies) - Fenster-Chrome kommt schon von der
+   .joke-card-Regel oben, hier nur die Innenliste/Tabs vergroessert. ---- */
+html.bkmp-app-mode #achievementsOverlay .achievements-list { font-size: .88rem !important; }
+html.bkmp-app-mode #achievementsOverlay button {
+  min-height: 44px !important;
+  padding: .6rem 1rem !important;
+}
+
+/* ============================================================
+   APP-MODUS REDESIGN, PHASE 12 (restliche Karten-Chromes)
+   ============================================================
+   Phase 7 hat bei vielen Karten (Skilltree-Zweig-Kopf, Arena-Gegner,
+   Gilde-Quest, Bestenliste-Zeile) nur Schrift/Abstand vergroessert, aber
+   keine eigene Hintergrund/Rahmen-Optik gegeben - dadurch wirkten sie
+   trotz groesserer Schrift noch wie flache Website-Listenzeilen statt
+   Karten. Gleiche Zwei-Ebenen-Verlaufstechnik wie ueberall sonst. */
+html.bkmp-app-mode .idle-dorf-panel .idle-skill-branch-header {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(0, 0, 0, .25)) !important;
+  border: 1.5px solid color-mix(in srgb, var(--app-purple-light) 55%, transparent) !important;
+  border-radius: 16px !important;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-arena-opponent-card,
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-quest-card,
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-tech-card,
+html.bkmp-app-mode .idle-dorf-panel .leaderboard-row {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(0, 0, 0, .25)) !important;
+  border: 1px solid rgba(255, 255, 255, .1) !important;
+  border-radius: 16px !important;
+}
+html.bkmp-app-mode .idle-dorf-panel .leaderboard-row:nth-child(1) {
+  border-color: color-mix(in srgb, var(--app-gold) 55%, transparent) !important;
+  background: linear-gradient(180deg, rgba(255, 215, 106, .12), rgba(0, 0, 0, .25)) !important;
+}
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-activity-entry,
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-chat-msg {
+  padding: .5rem .3rem;
+  border-bottom: 1px solid rgba(255, 255, 255, .06);
+}
+
+/* Erfolge/Kosmetik/Titel/Pluschies-Unterreiter im Erfolge-Popup - eigene
+   Klasse (.achievements-subtab), nicht .idle-dorf-tab, also kein
+   Ueberschneidungs-Risiko mit der Bottom-Navigation, aber trotzdem noch
+   auf Website-Groesse (0.45rem/0.8rem). */
+html.bkmp-app-mode .achievements-subtab {
+  padding: .7rem .9rem !important;
+  font-size: .88rem !important;
+  min-height: 44px !important;
+}
