@@ -1,0 +1,27 @@
+{
+  "name": "Idle Drachen Dorf",
+  "short_name": "Idle Dorf",
+  "description": "Baue dein Dorf auf, ziehe Drachen groß und besiege Weltbosse – das Idle-Spiel von BKMP.",
+  "start_url": "/app",
+  "scope": "/app",
+  "id": "/app",
+  "display": "standalone",
+  "orientation": "portrait",
+  "lang": "de",
+  "theme_color": "#08070A",
+  "background_color": "#08070A",
+  "icons": [
+    {
+      "src": "assets/android-chrome-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/android-chrome-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

@@ -5419,7 +5419,7 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   image-rendering: auto;
 }
 .idle-sprite-shenloss { background-image: url('assets/dragons/shenloss.png?v=20260710-eventdragons1'); aspect-ratio: 473 / 372; }
-.idle-sprite-liber { background-image: url('assets/dragons/liber.png?v=20260710-eventdragons1'); aspect-ratio: 422 / 245; }
+.idle-sprite-liber { background-image: url('assets/dragons/liber.png?v=20260718-libercutout2'); aspect-ratio: 419 / 259; }
 
 .idle-dragon-name { margin-top: 0.3rem; font-size: 0.75rem; font-weight: 700; color: var(--muted); }
 .idle-dragon-boss .idle-dragon-name { color: #facc15; }
@@ -7483,5 +7483,78 @@ body.admin-mode-sheepeditor .admin-nav-btn[data-role="sheep_editor"] { display: 
 .map-search-row input[type="text"] {
   flex: 1; min-width: 200px; padding: 0.55rem 0.8rem; border-radius: 999px;
   border: 1px solid var(--line); background: var(--paper); color: var(--ink); font: inherit; font-size: 0.85rem;
+}
+
+/* ============================================================
+   App-Modus (Play-Store-Verpackung des Idle-Dorfs, /app oder
+   ?app=idledorf) - reine Zusatzschicht ueber der bestehenden Seite,
+   kein separater Code. html.bkmp-app-mode wird ganz frueh im <head>
+   von index.html gesetzt (vor dem ersten Rendern). Blendet die
+   Investment-Seite drumherum aus und zeigt nur noch das Idle-Dorf
+   (oder den Login, wenn noch nicht eingeloggt) im Vollbild.
+   ============================================================ */
+#bkmpAppSplash { display: none; }
+html.bkmp-app-mode #bkmpAppSplash {
+  display: flex;
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  background: radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--gold) 12%, transparent), var(--paper) 65%);
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+html.bkmp-app-mode.bkmp-app-ready #bkmpAppSplash { display: none; }
+#bkmpAppSplash img {
+  width: 84px;
+  height: 84px;
+  border-radius: 20px;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.5);
+}
+#bkmpAppSplash p {
+  margin: 0;
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 1.05rem;
+  color: var(--ink);
+}
+
+html.bkmp-app-mode .site-top-bar,
+html.bkmp-app-mode .poll-banner,
+html.bkmp-app-mode .top-actions,
+html.bkmp-app-mode .top-actions-left,
+html.bkmp-app-mode header,
+html.bkmp-app-mode nav.topbar-wrap,
+html.bkmp-app-mode .panels-viewport,
+html.bkmp-app-mode footer,
+html.bkmp-app-mode .bkmp-penguin-easter-egg {
+  display: none !important;
+}
+html.bkmp-app-mode body { background: var(--paper); }
+
+/* Idle-Dorf-Fenster wird im App-Modus zur eigentlichen Seite statt eines
+   Popups darueber - immer die volle-Bildschirm-Darstellung (sonst nur ab
+   640px Breite aktiv), plus Sicherheitsabstand fuer Notch/Kamera-Ausschnitt
+   und die Android-Gesten-Leiste am unteren Rand. */
+html.bkmp-app-mode .idle-dorf-overlay .idle-dorf-card {
+  width: 100vw;
+  height: 100vh;
+  max-height: 100vh;
+  max-width: 100vw;
+  border-radius: 0;
+  padding-top: calc(1.4rem + env(safe-area-inset-top));
+  padding-right: calc(1rem + env(safe-area-inset-right));
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+  padding-left: calc(1rem + env(safe-area-inset-left));
+}
+/* Kein "Schliessen" und kein Streamer-Hilfe-Link im App-Modus - es gibt
+   keine Seite dahinter, zu der man zurueckkehren koennte, die App IST der
+   Bildschirm. Verlassen passiert ausschliesslich ueber die Android-
+   Zurueck-Geste (siehe Bootstrap-Skript am Seitenende). */
+html.bkmp-app-mode #idleDorfOverlay > .idle-dorf-card > .idle-dorf-close,
+html.bkmp-app-mode #idleDorfOverlay > .idle-dorf-card > .joke-buttons {
+  display: none !important;
 }
 .map-search-row select { padding: 0.5rem 0.7rem; border-radius: 999px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); font: inherit; font-size: 0.82rem; }

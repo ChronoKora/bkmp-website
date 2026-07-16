@@ -1,5 +1,8 @@
 {
   "cleanUrls": true,
+  "rewrites": [
+    { "source": "/app", "destination": "/index.html" }
+  ],
   "functions": {
     "api/scan-plushie-folder.js": {
       "includeFiles": "assets/plushies/**"

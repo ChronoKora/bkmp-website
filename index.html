@@ -2,8 +2,30 @@
 <html lang="de" data-theme="dark">
 <head>
 <script>
+  // App-Modus (Play-Store-Verpackung des Idle-Dorfs, siehe /app): so frueh
+  // wie moeglich erkannt (vor jedem Rendern), damit Theme/Chrome sich schon
+  // beim allerersten Frame richtig verhalten statt kurz die normale
+  // Investment-Seite aufblitzen zu lassen.
+  (function () {
+    var path = location.pathname.replace(/\/+$/, '');
+    var isApp = path === '/app' || new URLSearchParams(location.search).get('app') === 'idledorf';
+    if (isApp) {
+      window.BKMP_APP_MODE = true;
+      document.documentElement.classList.add('bkmp-app-mode');
+    }
+  })();
+</script>
+<script>
   // Verhindert Aufblitzen: Theme wird gesetzt, bevor die Seite gerendert wird.
   (function () {
+    // Der App-Modus zeigt immer das dunkle Standard-Design, unabhaengig von
+    // einer evtl. gespeicherten Theme-/Akzentfarben-Wahl vom Investment-
+    // Dashboard - soll wie eine eigene App mit festem Look wirken, nicht wie
+    // ein Browser-Tab mit individuellem Seiten-Stand.
+    if (window.BKMP_APP_MODE) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      return;
+    }
     var saved = localStorage.getItem('bkmp-theme');
     var theme = saved === 'light' ? 'light' : 'dark'; // Dunkel ist Standard
     document.documentElement.setAttribute('data-theme', theme);
@@ -31,13 +53,21 @@
   })();
 </script>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#08070A">
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
-<link rel="manifest" href="site.webmanifest">
+<link rel="manifest" href="site.webmanifest" id="bkmpManifestLink">
+<script>
+  // App-Modus bekommt sein eigenes Manifest (eigener Name/Icon/Start-URL
+  // fuer "Zum Startbildschirm hinzufuegen" bzw. die TWA-Verpackung) statt
+  // des Investment-Dashboard-Manifests.
+  if (window.BKMP_APP_MODE) {
+    document.getElementById('bkmpManifestLink').setAttribute('href', 'idledorf.webmanifest');
+  }
+</script>
 <title>BKMP – Minecraft Server Investment Dashboard</title>
 <meta name="description" content="Transparente Einblicke in Einnahmen, Investoren, News, Kartenideen und PartnerShops rund um den BKMP Minecraft-Server.">
 <link rel="canonical" href="https://bkinvestment.de/">
@@ -55,9 +85,18 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260717-dungeonsummaryfix1">
+<link rel="stylesheet" href="style.css?v=20260717-appmode1">
 </head>
 <body>
+
+  <!-- App-Modus-Ladebildschirm: deckt den kurzen Moment ab, bis das
+       Idle-Dorf (oder bei ausgeloggten Spielern der Login) tatsaechlich
+       offen ist - siehe App-Modus-Bootstrap-Skript am Seitenende. Auf der
+       normalen Investment-Seite per CSS unsichtbar/wirkungslos. -->
+  <div id="bkmpAppSplash" aria-hidden="true">
+    <img src="assets/android-chrome-192.png" width="84" height="84" alt="">
+    <p>Idle Drachen Dorf</p>
+  </div>
 
   <div class="site-top-bar" aria-hidden="true"></div>
 
@@ -1106,9 +1145,9 @@
   </div>
 
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260717-dungeonsummaryfix1"></script>
+  <script src="supabase.js?v=20260717-libercutout2"></script>
   <script src="app.js?v=20260712-themefix1"></script>
-  <script src="idledorf.js?v=20260717-dungeonsummaryfix1"></script>
+  <script src="idledorf.js?v=20260717-libercutout2"></script>
   <script src="mapart.js?v=20260717-kartenfirmen1"></script>
   <script>
     bkmpInitTheme();
@@ -5885,7 +5924,10 @@
        aufgerufen statt nur die "visible"-Klasse zu entfernen - sonst
        liefen z. B. Idle-Dorf-Tick oder Chat-Subscription im Hintergrund
        weiter, obwohl der Dialog optisch weg ist. */
-    const BKMP_OVERLAY_CLOSERS = {
+    /* Auf window statt const, damit der App-Modus-Bootstrap (eigenes
+       Skript weiter unten, fuer Android-Zurueck) dieselbe Zuordnung
+       mitbenutzen kann statt sie zu duplizieren. */
+    window.BKMP_OVERLAY_CLOSERS = {
       idleDorfOverlay: () => { if (typeof bkmpIdleCloseModal === 'function') bkmpIdleCloseModal(); },
       idleStagePickerOverlay: () => { if (typeof bkmpIdleCloseStagePicker === 'function') bkmpIdleCloseStagePicker(); },
       /* Bug-Report 17.07. (ChronoKora): "Streamer-Ticker bewegt sich nicht
@@ -5941,6 +5983,78 @@
         if (closer) closer(); else el.classList.remove('visible');
       });
     });
+  </script>
+
+  <script>
+    /* ============================================================
+       App-Modus-Bootstrap (/app oder ?app=idledorf, Flag+Klasse schon
+       ganz oben im <head> gesetzt). Oeffnet das Idle-Dorf automatisch
+       ueber die ganz normale bkmpIdleOpenModal()-Funktion (dieselbe, die
+       auch der Button auf der Hauptseite auslöst) - kein eigener,
+       zweiter Code-Pfad. Steht bewusst als LETZTES Skript vor </body>,
+       also erst NACHDEM idledorf.js (bkmpIdleOpenModal, idleDorfButton-
+       Listener) und der ESC-Sweep oben (window.BKMP_OVERLAY_CLOSERS)
+       schon geladen/eingerichtet sind.
+       ============================================================ */
+    if (window.BKMP_APP_MODE) {
+      (function () {
+        document.title = 'Idle Drachen Dorf';
+        async function boot() {
+          if (typeof bkmpIdleOpenModal === 'function') {
+            await bkmpIdleOpenModal();
+          }
+          /* Egal ob Spiel, Login- oder Wartungs-Overlay dabei geoeffnet
+             wurde (alle drei setzen synchron/vor dem Zurueckkehren ihre
+             eigene .visible-Klasse) - der Ladebildschirm darf jetzt weg. */
+          document.documentElement.classList.add('bkmp-app-ready');
+        }
+        boot();
+
+        /* Android-Zurueck-Taste/-Geste: schliesst offene Unter-Dialoge
+           (Stufen-Auswahl, Hilfe-Popups, Bestaetigungen, ...) einzeln statt
+           die App direkt zu verlassen - dieselbe Zuordnung wie der ESC-
+           Sweep oben (window.BKMP_OVERLAY_CLOSERS), nur nicht fuer die drei
+           "Grundbildschirme" (Idle-Dorf selbst, Login, Wartungshinweis) -
+           bei denen soll Zurueck tatsaechlich die App verlassen, statt auf
+           einem leeren, dunklen Bildschirm ohne jede Bedienmoeglichkeit
+           haengen zu bleiben (Header/Nav/Buttons sind im App-Modus ja
+           ausgeblendet). */
+        var ROOT_OVERLAY_IDS = ['idleDorfOverlay', 'mcNameOverlay', 'idleMaintenanceOverlay'];
+        var guardPushed = false;
+
+        function visibleSubOverlays() {
+          return Array.prototype.filter.call(
+            document.querySelectorAll('.joke-overlay.visible'),
+            function (el) { return ROOT_OVERLAY_IDS.indexOf(el.id) === -1; }
+          );
+        }
+        function closeTopOverlay() {
+          var list = visibleSubOverlays();
+          if (!list.length) return false;
+          var el = list[list.length - 1];
+          var closer = window.BKMP_OVERLAY_CLOSERS && window.BKMP_OVERLAY_CLOSERS[el.id];
+          if (closer) closer(); else el.classList.remove('visible');
+          return true;
+        }
+        window.addEventListener('popstate', function () {
+          if (closeTopOverlay()) history.pushState({ bkmpAppGuard: true }, '');
+        });
+        /* Statt jeden einzelnen .classList.add('visible')-Aufruf im Code
+           aufzuspueren (dutzende Stellen), beobachtet ein MutationObserver
+           einfach, ob GERADE ein Unter-Dialog sichtbar ist, und haelt per
+           pushState() genau EINEN "Puffer"-Eintrag in der History bereit,
+           solange das der Fall ist. */
+        new MutationObserver(function () {
+          var hasSub = visibleSubOverlays().length > 0;
+          if (hasSub && !guardPushed) {
+            guardPushed = true;
+            history.pushState({ bkmpAppGuard: true }, '');
+          } else if (!hasSub) {
+            guardPushed = false;
+          }
+        }).observe(document.body, { attributes: true, attributeFilter: ['class'], subtree: true });
+      })();
+    }
   </script>
 
 </body>
