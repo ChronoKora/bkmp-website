@@ -530,6 +530,20 @@
 
   <div class="joke-overlay idle-dorf-overlay" id="idleDorfOverlay">
     <div class="joke-card idle-dorf-card">
+      <!-- Rein dekorative Hintergrund-Ambience (Sterne/Funken/Nebel) - nur
+           im App-Modus sichtbar (siehe style.css html.bkmp-app-mode
+           .app-bg-fx), auf der normalen Website komplett unsichtbar/
+           wirkungslos. Statische Elemente, werden NIE von idledorf.js
+           angefasst (kein render()/innerHTML zielt hierauf), daher
+           sicher als handgeschriebenes Markup. -->
+      <div class="app-bg-fx" aria-hidden="true">
+        <div class="app-bg-fx-nebula"></div>
+        <div class="app-bg-fx-stars"></div>
+        <div class="app-bg-fx-embers">
+          <span></span><span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+      </div>
       <button type="button" class="idle-dorf-close" id="idleDorfCloseX" aria-label="Schlie&szlig;en">&times;</button>
       <!-- Spieler-Wunsch (14.07.): "Wir haben endlich ein banner fürs
            Spiel. Bau das gerne ordentlich ein!" - ersetzt den bisherigen

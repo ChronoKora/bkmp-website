@@ -7592,3 +7592,403 @@ html.bkmp-app-mode #idleDorfOverlay > .idle-dorf-card > .joke-buttons {
   cursor: pointer;
 }
 .map-search-row select { padding: 0.5rem 0.7rem; border-radius: 999px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); font: inherit; font-size: 0.82rem; }
+
+/* ============================================================
+   APP-MODUS REDESIGN, PHASE 1 (Mobile-Game-Optik)
+   ============================================================
+   Nutzerwunsch: "Ich will halt das die app komplett neu gemacht wird.
+   Website bleibt website." - JEDE Regel hier haengt an html.bkmp-app-mode
+   und greift daher NUR im App-Modus (/app bzw. ?app=idledorf). Die
+   normale Website-Ansicht des Idle-Dorfs bleibt exakt wie zuvor.
+
+   Baut bewusst NUR auf bestehenden Elementen/IDs/Klassen auf, die
+   idledorf.js schon selbst erzeugt/anspricht (siehe Recherche vor diesem
+   Umbau: bkmpIdleRenderHud, bkmpIdleInitTabs, bkmpIdleSpawnHitFlash usw.)
+   - keine JS-Aenderung noetig, nichts hier kann den Kampf-Loop/die
+   Tab-Logik/die Speicherstand-Synchronisation beeinflussen. Phase 1 =
+   Optik/Juice auf bestehender Struktur. Bottom-Navigation (echte
+   Neuanordnung der Tab-Leiste) und die einzelnen Unter-Panels
+   (Skilltree/Dungeon/Gilde/...) im Detail folgen in spaeteren Phasen.
+   ============================================================ */
+
+html.bkmp-app-mode {
+  --app-void: #0a0518;
+  --app-purple-deep: #170b30;
+  --app-purple: #2d1854;
+  --app-purple-light: #4a2a7a;
+  --app-gold: #ffd76a;
+  --app-gold-deep: #e8a93c;
+  --app-orange: #ff8c3d;
+  --app-red: #ff3b5c;
+  --app-blue-deep: #0f1830;
+  --app-blue: #2f6fd6;
+  --app-cyan: #3ce6e0;
+  --app-green: #4ade80;
+  --app-ink: #f5f0ff;
+  --app-muted: rgba(245, 240, 255, 0.62);
+  --app-glow-gold: 0 0 18px rgba(255, 215, 106, 0.55);
+  --app-glow-cyan: 0 0 16px rgba(60, 230, 224, 0.5);
+  --app-glow-red: 0 0 18px rgba(255, 59, 92, 0.6);
+}
+
+/* ---- Karten-Chrome: Kampf-Arena statt Web-Modal ---- */
+html.bkmp-app-mode .idle-dorf-overlay .idle-dorf-card {
+  position: relative;
+  overflow-x: hidden;
+  background:
+    radial-gradient(circle at 50% -10%, color-mix(in srgb, var(--app-purple-light) 45%, transparent), transparent 55%),
+    linear-gradient(180deg, var(--app-purple-deep) 0%, var(--app-void) 68%);
+}
+html.bkmp-app-mode .idle-dorf-overlay .idle-dorf-card::before {
+  background:
+    linear-gradient(180deg, var(--app-purple-deep), var(--app-void)) padding-box,
+    linear-gradient(135deg, var(--app-gold), var(--app-cyan), var(--app-purple-light), var(--app-gold)) border-box;
+}
+/* Marketing-Banner ergibt innerhalb der App selbst keinen Sinn mehr
+   (die App IST das Spiel) - der Platz geht stattdessen an HUD/Kampf. */
+html.bkmp-app-mode .idle-dorf-banner-picture { display: none; }
+
+/* ---- Hintergrund-Ambience (Sterne/Nebel/Funken), siehe .app-bg-fx in
+   index.html - rein dekorativ, idledorf.js fasst das nie an. ---- */
+html.bkmp-app-mode .app-bg-fx {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+html.bkmp-app-mode .app-bg-fx-nebula {
+  position: absolute;
+  inset: -20%;
+  background:
+    radial-gradient(circle at 20% 30%, color-mix(in srgb, var(--app-cyan) 14%, transparent), transparent 45%),
+    radial-gradient(circle at 80% 70%, color-mix(in srgb, var(--app-orange) 12%, transparent), transparent 50%),
+    radial-gradient(circle at 50% 100%, color-mix(in srgb, var(--app-purple-light) 22%, transparent), transparent 60%);
+  filter: blur(2px);
+  animation: appNebulaDrift 26s ease-in-out infinite alternate;
+}
+@keyframes appNebulaDrift {
+  from { transform: translate(0, 0) scale(1); }
+  to { transform: translate(-3%, -2%) scale(1.08); }
+}
+html.bkmp-app-mode .app-bg-fx-stars {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(1.5px 1.5px at 10% 20%, rgba(255, 255, 255, .9), transparent),
+    radial-gradient(1.5px 1.5px at 30% 65%, rgba(255, 255, 255, .7), transparent),
+    radial-gradient(1px 1px at 50% 15%, rgba(255, 255, 255, .8), transparent),
+    radial-gradient(1.5px 1.5px at 70% 45%, rgba(255, 255, 255, .6), transparent),
+    radial-gradient(1px 1px at 85% 80%, rgba(255, 255, 255, .9), transparent),
+    radial-gradient(1.5px 1.5px at 92% 25%, rgba(255, 255, 255, .7), transparent),
+    radial-gradient(1px 1px at 15% 85%, rgba(255, 255, 255, .6), transparent),
+    radial-gradient(1.5px 1.5px at 45% 92%, rgba(255, 255, 255, .8), transparent);
+  opacity: .55;
+  animation: appStarTwinkle 4s ease-in-out infinite alternate;
+}
+@keyframes appStarTwinkle {
+  from { opacity: .32; }
+  to { opacity: .62; }
+}
+html.bkmp-app-mode .app-bg-fx-embers span {
+  position: absolute;
+  bottom: -10px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--app-gold);
+  box-shadow: 0 0 6px 2px color-mix(in srgb, var(--app-gold) 70%, transparent);
+  opacity: 0;
+  animation: appEmberRise 9s linear infinite;
+}
+html.bkmp-app-mode .app-bg-fx-embers span:nth-child(1) { left: 8%;  animation-duration: 8s;   animation-delay: 0s; }
+html.bkmp-app-mode .app-bg-fx-embers span:nth-child(2) { left: 18%; animation-duration: 11s;  animation-delay: 1.2s; }
+html.bkmp-app-mode .app-bg-fx-embers span:nth-child(3) { left: 30%; animation-duration: 9.5s;  animation-delay: 2.4s; }
+html.bkmp-app-mode .app-bg-fx-embers span:nth-child(4) { left: 44%; animation-duration: 12s;  animation-delay: 0.6s; }
+html.bkmp-app-mode .app-bg-fx-embers span:nth-child(5) { left: 55%; animation-duration: 8.5s;  animation-delay: 3s; }
+html.bkmp-app-mode .app-bg-fx-embers span:nth-child(6) { left: 65%; animation-duration: 10.5s; animation-delay: 1.8s; }
+html.bkmp-app-mode .app-bg-fx-embers span:nth-child(7) { left: 74%; animation-duration: 9s;    animation-delay: 4.2s; }
+html.bkmp-app-mode .app-bg-fx-embers span:nth-child(8) { left: 83%; animation-duration: 11.5s; animation-delay: 2.1s; }
+html.bkmp-app-mode .app-bg-fx-embers span:nth-child(9) { left: 91%; animation-duration: 8s;    animation-delay: 3.6s; }
+html.bkmp-app-mode .app-bg-fx-embers span:nth-child(10) { left: 96%; animation-duration: 10s;   animation-delay: 0.9s; }
+@keyframes appEmberRise {
+  0% { transform: translateY(0) scale(.6); opacity: 0; }
+  10% { opacity: .9; }
+  90% { opacity: .5; }
+  100% { transform: translateY(-620px) scale(1); opacity: 0; }
+}
+
+/* ---- Top-Bar / HUD ---- */
+html.bkmp-app-mode #idleDorfHud { margin-bottom: .6rem; }
+html.bkmp-app-mode .idle-hud-top {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  padding: .5rem .7rem;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .07), rgba(255, 255, 255, .02));
+  border: 1px solid rgba(255, 255, 255, .09);
+}
+html.bkmp-app-mode .idle-hud-level-badge {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--app-gold), var(--app-gold-deep));
+  box-shadow: var(--app-glow-gold), inset 0 -3px 6px rgba(0, 0, 0, .35);
+  color: #2b1600;
+  animation: appHudPop .35s ease;
+}
+html.bkmp-app-mode .idle-hud-level-num { font-family: 'Fraunces', serif; font-weight: 700; font-size: 1.05rem; line-height: 1; }
+html.bkmp-app-mode .idle-hud-level-tag { font-size: .5rem; text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
+html.bkmp-app-mode .idle-hud-streak-badge {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: .2rem;
+  padding: .3rem .55rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--app-orange), var(--app-red));
+  color: #fff;
+  font-weight: 700;
+  font-size: .78rem;
+  box-shadow: var(--app-glow-red);
+  animation: appHudPop .35s ease;
+}
+html.bkmp-app-mode .idle-hud-xp-wrap { flex: 1; min-width: 0; }
+html.bkmp-app-mode .idle-hud-skillpoints {
+  font-size: .7rem;
+  font-weight: 700;
+  color: var(--app-cyan);
+  margin-bottom: .25rem;
+  text-shadow: 0 0 8px color-mix(in srgb, var(--app-cyan) 60%, transparent);
+}
+html.bkmp-app-mode .idle-xp-bar {
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, .4);
+  border: 1px solid rgba(255, 255, 255, .09);
+}
+html.bkmp-app-mode .idle-xp-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--app-cyan), var(--app-purple-light), var(--app-gold));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--app-cyan) 60%, transparent);
+  transition: width .5s cubic-bezier(.3, 1, .4, 1);
+}
+html.bkmp-app-mode .idle-xp-label { font-size: .62rem; color: var(--app-muted); margin-top: .2rem; font-variant-numeric: tabular-nums; }
+html.bkmp-app-mode .idle-hud-stats,
+html.bkmp-app-mode .idle-hud-resources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem;
+  margin-top: .5rem;
+  padding: 0;
+  border: none;
+}
+html.bkmp-app-mode .idle-hud-stats span,
+html.bkmp-app-mode .idle-hud-resources span {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  padding: .32rem .6rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid rgba(255, 255, 255, .09);
+  font-size: .74rem;
+  font-weight: 700;
+  color: var(--app-ink);
+  font-variant-numeric: tabular-nums;
+  animation: appHudPop .3s ease;
+}
+html.bkmp-app-mode .idle-hud-resources span {
+  background: linear-gradient(135deg, rgba(255, 215, 106, .16), rgba(255, 140, 61, .08));
+  border-color: color-mix(in srgb, var(--app-gold) 40%, transparent);
+}
+@keyframes appHudPop {
+  from { transform: scale(.7); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* ---- Tab-Leiste (bleibt oben in Phase 1, wird optisch zur Icon-Reihe;
+   echte Bottom-Navigation folgt in einer spaeteren Phase) ---- */
+html.bkmp-app-mode .idle-dorf-tabs {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: .5rem;
+  padding: .2rem .1rem .7rem;
+  margin: .6rem 0 .3rem;
+  scrollbar-width: none;
+}
+html.bkmp-app-mode .idle-dorf-tabs::-webkit-scrollbar { display: none; }
+html.bkmp-app-mode .idle-dorf-tab {
+  flex: none;
+  font-size: .82rem;
+  font-weight: 700;
+  padding: .6rem 1rem;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .02));
+  border: 1px solid rgba(255, 255, 255, .09);
+  color: var(--app-muted);
+  transition: transform .15s ease, box-shadow .2s ease, color .2s ease, border-color .2s ease;
+}
+html.bkmp-app-mode .idle-dorf-tab:active { transform: scale(.94); }
+html.bkmp-app-mode .idle-dorf-tab.active {
+  color: #2b1600;
+  background: linear-gradient(135deg, var(--app-gold), var(--app-orange));
+  border-color: transparent;
+  box-shadow: var(--app-glow-gold);
+  transform: translateY(-2px) scale(1.05);
+}
+
+/* ---- Kampfbereich: gross, dramatisch, reagiert live auf Treffer ---- */
+html.bkmp-app-mode .idle-battlefield {
+  min-height: 36vh;
+  padding: 1.3rem 1rem;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 50% 6%, color-mix(in srgb, var(--app-red) 12%, transparent), transparent 55%),
+    linear-gradient(180deg, rgba(255, 255, 255, .04), rgba(0, 0, 0, .28));
+  border: 1px solid rgba(255, 255, 255, .09);
+  position: relative;
+}
+html.bkmp-app-mode .idle-battlefield::before {
+  content: '⚔';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1.7rem;
+  color: var(--app-gold);
+  text-shadow: var(--app-glow-gold);
+  opacity: .85;
+  pointer-events: none;
+}
+html.bkmp-app-mode .idle-village,
+html.bkmp-app-mode .idle-dragon {
+  width: 44%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(0, 0, 0, .32));
+  border: 1.5px solid color-mix(in srgb, var(--app-gold) 45%, transparent);
+  border-radius: 18px;
+}
+html.bkmp-app-mode .idle-village-sprite,
+html.bkmp-app-mode .idle-dragon-sprite {
+  filter: drop-shadow(0 10px 14px rgba(0, 0, 0, .5)) drop-shadow(0 0 18px rgba(255, 140, 61, .25));
+}
+html.bkmp-app-mode .idle-hp-bar {
+  height: 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  background: rgba(0, 0, 0, .5);
+  overflow: hidden;
+}
+html.bkmp-app-mode .idle-hp-fill-village {
+  background: linear-gradient(90deg, var(--app-green), #22c55e);
+  box-shadow: 0 0 10px rgba(74, 222, 128, .6);
+}
+html.bkmp-app-mode .idle-hp-fill-dragon {
+  background: linear-gradient(90deg, var(--app-red), var(--app-orange));
+  box-shadow: 0 0 10px rgba(255, 59, 92, .6);
+}
+html.bkmp-app-mode .idle-hp-label { font-variant-numeric: tabular-nums; font-weight: 700; }
+
+/* Bildschirm-Wackler bei Treffer - reine CSS-Reaktion auf die schon
+   bestehende idle-hit-flash-Klasse (siehe bkmpIdleSpawnHitFlash in
+   idledorf.js), kein zusaetzlicher JS-Hook noetig. */
+html.bkmp-app-mode .idle-battlefield:has(.idle-hit-flash) {
+  animation: appBattlefieldShake .32s ease;
+}
+@keyframes appBattlefieldShake {
+  10%, 90% { transform: translate3d(-1px, 0, 0); }
+  20%, 80% { transform: translate3d(2px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+  40%, 60% { transform: translate3d(4px, 0, 0); }
+}
+
+/* Schadenszahlen: kraeftiger, elementfarbig */
+html.bkmp-app-mode .idle-dmg-float {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--app-gold);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--app-gold) 70%, transparent), 0 2px 4px rgba(0, 0, 0, .6);
+}
+html.bkmp-app-mode .idle-dmg-crit {
+  font-size: 1.75rem;
+  color: var(--app-red);
+  text-shadow: 0 0 16px color-mix(in srgb, var(--app-red) 80%, transparent), 0 2px 4px rgba(0, 0, 0, .6);
+}
+html.bkmp-app-mode .idle-dmg-burn {
+  color: var(--app-orange);
+  text-shadow: 0 0 12px color-mix(in srgb, var(--app-orange) 75%, transparent);
+}
+html.bkmp-app-mode .idle-dmg-lightning {
+  color: var(--app-cyan);
+  text-shadow: 0 0 12px color-mix(in srgb, var(--app-cyan) 75%, transparent);
+}
+html.bkmp-app-mode .idle-reward-float .rf-gold { color: var(--app-gold); text-shadow: var(--app-glow-gold); }
+html.bkmp-app-mode .idle-reward-float .rf-xp { color: var(--app-cyan); text-shadow: var(--app-glow-cyan); }
+
+/* AD-Free-Kauf-Button bleibt voll funktionsfaehig (echter Kauf!), nur
+   optisch als klare CTA im neuen Look. */
+html.bkmp-app-mode .idle-adfree-btn {
+  display: block;
+  width: 100%;
+  margin: .7rem 0;
+  padding: .8rem 1rem;
+  border-radius: 14px;
+  border: none;
+  background: linear-gradient(135deg, var(--app-gold), var(--app-orange));
+  color: #2b1600;
+  font-weight: 800;
+  box-shadow: var(--app-glow-gold);
+}
+html.bkmp-app-mode .idle-dorf-log {
+  border-radius: 14px;
+  background: rgba(0, 0, 0, .3);
+  border: 1px solid rgba(255, 255, 255, .08);
+}
+
+/* ---- Fenster/Buttons in allen Unter-Panels (Upgrades, Skilltree, Gilde,
+   ...) - generische, breite Selektoren statt jedes Panel einzeln
+   anzufassen, da deren Inhalt bei jedem Tab-Wechsel per innerHTML komplett
+   neu erzeugt wird (siehe Recherche: bkmpIdleRenderUpgradesPanel & Co.). */
+html.bkmp-app-mode .idle-dorf-panel button {
+  border-radius: 14px;
+  font-weight: 700;
+  transition: transform .15s ease, box-shadow .2s ease;
+}
+html.bkmp-app-mode .idle-dorf-panel button:active { transform: scale(.95); }
+html.bkmp-app-mode .idle-dorf-card .joke-buttons .btn-ja,
+html.bkmp-app-mode .idle-dorf-panel .btn-ja {
+  background: linear-gradient(135deg, var(--app-gold), var(--app-orange)) !important;
+  border: none !important;
+  color: #2b1600 !important;
+  box-shadow: var(--app-glow-gold);
+}
+html.bkmp-app-mode .idle-dorf-panel input[type="text"],
+html.bkmp-app-mode .idle-dorf-panel input[type="number"],
+html.bkmp-app-mode .idle-dorf-panel select,
+html.bkmp-app-mode .idle-dorf-panel textarea {
+  border-radius: 12px;
+  background: rgba(0, 0, 0, .3);
+  border: 1px solid rgba(255, 255, 255, .14);
+  color: var(--app-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.bkmp-app-mode .app-bg-fx-nebula,
+  html.bkmp-app-mode .app-bg-fx-stars,
+  html.bkmp-app-mode .app-bg-fx-embers span,
+  html.bkmp-app-mode .idle-hud-level-badge,
+  html.bkmp-app-mode .idle-hud-streak-badge,
+  html.bkmp-app-mode .idle-hud-stats span,
+  html.bkmp-app-mode .idle-hud-resources span,
+  html.bkmp-app-mode .idle-battlefield {
+    animation: none !important;
+  }
+}
