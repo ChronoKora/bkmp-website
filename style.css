@@ -7550,6 +7550,21 @@ html.bkmp-app-mode .idle-dorf-overlay .idle-dorf-card {
      damit Panel-Inhalte nicht dahinter verschwinden. */
   padding-bottom: calc(5.2rem + env(safe-area-inset-bottom));
   padding-left: calc(1rem + env(safe-area-inset-left));
+  /* KRITISCH: die Website-Optik setzt hier ein transform (Oeffnen-
+     "Pop"-Animation der Karte, .joke-card/.joke-overlay.visible .joke-card
+     weiter oben in dieser Datei). Ein transform auf einem Vorfahren macht
+     ihn per CSS-Spezifikation zum neuen Bezugsrahmen fuer ALLE
+     position:fixed-Kindelemente darin - meine Bottom-Navigation und das
+     "Mehr"-Menue haengen dadurch nicht mehr am echten Bildschirmrand,
+     sondern am (teils laenger scrollbaren) Kartenrahmen. Auf manchen
+     Mobilgeraeten/Browsern drifteten Navigation/Menue dadurch weit vom
+     sichtbaren unteren Bildschirmrand weg (Spieler-Videobeweis 16.07.:
+     riesige leere Flaeche vor der eigentlich fixierten Leiste). Im
+     App-Modus braucht es die Pop-Animation ohnehin nicht (die App-Karte
+     OEFFNET SICH NICHT wie ein Popup, sie IST der Bildschirm) - komplett
+     deaktivieren behebt das strukturell statt nur das Symptom zu kaschieren. */
+  transform: none !important;
+  animation: none !important;
 }
 /* Kein "Schliessen" und kein Streamer-Hilfe-Link im App-Modus - es gibt
    keine Seite dahinter, zu der man zurueckkehren koennte, die App IST der
@@ -7969,7 +7984,14 @@ html.bkmp-app-mode .idle-dorf-log {
 /* ---- Fenster/Buttons in allen Unter-Panels (Upgrades, Skilltree, Gilde,
    ...) - generische, breite Selektoren statt jedes Panel einzeln
    anzufassen, da deren Inhalt bei jedem Tab-Wechsel per innerHTML komplett
-   neu erzeugt wird (siehe Recherche: bkmpIdleRenderUpgradesPanel & Co.). */
+   neu erzeugt wird (siehe Recherche: bkmpIdleRenderUpgradesPanel & Co.).
+   Mindestgroesse 44px ist keine geschaetzte Zahl: Apples HIG setzt 44x44pt
+   als Minimum, und eine gezielte Studie zu MOBILE GAMES (nicht nur
+   allgemeine UI) fand 11mm als Mindestgroesse fuer >95% Treffergenauigkeit
+   bei Daumenbedienung - das entspricht ca. 42-44px auf typischen
+   Handy-Displays. Alle kleinen Icon-Buttons (Runen-Sockel, Drachen-
+   Favorit/Freilassen, Gilden-Chat-Loeschen, ...) sind unten explizit auf
+   mindestens 44px gesetzt, nicht nur "optisch groesser". */
 html.bkmp-app-mode .idle-dorf-panel button {
   border-radius: 14px;
   font-weight: 700;
@@ -7989,7 +8011,7 @@ html.bkmp-app-mode .idle-dungeon-diff-row button {
   flex: 1 1 auto;
   padding: .65rem .7rem;
   font-size: .82rem;
-  min-height: 42px;
+  min-height: 44px;
   min-width: 0;
 }
 html.bkmp-app-mode .idle-dorf-panel .idle-dungeon-start-btn {
@@ -8542,7 +8564,7 @@ html.bkmp-app-mode .idle-dorf-panel .idle-skill-node-rank { font-size: .78rem !i
 html.bkmp-app-mode .idle-dorf-panel .idle-skill-node-btn {
   padding: .6rem .7rem !important;
   font-size: .84rem !important;
-  min-height: 42px !important;
+  min-height: 44px !important;
 }
 /* Skill-/Runen-Hilfe-Popup (dasselbe Markup fuer beide) */
 html.bkmp-app-mode .skillhelp-name { font-size: .98rem !important; }
@@ -8586,8 +8608,8 @@ html.bkmp-app-mode .idle-dorf-panel .idle-runen-slot-tab-count { font-size: .74r
    winzig (Prozent-Positionierung auf einem Bild) - im App-Modus
    trotzdem ein spuerbares Mindestmass, sonst kaum treffbar. */
 html.bkmp-app-mode .idle-dorf-panel .idle-runen-equip-slot {
-  min-width: 40px !important;
-  min-height: 40px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
 }
 html.bkmp-app-mode .idle-dorf-panel .idle-runen-slot-level { font-size: .7rem !important; }
 html.bkmp-app-mode .idle-dorf-panel .idle-runen-item {
@@ -8617,7 +8639,7 @@ html.bkmp-app-mode .idle-dorf-panel .idle-runen-sell-btn,
 html.bkmp-app-mode .idle-dorf-panel .idle-runen-fuse-quick-btn {
   padding: .55rem .6rem !important;
   font-size: .8rem !important;
-  min-height: 40px !important;
+  min-height: 44px !important;
 }
 html.bkmp-app-mode .idle-dorf-panel .idle-runen-fuse-panel { padding: 1.1rem 1.2rem !important; }
 html.bkmp-app-mode .idle-dorf-panel .idle-runen-fuse-title { font-size: 1.05rem !important; }
@@ -8657,10 +8679,10 @@ html.bkmp-app-mode .idle-dorf-panel .idle-guild-banner-symbol-btn {
   font-size: 1.3rem !important;
 }
 html.bkmp-app-mode .idle-dorf-panel .idle-guild-chat-delete-btn {
-  font-size: 1rem !important;
-  min-width: 36px !important;
-  min-height: 36px !important;
-  opacity: .7 !important;
+  font-size: 1.1rem !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+  opacity: .8 !important;
 }
 html.bkmp-app-mode .idle-dorf-panel .idle-guild-level-badge { font-size: 1rem !important; }
 html.bkmp-app-mode .idle-dorf-panel .idle-guild-level-xp,
@@ -8739,15 +8761,15 @@ html.bkmp-app-mode .idle-dorf-panel .idle-dragon-substats { font-size: .78rem !i
 html.bkmp-app-mode .idle-dorf-panel .idle-dragon-fav-btn,
 html.bkmp-app-mode .idle-dorf-panel .idle-dragon-release-btn {
   font-size: 1.15rem !important;
-  min-width: 40px !important;
-  min-height: 40px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
   padding: .4rem !important;
 }
 html.bkmp-app-mode .idle-dorf-panel .idle-dragon-fav-badge { font-size: 1.3rem !important; }
 html.bkmp-app-mode .idle-dorf-panel .idle-dragon-filter-fav,
 html.bkmp-app-mode .idle-dorf-panel .idle-dragon-filter-bar select {
   font-size: .86rem !important;
-  min-height: 40px;
+  min-height: 44px;
 }
 html.bkmp-app-mode .idle-dorf-panel .idle-dragon-assign-btn,
 html.bkmp-app-mode .idle-dorf-panel .idle-dragon-hatch-btn,
