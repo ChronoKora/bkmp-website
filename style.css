@@ -7054,6 +7054,38 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   background: linear-gradient(120deg, var(--gold), #a78bfa, #38bdf8, #f472b6, var(--gold)); background-size: 320% 320%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: bkmpTierGlow 4.5s ease infinite;
 }
 
+/* Prestige-gestaffelte Kosmetiken (16.07., Lategame-Content) - gleiche
+   Doppel-Hintergrund-Technik wie die uebrigen .mc-cosmetic-* Klassen oben. */
+.mc-cosmetic-portal_wirbel {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box, linear-gradient(120deg, #4c1d95, #0891b2, #7e22ce, #4c1d95) border-box;
+  border: 1px solid transparent; background-size: 100% 100%, 280% 280%; animation: bkmpTierGlow 4s ease infinite;
+  box-shadow: 0 0 20px rgba(8, 145, 178, 0.45);
+}
+.mc-cosmetic-portal_wirbel #mcNameBadgeText, .mc-cosmetic-portal_wirbel .cosmetic-swatch-name, .mc-cosmetic-portal_wirbel .leaderboard-name-text {
+  background: linear-gradient(120deg, #a78bfa, #22d3ee, #c084fc, #a78bfa); background-size: 280% 280%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: bkmpTierGlow 4s ease infinite;
+}
+
+.mc-cosmetic-ewiger_kreislauf {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box, linear-gradient(120deg, var(--gold), #1e3a8a, #7e22ce, var(--gold)) border-box;
+  border: 1px solid transparent; background-size: 100% 100%, 300% 300%; animation: bkmpTierGlow 6s ease infinite;
+  box-shadow: 0 0 22px color-mix(in srgb, var(--gold) 35%, #1e3a8a);
+}
+.mc-cosmetic-ewiger_kreislauf #mcNameBadgeText, .mc-cosmetic-ewiger_kreislauf .cosmetic-swatch-name, .mc-cosmetic-ewiger_kreislauf .leaderboard-name-text {
+  background: linear-gradient(120deg, var(--gold), #60a5fa, #c084fc, var(--gold)); background-size: 300% 300%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: bkmpTierGlow 6s ease infinite;
+}
+
+.mc-cosmetic-jenseits_der_sterne {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box, linear-gradient(120deg, #030712, #4c1d95, #f8fafc, #030712) border-box;
+  border: 1px solid transparent; background-size: 100% 100%, 320% 320%; animation: bkmpTierGlow 5s ease infinite;
+  box-shadow: 0 0 24px rgba(248, 250, 252, 0.35);
+}
+.mc-cosmetic-jenseits_der_sterne #mcNameBadgeText, .mc-cosmetic-jenseits_der_sterne .cosmetic-swatch-name, .mc-cosmetic-jenseits_der_sterne .leaderboard-name-text {
+  background: linear-gradient(120deg, #f8fafc, #a78bfa, #38bdf8, #f8fafc); background-size: 320% 320%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: bkmpTierGlow 5s ease infinite;
+}
+
 .mc-cosmetic-leuchtendgold {
   border-color: transparent;
   background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box, linear-gradient(120deg, var(--gold), #fff7cc, var(--gold)) border-box;
@@ -7199,7 +7231,10 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   .mc-cosmetic-leuchtendgold, .mc-cosmetic-leuchtendgold #mcNameBadgeText, .mc-cosmetic-leuchtendgold .cosmetic-swatch-name, .mc-cosmetic-leuchtendgold .leaderboard-name-text,
   .mc-cosmetic-drachenfeuer, .mc-cosmetic-drachenfeuer #mcNameBadgeText, .mc-cosmetic-drachenfeuer .cosmetic-swatch-name, .mc-cosmetic-drachenfeuer .leaderboard-name-text,
   .mc-cosmetic-schatten_dunkel, .mc-cosmetic-schatten_dunkel #mcNameBadgeText, .mc-cosmetic-schatten_dunkel .cosmetic-swatch-name, .mc-cosmetic-schatten_dunkel .leaderboard-name-text,
-  .mc-cosmetic-sternenstaub, .mc-cosmetic-sternenstaub #mcNameBadgeText, .mc-cosmetic-sternenstaub .cosmetic-swatch-name, .mc-cosmetic-sternenstaub .leaderboard-name-text { animation: none; }
+  .mc-cosmetic-sternenstaub, .mc-cosmetic-sternenstaub #mcNameBadgeText, .mc-cosmetic-sternenstaub .cosmetic-swatch-name, .mc-cosmetic-sternenstaub .leaderboard-name-text,
+  .mc-cosmetic-portal_wirbel, .mc-cosmetic-portal_wirbel #mcNameBadgeText, .mc-cosmetic-portal_wirbel .cosmetic-swatch-name, .mc-cosmetic-portal_wirbel .leaderboard-name-text,
+  .mc-cosmetic-ewiger_kreislauf, .mc-cosmetic-ewiger_kreislauf #mcNameBadgeText, .mc-cosmetic-ewiger_kreislauf .cosmetic-swatch-name, .mc-cosmetic-ewiger_kreislauf .leaderboard-name-text,
+  .mc-cosmetic-jenseits_der_sterne, .mc-cosmetic-jenseits_der_sterne #mcNameBadgeText, .mc-cosmetic-jenseits_der_sterne .cosmetic-swatch-name, .mc-cosmetic-jenseits_der_sterne .leaderboard-name-text { animation: none; }
 }
 
 /* ============================================================

@@ -595,6 +595,21 @@ function bkmpDungeonWeightedPick(weights) {
   return entries[entries.length - 1][0];
 }
 
+/* Saisonaler Dungeon-Modifikator (Lategame-Content, Spieler-Vorgabe 16.07.):
+   rotierender woechentlicher Bonus auf EINEN der 7 Dungeon-Typen. Bewusst
+   OHNE eigene DB-Tabelle/Server-Cron - die Berechnung haengt nur von
+   Date.now() ab, jeder Client kommt unabhaengig auf denselben Typ fuer
+   dieselbe Woche (gleiches Prinzip wie z.B. bkmpDungeonWaveMult: rein
+   deterministisch statt gespeichert). "Woche" hier vereinfacht als
+   7-Tage-Block seit Unix-Epoch (nicht kalenderwochen-/zeitzonen-exakt) -
+   fuer einen reinen Komfort-Bonus ohne echten Wettbewerbs-Anspruch reicht
+   das, spart aber die Komplexitaet einer echten ISO-Wochenberechnung. */
+function bkmpDungeonSeasonalFeaturedType() {
+  const weekIndex = Math.floor(Date.now() / (7 * 24 * 3600 * 1000));
+  return BKMP_DUNGEON_TYPES[weekIndex % BKMP_DUNGEON_TYPES.length].id;
+}
+const BKMP_DUNGEON_SEASONAL_BONUS_MULT = 1.5;
+
 /* Basis-Geldformel (unveraendert aus dem alten Dungeon uebernommen, siehe
    Balance-Kommentar weiter unten) - linear pro Welle wachsend, mit
    rewardMult skaliert, +20% bei vollstaendigem Erfolg. Wird fuer alle
@@ -726,6 +741,19 @@ function bkmpDungeonGrantReward(type, difficulty, wavesCleared, success, dailyBo
   const xpBoost = bkmpDungeonBoostMultiplier('exp');
   if (goldBoost > 1 && summary.gold > 0) summary.gold = Math.round(summary.gold * goldBoost);
   if (xpBoost > 1 && summary.xp > 0) summary.xp = Math.round(summary.xp * xpBoost);
+
+  /* Saisonaler Wochen-Bonus - siehe bkmpDungeonSeasonalFeaturedType weiter
+     unten. Nur auf die kontinuierlichen Belohnungen angewendet, gleiche
+     Begruendung wie beim Tagesbonus (stueckige Ei-/Runen-Beute nicht mit
+     reingezogen, um deren bestehende Drop-Logik nicht anzufassen). */
+  if (success && type === bkmpDungeonSeasonalFeaturedType()) {
+    if (summary.gold > 0) summary.gold = Math.round(summary.gold * BKMP_DUNGEON_SEASONAL_BONUS_MULT);
+    if (summary.xp > 0) summary.xp = Math.round(summary.xp * BKMP_DUNGEON_SEASONAL_BONUS_MULT);
+    if (summary.gems > 0) summary.gems = Math.round(summary.gems * BKMP_DUNGEON_SEASONAL_BONUS_MULT);
+    if (summary.meat > 0) summary.meat = Math.round(summary.meat * BKMP_DUNGEON_SEASONAL_BONUS_MULT);
+    if (summary.fruit > 0) summary.fruit = Math.round(summary.fruit * BKMP_DUNGEON_SEASONAL_BONUS_MULT);
+    summary.seasonalBonusApplied = true;
+  }
 
   if (summary.gold > 0) {
     bkmpIdleState.gold = Number(bkmpIdleState.gold || 0) + summary.gold;
@@ -1599,10 +1627,12 @@ function bkmpIdleRenderDungeonPanel() {
     return;
   }
   const busy = bkmpDungeonActive || bkmpDungeonAutoActive();
+  const seasonalType = bkmpDungeonTypeById(bkmpDungeonSeasonalFeaturedType());
   panel.innerHTML = `
     <div class="idle-dungeon-intro">
       <h4>🏛️ Dungeon-System</h4>
       <p>7 spezialisierte Dungeons, jeder mit eigenem Schlüssel-Vorrat (max. ${BKMP_DUNGEON_KEY_MAX}, +1 alle 4 Stunden - läuft auch offline korrekt weiter) und eigenem Tagesbonus (+50% auf die erste erfolgreiche Runde pro Tag). Wähle einen Dungeon und eine Schwierigkeit - jede Schwierigkeit schaltet sich erst nach dem Meistern der vorherigen frei.</p>
+      <p class="idle-dungeon-seasonal-hint">⭐ Diese Woche im Rampenlicht: <b>${seasonalType.icon} ${seasonalType.name}</b> - +${Math.round((BKMP_DUNGEON_SEASONAL_BONUS_MULT - 1) * 100)}% auf Gold/EXP/Fleisch/Frucht/Edelsteine bei Erfolg.</p>
     </div>
     <div class="idle-dungeon-type-grid">
       ${BKMP_DUNGEON_TYPES.map(t => bkmpDungeonRenderCard(t, busy)).join('')}
@@ -1675,6 +1705,7 @@ function bkmpDungeonRenderCard(type, busy) {
           <strong>${type.name}</strong>
           <small>${type.short}</small>
         </div>
+        ${type.id === bkmpDungeonSeasonalFeaturedType() ? `<span class="idle-dungeon-seasonal-badge" title="Diese Woche +${Math.round((BKMP_DUNGEON_SEASONAL_BONUS_MULT - 1) * 100)}% Belohnung">⭐</span>` : ''}
       </div>
       ${type.highlight ? `<div class="idle-dungeon-card-highlight">${type.highlight}</div>` : ''}
       <div class="idle-dungeon-card-keys" id="idle-dungeon-keys-${type.id}">${keyLine}</div>
@@ -10364,13 +10395,28 @@ window.BKMP_IDLE_SKILLPOINTS_TIERS = [
    schlicht "Prestige N", waehrend die zugehoerigen Sammlung-Titel (siehe
    BKMP_IDLE_PRESTIGE_TITLE_NAMES) eine eigene, eskalierende Namensreihe
    bekommen. */
+/* Erweitert 16.07. (Lategame-Content, Spieler-Vorgabe: "Langzeit-fesselnder
+   Content") ueber die bisherige Obergrenze von 10 hinaus - die Stufen-
+   Anforderung fuer den naechsten Prestige-Aufstieg waechst laut
+   bkmpPrestigeRequiredStage() UNBEGRENZT weiter (100 + Stufe*50), belohnte
+   das bisher aber ab Stufe 10 ("Was ist Prestige?" war buchstaeblich als
+   Scherz-Ceiling gedacht) ueberhaupt nicht mehr. 15 neue Stufen mit
+   waechsenden Abstaenden (spiegelt den ebenfalls waechsenden Aufwand pro
+   Aufstieg), Namensreihe endet bewusst offen ("Der Unendliche") statt an
+   einer weiteren harten Zahl. */
 window.BKMP_IDLE_PRESTIGE_TIERS = [
   [1, 'Prestige 1'], [2, 'Prestige 2'], [3, 'Prestige 3'], [4, 'Prestige 4'], [5, 'Prestige 5'],
-  [6, 'Prestige 6'], [7, 'Prestige 7'], [8, 'Prestige 8'], [9, 'Prestige 9'], [10, 'Prestige 10']
+  [6, 'Prestige 6'], [7, 'Prestige 7'], [8, 'Prestige 8'], [9, 'Prestige 9'], [10, 'Prestige 10'],
+  [12, 'Prestige 12'], [14, 'Prestige 14'], [16, 'Prestige 16'], [18, 'Prestige 18'], [20, 'Prestige 20'],
+  [23, 'Prestige 23'], [26, 'Prestige 26'], [30, 'Prestige 30'], [35, 'Prestige 35'], [40, 'Prestige 40'],
+  [45, 'Prestige 45'], [50, 'Prestige 50'], [60, 'Prestige 60'], [75, 'Prestige 75'], [100, 'Prestige 100']
 ];
 window.BKMP_IDLE_PRESTIGE_TITLE_NAMES = [
   'Prestige Jäger', 'Prestige Krieger', 'Prestige Veteran', 'Prestige Meister', 'Prestige Champion',
-  'Prestige Legende', 'Prestige Titan', 'Prestige Halbgott', 'Prestige Gott', 'Was ist Prestige?'
+  'Prestige Legende', 'Prestige Titan', 'Prestige Halbgott', 'Prestige Gott', 'Was ist Prestige?',
+  'Portal-Wächter', 'Portal-Herrscher', 'Zyklus-Wanderer', 'Ewiger Wanderer', 'Dimensionsreisender',
+  'Zeitloser', 'Unsterblicher', 'Kosmischer Wanderer', 'Universums-Architekt', 'Multiversum-Meister',
+  'Jenseits der Sterne', 'Schöpfer neuer Welten', 'Der Ewige Kreislauf', 'Wächter der Unendlichkeit', 'Der Unendliche'
 ];
 
 /* Runen-Erfolge (Kategorie "Runen"). Vier Tier-Reihen fuer Verschmelzen/
@@ -10699,7 +10745,15 @@ window.BKMP_IDLE_COSMETICS = [
   { id: 'drachenschuppen', name: 'Drachenschuppen', desc: 'Schillernde Schuppenfarben für vielfältige Drachenzüchter.', rarity: 'Episch', unlockCustom: ctx => ctx.idleDragonSpeciesOwned >= 5 },
   { id: 'legendaerer_hort', name: 'Legendärer Hort', desc: 'Opulentes Gold-Schwarz für Besitzer legendärer Drachen.', rarity: 'Mythisch', unlockCustom: ctx => ctx.idleLegendaryDragonsOwned >= 1 },
   { id: 'gluetnfeuer', name: 'Glutfeuer', desc: 'Warmes Glühen für treue Dranbleiber.', rarity: 'Episch', unlockCustom: ctx => ctx.idleLoginStreak >= 30 },
-  { id: 'zahnradglanz', name: 'Zahnradglanz', desc: 'Bronze-Kupfer-Schimmer für Steampunk-Liebhaber.', rarity: 'Selten', unlockCustom: ctx => ctx.idleHasSteampunkSkin }
+  { id: 'zahnradglanz', name: 'Zahnradglanz', desc: 'Bronze-Kupfer-Schimmer für Steampunk-Liebhaber.', rarity: 'Selten', unlockCustom: ctx => ctx.idleHasSteampunkSkin },
+  /* Neu 16.07. (Lategame-Content): Prestige-Anzahl gated bisher NICHTS
+     (anders als die Gesamt-Erfolgszahl, die bereits bis 100 Kosmetiken
+     freischaltet, siehe BKMP_COSMETICS in index.html) - obwohl die
+     Stufen-Anforderung pro Aufstieg unbegrenzt weiterwaechst. Dieselbe
+     Eskalations-Logik wie oben, nur an ctx.idlePrestigeLevel gekoppelt. */
+  { id: 'portal_wirbel', name: 'Portal-Wirbel', desc: 'Verzerrtes Violett-Türkis wie ein sich schließendes Portal.', rarity: 'Legendär', unlockCustom: ctx => ctx.idlePrestigeLevel >= 10 },
+  { id: 'ewiger_kreislauf', name: 'Ewiger Kreislauf', desc: 'Ein Verlauf, der nie endet, für die, die nie aufhören.', rarity: 'Mythisch', unlockCustom: ctx => ctx.idlePrestigeLevel >= 20 },
+  { id: 'jenseits_der_sterne', name: 'Jenseits der Sterne', desc: 'Nur für die wenigen, die den Turm der Aufstiege bis hierher bezwungen haben.', rarity: 'Mythisch', unlockCustom: ctx => ctx.idlePrestigeLevel >= 30 }
 ];
 
 /* ---------------- Weltboss/Raid: Erfolge (window.BKMP_RAID_ACHIEVEMENTS_EXTRA) ----------------

@@ -3299,7 +3299,7 @@ async function loadPlayerDragons(name) {
   if (!client || !name) return [];
   const { data, error } = await client
     .from('player_dragons')
-    .select('id, species_id, nickname, stage, food_preference, growth_points, battle_xp, is_companion, is_favorite, main_stat_key, stat_attack, stat_defense, stat_hp, substats, hatched_at, adult_at')
+    .select('id, species_id, nickname, stage, food_preference, growth_points, battle_xp, is_companion, is_favorite, main_stat_key, stat_attack, stat_defense, stat_hp, substats, ascension_level, hatched_at, adult_at')
     .eq('name_key', String(name).trim().toLowerCase());
   if (error) throw error;
   return Array.isArray(data) ? data : [];
@@ -3335,7 +3335,7 @@ async function hatchDragonEgg(nestId, eggId, nameKey, speciesId, foodPreference)
       food_preference: foodPreference,
       stage: 'baby'
     })
-    .select('id, species_id, nickname, stage, food_preference, growth_points, battle_xp, is_companion, is_favorite, main_stat_key, stat_attack, stat_defense, stat_hp, substats, hatched_at, adult_at')
+    .select('id, species_id, nickname, stage, food_preference, growth_points, battle_xp, is_companion, is_favorite, main_stat_key, stat_attack, stat_defense, stat_hp, substats, ascension_level, hatched_at, adult_at')
     .limit(1);
   if (error) throw error;
 
