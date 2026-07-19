@@ -5331,6 +5331,21 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
     border-radius: 0;
     padding: 1.4rem 1rem 1rem;
   }
+  /* Spieler-Meldung 20.07. (Screenshot: schwarze Luecke unter dem Fenster
+     auf dem Handy) - klassisches Mobil-Browser-"100vh"-Problem: 100vh
+     misst je nach Browser/Zeitpunkt die maximale Bildschirmhoehe (Adress-
+     leiste ausgeblendet gedacht), waehrend beim ersten Rendern die
+     Adressleiste oft noch sichtbar ist - das Fenster faellt dadurch kleiner
+     aus als der tatsaechliche Bildschirm, darunter blieb die echte
+     Seite/Hintergrundfarbe sichtbar. dvh (dynamic viewport height) verfolgt
+     die WIRKLICH sichtbare Hoehe live nach, inkl. ein-/ausblendender
+     Adressleiste - eigene Regel NACH der vh-Zeile oben als reines
+     Progressive Enhancement (Browser ohne dvh-Unterstuetzung ignorieren
+     diese Zeile einfach und bleiben beim vh-Wert, kein Fallback-Risiko). */
+  .idle-dorf-overlay .idle-dorf-card {
+    height: 100dvh;
+    max-height: 100dvh;
+  }
   .idle-dorf-banner-img { border-radius: 10px; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3); }
 }
 
@@ -8661,6 +8676,16 @@ html.bkmp-app-mode.zone-game .idle-dorf-overlay .idle-dorf-card {
   transform: none !important;
   animation: none !important;
 }
+/* Spieler-Meldung 20.07. (schwarze Luecke unter dem Fenster auf dem Handy) -
+   gleicher dvh-Fix wie bei der Website-Vollbild-Karte oben (siehe
+   @media(max-width:640px) .idle-dorf-overlay .idle-dorf-card weiter oben in
+   dieser Datei fuer die volle Begruendung) - betrifft auch den echten
+   App-Modus, da mobile Browser-Adressleisten sich auch innerhalb einer
+   installierten PWA je nach Plattform ein-/ausblenden koennen. */
+html.bkmp-app-mode.zone-game .idle-dorf-overlay .idle-dorf-card {
+  height: 100dvh;
+  max-height: 100dvh;
+}
 /* Kein "Schliessen" und kein Streamer-Hilfe-Link im App-Modus - es gibt
    keine Seite dahinter, zu der man zurueckkehren koennte, die App IST der
    Bildschirm. Verlassen passiert ausschliesslich ueber die Android-
@@ -9352,7 +9377,27 @@ html.bkmp-app-mode .idle-dorf-tab-label {
 html.bkmp-app-mode .idle-dorf-tab.active .idle-dorf-tab-icon { transform: scale(1.2); }
 html.bkmp-app-mode .idle-dorf-tab.active { transform: translateY(-3px) scale(1.06); }
 
-/* ---- "Mehr"-Ausklappmenue (die restlichen 9 Tabs) ---- */
+} /* Ende @media (max-width:760px) - Redesign Phase 5 (17.07.): die fixierte Bottom-Navigation aus dem App-Modus ist ein reines Mobil-Muster (position:fixed relativ zum GESAMTEN Viewport) - auf breiten Desktop-Screens wuerde sie ueber die volle Fensterbreite gespannt, obwohl das Idle-Dorf-Fenster selbst nur einen Teil davon einnimmt (siehe Analyse). Ab hier deshalb an einen Breakpoint gekoppelt statt bedingungslos; Desktop bekommt direkt im Anschluss eine eigene, gruppierte Tableiste.
+
+/* ---- "Mehr"-Ausklappmenue (die restlichen 9 Tabs) ----
+   Bug-Fix 20.07. (Spieler-Foto vom echten Handy, installierte App: die
+   ganze Gruppen-Liste - Fortschritt/Kampf & Rang/Gilde/Sammlung - stand
+   permanent sichtbar MITTEN im Kampf-Tab statt als versteckte Bottom-
+   Sheet). Root Cause per direktem Nachstellen bestaetigt: dieser ganze
+   Block stand bisher INNERHALB von @media(max-width:760px) - auf einem
+   Geraet mit CSS-Breite >760px (grosses Display/Skalierung) griff die
+   gesamte Versteck-/Overlay-Logik (position:fixed, transform:translateY
+   (100%), .open-Umschaltung) dadurch gar nicht, der Sheet fiel auf einen
+   ganz normalen Block im Dokumentfluss zurueck - voll sichtbar, immer.
+   Das JS, das die 9 restlichen Tabs hineinsortiert (bkmpIdleSetupMobile-
+   TabOverflow, bkmp-app-mode-bootstrap.js), hat dagegen KEINE Breiten-
+   Pruefung und lief so oder so. Jetzt bewusst UNBEDINGT (kein @media
+   mehr) - echter App-Modus (html.bkmp-app-mode) bedeutet immer ein
+   Telefon/PWA, die urspruengliche Sorge "auf breiten Desktop-Screens
+   wuerde die Leiste ueber die volle Fensterbreite gespannt" betrifft nur
+   den seltenen Entwickler-/QA-Fall "?app=idledorf manuell auf einem
+   breiten Desktop-Browser aufgerufen" - eine kaputte Navigation fuer
+   echte Handy-Spieler wiegt schwerer als diese Kante. */
 html.bkmp-app-mode .idle-app-more-sheet {
   position: fixed;
   inset: 0;
@@ -9418,7 +9463,6 @@ html.bkmp-app-mode #idleAppMoreBtn.active {
   color: #2b1600;
   transform: translateY(-3px) scale(1.06);
 }
-} /* Ende @media (max-width:760px) - Redesign Phase 5 (17.07.): die fixierte Bottom-Navigation aus dem App-Modus ist ein reines Mobil-Muster (position:fixed relativ zum GESAMTEN Viewport) - auf breiten Desktop-Screens wuerde sie ueber die volle Fensterbreite gespannt, obwohl das Idle-Dorf-Fenster selbst nur einen Teil davon einnimmt (siehe Analyse). Ab hier deshalb an einen Breakpoint gekoppelt statt bedingungslos; Desktop bekommt direkt im Anschluss eine eigene, gruppierte Tableiste.
 
 /* ---- Kampfbereich als eine zusammenhaengende Kampf-Szene statt zwei
    getrennter Kaesten (Phase 4) ---- */
