@@ -294,7 +294,22 @@ function bkmpDungeonGrantReward(type, difficulty, wavesCleared, success, dailyBo
     summary[type] = amount;
     summary.gold = bkmpDungeonBaseAmount(Math.round((s.attack || 10) * 0.6), wavesCleared, difficulty.rewardMult, success);
   } else if (type === 'gem') {
-    summary.gems = success ? Math.round(8 * difficulty.rewardMult * dailyMult) : 0;
+    /* Balance-Fix 20.07. (Spieler-Meldung: "auf Alptraum +18 Dias? Das muss
+       dringend hochskaliert werden") - im Gegensatz zu JEDEM anderen
+       kontinuierlichen Belohnungstyp (Gold/EXP/Fleisch/Frucht, alle ueber
+       bkmpDungeonBaseAmount) war die Edelstein-Belohnung ein reiner
+       Festwert (8 * rewardMult), der weder mit wavesCleared noch mit dem
+       Angriffswert des Spielers skalierte - bei Albtraum (rewardMult 2.2)
+       exakt 8*2.2=17.6 -> 18, unabhaengig davon, ob 10 oder 25 Wellen
+       geschafft wurden oder wie weit der Spieler ist. Jetzt dieselbe
+       Wellen-/Angriffs-Skalierung wie die Geschwister-Typen - Koeffizient
+       0.005 (statt z.B. 1.2 bei Gold) ist bewusst klein gewaehlt, abgeleitet
+       aus dem bereits im Spiel etablierten Gold:Kristall-Wertverhaeltnis der
+       Produktionsgebaeude (Kristallmine kostet pro Rate-Einheit ca. 266x so
+       viel Gold wie die Goldmine, siehe BKMP_IDLE_PRODUCTION_BUILDINGS in
+       idledorf.js) - keine willkuerlich frei erfundene Zahl. */
+    let gems = bkmpDungeonBaseAmount(Math.round((s.attack || 10) * 0.005), wavesCleared, difficulty.rewardMult, success);
+    summary.gems = Math.round(gems * dailyMult);
     summary.gold = bkmpDungeonBaseAmount(Math.round((s.attack || 10) * 1.2), wavesCleared, difficulty.rewardMult, success);
   } else if (type === 'egg') {
     summary.gold = bkmpDungeonBaseAmount(Math.round((s.attack || 10) * 1.2), wavesCleared, difficulty.rewardMult, success);

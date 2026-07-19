@@ -5875,6 +5875,21 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   .idle-sprite-attacking { animation: none; }
 }
 
+/* Nutzerwunsch 19.07.: "Kannst du mal schauen ob du die 2 Fenster Stadt +
+   Drachen auf eine Größe haust? Drachen sind ein Stück höher... Pack den
+   einfach rechts neben die HP Leiste" - der Drache brauchte bisher unter
+   dem HP-Label eine dritte, eigene Zeile fuer seinen Namen, die das
+   Dorf-Fenster gar nicht hat (siehe #idleVillage in index.html, hat keine
+   .idle-dragon-name-Entsprechung) - dadurch war die Drachen-Box immer eine
+   Zeile hoeher. Name steht jetzt in derselben Zeile wie die HP-Leiste
+   selbst statt darunter, Dorf-Seite bleibt unveraendert - beide Kaesten
+   sind dadurch gleich hoch. */
+.idle-hp-row { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
+.idle-hp-row .idle-hp-bar { flex: 1; min-width: 0; margin-top: 0; }
+.idle-hp-row .idle-dragon-name {
+  flex: none; max-width: 45%; margin-top: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .idle-hp-bar { height: 10px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 12%, var(--paper)); overflow: hidden; border: 1px solid var(--line); margin-top: 0.5rem; }
 .idle-hp-fill { height: 100%; transition: width 0.25s ease; }
 .idle-hp-fill-village { background: linear-gradient(90deg, #4ade80, #22c55e); }
