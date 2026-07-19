@@ -1,0 +1,37 @@
+-- Bkmp - optionale Erweiterung fuer Section-C-Wunsch "Niederlage-
+-- Statistiken getrennt nach normalen Drachen und Boss-Drachen".
+-- NICHT ausgefuehrt - vorbereitet zur Freigabe, siehe Abschlussbericht.
+--
+-- Bestandsaufnahme: idle_player_state.village_defeats (siehe
+-- sql/supabase-idle-village-skins-zerstoertesdorf.sql) zaehlt bereits JEDE
+-- Niederlage insgesamt, inkrementiert in bkmpIdleHandleDefeat()
+-- (idledorf.js) bei jedem Erreichen von 0 Dorf-HP. Diese Spalte
+-- unterscheidet aber nicht zwischen normalem Drachen und Boss (👑, jede
+-- 25. Stufe, siehe bkmpIdleSelectDragonKindId) - der Gesamtwert ist schon
+-- heute ohne jede Migration anzeigbar.
+--
+-- Diese Migration ergaenzt genau EINE neue Spalte fuer den Boss-Anteil -
+-- "Niederlagen gegen normale Drachen" ergibt sich daraus rechnerisch ohne
+-- weitere Spalte: village_defeats - village_defeats_boss.
+--
+-- Bestehende Spielerwerte: starten bei 0 (keine Rueckwirkung moeglich, da
+-- bisher nie festgehalten wurde, welcher Anteil der vergangenen
+-- village_defeats gegen einen Boss war) - exakt dasselbe Vorgehen wie beim
+-- urspruenglichen Anlegen von village_defeats selbst.
+--
+-- Noetige Code-Aenderungen NACH dieser Migration (noch nicht vorgenommen):
+--   1) idledorf.js/bkmpIdleHandleDefeat(): zusaetzlich
+--      "if (bkmpIdleCurrentDragon.isBoss) bkmpIdleState.village_defeats_boss = Number(bkmpIdleState.village_defeats_boss || 0) + 1;"
+--   2) supabase.js: 'village_defeats_boss' zur SELECT-Spaltenliste (Zeile
+--      ~2836) UND zur Upsert-Feldliste (Zeile ~2982) hinzufuegen - beides
+--      muss GLEICHZEITIG mit dieser Migration passieren, sonst schlaegt
+--      jeder Speichervorgang fehl, sobald der Client ein Feld schreibt,
+--      das die DB noch nicht kennt (umgekehrt genauso: Spalte ohne
+--      Code-Anpassung ist harmlos, bleibt einfach ungenutzt bei 0).
+--   3) Neue UI-Zeile im Erfolge/Statistik-Bereich: "Niederlagen: X
+--      insgesamt (Y gegen normale Drachen, Z gegen Bosse)".
+--
+-- Supabase Dashboard > SQL Editor > New query > diesen Inhalt ausfuehren,
+-- NUR nach Rueckmeldung des Nutzers.
+
+alter table public.idle_player_state add column if not exists village_defeats_boss bigint not null default 0;

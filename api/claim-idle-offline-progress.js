@@ -163,6 +163,22 @@ module.exports = async function handler(req, res) {
 
     const dragonsRes = await sbFetch(serviceKey, `idle_dragons?active=eq.true&select=*&order=tier_order.asc`);
     const dragons = dragonsRes.ok ? await dragonsRes.json() : [];
+    /* Bug-Fix (Spieler-Report 19.07., Blazehunter07: "550 Min. weg, 0
+       Belohnung"): schlug dieser Fetch fehl oder kam leer zurueck (z.B.
+       kurzer Supabase-Ausreisser), lief die Simulation unten trotzdem
+       durch - die erste dragonStatsAt()-Abfrage fand mangels Eintraegen
+       keinen Erzeugertyp, brach die while-Schleife bei kills=0 sofort ab,
+       UND (das eigentlich Schaedliche) der Claim wurde trotzdem als
+       Erfolg abgespeichert, inklusive last_seen_at=jetzt - die komplette
+       Abwesenheits-Zeitspanne war dadurch fuer immer weg, ein erneuter
+       Versuch haette wieder bei 0 angefangen. Jetzt: bei leerem/fehl-
+       geschlagenem Drachen-Fetch gar nichts speichern (last_seen_at bleibt
+       unveraendert) und einen echten Fehler zurueckgeben, damit der Client
+       es spaeter erneut versuchen kann, statt die Zeit stillschweigend zu
+       verbrennen. */
+    if (!dragonsRes.ok || !Array.isArray(dragons) || dragons.length === 0) {
+      return send(res, 502, { error: 'dragons_unavailable' });
+    }
 
     // Zwei-seitige Erwartungswert-Simulation: der Drache schlaegt bei jedem
     // Treffer bis auf den letzten (der ihn toetet) zurueck, genau wie im

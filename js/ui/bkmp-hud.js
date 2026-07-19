@@ -1,0 +1,489 @@
+// Bkmp - Redesign Phase 2b (17.07.): semantisch aus idledorf.js einsortiert (Name-basiert, manuell verifiziert - siehe Chat-Log fuer Grenzfaelle). js/ui/bkmp-hud.js
+
+
+/* ---------------- Kampf-Loop ---------------- */
+
+const BKMP_IDLE_SPRITE_CLASS_PREFIX = 'idle-sprite-';
+
+/* Nutzerwunsch (18.07.): "wir wechseln jetzt nach und nach die PNG Frame
+   Drachen aus" - schrittweiser Umstieg von den bisherigen 4-Frame-PNG-
+   Spritesheets (siehe .idle-sprite-<key> Klassen in style.css) auf echte
+   Videos, wie es fuer Weltboss/Gildenboss (zerathor.mp4/malthyros.mp4)
+   schon laenger funktioniert. Einfach hier eintragen, sobald ein
+   Drache ein Video bekommt - alles andere (Spawn, Dungeon-Wellen,
+   Angriffs-Puls) lesen automatisch aus dieser Liste, kein Sonderfall
+   noetig. Nicht eingetragene Drachen laufen unveraendert ueber die
+   PNG-Klasse weiter. */
+const BKMP_IDLE_VIDEO_DRAGON_SPRITES = {
+  feuerdrache: 'assets/dragons/feuerdrache.mp4?v=20260718-feuerdrachevideo1',
+  erddrache: 'assets/dragons/erddrache.mp4?v=20260718-dragonvideos2',
+  blitzdrache: 'assets/dragons/blitzdrache.mp4?v=20260718-dragonvideos2',
+  winddrache: 'assets/dragons/winddrache.mp4?v=20260718-dragonvideos2',
+  cyberdrache: 'assets/dragons/cyberdrache.mp4?v=20260718-cyberdrache1',
+  'yaksha-boss': 'assets/dragons/yaksha-boss.mp4?v=20260718-yakshavideos1',
+  'yakshas-drache': 'assets/dragons/yakshas-drache.mp4?v=20260718-yakshavideos1',
+  wuffdrache: 'assets/dragons/wuffdrache.mp4?v=20260718-lastdragons1',
+  schattendrache: 'assets/dragons/schattendrache.mp4?v=20260718-lastdragons1',
+  wasserdrache: 'assets/dragons/wasserdrache.mp4?v=20260718-lastdragons1'
+};
+
+/* Gemeinsame Sprite-Zuweisung fuer #idleDragonSprite - vorher an zwei
+   Stellen (bkmpIdleSpawnDragon, bkmpDungeonApplyDragonVisuals) fast
+   identisch dupliziert. Entscheidet pro Drache, ob ein Video
+   (BKMP_IDLE_VIDEO_DRAGON_SPRITES) oder die klassische PNG-Sprite-Klasse
+   zum Einsatz kommt. */
+function bkmpIdleApplyDragonSprite(sprite, spriteKey) {
+  if (!sprite) return;
+  [...sprite.classList].filter(c => c.startsWith(BKMP_IDLE_SPRITE_CLASS_PREFIX)).forEach(c => sprite.classList.remove(c));
+  sprite.classList.remove('idle-sprite-attacking');
+  const videoSrc = BKMP_IDLE_VIDEO_DRAGON_SPRITES[spriteKey];
+  if (videoSrc) {
+    const existingVideo = sprite.querySelector('video');
+    /* Nur neu aufbauen, wenn sich der Drache tatsaechlich geaendert hat -
+       sonst wuerde das Video bei jedem Render (z.B. jedem Tick) neu
+       gestartet/neu geladen werden und nie richtig durchlaufen. */
+    if (!existingVideo || existingVideo.dataset.spriteKey !== spriteKey) {
+      sprite.innerHTML = `<video class="idle-dragon-sprite-video" src="${videoSrc}" data-sprite-key="${spriteKey}" autoplay muted loop playsinline></video>`;
+    }
+  } else {
+    sprite.innerHTML = '';
+    sprite.classList.add(BKMP_IDLE_SPRITE_CLASS_PREFIX + spriteKey);
+  }
+  /* PHASE 5.6 STUFE 1 (19.07., entfernbar): benachrichtigt das neue
+     Kampf-Ebenensystem (js/prototype/bkmp-proto-battlefield.js) ueber den
+     jeweils aktuellen Gegner - reine Anzeige-Entscheidung (Ebenensystem
+     zeigen oder auf diese bestehende Sprite-Zuweisung zurueckfallen),
+     kein Einfluss auf Kampfwerte. Wird von JEDEM Aufrufer dieser Funktion
+     mitgenommen (normaler Kampf UND Dungeon/Turm ueber
+     bkmpDungeonApplyDragonVisuals), kein Sonderfall noetig. No-op, wenn
+     das Ebenensystem entfernt/deaktiviert ist. */
+  if (typeof bkmpProtoSyncForCurrentDragon === 'function') bkmpProtoSyncForCurrentDragon(spriteKey);
+}
+
+function bkmpIdleSpawnDragon() {
+  /* Bug-Fix 18.07. (Spieler-Meldung: Liber erscheint bei einem Spieler
+     immer wieder auf derselben festen Stufe): bkmpIdleSelectDragonKindId()
+     wuerfelt den Event-Drachen-Spawn ueber einen DETERMINISTISCHEN Seed
+     (siehe bkmpIdleSeededRoll01) - Absicht war NUR, dass ein Neuladen der
+     Seite auf der AKTUELLEN Stufe nicht immer wieder neu wuerfelt (siehe
+     Kommentar dort). Der bisherige Seed ("name|killIndex|dragonId") war
+     aber unveraendert bei JEDEM erneuten Erreichen derselben Stufe -
+     insbesondere nach jedem Prestige-Aufstieg, der die Stufe wieder auf
+     niedrige Werte zuruecksetzt und der Spieler dieselben killIndex-Werte
+     danach zwangslaeufig erneut durchlaeuft. Traf der Wurf einmal auf einer
+     Stufe, traf er dort fuer diesen Spieler ab dann IMMER - genau das vom
+     Spieler beschriebene "fest auf Stufe 45-6" (gilt identisch fuer
+     Shenloss, derselbe Codepfad). Die Prestige-Stufe zusaetzlich in den
+     Seed aufzunehmen aendert den Wurf bei jedem neuen Prestige-Durchlauf,
+     bleibt aber INNERHALB eines Durchlaufs bei Reload/Stufenwechsel-und-
+     zurueck weiterhin stabil (kein Reroll-Exploit) - echte Zufaelligkeit
+     ueber die Spieler-Laufzeit hinweg, keine Wiederholbarkeit pro Reload. */
+  const prestigeLevelForSeed = bkmpPrestigeState ? Number(bkmpPrestigeState.prestige_level || 0) : 0;
+  bkmpIdleCurrentDragon = bkmpIdleDragonStatsAt(
+    bkmpIdleState.current_dragon_index,
+    bkmpIdleDragonDefs,
+    bkmpIdleGetMergedDragonScalingCfg(),
+    `${bkmpIdleState.name_key}|p${prestigeLevelForSeed}`,
+    bkmpIdleEventDragonExcludedIds(),
+    bkmpIdleEffectiveStats
+  );
+  if (!bkmpIdleCurrentDragon) return;
+  bkmpIdleCurrentDragon.hp = bkmpIdleCurrentDragon.maxHp;
+  const nameEl = document.getElementById('idleDragonName');
+  if (nameEl) nameEl.textContent = `${bkmpIdleCurrentDragon.isBoss ? '👑 BOSS: ' : ''}${bkmpIdleCurrentDragon.isEventDragon ? '✨ ' : ''}${bkmpIdleCurrentDragon.name} (Stufe ${bkmpIdleFormatStage(bkmpIdleCurrentDragon.killIndex)})`;
+  bkmpIdleApplyDragonSprite(document.getElementById('idleDragonSprite'), bkmpIdleCurrentDragon.spriteKey);
+  const dragonEl = document.getElementById('idleDragon');
+  if (dragonEl) {
+    dragonEl.classList.toggle('idle-dragon-boss', bkmpIdleCurrentDragon.bossTier === 'boss');
+    dragonEl.classList.toggle('idle-dragon-miniboss', bkmpIdleCurrentDragon.bossTier === 'miniboss');
+    dragonEl.classList.toggle('idle-dragon-event', Boolean(bkmpIdleCurrentDragon.isEventDragon));
+  }
+  bkmpIdleUpdateDragonHpBar();
+  bkmpIdleRenderStageBar();
+  bkmpIdleMaybeShowEventDragonPopup();
+  bkmpIdleBroadcastCombatState();
+}
+
+/* Gegenschlag des Drachen - eigene Funktion, damit Tick UND Klick
+   (bkmpIdleHandleDragonClick) exakt dieselbe Logik nutzen. Vorher hatte
+   NUR der Tick einen Gegenschlag; ein Klick, der den Drachen nicht sofort
+   toetete, machte Schaden OHNE dass der Drache je zurueckschlug. Sobald
+   ausschliesslich geklickt wurde (z.B. weil der Auto-Tick gerade tot war,
+   siehe der Raid-Bug oben, oder einfach weil man schnell durchklickt statt
+   zu warten), bekam das Dorf dadurch NIE Schaden - komplettes Nullrisiko.
+   Aufgerufen wird sie nur, wenn der Drache den Treffer ueberlebt hat - beim
+   toedlichen letzten Treffer bleibt der Gegenschlag weiterhin bewusst aus
+   (kein Rachehieb von einem toten Drachen), egal ob per Tick oder Klick.
+
+   Abklingzeit (bkmpIdleLastCounterAttackAt): Tick UND Klicks laufen
+   gleichzeitig und unabhaengig voneinander - ohne diese Bremse loeste
+   JEDER einzelne Klick zusaetzlich zum laufenden 900ms-Tick einen eigenen
+   Gegenschlag aus, wodurch schnelles Klicken das Dorf um ein Vielfaches
+   schneller draufgehen liess als vor der obigen Aenderung (genau das
+   Gegenteil des beabsichtigten Effekts). Der Drache greift dadurch
+   hoechstens einmal pro Tick-Intervall zurueck, egal ob dieser Treffer vom
+   Tick oder von einem Klick kam - schliesst weiterhin das Nullrisiko-Klicken
+   von oben, ohne Vielfach-Gegenschlaege bei normalem/schnellem Klicken. */
+function bkmpIdleDragonCounterAttack(stats, showVisuals) {
+  const now = Date.now();
+  const cooldownMs = stats.tickIntervalMs || 900;
+  if (now - bkmpIdleLastCounterAttackAt < cooldownMs) return;
+  bkmpIdleLastCounterAttackAt = now;
+  if (showVisuals === undefined) showVisuals = (typeof bkmpIdleCombatVisualsActive === 'function') ? bkmpIdleCombatVisualsActive() : true;
+
+  /* Eis (magie_eis): Chance, den Gegenangriff komplett auszusetzen. */
+  const frozen = stats.iceChancePct > 0 && Math.random() * 100 < stats.iceChancePct;
+  if (frozen) {
+    if (showVisuals) bkmpIdleSpawnIceBlock();
+  } else {
+    const dRoll = bkmpIdleDamageRoll(bkmpIdleCurrentDragon.attack, 5, 150, stats.defense);
+    /* Magieresistenz (magie_resistenz): mindert erlittenen Schaden zusaetzlich. */
+    const finalDmg = Math.round(dRoll.amount * (1 - (stats.magicResistPct || 0) / 100));
+    bkmpIdleVillageHp = Math.max(0, bkmpIdleVillageHp - finalDmg);
+    if (showVisuals) {
+      bkmpIdleSpawnProjectile('fire', finalDmg, dRoll.isCrit);
+      bkmpIdlePlaySpriteAttack();
+      bkmpIdleSpawnHitFlash('idleVillage');
+      bkmpIdleUpdateVillageHpBar();
+    }
+  }
+
+  if (bkmpIdleVillageHp <= 0) {
+    bkmpIdleHandleDefeat();
+  }
+}
+
+function bkmpIdleSpawnBurnTick(amount) {
+  const target = document.getElementById('idleDragon');
+  if (!target) return;
+  const dmg = document.createElement('span');
+  dmg.className = 'idle-dmg-float idle-dmg-burn';
+  dmg.textContent = '🔥-' + Math.round(amount);
+  target.appendChild(dmg);
+  window.setTimeout(() => dmg.remove(), 800);
+}
+
+function bkmpIdleSpawnLightningBolt(amount) {
+  const field = document.getElementById('idleBattlefield');
+  if (field) {
+    const el = document.createElement('span');
+    el.className = 'idle-lightning-bolt';
+    field.appendChild(el);
+    window.setTimeout(() => el.remove(), 350);
+  }
+  const target = document.getElementById('idleDragon');
+  if (target) {
+    const dmg = document.createElement('span');
+    dmg.className = 'idle-dmg-float idle-dmg-lightning';
+    dmg.textContent = '⚡-' + Math.round(amount);
+    target.appendChild(dmg);
+    window.setTimeout(() => dmg.remove(), 800);
+  }
+}
+
+function bkmpIdleSpawnIceBlock() {
+  const target = document.getElementById('idleVillage');
+  if (!target) return;
+  const el = document.createElement('span');
+  el.className = 'idle-ice-block';
+  el.textContent = '❄️ Eingefroren!';
+  target.appendChild(el);
+  window.setTimeout(() => el.remove(), 800);
+}
+
+function bkmpIdleUpdateDragonHpBar() {
+  const fill = document.getElementById('idleDragonHpFill');
+  const label = document.getElementById('idleDragonHpLabel');
+  if (!fill || !bkmpIdleCurrentDragon) return;
+  const pct = Math.max(0, Math.min(100, (bkmpIdleCurrentDragon.hp / bkmpIdleCurrentDragon.maxHp) * 100));
+  fill.style.width = pct + '%';
+  if (label) label.textContent = `${Math.max(0, Math.round(bkmpIdleCurrentDragon.hp))} / ${bkmpIdleCurrentDragon.maxHp}`;
+  /* PROTOTYP (18.07., entfernbar): spiegelt denselben bereits oben
+     berechneten pct/Label-Wert zusaetzlich auf die neuen, nur bei
+     aktivem Prototyp existierenden Elemente - kein neuer Wert, keine
+     neue Berechnung, reiner No-op wenn der Prototyp inaktiv ist. */
+  const protoFill = document.getElementById('idleDragonHpFillProto');
+  const protoTrail = document.getElementById('idleDragonHpTrailProto');
+  const protoLabel = document.getElementById('idleDragonHpLabelProto');
+  if (protoFill) {
+    if (bkmpProtoLastDragonPct !== null && pct < bkmpProtoLastDragonPct && typeof bkmpProtoFlashHit === 'function') bkmpProtoFlashHit('bkmpProtoDragonHpCard');
+    bkmpProtoLastDragonPct = pct;
+    protoFill.style.transform = `scaleX(${pct / 100})`;
+    if (protoTrail) protoTrail.style.transform = `scaleX(${pct / 100})`;
+    if (protoLabel) protoLabel.textContent = `${Math.max(0, Math.round(bkmpIdleCurrentDragon.hp))} / ${bkmpIdleCurrentDragon.maxHp}`;
+  }
+}
+
+function bkmpIdleUpdateVillageHpBar() {
+  const fill = document.getElementById('idleVillageHpFill');
+  const label = document.getElementById('idleVillageHpLabel');
+  if (!fill || !bkmpIdleEffectiveStats) return;
+  const maxHp = bkmpIdleEffectiveStats.hp;
+  const pct = Math.max(0, Math.min(100, (bkmpIdleVillageHp / maxHp) * 100));
+  fill.style.width = pct + '%';
+  if (label) label.textContent = `${Math.round(bkmpIdleVillageHp)} / ${Math.round(maxHp)}`;
+  /* PROTOTYP (18.07., entfernbar): siehe Kommentar in
+     bkmpIdleUpdateDragonHpBar() oben - gleiches Prinzip. */
+  const protoFill = document.getElementById('idleVillageHpFillProto');
+  const protoTrail = document.getElementById('idleVillageHpTrailProto');
+  const protoLabel = document.getElementById('idleVillageHpLabelProto');
+  if (protoFill) {
+    if (bkmpProtoLastVillagePct !== null && pct < bkmpProtoLastVillagePct && typeof bkmpProtoFlashHit === 'function') bkmpProtoFlashHit('bkmpProtoCityHpCard');
+    bkmpProtoLastVillagePct = pct;
+    protoFill.style.transform = `scaleX(${pct / 100})`;
+    if (protoTrail) protoTrail.style.transform = `scaleX(${pct / 100})`;
+    if (protoLabel) protoLabel.textContent = `${Math.round(bkmpIdleVillageHp)} / ${Math.round(maxHp)}`;
+  }
+}
+
+function bkmpIdleSpawnProjectile(kind, amount, isCrit) {
+  const field = document.getElementById('idleBattlefield');
+  if (!field) return;
+  const el = document.createElement('span');
+  el.className = kind === 'arrow' ? 'idle-arrow' : 'idle-fire-breath';
+  field.appendChild(el);
+  window.setTimeout(() => el.remove(), 500);
+
+  const targetId = kind === 'arrow' ? 'idleDragon' : 'idleVillage';
+  const target = document.getElementById(targetId);
+  if (target) {
+    const dmg = document.createElement('span');
+    dmg.className = 'idle-dmg-float' + (isCrit ? ' idle-dmg-crit' : '');
+    dmg.textContent = '-' + Math.round(amount) + (isCrit ? '!' : '');
+    target.appendChild(dmg);
+    window.setTimeout(() => dmg.remove(), 800);
+  }
+  /* PHASE 5.6 STUFE 1 (19.07., entfernbar): separater Treffer-/Krit-Effekt
+     im neuen Kampf-Ebenensystem - liest nur das hier bereits vorhandene
+     isCrit (vom bestehenden Schadenswurf), wuerfelt nichts neu. Nur fuer
+     'arrow' (Spieler trifft Drache) - der Dorf-Treffer ('fire') hat schon
+     seinen eigenen bestehenden Feueratem-Effekt. No-op, wenn das
+     Ebenensystem entfernt/deaktiviert/nicht aktiv ist. */
+  if (kind === 'arrow' && typeof bkmpProtoSpawnHitFx === 'function') bkmpProtoSpawnHitFx(isCrit);
+}
+
+/* Spielt den Angriffs-Frame-Zyklus des Drachensprites ab (Elementaratem).
+   Nutzt animationend statt eines festen Timeouts, damit ein neuer Angriff
+   die laufende Animation sauber neu startet, auch bei sehr kurzen Ticks. */
+function bkmpIdlePlaySpriteAttack() {
+  const sprite = document.getElementById('idleDragonSprite');
+  if (!sprite) return;
+  sprite.classList.remove('idle-sprite-attacking');
+  void sprite.offsetWidth;
+  sprite.classList.add('idle-sprite-attacking');
+}
+
+function bkmpIdleSpawnHitFlash(targetId) {
+  const el = document.getElementById(targetId);
+  if (!el) return;
+  el.classList.remove('idle-hit-flash');
+  void el.offsetWidth;
+  el.classList.add('idle-hit-flash');
+}
+
+function bkmpIdleRenderHud() {
+  const hud = document.getElementById('idleDorfHud');
+  if (!hud || !bkmpIdleState) return;
+  const xpCfg = bkmpIdleConfig.xp_curve || BKMP_IDLE_FALLBACK_CONFIG.xp_curve;
+  const xpNeeded = bkmpIdleXpForLevel(bkmpIdleState.level, xpCfg);
+  const xpPct = Math.max(0, Math.min(100, (bkmpIdleState.xp / xpNeeded) * 100));
+  const s = bkmpIdleEffectiveStats;
+  const streakCount = bkmpIdleGetStreakData().count;
+
+  /* Kompakte Portrait-HUD-Vorlage (Spieler-Name+Portrait-Kachel oben,
+     Ressourcen als eigene Chip-Zeile) - urspruenglich nur /app
+     (window.BKMP_APP_MODE), Redesign Phase 5 (17.07.): jetzt auf JEDEM
+     schmalen Viewport aktiv (nicht mehr /app-exklusiv), analog zur
+     Bottom-Navigation/Tab-Ueberlauf-Logik (bkmp-app-mode-bootstrap.js) -
+     dieselbe Kachel-Zeile war schon vorher fuer schmale Bildschirme
+     gebaut, nur faelschlich hinter dem /app-Flag versteckt. Auf breiten
+     Viewports unveraendert die bestehende Vorlage weiter unten (dort
+     passt die volle Statuszeile besser). Wird bei jedem Tick neu
+     ausgewertet (kein "einmal beim Laden" Caching noetig wie bei der
+     Tableiste), reagiert dadurch live auf Fenstergroessenaenderungen. */
+  if (window.BKMP_APP_MODE || window.matchMedia('(max-width: 760px)').matches) {
+    const playerName = (typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : '') || bkmpIdleState.name_key || 'Spieler';
+    hud.innerHTML = `
+      <div class="idle-hud-app-top">
+        <div class="idle-hud-app-portrait">
+          <span class="idle-hud-app-portrait-icon">🐉</span>
+          <span class="idle-hud-app-portrait-level">${bkmpIdleState.level}</span>
+        </div>
+        <div class="idle-hud-app-identity">
+          <div class="idle-hud-app-name">${escapeHtml(playerName)}</div>
+          <div class="idle-hud-app-sub">
+            ${streakCount > 0 ? `🔥 ${streakCount} Tage Serie` : ''}
+            ${bkmpIdleState.skill_points_available > 0 ? ` · 🔹 ${bkmpIdleState.skill_points_available} Skillpunkte` : ''}
+          </div>
+        </div>
+      </div>
+      <div class="idle-hud-app-resources">
+        <span class="idle-res-chip idle-res-gold" data-app-tab="idleTabBtnUpgrades"><i class="idle-res-icon">💰</i><b class="idle-res-val">${bkmpIdleFormatNumber(bkmpIdleState.gold)}</b></span>
+        <span class="idle-res-chip idle-res-wood" data-app-tab="idleTabBtnUpgrades"><i class="idle-res-icon">🌳</i><b class="idle-res-val">${bkmpIdleFormatNumber(bkmpIdleState.wood)}</b></span>
+        <span class="idle-res-chip idle-res-stone" data-app-tab="idleTabBtnUpgrades"><i class="idle-res-icon">🗿</i><b class="idle-res-val">${bkmpIdleFormatNumber(bkmpIdleState.stone)}</b></span>
+        <span class="idle-res-chip idle-res-crystal" data-app-tab="idleTabBtnUpgrades"><i class="idle-res-icon">💎</i><b class="idle-res-val">${bkmpIdleFormatNumber(bkmpIdleState.crystals)}</b></span>
+        <span class="idle-res-chip idle-res-essence" data-app-tab="idleTabBtnRunen"><i class="idle-res-icon">🧪</i><b class="idle-res-val">${bkmpIdleFormatNumber(bkmpIdleState.essence)}</b></span>
+      </div>
+      ${s ? `
+      <div class="idle-hud-app-stats">
+        <span class="idle-res-chip idle-res-hp" title="Maximale Leben"><i class="idle-res-icon">❤️</i><b class="idle-res-val">${bkmpIdleFormatNumber(Math.round(s.hp))}</b></span>
+        <span class="idle-res-chip idle-res-atk" title="Angriff"><i class="idle-res-icon">⚔️</i><b class="idle-res-val">${bkmpIdleFormatNumber(Math.round(s.attack))}</b></span>
+        <span class="idle-res-chip idle-res-def" title="Verteidigung"><i class="idle-res-icon">🛡️</i><b class="idle-res-val">${bkmpIdleFormatNumber(Math.round(s.defense))}</b></span>
+        <span class="idle-res-chip idle-res-lvl" title="Level"><i class="idle-res-icon">⭐</i><b class="idle-res-val">${bkmpIdleState.level}</b></span>
+      </div>` : ''}
+      <div class="idle-hud-app-xp">
+        <div class="idle-xp-bar"><div class="idle-xp-fill" style="width:${xpPct}%"></div></div>
+        <div class="idle-xp-label">${Math.floor(bkmpIdleState.xp)} / ${xpNeeded} XP</div>
+      </div>
+    `;
+    /* PROTOTYP 2 (18.07., entfernbar): spiegelt dieselben, oben schon
+       berechneten Werte zusaetzlich in die kompakte HUD-Leiste - kein
+       neuer Wert, reiner No-op wenn der Prototyp inaktiv ist. */
+    if (typeof bkmpProtoChudRenderHud === 'function') bkmpProtoChudRenderHud();
+    return;
+  }
+
+  hud.innerHTML = `
+    <div class="idle-hud-top">
+      <div class="idle-hud-level-badge"><span class="idle-hud-level-num">${bkmpIdleState.level}</span><span class="idle-hud-level-tag">Level</span></div>
+      ${streakCount > 0 ? `<div class="idle-hud-streak-badge" title="Tage in Folge eingeloggt">🔥 ${streakCount}</div>` : ''}
+      <div class="idle-hud-xp-wrap">
+        <div class="idle-hud-skillpoints">🔹 ${bkmpIdleState.skill_points_available} Skillpunkte</div>
+        <div class="idle-xp-bar"><div class="idle-xp-fill" style="width:${xpPct}%"></div></div>
+        <div class="idle-xp-label">${Math.floor(bkmpIdleState.xp)} / ${xpNeeded} XP</div>
+      </div>
+    </div>
+    ${s ? `
+    <div class="idle-hud-stats">
+      <span title="Angriff">⚔️ ${bkmpIdleFormatNumber(Math.round(s.attack))}</span>
+      <span title="Verteidigung">🛡️ ${bkmpIdleFormatNumber(Math.round(s.defense))}</span>
+      <span title="Maximale Leben">❤️ ${bkmpIdleFormatNumber(Math.round(s.hp))}</span>
+      <span title="Kritische-Treffer-Chance">🎯 ${s.critChance.toFixed(1)}%</span>
+      <span title="Kritischer Schaden">💥 ${Math.round(s.critDamage)}%</span>
+      <span title="Angriffstempo (Angriffe pro Sekunde)">⚡ ${(1000 / (s.tickIntervalMs || 900)).toFixed(2)}/s</span>
+      <span title="Glücksfaktor (Bonus auf Runen-/Ressourcen-Drops, aus Upgrades/Skills/Titeln/Runen zusammen)">🍀 +${(s.lootBonus || 0).toFixed(1)}%</span>
+    </div>` : ''}
+    <div class="idle-hud-resources">
+      <span>💰 ${bkmpIdleFormatNumber(bkmpIdleState.gold)}</span>
+      <span>🌳 ${bkmpIdleFormatNumber(bkmpIdleState.wood)}</span>
+      <span>🗿 ${bkmpIdleFormatNumber(bkmpIdleState.stone)}</span>
+      <span>💎 ${bkmpIdleFormatNumber(bkmpIdleState.crystals)}</span>
+      <span>🧪 ${bkmpIdleFormatNumber(bkmpIdleState.essence)}</span>
+      <span>🐉 ${bkmpIdleFormatNumber(bkmpIdleState.dragon_kills)} besiegt</span>
+    </div>`;
+  /* PROTOTYP 2 (18.07., entfernbar): siehe Kommentar im App-Modus-Zweig
+     oben - gleiches Prinzip fuer die Desktop-Vorlage. */
+  if (typeof bkmpProtoChudRenderHud === 'function') bkmpProtoChudRenderHud();
+}
+
+/* ---------------- Live-Kampf-Broadcast fuers OBS-Mini-Overlay ----------------
+   Umbau 17.07. (Nutzerwunsch: "das Große entfernen, das Kleine soll nur
+   noch visuell sein - Klicken/Interagieren nur noch Hauptseite... auf der
+   Hauptseite kämpft/klickert sie gegen einen Winddrache und das soll man im
+   OBS-Stream sehen"): loest das alte Herzschlag+Poll+Lock-System komplett
+   ab (zwei Seiten konnten dort unabhaengig voneinander kaempfen, siehe
+   Git-Historie). Jetzt gibt es nur noch EINE aktive Spiel-Instanz - die
+   Hauptseite - die ihren aktuellen Kampf-Zustand ueber einen reinen
+   Realtime-BROADCAST-Kanal sendet (keine Tabelle, keine Persistenz noetig,
+   Drachen-HP war noch nie gespeichert und muss es dafuer auch nicht werden -
+   ein Broadcast ist fluechtig und kostet quasi nichts). Das Mini-Overlay
+   (idle-stream-mini.html) hat KEINE eigene Spiellogik mehr, sondern
+   abonniert nur und zeichnet rein visuell nach. */
+function bkmpIdleBroadcastCombatState() {
+  if (window.BKMP_IDLE_IS_STREAM_PAGE || !bkmpIdleState || !bkmpIdleCurrentDragon || !bkmpIdleEffectiveStats) return;
+  if (typeof bkmpBroadcastCombatState !== 'function') return;
+  bkmpBroadcastCombatState(bkmpIdleState.name_key, {
+    dragonSpriteKey: bkmpIdleCurrentDragon.spriteKey,
+    dragonName: bkmpIdleCurrentDragon.name,
+    dragonHp: bkmpIdleCurrentDragon.hp,
+    dragonMaxHp: bkmpIdleCurrentDragon.maxHp,
+    isBoss: bkmpIdleCurrentDragon.bossTier === 'boss',
+    isMiniboss: bkmpIdleCurrentDragon.bossTier === 'miniboss',
+    isEventDragon: Boolean(bkmpIdleCurrentDragon.isEventDragon),
+    villageHp: bkmpIdleVillageHp,
+    villageMaxHp: bkmpIdleEffectiveStats.hp,
+    villageSkinId: typeof bkmpGetActiveVillageSkinId === 'function' ? bkmpGetActiveVillageSkinId() : null,
+    level: bkmpIdleState.level
+  });
+}
+
+/* Spieler-Feedback (viceBlade, 13.7.): "die minus Lebenspunkte [sollen]
+   angezeigt werden wo man auch hin klickt anstatt auf einer bestimmten
+   Stelle" - clientX/clientY (falls vorhanden, siehe bkmpIdleHandleDragonClick)
+   ueberschreiben per Inline-Style die feste CSS-Position (left:65%/top:-6px
+   aus .idle-dmg-click) mit der tatsaechlichen Klick-Position relativ zum
+   Drachen-Kasten. Ohne Koordinaten (z.B. Leertaste als Klick-Ersatz) faellt
+   die Zahl auf die alte, feste Position zurueck. */
+function bkmpIdleSpawnClickDamage(amount, clientX, clientY) {
+  const target = document.getElementById('idleDragon');
+  if (!target) return;
+  const dmg = document.createElement('span');
+  dmg.className = 'idle-dmg-float idle-dmg-click';
+  dmg.textContent = '-' + Math.round(amount);
+  if (typeof clientX === 'number' && typeof clientY === 'number') {
+    /* Nur left/top ueberschreiben, NICHT transform - die bestehende
+       idleDmgFloat-Animation (@keyframes) steuert transform selbst
+       (translate(-50%, 0) -> translate(-50%, -34px)) fuer den Hochschweb-
+       Effekt. translate(-50%, ...) zentriert die Zahl dabei automatisch
+       horizontal genau auf dem hier gesetzten left-Wert - deckt sich exakt
+       mit dem Klickpunkt, kein zusaetzlicher Transform noetig/sinnvoll
+       (wuerde vom Animations-Keyframe ohnehin sofort ueberschrieben). */
+    const rect = target.getBoundingClientRect();
+    dmg.style.left = Math.round(clientX - rect.left) + 'px';
+    dmg.style.top = Math.round(clientY - rect.top) + 'px';
+  }
+  target.appendChild(dmg);
+  window.setTimeout(() => dmg.remove(), 800);
+}
+
+function bkmpIdleHandleDragonClick(e) {
+  if (!bkmpIdleModalOpen || !bkmpIdleState || !bkmpIdleCurrentDragon || !bkmpIdleEffectiveStats) return;
+  /* Kein Klickschaden, solange das Vorbereitungs-Popup eines Event-
+     Drachen noch nicht bestaetigt wurde. */
+  if (bkmpIdleEventPauseActive) return;
+
+  const now = Date.now();
+  if (now < bkmpIdleClickLockedUntil) return;
+
+  bkmpIdleClickBurst = bkmpIdleClickBurst.filter(t => now - t <= BKMP_BURST_WINDOW_MS);
+  bkmpIdleClickBurst.push(now);
+  if (bkmpIdleClickBurst.length >= BKMP_BURST_CLICK_THRESHOLD) {
+    bkmpIdleClickLockedUntil = now + BKMP_AUTOCLICK_LOCK_MS;
+    bkmpIdleClickBurst = [];
+    bkmpIdleClickTimestamps = [];
+    bkmpAutoclickSaveNumber(BKMP_IDLE_CLICK_LOCK_KEY, bkmpIdleClickLockedUntil);
+    bkmpAutoclickSaveTimestamps(BKMP_IDLE_CLICK_HISTORY_KEY, bkmpIdleClickTimestamps);
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(BKMP_AUTOCLICK_TOAST, 3200);
+    return;
+  }
+
+  if (now - bkmpIdleLastClickAt < BKMP_CLICK_RATE_CAP_MS) return;
+  bkmpIdleLastClickAt = now;
+  bkmpIdleClickTimestamps.push(now);
+  bkmpIdleClickTimestamps = bkmpIdleClickTimestamps.filter(t => now - t <= BKMP_AUTOCLICK_HISTORY_MS).slice(-BKMP_AUTOCLICK_WINDOW);
+  bkmpAutoclickSaveTimestamps(BKMP_IDLE_CLICK_HISTORY_KEY, bkmpIdleClickTimestamps);
+  if (bkmpIdleDetectAutoclickPattern(bkmpIdleClickTimestamps)) {
+    bkmpIdleClickLockedUntil = now + BKMP_AUTOCLICK_LOCK_MS;
+    bkmpIdleClickTimestamps = [];
+    bkmpAutoclickSaveNumber(BKMP_IDLE_CLICK_LOCK_KEY, bkmpIdleClickLockedUntil);
+    bkmpAutoclickSaveTimestamps(BKMP_IDLE_CLICK_HISTORY_KEY, bkmpIdleClickTimestamps);
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(BKMP_AUTOCLICK_TOAST, 3200);
+    return;
+  }
+
+  const clickDamage = Math.max(1, Math.round(bkmpIdleEffectiveStats.attack * (0.12 + (bkmpIdleEffectiveStats.clickDamagePct || 0) / 100)));
+  bkmpIdleCurrentDragon.hp = Math.max(0, bkmpIdleCurrentDragon.hp - clickDamage);
+  bkmpIdleSpawnClickDamage(clickDamage, e && typeof e.clientX === 'number' ? e.clientX : undefined, e && typeof e.clientY === 'number' ? e.clientY : undefined);
+  bkmpIdleSpawnHitFlash('idleDragon');
+  bkmpIdleUpdateDragonHpBar();
+
+  if (bkmpIdleCurrentDragon.hp <= 0) {
+    bkmpIdleHandleDragonDefeated();
+  } else {
+    /* Ueberlebt der Drache den Klick, schlaegt er jetzt genau wie beim Tick
+       zurueck - siehe bkmpIdleDragonCounterAttack. Nur der wirklich
+       toedliche Treffer (oben) bleibt weiterhin gegenschlagfrei. */
+    bkmpIdleDragonCounterAttack(bkmpIdleEffectiveStats);
+    bkmpIdleBroadcastCombatState();
+  }
+}

@@ -56,8 +56,15 @@ alter table public.player_stats add column if not exists bonk_count integer not 
 alter table public.player_stats drop constraint if exists player_stats_minutes_check;
 alter table public.player_stats add constraint player_stats_minutes_check check (minutes_spent >= 0 and minutes_spent <= 200000);
 
+-- BUG-FIX 18.07. (siehe sql/20260718-fix-achievements-leaderboard-cap.sql
+-- fuer den vollen Root-Cause): "<= 250" war eine veraltete Annahme einer
+-- festen Erfolge-Obergrenze - BKMP_ACHIEVEMENTS waechst dynamisch mit
+-- jedem neuen Inhalt (aktuell bereits 435) und hat keine feste Anzahl.
+-- Jeder Spieler mit mehr als 250 echten Erfolgen blieb dadurch auf der
+-- oeffentlichen Bestenliste faelschlich bei genau 250 haengen (bestaetigt:
+-- ByAlex0, RandomAuto), weil Postgres jeden weiteren Schreibversuch ablehnte.
 alter table public.player_stats drop constraint if exists player_stats_achievements_check;
-alter table public.player_stats add constraint player_stats_achievements_check check (achievements_unlocked >= 0 and achievements_unlocked <= 250);
+alter table public.player_stats add constraint player_stats_achievements_check check (achievements_unlocked >= 0);
 
 create index if not exists player_stats_minutes_idx on public.player_stats (minutes_spent desc);
 create index if not exists player_stats_achievements_idx on public.player_stats (achievements_unlocked desc);

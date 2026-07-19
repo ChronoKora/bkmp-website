@@ -1,0 +1,19 @@
+# Bkmp - Redesign Phase 1 (17.07.): Die Website hat keinen Build-Schritt und
+# braucht kein npm/node_modules zum Deployen. scripts/optimize-images.ps1
+# installiert "sharp" gelegentlich lokal fuer eine einmalige Bildkonvertierung
+# - das darf nie versehentlich mit committet werden.
+node_modules/
+package-lock.json
+npm-debug.log*
+
+# Editor-/OS-Muell
+.DS_Store
+Thumbs.db
+
+# Bkmp - Phase 6.0 (19.07.): Scratch-/Testausgaben der ffmpeg-Asset-Pipeline
+# (Phase 5.6, siehe js/prototype/bkmp-proto-battlefield.js) - Cropped-Frames,
+# Chroma-Key-Vorschauen, verworfene WebM-Testversionen. Landen bewusst in
+# .tmp*/-Ordnern statt in assets/prototype-battle/, damit sie nie versehentlich
+# mit einem breiten "git add" mitgenommen werden.
+.tmp*/
+*.bak

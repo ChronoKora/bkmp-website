@@ -65,37 +65,54 @@
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
+/* Redesign Phase 3 (17.07.): diese Tokens waren bisher die einzige Quelle
+   der Wahrheit (rohe Hex-/rgba-Werte direkt hier). Jetzt zeigen sie auf
+   design-tokens.css (siehe dort) - das eigentliche "Umschalten" (Dunkel/
+   Hell, spaeter .zone-site/.zone-game) passiert nur noch dort, EINMAL.
+   Diese Namen (--ink, --gold, --paper, ...) bleiben unveraendert bestehen,
+   weil ueber 600 Stellen in dieser Datei sie bereits per var() referenzieren
+   - so erben alle automatisch die neuen Tokens, ohne dass jede einzelne
+   Stelle angefasst werden muss. Werte sind absichtlich IDENTISCH zu vorher,
+   das hier ist reines Verkabeln, keine Design-Aenderung. */
 :root {
-  /* Dunkel-Modus (Standard) */
-  --ink: #F4F2F5;
-  --paper: #08070A;
-  --paper-2: #121016;
-  --paper-3: #1A1720;
-  --gold: #C9A56A;
+  --ink: var(--color-ink);
+  --paper: var(--color-bg);
+  --paper-2: var(--color-surface);
+  --paper-3: var(--color-surface-2);
+  --gold: var(--color-accent);
   /* Fest, NICHT vom Akzentfarben-Regler ueberschreibbar - fuer Stellen wie
      die Bestenliste, die Infos ueber ANDERE Spieler zeigen. Dort soll die
      persoenliche Akzentfarbe des Betrachters nicht mit reinfaerben (sonst
      wirkt es so, als haette der jeweilige Spieler diese Farbe). */
-  --gold-fixed: #C9A56A;
-  --purple: #9333EA;
-  --line: rgba(244, 242, 245, 0.08);
-  --muted: rgba(244, 242, 245, 0.55);
-  --pos: #4ADE80;
-  --neg: #F87171;
+  --gold-fixed: var(--color-accent-fixed);
+  --purple: var(--color-accent-2);
+  --line: var(--color-line);
+  --muted: var(--color-muted);
+  --pos: var(--color-positive);
+  --neg: var(--color-negative);
+  /* NEU: bisher als rohes #0A0A0F an 11 Stellen hartkodiert (Text auf
+     goldenem/hellem Untergrund) - siehe design-tokens.css. */
+  --accent-ink: var(--color-accent-ink);
+  /* NEU (Audit-Fund: kein echter Danger-Button im ganzen Projekt) - noch
+     nirgends benutzt, steht ab jetzt bereit fuer Phase 4/5. */
+  --danger: var(--color-danger);
+  --danger-ink: var(--color-danger-ink);
 }
 
 html[data-theme="light"] {
-  --ink: #0E1C17;
-  --paper: #F6F3EC;
-  --paper-2: #EFEADD;
-  --paper-3: #E5DFCE;
-  --gold: #B08D57;
-  --gold-fixed: #B08D57;
-  --purple: #7C3AED;
-  --line: rgba(14, 28, 23, 0.12);
-  --muted: rgba(14, 28, 23, 0.64);
-  --pos: #16A34A;
-  --neg: #DC2626;
+  --ink: var(--color-ink);
+  --paper: var(--color-bg);
+  --paper-2: var(--color-surface);
+  --paper-3: var(--color-surface-2);
+  --gold: var(--color-accent);
+  --gold-fixed: var(--color-accent-fixed);
+  --purple: var(--color-accent-2);
+  --line: var(--color-line);
+  --muted: var(--color-muted);
+  --pos: var(--color-positive);
+  --neg: var(--color-negative);
+  --danger: var(--color-danger);
+  --danger-ink: var(--color-danger-ink);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -455,7 +472,7 @@ body.modal-open .bkmp-easter > span {
   transition: transform 0.15s ease, border-color 0.2s ease;
 }
 .btn-ja:hover, .btn-nein:hover { transform: translateY(-1px); }
-.btn-ja { border-color: var(--gold) !important; background: var(--gold) !important; color: #0A0A0F !important; }
+.btn-ja { border-color: var(--gold) !important; background: var(--gold) !important; color: var(--accent-ink) !important; }
 .btn-nein:hover { border-color: var(--gold); }
 
 /* ---------- "Wer bist du?" Login/Registrieren ---------- */
@@ -1113,20 +1130,38 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
   content-visibility: visible;
 }
 
+/* Redesign Phase 4 (17.07.): "professionelle Stimmung" - .panel-title ist
+   DIE eine gemeinsame Ueberschriften-Komponente aller 10 Marketing-
+   Abschnitte (jeder <section class="panel"> beginnt damit), deshalb wirkt
+   eine einzige Verbesserung hier sofort auf die ganze Seite. Groesse jetzt
+   auf der Typo-Skala (--font-size-2xl statt dem alten 1.6rem-Alleingang),
+   text-wrap:balance verhindert haessliche Ein-Wort-Zeilen bei laengeren
+   Titeln, ein schmaler Akzentstrich darunter gibt jedem Abschnitt einen
+   klaren visuellen Anker statt reinem Fliesstext-Uebergang. */
 .panel-title {
-  font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.6rem; margin-bottom: 1.7rem;
-  text-align: center;
+  font-family: var(--font-display); font-weight: 600; font-size: var(--font-size-2xl);
+  line-height: 1.25; margin-bottom: var(--space-4); text-align: center; text-wrap: balance;
+  position: relative; padding-bottom: var(--space-3);
+}
+.panel-title::after {
+  content: ""; position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
+  width: 44px; height: 3px; border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--gold) calc(55% * var(--mood-gradient-intensity, 1)), transparent);
 }
 
 /* ---------- Hauptseite: Stat-Balken ---------- */
-.stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2.8rem; }
+.stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); margin-bottom: var(--space-6); }
 @media (max-width: 720px) { .stat-row { grid-template-columns: 1fr; } .topbar-wrap, .panel { padding-left: 0.7rem; padding-right: 0.7rem; } }
 
 .stat-card {
-  background: var(--paper-2); border: 1px solid var(--line); border-radius: 16px;
+  background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--mood-radius-panel, 16px);
   padding: 1.6rem 1.5rem; text-align: center;
   cursor: default; user-select: none;
+  box-shadow: var(--shadow-1);
+  transition: transform var(--duration-base) var(--ease-out), box-shadow var(--duration-base) var(--ease-out), border-color var(--duration-base) var(--ease-out);
 }
+.stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); border-color: color-mix(in srgb, var(--gold) 30%, var(--line)); }
+@media (prefers-reduced-motion: reduce) { .stat-card { transition: none; } .stat-card:hover { transform: none; } }
 .stat-label { font-size: 0.75rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.7rem; }
 .stat-value { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.9rem; }
 .stat-value.positive { color: var(--pos); }
@@ -1439,7 +1474,8 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
 /* ---------- Alle-Einträge-Liste (Hauptseite unten) ---------- */
 .ledger-list {
   max-width: none; width: 100%; margin: 0 auto; display: flex; flex-direction: column;
-  border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
+  border: 1px solid var(--line); border-radius: var(--radius-md); overflow: hidden;
+  box-shadow: var(--shadow-1);
 }
 .ledger-row {
   display: flex; align-items: center; justify-content: space-between;
@@ -1465,19 +1501,24 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
 .wish-cta {
   display: block;
   width: min(720px, 100%);
-  margin: 0 auto 2.8rem;
+  margin: 0 auto var(--space-6);
   text-align: center;
   color: #111018;
   background:
     linear-gradient(135deg, #f7d678 0%, #ffb02e 48%, #f472b6 100%);
   border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 22px;
+  border-radius: var(--radius-lg);
   padding: 2rem clamp(1.4rem, 4vw, 3rem);
   cursor: pointer;
-  box-shadow: 0 22px 65px rgba(245, 171, 42, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.35);
-  transition: transform 0.15s ease, filter 0.2s ease, box-shadow 0.2s ease;
+  /* --mood-glow-strength daempft die Leucht-Intensitaet auf der ruhigeren
+     Marketing-Seite (0.35) gegenueber dem vollen Wert im Idle-Dorf (1) -
+     derselbe CTA-Farbverlauf bleibt erkennbar, wirkt hier aber zurueck-
+     haltender statt wie ein Spiel-Belohnungs-Knopf. */
+  box-shadow: 0 22px 65px rgba(245, 171, 42, calc(0.22 * var(--mood-glow-strength, 0.6) / 0.6)), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition: transform var(--duration-base) var(--ease-out), filter var(--duration-base) var(--ease-out), box-shadow var(--duration-base) var(--ease-out);
 }
-.wish-cta:hover { transform: translateY(-3px); filter: saturate(1.08); box-shadow: 0 28px 80px rgba(245, 171, 42, 0.28); }
+.wish-cta:hover { transform: translateY(-3px); filter: saturate(1.08); box-shadow: 0 28px 80px rgba(245, 171, 42, calc(0.28 * var(--mood-glow-strength, 0.6) / 0.6)); }
+@media (prefers-reduced-motion: reduce) { .wish-cta { transition: none; } .wish-cta:hover { transform: none; } }
 .wish-cta-kicker {
   display: inline-flex;
   margin-bottom: 0.65rem;
@@ -1501,10 +1542,10 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
 .wish-card {
   background: linear-gradient(180deg, var(--paper-2), color-mix(in srgb, var(--paper) 82%, transparent));
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: var(--mood-radius-panel, 16px);
   overflow: hidden;
-  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.18);
-  transition: transform 0.15s ease, border-color 0.2s ease;
+  box-shadow: var(--shadow-2);
+  transition: transform var(--duration-base) var(--ease-out), border-color var(--duration-base) var(--ease-out);
 }
 .wish-card:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); }
 .wish-image-btn {
@@ -1676,11 +1717,11 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
 .about-block {
   grid-column: span 2;
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: var(--radius-lg);
   background: linear-gradient(180deg, var(--paper-2), color-mix(in srgb, var(--paper) 86%, transparent));
   padding: clamp(1.2rem, 2.3vw, 2rem);
   overflow: hidden;
-  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--shadow-2);
 }
 .about-block.about-block-half { grid-column: span 1; }
 @media (max-width: 760px) {
@@ -1835,7 +1876,7 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #0A0A0F;
+  color: var(--accent-ink);
   background: linear-gradient(135deg, #f5d58a, var(--gold));
 }
 @media (max-width: 900px) {
@@ -1849,10 +1890,14 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
 }
 
 /* ---------- Investoren ---------- */
-.investor-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(430px, 100%), 1fr)); gap: 1rem; }
+.investor-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(430px, 100%), 1fr)); gap: var(--space-3); }
 .investor-card {
-  background: var(--paper-2); border: 1px solid var(--line); border-radius: 16px; padding: 1.5rem;
+  background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--mood-radius-panel, 16px); padding: 1.5rem;
+  box-shadow: var(--shadow-1);
+  transition: box-shadow var(--duration-base) var(--ease-out), border-color var(--duration-base) var(--ease-out);
 }
+.investor-card:hover { box-shadow: var(--shadow-2); border-color: color-mix(in srgb, var(--gold) 24%, var(--line)); }
+@media (prefers-reduced-motion: reduce) { .investor-card { transition: none; } }
 .investor-card-rich {
   display: flex;
   flex-direction: column;
@@ -1919,9 +1964,10 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
 .investor-row .v.pos { color: var(--pos); }
 
 /* ---------- News ---------- */
-.news-feed { display: flex; flex-direction: column; gap: 1.4rem; max-width: 980px; margin: 0 auto; }
+.news-feed { display: flex; flex-direction: column; gap: var(--space-4); max-width: 980px; margin: 0 auto; }
 .news-card {
-  background: var(--paper-2); border: 1px solid var(--line); border-radius: 18px; overflow: hidden;
+  background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden;
+  box-shadow: var(--shadow-1);
 }
 .news-images {
   display: grid;
@@ -2026,7 +2072,7 @@ label { display: block; font-size: 0.76rem; color: var(--muted); margin-bottom: 
   background: var(--paper); color: var(--ink); cursor: pointer; transition: all 0.2s ease;
 }
 .btn:hover { border-color: var(--gold); }
-.btn-primary { background: var(--gold); border-color: var(--gold); color: #0A0A0F; font-weight: 600; }
+.btn-primary { background: var(--gold); border-color: var(--gold); color: var(--accent-ink); font-weight: 600; }
 .btn-primary:hover { filter: brightness(1.08); }
 .btn-danger { color: var(--neg); }
 .btn-danger:hover { border-color: var(--neg); }
@@ -2100,7 +2146,7 @@ label { display: block; font-size: 0.76rem; color: var(--muted); margin-bottom: 
   transition: background 0.15s ease, color 0.15s ease;
 }
 .admin-nav-btn:hover { background: var(--paper-3); color: var(--ink); }
-.admin-nav-btn.active { background: var(--gold); color: #0A0A0F; font-weight: 600; }
+.admin-nav-btn.active { background: var(--gold); color: var(--accent-ink); font-weight: 600; }
 .admin-nav-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; flex-shrink: 0; }
 .admin-nav-badge {
   margin-left: auto;
@@ -2118,7 +2164,7 @@ label { display: block; font-size: 0.76rem; color: var(--muted); margin-bottom: 
   flex-shrink: 0;
 }
 .admin-nav-badge.visible { display: flex; }
-.admin-nav-btn.active .admin-nav-badge { background: #0A0A0F; }
+.admin-nav-btn.active .admin-nav-badge { background: var(--accent-ink); }
 
 .admin-main { flex: 1; min-width: 0; }
 .admin-page { display: none; }
@@ -2216,7 +2262,7 @@ body:has(.admin-wrap), body:has(.login-card) {
   border-color: color-mix(in srgb, var(--gold) 22%, transparent);
 }
 .admin-nav-btn.active {
-  color: #0A0A0F;
+  color: var(--accent-ink);
   background: linear-gradient(135deg, #f5d58a, var(--gold));
   box-shadow: 0 12px 30px color-mix(in srgb, var(--gold) 20%, transparent);
 }
@@ -2550,7 +2596,7 @@ label {
 }
 .partner-filter button {
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--paper-2);
   color: var(--muted);
   min-height: 36px;
@@ -2559,27 +2605,31 @@ label {
   font-size: 0.82rem;
   font-weight: 700;
   cursor: pointer;
+  transition: background var(--duration-base) var(--ease-out), color var(--duration-base) var(--ease-out), border-color var(--duration-base) var(--ease-out);
 }
 .partner-filter button:hover,
 .partner-filter button.active {
-  color: #08080c;
+  color: var(--accent-ink);
   border-color: transparent;
   background: linear-gradient(135deg, #f5d58a, var(--gold));
 }
 .partner-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(245px, 1fr));
-  gap: 1rem;
+  gap: var(--space-3);
   align-items: stretch;
 }
 .partner-card {
   position: relative;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 18px;
+  border-radius: var(--radius-lg);
   background: linear-gradient(180deg, var(--paper-2), var(--paper));
-  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-2);
+  transition: transform var(--duration-base) var(--ease-out), border-color var(--duration-base) var(--ease-out);
 }
+.partner-card:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--gold) 40%, var(--line)); }
+@media (prefers-reduced-motion: reduce) { .partner-card, .partner-filter button { transition: none; } .partner-card:hover { transform: none; } }
 .partner-image-frame,
 .partner-image-empty {
   width: 100%;
@@ -2657,14 +2707,14 @@ label {
 /* ---------- Karten Verkaufen ---------- */
 .cardsale-banner {
   width: min(880px, 100%);
-  margin: 0 auto 2.4rem;
+  margin: 0 auto var(--space-6);
   text-align: center;
   color: #111018;
   background: linear-gradient(135deg, #f7d678 0%, #ffb02e 48%, #f472b6 100%);
   border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 22px;
+  border-radius: var(--radius-lg);
   padding: 2rem clamp(1.4rem, 4vw, 3rem);
-  box-shadow: 0 22px 65px rgba(245, 171, 42, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  box-shadow: 0 22px 65px rgba(245, 171, 42, calc(0.22 * var(--mood-glow-strength, 0.6) / 0.6)), inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 .cardsale-banner-kicker {
   display: inline-flex;
@@ -2683,16 +2733,17 @@ label {
 .cardsale-banner p b { font-weight: 900; }
 .cardsale-request-cta { margin-top: 1.1rem; }
 
-.cardsale-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1.1rem; }
+.cardsale-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: var(--space-3); }
 .cardsale-card {
   background: linear-gradient(180deg, var(--paper-2), color-mix(in srgb, var(--paper) 82%, transparent));
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: var(--mood-radius-panel, 16px);
   overflow: hidden;
-  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.18);
-  transition: transform 0.15s ease, border-color 0.2s ease;
+  box-shadow: var(--shadow-2);
+  transition: transform var(--duration-base) var(--ease-out), border-color var(--duration-base) var(--ease-out);
 }
 .cardsale-card:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); }
+@media (prefers-reduced-motion: reduce) { .cardsale-card { transition: none; } .cardsale-card:hover { transform: none; } }
 .cardsale-image-frame, .cardsale-image-empty {
   width: 100%;
   aspect-ratio: 1 / 1;
@@ -2766,14 +2817,16 @@ input.cardcatalog-search {
   width: 100%;
   margin: 0;
   padding: 0.75rem 1.1rem 0.75rem 2.7rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--paper) 86%, transparent);
+  transition: border-color var(--duration-base) var(--ease-out), box-shadow var(--duration-base) var(--ease-out);
 }
 input.cardcatalog-search::placeholder { color: var(--muted); }
 input.cardcatalog-search:focus {
   border-color: color-mix(in srgb, var(--gold) 55%, var(--line));
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 16%, transparent);
 }
+@media (prefers-reduced-motion: reduce) { input.cardcatalog-search { transition: none; } }
 .cardcatalog-search-wrap:focus-within .cardcatalog-search-icon { stroke: var(--gold); }
 .cardcatalog-filters {
   display: flex;
@@ -2798,7 +2851,7 @@ input.cardcatalog-search:focus {
 }
 .cardcatalog-filter-row .partner-filter { margin: 0; }
 
-.cardcatalog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1.1rem; }
+.cardcatalog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: var(--space-3); }
 
 /* ---------- Bestenliste ---------- */
 .leaderboard-intro {
@@ -2820,18 +2873,19 @@ input.cardcatalog-search:focus {
   border: 1px solid var(--line);
   background: var(--paper-2);
   color: var(--muted);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0.55rem 1.1rem;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-body);
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background var(--duration-base) var(--ease-out), color var(--duration-base) var(--ease-out), border-color var(--duration-base) var(--ease-out);
 }
+@media (prefers-reduced-motion: reduce) { .leaderboard-tab { transition: none; } }
 .leaderboard-tab:hover { border-color: var(--gold); color: var(--ink); }
 .leaderboard-tab.active {
   background: linear-gradient(135deg, #f5d58a, var(--gold));
-  color: #0A0A0F;
+  color: var(--accent-ink);
   border-color: transparent;
 }
 .leaderboard-list { max-width: 640px; margin: 0 auto; display: grid; gap: 0.6rem; }
@@ -2882,12 +2936,13 @@ input.cardcatalog-search:focus {
 .cardcatalog-card {
   background: linear-gradient(180deg, var(--paper-2), color-mix(in srgb, var(--paper) 82%, transparent));
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: var(--mood-radius-panel, 16px);
   overflow: hidden;
-  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.18);
-  transition: transform 0.15s ease, border-color 0.2s ease;
+  box-shadow: var(--shadow-2);
+  transition: transform var(--duration-base) var(--ease-out), border-color var(--duration-base) var(--ease-out);
 }
 .cardcatalog-card:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); }
+@media (prefers-reduced-motion: reduce) { .cardcatalog-card { transition: none; } .cardcatalog-card:hover { transform: none; } }
 .cardcatalog-image-frame, .cardcatalog-image-empty {
   width: 100%;
   aspect-ratio: 4 / 3;
@@ -3706,6 +3761,122 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   .bkmp-achievement-confetti { display: none; }
 }
 
+/* ============================================================
+   Phase 5.5 (19.07.): gemeinsames Reward-Presentation-System, siehe
+   js/ui/bkmp-reward-presenter.js. Drei Stufen, dieselbe Rahmensprache wie
+   die bereits bestehenden .bkmp-jannik-toast/.bkmp-achievement-popup/
+   -confetti oben - hier verallgemeinert um --reward-color (gespeist aus
+   den --rarity-*-Tokens in design-tokens.css) statt fest verdrahtetem Gold.
+   ============================================================ */
+
+/* ---- Stufe 1: stapelbarer Reward-Toast ---- */
+.bkmp-reward-toast-stack {
+  position: fixed;
+  top: 5.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 98;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  pointer-events: none;
+  max-width: min(360px, calc(100vw - 2rem));
+}
+.bkmp-reward-toast {
+  padding: 0.55rem 1.1rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--reward-color, var(--gold)) 70%, #f7d678), var(--reward-color, var(--gold)));
+  color: #111018;
+  font-family: 'Fraunces', serif;
+  font-weight: 700;
+  font-size: 0.85rem;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  text-align: center;
+}
+.bkmp-reward-toast.visible { opacity: 1; transform: translateY(0); }
+@media (max-width: 640px) {
+  .bkmp-reward-toast-stack { top: 4.4rem; }
+  .bkmp-reward-toast { font-size: 0.78rem; padding: 0.5rem 0.9rem; }
+}
+
+/* ---- Stufe 2: Reward-Karte (verallgemeinert .bkmp-achievement-popup) ---- */
+.bkmp-reward-card {
+  position: fixed;
+  left: 1.2rem;
+  bottom: 1.2rem;
+  z-index: 98;
+  width: min(320px, calc(100vw - 2rem));
+  display: flex;
+  gap: 0.7rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid color-mix(in srgb, var(--reward-color, var(--gold)) 45%, var(--line));
+  border-radius: 16px;
+  background: linear-gradient(145deg, var(--paper-2), var(--paper));
+  color: var(--ink);
+  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.38), 0 0 34px color-mix(in srgb, var(--reward-color, var(--gold)) 18%, transparent);
+  opacity: 0;
+  transform: translate3d(0, 14px, 0) scale(0.97);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+  flex-wrap: wrap;
+}
+.bkmp-reward-card.visible { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+.bkmp-reward-card-icon { flex: none; font-size: 2rem; line-height: 1; }
+/* Phase 5.5 (19.07.): Dragon-Thumbnails (bkmpDragonThumbHtml) statt Emoji fuer
+   Ei-/Schluepf-/Entwicklungs-Karten - .idle-dragon-thumb bringt bereits die
+   96px-Begrenzung mit, hier nur der Seltenheits-Glow-Rahmen dazu. */
+.bkmp-reward-card-thumb { border-radius: 12px; box-shadow: 0 0 16px color-mix(in srgb, var(--reward-color, var(--gold)) 35%, transparent); }
+.bkmp-reward-ceremony-thumb { max-width: 128px !important; border-radius: 14px; box-shadow: 0 0 26px color-mix(in srgb, var(--reward-color, var(--gold)) 45%, transparent); }
+.bkmp-reward-card-body { flex: 1 1 160px; min-width: 0; }
+.bkmp-reward-card-rarity { font-size: 0.68rem; font-weight: 800; color: var(--reward-color, var(--gold)); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.2rem; }
+.bkmp-reward-card-title { font-family: 'Fraunces', serif; font-size: 1rem; font-weight: 700; overflow-wrap: break-word; }
+.bkmp-reward-card-desc { font-size: 0.78rem; color: var(--muted); margin: 0.3rem 0 0; }
+.bkmp-reward-card-source { font-size: 0.7rem; color: var(--muted); margin-top: 0.3rem; }
+.bkmp-reward-card-actions { flex: 1 0 100%; display: flex; gap: 0.5rem; margin-top: 0.4rem; }
+.bkmp-reward-card-actions button { flex: 1; padding: 0.4rem 0.6rem; font-size: 0.76rem; }
+@media (prefers-reduced-motion: reduce) {
+  .bkmp-reward-card { transition: opacity 0.2s linear; transform: none !important; }
+}
+
+/* ---- Stufe 3: Zeremonie ---- */
+.bkmp-reward-ceremony-overlay { z-index: 97; }
+.bkmp-reward-ceremony-card {
+  max-width: 420px;
+  text-align: center;
+  border: 1px solid color-mix(in srgb, var(--reward-color, var(--gold)) 55%, var(--line));
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.5), 0 0 60px color-mix(in srgb, var(--reward-color, var(--gold)) 25%, transparent);
+}
+.bkmp-reward-ceremony-icon { font-size: 3rem; margin-bottom: 0.4rem; }
+.bkmp-reward-ceremony-rarity { font-size: 0.78rem; font-weight: 800; color: var(--reward-color, var(--gold)); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.3rem; }
+.bkmp-reward-ceremony-desc { color: var(--muted); font-size: 0.9rem; margin: 0.4rem 0; }
+.bkmp-reward-ceremony-source { color: var(--muted); font-size: 0.78rem; }
+
+.bkmp-reward-burst {
+  position: fixed;
+  left: 50%;
+  top: 40%;
+  transform: translateX(-50%);
+  width: min(320px, calc(100vw - 2rem));
+  height: 0;
+  z-index: 99;
+  pointer-events: none;
+}
+.bkmp-reward-burst > span {
+  position: absolute;
+  bottom: 0;
+  width: 7px;
+  height: 11px;
+  border-radius: 2px;
+  opacity: 0;
+  animation: bkmpConfettiBurst ease-out forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bkmp-reward-burst { display: none; }
+}
+
 .bkmp-jannik-carrot {
   position: fixed;
   top: -8vh;
@@ -3989,7 +4160,25 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
 }
 /* Eingesetzte Rune direkt auf einem der 6 Hex-Rahmen, siehe
-   BKMP_RUNE_SLOT_POSITIONS in idledorf.js. */
+   BKMP_RUNE_SLOT_POSITIONS in idledorf.js.
+   KRITISCHER FUND (Spieler-Screenshot: "Rune viel zu klein"): die 6
+   Slot-Positionen sind bewusst klein bemessen (~16.5-18.6% der
+   Kreisbreite - passend zur GENAUEN Position/Groesse der gemalten
+   Hex-Aussparung auf circle-full.png/circle-empty.png), das vorhandene
+   Runen-PNG (enthaelt Hex-Rahmen+Symbol+Glow+Badge-Flaeche in einer
+   Datei, ~386x479px, deutlich hochkant) wurde bisher aber per
+   "width/height:100%" exakt auf diese kleine Slot-Box gezwungen -
+   dadurch wirkte die vollstaendige Rune wie ein kleines Icon.
+   "object-fit:fill" verzerrte das Bild zusaetzlich (die Slot-Box hat
+   nicht exakt dasselbe Seitenverhaeltnis wie das PNG). Jetzt: die
+   Slot-Position (top/left, weiterhin exakt auf der gemalten Hex-
+   Aussparung) bleibt unveraendert der Klick-Anker, das <img> selbst
+   wird per position:absolute+translate(-50%,-50%) UNABHAENGIG groesser
+   dargestellt und darf ueber die kleine Slot-Box hinausragen
+   (overflow:visible) - "object-fit:contain" verhindert dabei jede
+   Verzerrung. Ein Klick auf den ueberstehenden Bildbereich funktioniert
+   weiterhin (Event-Bubbling vom <img> zum umschliessenden <button>,
+   unabhaengig von CSS-Ueberlauf). */
 .idle-runen-equip-slot {
   position: absolute;
   transform: translate(-50%, -50%);
@@ -3997,27 +4186,40 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   background: transparent;
   padding: 0;
   cursor: pointer;
+  overflow: visible;
 }
 .idle-runen-equip-slot img {
-  width: 100%;
-  height: 100%;
-  object-fit: fill;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 140%;
+  height: 140%;
+  max-width: none;
+  max-height: none;
+  object-fit: contain;
+  transform: translate(-50%, -50%);
   filter: drop-shadow(0 0 10px color-mix(in srgb, var(--rune-color) 65%, transparent));
   transition: transform 0.15s ease;
 }
-.idle-runen-equip-slot:hover img, .idle-runen-equip-slot:focus-visible img { transform: scale(1.1); }
+.idle-runen-equip-slot:hover img, .idle-runen-equip-slot:focus-visible img { transform: translate(-50%, -50%) scale(1.08); }
+/* Prozent-Werte statt fixer Pixel, damit der Level-Badge weiterhin am
+   sichtbaren (jetzt groesseren) Bildrand sitzt statt an der Ecke der
+   unveraendert kleinen Slot-Hitbox - Prozentangaben bei position:absolute
+   loesen relativ zur eigenen Elterngroesse auf (hier: die Slot-Box, siehe
+   BKMP_RUNE_SLOT_POSITIONS), skaliert dadurch automatisch pro Slot mit. */
 .idle-runen-slot-level {
   position: absolute;
-  bottom: -2px;
-  right: -2px;
+  bottom: -18%;
+  right: -14%;
   background: color-mix(in srgb, black 45%, var(--paper));
   border: 1px solid var(--rune-color);
   color: var(--ink);
-  font-size: 0.58rem;
+  font-size: 0.72rem;
   font-weight: 800;
-  padding: 0 3px;
+  padding: 0 4px;
   border-radius: 999px;
-  line-height: 14px;
+  line-height: 16px;
+  z-index: 1;
 }
 /* Pro-Slot-Inventarfenster: 6 Reiter (einer je Runen-Typ), zeigen nur die
    Runen des jeweils aktiven Slots statt eines gemeinsamen 30er-Rasters -
@@ -4211,6 +4413,8 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 .idle-runen-fuse-quick-btn { flex: 1; font-size: 0.72rem; padding: 0.35rem 0.4rem; }
 .idle-runen-fuse-quick-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .idle-runen-fuse-progress { font-weight: 700; font-size: 0.88rem; margin-bottom: 0.4rem; }
+.idle-runen-fuse-autoconfirm { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.6rem; cursor: pointer; }
+.idle-runen-fuse-autoconfirm input { margin: 0; }
 .idle-runen-fuse-warn { color: #facc15; font-weight: 700; font-size: 0.78rem; }
 .idle-runen-fuse-confirm-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .idle-runen-item.is-fuse-ineligible { opacity: 0.28; filter: grayscale(0.7); cursor: not-allowed; }
@@ -4243,7 +4447,7 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 }
 .achievements-subtab.active {
   background: linear-gradient(135deg, #f5d58a, var(--gold));
-  color: #0A0A0F;
+  color: var(--accent-ink);
   border-color: transparent;
 }
 
@@ -4314,7 +4518,7 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   right: 8px;
   z-index: 2;
   background: linear-gradient(135deg, #f5d58a, var(--gold));
-  color: #0A0A0F;
+  color: var(--accent-ink);
   font-family: 'Inter', sans-serif;
   font-size: 0.6rem;
   font-weight: 800;
@@ -5018,6 +5222,40 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 }
 .idle-dorf-close:hover { color: var(--ink); border-color: var(--gold); }
 
+/* Bug-Fix 18.07.: zusaetzlicher Feedback-Zugang direkt im Idle-Dorf-Fenster
+   (siehe Kommentar bei #idleDorfFeedbackBtn in index.html) - selbe Form/
+   Groesse wie .idle-dorf-close, nur eine Position weiter links, damit
+   beide Kreise nicht ueberlappen. */
+.idle-dorf-feedback-btn {
+  position: absolute;
+  top: 0.8rem;
+  right: 2.9rem;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.idle-dorf-feedback-btn:hover { color: var(--ink); border-color: var(--gold); }
+
+/* Bug-Fix 18.07. (im Zuge der Feedback-Button-Untersuchung entdeckt): die
+   generische Regel ".idle-dorf-overlay .idle-dorf-card > *" weiter unten
+   in dieser Datei (2 Klassen-Selektoren) hat mehr Spezifitaet als die
+   einfachen Ein-Klassen-Selektoren oben und ueberschreibt deren
+   position:absolute dadurch IMMER mit position:relative, unabhaengig von
+   der Reihenfolge in der Datei - beide Knoepfe rutschten dadurch in den
+   normalen Text-/Flex-Fluss der Karte statt oben rechts zu schweben (beim
+   Schliessen-Knopf bisher unbemerkt, weil er parallel dazu noch von einer
+   zu weit gefassten html.bkmp-app-mode-Regel komplett ausgeblendet war,
+   siehe Fix weiter unten). Ein ID-Selektor hat mehr Spezifitaet als jede
+   Klassen-Kombination und erzwingt zuverlaessig position:absolute. */
+#idleDorfCloseX, #idleDorfFeedbackBtn { position: absolute; }
+
 /* Spieler-Wunsch (14.07.): offizielles Spiel-Banner statt der bisherigen
    kleinen Text-Ueberschrift im Idle-Dorf-Fenster. Gleiches WEBP+PNG-
    Fallback-Muster wie .hero-banner-picture/.hero-banner (Startseite),
@@ -5097,11 +5335,12 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 }
 .idle-dorf-tab:disabled { opacity: 0.45; cursor: not-allowed; }
 .idle-dorf-tab:disabled:hover { background: var(--paper); color: var(--muted); }
-.idle-dorf-tab.active {
-  background: linear-gradient(135deg, #f5d58a, var(--gold));
-  color: #0A0A0F;
-  border-color: transparent;
-}
+/* Redesign Phase 5 (17.07., Audit-Fund): hier stand frueher noch eine
+   zweite .idle-dorf-tab.active-Regel (Gold-Verlauf-Pille) - durch eine
+   SPAETERE, spezifischere Regel weiter unten ("Tableiste: Spielmenue")
+   bereits vollstaendig ueberschrieben und deshalb komplett totes CSS.
+   Geloescht statt weiter mitgeschleppt; die eine verbleibende
+   .active-Definition weiter unten ist ab jetzt die einzige Quelle. */
 /* Tab bleibt klickbar (zeigt einen Hinweis-Toast statt sich zu oeffnen,
    siehe idledorf.js bkmpIdleInitTabs) - deshalb dezente Opazitaet statt
    :disabled, damit der Klick weiter ankommt. */
@@ -5135,6 +5374,7 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 }
 #idlePanelKampf .idle-stage-bar,
 #idlePanelKampf .idle-battlefield,
+#idlePanelKampf .bkmp-proto-battlefield,
 #idlePanelKampf .idle-adfree-btn {
   flex-shrink: 0;
 }
@@ -5177,6 +5417,30 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 #adFreePopup1, #adFreePopupSure, #adFreePopupCar { z-index: 60; }
 
 /* ---- Stufen-Leiste ---- */
+/* Performance-Modus-Umschalter (Nutzer-Auftrag, Section B Prioritaet 7):
+   klein und zurueckhaltend statt eine eigene Einstellungsseite zu
+   erfordern - direkt im Kampf-Panel, wo die Wirkung sofort sichtbar ist.
+   Zyklisch Hoch -> Reduziert -> Aus -> Hoch, siehe bkmpFxCycleMode() in
+   idledorf.js. Reine Anzeige-/Komfort-Einstellung, aendert nie Werte. */
+.idle-fx-mode-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0 0 0.6rem auto;
+  padding: 0.4rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 44px;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.idle-fx-mode-btn:hover { color: var(--ink); border-color: color-mix(in srgb, var(--gold) 40%, var(--line)); }
+@media (min-width: 481px) { .idle-fx-mode-btn { display: flex; width: fit-content; min-height: auto; padding: 0.35rem 0.7rem; } }
+
 .idle-stage-bar {
   display: flex;
   flex-wrap: wrap;
@@ -5207,6 +5471,26 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   border-radius: 22px;
 }
 .idle-stage-picker-hint { font-size: 0.82rem; color: var(--muted); margin: -0.4rem 0 1rem; text-align: left; }
+
+/* Redesign 18.07. (Sprungleiste + einklappbare Akte) - siehe
+   ausfuehrlichen Kommentar bei bkmpIdleRenderStagePickerBody() in
+   idledorf.js fuer die Begruendung. */
+.idle-stagepicker-jump-row { display: flex; gap: 0.5rem; margin-bottom: 0.3rem; }
+.idle-stagepicker-jump-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+  color: var(--ink);
+  border-radius: 10px;
+  padding: 0.55rem 0.8rem;
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+.idle-stagepicker-jump-input:focus { outline: none; border-color: var(--gold); }
+.idle-stagepicker-jump-btn { flex: none; padding: 0.55rem 1.1rem; }
+.idle-stage-picker-error { color: #f87171; font-size: 0.78rem; margin: -0.1rem 0 0.7rem; text-align: left; }
+
 .idle-stage-picker-body {
   overflow-y: auto;
   max-height: 55vh;
@@ -5214,11 +5498,63 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   margin-bottom: 1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
+  gap: 0.4rem;
 }
-.idle-stagepicker-act-title { font-family: 'Fraunces', serif; font-size: 0.95rem; color: var(--gold); margin-bottom: 0.5rem; }
+.idle-stagepicker-showolder-btn {
+  border: 1px dashed var(--line);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 10px;
+  padding: 0.5rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  margin-bottom: 0.3rem;
+}
+.idle-stagepicker-showolder-btn:hover { color: var(--ink); border-color: var(--gold); }
+
+/* Akt-Kopfzeile: immer sichtbar, klickbar zum Auf-/Zuklappen - das
+   10er-Stufen-Grid darunter existiert im DOM erst, nachdem der Akt
+   mindestens einmal aufgeklappt wurde (siehe bkmpIdleWireStagePicker). */
+/* Bug-Fix 18.07. (Spieler-Screenshot: Akt-Zeilen nur noch hauchduenne
+   Striche statt lesbarer Kopfzeilen): .idle-stage-picker-body ist
+   flex-direction:column - ein Flex-Kind mit overflow:hidden verliert
+   dadurch den impliziten min-height:auto-Schutz (der normalerweise
+   verhindert, dass Inhalt kleiner gequetscht wird, als er eigentlich
+   braucht). Bei vielen Akt-Zeilen auf einmal (mehr als in den 55vh
+   Platz passen) hat der Flex-Algorithmus deshalb JEDE Zeile auf quasi 0
+   zusammengedrueckt, sichtbar blieb nur noch die 1px-Umrandung. Gleiches
+   Muster, gleicher Fix wie zuvor schon bei #idlePanelKampf .idle-dorf-log
+   in dieser Datei: flex-shrink:0 verbietet das Zusammendruecken - das
+   eigentliche Scrollen uebernimmt weiterhin ganz normal overflow-y:auto
+   auf dem umschliessenden .idle-stage-picker-body. */
+.idle-stagepicker-act { flex-shrink: 0; border: 1px solid var(--line); border-radius: 12px; background: color-mix(in srgb, var(--paper-2) 60%, transparent); overflow: hidden; }
+.idle-stagepicker-act.is-open { border-color: color-mix(in srgb, var(--gold) 35%, var(--line)); }
+.idle-stagepicker-act-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.6rem 0.8rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+.idle-stagepicker-act-header:disabled { cursor: not-allowed; opacity: 0.6; }
+.idle-stagepicker-act-chevron { flex: none; color: var(--muted); font-size: 0.8rem; transition: transform 0.15s ease; }
+.idle-stagepicker-act-title { flex: none; font-family: 'Fraunces', serif; font-size: 0.95rem; color: var(--gold); }
 .idle-stagepicker-act.is-locked .idle-stagepicker-act-title { color: var(--muted); }
-.idle-stagepicker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 0.45rem; }
+.idle-stagepicker-act-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--gold) 16%, transparent);
+  color: var(--gold);
+}
+.idle-stagepicker-act-badge.is-current { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+.idle-stagepicker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 0.45rem; padding: 0 0.8rem 0.8rem; }
 .idle-stagepicker-stage {
   padding: 0.4rem 0.3rem;
   border-radius: 10px;
@@ -5594,6 +5930,13 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 
 .idle-dorf-log {
   margin-top: 1rem;
+  /* Bug-Fix 18.07. (Spieler-Meldung: Bereich springt bei jedem Drop/Fund
+     eine Zeile hoeher): nur max-height reserviert keinen Platz, solange
+     das Log leer/kurz ist - der Block wuchs dadurch mit jeder neuen Zeile
+     sichtbar mit und verschob alles darunter. min-height=max-height
+     reserviert von Anfang an den vollen Platz fuer ~5 Zeilen, der Block
+     scrollt intern statt zu wachsen. */
+  min-height: 120px;
   max-height: 120px;
   overflow-y: auto;
   border-top: 1px solid var(--line);
@@ -5656,12 +5999,29 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 }
 .idle-autobuy-toggle input { width: 1.05rem; height: 1.05rem; cursor: pointer; accent-color: var(--gold, #c9a24b); }
 .idle-upgrade-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.8rem; }
-.idle-upgrade-card { border: 1px solid var(--line); border-radius: 14px; padding: 0.9rem; background: var(--paper); text-align: center; }
-.idle-upgrade-icon { font-size: 1.6rem; margin-bottom: 0.3rem; }
-.idle-upgrade-name { font-weight: 700; font-size: 0.85rem; margin-bottom: 0.2rem; }
-.idle-upgrade-level { display: block; font-size: 0.68rem; color: var(--muted); font-weight: 500; }
-.idle-upgrade-desc { font-size: 0.72rem; color: var(--muted); margin-bottom: 0.6rem; min-height: 2em; }
-.idle-upgrade-buy { width: 100%; padding: 0.4rem 0.6rem; font-size: 0.78rem; }
+.idle-upgrade-card { border: 1px solid var(--line); border-radius: 14px; padding: 0.85rem; background: var(--paper); text-align: left; display: flex; flex-direction: column; gap: 0.55rem; }
+/* Redesign 18.07. (Phase 5.4): Kopfzeile aus Icon + Name/Stufe (statt
+   zentriert uebereinander gestapelt) und eine "aktuell → naechste Stufe"-
+   Effektzeile ersetzen den bisherigen statischen Fliesstext - liest
+   weiterhin nur bestehende Felder (siehe bkmpIdleUpgradeCardHtml in
+   idledorf.js), keine neue Berechnung. */
+.idle-upgrade-card-head { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
+.idle-upgrade-icon { flex: none; font-size: 1.4rem; line-height: 1; }
+/* Bug-Fix (Phase 5.4, Mobile-Verifikation 375px): Flex-Kinder schrumpfen
+   ohne min-width:0 nie unter die Breite ihres eigenen Inhalts - lange
+   Upgrade-Namen ("Magierakademie", "Holzfällerlager") liessen dadurch die
+   ganze Karte ueber ihren Container hinauswachsen. flex:1 zusaetzlich,
+   damit der Titel-Block den verbleibenden Platz neben dem Icon ausfuellt
+   statt sich nur an seinem Inhalt zu orientieren. */
+.idle-upgrade-card-title { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; flex: 1 1 auto; }
+.idle-upgrade-name { font-weight: 700; font-size: 0.85rem; overflow-wrap: break-word; }
+.idle-upgrade-level { font-size: 0.68rem; color: var(--muted); font-weight: 500; }
+.idle-upgrade-effect-row { display: flex; align-items: center; gap: 0.4rem; font-size: 0.74rem; color: var(--muted); flex-wrap: wrap; }
+.idle-upgrade-effect-current { color: var(--ink); }
+.idle-upgrade-effect-arrow { color: var(--muted); }
+.idle-upgrade-effect-next { color: var(--gold); font-weight: 600; }
+.idle-upgrade-card.is-maxed .idle-upgrade-effect-current { color: var(--gold); font-weight: 600; }
+.idle-upgrade-buy { width: 100%; padding: 0.4rem 0.6rem; font-size: 0.78rem; margin-top: auto; }
 .idle-upgrade-buy:disabled { opacity: 0.5; cursor: not-allowed; }
 .idle-upgrade-section-title { font-size: 0.95rem; margin: 1.2rem 0 0.6rem; }
 .idle-dragon-building-upgrade { width: 100%; padding: 0.4rem 0.6rem; font-size: 0.78rem; }
@@ -5706,13 +6066,28 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 .idle-dragon-nest-empty { opacity: 0.6; }
 .idle-dragon-nest-buy { border-style: dashed; opacity: 0.85; }
 .idle-dragon-baby-card { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 14px; padding: 0.9rem; background: var(--paper); text-align: center; }
-.idle-dragon-feed-row { display: flex; gap: 0.5rem; margin-top: 0.4rem; }
-.idle-dragon-feed-row .idle-skin-action { margin-top: 0; }
+/* Bug-Fix 18.07. (Spieler-Screenshot: "Füttern"-Knöpfe außerhalb der
+   Karte): dieselbe Ursache wie bei .idle-dragon-actions-row oben - das
+   globale 44px-Touch-Target-Mindestmaß (html.bkmp-app-mode .idle-dragon-
+   feed-btn, siehe weiter unten) plus groesseres Padding/Schriftgroesse
+   liessen "Füttern (+10)" und "Füttern (+100)" nebeneinander nicht mehr
+   in eine schmale .idle-skin-grid-Karte (ab 180px) passen. */
+.idle-dragon-feed-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.4rem; }
+.idle-dragon-feed-row .idle-skin-action { margin-top: 0; flex: 1 1 auto; min-width: 100px; }
 .idle-dragon-fav-badge { position: absolute; top: 0.5rem; right: 0.6rem; color: var(--gold); font-size: 1.1rem; }
 .idle-dragon-stats { font-size: 0.75rem; margin-bottom: 0.5rem; }
 .idle-dragon-substats { color: var(--muted); font-size: 0.68rem; margin-top: 0.3rem; display: flex; flex-direction: column; gap: 0.15rem; }
-.idle-dragon-actions-row { display: flex; gap: 0.4rem; margin-top: 0.5rem; align-items: center; }
-.idle-dragon-actions-row .idle-skin-action { margin-top: 0; flex: 1; }
+/* Bug-Fix 18.07. (Spieler-Screenshot: Favoriten-/Löschen-Knopf liegt
+   außerhalb der Drachen-Karte): .idle-skin-grid erlaubt Karten ab 180px
+   Breite (minmax(180px,1fr)) - "Als Begleiter" + die beiden Icon-Knöpfe
+   mit dem seit Phase 5 global aktiven 44px-Touch-Target-Minimum
+   (html.bkmp-app-mode .idle-dragon-fav-btn/-release-btn, siehe weiter
+   unten in dieser Datei) passten dadurch bei schmalen Karten nicht mehr
+   in eine Zeile und liefen ueber den Kartenrand hinaus. flex-wrap laesst
+   die Icon-Knoepfe bei Bedarf in eine zweite Zeile umbrechen, statt das
+   44px-Minimum (wichtig fuer Touch-Bedienung) wieder zu verkleinern. */
+.idle-dragon-actions-row { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; align-items: center; }
+.idle-dragon-actions-row .idle-skin-action { margin-top: 0; flex: 1 1 auto; min-width: 88px; }
 .idle-dragon-fav-btn, .idle-dragon-release-btn { border: 1px solid var(--line); background: var(--paper-2); border-radius: 8px; padding: 0.3rem 0.5rem; cursor: pointer; font-size: 0.9rem; }
 .idle-dragon-fav-btn:hover, .idle-dragon-release-btn:hover { border-color: var(--gold); }
 .idle-dragon-filter-bar { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 0.8rem; }
@@ -5785,6 +6160,145 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
    ueber opacity abdunkeln statt Farben zu ueberschreiben. */
 .idle-prestige-buy { background: linear-gradient(135deg, #a78bfa, #7c3aed); border: none; color: #fff; }
 .idle-prestige-buy:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ---- Section C (18.07.): Prestige-Panel - neue Uebersichts-Abschnitte
+   (Du erhaeltst / Wird zurueckgesetzt / Bleibt erhalten / Naechster
+   Durchlauf). Wiederverwendet die bereits vorhandene .idle-upgrade-
+   section-title (Phase-2-Klasse, bisher nirgends im Prestige-Panel
+   genutzt) statt eine neue Ueberschriften-Klasse zu erfinden. ---- */
+.idle-prestige-section { border: 1px solid var(--line); border-radius: var(--mood-radius-panel, 14px); padding: 0.9rem 1rem; background: var(--paper); margin-bottom: 0.9rem; }
+.idle-prestige-section-gain { border-color: color-mix(in srgb, #a78bfa 40%, var(--line)); background: linear-gradient(135deg, color-mix(in srgb, #a78bfa 12%, var(--paper)), var(--paper)); }
+.idle-prestige-gain-highlight { font-family: 'Fraunces', serif; font-weight: 700; font-size: 1.15rem; color: #c4b5fd; }
+.idle-prestige-gain-highlight .idle-prestige-gain-arrow { display: block; font-family: 'Inter', sans-serif; font-weight: 600; font-size: 0.82rem; color: var(--gold); margin-top: 0.25rem; }
+.idle-prestige-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; margin-bottom: 0.9rem; }
+.idle-prestige-section-reset { border-color: color-mix(in srgb, #f87171 30%, var(--line)); }
+.idle-prestige-section-keep { border-color: color-mix(in srgb, var(--gold) 35%, var(--line)); }
+.idle-upgrade-section-title-reset { color: #f87171; }
+.idle-upgrade-section-title-keep { color: var(--gold); }
+.idle-prestige-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.idle-prestige-list li { display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.82rem; color: var(--muted); line-height: 1.4; }
+.idle-prestige-list-icon { flex: none; font-size: 0.9rem; line-height: 1.3; }
+.idle-prestige-next-note { font-size: 0.82rem; color: var(--muted); line-height: 1.5; margin: 0; }
+@media (max-width: 640px) {
+  .idle-prestige-columns { grid-template-columns: 1fr; }
+}
+
+/* ---- Section C (18.07.): Prestige-Bestaetigungsdialog (2-stufig, siehe
+   #idlePrestigeConfirmOverlay in index.html - ein Overlay, zwei per
+   [data-step] umgeschaltete .idle-prestige-confirm-step-Bloecke). ---- */
+.idle-prestige-confirm-card {
+  max-width: 620px; text-align: left; border-radius: 22px;
+  background: linear-gradient(165deg, color-mix(in srgb, #a78bfa 10%, var(--paper-2)), var(--paper-2) 60%);
+  border: 1px solid color-mix(in srgb, #a78bfa 35%, var(--line));
+}
+.idle-prestige-confirm-card h3 { font-family: 'Fraunces', serif; font-size: 1.2rem; margin-bottom: 0.7rem; text-align: center; color: #c4b5fd; }
+.idle-prestige-confirm-step { display: none; }
+.idle-prestige-confirm-overlay[data-step="preview"] .idle-prestige-confirm-step-preview { display: block; }
+.idle-prestige-confirm-overlay[data-step="final"] .idle-prestige-confirm-step-final { display: block; }
+.idle-prestige-confirm-gain {
+  text-align: center; font-family: 'Fraunces', serif; font-weight: 700; font-size: 1.05rem;
+  color: var(--gold); margin-bottom: 1rem; padding: 0.6rem; border-radius: 12px;
+  background: color-mix(in srgb, var(--gold) 10%, transparent);
+}
+.idle-prestige-confirm-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 0.5rem; }
+.idle-prestige-confirm-col-title { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.5rem; }
+.idle-prestige-confirm-col-title-reset { color: #f87171; }
+.idle-prestige-confirm-col-title-keep { color: var(--gold); }
+.idle-prestige-confirm-columns .idle-prestige-list { max-height: 220px; overflow-y: auto; padding-right: 0.3rem; }
+.idle-prestige-confirm-next-btn, .idle-prestige-confirm-final-btn { background: linear-gradient(135deg, #a78bfa, #7c3aed) !important; border: none !important; color: #fff !important; box-shadow: 0 0 18px rgba(167, 139, 250, 0.4); }
+.idle-prestige-confirm-final-btn:disabled { opacity: 0.6; cursor: progress; box-shadow: none; }
+.idle-prestige-confirm-final-warning { font-size: 0.85rem; color: var(--muted); line-height: 1.5; text-align: center; margin-bottom: 1rem; border: 1px solid color-mix(in srgb, #f87171 35%, var(--line)); border-radius: 12px; padding: 0.7rem 0.9rem; background: color-mix(in srgb, #f87171 8%, transparent); }
+.idle-prestige-confirm-final-gain { text-align: center; font-family: 'Fraunces', serif; font-weight: 700; font-size: 1.1rem; color: #c4b5fd; line-height: 1.5; margin-bottom: 1rem; }
+.idle-prestige-confirm-error { display: none; font-size: 0.82rem; color: #f87171; line-height: 1.5; text-align: center; margin: 0 0 0.8rem; }
+.idle-prestige-confirm-error.visible { display: block; }
+@media (max-width: 640px) {
+  .idle-prestige-confirm-columns { grid-template-columns: 1fr; }
+  .idle-prestige-confirm-columns .idle-prestige-list { max-height: 160px; }
+}
+@media (max-width: 480px) {
+  .idle-prestige-confirm-card .joke-buttons button,
+  .idle-prestige-ceremony-continue-btn {
+    min-height: 44px;
+  }
+}
+
+/* ---- Section C (18.07.): Prestige-Zeremonie (siehe
+   #idlePrestigeCeremonyOverlay in index.html). Nur transform/opacity-
+   Animationen, jede laeuft genau EINMAL pro Zeremonie (keine infinite-
+   Loops, kein dauerhaft laufender Effekt) - Phasen werden per
+   Klassenwechsel aus bkmpPrestigeShowCeremony()/-CloseCeremony()
+   gesteuert (idledorf.js). --mood-glow-strength normiert wie ueberall im
+   Redesign gegen die .zone-site-Basis 0.6 (siehe design-tokens.css). ---- */
+.idle-prestige-ceremony-overlay { background: rgba(5, 4, 8, 0.88); z-index: 60; }
+.idle-prestige-ceremony { position: relative; width: min(420px, 88vw); aspect-ratio: 1; display: flex; align-items: center; justify-content: center; }
+.idle-prestige-ceremony-ring {
+  position: absolute; inset: 8%; border-radius: 50%;
+  background: conic-gradient(from 0deg, #a78bfa, var(--gold), #7c3aed, var(--gold), #a78bfa);
+  opacity: 0; transform: scale(0.7) rotate(-90deg);
+  -webkit-mask: radial-gradient(closest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
+  mask: radial-gradient(closest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
+  transition: opacity 1.1s ease, transform 1.1s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.idle-prestige-ceremony-overlay.phase-gather .idle-prestige-ceremony-ring,
+.idle-prestige-ceremony-overlay.phase-dissolve .idle-prestige-ceremony-ring,
+.idle-prestige-ceremony-overlay.phase-result .idle-prestige-ceremony-ring {
+  opacity: calc(0.8 * var(--mood-glow-strength, 0.6) / 0.6); transform: scale(1) rotate(90deg);
+}
+.idle-prestige-ceremony-seal {
+  position: absolute; width: 42%; aspect-ratio: 1; border-radius: 50%;
+  background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--gold) 55%, #1a1024), #120b1c 72%);
+  border: 2px solid color-mix(in srgb, var(--gold) 70%, transparent);
+  opacity: 0; transform: scale(0.55); box-shadow: 0 0 0 rgba(167, 139, 250, 0);
+  transition: opacity 0.9s ease, transform 0.9s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.9s ease;
+}
+.idle-prestige-ceremony-overlay.phase-gather .idle-prestige-ceremony-seal,
+.idle-prestige-ceremony-overlay.phase-dissolve .idle-prestige-ceremony-seal,
+.idle-prestige-ceremony-overlay.phase-result .idle-prestige-ceremony-seal {
+  opacity: 1; transform: scale(1);
+  box-shadow: 0 0 calc(40px * var(--mood-glow-strength, 0.6) / 0.6) rgba(167, 139, 250, 0.55);
+}
+.idle-prestige-ceremony-overlay.phase-dissolve .idle-prestige-ceremony-seal { transform: scale(1.08); }
+.idle-prestige-ceremony-sparks { position: absolute; inset: 0; pointer-events: none; }
+.idle-prestige-ceremony-sparks > span {
+  position: absolute; top: 50%; left: 50%; width: 6px; height: 6px; border-radius: 50%;
+  opacity: 0; animation: bkmpPrestigeSparkOut 0.9s ease-out forwards;
+}
+@keyframes bkmpPrestigeSparkOut {
+  0% { opacity: 1; transform: translate(-50%, -50%) translate(0, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) translate(var(--sx), var(--sy)) scale(0.4); }
+}
+.idle-prestige-ceremony-result {
+  position: relative; text-align: center; padding: 1.4rem 1.6rem; border-radius: 20px;
+  opacity: 0; transform: translateY(10px) scale(0.96);
+  transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.idle-prestige-ceremony-overlay.phase-result .idle-prestige-ceremony-result { opacity: 1; transform: translateY(0) scale(1); }
+.idle-prestige-ceremony-level { font-size: 0.78rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold); margin-bottom: 0.3rem; }
+.idle-prestige-ceremony-title { font-family: 'Fraunces', serif; font-size: 1.5rem; font-weight: 700; color: #fff; margin-bottom: 0.6rem; }
+.idle-prestige-ceremony-bonus { font-size: 0.95rem; line-height: 1.6; color: #e9e4f7; margin-bottom: 1.1rem; }
+.idle-prestige-ceremony-bonus-pct { display: block; color: var(--gold); font-weight: 700; margin-top: 0.2rem; }
+.idle-prestige-ceremony-continue-btn { opacity: 0; pointer-events: none; transition: opacity 0.3s ease; background: linear-gradient(135deg, #a78bfa, #7c3aed) !important; border: none !important; color: #fff !important; }
+.idle-prestige-ceremony-overlay.phase-result .idle-prestige-ceremony-continue-btn { opacity: 1; pointer-events: auto; }
+
+/* Performance-Modus Reduziert/Aus (siehe bkmpFxGetMode, Section B): kein
+   rotierender Ring, keine Funken - nur ein einfacher Opacity-Crossfade
+   direkt in die Ergebnis-Phase. Wird zusaetzlich JS-seitig gesteuert
+   (bkmpPrestigeShowCeremony ueberspringt die Gather-/Dissolve-Phasen
+   komplett bei "aus"), diese Regeln sind das CSS-seitige Sicherheitsnetz. */
+.idle-prestige-ceremony-overlay.is-simplified .idle-prestige-ceremony-ring,
+.idle-prestige-ceremony-overlay.is-simplified .idle-prestige-ceremony-sparks,
+.idle-prestige-ceremony-overlay.is-instant .idle-prestige-ceremony-ring,
+.idle-prestige-ceremony-overlay.is-instant .idle-prestige-ceremony-sparks {
+  display: none;
+}
+.idle-prestige-ceremony-overlay.is-instant .idle-prestige-ceremony-seal,
+.idle-prestige-ceremony-overlay.is-instant .idle-prestige-ceremony-result {
+  transition-duration: 0.15s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .idle-prestige-ceremony-ring, .idle-prestige-ceremony-sparks { display: none !important; }
+  .idle-prestige-ceremony-seal, .idle-prestige-ceremony-result, .idle-prestige-ceremony-ring { transition-duration: 0.15s !important; }
+}
 
 /* ---- Dungeon-Modus ---- */
 .idle-dungeon-intro {
@@ -6142,6 +6656,9 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   50% { box-shadow: 0 0 16px rgba(249, 115, 22, 0.35); }
 }
 .idle-dungeon-result-card strong { color: #fb923c; }
+/* Phase 5.5 (19.07.): Schluessel-/Regen-Zeile im Ergebnis-Popup - dezenter
+   als der Haupttext, damit "Belohnung" weiter der Blickfang bleibt. */
+.idle-dungeon-result-keys { margin-top: 0.5rem !important; padding-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.1); font-size: 0.82rem; color: #a89fc7 !important; }
 /* Spieler-Vorgabe 16.07.: "feste Popups mit den Belohnungen, die man
    wegklicken kann" - .bkmp-easter hat bewusst pointer-events:none (reine
    Deko-Ebene fuer die spark-Animation, blockiert absichtlich keine Klicks
@@ -6638,8 +7155,14 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 /* Hoehere Spezifitaet als die generische Regel direkt darueber noetig
    (3 statt 2 Klassen im Selektor) - der Schliessen-Knopf sitzt in derselben
    Ecke wie das neue Banner (siehe .idle-dorf-banner-picture) und muss trotz
-   spaeterer DOM-Position des Banners immer sichtbar obenauf bleiben. */
-.idle-dorf-overlay .idle-dorf-card > .idle-dorf-close { z-index: 2; }
+   spaeterer DOM-Position des Banners immer sichtbar obenauf bleiben.
+   Bug-Fix 18.07.: #idleDorfFeedbackBtn sitzt direkt daneben in derselben
+   Ecke und braucht denselben Schutz - sonst kann z.B. #idleDorfOfflineCard
+   (spaeter im DOM, ebenfalls z-index:1 durch die generische Regel) den
+   Klick auf den Feedback-Knopf abfangen, sobald dieses Banner sichtbar
+   ist (per elementFromPoint() verifiziert). */
+.idle-dorf-overlay .idle-dorf-card > .idle-dorf-close,
+.idle-dorf-overlay .idle-dorf-card > .idle-dorf-feedback-btn { z-index: 2; }
 @media (prefers-reduced-motion: reduce) {
   .idle-dorf-overlay .idle-dorf-card::before { animation: none; opacity: 0.2; }
 }
@@ -6723,15 +7246,42 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 .idle-hud-resources span { color: var(--muted); }
 .idle-hud-stats { border-bottom: none; padding-bottom: 0; }
 
-/* ---- Tableiste: Spielmenue statt flacher Pillen ---- */
-.idle-dorf-tabs { gap: 0.35rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--line); }
+/* ---- Tableiste: Spielmenue statt flacher Pillen ----
+   Redesign Phase 5 (17.07.): diese Regel gilt jetzt bei JEDER Breite (auch
+   die 44px-Touch-Hoehe unten, frueher app-mode-exklusiv, siehe Audit) - nur
+   die eigentliche LAYOUT-Frage (fixierte Mobil-Bottom-Bar vs. gruppierte
+   Desktop-Leiste) unterscheidet sich noch per Breakpoint, siehe die beiden
+   @media-Bloecke oben (Mobil, aus dem App-Modus befoerdert) und unten
+   (Desktop, neu). Gleiche Buttons/IDs/Klick-Listener wie immer. */
+/* KRITISCHER FUND (Phase 5.1 Verifikation, zweite Runde, 17.07.): echter
+   Nutzer-Screenshot mit vollem Spielstand zeigte die Tab-Leiste auf
+   einen schmalen Streifen zusammengequetscht, Panel-Inhalt begann darueber.
+   Ursache: .idle-dorf-card ist html.bkmp-app-mode-weit ein
+   "display:flex;flex-direction:column"-Container (siehe "Karten-Chrome"-
+   Regel weiter unten in dieser Datei), #idlePanelKampf ist darin bewusst
+   auf "flex:1 1 auto;min-height:0" gesetzt, um bei Bedarf zu wachsen/zu
+   schrumpfen - ist Kampf aber NICHT der aktive Tab (z.B. Erfolge), faellt
+   dieser "Platz-Puffer" komplett weg (display:none nimmt nicht am Flex-
+   Layout teil), UND eine seither entfernte alte Regel setzte hier
+   zusaetzlich "overflow-x:auto" - das zwingt Flexbox-Items laut Spec dazu,
+   ihre automatische Mindesthoehe von "auto" auf "0" zu senken, wodurch
+   *diese* Tableiste (nicht die Panels) als einziges verbleibendes flexibles
+   Element zusammengedrueckt wurde, sobald ein hoher Panel-Inhalt (z.B. eine
+   lange Erfolge-Liste bei echtem Spielstand) die max-height der Karte
+   ueberschritt. "flex-shrink:0" verhindert das strukturell: die Tableiste
+   behaelt IMMER ihre volle, von den echten Buttons benoetigte Hoehe: reicht
+   der Platz nicht, scrollt stattdessen die Karte selbst (die schon laenger
+   "overflow-y:auto" traegt), nicht die Navigation. */
+.idle-dorf-tabs { gap: 0.35rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--line); flex-shrink: 0; }
 .idle-dorf-tab {
   border-radius: 12px 12px 6px 6px;
   background: color-mix(in srgb, var(--paper-2) 70%, transparent);
   border: 1px solid var(--line);
   position: relative;
   top: 0;
-  transition: top 0.15s ease, border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  min-height: 44px;
+  flex-shrink: 0;
+  transition: top var(--duration-base) var(--ease-out), border-color var(--duration-base) var(--ease-out), background var(--duration-base) var(--ease-out), color var(--duration-base) var(--ease-out);
 }
 .idle-dorf-tab:not(:disabled):hover { top: -2px; color: var(--ink); border-color: color-mix(in srgb, var(--gold) 55%, var(--line)); }
 .idle-dorf-tab.active {
@@ -6751,6 +7301,64 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   background: var(--gold);
   box-shadow: 0 0 8px color-mix(in srgb, var(--gold) 70%, transparent);
   border-radius: 2px;
+}
+@media (prefers-reduced-motion: reduce) { .idle-dorf-tab { transition: none; } }
+
+/* KRITISCHER FUND (Phase 5.1, dritte Runde, echter Nutzer-Screenshot):
+   die vorherige Fassung (flex-basis:100% auf einer einzelnen Label-Zeile
+   VOR jeder Gruppe) loeste zwar die Ueberlappung, erzwang aber JEDE
+   Gruppe auf eine eigene volle Zeile - bei 4 Gruppen also mindestens 5
+   Zeilen (Kampf allein + 4x Label+Buttons), extrem viel vertikaler
+   Platzverbrauch, Spielinhalt weit nach unten gedrueckt, Gruppen wirkten
+   durch die langen Trennlinien optisch nicht zusammengehoerig.
+   Jetzt echte Gruppen-Container (index.html: .idle-dorf-tab-group >
+   .idle-dorf-tab-group-label + .idle-dorf-tab-group-buttons): jede
+   Gruppe ist eine eigene kleine Karte, mehrere Karten stehen nebeneinander
+   und brechen nur als GANZES Paket um, wenn der Platz nicht reicht -
+   keine erzwungenen Vollzeilen mehr, kein Kampf-Solo-Zeile, keine langen
+   Trennlinien zwischen Gruppen (nur noch eine dezente Kartenumrandung).
+   Per Default (auch Mobil/Tablet) sind Gruppe/Buttons-Container
+   "display:contents" - das nimmt NUR die Box selbst aus dem Layout, die
+   echten Kind-Elemente (Label versteckt, einzelne Tab-Buttons) bleiben
+   normale, direkte Flex-Kinder von .idle-dorf-tabs, exakt wie vor der
+   Gruppierung. Zusaetzliche Absicherung: das mobile Ueberlauf-Skript
+   (bkmp-app-mode-bootstrap.js) loest die drei Haupt-Tabs zusaetzlich
+   aktiv aus ihren Gruppen und entfernt die dann leeren Gruppen-Huellen
+   komplett aus dem DOM, bevor es die restlichen Tabs ins "Mehr"-Menue
+   verschiebt - mobile Bottom-Navigation bleibt dadurch unveraendert. */
+.idle-dorf-tab-group { display: contents; }
+.idle-dorf-tab-group-buttons { display: contents; }
+.idle-dorf-tab-group-label { display: none; }
+
+@media (min-width: 761px) {
+  .idle-dorf-tabs { gap: 0.6rem 0.8rem; padding: 0 0.1rem 0.6rem; align-items: flex-start; }
+  .idle-dorf-tab {
+    flex: 0 1 auto;
+    min-width: 96px;
+    padding: 0.55rem 0.85rem;
+    font-size: 0.8rem;
+  }
+  .idle-dorf-tab-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.32rem;
+    flex-shrink: 0;
+    padding: 0.45rem 0.55rem 0.5rem;
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--paper-2) 45%, transparent);
+    border: 1px solid color-mix(in srgb, var(--line) 65%, transparent);
+  }
+  .idle-dorf-tab-group-label {
+    display: block;
+    font-family: var(--font-body);
+    font-size: 0.64rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-left: 0.2rem;
+  }
+  .idle-dorf-tab-group-buttons { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 }
 
 /* ---- Schlachtfeld: Arena statt Info-Box ---- */
@@ -7673,8 +8281,16 @@ body.admin-mode-sheepeditor .admin-nav-btn[data-role="sheep_editor"] { display: 
    Investment-Seite drumherum aus und zeigt nur noch das Idle-Dorf
    (oder den Login, wenn noch nicht eingeloggt) im Vollbild.
    ============================================================ */
+/* KRITISCHER FUND (Phase 5.0 Verifikation, 17.07.): dieselbe Klasse wie
+   beim Header/Footer-Fund oben - stand auf "html.bkmp-app-mode", das
+   seit der globalen Klasse einen z-index:100000-Vollbild-Splash dauerhaft
+   ueber die GESAMTE normale Website gelegt hat (nichts dahinter war je
+   erreichbar, da "bkmp-app-ready" - einzige Bedingung zum Ausblenden -
+   auf der normalen Website nie gesetzt wird, siehe bkmp-app-mode-
+   bootstrap.js). Gehoert exklusiv zu echtem /app, siehe html.zone-game-
+   Begruendung oben. */
 #bkmpAppSplash { display: none; }
-html.bkmp-app-mode #bkmpAppSplash {
+html.bkmp-app-mode.zone-game #bkmpAppSplash {
   display: flex;
   position: fixed;
   inset: 0;
@@ -7686,7 +8302,7 @@ html.bkmp-app-mode #bkmpAppSplash {
   background: radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--gold) 12%, transparent), var(--paper) 65%);
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
-html.bkmp-app-mode.bkmp-app-ready #bkmpAppSplash { display: none; }
+html.bkmp-app-mode.zone-game.bkmp-app-ready #bkmpAppSplash { display: none; }
 #bkmpAppSplash img {
   width: 84px;
   height: 84px;
@@ -7701,24 +8317,48 @@ html.bkmp-app-mode.bkmp-app-ready #bkmpAppSplash { display: none; }
   color: var(--ink);
 }
 
-html.bkmp-app-mode .site-top-bar,
-html.bkmp-app-mode .poll-banner,
-html.bkmp-app-mode .top-actions,
-html.bkmp-app-mode .top-actions-left,
-html.bkmp-app-mode header,
-html.bkmp-app-mode nav.topbar-wrap,
-html.bkmp-app-mode .panels-viewport,
-html.bkmp-app-mode footer,
-html.bkmp-app-mode .bkmp-penguin-easter-egg {
+/* KRITISCHER FUND (Phase 5.0 Verifikation, 17.07.): stand bis eben auf
+   "html.bkmp-app-mode" - seit diese Klasse global ist (siehe Kommentar im
+   <head>-Script von index.html), hat das gerade JEDEN Besuch der
+   normalen Website unsichtbar gemacht (Header/Nav/Footer UND der
+   komplette .panels-viewport mit allen 10 Marketing-Sektionen auf
+   display:none)! Das war als reine /app-Vollbild-Regel gedacht (die
+   installierte App zeigt NUR das Idle-Dorf, keine Website-Chrome) und
+   gehoert exakt dorthin zurueck. "html.zone-game" (die Klasse DIREKT auf
+   <html>, nicht zu verwechseln mit #idleDorfOverlay, das zone-game IMMER
+   traegt) wird im selben synchronen Kopf-Script wie bkmp-app-mode gesetzt,
+   aber nur wenn isApp true ist - genau das reicht als Signal, ganz ohne
+   Wartezeit auf async Bootstrap (kein Aufblitz-Risiko, siehe Kommentar im
+   Kopf-Script "damit kein falscher Stimmungs-Ton kurz aufblitzt"). */
+html.bkmp-app-mode.zone-game .site-top-bar,
+html.bkmp-app-mode.zone-game .poll-banner,
+html.bkmp-app-mode.zone-game .top-actions,
+html.bkmp-app-mode.zone-game .top-actions-left,
+html.bkmp-app-mode.zone-game header,
+html.bkmp-app-mode.zone-game nav.topbar-wrap,
+html.bkmp-app-mode.zone-game .panels-viewport,
+html.bkmp-app-mode.zone-game footer,
+html.bkmp-app-mode.zone-game .bkmp-penguin-easter-egg {
   display: none !important;
 }
-html.bkmp-app-mode body { background: var(--paper); }
+html.bkmp-app-mode.zone-game body { background: var(--paper); }
 
-/* Idle-Dorf-Fenster wird im App-Modus zur eigentlichen Seite statt eines
+/* KRITISCHER FUND (Phase 5.1 Verifikation, 17.07.): stand auf
+   "html.bkmp-app-mode" - seit diese Klasse global ist, hat das die
+   Idle-Dorf-Karte auch auf der normalen Website in eine randlose
+   100vw/100vh-Vollbild-Flaeche verwandelt (statt der gewollten
+   zentrierten 94vw/max-1200px-Dialogkarte mit rundem Goldrahmen aus
+   Phase 4) - dabei rutschten HUD und Tableiste sichtbar durcheinander,
+   weil #idleDorfHuds negative Raender (siehe weiter unten) exakt auf
+   DIESES Padding hier kalibriert sind, das Padding aber nur fuer die
+   echte /app-Vollbild-Karte gedacht war. Gehoert exklusiv zu echtem
+   /app (html.zone-game, siehe Begruendung beim Header/Footer/Splash-
+   Fund in Phase 5.0).
+   Idle-Dorf-Fenster wird im App-Modus zur eigentlichen Seite statt eines
    Popups darueber - immer die volle-Bildschirm-Darstellung (sonst nur ab
    640px Breite aktiv), plus Sicherheitsabstand fuer Notch/Kamera-Ausschnitt
    und die Android-Gesten-Leiste am unteren Rand. */
-html.bkmp-app-mode .idle-dorf-overlay .idle-dorf-card {
+html.bkmp-app-mode.zone-game .idle-dorf-overlay .idle-dorf-card {
   width: 100vw;
   height: 100vh;
   max-height: 100vh;
@@ -7726,9 +8366,13 @@ html.bkmp-app-mode .idle-dorf-overlay .idle-dorf-card {
   border-radius: 0;
   padding-top: calc(1.4rem + env(safe-area-inset-top));
   padding-right: calc(1rem + env(safe-area-inset-right));
-  /* Unten Platz fuer die fixierte Bottom-Navigation (Phase 3) reservieren,
-     damit Panel-Inhalte nicht dahinter verschwinden. */
-  padding-bottom: calc(5.2rem + env(safe-area-inset-bottom));
+  /* Unten Platz fuer die fixierte Bottom-Navigation reservieren, damit
+     Panel-Inhalte nicht dahinter verschwinden - seit Phase 5.1 in EINER
+     gemeinsamen Regel mit dem Website-Pendant zusammengefasst (siehe
+     "html.bkmp-app-mode .idle-dorf-overlay .idle-dorf-card" innerhalb
+     von @media(max-width:760px) weiter unten in dieser Datei), damit
+     nicht zwei verschiedene Werte fuer denselben Zweck an zwei Stellen
+     gepflegt werden muessen. */
   padding-left: calc(1rem + env(safe-area-inset-left));
   /* KRITISCH: die Website-Optik setzt hier ein transform (Oeffnen-
      "Pop"-Animation der Karte, .joke-card/.joke-overlay.visible .joke-card
@@ -7749,9 +8393,21 @@ html.bkmp-app-mode .idle-dorf-overlay .idle-dorf-card {
 /* Kein "Schliessen" und kein Streamer-Hilfe-Link im App-Modus - es gibt
    keine Seite dahinter, zu der man zurueckkehren koennte, die App IST der
    Bildschirm. Verlassen passiert ausschliesslich ueber die Android-
-   Zurueck-Geste (siehe Bootstrap-Skript am Seitenende). */
-html.bkmp-app-mode #idleDorfOverlay > .idle-dorf-card > .idle-dorf-close,
-html.bkmp-app-mode #idleDorfOverlay > .idle-dorf-card > .joke-buttons {
+   Zurueck-Geste (siehe Bootstrap-Skript am Seitenende).
+   Bug-Fix 18.07. (im Zuge der Feedback-Button-Untersuchung entdeckt,
+   siehe idleDorfFeedbackBtn-Kommentar in index.html): stand bisher auf
+   dem seit Phase 5 GLOBAL immer aktiven "html.bkmp-app-mode" (siehe
+   Kommentar im Kopf-Script von index.html: die Klasse steuert seitdem
+   nur noch Optik, nicht mehr Kontext) - dadurch war der Schliessen-Knopf
+   im Idle-Dorf-Fenster auch auf der GANZ NORMALEN Website unsichtbar UND
+   unklickbar (display:none!important), obwohl dort sehr wohl eine Seite
+   dahinter existiert, zu der man zurueckkehren will. ".zone-game" ist
+   die tatsaechliche Kontext-Unterscheidung (nur im echten /app gesetzt,
+   siehe html.zone-game-Begruendung an anderer Stelle in dieser Datei) -
+   exakt derselbe Fund/Fix wie bei den bereits behobenen Header/Footer/
+   Splash-Faellen (siehe CLAUDE.md). */
+html.bkmp-app-mode.zone-game #idleDorfOverlay > .idle-dorf-card > .idle-dorf-close,
+html.bkmp-app-mode.zone-game #idleDorfOverlay > .idle-dorf-card > .joke-buttons {
   display: none !important;
 }
 
@@ -7785,7 +8441,7 @@ html.bkmp-app-mode #idleDorfOverlay > .idle-dorf-card > .joke-buttons {
   border-radius: 999px;
   border: none;
   background: var(--gold);
-  color: #0A0A0F;
+  color: var(--accent-ink);
   cursor: pointer;
 }
 .map-search-row select { padding: 0.5rem 0.7rem; border-radius: 999px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); font: inherit; font-size: 0.82rem; }
@@ -7814,9 +8470,14 @@ html.bkmp-app-mode #idleDorfOverlay > .idle-dorf-card > .joke-buttons {
    geschrieben, also relativ zur Basis-Schriftgroesse von <html>. Diese
    hier um ~18% anzuheben skaliert automatisch JEDEN Text, jedes Padding,
    jeden Abstand im ganzen App-Modus gleichzeitig mit, statt nur einzelne
-   Klassen zu treffen. Nur auf html.bkmp-app-mode selbst - betrifft nie
-   die normale Website (dort bleibt die Basis-Schriftgroesse 16px). */
-html.bkmp-app-mode {
+   Klassen zu treffen. Nur auf echtem /app (html.zone-game, siehe
+   Begruendung beim Header/Footer/Splash-Fund oben) - betrifft nie die
+   normale Website (dort bleibt die Basis-Schriftgroesse unveraendert).
+   KRITISCHER FUND (Phase 5.0 Verifikation, 17.07.): stand vorher auf
+   "html.bkmp-app-mode" allein - seit diese Klasse global ist, waere JEDER
+   rem-Wert auf der GESAMTEN normalen Website (auch alle Marketing-
+   Sektionen aus Phase 4) automatisch ~18% zu gross gerendert. */
+html.bkmp-app-mode.zone-game {
   font-size: 18.5px;
 }
 html.bkmp-app-mode {
@@ -7864,14 +8525,44 @@ html.bkmp-app-mode .idle-dorf-overlay .idle-dorf-card::before {
 html.bkmp-app-mode .idle-dorf-banner-picture { display: none; }
 
 /* ---- Hintergrund-Ambience (Sterne/Nebel/Funken), siehe .app-bg-fx in
-   index.html - rein dekorativ, idledorf.js fasst das nie an. ---- */
-html.bkmp-app-mode .app-bg-fx {
+   index.html - rein dekorativ, idledorf.js fasst das nie an.
+   KRITISCHER FUND (Phase 5.1 Verifikation, 17.07.): stand auf blossem
+   "html.bkmp-app-mode" - der Kommentar bei der Markup-Stelle in
+   index.html sagt explizit "nur im App-Modus sichtbar... auf der
+   normalen Website komplett unsichtbar" - genau das stimmte nicht mehr,
+   sobald die Klasse global wurde: 12 dauerhaft laufende Animationen
+   (Nebel-Drift 26s, Stern-Flackern 4s, 10x Funken-Aufstieg 8-12s) liefen
+   im Hintergrund JEDES Idle-Dorf-Fensters auf der normalen Website mit,
+   ohne dass sie dort je sichtbar sein sollten - reine verschwendete
+   Bildwiederholungs-Arbeit. ".zone-game" allein reicht hier NICHT (das
+   traegt auch #idleDorfOverlay auf der normalen Website automatisch,
+   siehe Phase 4) - erst "html.bkmp-app-mode.zone-game" (nur wenn <html>
+   SELBST zone-game traegt, siehe Kopf-Script) trifft ausschliesslich
+   echtes /app, wie urspruenglich gemeint. ---- */
+html.bkmp-app-mode.zone-game .app-bg-fx {
   position: absolute;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
 }
-html.bkmp-app-mode .app-bg-fx-nebula {
+/* Performance-Modus: die dekorative Ambience (Nebel-Drift + Stern-
+   Flackern + 10x Funken-Aufstieg, siehe Kommentar weiter oben bei dieser
+   Regel) war beim Profiling die teuerste einzelne Quelle dauerhaft
+   laufender Animationen (12 gleichzeitig). "Reduziert" behaelt die
+   guenstigen Sterne (reines Opacity-Flackern), schaltet aber Nebel
+   (transform+filter:blur kombiniert) und die 10 Funken (individuelle
+   transform-Animationen) ab. "Aus" blendet die komplette Ambience-Ebene
+   aus. */
+html[data-fx="reduziert"].bkmp-app-mode.zone-game .app-bg-fx-nebula,
+html[data-fx="aus"].bkmp-app-mode.zone-game .app-bg-fx-nebula,
+html[data-fx="reduziert"].bkmp-app-mode.zone-game .app-bg-fx-embers,
+html[data-fx="aus"].bkmp-app-mode.zone-game .app-bg-fx-embers {
+  display: none;
+}
+html[data-fx="aus"].bkmp-app-mode.zone-game .app-bg-fx-stars {
+  display: none;
+}
+html.bkmp-app-mode.zone-game .app-bg-fx-nebula {
   position: absolute;
   inset: -20%;
   background:
@@ -7885,7 +8576,7 @@ html.bkmp-app-mode .app-bg-fx-nebula {
   from { transform: translate(0, 0) scale(1); }
   to { transform: translate(-3%, -2%) scale(1.08); }
 }
-html.bkmp-app-mode .app-bg-fx-stars {
+html.bkmp-app-mode.zone-game .app-bg-fx-stars {
   position: absolute;
   inset: 0;
   background-image:
@@ -7904,7 +8595,7 @@ html.bkmp-app-mode .app-bg-fx-stars {
   from { opacity: .32; }
   to { opacity: .62; }
 }
-html.bkmp-app-mode .app-bg-fx-embers span {
+html.bkmp-app-mode.zone-game .app-bg-fx-embers span {
   position: absolute;
   bottom: -10px;
   width: 4px;
@@ -7915,16 +8606,16 @@ html.bkmp-app-mode .app-bg-fx-embers span {
   opacity: 0;
   animation: appEmberRise 9s linear infinite;
 }
-html.bkmp-app-mode .app-bg-fx-embers span:nth-child(1) { left: 8%;  animation-duration: 8s;   animation-delay: 0s; }
-html.bkmp-app-mode .app-bg-fx-embers span:nth-child(2) { left: 18%; animation-duration: 11s;  animation-delay: 1.2s; }
-html.bkmp-app-mode .app-bg-fx-embers span:nth-child(3) { left: 30%; animation-duration: 9.5s;  animation-delay: 2.4s; }
-html.bkmp-app-mode .app-bg-fx-embers span:nth-child(4) { left: 44%; animation-duration: 12s;  animation-delay: 0.6s; }
-html.bkmp-app-mode .app-bg-fx-embers span:nth-child(5) { left: 55%; animation-duration: 8.5s;  animation-delay: 3s; }
-html.bkmp-app-mode .app-bg-fx-embers span:nth-child(6) { left: 65%; animation-duration: 10.5s; animation-delay: 1.8s; }
-html.bkmp-app-mode .app-bg-fx-embers span:nth-child(7) { left: 74%; animation-duration: 9s;    animation-delay: 4.2s; }
-html.bkmp-app-mode .app-bg-fx-embers span:nth-child(8) { left: 83%; animation-duration: 11.5s; animation-delay: 2.1s; }
-html.bkmp-app-mode .app-bg-fx-embers span:nth-child(9) { left: 91%; animation-duration: 8s;    animation-delay: 3.6s; }
-html.bkmp-app-mode .app-bg-fx-embers span:nth-child(10) { left: 96%; animation-duration: 10s;   animation-delay: 0.9s; }
+html.bkmp-app-mode.zone-game .app-bg-fx-embers span:nth-child(1) { left: 8%;  animation-duration: 8s;   animation-delay: 0s; }
+html.bkmp-app-mode.zone-game .app-bg-fx-embers span:nth-child(2) { left: 18%; animation-duration: 11s;  animation-delay: 1.2s; }
+html.bkmp-app-mode.zone-game .app-bg-fx-embers span:nth-child(3) { left: 30%; animation-duration: 9.5s;  animation-delay: 2.4s; }
+html.bkmp-app-mode.zone-game .app-bg-fx-embers span:nth-child(4) { left: 44%; animation-duration: 12s;  animation-delay: 0.6s; }
+html.bkmp-app-mode.zone-game .app-bg-fx-embers span:nth-child(5) { left: 55%; animation-duration: 8.5s;  animation-delay: 3s; }
+html.bkmp-app-mode.zone-game .app-bg-fx-embers span:nth-child(6) { left: 65%; animation-duration: 10.5s; animation-delay: 1.8s; }
+html.bkmp-app-mode.zone-game .app-bg-fx-embers span:nth-child(7) { left: 74%; animation-duration: 9s;    animation-delay: 4.2s; }
+html.bkmp-app-mode.zone-game .app-bg-fx-embers span:nth-child(8) { left: 83%; animation-duration: 11.5s; animation-delay: 2.1s; }
+html.bkmp-app-mode.zone-game .app-bg-fx-embers span:nth-child(9) { left: 91%; animation-duration: 8s;    animation-delay: 3.6s; }
+html.bkmp-app-mode.zone-game .app-bg-fx-embers span:nth-child(10) { left: 96%; animation-duration: 10s;   animation-delay: 0.9s; }
 @keyframes appEmberRise {
   0% { transform: translateY(0) scale(.6); opacity: 0; }
   10% { opacity: .9; }
@@ -8029,37 +8720,18 @@ html.bkmp-app-mode .idle-hud-resources span {
   to { transform: scale(1); opacity: 1; }
 }
 
-/* ---- Tab-Leiste (bleibt oben in Phase 1, wird optisch zur Icon-Reihe;
-   echte Bottom-Navigation folgt in einer spaeteren Phase) ---- */
-html.bkmp-app-mode .idle-dorf-tabs {
-  display: flex;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  gap: .5rem;
-  padding: .2rem .1rem .7rem;
-  margin: .6rem 0 .3rem;
-  scrollbar-width: none;
-}
-html.bkmp-app-mode .idle-dorf-tabs::-webkit-scrollbar { display: none; }
-html.bkmp-app-mode .idle-dorf-tab {
-  flex: none;
-  font-size: .82rem;
-  font-weight: 700;
-  padding: .6rem 1rem;
-  border-radius: 14px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .02));
-  border: 1px solid rgba(255, 255, 255, .09);
-  color: var(--app-muted);
-  transition: transform .15s ease, box-shadow .2s ease, color .2s ease, border-color .2s ease;
-}
-html.bkmp-app-mode .idle-dorf-tab:active { transform: scale(.94); }
-html.bkmp-app-mode .idle-dorf-tab.active {
-  color: #2b1600;
-  background: linear-gradient(135deg, var(--app-gold), var(--app-orange));
-  border-color: transparent;
-  box-shadow: var(--app-glow-gold);
-  transform: translateY(-2px) scale(1.05);
-}
+/* KRITISCHER FUND (Phase 5.1 Verifikation, zweite Runde, 17.07.): dieser
+   ganze Block war die urspruengliche "Phase 1"-Tab-Optik aus der /app-
+   Entwicklung, laut eigenem Kommentar laengst durch "Phase 3: echte
+   Bottom-Navigation" (siehe @media(max-width:760px) weiter unten) UND die
+   neue gruppierte Desktop-Tableiste ersetzt - stand aber weiterhin
+   unbedingt (kein @media, kein .zone-game) im CSS und war dadurch seit der
+   bkmp-app-mode-Globalisierung die tatsaechliche Ursache dafuer, dass die
+   Tab-Leiste auf der normalen Website zusammengequetscht wurde ("overflow-
+   x:auto" zwingt Flexbox dazu, die Mindesthoehe des Elements auf 0 zu
+   setzen, siehe Begruendung bei der echten .idle-dorf-tabs-Regel weiter
+   oben). Ersatzlos entfernt statt nur deaktiviert - komplett von neueren
+   Phasen abgeloest, keine Funktionalitaet geht verloren. ---- */
 
 /* ---- Kampfbereich: gross, dramatisch, reagiert live auf Treffer ---- */
 html.bkmp-app-mode .idle-battlefield {
@@ -8118,6 +8790,16 @@ html.bkmp-app-mode .idle-hp-label { font-variant-numeric: tabular-nums; font-wei
    idledorf.js), kein zusaetzlicher JS-Hook noetig. */
 html.bkmp-app-mode .idle-battlefield:has(.idle-hit-flash) {
   animation: appBattlefieldShake .32s ease;
+}
+/* Performance-Modus (Nutzer-Auftrag, Section B Prioritaet 7): Screen-Shake
+   ist einer der in der Profiling-Runde identifizierten teuersten Effekte
+   (Layout-Transform auf dem gesamten Schlachtfeld bei jedem Treffer) -
+   in "Reduziert" UND "Aus" abgeschaltet. Siehe html[data-fx]-Sammelblock
+   weiter unten in dieser Datei fuer alle Performance-Modus-Regeln
+   gebuendelt an einer Stelle. */
+html[data-fx="reduziert"].bkmp-app-mode .idle-battlefield:has(.idle-hit-flash),
+html[data-fx="aus"].bkmp-app-mode .idle-battlefield:has(.idle-hit-flash) {
+  animation: none;
 }
 @keyframes appBattlefieldShake {
   10%, 90% { transform: translate3d(-1px, 0, 0); }
@@ -8304,6 +8986,7 @@ html.bkmp-app-mode .raid-join-banner.raid-urgent .raid-join-banner-countdown {
   50% { opacity: .35; }
 }
 
+@media (max-width: 760px) {
 /* ============================================================
    APP-MODUS REDESIGN, PHASE 3 (echte Bottom Navigation)
    ============================================================
@@ -8328,6 +9011,48 @@ html.bkmp-app-mode .idle-dorf-tabs {
   backdrop-filter: blur(10px);
   border-top: 1px solid rgba(255, 255, 255, .08);
   box-shadow: 0 -10px 30px rgba(0, 0, 0, .5);
+}
+/* Performance-Modus: backdrop-filter zwingt den Browser dazu, staendig neu
+   zu berechnen, was HINTER dieser (immer sichtbaren) Leiste passiert -
+   einer der teuersten identifizierten Effekte auf schwaecheren Geraeten.
+   "Reduziert" UND "Aus" ersetzen den Weichzeichner durch einen einfachen,
+   blickdichteren Verlauf ohne Echtzeit-Neuberechnung. */
+html[data-fx="reduziert"].bkmp-app-mode .idle-dorf-tabs,
+html[data-fx="aus"].bkmp-app-mode .idle-dorf-tabs {
+  backdrop-filter: none;
+  background: linear-gradient(180deg, rgba(10, 5, 24, .75), rgba(9, 4, 20, .99) 35%);
+}
+/* KRITISCHER FUND (Phase 5.1 Verifikation, 17.07.): die fixierte
+   Bottom-Navigation haengt am VIEWPORT, nicht an der Karte - ohne
+   reservierten Platz am Kartenende wuerde sie die letzten ~60-80px
+   jedes Panel-Inhalts beim Herunterscrollen dauerhaft ueberdecken (auf
+   der echten /app-Vollbild-Karte macht das bereits die dortige, davon
+   unabhaengige padding-bottom:5.2rem-Reservierung - die zentrierte
+   94vw-Dialogkarte der normalen Website kennt diese Reservierung aber
+   nicht, da sie nie fuer eine fixierte Navigation gebaut wurde). Nur
+   dieser eine Wert wird ergaenzt, alle anderen Seiten/Ecken/Farben der
+   Karte bleiben unangetastet (siehe Basis-Regel weiter oben in dieser
+   Datei). */
+html.bkmp-app-mode .idle-dorf-overlay .idle-dorf-card {
+  padding-bottom: calc(6rem + env(safe-area-inset-bottom));
+}
+/* KRITISCHER FUND (Phase 5.1 Verifikation, 17.07.): ohne dies bricht die
+   fixierte Bottom-Navigation komplett auf der normalen Website bei
+   schmaler Breite - die Karte hat eine eigene Oeffnen-"Pop"-Animation
+   (transform: translateY/scale, siehe .joke-overlay.visible .joke-card
+   weiter oben in dieser Datei), und ein transform auf einem Vorfahren
+   macht diesen per CSS-Spezifikation zum neuen Bezugsrahmen fuer ALLE
+   position:fixed-Kindelemente darin (dieselbe Ursache, die die echte
+   /app-Karte schon laenger mit "transform:none!important" umgeht, siehe
+   die zone-game-Regel oben - hier zusaetzlich noetig, weil die
+   Vollbild-Karte dort NICHT mehr ausserhalb von /app greift, siehe
+   Fund oben, die fixierte Navigation aber sehr wohl schon bei schmaler
+   Website-Breite aktiv ist). Ohne diese Regel hing die Navigation (und
+   das "Mehr"-Menue) irgendwo an der animierten Kartenposition statt am
+   echten Bildschirmrand. */
+html.bkmp-app-mode .idle-dorf-overlay .idle-dorf-card {
+  transform: none !important;
+  animation: none !important;
 }
 /* Nur noch 6 Buttons stehen hier (5 wichtigste Tabs + "Mehr" - der Rest
    wandert per JS ins Ausklappmenue, siehe index.html setupMoreMenu) -
@@ -8424,6 +9149,7 @@ html.bkmp-app-mode #idleAppMoreBtn.active {
   color: #2b1600;
   transform: translateY(-3px) scale(1.06);
 }
+} /* Ende @media (max-width:760px) - Redesign Phase 5 (17.07.): die fixierte Bottom-Navigation aus dem App-Modus ist ein reines Mobil-Muster (position:fixed relativ zum GESAMTEN Viewport) - auf breiten Desktop-Screens wuerde sie ueber die volle Fensterbreite gespannt, obwohl das Idle-Dorf-Fenster selbst nur einen Teil davon einnimmt (siehe Analyse). Ab hier deshalb an einen Breakpoint gekoppelt statt bedingungslos; Desktop bekommt direkt im Anschluss eine eigene, gruppierte Tableiste.
 
 /* ---- Kampfbereich als eine zusammenhaengende Kampf-Szene statt zwei
    getrennter Kaesten (Phase 4) ---- */
@@ -8470,9 +9196,9 @@ html.bkmp-app-mode .idle-battlefield::before {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html.bkmp-app-mode .app-bg-fx-nebula,
-  html.bkmp-app-mode .app-bg-fx-stars,
-  html.bkmp-app-mode .app-bg-fx-embers span,
+  html.bkmp-app-mode.zone-game .app-bg-fx-nebula,
+  html.bkmp-app-mode.zone-game .app-bg-fx-stars,
+  html.bkmp-app-mode.zone-game .app-bg-fx-embers span,
   html.bkmp-app-mode .idle-hud-level-badge,
   html.bkmp-app-mode .idle-hud-streak-badge,
   html.bkmp-app-mode .idle-hud-stats span,
@@ -8580,7 +9306,15 @@ html.bkmp-app-mode .idle-hud-app-xp { margin-top: .1rem; }
    3) Kontrast/Lesbarkeit zuerst: dickere Textschatten, klare
       Rahmenfarbe pro Kachel, getestet auf hellstem Hintergrund-Effekt
       (Sternenfeld/Nebel). */
-html.bkmp-app-mode #idleDorfHud {
+/* KRITISCHER FUND (Phase 5.1 Verifikation, 17.07.): diese negativen
+   Raender sind exakt auf das Padding der /app-Vollbild-Karte (siehe
+   Fund weiter oben, jetzt html.bkmp-app-mode.zone-game) kalibriert -
+   standen aber selbst auf blossem html.bkmp-app-mode. Auf der normalen
+   Website (94vw-Dialogkarte mit anderem Padding, siehe Phase 4) zog das
+   den HUD zu weit nach oben/aussen und liess ihn mit der direkt
+   darunter liegenden Tableiste kollidieren. Gehoert exklusiv zusammen
+   mit der Vollbild-Karte zu echtem /app. */
+html.bkmp-app-mode.zone-game #idleDorfHud {
   position: sticky;
   top: 0;
   z-index: 6;
@@ -8597,7 +9331,7 @@ html.bkmp-app-mode #idleDorfHud {
   border-bottom: 1px solid color-mix(in srgb, var(--app-gold) 30%, transparent);
   box-shadow: 0 10px 24px -8px rgba(0, 0, 0, .7), inset 0 1px 0 rgba(255, 255, 255, .05);
 }
-html.bkmp-app-mode #idleDorfHud::after {
+html.bkmp-app-mode.zone-game #idleDorfHud::after {
   content: '';
   position: absolute;
   left: 0;
@@ -8751,7 +9485,7 @@ html.bkmp-app-mode .idle-dorf-panel .idle-skin-name {
 html.bkmp-app-mode .idle-dorf-panel .idle-upgrade-level {
   font-size: .8rem !important;
 }
-html.bkmp-app-mode .idle-dorf-panel .idle-upgrade-desc,
+html.bkmp-app-mode .idle-dorf-panel .idle-upgrade-effect-row,
 html.bkmp-app-mode .idle-dorf-panel .idle-skin-desc {
   font-size: .84rem !important;
   line-height: 1.4;
@@ -9120,9 +9854,22 @@ html.bkmp-app-mode .idle-dorf-panel .idle-dragon-dex-grid .idle-skin-name { font
       Skill-/Runen-Hilfe, Event-Popups, Account-Einstellungen, ...).
    ============================================================ */
 
-/* ---- Alle Popup-Fenster (.joke-card) im App-Modus einheitlich im
-   Fantasy-Look, nicht nur die grosse Idle-Dorf-Karte. ---- */
-html.bkmp-app-mode .joke-card {
+/* ---- Alle Popup-Fenster (.joke-card) im Idle-Dorf-Kontext einheitlich im
+   Fantasy-Look, nicht nur die grosse Idle-Dorf-Karte.
+   Redesign Phase 5 (17.07.): war "html.bkmp-app-mode .joke-card" - seit
+   .bkmp-app-mode global (nicht mehr /app-exklusiv) ist, haette das JEDES
+   .joke-card auf der ganzen Seite erfasst, auch die professionellen
+   Marketing-Popups (Wunsch-CTA, Feedback, Investoren-Anfrage,
+   Kartendatenbank-Einreichung, ...) - das widerspraeche "ein Designsystem,
+   zwei Stimmungen". Jetzt auf .zone-game beschraenkt: alle Spiel-/Account-
+   bezogenen Overlays (Login, Erfolge, Name/Passwort/Account, Dorf-Skin-Kauf,
+   Drachen-Lexikon, Wartung, Skilltree-/Runen-Hilfe, Spielerprofil,
+   Arena-Kampf, Stream-Hilfe) tragen dafuer jetzt explizit zone-game im
+   Markup (siehe index.html), analog zu #idleDorfOverlay. Generische/
+   Website-Popups (bkmpConfirmOverlay, Wunsch/Feedback/Investoren/
+   Kartendatenbank/PartnerShop-Formulare) bleiben bewusst unverändert bei
+   zone-site. */
+.zone-game .joke-card {
   position: relative;
   border-radius: 20px;
   border-color: transparent;
@@ -9133,21 +9880,21 @@ html.bkmp-app-mode .joke-card {
   box-shadow: 0 24px 70px rgba(0, 0, 0, .6), 0 0 40px color-mix(in srgb, var(--app-gold) 18%, transparent);
   color: var(--app-ink);
 }
-html.bkmp-app-mode .joke-card h3 {
+.zone-game .joke-card h3 {
   font-family: 'Fraunces', serif;
   font-weight: 700;
   color: var(--app-gold);
   text-shadow: 0 0 12px color-mix(in srgb, var(--app-gold) 45%, transparent);
 }
-html.bkmp-app-mode .joke-card p,
-html.bkmp-app-mode .joke-card label {
+.zone-game .joke-card p,
+.zone-game .joke-card label {
   color: var(--app-muted);
 }
-html.bkmp-app-mode .joke-card input[type="text"],
-html.bkmp-app-mode .joke-card input[type="password"],
-html.bkmp-app-mode .joke-card input[type="number"],
-html.bkmp-app-mode .joke-card select,
-html.bkmp-app-mode .joke-card textarea {
+.zone-game .joke-card input[type="text"],
+.zone-game .joke-card input[type="password"],
+.zone-game .joke-card input[type="number"],
+.zone-game .joke-card select,
+.zone-game .joke-card textarea {
   background: rgba(0, 0, 0, .3);
   border: 1px solid rgba(255, 255, 255, .14);
   color: var(--app-ink);
@@ -9161,13 +9908,13 @@ html.bkmp-app-mode .joke-card .btn-nein {
   border-radius: 12px;
   font-weight: 700;
 }
-html.bkmp-app-mode .joke-card .btn-ja {
+.zone-game .joke-card .btn-ja {
   background: linear-gradient(135deg, var(--app-gold), var(--app-orange)) !important;
   border: none !important;
   color: #2b1600 !important;
   box-shadow: var(--app-glow-gold);
 }
-html.bkmp-app-mode .joke-card .btn-nein {
+.zone-game .joke-card .btn-nein {
   background: rgba(255, 255, 255, .06);
   border-color: rgba(255, 255, 255, .16);
 }
@@ -9509,6 +10256,12 @@ html.bkmp-app-mode .idle-battlefield:has(.idle-dmg-crit)::before {
   animation: appCritFlash .28s ease-out;
   pointer-events: none;
 }
+/* Performance-Modus: Krit-Flash ist ein einzelner, kurzer Opacity-Uebergang
+   auf einer bereits vorhandenen Ebene (guenstig) - bleibt deshalb in
+   "Reduziert" erhalten, nur "Aus" schaltet ihn ab. */
+html[data-fx="aus"].bkmp-app-mode .idle-battlefield:has(.idle-dmg-crit)::before {
+  display: none;
+}
 @keyframes appCritFlash {
   0% { opacity: 1; }
   100% { opacity: 0; }
@@ -9626,6 +10379,10 @@ html.bkmp-app-mode #idlePanelKampf .idle-battlefield {
 }
 html.bkmp-app-mode #idlePanelKampf .idle-dorf-log {
   flex: 0 0 auto !important;
+  /* Bug-Fix 18.07.: siehe Kommentar bei der Basis-Regel .idle-dorf-log -
+     dieselbe Wachsen-bei-neuer-Zeile-Ursache, hier per !important auf
+     max-height ueberschrieben, daher auch hier min-height ergaenzt. */
+  min-height: 13vh;
   max-height: 13vh;
   margin-top: .6rem;
 }
@@ -9693,4 +10450,430 @@ html.bkmp-app-mode .idle-app-more-sheet-group-title:first-child {
   margin-top: 0;
   padding-top: 0;
   border-top: none;
+}
+
+/* ============================================================
+   Redesign Phase 3 (17.07.): Styles fuer js/ui/bkmp-ui-components.js.
+   Nutzt ausschliesslich design-tokens.css-Variablen. .bkmp-ui-card und
+   .bkmp-ui-modal-overlay brauchen bewusst keine eigenen Regeln - sie sind
+   zusaetzlich zu .idle-skin-card/.joke-overlay geklebt und erben deren
+   bestehende Optik vollstaendig.
+   ============================================================ */
+.bkmp-ui-rarity-badge {
+  display: inline-block;
+  font-family: var(--font-body);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.14rem 0.5rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--badge-color, var(--color-muted));
+  color: var(--badge-color, var(--color-muted));
+  background: color-mix(in srgb, var(--badge-color, var(--color-muted)) 16%, transparent);
+  vertical-align: middle;
+  margin-left: 0.4rem;
+}
+.idle-skin-card.has-rarity { border-color: color-mix(in srgb, var(--badge-color) 45%, var(--line)); }
+
+.bkmp-ui-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: var(--color-surface-2);
+  color: var(--color-ink);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.6rem;
+  font-size: var(--font-size-xs);
+  max-width: 240px;
+  white-space: normal;
+  text-align: center;
+  box-shadow: var(--shadow-2);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity var(--duration-base) var(--ease-out), transform var(--duration-base) var(--ease-out);
+  z-index: var(--z-toast);
+}
+.bkmp-ui-tooltip.visible { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0); }
+@media (prefers-reduced-motion: reduce) { .bkmp-ui-tooltip { transition: opacity var(--duration-base) linear; } }
+
+.bkmp-ui-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%) translateY(12px);
+  background: var(--color-surface-2);
+  border: 1px solid var(--toast-color, var(--color-line));
+  border-left-width: 4px;
+  color: var(--color-ink);
+  padding: 0.7rem 1.1rem;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-3);
+  font-size: var(--font-size-sm);
+  opacity: 0;
+  z-index: var(--z-toast);
+  transition: opacity var(--duration-base) var(--ease-out), transform var(--duration-base) var(--ease-out);
+  max-width: min(360px, 86vw);
+}
+.bkmp-ui-toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+@media (prefers-reduced-motion: reduce) { .bkmp-ui-toast { transition: opacity var(--duration-base) linear; } }
+
+/* ============================================================
+   PHASE 5.6 STUFE 1 (19.07., ISOLIERT & VOLLSTAENDIG ENTFERNBAR) -
+   modulares Kampf-Ebenensystem mit echtem transparentem Drachen.
+   Entfernen: dieser gesamte Block + js/prototype/
+   bkmp-proto-battlefield.js + dessen <script>-Tag + der HTML-Block in
+   index.html + die 2 zusaetzlichen Hook-Zeilen in js/ui/bkmp-hud.js
+   (klar markiert). Die bestehende .idle-battlefield-Regelung weiter
+   oben in dieser Datei ist davon unberuehrt und bleibt der garantierte
+   Fallback.
+
+   Vorgeschichte (Phase 5.1, 18.07.): Web-MP4/H.264 unterstuetzt keinen
+   Alphakanal - ein mix-blend-mode:screen-Test funktionierte technisch,
+   wusch aber dunkle Drachenschuppen sichtbar aus (screen(src,dst)=dst
+   nur fuer src=0 exakt) und wurde vom Nutzer verworfen; die Darstellung
+   fiel danach auf ein gerahmtes Portrait-Video zurueck (kein Transparenz-
+   Versuch mehr). Phase 5.6 (19.07.) loest das jetzt richtig: der Nutzer
+   stellte einen Greenscreen-Rohclip bereit, mit seiner ausdruecklichen
+   Zustimmung wurde lokal ffmpeg installiert und daraus EINMALIG, offline
+   ein echtes VP9/yuva420p-WebM mit echtem Alphakanal erzeugt (chromakey-
+   Filter + Crop der Letterbox-Raender, siehe Abschlussbericht fuer die
+   exakten Parameter) - keine Laufzeit-Chroma-Key-Schleife, kein
+   mix-blend-mode mehr noetig, der Drache traegt seine volle Farbtiefe. */
+.bkmp-proto-battlefield {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  /* Bewusst etwas hoeher als das rohe Quellvideo-Seitenverhaeltnis
+     (2230:930 = 2,398:1) - Prototyp 2 (18.07., kompaktes HUD/Nav) will
+     den Kampfbereich auf ~55-65% der Fensterhoehe bringen. Da die Karte
+     ihrer Inhaltshoehe folgt (kein fixes Viewport-Grow), ist die einzige
+     wirksame Stellschraube die eigene Boxhoehe - object-fit:cover auf
+     .bkmp-proto-bg-video gleicht die etwas staerkere Rand-Beschneidung
+     der Landschaft dabei automatisch aus, Stadt/Terrain bleiben je nach
+     Breite weiterhin sichtbar (siehe Verifikation im Abschlussbericht). */
+  aspect-ratio: 21 / 10;
+  min-height: 200px;
+  background: #050506;
+  /* FIX (Nutzer-Screenshot 18.07.): #idlePanelKampf/.idle-dorf-card sind
+     display:flex;flex-direction:column - ohne flex-shrink:0 durfte der
+     Flex-Layout-Algorithmus dieses Element bei knapper Fensterhoehe unter
+     seine eigene aspect-ratio-Hoehe zusammendruecken (gemessen: bei
+     1440x760 sollten es 451px Hoehe sein, gerendert wurden nur 280px) -
+     die Drachen-Ebene (separat ueber ihre eigene Breite berechnet) behielt
+     dabei ihre volle Groesse und ragte dadurch unten aus dem jetzt zu
+     kurzen Kasten heraus, wo overflow:hidden sie sichtbar abschnitt. Das
+     war die tatsaechliche Ursache des "Drache unten abgeschnitten"-Bugs,
+     nicht die Drachen-Position selbst (deren eigener Bildinhalt hat bei
+     jedem Zeitpunkt im Video reichlich Rand nach oben/unten, per
+     Canvas-Bounding-Box ueber die ganze Clip-Laenge verifiziert). */
+  flex-shrink: 0;
+  /* FIX (Nutzer-Screenshot 18.07.): eigener, kontrollierter Stacking-
+     Context fuer die ganze Szene - haelt den weiter unten reparierten
+     mix-blend-mode sauber auf dieses Element begrenzt (blendet nur mit
+     Inhalt INNERHALB dieser Box, nie mit Seiteninhalt dahinter). */
+  isolation: isolate;
+}
+.bkmp-proto-bg-video {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; object-position: center center;
+}
+.bkmp-proto-dragon-layer {
+  position: absolute;
+  /* Startwerte fuer Abschnitt 5's Default-Position (feuerdrache, Desktop) -
+     bkmpProtoApplyPosition() in bkmp-proto-battlefield.js ueberschreibt
+     width/right/top pro Gegner/Breakpoint aus BKMP_COMBAT_ASSETS, aspect-
+     ratio wird beim Asset-Laden ebenfalls per JS gesetzt (asset.aspectRatio) -
+     diese Werte hier greifen nur als Fallback vor dem ersten JS-Sync. */
+  width: 32%;
+  right: 5%;
+  top: 18%;
+  aspect-ratio: 1080 / 612;
+  pointer-events: none;
+  /* Kein z-index hier - ein eigener z-index wuerde einen neuen Stacking-
+     Context erzeugen (siehe Phase-5.1-Historie oben). Mit echtem Alpha
+     ist das inzwischen irrelevant fuer die Sichtbarkeit selbst, aber
+     unnoetiger Stacking-Context bleibt trotzdem vermieden. */
+}
+.bkmp-proto-dragon-video {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  /* object-fit:contain statt cover (Unterschied zur Phase-5.1-Portrait-
+     Variante): mit echtem Alphakanal soll der GESAMTE Drache inkl.
+     Fluegelspitzen/Feueratem sichtbar bleiben, nicht auf ein Rechteck
+     zugeschnitten werden (Auftrag Abschnitt 7: "nicht abgeschnitten
+     werden"). Kein Rahmen/Schatten mehr - die alte Portrait-Umrandung
+     kaschierte die fehlende Transparenz, mit echtem Alpha braucht es sie
+     nicht mehr (Auftrag Abschnitt 7: "keine sichtbare rechteckige
+     Hintergrundflaeche besitzen"). */
+  object-fit: contain;
+}
+.bkmp-proto-hit-area {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  border: none; background: transparent; cursor: pointer; padding: 0; z-index: 3;
+}
+.bkmp-proto-effects { position: absolute; inset: 0; pointer-events: none; z-index: 4; }
+/* Abschnitt 9/10: Treffer-/Krit-Partikel, positioniert per Prozentwert
+   (left/top aus asset.anchors.dragonHit) statt fester Pixel. Kurz,
+   selbst-entfernend (siehe bkmpProtoSpawnHitFx setTimeout), kein Loop. */
+.bkmp-proto-hit-fx { position: absolute; width: 0; height: 0; transform: translate(-50%, -50%); }
+.bkmp-proto-hit-fx > span {
+  position: absolute; left: 0; top: 0; width: 5px; height: 5px; border-radius: 50%;
+  background: #fbbf24;
+  animation-name: bkmpProtoHitFxFly; animation-timing-function: ease-out; animation-fill-mode: forwards;
+}
+.bkmp-proto-hit-fx.is-crit > span { width: 7px; height: 7px; background: #f87171; }
+@keyframes bkmpProtoHitFxFly {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(0.3); opacity: 0; }
+}
+.bkmp-proto-hp-card {
+  position: absolute; z-index: 5;
+  /* Feste width statt nur min-/max-width: .bkmp-proto-hp-bar hat KEINE
+     eigene intrinsische Breite (ihre Kinder sind position:absolute,
+     tragen also nichts zur Shrink-to-fit-Breite dieser Karte bei) -
+     ohne eine echte width haengt die gesamte Kartenbreite ausschliesslich
+     vom Namens-/Label-Textinhalt ab und kollabiert sichtbar, sobald der
+     Text kurz oder (wie im Test ohne echten Spielstand) leer ist. */
+  width: 42%; max-width: 220px;
+  padding: 0.55rem 0.8rem;
+  border-radius: 12px;
+  background: linear-gradient(155deg, rgba(10, 8, 16, 0.82), rgba(6, 5, 10, 0.78));
+  border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 16px color-mix(in srgb, #a78bfa 25%, transparent);
+}
+.bkmp-proto-hp-card-city { top: 4%; left: 3%; }
+.bkmp-proto-hp-card-dragon { top: 4%; right: 3%; text-align: right; }
+.bkmp-proto-hp-name {
+  font-family: 'Fraunces', serif; font-size: 0.82rem; font-weight: 700; color: #fff;
+  margin-bottom: 0.3rem; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+.bkmp-proto-hp-bar {
+  position: relative; width: 100%; height: 10px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12); overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.18);
+}
+.bkmp-proto-hp-fill-trail, .bkmp-proto-hp-fill {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  transform-origin: left; transform: scaleX(1); border-radius: inherit;
+}
+.bkmp-proto-hp-card-dragon .bkmp-proto-hp-fill-trail,
+.bkmp-proto-hp-card-dragon .bkmp-proto-hp-fill { transform-origin: right; }
+.bkmp-proto-hp-fill-trail { transition: transform 0.6s ease 0.15s; }
+.bkmp-proto-hp-fill { transition: transform 0.25s ease; }
+.bkmp-proto-hp-fill-trail-city { background: rgba(52, 211, 153, 0.55); }
+.bkmp-proto-hp-fill-trail-dragon { background: rgba(249, 115, 22, 0.55); }
+.bkmp-proto-hp-fill-city { background: linear-gradient(90deg, #10b981, #34d399); }
+.bkmp-proto-hp-fill-dragon { background: linear-gradient(90deg, #dc2626, #f97316); }
+.bkmp-proto-hp-label { margin-top: 0.25rem; font-size: 0.7rem; font-weight: 700; color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); }
+.bkmp-proto-hp-card.hit { animation: bkmpProtoHitPulse 0.22s ease; }
+@keyframes bkmpProtoHitPulse {
+  0% { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 0 rgba(220, 38, 38, 0); }
+  40% { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 22px rgba(220, 38, 38, 0.65); }
+  100% { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 16px color-mix(in srgb, #a78bfa 25%, transparent); }
+}
+.bkmp-proto-badge {
+  position: absolute; bottom: 3%; left: 50%; transform: translateX(-50%); z-index: 5;
+  font-size: 0.65rem; font-weight: 700; letter-spacing: 0.03em;
+  padding: 0.2rem 0.6rem; border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.4);
+  pointer-events: none;
+}
+
+/* Effektmodus (wiederverwendet data-fx aus Section B statt eines neuen
+   Systems) - Reduziert/Aus daempfen nur die HP-Balken-/Treffer-
+   Animationen; das eigentliche Pausieren der beiden Videos passiert in
+   JS (bkmp-proto-battlefield.js), nicht per CSS. */
+html[data-fx="reduziert"] .bkmp-proto-hp-fill-trail,
+html[data-fx="aus"] .bkmp-proto-hp-fill-trail { transition: none; }
+html[data-fx="aus"] .bkmp-proto-hp-fill { transition: none; }
+html[data-fx="aus"] .bkmp-proto-hp-card.hit { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .bkmp-proto-hp-fill-trail, .bkmp-proto-hp-fill { transition: none !important; }
+  .bkmp-proto-hp-card.hit { animation: none !important; }
+}
+
+@media (max-width: 640px) {
+  .bkmp-proto-hp-card { width: 47%; max-width: none; padding: 0.4rem 0.55rem; }
+  .bkmp-proto-hp-name { font-size: 0.68rem; }
+  .bkmp-proto-hp-label { font-size: 0.62rem; }
+  .bkmp-proto-dragon-layer { width: 34%; right: 3%; top: 18%; }
+}
+
+/* ============================================================
+   PROTOTYP 2 (18.07., ISOLIERT & VOLLSTAENDIG ENTFERNBAR) - kompaktes
+   HUD/Nav/Stufenleiste-Layout. Ziel: Abstand vom Kartenrand bis zum
+   Kampffeld auf ~180-220px bei 1638x900 senken (vorher gemessen: 611px).
+   Entfernen: dieser Block + js/prototype/bkmp-proto-compact-hud.js +
+   dessen <script>-Tag + der HTML-Block in index.html - die bestehenden
+   #idleDorfHud/#idleDorfTabs/#idleStageBar/#idleFxModeBtn-Regeln weiter
+   oben in dieser Datei sind davon unberuehrt und bleiben der garantierte
+   Fallback. Bewusst wenige Rahmen/Karten (Nutzer-Vorgabe "weniger
+   Verwaltungsoberflaeche") - Trennung ueber Abstand/dezente Hintergrund-
+   tönung statt harter Border-Linien. ============ */
+.bkmp-proto-chud {
+  margin-bottom: 0.5rem;
+}
+.bkmp-proto-chud-row {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.45rem 0.7rem;
+  /* Bug-Fix 18.07. (Spieler-Screenshot: Feedback-Button überlappt mit
+     Effektmodus-Icon): #idleDorfCloseX/#idleDorfFeedbackBtn schweben
+     position:absolute in genau der Ecke, in der diese Flex-Zeile (normaler
+     Dokumentfluss, direkt am Kartenanfang) ihre eigenen ⓘ/FX-Icons
+     rechtsbündig platziert - beide Ebenen kollidierten sichtbar. Rechter
+     Freiraum reserviert exakt den von beiden Knöpfen belegten Bereich
+     (je 34px breit, right:0.9rem/2.9rem => bis ~80px vom Kartenrand). */
+  padding-right: 5.3rem;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--paper-2) 55%, transparent);
+}
+.bkmp-proto-chud-level {
+  flex: none; display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 50%;
+  background: linear-gradient(145deg, var(--gold), color-mix(in srgb, var(--gold) 55%, #7c3aed));
+  color: var(--accent-ink); font-weight: 800; font-size: 0.82rem;
+}
+.bkmp-proto-chud-xp { flex: 1 1 160px; min-width: 90px; }
+.bkmp-proto-chud-xp .idle-xp-bar { height: 7px; }
+.bkmp-proto-chud-xp-label { font-size: 0.66rem; color: var(--muted); margin-top: 0.15rem; }
+.bkmp-proto-chud-resources { display: flex; align-items: center; gap: 0.55rem; flex-wrap: wrap; }
+.bkmp-proto-chud-res { display: flex; align-items: center; gap: 0.25rem; font-size: 0.78rem; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.bkmp-proto-chud-res-icon { font-size: 0.85rem; line-height: 1; }
+.bkmp-proto-chud-icon-btn {
+  flex: none; width: 32px; height: 32px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--paper);
+  color: var(--muted); font-size: 0.9rem; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color 0.15s ease, color 0.15s ease;
+  position: relative;
+}
+.bkmp-proto-chud-icon-btn:hover, .bkmp-proto-chud-icon-btn[aria-expanded="true"] { color: var(--ink); border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); }
+.bkmp-proto-chud-details {
+  margin-top: 0.4rem; padding: 0.5rem 0.7rem; border-radius: 10px;
+  background: color-mix(in srgb, var(--paper-2) 45%, transparent);
+  display: flex; flex-wrap: wrap; gap: 0.15rem 0.9rem;
+  font-size: 0.76rem; color: var(--muted);
+}
+.bkmp-proto-chud-fx-menu {
+  /* FIX (Nutzer-Screenshot 18.07., root-caused nach mehreren Fehlversuchen):
+     ein hoeherer z-index allein reichte nicht. Ursache liegt eine Ebene
+     hoeher: .idle-dorf-card (der Elternrahmen dieses Dropdowns) hat
+     position:relative aber z-index:auto - und z-index wirkt NUR zwischen
+     Geschwistern im SELBEN Stacking-Context. .idle-runen-drawer ist ein
+     GESCHWISTER von .idle-dorf-card (beide direkte Kinder von
+     #idleDorfOverlay), aber mit explizitem z-index:56 - explizite
+     z-index-Werte malen laut CSS-Spezifikation IMMER ueber z-index:auto-
+     Geschwister, unabhaengig davon, welchen z-index ein NACHFAHRE (wie
+     dieses Dropdown) intern hat. Die ganze Karte blieb dadurch als
+     Einheit hinter dem Lager-Balken haengen, egal wie hoch der z-index
+     hier gesetzt wurde. Fix: position:fixed statt position:absolute -
+     entkommt damit dem lokalen Stacking-Context der Karte komplett und
+     wird (wie .idle-runen-drawer selbst) ein echtes Geschwister auf
+     #idleDorfOverlay-Ebene, wo der eigene z-index (62) wieder normal
+     zaehlt. Position wird beim Oeffnen per JS (bkmpProtoChudOpenFxMenu)
+     anhand der echten Button-Position gesetzt, da fixed nicht mehr an
+     einem position:relative-Elternteil verankern kann. */
+  position: fixed; z-index: 62;
+  width: 150px; border-radius: 10px; padding: 0.3rem;
+  background: var(--paper-2); border: 1px solid var(--line);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+}
+.bkmp-proto-chud-fx-option {
+  display: block; width: 100%; text-align: left; padding: 0.4rem 0.6rem;
+  border-radius: 7px; border: none; background: transparent; color: var(--ink);
+  font-size: 0.8rem; cursor: pointer;
+}
+.bkmp-proto-chud-fx-option:hover { background: color-mix(in srgb, var(--gold) 12%, transparent); }
+.bkmp-proto-chud-fx-option.active { color: var(--gold); font-weight: 700; }
+
+.bkmp-proto-nav {
+  display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; position: relative;
+}
+.bkmp-proto-nav-primary { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
+.bkmp-proto-nav-btn {
+  display: flex; align-items: center; gap: 0.35rem;
+  padding: 0.42rem 0.75rem; border-radius: 9px;
+  border: 1px solid transparent; background: transparent;
+  color: var(--muted); font-size: 0.8rem; font-weight: 700; cursor: pointer;
+  min-height: 38px;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.bkmp-proto-nav-btn svg { width: 16px; height: 16px; flex: none; }
+.bkmp-proto-nav-btn:hover { color: var(--ink); background: color-mix(in srgb, var(--paper-2) 70%, transparent); }
+.bkmp-proto-nav-btn.active {
+  color: var(--gold); background: color-mix(in srgb, var(--gold) 12%, transparent);
+  border-color: color-mix(in srgb, var(--gold) 35%, transparent);
+}
+.bkmp-proto-nav-more-wrap { position: relative; margin-left: auto; }
+.bkmp-proto-nav-more-btn {
+  padding: 0.42rem 0.85rem; border-radius: 9px; min-height: 38px;
+  border: 1px solid var(--line); background: var(--paper); color: var(--muted);
+  font-size: 0.8rem; font-weight: 700; cursor: pointer;
+}
+.bkmp-proto-nav-more-btn:hover, .bkmp-proto-nav-more-btn[aria-expanded="true"] { color: var(--ink); border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); }
+.bkmp-proto-nav-more-menu {
+  /* FIX (Nutzer-Screenshot 18.07.): siehe ausfuehrlichen Kommentar bei
+     .bkmp-proto-chud-fx-menu oben - identische Ursache (Stacking-Context
+     der Karte, nicht nur ein zu niedriger z-index) und identischer Fix
+     (position:fixed, Koordinaten per JS in bkmpProtoChudOpenMoreMenu). */
+  position: fixed; z-index: 62;
+  width: 200px; max-height: 60vh; overflow-y: auto;
+  border-radius: 12px; padding: 0.4rem;
+  background: var(--paper-2); border: 1px solid var(--line);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem;
+}
+.bkmp-proto-nav-more-item {
+  display: flex; align-items: center; gap: 0.4rem; text-align: left;
+  padding: 0.5rem 0.6rem; border-radius: 8px; min-height: 40px;
+  border: none; background: transparent; color: var(--ink); font-size: 0.78rem; font-weight: 600; cursor: pointer;
+}
+.bkmp-proto-nav-more-item:hover { background: color-mix(in srgb, var(--gold) 12%, transparent); }
+.bkmp-proto-nav-more-item.active { color: var(--gold); }
+.bkmp-proto-nav-more-item[disabled] { opacity: 0.5; cursor: not-allowed; }
+
+.bkmp-proto-stagebar {
+  display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+  padding: 0.35rem 0.7rem; margin-bottom: 0.5rem; border-radius: 10px;
+  background: color-mix(in srgb, var(--paper-2) 40%, transparent);
+  font-size: 0.78rem; color: var(--muted);
+}
+.bkmp-proto-stagebar strong { color: var(--ink); }
+.bkmp-proto-stagebar-btn {
+  padding: 0.3rem 0.65rem; border-radius: 999px; min-height: 32px;
+  border: 1px solid var(--line); background: var(--paper); color: var(--ink);
+  font-size: 0.74rem; font-weight: 700; cursor: pointer; margin-left: auto;
+}
+.bkmp-proto-stagebar-btn:hover:not(:disabled) { border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); }
+.bkmp-proto-stagebar-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.bkmp-proto-stagebar-icon-btn {
+  flex: none; width: 30px; height: 30px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--paper); color: var(--muted);
+  cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.85rem;
+}
+.bkmp-proto-stagebar-icon-btn.is-on { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); }
+
+@media (max-width: 760px) {
+  .bkmp-proto-chud-row { flex-wrap: wrap; }
+  .bkmp-proto-chud-xp { flex-basis: 100%; order: 3; }
+  /* FIX (18.07., beim Testen gefunden): "left:0" drehte den Anker auf die
+     LINKE Seite um - der "Mehr"-Button sitzt aber (per margin-left:auto
+     in .bkmp-proto-nav-more-wrap) immer am RECHTEN Rand der Nav-Zeile.
+     Bei schmalem Fenster wuchs das Menue dadurch von dort aus nach
+     RECHTS weiter ueber die Kartenkante hinaus, statt nach links in den
+     vorhandenen Platz hinein. right:0 (aus der Basisregel geerbt) ist
+     die richtige Ankerseite fuer JEDE Fensterbreite - hier nur noch die
+     Spaltenzahl/Breite fuer schmale Bildschirme anpassen. */
+  .bkmp-proto-nav-more-menu { grid-template-columns: 1fr; width: min(200px, calc(100vw - 2rem)); }
+  .bkmp-proto-nav-btn span.bkmp-proto-nav-label { display: none; }
+  .bkmp-proto-nav-btn { padding: 0.42rem 0.55rem; min-height: 44px; }
+  .bkmp-proto-stagebar-btn { font-size: 0.7rem; padding: 0.3rem 0.5rem; min-height: 44px; }
+  /* a11y: 44x44px Mindest-Touch-Ziel (gleiche Konvention wie Section B/C) */
+  .bkmp-proto-chud-icon-btn, .bkmp-proto-nav-more-btn, .bkmp-proto-stagebar-icon-btn { min-width: 44px; min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bkmp-proto-chud-icon-btn, .bkmp-proto-nav-btn, .bkmp-proto-nav-more-btn { transition: none; }
 }
