@@ -827,6 +827,31 @@ function bkmpRaidRewardSpans(state, mine, totalDamage) {
   return parts.join('');
 }
 
+/* Nutzerwunsch 19.07.: "Anzeige nach dem Raidboss wieviel damage jeder hat
+   zum ausklappen" - bisher zeigte das Ergebnis-Fenster nur den eigenen
+   Schaden + den MVP-Namen, nicht die volle Teilnehmerliste. participants
+   ist bereits nach Schaden sortiert (server-seitig, siehe loadRaidParticipants)
+   - hier nur als ausklappbare Liste gerendert statt permanent Platz zu
+   beanspruchen, analog zum bestehenden .achievement-category-Muster. */
+function bkmpRaidResultParticipantsHTML(participants, totalDamage, mine) {
+  if (!participants.length) return '';
+  const rows = participants.map((p, i) => {
+    const pct = totalDamage > 0 ? ((p.damageDealt / totalDamage) * 100).toFixed(1) : '0';
+    return `<div class="raid-result-participant-row${p === mine ? ' is-me' : ''}">
+      <span class="raid-result-participant-rank">#${i + 1}</span>
+      <span class="raid-result-participant-name">${escapeHtml(p.displayName)}</span>
+      <span class="raid-result-participant-damage">${bkmpIdleFormatNumber(p.damageDealt)} <small>(${pct}%)</small></span>
+    </div>`;
+  }).join('');
+  return `
+    <div class="raid-result-participants">
+      <button type="button" class="raid-result-participants-toggle" id="raidResultParticipantsToggle" aria-expanded="false">
+        <span class="raid-result-participants-toggle-icon">▸</span> Alle Teilnehmer anzeigen (${participants.length})
+      </button>
+      <div class="raid-result-participants-list" id="raidResultParticipantsList" style="display:none;">${rows}</div>
+    </div>`;
+}
+
 async function bkmpRaidShowResult() {
   const resultCard = document.getElementById('raidResultCard');
   const battlefield = document.getElementById('raidBattlefield');
@@ -886,6 +911,7 @@ async function bkmpRaidShowResult() {
       <div class="raid-result-stat"><div class="raid-result-stat-label">${won ? 'Stadt-HP übrig' : 'Boss-HP übrig'}</div><div class="raid-result-stat-value">${bkmpIdleFormatNumber(won ? bkmpRaidState.cityHp : bkmpRaidState.bossHp)}</div></div>
     </div>
     ${won ? `<div class="raid-result-rewards">${bkmpRaidRewardSpans(bkmpRaidState, mine, totalDamage)}</div><p class="admin-help-text" style="margin-top:-0.3rem;">Belohnung nach Schadensanteil (${totalDamage > 0 && mine ? ((mine.damageDealt / totalDamage) * 100).toFixed(1) : '0'}% des Gesamtschadens).</p>` : ''}
+    ${bkmpRaidResultParticipantsHTML(participants, totalDamage, mine)}
     ${rewardCode ? `
     <div class="raid-result-zerator-code">
       <div class="raid-result-zerator-title">🎁 Plushie! Hier ist dein Code:</div>
@@ -913,6 +939,14 @@ async function bkmpRaidShowResult() {
   if (closeBtn) closeBtn.addEventListener('click', () => {
     bkmpRaidStopCombatView();
     bkmpIdleRenderActiveTabContent();
+  });
+  const participantsToggle = document.getElementById('raidResultParticipantsToggle');
+  const participantsList = document.getElementById('raidResultParticipantsList');
+  if (participantsToggle && participantsList) participantsToggle.addEventListener('click', () => {
+    const open = participantsList.style.display !== 'none';
+    participantsList.style.display = open ? 'none' : '';
+    participantsToggle.setAttribute('aria-expanded', String(!open));
+    participantsToggle.querySelector('.raid-result-participants-toggle-icon').textContent = open ? '▸' : '▾';
   });
 }
 

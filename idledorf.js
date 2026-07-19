@@ -2261,6 +2261,26 @@ function bkmpIdleInit() {
   });
   const dragonEl = document.getElementById('idleDragon');
   if (dragonEl) { dragonEl.classList.add('idle-dragon-clickable'); dragonEl.addEventListener('click', bkmpIdleHandleDragonClick); }
+  /* Bug-Fix 19.07. (Spieler-Meldung: "⚔️ Angreifen"-Button beim Weltboss
+     "bewirkt nichts"): #raidBoss hatte trotz der Klasse "raid-clickable"
+     nirgends einen echten click-Listener - bisher funktionierte manueller
+     Boss-Schaden nur ueber die Leertaste (siehe keydown-Handler unten, ruft
+     bkmpRaidHandleBossClick direkt auf). #raidBoss ist statisches Markup
+     (kein Re-Render, siehe index.html), daher genuegt ein einmaliges
+     Anhaengen hier - analog zu #idleDragon oben. */
+  const raidBossEl = document.getElementById('raidBoss');
+  if (raidBossEl) raidBossEl.addEventListener('click', bkmpRaidHandleBossClick);
+  /* Der "⚔️ Angreifen"-Button daneben (#raidAttackBtn) simulierte bisher nur
+     per bossEl.click() einen Klick auf #raidBoss - dieser Proxy-Listener
+     stand aber in bkmp-app-mode-bootstrap.js hinter "if (window.BKMP_APP_MODE)",
+     lief also NUR im echten /app-Modus. Auf der normalen Website (wo der
+     Button genauso sichtbar ist, siehe .raid-action-bar in index.html) tat
+     der Button dadurch buchstaeblich nichts - direkt hier verdrahtet, ohne
+     App-Modus-Abhaengigkeit, ruft direkt dieselbe Funktion wie der
+     Boss-Klick selbst auf statt noch einen Umweg ueber ein simuliertes
+     Klick-Event zu gehen. */
+  const raidAttackBtnEl = document.getElementById('raidAttackBtn');
+  if (raidAttackBtnEl) raidAttackBtnEl.addEventListener('click', bkmpRaidHandleBossClick);
   bkmpIdleWireStagePicker();
   const eventDragonReadyBtn = document.getElementById('idleEventDragonReadyBtn');
   if (eventDragonReadyBtn) eventDragonReadyBtn.addEventListener('click', bkmpIdleConfirmEventDragonReady);

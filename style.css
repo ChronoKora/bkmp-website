@@ -6098,6 +6098,13 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 html[data-fx="aus"] .idle-reward-float { animation: none; opacity: 1; }
 html[data-fx="aus"] .idle-reward-float .rf-chip { animation: none; }
 html[data-fx="aus"] .idle-reward-float .rf-gold::after { animation: none; display: none; }
+/* Nutzerwunsch 19.07.: "Zu denn Effekten deaktivieren auch dieses Damage
+   hochploppen" - die Schadenszahlen (-1234!, Brand-/Blitz-Tick, Klick-
+   Schaden, siehe bkmpIdleSpawnProjectile/-BurnTick/-LightningBolt in
+   bkmp-hud.js) werden weiterhin nach 800ms per JS entfernt, animieren beim
+   Erscheinen/Verschwinden aber nicht mehr - erscheinen kurz statisch statt
+   hochzupoppen und wegzufaden. */
+html[data-fx="aus"] .idle-dmg-float { animation: none; opacity: 1; transform: translate(-50%, 0); }
 
 /* ---- Upgrades ---- */
 .idle-autobuy-toggle {
@@ -6180,7 +6187,8 @@ html[data-fx="aus"] .idle-reward-float .rf-gold::after { animation: none; displa
 /* .idle-skin-afford uebernimmt hier bereits das margin-top:auto (druckt sich
    selbst + den Button darunter an die Unterkante) - der Button braucht dann
    nur noch einen kleinen festen Abstand statt selbst nochmal aufzufuellen. */
-.idle-skin-afford + .idle-skin-action { margin-top: 0.35rem; }
+.idle-skin-afford + .idle-skin-action,
+.idle-skin-afford + .idle-skin-locked-hint { margin-top: 0.35rem; }
 .idle-skin-action { width: 100%; padding: 0.4rem 0.6rem; font-size: 0.78rem; margin-top: auto; }
 .idle-skin-action:disabled { opacity: 0.7; cursor: default; }
 .idle-skin-buy:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -7775,6 +7783,51 @@ html[data-fx="aus"] .idle-reward-float .rf-gold::after { animation: none; displa
 .raid-result-rewards { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.6rem 1rem; font-weight: 700; margin-top: 0.8rem; }
 .raid-result-flawless { color: #facc15; font-weight: 700; font-size: 0.9rem; margin-bottom: 0.6rem; }
 .raid-result-mvp { color: var(--gold); font-size: 0.95rem; }
+
+/* Nutzerwunsch 19.07.: ausklappbare Schadensliste aller Teilnehmer im
+   Raid-Ergebnis-Fenster (bkmpRaidResultParticipantsHTML), gleiches
+   Auf/Zu-Muster wie .achievement-category-head/-body. */
+.raid-result-participants { margin-top: 1rem; text-align: left; }
+.raid-result-participants-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.raid-result-participants-toggle:hover { border-color: var(--gold); }
+.raid-result-participants-toggle-icon { color: var(--gold); font-size: 0.75rem; }
+.raid-result-participants-list {
+  margin-top: 0.5rem;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.3rem 0.7rem;
+}
+.raid-result-participant-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  font-size: 0.82rem;
+  border-bottom: 1px solid var(--line);
+}
+.raid-result-participant-row:last-child { border-bottom: none; }
+.raid-result-participant-row.is-me { color: var(--gold); font-weight: 700; }
+.raid-result-participant-rank { flex: none; width: 2.2rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.raid-result-participant-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.raid-result-participant-damage { flex: none; font-variant-numeric: tabular-nums; }
+.raid-result-participant-damage small { color: var(--muted); font-weight: 400; }
 
 .raid-result-zerathor-code {
   margin-top: 1rem;
@@ -10450,6 +10503,14 @@ html.bkmp-app-mode .idle-runen-item[style*="facc15"] {
 @media (prefers-reduced-motion: reduce) {
   html.bkmp-app-mode .idle-runen-item[style*="facc15"] { animation: none !important; }
 }
+/* Spieler-Meldung 19.07. ("Die Runen rechts leuchten immer wieder auf"):
+   appLegendaryPulse ist eine bewusste, dauerhafte 2,2s-Endlosschleife fuer
+   JEDE legendaere Rune im Lager (kein Drachentod-Trigger, faellt bei
+   entsprechendem Kampf-Tempo aber leicht damit zusammen) - fuer Spieler,
+   die genau das als staendiges Aufblitzen stoerend empfinden, jetzt
+   zusaetzlich ueber den bestehenden Effektmodus-Schalter abschaltbar,
+   gleiches Prinzip wie bei den anderen html[data-fx="aus"]-Regeln. */
+html[data-fx="aus"].bkmp-app-mode .idle-runen-item[style*="facc15"] { animation: none !important; }
 
 /* ---- Dungeon-Karten bekamen in Phase 6 nur groessere Buttons - jetzt
    auch die Karten-Umrandung selbst im einheitlichen Fantasy-Look. ---- */

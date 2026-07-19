@@ -264,7 +264,21 @@ function bkmpIdleRenderSkinsPanel() {
         ? `<button type="button" class="btn-ja idle-skin-action idle-skin-buy-real-money" data-skin-id="${def.id}">Kaufen (${priceEur} €)</button>`
         : `<button type="button" class="btn-ja idle-skin-action idle-skin-buy-real-money-locked" data-skin-id="${def.id}" disabled title="Käufe sind noch nicht freigeschaltet">🔒 Kaufen (${priceEur} €)</button>`;
     } else {
-      actionHtml = `<div class="idle-skin-locked-hint">🔒 ${escapeHtml(def.unlock_hint || (def.unlock_type === 'achievement' ? 'Über einen Erfolg freischaltbar' : 'Seltener Boss-Drop'))}</div>`;
+      /* Nutzerwunsch 19.07.: "sollte die Anzahl auch stehen wieviel man
+         davon schon hat" - fuer Zerstoertes Dorf/Yakshas Heimat gibt es
+         bereits live gezaehlte Fortschritts-Werte (village_defeats/
+         yaksha_boss_kills, siehe bkmpIdleCheckZerstoertesDorfUnlock/
+         -YakshasHeimatUnlock in idledorf.js) - hier nur ergaenzend
+         angezeigt, keine neue Zaehl-Logik. Andere Achievement-/Boss-Drop-
+         Skins ohne bekannten Zaehler (Zerathor Dorf, Libers Heimat, ...)
+         zeigen weiterhin nur den reinen Hinweistext. */
+      const progressSource = {
+        zerstoertesdorf: () => ({ current: Number(bkmpIdleState.village_defeats || 0), target: BKMP_ZERSTOERTES_DORF_UNLOCK_THRESHOLD }),
+        yakshasheimat: () => ({ current: Number(bkmpIdleState.yaksha_boss_kills || 0), target: BKMP_YAKSHAS_HEIMAT_UNLOCK_THRESHOLD })
+      }[def.id];
+      const progress = progressSource ? progressSource() : null;
+      const progressHtml = progress ? `<div class="idle-skin-afford">Du hast: ${bkmpIdleFormatNumber(progress.current)} von ${bkmpIdleFormatNumber(progress.target)}</div>` : '';
+      actionHtml = `${progressHtml}<div class="idle-skin-locked-hint">🔒 ${escapeHtml(def.unlock_hint || (def.unlock_type === 'achievement' ? 'Über einen Erfolg freischaltbar' : 'Seltener Boss-Drop'))}</div>`;
     }
     return `
       <div class="idle-skin-card ${isEquipped ? 'idle-skin-card-equipped' : ''} ${def.unlock_type === 'real_money' ? 'idle-skin-card-premium' : ''}">

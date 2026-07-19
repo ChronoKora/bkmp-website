@@ -276,18 +276,11 @@
           banner.classList.toggle('raid-urgent', urgent);
         }, 1000);
 
-        /* Grosser "ANGREIFEN"-Button (Phase 16): loest exakt denselben
-           Klick aus wie ein Tipp auf den Boss selbst (#raidBoss hat schon
-           laenger einen echten click-Handler in idledorf.js, siehe
-           bkmpRaidHandleBossClick - inkl. Schaden, Anti-Autoklicker-Sperre
-           etc.). Keine neue Kampf-Logik, nur ein zweiter, groesserer
-           Ausloeser fuer die bereits bestehende Mechanik. */
-        var raidAttackBtn = document.getElementById('raidAttackBtn');
-        if (raidAttackBtn) {
-          raidAttackBtn.addEventListener('click', function () {
-            var bossEl = document.getElementById('raidBoss');
-            if (bossEl) bossEl.click();
-          });
-        }
+        /* Bug-Fix 19.07.: #raidAttackBtn wird jetzt unconditional direkt in
+           idledorf.js an bkmpRaidHandleBossClick gehaengt (lief hier bisher
+           NUR im echten App-Modus, auf der normalen Website blieb der
+           Button dadurch komplett wirkungslos - Spieler-Meldung "Was ist
+           das? Es bewirkt nichts?"). Dieser Proxy-Listener hier waere jetzt
+           nur noch ein zweiter, ueberfluessiger Ausloeser derselben Aktion. */
       })();
     }

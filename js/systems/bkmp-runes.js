@@ -262,7 +262,7 @@ function bkmpRuneUpgrade(cid) {
       const pool = Object.keys(BKMP_RUNE_SUBSTAT_WEIGHTS).filter(st => !usedStats.has(st));
       if (pool.length) {
         const newStat = bkmpRunePickWeightedStat(pool);
-        rune.substats.push({ stat: newStat, value: bkmpIdleRollSubstatValue(newStat, rune.rarity) });
+        rune.substats.push({ stat: newStat, value: bkmpIdleRollSubstatValue(newStat, rune.rarity), boostCount: 0 });
         const meta = bkmpRuneStatMeta(newStat);
         bkmpIdleLog(`✨ ${slot.name} +${rune.upgrade_level}: neuer Sub-Stat ${meta.icon} ${meta.desc}!`);
       }
@@ -270,6 +270,7 @@ function bkmpRuneUpgrade(cid) {
       const pick = rune.substats[Math.floor(Math.random() * rune.substats.length)];
       const bump = bkmpIdleRollSubstatValue(pick.stat, rune.rarity) * 0.5;
       pick.value = pick.stat.endsWith('_flat') ? pick.value + Math.max(1, Math.round(bump)) : Math.round((pick.value + bump) * 100) / 100;
+      pick.boostCount = (pick.boostCount || 0) + 1;
     }
   }
   /* Ohne echte DB-id (frisch gedroppt/verschmolzen, Insert noch nicht
@@ -335,12 +336,13 @@ function bkmpRuneInstantUpgrade(cid) {
         const pool = Object.keys(BKMP_RUNE_SUBSTAT_WEIGHTS).filter(st => !usedStats.has(st));
         if (pool.length) {
           const newStat = bkmpRunePickWeightedStat(pool);
-          rune.substats.push({ stat: newStat, value: bkmpIdleRollSubstatValue(newStat, rune.rarity) });
+          rune.substats.push({ stat: newStat, value: bkmpIdleRollSubstatValue(newStat, rune.rarity), boostCount: 0 });
         }
       } else if (rune.substats.length) {
         const pick = rune.substats[Math.floor(Math.random() * rune.substats.length)];
         const bump = bkmpIdleRollSubstatValue(pick.stat, rune.rarity) * 0.5;
         pick.value = pick.stat.endsWith('_flat') ? pick.value + Math.max(1, Math.round(bump)) : Math.round((pick.value + bump) * 100) / 100;
+        pick.boostCount = (pick.boostCount || 0) + 1;
       }
     }
   }
@@ -392,7 +394,7 @@ function bkmpRuneRerollSubstat(cid, statIndex) {
   }
   bkmpIdleState.crystals -= cost;
   const oldValue = entry.value;
-  entry.value = bkmpIdleRollSubstatValue(entry.stat, rune.rarity);
+  entry.value = bkmpIdleRollBoostedSubstatValue(entry.stat, rune.rarity, entry.boostCount);
   const meta = bkmpRuneStatMeta(entry.stat);
   const subUnit = entry.stat.endsWith('_flat') ? '' : '%';
   const better = entry.value > oldValue;
@@ -829,7 +831,13 @@ function bkmpRuneStatBoxHTML(slot, rune) {
         const subUnit = s.stat.endsWith('_flat') ? '' : '%';
         const rerollCost = bkmpRuneRerollSubstatCost(rune);
         const canAffordReroll = bkmpIdleState && Number(bkmpIdleState.crystals || 0) >= rerollCost;
-        return `<li>${meta.icon} +${s.value}${subUnit} ${escapeHtml(meta.desc)} <button type="button" class="idle-runen-reroll-btn" data-cid="${rune._cid}" data-index="${i}" ${canAffordReroll ? '' : 'disabled'} title="Diesen Sub-Stat neu würfeln (gleicher Bereich wie beim ursprünglichen Fund)">🎲 ${rerollCost} 💎</button></li>`;
+        /* Nutzerwunsch 19.07.: "dazu schreiben in was für einer Spanne man
+           rerollt" - zeigt jetzt die tatsaechliche Ziel-Spanne (inkl. der
+           bereits erhaltenen Meilenstein-Boosts, siehe boostCount/
+           bkmpIdleSubstatValueRange) statt nur des vagen "gleicher Bereich
+           wie beim urspruenglichen Fund". */
+        const [rerollMin, rerollMax] = bkmpIdleSubstatValueRange(s.stat, rune.rarity, s.boostCount);
+        return `<li>${meta.icon} +${s.value}${subUnit} ${escapeHtml(meta.desc)} <button type="button" class="idle-runen-reroll-btn" data-cid="${rune._cid}" data-index="${i}" ${canAffordReroll ? '' : 'disabled'} title="Diesen Sub-Stat neu würfeln (Spanne +${rerollMin}${subUnit} bis +${rerollMax}${subUnit})">🎲 ${rerollCost} 💎</button></li>`;
       }).join('')}
     </ul>` : '<p class="idle-runen-stat-note">Noch keine Sub-Stats - bei +3/+6/+9/+12 kommt bis zu insgesamt 4 jeweils einer dazu.</p>'}
     <div class="idle-runen-stat-actions">
@@ -1259,6 +1267,40 @@ function bkmpIdleRollSubstatValue(statKey, rarityId) {
      Angriff (fest)" waere fuer einen Fest-Wert unueblich/unschoen. */
   return statKey.endsWith('_flat') ? Math.max(1, Math.round(raw)) : Math.round(raw * 100) / 100;
 }
+/* Bug-Fix 19.07. (Discord-Meldung argus_02 an ChronoKora: "wenn man die
+   Stats upgraded und dann rerollt, gehen die nur auf die Skala als waeren
+   sie nicht upgradet"): bkmpIdleRollSubstatValue() kennt nur die
+   Basis-Spanne einer Seltenheit, nicht die zusaetzlichen Meilenstein-Boosts
+   (+3/+6/+9/+12, siehe bkmpRuneUpgrade/bkmpRuneInstantUpgrade), die ein
+   Sub-Stat im Laufe der Aufwertung obendrauf bekommen haben kann. Ein
+   Reroll setzte den Wert dadurch faktisch auf Stufe-0-Niveau zurueck, auch
+   wenn die Rune laengst +15 war - ein reiner Wert-VERLUST statt eines
+   echten Neuwuerfelns auf gleichem Niveau. Jeder Sub-Stat traegt jetzt sein
+   eigenes boostCount (wie oft er bei einem Meilenstein tatsaechlich
+   verstaerkt wurde) - Reroll wuerfelt denselben Basiswert PLUS genauso
+   viele frische Boost-Wuerfe neu, statt sie wegzuwerfen. */
+function bkmpIdleRollBoostedSubstatValue(statKey, rarityId, boostCount) {
+  let value = bkmpIdleRollSubstatValue(statKey, rarityId);
+  for (let i = 0; i < (boostCount || 0); i++) {
+    const bump = bkmpIdleRollSubstatValue(statKey, rarityId) * 0.5;
+    value = statKey.endsWith('_flat') ? value + Math.max(1, Math.round(bump)) : Math.round((value + bump) * 100) / 100;
+  }
+  return value;
+}
+/* Anzeige-Spanne (min/max) fuer den Reroll-Tooltip (Nutzerwunsch 19.07.:
+   "dazu schreiben in was fuer einer Spanne man rerollt") - dieselbe Formel
+   wie bkmpIdleRollBoostedSubstatValue, aber als geschlossenes Intervall
+   statt eines einzelnen Zufallswurfs. */
+function bkmpIdleSubstatValueRange(statKey, rarityId, boostCount) {
+  const [lo, hi] = bkmpIdleRuneStatRange(statKey, rarityId);
+  let min = lo * 0.35, max = hi * 0.35;
+  for (let i = 0; i < (boostCount || 0); i++) {
+    min += lo * 0.35 * 0.5;
+    max += hi * 0.35 * 0.5;
+  }
+  const round = statKey.endsWith('_flat') ? v => Math.max(1, Math.round(v)) : v => Math.round(v * 100) / 100;
+  return [round(min), round(max)];
+}
 
 /* Rollt die Sub-Stats, mit denen eine Rune SOFORT droppt/verschmilzt -
    Anzahl nach Seltenheit (BKMP_RUNE_MAX_SUBSTATS), Typen gewichtet-zufaellig
@@ -1275,7 +1317,7 @@ function bkmpIdleRollInitialSubstats(primaryStat, rarityId) {
     if (!pool.length) break;
     const stat = bkmpRunePickWeightedStat(pool);
     used.add(stat);
-    substats.push({ stat, value: bkmpIdleRollSubstatValue(stat, rarityId) });
+    substats.push({ stat, value: bkmpIdleRollSubstatValue(stat, rarityId), boostCount: 0 });
   }
   return substats;
 }
