@@ -131,7 +131,7 @@ function bkmpIdleSpawnDragon() {
   bkmpIdleUpdateDragonHpBar();
   bkmpIdleRenderStageBar();
   bkmpIdleMaybeShowEventDragonPopup();
-  bkmpIdleBroadcastCombatState();
+  bkmpIdleBroadcastCombatState(true);
 }
 
 /* Gegenschlag des Drachen - eigene Funktion, damit Tick UND Klick
@@ -382,13 +382,31 @@ function bkmpIdleRenderHud() {
    Git-Historie). Jetzt gibt es nur noch EINE aktive Spiel-Instanz - die
    Hauptseite - die ihren aktuellen Kampf-Zustand ueber einen reinen
    Realtime-BROADCAST-Kanal sendet (keine Tabelle, keine Persistenz noetig,
-   Drachen-HP war noch nie gespeichert und muss es dafuer auch nicht werden -
-   ein Broadcast ist fluechtig und kostet quasi nichts). Das Mini-Overlay
-   (idle-stream-mini.html) hat KEINE eigene Spiellogik mehr, sondern
-   abonniert nur und zeichnet rein visuell nach. */
-function bkmpIdleBroadcastCombatState() {
+   Drachen-HP war noch nie gespeichert und muss es dafuer auch nicht werden).
+   Das Mini-Overlay (idle-stream-mini.html) hat KEINE eigene Spiellogik mehr,
+   sondern abonniert nur und zeichnet rein visuell nach. */
+/* NOTFALL-FIX (20.07., Supabase Realtime Messages: 5 Mio. inklusive, 14.7
+   Mio. verbraucht, 9.7 Mio. Ueberschreitung nach nur 5 Tagen - siehe
+   Dashboard-Screenshot): die Annahme oben ("kostet quasi nichts") war
+   falsch. bkmpIdleTick() lief alle 400-900ms (tickIntervalMs) und rief
+   diese Funktion bei JEDEM Tick auf - UND der Kampf-Loop laeuft bewusst
+   auch im Hintergrund weiter, solange der Tab offen ist (siehe Kommentar
+   bei bkmpIdleCloseModal), also fuer JEDEN eingeloggten Spieler quasi
+   durchgehend, nicht nur waehrend ein Stream-Overlay tatsaechlich zusieht.
+   Das ergab bis zu ~2,5 Broadcasts/Sekunde PRO SPIELER, dauerhaft - exakt
+   der Zeitraum und die Groessenordnung des Kostenanstiegs im Dashboard.
+   Fix: harte Zeit-Drosselung auf max. 1 Broadcast alle 3 Sekunden fuer die
+   haeufigen Tick-/Klick-Aufrufe; echte Zustandswechsel (neuer Drache, siehe
+   bkmpIdleSpawnDragon) rufen weiterhin sofort per force=true durch, damit
+   das Overlay bei einem Drachenwechsel nicht sichtbar nachhinkt. */
+let bkmpIdleLastCombatBroadcastAt = 0;
+const BKMP_IDLE_COMBAT_BROADCAST_MIN_MS = 3000;
+function bkmpIdleBroadcastCombatState(force) {
   if (window.BKMP_IDLE_IS_STREAM_PAGE || !bkmpIdleState || !bkmpIdleCurrentDragon || !bkmpIdleEffectiveStats) return;
   if (typeof bkmpBroadcastCombatState !== 'function') return;
+  const now = Date.now();
+  if (!force && now - bkmpIdleLastCombatBroadcastAt < BKMP_IDLE_COMBAT_BROADCAST_MIN_MS) return;
+  bkmpIdleLastCombatBroadcastAt = now;
   bkmpBroadcastCombatState(bkmpIdleState.name_key, {
     dragonSpriteKey: bkmpIdleCurrentDragon.spriteKey,
     dragonName: bkmpIdleCurrentDragon.name,
