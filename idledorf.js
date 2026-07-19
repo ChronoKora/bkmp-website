@@ -8,19 +8,6 @@
    durchgelaufen ist. */
 const BKMP_REAL_MONEY_PURCHASES_ENABLED = false;
 
-/* Nutzer-Auftrag 19.07. (Phase 5.6): Dorf-Skins vorruebergehend pausieren -
-   das neue Kampf-Hintergrundsystem (js/prototype/bkmp-proto-battlefield.js,
-   landschaft.mp4) ersetzt visuell genau die Flaeche, die #idleVillageSprite
-   bisher eingenommen hat, sobald ein Gegner ein neues Rendering hat (aktuell
-   Feuer/Wasser/Wind/Yaksha-Boss - nach der Rotationsbeschraenkung also fast
-   jeder normale Kampf). Der gekaufte/gewaehlte Dorf-Skin wuerde dadurch kaum
-   noch sichtbar sein, nur noch bei Raid/Gildenboss (bleiben vorerst beim
-   alten Rendering). Rein UI-seitig (Tab ausgegraut + Panel-Hinweis) - KEINE
-   Datenbank-Aenderung, kein Spieler verliert etwas, jederzeit mit true
-   reaktivierbar, sobald das neue System Dorf-Skins ebenfalls unterstuetzt
-   oder ersetzt. */
-const BKMP_VILLAGE_SKINS_ENABLED = false;
-
 async function bkmpIdleRefreshMaintenanceFlag() {
   try {
     const flags = typeof loadSiteFlags === 'function' ? await loadSiteFlags() : null;
@@ -1110,7 +1097,34 @@ function bkmpIdleWireStagePicker() {
    Zusaetzlich zum (weiterhin bestehenden, aber deutlich selteneren)
    Kampf-Log jetzt auch als Toast, damit diese Ereignisse nicht verpasst
    werden, falls gerade niemand auf den Log schaut. */
-function bkmpIdleLog(msg) {
+/* Nutzerwunsch (19.07.): "Funktion die unten im Drop-Chat einstellbar ist,
+   ob nur Legi-Runen angezeigt werden" - persistiert wie Theme/Effektmodus
+   ueber localStorage. Filtert bewusst NUR die Runenfund-Zeile im Kampf-Log
+   (siehe Aufrufstelle in bkmpIdleMaybeDropRune, bkmp-runes.js) - alle
+   anderen bkmpIdleLog-Aufrufer (Level-Aufstieg, Aufwertungen, Niederlage,
+   Prestige, ...) bleiben unveraendert sichtbar. Die Belohnungs-Karte/
+   -Zeremonie daneben ist davon nicht betroffen, nur die Textzeile im Log. */
+const BKMP_IDLE_LOG_LEGENDARY_ONLY_KEY = 'bkmp-idle-log-legendary-only';
+function bkmpIdleLogLegendaryOnly() {
+  try { return localStorage.getItem(BKMP_IDLE_LOG_LEGENDARY_ONLY_KEY) === '1'; } catch (e) { return false; }
+}
+function bkmpIdleLogLegendaryOnlyInit() {
+  const toggle = document.getElementById('idleLogLegendaryOnlyToggle');
+  if (!toggle) return;
+  toggle.checked = bkmpIdleLogLegendaryOnly();
+  toggle.addEventListener('change', () => {
+    try { localStorage.setItem(BKMP_IDLE_LOG_LEGENDARY_ONLY_KEY, toggle.checked ? '1' : '0'); } catch (e) {}
+  });
+}
+/* skipToast (Nutzerwunsch 19.07., Screenshot "oben die Benachrichtigung weg"):
+   fuer Ereignisse, die GLEICHZEITIG ueber das neue Reward-Presentation-
+   System (bkmpRewardPresent, siehe js/ui/bkmp-reward-presenter.js) bereits
+   eine eigene Anzeige bekommen, war der hier automatisch ausgeloeste
+   bkmpShowJannikToast doppelt gemoppelt - zwei fast identische Meldungen
+   gleichzeitig oben mittig. Bewusst opt-in (Standardverhalten fuer alle
+   anderen bkmpIdleLog-Aufrufer bleibt exakt gleich), nur an den Stellen
+   gesetzt, die bereits eigenstaendig ueber bkmpRewardPresent benachrichtigen. */
+function bkmpIdleLog(msg, skipToast) {
   const log = document.getElementById('idleDorfLog');
   if (log) {
     const line = document.createElement('div');
@@ -1119,7 +1133,7 @@ function bkmpIdleLog(msg) {
     log.prepend(line);
     while (log.children.length > 20) log.removeChild(log.lastChild);
   }
-  if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(msg, 3200);
+  if (!skipToast && typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(msg, 3200);
 }
 
 /* ---------------- Rendering: Upgrades-Tab ---------------- */
@@ -1901,6 +1915,12 @@ function bkmpFxApplyMode(mode) {
   document.documentElement.setAttribute('data-fx', mode);
   const btn = document.getElementById('idleFxModeBtn');
   if (btn) btn.textContent = BKMP_FX_MODE_LABELS[mode] || BKMP_FX_MODE_LABELS.hoch;
+  /* Nutzerwunsch (19.07.): "Aus" haelt jetzt auch die Drachen-Kampfvideos
+     an (Standbild statt Endlosschleife) - deckt den Fall ab, dass schon
+     ein Drache zu sehen ist, WAEHREND umgeschaltet wird (Neu-Erscheinen
+     eines Drachen deckt bkmpIdleApplyDragonSprite in js/ui/bkmp-hud.js
+     selbst ab). Reiner Anzeige-Unterschied, keine Kampfwerte betroffen. */
+  if (typeof bkmpIdleSyncDragonVideoPlayback === 'function') bkmpIdleSyncDragonVideoPlayback();
 }
 
 function bkmpFxSetMode(mode) {
@@ -1964,19 +1984,6 @@ function bkmpIdleSyncLockedTabVisuals() {
     const btn = document.getElementById(t.btn);
     if (btn) btn.classList.toggle('idle-dorf-tab-locked', !isTester);
   });
-  /* Nutzer-Auftrag 19.07.: Dorf-Skins-Tab ausgrauen (BKMP_VILLAGE_SKINS_
-     ENABLED, siehe idledorf.js Kopf) - bewusst NICHT ueber t.locked/isTester
-     gelöst, das ist fuer "noch nicht freigeschaltet" gedacht, hier geht es
-     um "vorruebergehend pausiert" fuer ALLE Spieler inkl. Tester. Tab bleibt
-     klickbar (kein disabled-Attribut), Panel zeigt stattdessen den Hinweis
-     aus bkmpIdleRenderSkinsPanel - so funktioniert auch die App-Modus-
-     "Mehr"-Sheet-Verschiebung (js/core/bkmp-app-mode-bootstrap.js) unveraendert
-     weiter, die echte Button-Elemente per appendChild verschiebt. */
-  const skinsBtn = document.getElementById('idleTabBtnSkins');
-  if (skinsBtn) {
-    skinsBtn.classList.toggle('idle-dorf-tab-locked', !BKMP_VILLAGE_SKINS_ENABLED);
-    skinsBtn.title = BKMP_VILLAGE_SKINS_ENABLED ? '' : 'Vorübergehend pausiert - Kampf-Hintergrundsystem wird umgebaut';
-  }
 }
 
 function bkmpIdleRenderActiveTabContent() {
@@ -2195,6 +2202,7 @@ let bkmpIdleClickLockedUntil = bkmpAutoclickLoadNumber(BKMP_IDLE_CLICK_LOCK_KEY)
 function bkmpIdleInit() {
   bkmpIdleInitTabs();
   bkmpFxInit();
+  bkmpIdleLogLegendaryOnlyInit();
   bkmpPrestigeInit();
   bkmpRaidInit();
   bkmpIdleHandleStripeReturn();
@@ -2320,7 +2328,7 @@ document.addEventListener('bkmpIdleRewardGained', e => {
   if (!field || !e.detail) return;
   const el = document.createElement('div');
   el.className = 'idle-reward-float';
-  el.innerHTML = `<span class="rf-gold">+${Math.round(e.detail.gold)} 💰</span><span class="rf-xp">+${Math.round(e.detail.xp)} ✨</span>`;
+  el.innerHTML = `<span class="rf-chip rf-gold"><span class="rf-icon">💰</span>+${Math.round(e.detail.gold)}</span><span class="rf-chip rf-xp"><span class="rf-icon">✨</span>+${Math.round(e.detail.xp)}</span>`;
   field.appendChild(el);
   window.setTimeout(() => el.remove(), 1500);
 });

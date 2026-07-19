@@ -108,7 +108,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260719-p55d">
+<link rel="stylesheet" href="style.css?v=20260719-runenotify1">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 </head>
 <body>
@@ -758,49 +758,11 @@
           </div>
         </div>
 
-        <!-- PHASE 5.6 STUFE 1 (19.07., isoliert & jederzeit entfernbar):
-             modulares Kampf-Ebenensystem mit echtem transparentem Drachen,
-             siehe js/prototype/bkmp-proto-battlefield.js. Bleibt per
-             display:none unsichtbar, bis das Skript BKMP_LAYERED_COMBAT_
-             ENABLED prueft UND fuer den jeweils aktuellen Gegner (spriteKey)
-             ein passendes Asset in BKMP_COMBAT_ASSETS findet UND beide
-             Video-Assets erfolgreich geladen haben - vorher/beim Fehlschlag/
-             bei unbekanntem Gegner bleibt #idleBattlefield oben unveraendert
-             die einzige sichtbare Darstellung. Entfernen: dieser Block +
-             die JS-Datei + ihr <script>-Tag + der CSS-Abschnitt in
-             style.css (klar markiert) + die 2 zusaetzlichen Hook-Zeilen in
-             js/ui/bkmp-hud.js. -->
-        <div class="bkmp-proto-battlefield" id="bkmpProtoBattlefield" style="display:none;">
-          <video class="bkmp-proto-bg-video" id="bkmpProtoBgVideo" muted playsinline loop preload="none"></video>
-
-          <div class="bkmp-proto-hp-card bkmp-proto-hp-card-city" id="bkmpProtoCityHpCard">
-            <div class="bkmp-proto-hp-name">Dein Dorf</div>
-            <div class="bkmp-proto-hp-bar">
-              <div class="bkmp-proto-hp-fill-trail bkmp-proto-hp-fill-trail-city" id="idleVillageHpTrailProto"></div>
-              <div class="bkmp-proto-hp-fill bkmp-proto-hp-fill-city" id="idleVillageHpFillProto"></div>
-            </div>
-            <div class="bkmp-proto-hp-label" id="idleVillageHpLabelProto"></div>
-          </div>
-
-          <div class="bkmp-proto-dragon-layer" id="bkmpProtoDragonLayer">
-            <video class="bkmp-proto-dragon-video" id="bkmpProtoDragonVideo" muted playsinline loop preload="none"></video>
-          </div>
-
-          <div class="bkmp-proto-hp-card bkmp-proto-hp-card-dragon" id="bkmpProtoDragonHpCard">
-            <div class="bkmp-proto-hp-name" id="bkmpProtoDragonName"></div>
-            <div class="bkmp-proto-hp-bar">
-              <div class="bkmp-proto-hp-fill-trail bkmp-proto-hp-fill-trail-dragon" id="idleDragonHpTrailProto"></div>
-              <div class="bkmp-proto-hp-fill bkmp-proto-hp-fill-dragon" id="idleDragonHpFillProto"></div>
-            </div>
-            <div class="bkmp-proto-hp-label" id="idleDragonHpLabelProto"></div>
-          </div>
-
-          <div class="bkmp-proto-effects" id="bkmpProtoEffects" aria-hidden="true"></div>
-          <button type="button" class="bkmp-proto-hit-area" id="bkmpProtoHitArea" aria-label="Angreifen"></button>
-          <div class="bkmp-proto-badge">Prototyp – Testdarstellung</div>
-        </div>
-
         <button type="button" class="idle-adfree-btn" id="idleAdFreeBtn" style="display:none;">AD-Free &ndash; nur 99$</button>
+        <label class="idle-dorf-log-filter" for="idleLogLegendaryOnlyToggle">
+          <input type="checkbox" id="idleLogLegendaryOnlyToggle">
+          Nur legendäre Runenfunde im Log
+        </label>
         <div class="idle-dorf-log" id="idleDorfLog"></div>
       </div>
 
@@ -1434,29 +1396,24 @@
   <script src="js/systems/bkmp-dungeon.js?v=20260719-p55d" defer></script>
   <script src="js/systems/bkmp-breeding.js?v=20260719-p55b" defer></script>
   <script src="js/systems/bkmp-guild.js?v=20260717-p51perf2" defer></script>
-  <script src="js/systems/bkmp-runes.js?v=20260719-bugfix1" defer></script>
+  <script src="js/systems/bkmp-runes.js?v=20260719-runenotify1" defer></script>
   <script src="js/systems/bkmp-raid.js?v=20260717-p51perf2" defer></script>
   <script src="js/systems/bkmp-tower.js?v=20260717-p51perf2" defer></script>
   <script src="js/systems/bkmp-prestige.js?v=20260718-runedupfix1" defer></script>
   <script src="js/systems/bkmp-arena.js?v=20260717-p2bfoundation" defer></script>
   <script src="js/systems/bkmp-meister.js?v=20260717-p2bfoundation" defer></script>
   <script src="js/systems/bkmp-skilltree.js?v=20260717-p2bfoundation" defer></script>
-  <script src="js/systems/bkmp-cosmetics.js?v=20260719-villageskinspause" defer></script>
+  <script src="js/systems/bkmp-cosmetics.js?v=20260719-p56revert" defer></script>
   <script src="js/systems/bkmp-events.js?v=20260719-p55g" defer></script>
-  <script src="js/ui/bkmp-hud.js?v=20260719-p56stufe1" defer></script>
+  <script src="js/ui/bkmp-hud.js?v=20260719-videoreuse1" defer></script>
   <script src="js/systems/bkmp-leaderboard.js?v=20260717-p2cfoundation" defer></script>
   <script src="js/ui/bkmp-ui-components.js?v=20260719-p55b" defer></script>
   <script src="js/ui/bkmp-reward-presenter.js?v=20260719-p55e" defer></script>
-  <script src="idledorf.js?v=20260719-villageskinspause" defer></script>
+  <script src="idledorf.js?v=20260719-runenotify1" defer></script>
   <script src="mapart.js?v=20260717-kartenfirmen1" defer></script>
   <script src="js/core/bkmp-idle-bootstrap.js?v=20260717-p2afoundation" defer></script>
   <script src="js/core/bkmp-site.js?v=20260719-p55g" defer></script>
   <script src="js/core/bkmp-app-mode-bootstrap.js?v=20260717-p51fix9" defer></script>
-  <!-- PROTOTYP (18.07., isoliert & jederzeit entfernbar) - siehe Kommentar
-       in js/prototype/bkmp-proto-battlefield.js. Laedt bewusst zuletzt,
-       nach allem, was sie braucht (bkmpIdleCombatVisualsActive/
-       bkmpFxGetMode/bkmpIdleHandleDragonClick/bkmpIdleUpdate*HpBar). -->
-  <script src="js/prototype/bkmp-proto-battlefield.js?v=20260719-p56stufe2" defer></script>
   <!-- PROTOTYP 2 (18.07., isoliert & jederzeit entfernbar) - siehe Kommentar
        in js/prototype/bkmp-proto-compact-hud.js. Laedt bewusst zuletzt. -->
   <script src="js/prototype/bkmp-proto-compact-hud.js?v=20260718-runedupfix1" defer></script>

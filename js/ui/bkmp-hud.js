@@ -38,26 +38,55 @@ function bkmpIdleApplyDragonSprite(sprite, spriteKey) {
   sprite.classList.remove('idle-sprite-attacking');
   const videoSrc = BKMP_IDLE_VIDEO_DRAGON_SPRITES[spriteKey];
   if (videoSrc) {
-    const existingVideo = sprite.querySelector('video');
-    /* Nur neu aufbauen, wenn sich der Drache tatsaechlich geaendert hat -
-       sonst wuerde das Video bei jedem Render (z.B. jedem Tick) neu
-       gestartet/neu geladen werden und nie richtig durchlaufen. */
-    if (!existingVideo || existingVideo.dataset.spriteKey !== spriteKey) {
-      sprite.innerHTML = `<video class="idle-dragon-sprite-video" src="${videoSrc}" data-sprite-key="${spriteKey}" autoplay muted loop playsinline></video>`;
+    /* Perf-Fix (Nutzer-Videobericht 19.07., "Fenster flackert 1x komplett"
+       beim Drachenwechsel): vorher wurde bei JEDEM Drachenwechsel das
+       gesamte <video>-Element per innerHTML zerstoert und neu gebaut - ein
+       harter Abriss+Neuaufbau der Video-Decodierung/GPU-Textur, ausgerechnet
+       in dem Moment, in dem gleichzeitig HP-Balken/Schadenszahl/Reward-
+       Anzeige neu rendern. Jetzt wird bei einem Drache-zu-Drache-Wechsel
+       (haeufigster Fall) dasselbe <video>-Element weiterverwendet und nur
+       src ausgetauscht - deutlich weniger GPU-/Decoder-Umbau in diesem
+       kritischen Moment. Ein echter Neuaufbau passiert nur noch, wenn zuvor
+       gar kein Video da war (z.B. Wechsel von PNG-Sprite auf Video). */
+    let video = sprite.querySelector('video.idle-dragon-sprite-video');
+    if (!video) {
+      sprite.innerHTML = '';
+      video = document.createElement('video');
+      video.className = 'idle-dragon-sprite-video';
+      video.muted = true;
+      video.loop = true;
+      video.playsInline = true;
+      sprite.appendChild(video);
+    }
+    if (video.dataset.spriteKey !== spriteKey) {
+      /* Nutzerwunsch (19.07.): Effektmodus "Aus" haelt Drachen-Videos an
+         (Standbild statt Endlosschleife) - reiner Anzeige-Unterschied,
+         keine Kampfwerte betroffen (siehe bkmpFxApplyMode/
+         bkmpIdleSyncDragonVideoPlayback fuer den Live-Umschalt-Fall). */
+      const paused = typeof bkmpFxGetMode === 'function' && bkmpFxGetMode() === 'aus';
+      video.dataset.spriteKey = spriteKey;
+      video.src = videoSrc;
+      if (paused) video.pause();
+      else video.play().catch(() => {});
     }
   } else {
     sprite.innerHTML = '';
     sprite.classList.add(BKMP_IDLE_SPRITE_CLASS_PREFIX + spriteKey);
   }
-  /* PHASE 5.6 STUFE 1 (19.07., entfernbar): benachrichtigt das neue
-     Kampf-Ebenensystem (js/prototype/bkmp-proto-battlefield.js) ueber den
-     jeweils aktuellen Gegner - reine Anzeige-Entscheidung (Ebenensystem
-     zeigen oder auf diese bestehende Sprite-Zuweisung zurueckfallen),
-     kein Einfluss auf Kampfwerte. Wird von JEDEM Aufrufer dieser Funktion
-     mitgenommen (normaler Kampf UND Dungeon/Turm ueber
-     bkmpDungeonApplyDragonVisuals), kein Sonderfall noetig. No-op, wenn
-     das Ebenensystem entfernt/deaktiviert ist. */
-  if (typeof bkmpProtoSyncForCurrentDragon === 'function') bkmpProtoSyncForCurrentDragon(spriteKey);
+}
+
+/* Nutzerwunsch (19.07.): haelt/setzt das bereits vorhandene Drachen-Video
+   fort, wenn der Effektmodus WAEHREND ein Drache schon zu sehen ist
+   umgeschaltet wird (bkmpIdleApplyDragonSprite oben deckt nur den Fall
+   "neuer Drache erscheint" ab). Von bkmpFxApplyMode() aufgerufen. */
+function bkmpIdleSyncDragonVideoPlayback() {
+  const video = document.querySelector('#idleDragonSprite .idle-dragon-sprite-video');
+  if (!video) return;
+  if (typeof bkmpFxGetMode === 'function' && bkmpFxGetMode() === 'aus') {
+    if (!video.paused) video.pause();
+  } else if (video.paused) {
+    video.play().catch(() => {});
+  }
 }
 
 function bkmpIdleSpawnDragon() {
@@ -198,20 +227,6 @@ function bkmpIdleUpdateDragonHpBar() {
   const pct = Math.max(0, Math.min(100, (bkmpIdleCurrentDragon.hp / bkmpIdleCurrentDragon.maxHp) * 100));
   fill.style.width = pct + '%';
   if (label) label.textContent = `${Math.max(0, Math.round(bkmpIdleCurrentDragon.hp))} / ${bkmpIdleCurrentDragon.maxHp}`;
-  /* PROTOTYP (18.07., entfernbar): spiegelt denselben bereits oben
-     berechneten pct/Label-Wert zusaetzlich auf die neuen, nur bei
-     aktivem Prototyp existierenden Elemente - kein neuer Wert, keine
-     neue Berechnung, reiner No-op wenn der Prototyp inaktiv ist. */
-  const protoFill = document.getElementById('idleDragonHpFillProto');
-  const protoTrail = document.getElementById('idleDragonHpTrailProto');
-  const protoLabel = document.getElementById('idleDragonHpLabelProto');
-  if (protoFill) {
-    if (bkmpProtoLastDragonPct !== null && pct < bkmpProtoLastDragonPct && typeof bkmpProtoFlashHit === 'function') bkmpProtoFlashHit('bkmpProtoDragonHpCard');
-    bkmpProtoLastDragonPct = pct;
-    protoFill.style.transform = `scaleX(${pct / 100})`;
-    if (protoTrail) protoTrail.style.transform = `scaleX(${pct / 100})`;
-    if (protoLabel) protoLabel.textContent = `${Math.max(0, Math.round(bkmpIdleCurrentDragon.hp))} / ${bkmpIdleCurrentDragon.maxHp}`;
-  }
 }
 
 function bkmpIdleUpdateVillageHpBar() {
@@ -222,18 +237,6 @@ function bkmpIdleUpdateVillageHpBar() {
   const pct = Math.max(0, Math.min(100, (bkmpIdleVillageHp / maxHp) * 100));
   fill.style.width = pct + '%';
   if (label) label.textContent = `${Math.round(bkmpIdleVillageHp)} / ${Math.round(maxHp)}`;
-  /* PROTOTYP (18.07., entfernbar): siehe Kommentar in
-     bkmpIdleUpdateDragonHpBar() oben - gleiches Prinzip. */
-  const protoFill = document.getElementById('idleVillageHpFillProto');
-  const protoTrail = document.getElementById('idleVillageHpTrailProto');
-  const protoLabel = document.getElementById('idleVillageHpLabelProto');
-  if (protoFill) {
-    if (bkmpProtoLastVillagePct !== null && pct < bkmpProtoLastVillagePct && typeof bkmpProtoFlashHit === 'function') bkmpProtoFlashHit('bkmpProtoCityHpCard');
-    bkmpProtoLastVillagePct = pct;
-    protoFill.style.transform = `scaleX(${pct / 100})`;
-    if (protoTrail) protoTrail.style.transform = `scaleX(${pct / 100})`;
-    if (protoLabel) protoLabel.textContent = `${Math.round(bkmpIdleVillageHp)} / ${Math.round(maxHp)}`;
-  }
 }
 
 function bkmpIdleSpawnProjectile(kind, amount, isCrit) {
@@ -253,13 +256,6 @@ function bkmpIdleSpawnProjectile(kind, amount, isCrit) {
     target.appendChild(dmg);
     window.setTimeout(() => dmg.remove(), 800);
   }
-  /* PHASE 5.6 STUFE 1 (19.07., entfernbar): separater Treffer-/Krit-Effekt
-     im neuen Kampf-Ebenensystem - liest nur das hier bereits vorhandene
-     isCrit (vom bestehenden Schadenswurf), wuerfelt nichts neu. Nur fuer
-     'arrow' (Spieler trifft Drache) - der Dorf-Treffer ('fire') hat schon
-     seinen eigenen bestehenden Feueratem-Effekt. No-op, wenn das
-     Ebenensystem entfernt/deaktiviert/nicht aktiv ist. */
-  if (kind === 'arrow' && typeof bkmpProtoSpawnHitFx === 'function') bkmpProtoSpawnHitFx(isCrit);
 }
 
 /* Spielt den Angriffs-Frame-Zyklus des Drachensprites ab (Elementaratem).

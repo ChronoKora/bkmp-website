@@ -214,10 +214,6 @@ function bkmpIdleEquipVillageSkin(skinId) {
 function bkmpIdleRenderSkinsPanel() {
   const panel = document.getElementById('idlePanelSkins');
   if (!panel || !bkmpIdleState) return;
-  if (!BKMP_VILLAGE_SKINS_ENABLED) {
-    panel.innerHTML = `<p class="idle-skin-empty-hint">🖼️ Dorf-Skins sind vorübergehend pausiert - das Kampf-Hintergrundsystem wird gerade umgebaut. Bereits freigeschaltete Skins bleiben erhalten und kommen zurück, sobald es weitergeht.</p>`;
-    return;
-  }
   const activeVillageId = bkmpGetActiveVillageSkinId();
   if (!bkmpVillageSkinsCatalog.length) {
     panel.innerHTML = `<p class="idle-skin-empty-hint">Noch keine Dorf-Skins verfuegbar - schau bald wieder vorbei.</p>`;

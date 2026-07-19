@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="favicon.ico" sizes="any">
 <title>BKMP – Idle Drachen Dorf (Mini-Stream-Overlay)</title>
-<link rel="stylesheet" href="style.css?v=20260719-p55d">
+<link rel="stylesheet" href="style.css?v=20260719-runenotify1">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 <style>
   /* ============================================================
@@ -33,6 +33,7 @@
   #idleDorfTabs,
   #idleStageBar,
   #idleAdFreeBtn,
+  .idle-dorf-log-filter,
   #idleDorfLog,
   #idlePanelUpgrades, #idlePanelSkilltree, #idlePanelSammlung,
   #idlePanelErfolge, #idlePanelBestenliste, #idlePanelPrestige, #idlePanelRunen,
@@ -304,6 +305,10 @@
           </div>
         </div>
         <button type="button" class="idle-adfree-btn" id="idleAdFreeBtn" style="display:none;">AD-Free &ndash; nur 99$</button>
+        <label class="idle-dorf-log-filter" for="idleLogLegendaryOnlyToggle">
+          <input type="checkbox" id="idleLogLegendaryOnlyToggle">
+          Nur legendäre Runenfunde im Log
+        </label>
         <div class="idle-dorf-log" id="idleDorfLog"></div>
       </div>
 
@@ -405,19 +410,19 @@
   <script src="js/systems/bkmp-dungeon.js?v=20260719-p55d"></script>
   <script src="js/systems/bkmp-breeding.js?v=20260719-p55b"></script>
   <script src="js/systems/bkmp-guild.js?v=20260717-p51perf2"></script>
-  <script src="js/systems/bkmp-runes.js?v=20260719-bugfix1"></script>
+  <script src="js/systems/bkmp-runes.js?v=20260719-runenotify1"></script>
   <script src="js/systems/bkmp-raid.js?v=20260717-p51perf2"></script>
   <script src="js/systems/bkmp-tower.js?v=20260717-p51perf2"></script>
   <script src="js/systems/bkmp-prestige.js?v=20260718-runedupfix1"></script>
   <script src="js/systems/bkmp-arena.js?v=20260717-p2bfoundation"></script>
   <script src="js/systems/bkmp-meister.js?v=20260717-p2bfoundation"></script>
   <script src="js/systems/bkmp-skilltree.js?v=20260717-p2bfoundation"></script>
-  <script src="js/systems/bkmp-cosmetics.js?v=20260719-villageskinspause"></script>
+  <script src="js/systems/bkmp-cosmetics.js?v=20260719-p56revert"></script>
   <script src="js/systems/bkmp-events.js?v=20260719-p55g"></script>
-  <script src="js/ui/bkmp-hud.js?v=20260719-p56stufe1"></script>
+  <script src="js/ui/bkmp-hud.js?v=20260719-videoreuse1"></script>
   <script src="js/systems/bkmp-leaderboard.js?v=20260717-p2cfoundation"></script>
   <script src="js/ui/bkmp-ui-components.js?v=20260719-p55b"></script>
-  <script src="idledorf.js?v=20260719-villageskinspause"></script>
+  <script src="idledorf.js?v=20260719-runenotify1"></script>
   <script src="js/core/bkmp-idle-bootstrap.js?v=20260717-p2afoundation"></script>
   <script>
     /* Gold/XP-Hochschweb-Anzeige laeuft jetzt zentral in idledorf.js

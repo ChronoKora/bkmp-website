@@ -1290,19 +1290,34 @@ function bkmpIdleMaybeDropRune(source) {
   bkmpIdlePendingRuneDrops.push(rune);
   bkmpIdleQueueRuneSync();
   const rarityDef = window.BKMP_RUNE_RARITIES.find(r => r.id === rarityId);
-  bkmpIdleLog(`🔮 ${rarityDef.name} ${slot.name} gefunden! (+${rolledValue}% ${slot.desc})`);
-  /* Phase 5.5 (19.07.): Stufe wird automatisch aus der Seltenheit
-     abgeleitet (siehe BKMP_REWARD_RARITY_DEFAULT_TIER in
-     bkmp-reward-presenter.js - gray/green haeufig->Toast, blue/purple->
-     Karte, gold->Zeremonie), keine eigene tier-Angabe noetig. Zeigt nur
-     bereits gewuerfelte Werte (rolledValue/rarityId/slot) an, wuerfelt
-     nichts neu. Ruestet NICHT automatisch aus - "Zu den Runen" wechselt
-     nur den Tab, per Proxy-Klick auf den bestehenden Tab-Button (identisch
-     zum Muster in js/prototype/bkmp-proto-compact-hud.js). */
+  /* Nutzerwunsch (19.07., Screenshot "oben die Benachrichtigung weg... unten
+     links reicht"): bkmpIdleLog loeste bisher IMMER zusaetzlich seinen
+     eigenen automatischen Toast oben mittig aus (bkmpShowJannikToast) - fuer
+     Runenfunde doppelt gemoppelt, weil bkmpRewardPresent direkt darunter
+     bereits eine eigene Anzeige zeigt. skipToast=true unterdrueckt nur
+     diesen redundanten automatischen Toast, die Logzeile selbst bleibt
+     (Drop-Chat-Historie unveraendert).
+     Zusaetzlich (Nutzerwunsch, gleiche Rueckmeldung): "Nur legendaere
+     Runenfunde im Log" - Filter-Checkbox unter dem Log (siehe
+     bkmpIdleLogLegendaryOnlyInit, idledorf.js), wirkt NUR auf diese
+     Logzeile, nicht auf die Belohnungs-Karte/-Zeremonie oben. */
+  const legendaryOnly = typeof bkmpIdleLogLegendaryOnly === 'function' && bkmpIdleLogLegendaryOnly();
+  if (!legendaryOnly || rarityId === 'gold') {
+    bkmpIdleLog(`🔮 ${rarityDef.name} ${slot.name} gefunden! (+${rolledValue}% ${slot.desc})`, true);
+  }
+  /* Phase 5.5 (19.07.), NACHBESSERUNG (19.07., selbe Nutzer-Rueckmeldung):
+     "Toast" (oben mittig) war fuer gray/green-Funde bisher die automatische
+     Standard-Stufe (siehe BKMP_REWARD_RARITY_DEFAULT_TIER) - der Nutzer
+     will dort keine eigene Anzeige mehr, "unten links reicht". tier wird
+     jetzt IMMER explizit gesetzt statt aus der Seltenheit abgeleitet: nie
+     mehr Toast fuer Runenfunde, gold(legendaer) bleibt bewusst die grosse
+     Zeremonie (bereits vorher so), alles andere (gray/green/blue/purple)
+     wird einheitlich zur Karte unten links. */
   if (typeof bkmpRewardPresent === 'function') {
     const alreadyEquipped = bkmpIdlePlayerRunes.some(r => r.rune_type === slot.id && r.equipped && r._cid !== rune._cid);
     bkmpRewardPresent({
       rarity: rarityId,
+      tier: rarityId === 'gold' ? 'ceremony' : 'card',
       icon: '🔮',
       title: `${rarityDef.name} ${slot.name} gefunden`,
       description: `+${rolledValue}% ${slot.desc}${alreadyEquipped ? ' · Diese Runenart ist bereits ausgerüstet.' : ''}`,

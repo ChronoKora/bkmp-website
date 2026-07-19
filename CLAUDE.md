@@ -6,20 +6,26 @@ Statische Website (kein Build-Schritt, kein package.json) + Supabase-Backend + V
 
 Am 17.07.2026 wurde ein **vollständiges professionelles Redesign** freigegeben (Plan: `C:\Users\David\.claude\plans\delightful-floating-frog.md`). Rollout ist **phasenweise mit Zwischen-Deployments** — jede Phase wird fertig, geprüft, getaggt (`git tag phase-N-complete`), bevor die nächste beginnt.
 
-**Aktueller Stand:** Phase 1, 2 (2a+2b+2c), 3, 4 (Marketing-Redesign) und 5.0 (App-Modus-Promotion) sind komplett fertig und ausführlich verifiziert. Phase 5.1+ (Prestige/Kosmetik/Gilde/weitere Subsysteme, epische Stimmung im Detail) offen. Bereit für Phase 5.1, sobald der Nutzer committet/deployed. Kein Kollisions-Hinweis aktiv.
+**Aktueller Stand:** Phase 1 bis 5.5 komplett fertig und ausführlich verifiziert. **Phase 5.6 (modularer Kampfrenderer mit transparenten Drachen) wurde am 19.07.2026 wieder vollständig zurückgebaut** (Nutzer-Entscheidung "Wir rudern hier zurück... baue wieder die alten ein!") — die alte Seite-an-Seite-Kampfdarstellung (#idleBattlefield, Dorf links/Drache rechts) ist wieder die einzige Darstellung für ALLE Drachen inkl. Feuer/Wasser/Wind/Yaksha-Boss. Entfernt: `js/prototype/bkmp-proto-battlefield.js` (gelöscht), der zugehörige HTML-Block + `<script>`-Tag in index.html, der CSS-Abschnitt in style.css, die Hook-Aufrufe in js/ui/bkmp-hud.js. Die konvertierten Greenscreen-WebMs liegen weiterhin unangetastet in `assets/prototype-battle/` (nicht mehr referenziert, bewusst nicht gelöscht - siehe Chat, falls der Nutzer sie endgültig entfernen will). `sql/20260719-restrict-normal-dragon-rotation.sql` ist dadurch hinfällig (wurde ohnehin nie ausgeführt) - Grund für die Rotationsbeschränkung ist entfallen. Phase 5.4 (einheitliche Tab-UI) ist teilweise offen (Erfolge/Dorf-Skins/Dungeon/Turm/Arena/Gilde/Gilden-Tech/Gildenboss/Bestenliste/Drachenzucht/Kampfbereich-Feinschliff noch nicht überarbeitet, siehe Tasks). **Phase 6.0 (finale QA/Stabilisierung) am 19.07.2026 abgeschlossen** — voller Bericht als Artefakt, kein Release-Blocker gefunden, lokaler Release-Kandidaten-Commit `1ccfa38` erstellt (nicht gepusht, nicht deployed, keine SQL ausgeführt) - der Kampfrenderer-Rückbau kam DANACH und ist noch nicht in einem RC-Commit. Kein Kollisions-Hinweis aktiv.
 
 ⚠️ **Phase 5.0 hat einen kritischen, nie deployten Bug gefunden+gefixt** (siehe Abschnitt "App-Modus-Promotion" unten) — `html.bkmp-app-mode` wurde global, aber mehrere Regeln waren noch mit der Annahme "nur /app" geschrieben und haben dadurch Header/Footer/Nav/alle 10 Marketing-Sektionen sowie einen Vollbild-Splash dauerhaft über die normale Website gelegt. Vor jeder weiteren Arbeit an `html.bkmp-app-mode`-Selektoren in style.css: prüfen, ob der Selektor eine Klasse trifft, die AUCH auf der normalen Website vorkommt (z.B. `.joke-card`, `header`, `footer`, bare Tag-Namen) - falls ja, gehört er entweder auf `.zone-game` (Stimmungs-Chrome) oder `html.bkmp-app-mode.zone-game` (echtes /app-Vollbild-Verhalten wie Splash/Header-Ausblenden/Basis-Schriftgröße), nicht auf `html.bkmp-app-mode` allein.
 
 | Phase | Inhalt | Status |
 |---|---|---|
-| 1 | Inline-Scripts extrahiert, `defer`, Lazy-Loading, Cache-Header, Bild-Pipeline, Tokens (inert), `/sql/`-Ordner | ✅ fertig (noch nicht committet) |
+| 1 | Inline-Scripts extrahiert, `defer`, Lazy-Loading, Cache-Header, Bild-Pipeline, Tokens (inert), `/sql/`-Ordner | ✅ fertig |
 | 2 | idledorf.js in `/js/systems/*.js` zerlegen (siehe Modul-Karte unten) | ✅ fertig (2a+2b+2c) |
 | 3 | design-tokens.css tatsächlich verdrahten, geteilte UI-Komponenten (`js/ui/bkmp-ui-components.js`) | ✅ fertig |
 | 4 | Marketing-/Investoren-/Marktplatz-Redesign (professionelle Stimmung) | ✅ fertig |
 | 5.0 | App-Modus-Ideen einzeln übernehmen/verwerfen (Touch-Targets, Bottom-Nav, Kampf-Juice, Popup-Chrome, HUD-Portrait) | ✅ fertig |
-| 5.1+ | Idle-Game-Redesign pro Subsystem (Prestige, Kosmetik, Gilde, Zucht, Dungeon, Arena, ...) | offen |
-| 6 | Admin & idle-stream-mini.html | offen |
-| 7 | Barrierefreiheit, totes CSS löschen, restliche Assets auf WebP | offen |
+| 5.1 | UI-Fixes, Performance (Pause-bei-Unsichtbarkeit, Effektmodus), Prestige-Zeremonie | ✅ fertig |
+| 5.2 | Kompaktes HUD/Nav-Overlay, Erfolge-/Bestenlisten-250er-Deckel entfernt | ✅ fertig |
+| 5.3 | 5 gemeldete Spieler-Bugs behoben (Runen-Doppelausrüstung, Ei-Dungeon-Regen, Feedback-Button, Klick-Erkennung, Liber-Fixstufe) + Runen überleben Prestige | ✅ fertig |
+| 5.4 | Einheitliche UI für alle Idle-Dorf-Tabs | 🟡 teilweise (Shell/Upgrades/Skilltree/Prestige/Runen fertig; Erfolge/Dorf-Skins/Dungeon/Turm/Arena/Gilde/Gilden-Tech/Gildenboss/Bestenliste/Drachenzucht/Kampfbereich-Feinschliff offen, siehe Tasks) |
+| 5.5 | Gemeinsames Reward-Presentation-System an alle Belohnungsmomente angeschlossen | ✅ fertig |
+| 5.6 | Modularer Kampf-Ebenensystem mit transparenten Drachen | ❌ zurückgebaut (19.07., Nutzer-Entscheidung) — alte Seite-an-Seite-Darstellung wieder Standard für alle Drachen |
+| 6.0 | Finale QA, Stabilisierung, Release-Kandidat | ✅ fertig (19.07.2026, siehe QA-Artefakt in der Session) — RC-Commit `1ccfa38`, nicht gepusht |
+| 6 (Admin) | Admin & idle-stream-mini.html ans neue System anpassen | offen |
+| 7 | Barrierefreiheit, totes CSS löschen (u.a. doppelte `.idle-dorf-tab`-Basisregel), restliche Assets auf WebP | offen |
 
 **⚠️ Parallele Sessions:** Dieses Repo hat keine Worktree-Isolation — mehrere Claude-Code-Sessions können gleichzeitig hier arbeiten. **Vor jeder größeren Änderung an `idledorf.js`, `style.css` oder den Dateien unter `/js/` diesen Abschnitt auf einen Hinweis wie „⚠️ Phase 2 läuft, nicht parallel an idledorf.js arbeiten" prüfen** (wird hier eingetragen, sobald eine Phase mit hohem Kollisionsrisiko startet, und nach Abschluss wieder entfernt).
 

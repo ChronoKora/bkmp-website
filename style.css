@@ -5374,7 +5374,6 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 }
 #idlePanelKampf .idle-stage-bar,
 #idlePanelKampf .idle-battlefield,
-#idlePanelKampf .bkmp-proto-battlefield,
 #idlePanelKampf .idle-adfree-btn {
   flex-shrink: 0;
 }
@@ -5928,8 +5927,29 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   pointer-events: none; white-space: nowrap;
 }
 
+/* Nutzerwunsch (19.07.): "Funktion die unten im Drop-Chat einstellbar ist,
+   ob nur Legi-Runen angezeigt werden" - filtert NUR die Textzeilen im Log
+   (siehe bkmpIdleLog-Aufruf in bkmpIdleMaybeDropRune, bkmp-runes.js), nicht
+   die Belohnungs-Karte/-Zeremonie daneben. Persistiert wie Theme/Effektmodus
+   ueber localStorage (siehe bkmpIdleLogLegendaryOnlyInit in idledorf.js). */
+.idle-dorf-log-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.8rem;
+  font-size: 0.76rem;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+.idle-dorf-log-filter input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--gold);
+  cursor: pointer;
+}
 .idle-dorf-log {
-  margin-top: 1rem;
+  margin-top: 0.5rem;
   /* Bug-Fix 18.07. (Spieler-Meldung: Bereich springt bei jedem Drop/Fund
      eine Zeile hoeher): nur max-height reserviert keinen Platz, solange
      das Log leer/kurz ist - der Block wuchs dadurch mit jeder neuen Zeile
@@ -5958,20 +5978,75 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 0.5rem;
+  gap: 0.45rem;
   pointer-events: none;
   z-index: 6;
   animation: idleRewardFloat 1.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
-.idle-reward-float span {
+/* Nutzerwunsch (19.07.): "optisch was einfallen lassen" - vorher reiner
+   Text mit Farbe+Schatten, jetzt kleine "Belohnungs-Chips" mit Glas-
+   Hintergrund + zur jeweiligen Ressource passendem Rand/Glow (--rf-color
+   pro Chip gesetzt, einmal zentral in box-shadow/border/color verwendet
+   statt 3x hartkodierter Hex-Werte). Nutzt den echten Marken-Gold-Ton
+   (--gold) statt des alten generischen Amber-Tons, der farblich nirgends
+   sonst im Spiel vorkam. */
+.idle-reward-float .rf-chip {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   font-family: 'Fraunces', serif;
   font-weight: 800;
-  font-size: 1.05rem;
+  font-size: 0.92rem;
   white-space: nowrap;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  padding: 0.28rem 0.6rem 0.28rem 0.5rem;
+  border-radius: 999px;
+  color: var(--rf-color);
+  background: linear-gradient(155deg, rgba(10, 8, 16, 0.8), rgba(6, 5, 10, 0.68));
+  border: 1px solid color-mix(in srgb, var(--rf-color) 55%, transparent);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35), 0 0 14px color-mix(in srgb, var(--rf-color) 45%, transparent);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  animation: idleRewardChipIn 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
 }
-.idle-reward-float .rf-gold { color: #ffd166; }
-.idle-reward-float .rf-xp { color: #8ecdf7; }
+.idle-reward-float .rf-chip .rf-icon {
+  font-size: 0.95em;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+}
+.idle-reward-float .rf-gold { --rf-color: var(--gold); }
+.idle-reward-float .rf-xp { --rf-color: #7ee0ff; animation-delay: 0.09s; }
+/* Kleiner Glanz-Streifen nur ueber den Gold-Chip (Muenzen glaenzen,
+   Erfahrung nicht) - reine Deko, laeuft einmal waehrend des Aufploppens
+   durch, kein Dauerloop.
+   Perf-Fix (Nutzer-Videobericht 19.07., "Fenster flackert 1x komplett" beim
+   Drachenwechsel): urspruenglich per "left" animiert - das zwingt den
+   Browser bei JEDEM Frame zu einem echten Layout-Reflow statt nur neu zu
+   compositen, ausgerechnet genau in dem Moment, in dem ohnehin schon viel
+   gleichzeitig passiert (neues Drachen-Video, HP-Sprung, Schadenszahl).
+   "transform: translateX()" laeuft dagegen rein auf der GPU-Compositor-
+   Ebene, ohne Layout/Paint - gleicher optischer Effekt, ohne die
+   zusaetzliche Reflow-Last in diesem kritischen Moment. */
+.idle-reward-float .rf-gold::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 45%;
+  height: 100%;
+  background: linear-gradient(115deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  transform: translateX(-250%);
+  animation: idleRewardShimmer 1.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  will-change: transform;
+}
+@keyframes idleRewardChipIn {
+  from { opacity: 0; transform: scale(0.5); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes idleRewardShimmer {
+  0%, 15% { transform: translateX(-250%); }
+  32% { transform: translateX(250%); }
+  100% { transform: translateX(250%); }
+}
 @keyframes idleRewardFloat {
   0% { opacity: 0; transform: translate(-50%, 8px) scale(0.6); }
   18% { opacity: 1; transform: translate(-50%, -4px) scale(1.2); }
@@ -5981,6 +6056,8 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 }
 @media (prefers-reduced-motion: reduce) {
   .idle-reward-float { animation: none; opacity: 0; }
+  .idle-reward-float .rf-chip { animation: none; }
+  .idle-reward-float .rf-gold::after { animation: none; }
 }
 
 /* ---- Upgrades ---- */
@@ -5998,7 +6075,11 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   cursor: pointer;
 }
 .idle-autobuy-toggle input { width: 1.05rem; height: 1.05rem; cursor: pointer; accent-color: var(--gold, #c9a24b); }
-.idle-upgrade-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.8rem; }
+/* Nutzer-Screenshot 19.07.: unterste Kartenreihe wirkte zu dicht an der
+   Button-Leiste (Als App installieren/Für Streamer/Schließen), die IMMER
+   unterhalb des scrollenden .idle-dorf-panel sitzt (siehe dort) - etwas
+   Luft am Ende des Scrollbereichs, bevor die Leiste beginnt. */
+.idle-upgrade-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.8rem; padding-bottom: 0.4rem; }
 .idle-upgrade-card { border: 1px solid var(--line); border-radius: 14px; padding: 0.85rem; background: var(--paper); text-align: left; display: flex; flex-direction: column; gap: 0.55rem; }
 /* Redesign 18.07. (Phase 5.4): Kopfzeile aus Icon + Name/Stufe (statt
    zentriert uebereinander gestapelt) und eine "aktuell → naechste Stufe"-
@@ -6160,6 +6241,15 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
    ueber opacity abdunkeln statt Farben zu ueberschreiben. */
 .idle-prestige-buy { background: linear-gradient(135deg, #a78bfa, #7c3aed); border: none; color: #fff; }
 .idle-prestige-buy:disabled { opacity: 0.45; cursor: not-allowed; }
+/* Bug-Fix (Nutzer-Screenshot 19.07.): "Maximal"-Buttons standen je nach
+   Laenge des Beschreibungstexts auf unterschiedlicher Hoehe, weil
+   .idle-upgrade-card zwar schon Flex-Spalte ist (macht alle Karten pro
+   Grid-Zeile automatisch gleich hoch), aber nur .idle-upgrade-buy (die
+   normale Upgrades-Tab-Variante) bereits margin-top:auto hatte, um sich
+   selbst an den unteren Kartenrand zu schieben - .idle-prestige-buy (der
+   Bonusbaum-Zwilling mit eigener Lila-Farbe) hatte dieselbe Regel bisher
+   nicht mitbekommen. */
+.idle-prestige-buy { width: 100%; margin-top: auto; }
 
 /* ---- Section C (18.07.): Prestige-Panel - neue Uebersichts-Abschnitte
    (Du erhaeltst / Wird zurueckgesetzt / Bleibt erhalten / Naechster
@@ -8828,8 +8918,6 @@ html.bkmp-app-mode .idle-dmg-lightning {
   color: var(--app-cyan);
   text-shadow: 0 0 12px color-mix(in srgb, var(--app-cyan) 75%, transparent);
 }
-html.bkmp-app-mode .idle-reward-float .rf-gold { color: var(--app-gold); text-shadow: var(--app-glow-gold); }
-html.bkmp-app-mode .idle-reward-float .rf-xp { color: var(--app-cyan); text-shadow: var(--app-glow-cyan); }
 
 /* AD-Free-Kauf-Button bleibt voll funktionsfaehig (echter Kauf!), nur
    optisch als klare CTA im neuen Look. */
@@ -10520,187 +10608,6 @@ html.bkmp-app-mode .idle-app-more-sheet-group-title:first-child {
 }
 .bkmp-ui-toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
 @media (prefers-reduced-motion: reduce) { .bkmp-ui-toast { transition: opacity var(--duration-base) linear; } }
-
-/* ============================================================
-   PHASE 5.6 STUFE 1 (19.07., ISOLIERT & VOLLSTAENDIG ENTFERNBAR) -
-   modulares Kampf-Ebenensystem mit echtem transparentem Drachen.
-   Entfernen: dieser gesamte Block + js/prototype/
-   bkmp-proto-battlefield.js + dessen <script>-Tag + der HTML-Block in
-   index.html + die 2 zusaetzlichen Hook-Zeilen in js/ui/bkmp-hud.js
-   (klar markiert). Die bestehende .idle-battlefield-Regelung weiter
-   oben in dieser Datei ist davon unberuehrt und bleibt der garantierte
-   Fallback.
-
-   Vorgeschichte (Phase 5.1, 18.07.): Web-MP4/H.264 unterstuetzt keinen
-   Alphakanal - ein mix-blend-mode:screen-Test funktionierte technisch,
-   wusch aber dunkle Drachenschuppen sichtbar aus (screen(src,dst)=dst
-   nur fuer src=0 exakt) und wurde vom Nutzer verworfen; die Darstellung
-   fiel danach auf ein gerahmtes Portrait-Video zurueck (kein Transparenz-
-   Versuch mehr). Phase 5.6 (19.07.) loest das jetzt richtig: der Nutzer
-   stellte einen Greenscreen-Rohclip bereit, mit seiner ausdruecklichen
-   Zustimmung wurde lokal ffmpeg installiert und daraus EINMALIG, offline
-   ein echtes VP9/yuva420p-WebM mit echtem Alphakanal erzeugt (chromakey-
-   Filter + Crop der Letterbox-Raender, siehe Abschlussbericht fuer die
-   exakten Parameter) - keine Laufzeit-Chroma-Key-Schleife, kein
-   mix-blend-mode mehr noetig, der Drache traegt seine volle Farbtiefe. */
-.bkmp-proto-battlefield {
-  position: relative;
-  overflow: hidden;
-  border-radius: 18px;
-  border: 1px solid var(--line);
-  /* Bewusst etwas hoeher als das rohe Quellvideo-Seitenverhaeltnis
-     (2230:930 = 2,398:1) - Prototyp 2 (18.07., kompaktes HUD/Nav) will
-     den Kampfbereich auf ~55-65% der Fensterhoehe bringen. Da die Karte
-     ihrer Inhaltshoehe folgt (kein fixes Viewport-Grow), ist die einzige
-     wirksame Stellschraube die eigene Boxhoehe - object-fit:cover auf
-     .bkmp-proto-bg-video gleicht die etwas staerkere Rand-Beschneidung
-     der Landschaft dabei automatisch aus, Stadt/Terrain bleiben je nach
-     Breite weiterhin sichtbar (siehe Verifikation im Abschlussbericht). */
-  aspect-ratio: 21 / 10;
-  min-height: 200px;
-  background: #050506;
-  /* FIX (Nutzer-Screenshot 18.07.): #idlePanelKampf/.idle-dorf-card sind
-     display:flex;flex-direction:column - ohne flex-shrink:0 durfte der
-     Flex-Layout-Algorithmus dieses Element bei knapper Fensterhoehe unter
-     seine eigene aspect-ratio-Hoehe zusammendruecken (gemessen: bei
-     1440x760 sollten es 451px Hoehe sein, gerendert wurden nur 280px) -
-     die Drachen-Ebene (separat ueber ihre eigene Breite berechnet) behielt
-     dabei ihre volle Groesse und ragte dadurch unten aus dem jetzt zu
-     kurzen Kasten heraus, wo overflow:hidden sie sichtbar abschnitt. Das
-     war die tatsaechliche Ursache des "Drache unten abgeschnitten"-Bugs,
-     nicht die Drachen-Position selbst (deren eigener Bildinhalt hat bei
-     jedem Zeitpunkt im Video reichlich Rand nach oben/unten, per
-     Canvas-Bounding-Box ueber die ganze Clip-Laenge verifiziert). */
-  flex-shrink: 0;
-  /* FIX (Nutzer-Screenshot 18.07.): eigener, kontrollierter Stacking-
-     Context fuer die ganze Szene - haelt den weiter unten reparierten
-     mix-blend-mode sauber auf dieses Element begrenzt (blendet nur mit
-     Inhalt INNERHALB dieser Box, nie mit Seiteninhalt dahinter). */
-  isolation: isolate;
-}
-.bkmp-proto-bg-video {
-  position: absolute; inset: 0; width: 100%; height: 100%;
-  object-fit: cover; object-position: center center;
-}
-.bkmp-proto-dragon-layer {
-  position: absolute;
-  /* Startwerte fuer Abschnitt 5's Default-Position (feuerdrache, Desktop) -
-     bkmpProtoApplyPosition() in bkmp-proto-battlefield.js ueberschreibt
-     width/right/top pro Gegner/Breakpoint aus BKMP_COMBAT_ASSETS, aspect-
-     ratio wird beim Asset-Laden ebenfalls per JS gesetzt (asset.aspectRatio) -
-     diese Werte hier greifen nur als Fallback vor dem ersten JS-Sync. */
-  width: 32%;
-  right: 5%;
-  top: 18%;
-  aspect-ratio: 1080 / 612;
-  pointer-events: none;
-  /* Kein z-index hier - ein eigener z-index wuerde einen neuen Stacking-
-     Context erzeugen (siehe Phase-5.1-Historie oben). Mit echtem Alpha
-     ist das inzwischen irrelevant fuer die Sichtbarkeit selbst, aber
-     unnoetiger Stacking-Context bleibt trotzdem vermieden. */
-}
-.bkmp-proto-dragon-video {
-  position: absolute; inset: 0; width: 100%; height: 100%;
-  /* object-fit:contain statt cover (Unterschied zur Phase-5.1-Portrait-
-     Variante): mit echtem Alphakanal soll der GESAMTE Drache inkl.
-     Fluegelspitzen/Feueratem sichtbar bleiben, nicht auf ein Rechteck
-     zugeschnitten werden (Auftrag Abschnitt 7: "nicht abgeschnitten
-     werden"). Kein Rahmen/Schatten mehr - die alte Portrait-Umrandung
-     kaschierte die fehlende Transparenz, mit echtem Alpha braucht es sie
-     nicht mehr (Auftrag Abschnitt 7: "keine sichtbare rechteckige
-     Hintergrundflaeche besitzen"). */
-  object-fit: contain;
-}
-.bkmp-proto-hit-area {
-  position: absolute; inset: 0; width: 100%; height: 100%;
-  border: none; background: transparent; cursor: pointer; padding: 0; z-index: 3;
-}
-.bkmp-proto-effects { position: absolute; inset: 0; pointer-events: none; z-index: 4; }
-/* Abschnitt 9/10: Treffer-/Krit-Partikel, positioniert per Prozentwert
-   (left/top aus asset.anchors.dragonHit) statt fester Pixel. Kurz,
-   selbst-entfernend (siehe bkmpProtoSpawnHitFx setTimeout), kein Loop. */
-.bkmp-proto-hit-fx { position: absolute; width: 0; height: 0; transform: translate(-50%, -50%); }
-.bkmp-proto-hit-fx > span {
-  position: absolute; left: 0; top: 0; width: 5px; height: 5px; border-radius: 50%;
-  background: #fbbf24;
-  animation-name: bkmpProtoHitFxFly; animation-timing-function: ease-out; animation-fill-mode: forwards;
-}
-.bkmp-proto-hit-fx.is-crit > span { width: 7px; height: 7px; background: #f87171; }
-@keyframes bkmpProtoHitFxFly {
-  0% { transform: translate(0, 0) scale(1); opacity: 1; }
-  100% { transform: translate(var(--dx), var(--dy)) scale(0.3); opacity: 0; }
-}
-.bkmp-proto-hp-card {
-  position: absolute; z-index: 5;
-  /* Feste width statt nur min-/max-width: .bkmp-proto-hp-bar hat KEINE
-     eigene intrinsische Breite (ihre Kinder sind position:absolute,
-     tragen also nichts zur Shrink-to-fit-Breite dieser Karte bei) -
-     ohne eine echte width haengt die gesamte Kartenbreite ausschliesslich
-     vom Namens-/Label-Textinhalt ab und kollabiert sichtbar, sobald der
-     Text kurz oder (wie im Test ohne echten Spielstand) leer ist. */
-  width: 42%; max-width: 220px;
-  padding: 0.55rem 0.8rem;
-  border-radius: 12px;
-  background: linear-gradient(155deg, rgba(10, 8, 16, 0.82), rgba(6, 5, 10, 0.78));
-  border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 16px color-mix(in srgb, #a78bfa 25%, transparent);
-}
-.bkmp-proto-hp-card-city { top: 4%; left: 3%; }
-.bkmp-proto-hp-card-dragon { top: 4%; right: 3%; text-align: right; }
-.bkmp-proto-hp-name {
-  font-family: 'Fraunces', serif; font-size: 0.82rem; font-weight: 700; color: #fff;
-  margin-bottom: 0.3rem; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
-}
-.bkmp-proto-hp-bar {
-  position: relative; width: 100%; height: 10px; border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12); overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.18);
-}
-.bkmp-proto-hp-fill-trail, .bkmp-proto-hp-fill {
-  position: absolute; inset: 0; width: 100%; height: 100%;
-  transform-origin: left; transform: scaleX(1); border-radius: inherit;
-}
-.bkmp-proto-hp-card-dragon .bkmp-proto-hp-fill-trail,
-.bkmp-proto-hp-card-dragon .bkmp-proto-hp-fill { transform-origin: right; }
-.bkmp-proto-hp-fill-trail { transition: transform 0.6s ease 0.15s; }
-.bkmp-proto-hp-fill { transition: transform 0.25s ease; }
-.bkmp-proto-hp-fill-trail-city { background: rgba(52, 211, 153, 0.55); }
-.bkmp-proto-hp-fill-trail-dragon { background: rgba(249, 115, 22, 0.55); }
-.bkmp-proto-hp-fill-city { background: linear-gradient(90deg, #10b981, #34d399); }
-.bkmp-proto-hp-fill-dragon { background: linear-gradient(90deg, #dc2626, #f97316); }
-.bkmp-proto-hp-label { margin-top: 0.25rem; font-size: 0.7rem; font-weight: 700; color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); }
-.bkmp-proto-hp-card.hit { animation: bkmpProtoHitPulse 0.22s ease; }
-@keyframes bkmpProtoHitPulse {
-  0% { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 0 rgba(220, 38, 38, 0); }
-  40% { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 22px rgba(220, 38, 38, 0.65); }
-  100% { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 16px color-mix(in srgb, #a78bfa 25%, transparent); }
-}
-.bkmp-proto-badge {
-  position: absolute; bottom: 3%; left: 50%; transform: translateX(-50%); z-index: 5;
-  font-size: 0.65rem; font-weight: 700; letter-spacing: 0.03em;
-  padding: 0.2rem 0.6rem; border-radius: 999px;
-  background: rgba(0, 0, 0, 0.55); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.4);
-  pointer-events: none;
-}
-
-/* Effektmodus (wiederverwendet data-fx aus Section B statt eines neuen
-   Systems) - Reduziert/Aus daempfen nur die HP-Balken-/Treffer-
-   Animationen; das eigentliche Pausieren der beiden Videos passiert in
-   JS (bkmp-proto-battlefield.js), nicht per CSS. */
-html[data-fx="reduziert"] .bkmp-proto-hp-fill-trail,
-html[data-fx="aus"] .bkmp-proto-hp-fill-trail { transition: none; }
-html[data-fx="aus"] .bkmp-proto-hp-fill { transition: none; }
-html[data-fx="aus"] .bkmp-proto-hp-card.hit { animation: none; }
-@media (prefers-reduced-motion: reduce) {
-  .bkmp-proto-hp-fill-trail, .bkmp-proto-hp-fill { transition: none !important; }
-  .bkmp-proto-hp-card.hit { animation: none !important; }
-}
-
-@media (max-width: 640px) {
-  .bkmp-proto-hp-card { width: 47%; max-width: none; padding: 0.4rem 0.55rem; }
-  .bkmp-proto-hp-name { font-size: 0.68rem; }
-  .bkmp-proto-hp-label { font-size: 0.62rem; }
-  .bkmp-proto-dragon-layer { width: 34%; right: 3%; top: 18%; }
-}
 
 /* ============================================================
    PROTOTYP 2 (18.07., ISOLIERT & VOLLSTAENDIG ENTFERNBAR) - kompaktes
