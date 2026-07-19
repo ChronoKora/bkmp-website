@@ -4346,6 +4346,10 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 }
 .idle-runen-reroll-btn:hover:not(:disabled) { border-color: var(--gold); transform: translateY(-1px); }
 .idle-runen-reroll-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+/* Nutzerwunsch 19.07.: Reroll-Zielspanne "ruhig daneben anzeigen und nicht
+   erst beim hovern" - steht jetzt permanent unter der Sub-Stat-Zeile
+   (title-Tooltip bleibt zusaetzlich als redundante Kurzform bestehen). */
+.idle-runen-reroll-range { display: block; font-size: 0.68rem; color: var(--muted); opacity: 0.75; margin: 0.1rem 0 0.2rem; }
 /* flex:1 statt width:100% (Nutzerwunsch 19.07.: Instant-Aufwerten-Button
    daneben) - .idle-runen-stat-actions ist bereits display:flex, dadurch
    teilen sich beide Buttons die Zeile automatisch je zur Haelfte. */

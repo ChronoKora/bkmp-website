@@ -394,6 +394,11 @@ function bkmpRuneRerollSubstat(cid, statIndex) {
   }
   bkmpIdleState.crystals -= cost;
   const oldValue = entry.value;
+  /* Alt-Runen ohne gespeichertes boostCount (vor diesem Update aufgewertet)
+     bekommen es hier aus dem bisherigen Wert geschaetzt und PERSISTENT
+     gesetzt (siehe bkmpRuneSubstatEffectiveBoostCount) - ab jetzt zaehlt
+     fuer diesen Sub-Stat nur noch die echte, mitgezaehlte Zahl. */
+  entry.boostCount = bkmpRuneSubstatEffectiveBoostCount(entry, rune.rarity);
   entry.value = bkmpIdleRollBoostedSubstatValue(entry.stat, rune.rarity, entry.boostCount);
   const meta = bkmpRuneStatMeta(entry.stat);
   const subUnit = entry.stat.endsWith('_flat') ? '' : '%';
@@ -832,12 +837,21 @@ function bkmpRuneStatBoxHTML(slot, rune) {
         const rerollCost = bkmpRuneRerollSubstatCost(rune);
         const canAffordReroll = bkmpIdleState && Number(bkmpIdleState.crystals || 0) >= rerollCost;
         /* Nutzerwunsch 19.07.: "dazu schreiben in was für einer Spanne man
-           rerollt" - zeigt jetzt die tatsaechliche Ziel-Spanne (inkl. der
-           bereits erhaltenen Meilenstein-Boosts, siehe boostCount/
-           bkmpIdleSubstatValueRange) statt nur des vagen "gleicher Bereich
-           wie beim urspruenglichen Fund". */
-        const [rerollMin, rerollMax] = bkmpIdleSubstatValueRange(s.stat, rune.rarity, s.boostCount);
-        return `<li>${meta.icon} +${s.value}${subUnit} ${escapeHtml(meta.desc)} <button type="button" class="idle-runen-reroll-btn" data-cid="${rune._cid}" data-index="${i}" ${canAffordReroll ? '' : 'disabled'} title="Diesen Sub-Stat neu würfeln (Spanne +${rerollMin}${subUnit} bis +${rerollMax}${subUnit})">🎲 ${rerollCost} 💎</button></li>`;
+           rerollt" - zeigt die tatsaechliche Ziel-Spanne (inkl. bereits
+           erhaltener Meilenstein-Boosts). Nachbesserung (Spieler-Meldung
+           "wie kann das sein, 2,8% bis 4,2%, wenn 7.64 bereits drauf
+           sind"): fuer Alt-Runen ohne gespeichertes boostCount (vor diesem
+           Update aufgewertet) ueber bkmpRuneSubstatEffectiveBoostCount aus
+           dem sichtbaren Wert geschaetzt, statt faelschlich boostCount=0
+           anzunehmen - sonst widersprach die Spanne dem eigenen aktuellen
+           Wert. Zweite Nachbesserung: steht jetzt direkt sichtbar daneben
+           (zusaetzlich weiterhin im title-Tooltip), nicht mehr nur beim
+           Hovern sichtbar. */
+        const effectiveBoost = bkmpRuneSubstatEffectiveBoostCount(s, rune.rarity);
+        const [rerollMin, rerollMax] = bkmpIdleSubstatValueRange(s.stat, rune.rarity, effectiveBoost);
+        return `<li>${meta.icon} +${s.value}${subUnit} ${escapeHtml(meta.desc)}
+          <button type="button" class="idle-runen-reroll-btn" data-cid="${rune._cid}" data-index="${i}" ${canAffordReroll ? '' : 'disabled'} title="Diesen Sub-Stat neu würfeln (Spanne +${rerollMin}${subUnit} bis +${rerollMax}${subUnit})">🎲 ${rerollCost} 💎</button>
+          <span class="idle-runen-reroll-range">Spanne +${rerollMin}${subUnit} bis +${rerollMax}${subUnit}</span></li>`;
       }).join('')}
     </ul>` : '<p class="idle-runen-stat-note">Noch keine Sub-Stats - bei +3/+6/+9/+12 kommt bis zu insgesamt 4 jeweils einer dazu.</p>'}
     <div class="idle-runen-stat-actions">
@@ -1300,6 +1314,28 @@ function bkmpIdleSubstatValueRange(statKey, rarityId, boostCount) {
   }
   const round = statKey.endsWith('_flat') ? v => Math.max(1, Math.round(v)) : v => Math.round(v * 100) / 100;
   return [round(min), round(max)];
+}
+/* Bug-Fix 19.07. (Spieler-Meldung: "Wie kann das sein? Zwischen 2,8% und
+   4,2%? wenn 7.64 bereits drauf sind"): boostCount existiert erst seit
+   diesem Update - Runen, die VOR dem Update schon Meilenstein-Boosts
+   erhalten hatten, haben kein gespeichertes boostCount (undefined -> bisher
+   als 0 behandelt) und zeigten dadurch weiterhin die alte, zu niedrige
+   Basis-Spanne, obwohl ihr tatsaechlicher Wert laengst hoeher lag. Fuer
+   genau diesen Fall wird boostCount rueckwirkend aus dem VORHANDENEN Wert
+   geschaetzt (Erwartungswert-Umkehrung derselben Formel wie beim Wuerfeln:
+   value = baseErwartungswert * (1 + 0.5 * boostCount)) - keine exakte
+   Rekonstruktion der echten Historie moeglich (die war zufaellig), aber
+   eine Spanne, die zum sichtbaren Wert passt statt ihn zu widersprechen.
+   Alt-Runen ohne gespeichertes boostCount erhalten es beim naechsten
+   Reroll dann tatsaechlich gespeichert (siehe bkmpRuneRerollSubstat). */
+function bkmpIdleEstimateSubstatBoostCount(statKey, rarityId, currentValue) {
+  const [lo, hi] = bkmpIdleRuneStatRange(statKey, rarityId);
+  const baseExpected = (lo + hi) / 2 * 0.35;
+  if (!baseExpected || !currentValue || currentValue <= baseExpected) return 0;
+  return Math.max(0, Math.round((currentValue / baseExpected - 1) / 0.5));
+}
+function bkmpRuneSubstatEffectiveBoostCount(entry, rarityId) {
+  return typeof entry.boostCount === 'number' ? entry.boostCount : bkmpIdleEstimateSubstatBoostCount(entry.stat, rarityId, entry.value);
 }
 
 /* Rollt die Sub-Stats, mit denen eine Rune SOFORT droppt/verschmilzt -
