@@ -3719,11 +3719,20 @@
     function bkmpStartDailyEventPolling() {
       bkmpPollDailyEvent();
       clearInterval(bkmpDailyEventPollTimer);
-      /* Egress/Performance-Fix 17.07.: laeuft unconditional fuer jeden
-         Besucher der Hauptseite - 15s war fuer ein taegliches Event
-         unnoetig haeufig, 30s reicht (siehe bkmpIdleMaintenancePoll fuer
-         den gleichen Grund/dieselbe Aenderung). */
-      bkmpDailyEventPollTimer = setInterval(bkmpPollDailyEvent, 30000);
+      /* Spieler-Meldung 20.07. ("Der ist erst 30 Sekunden spaeter aufgetaucht,
+         obwohl Fenster offen war"): dieses Event ist ein "wer zuerst"-Rennen
+         mit nur 3 Minuten Laufzeit (siehe api/active-daily-event.js) - im
+         30s-Takt (Egress-Fix vom 17.07., davor 15s) verliert man das Rennen
+         im schlimmsten Fall rein durch Polling-Timing, nicht durch
+         tatsaechliche Reaktionsgeschwindigkeit. Echtzeit-Push (Supabase
+         Realtime) geht hier bewusst NICHT - daily_code_events hat absichtlich
+         KEINE anonyme Lese-Policy, damit niemand kuenftige Codes/Zeiten vorab
+         sieht (siehe Kommentar dort); ein Realtime-Abo wuerde genau diesen
+         Schutz aushebeln. Einzige verbleibende Stellschraube ist das
+         Intervall selbst - Nutzer-Entscheidung 20.07.: 10s als Mittelweg
+         (verdreifacht die Lesezugriffe ggue. 30s, bleibt aber unter dem
+         alten 15s-Stand). */
+      bkmpDailyEventPollTimer = setInterval(bkmpPollDailyEvent, 10000);
     }
 
     async function bkmpPollDailyEvent() {
