@@ -111,7 +111,7 @@ function bkmpApplyVillageSkinToElement(el, skinId, options) {
      gleiches Prinzip wie schon beim Drachen-Kampfvideo
      (bkmpIdleSyncDragonVideoPlayback, js/ui/bkmp-hud.js). Reiner Anzeige-
      Unterschied, keine Kampfwerte betroffen. */
-  const fxOff = typeof bkmpFxGetMode === 'function' && bkmpFxGetMode() === 'aus';
+  const fxOff = typeof bkmpFxVillageSkinAnimOff === 'function' && bkmpFxVillageSkinAnimOff();
   if (def && def.video_file) {
     /* Video-Skin (z.B. Pinguindorf) statt Bild-Sprite-Streifen: aspect-
        ratio wird hier auf die ECHTEN Video-Massse gesetzt (frame_aspect_w/h

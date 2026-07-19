@@ -228,25 +228,68 @@ function bkmpProtoChudRenderStageBar() {
 }
 
 // ---------------- Effektmodus-Icon (wiederverwendet Section B) ----------------
+/* Nutzerwunsch 19.07.: "Oben rechts ein Menue mit 'Welche Effekte willst du
+   deaktivieren?' oeffnen... ich meine wirklich alle Effekte selbst
+   auswaehlbar. (Ruhig die 3 Buttons drinlassen...)" - die 3 Presets bleiben
+   als Schnellauswahl oben im Menue, darunter jetzt zusaetzlich eine
+   Checkbox pro Einzeleffekt (BKMP_FX_TOGGLE_DEFS, idledorf.js). Ein Preset-
+   Klick setzt alle Checkboxen passend mit (siehe bkmpFxSetMode ->
+   bkmpFxApplyPresetToToggles) - das Menue bleibt danach bewusst offen
+   (anders als vorher), damit sichtbar bleibt, was der Preset bewirkt hat,
+   und einzelne Haken sich direkt danach noch anpassen lassen. */
 function bkmpProtoChudRenderFxMenu() {
   const menu = document.getElementById('bkmpProtoChudFxMenu');
   if (!menu) return;
-  const current = typeof bkmpFxGetMode === 'function' ? bkmpFxGetMode() : 'hoch';
   const options = [
     { mode: 'hoch', label: '✨ Hoch' },
-    { mode: 'reduziert', label: '🔅 Reduziert' },
-    { mode: 'aus', label: '🚫 Aus' }
+    { mode: 'reduziert', label: '🔅 Mittel' },
+    { mode: 'aus', label: '🚫 Alle aus' }
   ];
-  menu.innerHTML = options.map(o =>
-    `<button type="button" class="bkmp-proto-chud-fx-option${o.mode === current ? ' active' : ''}" data-proto-fx="${o.mode}">${o.label}</button>`
-  ).join('');
+  const toggleDefs = typeof BKMP_FX_TOGGLE_DEFS !== 'undefined' ? BKMP_FX_TOGGLE_DEFS : [];
+  menu.innerHTML = `
+    <div class="bkmp-proto-chud-fx-presets">
+      ${options.map(o => `<button type="button" class="bkmp-proto-chud-fx-option" data-proto-fx="${o.mode}">${o.label}</button>`).join('')}
+    </div>
+    <div class="bkmp-proto-chud-fx-divider"></div>
+    <div class="bkmp-proto-chud-fx-title">Welche Effekte willst du deaktivieren?</div>
+    <div class="bkmp-proto-chud-fx-toggles">
+      ${toggleDefs.map(def => `<label class="bkmp-proto-chud-fx-toggle"><input type="checkbox" data-proto-fx-toggle="${def.id}"><span>${def.label}</span></label>`).join('')}
+    </div>
+  `;
+  /* Bug-Fix (beim eigenen Testen gefunden): ein Klick-Handler, der SEIN
+     EIGENES Menue per innerHTML komplett neu aufbaut, loeste beim
+     naechsten Bubbling-Schritt versehentlich den globalen "Aussen-Klick
+     schliesst das Menue"-Listener (bkmpProtoChudInit) aus - der geklickte
+     Button existiert zu dem Zeitpunkt (nach dem innerHTML-Ersatz) nicht
+     mehr im DOM, e.target.closest('.bkmp-proto-chud-fx-menu') lieferte
+     dadurch null statt das Menue korrekt als "innen" zu erkennen, das
+     Menue schloss sich sofort wieder nach jedem Preset-Klick. Deshalb hier
+     Markup EINMALIG aufbauen (nur bei bkmpProtoChudOpenFxMenu), Klicks/
+     Haken aktualisieren danach nur noch bestehende Knoten in-place statt
+     das Menue erneut zu ersetzen. */
   menu.querySelectorAll('[data-proto-fx]').forEach(btn => {
     btn.addEventListener('click', () => {
       if (typeof bkmpFxSetMode === 'function') bkmpFxSetMode(btn.dataset.protoFx);
       bkmpProtoChudUpdateFxIcon();
-      bkmpProtoChudRenderFxMenu();
-      bkmpProtoChudCloseFxMenu();
+      bkmpProtoChudSyncFxMenuState();
     });
+  });
+  menu.querySelectorAll('[data-proto-fx-toggle]').forEach(input => {
+    input.addEventListener('change', () => {
+      if (typeof bkmpFxToggleSet === 'function') bkmpFxToggleSet(input.dataset.protoFxToggle, input.checked);
+    });
+  });
+  bkmpProtoChudSyncFxMenuState();
+}
+function bkmpProtoChudSyncFxMenuState() {
+  const menu = document.getElementById('bkmpProtoChudFxMenu');
+  if (!menu) return;
+  const current = typeof bkmpFxGetMode === 'function' ? bkmpFxGetMode() : 'hoch';
+  menu.querySelectorAll('[data-proto-fx]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.protoFx === current);
+  });
+  menu.querySelectorAll('[data-proto-fx-toggle]').forEach(input => {
+    input.checked = typeof bkmpFxToggleGet !== 'function' || bkmpFxToggleGet(input.dataset.protoFxToggle);
   });
 }
 function bkmpProtoChudUpdateFxIcon() {

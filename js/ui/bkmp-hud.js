@@ -59,11 +59,12 @@ function bkmpIdleApplyDragonSprite(sprite, spriteKey) {
       sprite.appendChild(video);
     }
     if (video.dataset.spriteKey !== spriteKey) {
-      /* Nutzerwunsch (19.07.): Effektmodus "Aus" haelt Drachen-Videos an
-         (Standbild statt Endlosschleife) - reiner Anzeige-Unterschied,
-         keine Kampfwerte betroffen (siehe bkmpFxApplyMode/
+      /* Nutzerwunsch (19.07.): Effektmodus "Aus" ODER der Einzelschalter
+         "Drachen-Kampfvideo" haelt Drachen-Videos an (Standbild statt
+         Endlosschleife) - reiner Anzeige-Unterschied, keine Kampfwerte
+         betroffen (siehe bkmpFxDragonVideoOff/bkmpFxApplyMode/
          bkmpIdleSyncDragonVideoPlayback fuer den Live-Umschalt-Fall). */
-      const paused = typeof bkmpFxGetMode === 'function' && bkmpFxGetMode() === 'aus';
+      const paused = typeof bkmpFxDragonVideoOff === 'function' && bkmpFxDragonVideoOff();
       video.dataset.spriteKey = spriteKey;
       video.src = videoSrc;
       if (paused) video.pause();
@@ -82,7 +83,7 @@ function bkmpIdleApplyDragonSprite(sprite, spriteKey) {
 function bkmpIdleSyncDragonVideoPlayback() {
   const video = document.querySelector('#idleDragonSprite .idle-dragon-sprite-video');
   if (!video) return;
-  if (typeof bkmpFxGetMode === 'function' && bkmpFxGetMode() === 'aus') {
+  if (typeof bkmpFxDragonVideoOff === 'function' && bkmpFxDragonVideoOff()) {
     if (!video.paused) video.pause();
   } else if (video.paused) {
     video.play().catch(() => {});

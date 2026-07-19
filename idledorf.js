@@ -1826,7 +1826,16 @@ const BKMP_IDLE_PRODUCTION_BUILDINGS = [
   { id: 'manaquelle', name: 'Manaquelle', icon: '🧪', resource: 'essence', levelKey: 'manaquelle_level', tsKey: 'manaquelle_collected_at', baseCost: 10000, costRate: 0.34, costExponent: 2.25, baseRate: 4, rateCoef: 0.4, unit: 'Essenz/Std.', desc: 'Produziert Essenz pro Stunde, auch offline.' },
   { id: 'magierakademie', name: 'Magierakademie', icon: '🧙', resource: 'xp', levelKey: 'magierakademie_level', tsKey: 'magierakademie_collected_at', baseCost: 5000, costRate: 0.30, costExponent: 2.15, baseRate: 50, rateCoef: 0.5, unit: 'EXP/Std.', desc: 'Produziert Spieler-EXP pro Stunde, auch offline.' }
 ];
-const BKMP_IDLE_PRODUCTION_BUILDING_MAX_LEVEL = 30;
+/* Cap-Erhoehung 19.07. (Spieler-Meldung: "1.1K Holz/Std? wenn ich für 1 lvl
+   schon Vorratshaus 27.4k brauche" - bei altem Cap 30 dauerte allein EIN
+   Vorratshaus-Level laenger als die gesamte Holzproduktion pro Tag liefert,
+   obwohl Vorratshaus bis Stufe 5000 geht). 30 -> 150 als erster Schritt
+   (Nutzer-Vorgabe: "Erstmal Cap lvl 150") - rate(level) ist linear
+   (baseRate*(1+level*rateCoef), siehe bkmpIdleProductionRate weiter unten),
+   bei Stufe 150 rund das 4,75-fache der bisherigen Maximalproduktion.
+   Reine Obergrenze, keine SQL-Migration noetig (level-Spalten sind
+   ungedeckelte Integer, siehe supabase-idle-production-buildings.sql). */
+const BKMP_IDLE_PRODUCTION_BUILDING_MAX_LEVEL = 150;
 
 /* Flacher Bonus pro Prestige-STUFE (nicht Prestige-Baumrang) - dieselbe
    Formel wie prestigeLevelBonusPct in bkmpIdleRecomputeEffectiveStats
@@ -1943,6 +1952,7 @@ function bkmpFxSetMode(mode) {
   if (BKMP_FX_MODES.indexOf(mode) === -1) return;
   try { localStorage.setItem(BKMP_FX_MODE_KEY, mode); } catch (e) {}
   bkmpFxApplyMode(mode);
+  if (typeof bkmpFxApplyPresetToToggles === 'function') bkmpFxApplyPresetToToggles(mode);
 }
 
 function bkmpFxCycleMode() {
@@ -1952,8 +1962,82 @@ function bkmpFxCycleMode() {
 
 function bkmpFxInit() {
   bkmpFxApplyMode(bkmpFxGetMode());
+  bkmpFxTogglesApply();
   const btn = document.getElementById('idleFxModeBtn');
   if (btn) btn.addEventListener('click', bkmpFxCycleMode);
+}
+
+/* Granulare Effekt-Einzelschalter (Nutzerwunsch 19.07.: "Welche Effekte
+   willst du deaktivieren? ... ich meine wirklich alle Effekte selbst
+   auswaehlbar") - baut NEBEN dem bestehenden 3-stufigen Effektmodus oben
+   (Hoch/Reduziert/Aus, bleibt als Schnellauswahl bestehen, Nutzer-Vorgabe:
+   "ruhig die 3 buttons drinlassen") eine feinere Ebene: jeder einzelne
+   Effekt laesst sich unabhaengig an/abschalten, unabhaengig davon, welche
+   Grobstufe zuletzt gewaehlt wurde. Ein Klick auf einen der 3 Presets setzt
+   weiterhin ALLE Einzelschalter passend (siehe BKMP_FX_PRESET_TOGGLES),
+   damit die Checkbox-Liste sich sofort sichtbar mitbewegt statt
+   widerspruechlich stehen zu bleiben - danach kann der Spieler beliebig
+   einzelne wieder umschalten. Reine Anzeige-Einstellung, wie der 3-Stufen-
+   Modus selbst - fasst nie Spielwerte/Drop-Chancen/Kampfberechnungen an. */
+const BKMP_FX_TOGGLES_KEY = 'bkmp-fx-toggles';
+const BKMP_FX_TOGGLE_DEFS = [
+  { id: 'dmgNumbers', label: 'Schadenszahlen im Kampf' },
+  { id: 'hitShake', label: 'Bildschirm-Wackler & Aufblitzen bei Treffern' },
+  { id: 'attackAnim', label: 'Angriffsanimation (Pfeil/Feueratem/Drache)' },
+  { id: 'rewardPopups', label: 'Belohnungs-Popups (Gold/XP)' },
+  { id: 'dragonVideo', label: 'Drachen-Kampfvideo (statt Standbild)' },
+  { id: 'villageSkinAnim', label: 'Dorf-Skin-Animation' },
+  { id: 'legendaryPulse', label: 'Legendäre-Runen-Puls im Lager' }
+];
+/* Deckt sich bewusst 1:1 mit dem, was die bestehenden data-fx="reduziert"/
+   "aus"-Regeln in style.css bisher schon an-/abschalten (siehe die
+   jeweiligen html[data-fx="..."]-Kommentare dort) - "Reduziert" hat bisher
+   NUR den teuersten Effekt (Bildschirm-Wackler) abgeschaltet, alles andere
+   blieb an. */
+const BKMP_FX_PRESET_TOGGLES = {
+  hoch: { dmgNumbers: true, hitShake: true, attackAnim: true, rewardPopups: true, dragonVideo: true, villageSkinAnim: true, legendaryPulse: true },
+  reduziert: { dmgNumbers: true, hitShake: false, attackAnim: true, rewardPopups: true, dragonVideo: true, villageSkinAnim: true, legendaryPulse: true },
+  aus: { dmgNumbers: false, hitShake: false, attackAnim: false, rewardPopups: false, dragonVideo: false, villageSkinAnim: false, legendaryPulse: false }
+};
+function bkmpFxGetToggles() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(BKMP_FX_TOGGLES_KEY) || 'null'); } catch (e) {}
+  return saved && typeof saved === 'object' ? saved : {};
+}
+function bkmpFxToggleGet(id) {
+  return bkmpFxGetToggles()[id] !== false;
+}
+function bkmpFxSaveToggles(toggles) {
+  try { localStorage.setItem(BKMP_FX_TOGGLES_KEY, JSON.stringify(toggles)); } catch (e) {}
+}
+function bkmpFxTogglesApply() {
+  const toggles = bkmpFxGetToggles();
+  BKMP_FX_TOGGLE_DEFS.forEach(def => {
+    document.documentElement.classList.toggle('fx-off-' + def.id, toggles[def.id] === false);
+  });
+  if (typeof bkmpIdleSyncDragonVideoPlayback === 'function') bkmpIdleSyncDragonVideoPlayback();
+  if (typeof bkmpApplyVillageSkin === 'function') bkmpApplyVillageSkin();
+}
+function bkmpFxToggleSet(id, enabled) {
+  const toggles = bkmpFxGetToggles();
+  toggles[id] = !!enabled;
+  bkmpFxSaveToggles(toggles);
+  bkmpFxTogglesApply();
+}
+function bkmpFxApplyPresetToToggles(mode) {
+  const preset = BKMP_FX_PRESET_TOGGLES[mode];
+  if (!preset) return;
+  bkmpFxSaveToggles(Object.assign({}, preset));
+  bkmpFxTogglesApply();
+}
+/* Gemeinsam von bkmpIdleApplyDragonSprite/bkmpIdleSyncDragonVideoPlayback
+   (js/ui/bkmp-hud.js) genutzt - "aus" ODER der Einzelschalter reicht. */
+function bkmpFxDragonVideoOff() {
+  return bkmpFxGetMode() === 'aus' || !bkmpFxToggleGet('dragonVideo');
+}
+/* Von bkmpApplyVillageSkinToElement (js/systems/bkmp-cosmetics.js) genutzt. */
+function bkmpFxVillageSkinAnimOff() {
+  return bkmpFxGetMode() === 'aus' || !bkmpFxToggleGet('villageSkinAnim');
 }
 
 function bkmpIdleCatchUpCombatVisuals() {

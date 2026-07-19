@@ -6119,6 +6119,29 @@ html[data-fx="aus"] .idle-reward-float .rf-gold::after { animation: none; displa
    hochzupoppen und wegzufaden. */
 html[data-fx="aus"] .idle-dmg-float { animation: none; opacity: 1; transform: translate(-50%, 0); }
 
+/* ============================================================
+   Granulare Effekt-Einzelschalter (Nutzerwunsch 19.07.: "wirklich alle
+   Effekte selbst auswaehlbar", siehe BKMP_FX_TOGGLE_DEFS in idledorf.js) -
+   jede Regel hier ist eine gezielte, EIGENSTAENDIGE Ergaenzung zu den
+   bestehenden html[data-fx="..."]-Regeln oben (nicht deren Ersatz): ein
+   Effekt ist aus, sobald ENTWEDER die Grobstufe "Aus"/"Reduziert" ODER der
+   jeweilige html.fx-off-<id>-Einzelschalter aktiv ist. dragonVideo/
+   villageSkinAnim sind rein JS-gesteuert (siehe bkmpFxDragonVideoOff/
+   bkmpFxVillageSkinAnimOff in idledorf.js), brauchen daher keine eigene
+   CSS-Regel hier.
+   ============================================================ */
+html.fx-off-dmgNumbers .idle-dmg-float { animation: none; opacity: 1; transform: translate(-50%, 0); }
+html.fx-off-hitShake .idle-battlefield:has(.idle-hit-flash) { animation: none; }
+html.fx-off-hitShake .idle-hit-flash { animation: none; }
+html.fx-off-attackAnim .idle-arrow,
+html.fx-off-attackAnim .idle-fire-breath { animation: none; opacity: 0; }
+html.fx-off-attackAnim .idle-sprite-attacking { animation: none; }
+html.fx-off-attackAnim .idle-sprite-attacking > .idle-dragon-sprite-video { animation: none; }
+html.fx-off-rewardPopups .idle-reward-float { animation: none; opacity: 1; }
+html.fx-off-rewardPopups .idle-reward-float .rf-chip { animation: none; }
+html.fx-off-rewardPopups .idle-reward-float .rf-gold::after { animation: none; display: none; }
+html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !important; }
+
 /* ---- Upgrades ---- */
 .idle-autobuy-toggle {
   display: flex;
@@ -10845,17 +10868,31 @@ html.bkmp-app-mode .idle-app-more-sheet-group-title:first-child {
      anhand der echten Button-Position gesetzt, da fixed nicht mehr an
      einem position:relative-Elternteil verankern kann. */
   position: fixed; z-index: 62;
-  width: 150px; border-radius: 10px; padding: 0.3rem;
+  width: 260px; max-height: 80vh; overflow-y: auto;
+  border-radius: 10px; padding: 0.5rem;
   background: var(--paper-2); border: 1px solid var(--line);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
 }
+/* Nutzerwunsch 19.07.: Presets jetzt als Reihe statt gestapelt (spart
+   vertikalen Platz fuer die neue Checkbox-Liste darunter). */
+.bkmp-proto-chud-fx-presets { display: flex; gap: 0.3rem; }
 .bkmp-proto-chud-fx-option {
-  display: block; width: 100%; text-align: left; padding: 0.4rem 0.6rem;
-  border-radius: 7px; border: none; background: transparent; color: var(--ink);
-  font-size: 0.8rem; cursor: pointer;
+  flex: 1; min-width: 0; text-align: center; padding: 0.4rem 0.3rem;
+  border-radius: 7px; border: 1px solid var(--line); background: transparent; color: var(--ink);
+  font-size: 0.72rem; font-weight: 600; cursor: pointer; white-space: nowrap;
 }
 .bkmp-proto-chud-fx-option:hover { background: color-mix(in srgb, var(--gold) 12%, transparent); }
-.bkmp-proto-chud-fx-option.active { color: var(--gold); font-weight: 700; }
+.bkmp-proto-chud-fx-option.active { color: var(--gold); font-weight: 700; border-color: var(--gold); }
+.bkmp-proto-chud-fx-divider { height: 1px; background: var(--line); margin: 0.5rem 0; }
+.bkmp-proto-chud-fx-title { font-size: 0.72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 0.35rem; }
+.bkmp-proto-chud-fx-toggles { display: flex; flex-direction: column; gap: 0.1rem; }
+.bkmp-proto-chud-fx-toggle {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.4rem 0.3rem; border-radius: 7px; cursor: pointer;
+  font-size: 0.78rem; color: var(--ink); line-height: 1.25;
+}
+.bkmp-proto-chud-fx-toggle:hover { background: color-mix(in srgb, var(--gold) 10%, transparent); }
+.bkmp-proto-chud-fx-toggle input { flex: none; width: 1rem; height: 1rem; cursor: pointer; accent-color: var(--gold, #c9a24b); }
 
 .bkmp-proto-nav {
   display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; position: relative;
