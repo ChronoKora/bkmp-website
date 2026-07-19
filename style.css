@@ -4002,7 +4002,16 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 .idle-runen-inventory-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; }
 .idle-runen-inventory-header .idle-sammlung-subheading { margin: 0; }
 .idle-runen-inventory-header-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
-.idle-runen-sell-all-btn, .idle-runen-autofuse-btn { font-size: 0.76rem; padding: 0.4rem 0.7rem; white-space: nowrap; }
+/* Bug-Fix 19.07. (Spieler-Meldung: "Alle Button im Runen Fenster wackeln
+   komisch immer wenn 1 Drache besiegt wird"): bkmpIdleRenderRunenPanel()
+   laeuft bei jedem Drachen-Kill neu (siehe Kommentar bei drawerContent
+   weiter unten) - die "(N)"-Zahl in diesen 3 Buttons erschien/verschwand
+   bisher komplett je nach Zaehlerstand (0 vs. >0), wodurch sich die
+   Button-Breite bei jedem Runenfund/-verbrauch sichtbar sprunghaft
+   aenderte und alle Buttons in der Zeile mitverschob. Jetzt steht die Zahl
+   IMMER da (auch "(0)"), nur noch Ziffernanzahl-Wechsel (z.B. 9->10)
+   aendert minimal die Breite - tabular-nums haelt auch das stabil. */
+.idle-runen-sell-all-btn, .idle-runen-autofuse-btn, .idle-runen-autoascend-btn { font-size: 0.76rem; padding: 0.4rem 0.7rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .idle-runen-sell-all-btn:disabled, .idle-runen-autofuse-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .idle-sammlung-count { font-size: 0.75rem; font-weight: 400; color: var(--muted); font-family: 'Inter', sans-serif; }
 .idle-title-bonus-list { display: grid; gap: 0.5rem; margin-top: 0.6rem; }

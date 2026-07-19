@@ -101,7 +101,17 @@ const BKMP_IDLE_UPGRADES = [
      Essenzkern schliesst dieselbe Luecke wie 'hp'/'walls' oben, nur fuer
      Essenz statt Holz/Stein - flacher, ungedeckelter Angriffsbonus als
      echtes Langzeitziel. */
-  { id: 'essence_core', name: 'Essenzkern', desc: '+2 Angriff pro Stufe.', icon: '🔮', resource: 'essence', baseCost: 8, costRate: 0.22, costExponent: 2.0, effectType: 'attack_flat', effectPerLevel: 2, maxLevel: 5000 }
+  { id: 'essence_core', name: 'Essenzkern', desc: '+2 Angriff pro Stufe.', icon: '🔮', resource: 'essence', baseCost: 8, costRate: 0.22, costExponent: 2.0, effectType: 'attack_flat', effectPerLevel: 2, maxLevel: 5000 },
+  /* Nutzerwunsch 19.07.: "Diamanten Verhärtung wie essenzkern Angriff nur
+     mit Verteidigung - weil du sonst keine Ausgabe mehr mit Diamanten
+     hast.. sie liegen nur noch rum". Genau dieselbe Luecke wie bei
+     essence_core oben, nur fuer Kristalle: Kristallschliff ist bei Stufe
+     100 gedeckelt "fertig", danach haben Kristalle ausser Runen-Aktionen
+     keinen laufenden Sink mehr. Bewusst 1:1 dieselbe Kosten-Kurve wie
+     essence_core (keine neu erfundenen Balance-Werte) - nur Ressource
+     (crystals statt essence) und Effekt (Verteidigung statt Angriff)
+     getauscht. */
+  { id: 'crystal_defense', name: 'Diamantenhärtung', desc: '+2 Verteidigung pro Stufe.', icon: '💠', resource: 'crystals', baseCost: 8, costRate: 0.22, costExponent: 2.0, effectType: 'defense_flat', effectPerLevel: 2, maxLevel: 5000 }
 ];
 
 /* ---------------- Fallback-Daten (falls SQL-Migration noch nicht lief / Supabase nicht erreichbar) ---------------- */

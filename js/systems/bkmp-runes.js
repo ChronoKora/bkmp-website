@@ -1665,13 +1665,13 @@ function bkmpIdleRenderRunenPanel() {
       <h4 class="idle-sammlung-subheading">🎒 ${escapeHtml(activeSlot.name)}-Lager <span class="idle-sammlung-count">${slotOwned.length} von ${totalOwned} gesamt</span></h4>
       <div class="idle-runen-inventory-header-actions">
         <button type="button" class="btn-nein idle-runen-autofuse-btn" id="idleRuneAutoFuseBtn" ${autoFuseGroupCount ? '' : 'disabled'}>
-          🔥 Auto-Schmelzen${autoFuseGroupCount ? ` (${autoFuseGroupCount})` : ''}
+          🔥 Auto-Schmelzen (${autoFuseGroupCount})
         </button>
         <button type="button" class="btn-nein idle-runen-autoascend-btn" id="idleRuneAutoAscendBtn" ${autoAscendPairCount ? '' : 'disabled'} title="Aufstieg für alle passenden Legendäre-Paare gleicher Stufe (ab +${BKMP_RUNE_MAX_LEVEL}) auf einmal.">
-          🌟 Auto-Aufstieg${autoAscendPairCount ? ` (${autoAscendPairCount})` : ''}
+          🌟 Auto-Aufstieg (${autoAscendPairCount})
         </button>
         <button type="button" class="btn-nein idle-runen-sell-all-btn" id="idleRuneSellAllBtn" ${unequippedSlotCount ? '' : 'disabled'}>
-          💰 Alle verkaufen${unequippedSlotCount ? ` (${unequippedSlotCount})` : ''}
+          💰 Alle verkaufen (${unequippedSlotCount})
         </button>
       </div>
     </div>
