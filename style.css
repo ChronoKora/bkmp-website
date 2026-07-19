@@ -4322,6 +4322,30 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   font-size: 0.8rem;
   color: var(--muted);
 }
+/* Bug-Fix (Nutzer-Screenshot 19.07.): .idle-runen-reroll-btn hatte nie eine
+   eigene Regel (weder hier noch in .btn-ja/.btn-nein aufgenommen) und fiel
+   dadurch auf den ungestylten grauen Browser-Standard-Button zurueck -
+   siehe Kommentar oben bei .btn-ja, .btn-nein, exakt derselbe Fehlerfall.
+   Bewusst eigene, kleinere Pille statt .btn-nein: sitzt inline direkt
+   hinter dem Sub-Stat-Text, .btn-nein-Standardgroesse waere hier zu
+   dominant fuer eine haeufig wiederholte Nebenaktion (bis zu 4x pro Rune). */
+.idle-runen-reroll-btn {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+  white-space: nowrap;
+  vertical-align: middle;
+  margin-left: 0.35rem;
+  transition: transform 0.15s ease, border-color 0.2s ease;
+}
+.idle-runen-reroll-btn:hover:not(:disabled) { border-color: var(--gold); transform: translateY(-1px); }
+.idle-runen-reroll-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .idle-runen-upgrade-btn { width: 100%; font-size: 0.82rem; }
 .idle-runen-upgrade-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 /* Aufstieg (ueberwindet den normalen +15-Cap fuer Legendaere, siehe
@@ -6059,6 +6083,16 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   .idle-reward-float .rf-chip { animation: none; }
   .idle-reward-float .rf-gold::after { animation: none; }
 }
+/* Nutzerwunsch (19.07.): "bei den Effekten deaktivieren-Option einbauen,
+   das Flackern/Hochploppen vom Fight" - Effektmodus "Aus" haelt jetzt auch
+   die Gold/XP-Hochschweb-Chips an. Bewusst NICHT wie beim reinen
+   reduced-motion-Fall oben komplett unsichtbar (opacity:0 dort wuerde die
+   Zahlen fuer Aus-Spieler ganz verschwinden lassen) - die Chips bleiben
+   sichtbar+lesbar, nur ohne Flug-/Pop-/Glanz-Animation, damit in genau dem
+   Moment (Drachenwechsel) weniger gleichzeitig animiert werden muss. */
+html[data-fx="aus"] .idle-reward-float { animation: none; opacity: 1; }
+html[data-fx="aus"] .idle-reward-float .rf-chip { animation: none; }
+html[data-fx="aus"] .idle-reward-float .rf-gold::after { animation: none; display: none; }
 
 /* ---- Upgrades ---- */
 .idle-autobuy-toggle {

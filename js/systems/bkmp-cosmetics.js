@@ -104,6 +104,14 @@ function bkmpApplyVillageSkinToElement(el, skinId, options) {
   if (!def || (checkOwnership && !bkmpVillageSkinOwned(activeId))) {
     def = bkmpVillageSkinsCatalog.find(s => s.id === 'standard');
   }
+  /* Nutzerwunsch (19.07.): "bei den Effekten deaktivieren-Option einbauen,
+     das Flackern/Hochploppen vom Fight UND Dorfskins" - Effektmodus "Aus"
+     haelt jetzt auch die Dorf-Skin-Animation an (Video-Skins wie
+     Pinguindorf UND die Mehrfach-Frame-Sprite-Streifen wie Pilzdorf),
+     gleiches Prinzip wie schon beim Drachen-Kampfvideo
+     (bkmpIdleSyncDragonVideoPlayback, js/ui/bkmp-hud.js). Reiner Anzeige-
+     Unterschied, keine Kampfwerte betroffen. */
+  const fxOff = typeof bkmpFxGetMode === 'function' && bkmpFxGetMode() === 'aus';
   if (def && def.video_file) {
     /* Video-Skin (z.B. Pinguindorf) statt Bild-Sprite-Streifen: aspect-
        ratio wird hier auf die ECHTEN Video-Massse gesetzt (frame_aspect_w/h
@@ -121,7 +129,6 @@ function bkmpApplyVillageSkinToElement(el, skinId, options) {
     if (!video) {
       video = document.createElement('video');
       video.className = 'idle-village-video';
-      video.autoplay = true;
       video.muted = true;
       video.loop = true;
       video.playsInline = true;
@@ -131,6 +138,7 @@ function bkmpApplyVillageSkinToElement(el, skinId, options) {
       video.src = def.video_file;
       video.dataset.src = def.video_file;
     }
+    if (fxOff) { if (!video.paused) video.pause(); } else if (video.paused) { video.play().catch(() => {}); }
   } else if (def && def.image_file) {
     const existingVideo = el.querySelector('.idle-village-video');
     if (existingVideo) existingVideo.remove();
@@ -139,7 +147,7 @@ function bkmpApplyVillageSkinToElement(el, skinId, options) {
     const aspectW = Number(def.frame_aspect_w || 1164);
     const aspectH = Number(def.frame_aspect_h || 199);
     el.style.aspectRatio = `${aspectW} / ${aspectH}`;
-    if (frameCount > 1) {
+    if (frameCount > 1 && !fxOff) {
       /* Mehrere leicht unterschiedliche Frames (ambiente Partikel-
          Variation, z.B. Pilzdorf) liegen als horizontaler Sprite-Streifen
          vor - background-size auf die Gesamtbreite des Streifens strecken
@@ -151,6 +159,11 @@ function bkmpApplyVillageSkinToElement(el, skinId, options) {
       const kfName = bkmpEnsureVillageFrameKeyframes(frameCount);
       el.style.animation = `${kfName} ${(frameCount * 0.6).toFixed(1)}s steps(${frameCount}) infinite`;
     } else {
+      /* fxOff: bleibt bewusst beim ersten Frame stehen (background-size
+         100% statt frameCount*100%) statt nur die Animation zu pausieren -
+         steps()-Animationen "pausiert" ueber animation-play-state wuerden
+         sonst mitten in einem Frame haengen bleiben koennen, je nachdem
+         wann genau umgeschaltet wird. */
       el.style.backgroundSize = '100% 100%';
       el.style.animation = 'none';
     }

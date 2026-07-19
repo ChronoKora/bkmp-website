@@ -1921,6 +1921,12 @@ function bkmpFxApplyMode(mode) {
      eines Drachen deckt bkmpIdleApplyDragonSprite in js/ui/bkmp-hud.js
      selbst ab). Reiner Anzeige-Unterschied, keine Kampfwerte betroffen. */
   if (typeof bkmpIdleSyncDragonVideoPlayback === 'function') bkmpIdleSyncDragonVideoPlayback();
+  /* Nutzerwunsch (19.07.): "...und Dorfskins" - gleiches Prinzip fuer die
+     Dorf-Skin-Animation (Video-Skins wie Pinguindorf, Mehrfach-Frame-
+     Sprites wie Pilzdorf). bkmpApplyVillageSkinToElement liest bkmpFxGetMode
+     bereits selbst aus - ein erneuter Aufruf reicht, um den Live-Umschalt-
+     Fall abzudecken (Skin ist schon sichtbar, WAEHREND umgeschaltet wird). */
+  if (typeof bkmpApplyVillageSkin === 'function') bkmpApplyVillageSkin();
 }
 
 function bkmpFxSetMode(mode) {
