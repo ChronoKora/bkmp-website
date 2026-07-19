@@ -1209,8 +1209,8 @@ function bkmpIdleUpgradeCardHtml(opts) {
         </div>
       </div>
       <div class="idle-upgrade-effect-row">
-        <span class="idle-upgrade-effect-current">${currentLabel}</span>
-        ${!maxed ? `<span class="idle-upgrade-effect-arrow" aria-hidden="true">→</span><span class="idle-upgrade-effect-next">${nextLabel}</span>` : ''}
+        <div class="idle-upgrade-effect-line idle-upgrade-effect-current">${currentLabel}</div>
+        ${!maxed ? `<div class="idle-upgrade-effect-line idle-upgrade-effect-next"><span class="idle-upgrade-effect-arrow" aria-hidden="true">→</span> ${nextLabel}</div>` : ''}
       </div>
       <button type="button" class="btn-ja idle-upgrade-buy ${buyClass}" ${buyDataAttr} ${maxed || !affordable ? 'disabled' : ''}>
         ${maxed ? 'Maximal' : `${resourceEmoji} ${bkmpIdleFormatNumber(cost)}`}

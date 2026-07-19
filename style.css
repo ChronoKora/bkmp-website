@@ -6097,7 +6097,19 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 .idle-upgrade-card-title { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; flex: 1 1 auto; }
 .idle-upgrade-name { font-weight: 700; font-size: 0.85rem; overflow-wrap: break-word; }
 .idle-upgrade-level { font-size: 0.68rem; color: var(--muted); font-weight: 500; }
-.idle-upgrade-effect-row { display: flex; align-items: center; gap: 0.4rem; font-size: 0.74rem; color: var(--muted); flex-wrap: wrap; }
+/* Bug-Fix (Nutzer-Screenshot 19.07., "durch das Wort Verteidigung springt
+   das staendig hoch runter"): vorher EINE Flex-Zeile mit flex-wrap - ob
+   "aktuell → naechste Stufe" auf eine oder zwei Zeilen passt, hing vom
+   exakten Pixel-Wert der Zahl UND der Laenge des Stat-Worts ab
+   ("Verteidigung" ist mit Abstand das laengste einzelne Wort ohne
+   natuerliche Trennstelle). Bei jeder Stufen-Aenderung (Auto-Kauf!)
+   konnte dieselbe Karte dadurch zwischen ein- und zweizeilig hin- und
+   herspringen und die ganze Kartenreihe (Grid-Zeilen strecken sich auf
+   die hoechste Karte) sichtbar mitreissen. Jetzt IMMER zwei eigene
+   Zeilen (aktuell / naechste Stufe) statt einer gemeinsamen, umbrechenden
+   Zeile - Hoehe haengt dadurch nie mehr vom exakten Zahlenwert ab. */
+.idle-upgrade-effect-row { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.74rem; color: var(--muted); }
+.idle-upgrade-effect-line { overflow-wrap: break-word; }
 .idle-upgrade-effect-current { color: var(--ink); }
 .idle-upgrade-effect-arrow { color: var(--muted); }
 .idle-upgrade-effect-next { color: var(--gold); font-weight: 600; }

@@ -1305,19 +1305,19 @@ function bkmpIdleMaybeDropRune(source) {
   if (!legendaryOnly || rarityId === 'gold') {
     bkmpIdleLog(`🔮 ${rarityDef.name} ${slot.name} gefunden! (+${rolledValue}% ${slot.desc})`, true);
   }
-  /* Phase 5.5 (19.07.), NACHBESSERUNG (19.07., selbe Nutzer-Rueckmeldung):
-     "Toast" (oben mittig) war fuer gray/green-Funde bisher die automatische
-     Standard-Stufe (siehe BKMP_REWARD_RARITY_DEFAULT_TIER) - der Nutzer
-     will dort keine eigene Anzeige mehr, "unten links reicht". tier wird
-     jetzt IMMER explizit gesetzt statt aus der Seltenheit abgeleitet: nie
-     mehr Toast fuer Runenfunde, gold(legendaer) bleibt bewusst die grosse
-     Zeremonie (bereits vorher so), alles andere (gray/green/blue/purple)
-     wird einheitlich zur Karte unten links. */
-  if (typeof bkmpRewardPresent === 'function') {
+  /* Phase 5.5 (19.07.), 2. NACHBESSERUNG (19.07., Nutzer-Rueckmeldung nach
+     dem 1. Fix): "Nur der Legi-Drop sollte auch unten links nicht mehr
+     kommen" [gemeint: nur legendaere Funde sollen ueberhaupt noch eine
+     Anzeige bekommen] - erst wurde nur der Toast (oben) durch die Karte
+     (unten links) ersetzt, jetzt zeigt ausschliesslich Gold(legendaer)
+     noch etwas (die grosse Zeremonie) - gray/green/blue/purple bekommen
+     ab sofort GAR keine Anzeige mehr, landen nur noch in der Logzeile
+     oben (bkmpIdleLog). */
+  if (rarityId === 'gold' && typeof bkmpRewardPresent === 'function') {
     const alreadyEquipped = bkmpIdlePlayerRunes.some(r => r.rune_type === slot.id && r.equipped && r._cid !== rune._cid);
     bkmpRewardPresent({
       rarity: rarityId,
-      tier: rarityId === 'gold' ? 'ceremony' : 'card',
+      tier: 'ceremony',
       icon: '🔮',
       title: `${rarityDef.name} ${slot.name} gefunden`,
       description: `+${rolledValue}% ${slot.desc}${alreadyEquipped ? ' · Diese Runenart ist bereits ausgerüstet.' : ''}`,
