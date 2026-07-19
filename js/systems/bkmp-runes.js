@@ -298,6 +298,72 @@ function bkmpRuneUpgrade(cid) {
   bkmpIdleQueueSync();
 }
 
+/* Nutzerwunsch 19.07.: "Runen Instant auf +15 upgraden" - fasst wiederholte
+   Einzelklicks auf bkmpRuneUpgrade() zu einem Schritt zusammen. Ruft
+   bewusst dieselben Formeln auf (bkmpIdleRuneUpgradeCost/-FailChance,
+   BKMP_RUNE_SUBSTAT_MILESTONES-Logik identisch zu bkmpRuneUpgrade oben) -
+   keine Balance-Aenderung, nur weniger Klicks. Stoppt automatisch bei
+   Stufe +15 ODER sobald das Gold fuer den naechsten Versuch nicht mehr
+   reicht; bereits verbrauchtes Gold bei Fehlschlaegen bleibt real weg,
+   exakt wie beim manuellen Aufwerten. Rendert/persistiert erst NACH der
+   kompletten Schleife statt bei jedem Einzelschritt, damit z.B. 15 rasche
+   Stufen nicht 15 Netzwerk-Aufrufe + 15 Toasts ausloesen. */
+function bkmpRuneInstantUpgrade(cid) {
+  const rune = bkmpIdlePlayerRunes.find(r => r._cid === cid);
+  if (!rune || !bkmpIdleState) return;
+  if (!rune.id && typeof bkmpIdleFlushRuneSyncNow === 'function') bkmpIdleFlushRuneSyncNow().catch(() => {});
+  const slot = window.BKMP_RUNE_SLOTS.find(s => s.id === rune.rune_type);
+  rune.substats = Array.isArray(rune.substats) ? rune.substats : [];
+  const startLevel = Number(rune.upgrade_level || 0);
+  let goldSpent = 0, successes = 0, failures = 0;
+  while (rune.upgrade_level < BKMP_RUNE_MAX_LEVEL) {
+    const cost = bkmpIdleRuneUpgradeCost(rune);
+    if (bkmpIdleState.gold < cost) break;
+    bkmpIdleState.gold -= cost;
+    goldSpent += cost;
+    if (Math.random() < bkmpIdleRuneUpgradeFailChance(rune)) {
+      failures++;
+      bkmpIdleState.rune_upgrade_failures = Number(bkmpIdleState.rune_upgrade_failures || 0) + 1;
+      continue;
+    }
+    successes++;
+    rune.upgrade_level += 1;
+    bkmpIdleState.rune_upgrade_successes = Number(bkmpIdleState.rune_upgrade_successes || 0) + 1;
+    if (BKMP_RUNE_SUBSTAT_MILESTONES.includes(rune.upgrade_level)) {
+      if (rune.substats.length < BKMP_RUNE_SUBSTAT_CAP) {
+        const usedStats = new Set([slot.stat, ...rune.substats.map(s => s.stat)]);
+        const pool = Object.keys(BKMP_RUNE_SUBSTAT_WEIGHTS).filter(st => !usedStats.has(st));
+        if (pool.length) {
+          const newStat = bkmpRunePickWeightedStat(pool);
+          rune.substats.push({ stat: newStat, value: bkmpIdleRollSubstatValue(newStat, rune.rarity) });
+        }
+      } else if (rune.substats.length) {
+        const pick = rune.substats[Math.floor(Math.random() * rune.substats.length)];
+        const bump = bkmpIdleRollSubstatValue(pick.stat, rune.rarity) * 0.5;
+        pick.value = pick.stat.endsWith('_flat') ? pick.value + Math.max(1, Math.round(bump)) : Math.round((pick.value + bump) * 100) / 100;
+      }
+    }
+  }
+  if (goldSpent === 0) {
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('💰 Nicht genug Gold für auch nur eine Aufwertung.', 2400);
+    return;
+  }
+  bkmpIdleLog(`⚡ ${slot.name}: Instant-Aufwertung +${startLevel} → +${rune.upgrade_level} (${successes} Erfolge, ${failures} Fehlschläge, ${bkmpIdleFormatNumber(goldSpent)} Gold).`, true);
+  if (rune.id) updatePlayerRuneUpgrade(rune.id, rune.upgrade_level, rune.substats).catch(() => {});
+  if (typeof bkmpRewardPresent === 'function') {
+    bkmpRewardPresent({
+      tier: 'toast', rarity: rune.rarity,
+      title: rune.upgrade_level > startLevel ? `${slot.name} instant auf +${rune.upgrade_level}` : `${slot.name}: alle Versuche fehlgeschlagen`,
+      dedupeKey: `rune-instant-${cid}-${rune.upgrade_level}-${Date.now()}`
+    });
+  }
+  bkmpRuneCurrentlyViewing = cid;
+  bkmpIdleRecomputeEffectiveStats();
+  bkmpIdleRenderRunenPanel();
+  bkmpIdleRenderHud();
+  bkmpIdleQueueSync();
+}
+
 /* Substat-Reroll (Lategame-Content, Spieler-Vorgabe 16.07.): bisher gab es
    KEINERLEI Moeglichkeit, einen bereits vorhandenen Sub-Stat neu zu wuerfeln
    - einmal (bei Drop/Verschmelzung/Meilenstein) gewuerfelt, fuer immer so.
@@ -770,6 +836,7 @@ function bkmpRuneStatBoxHTML(slot, rune) {
       <button type="button" class="btn-ja idle-runen-upgrade-btn" id="idleRuneUpgradeBtn" data-cid="${rune._cid}" ${isMaxLevel || !canAffordUpgrade ? 'disabled' : ''} title="${isMaxLevel ? '' : `${upgradeFailPct}% Chance, dass die Aufwertung fehlschlägt (Gold ist dann trotzdem weg)`}">
         ${isMaxLevel ? `⭐ Maximal aufgewertet (+${BKMP_RUNE_MAX_LEVEL})` : `⬆️ Aufwerten (${cost} Gold${upgradeFailPct ? `, ${upgradeFailPct}% Risiko` : ''})`}
       </button>
+      ${!isMaxLevel ? `<button type="button" class="btn-nein idle-runen-instant-btn" id="idleRuneInstantBtn" data-cid="${rune._cid}" ${canAffordUpgrade ? '' : 'disabled'} title="Wiederholt automatisch aufwerten, bis +${BKMP_RUNE_MAX_LEVEL} erreicht ist oder das Gold nicht mehr reicht - gleiches Risiko/gleiche Kosten pro Stufe wie ein einzelner Klick auf Aufwerten.">⚡ Instant bis +${BKMP_RUNE_MAX_LEVEL}</button>` : ''}
     </div>
     ${showAscend ? `
     <div class="idle-runen-stat-actions">
@@ -1573,6 +1640,8 @@ function bkmpIdleRenderRunenPanel() {
   if (equipBtn) equipBtn.addEventListener('click', () => bkmpRuneToggleEquip(equipBtn.dataset.cid));
   const upgradeBtn = document.getElementById('idleRuneUpgradeBtn');
   if (upgradeBtn) upgradeBtn.addEventListener('click', () => bkmpRuneUpgrade(upgradeBtn.dataset.cid));
+  const instantBtn = document.getElementById('idleRuneInstantBtn');
+  if (instantBtn) instantBtn.addEventListener('click', () => bkmpRuneInstantUpgrade(instantBtn.dataset.cid));
   const ascendBtn = document.getElementById('idleRuneAscendBtn');
   if (ascendBtn) ascendBtn.addEventListener('click', () => bkmpRuneAscend(ascendBtn.dataset.cid));
   panel.querySelectorAll('.idle-runen-reroll-btn').forEach(btn => btn.addEventListener('click', () => bkmpRuneRerollSubstat(btn.dataset.cid, Number(btn.dataset.index))));

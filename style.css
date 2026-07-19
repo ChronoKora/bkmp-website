@@ -4346,8 +4346,13 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 }
 .idle-runen-reroll-btn:hover:not(:disabled) { border-color: var(--gold); transform: translateY(-1px); }
 .idle-runen-reroll-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.idle-runen-upgrade-btn { width: 100%; font-size: 0.82rem; }
+/* flex:1 statt width:100% (Nutzerwunsch 19.07.: Instant-Aufwerten-Button
+   daneben) - .idle-runen-stat-actions ist bereits display:flex, dadurch
+   teilen sich beide Buttons die Zeile automatisch je zur Haelfte. */
+.idle-runen-upgrade-btn { flex: 1; min-width: 0; font-size: 0.82rem; }
 .idle-runen-upgrade-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.idle-runen-instant-btn { flex: 1; min-width: 0; font-size: 0.82rem; }
+.idle-runen-instant-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 /* Aufstieg (ueberwindet den normalen +15-Cap fuer Legendaere, siehe
    bkmpRuneAscend) - eigene, auffaelligere Gold-Verlauf-Optik statt der
    normalen .btn-ja-Farbe, damit sich dieser seltene Endgame-Schritt
@@ -6166,6 +6171,16 @@ html[data-fx="aus"] .idle-reward-float .rf-gold::after { animation: none; displa
 .idle-skin-icon { font-size: 1.6rem; margin-bottom: 0.3rem; }
 .idle-skin-name { font-weight: 700; font-size: 0.85rem; margin-bottom: 0.2rem; }
 .idle-skin-desc { font-size: 0.72rem; color: var(--muted); margin-bottom: 0.6rem; }
+/* Nutzerwunsch 19.07.: zeigt den eigenen Bestand neben dem Kaufpreis (siehe
+   bkmpIdleRenderSkinsPanel in bkmp-cosmetics.js) - dezent, wird erst gruen
+   sobald leistbar (is-affordable), damit der Kaufen-Button selbst weiter
+   das eigentliche Signal bleibt. */
+.idle-skin-afford { font-size: 0.68rem; color: var(--muted); margin-top: auto; padding-top: 0.3rem; font-variant-numeric: tabular-nums; }
+.idle-skin-afford.is-affordable { color: var(--positive, #4ade80); }
+/* .idle-skin-afford uebernimmt hier bereits das margin-top:auto (druckt sich
+   selbst + den Button darunter an die Unterkante) - der Button braucht dann
+   nur noch einen kleinen festen Abstand statt selbst nochmal aufzufuellen. */
+.idle-skin-afford + .idle-skin-action { margin-top: 0.35rem; }
 .idle-skin-action { width: 100%; padding: 0.4rem 0.6rem; font-size: 0.78rem; margin-top: auto; }
 .idle-skin-action:disabled { opacity: 0.7; cursor: default; }
 .idle-skin-buy:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -6174,7 +6189,23 @@ html[data-fx="aus"] .idle-reward-float .rf-gold::after { animation: none; displa
 .idle-skin-card-premium { border-color: color-mix(in srgb, var(--gold) 55%, var(--line)); background: linear-gradient(180deg, color-mix(in srgb, var(--gold) 6%, var(--paper)), var(--paper)); }
 .idle-skin-buy-real-money { background: linear-gradient(135deg, #fbbf24, #b45309); border: none; color: #1a1206; font-weight: 700; }
 .idle-skin-buy-real-money-locked { background: var(--paper-2); border: 1px dashed var(--line); color: var(--muted); font-weight: 700; cursor: not-allowed; opacity: 0.85; }
-.idle-skin-locked-hint { font-size: 0.72rem; color: var(--muted); padding: 0.4rem 0.2rem; margin-top: auto; }
+/* Bug-Fix 19.07. (Spieler-Meldung "sieht gequetscht aus", Zerstoertes-Dorf-/
+   Yakshas-Heimat-Karte): war reiner Fliesstext ohne die Chip-Optik, die
+   .idle-skin-action (Kaufen/Ausruesten-Button) daneben hat - wirkte dadurch
+   knapp an die Kartenunterkante gequetscht statt wie ein gleichwertiges
+   drittes Element. Jetzt gleiche Flaeche/Rundung wie ein deaktivierter
+   Button, nur ohne Klick-Optik. */
+.idle-skin-locked-hint {
+  width: 100%;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--muted);
+  padding: 0.45rem 0.6rem;
+  margin-top: auto;
+  border: 1px dashed var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--paper-2) 60%, transparent);
+}
 .idle-skin-empty-hint { color: var(--muted); font-size: 0.85rem; text-align: center; padding: 1.2rem 0.6rem; }
 
 /* ---- Drachenzucht ---- */
@@ -9784,6 +9815,7 @@ html.bkmp-app-mode .idle-dorf-panel .idle-runen-stat-note { font-size: .8rem !im
 html.bkmp-app-mode .idle-dorf-panel .idle-runen-substat-list { font-size: .88rem !important; line-height: 1.6; }
 html.bkmp-app-mode .idle-dorf-panel .idle-runen-equip-btn,
 html.bkmp-app-mode .idle-dorf-panel .idle-runen-upgrade-btn,
+html.bkmp-app-mode .idle-dorf-panel .idle-runen-instant-btn,
 html.bkmp-app-mode .idle-dorf-panel .idle-runen-ascend-btn,
 html.bkmp-app-mode .idle-dorf-panel .idle-runen-autofuse-btn,
 html.bkmp-app-mode .idle-dorf-panel .idle-runen-sell-all-btn,
@@ -10438,7 +10470,16 @@ html.bkmp-app-mode .idle-dorf-panel .idle-dungeon-card-meta { font-size: .78rem 
    Kosmetik/Titel/Pluschies) - Fenster-Chrome kommt schon von der
    .joke-card-Regel oben, hier nur die Innenliste/Tabs vergroessert. ---- */
 html.bkmp-app-mode #achievementsOverlay .achievements-list { font-size: .88rem !important; }
-html.bkmp-app-mode #achievementsOverlay button {
+/* Bug-Fix 19.07. (Spieler-Meldung: Kosmetik-/Titel-Kacheln ueberlappen sich):
+   ":not(.cosmetic-swatch)" noetig, weil .cosmetic-swatch (Kosmetik- UND
+   Titel-Tab) mehrzeiligen Inhalt (Name + Raritaets-Badge + Beschreibung)
+   hat - ein hartes min-height:44px!important entfernt dabei den Browser-
+   eigenen "min-height:auto"-Content-Schutz von Grid-/Flex-Items, wodurch
+   laengere Karten die 44px-Zeile sprengen und sichtbar in die naechste
+   Grid-Zeile ueberlaufen (bestaetigt per Live-Test: offsetHeight blieb bei
+   44px, obwohl scrollHeight bis zu 96px brauchte). Einfache Buttons (Tabs,
+   Schliessen, Namen-aendern-Links) behalten das groessere Touch-Target. */
+html.bkmp-app-mode #achievementsOverlay button:not(.cosmetic-swatch) {
   min-height: 44px !important;
   padding: .6rem 1rem !important;
 }

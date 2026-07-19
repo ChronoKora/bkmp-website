@@ -331,7 +331,20 @@ function bkmpRaidToggleCombatView(show) {
   const tabs = document.getElementById('idleDorfTabs');
   const combatView = document.getElementById('raidCombatView');
   const panels = document.querySelectorAll('#idleDorfOverlay .idle-dorf-panel:not(#raidCombatView)');
-  if (tabs) tabs.style.display = show ? 'none' : '';
+  /* Bug-Fix 19.07. (Spieler-Meldung: nach Schliessen+Wiederoeffnen des
+     Idle-Dorf-Fensters zeigen sich ploetzlich ZWEI Tableisten uebereinander,
+     erst ein Seiten-Reload behebt es): bkmpIdleCloseModal() ruft IMMER
+     bkmpRaidStopCombatView() -> hier show=false, unabhaengig davon, ob
+     ueberhaupt je ein Raid-Kampf lief. Das alte ''-Zuruecksetzen hat damit
+     bei JEDEM Schliessen die alte, kategorisierte #idleDorfTabs-Leiste
+     wieder sichtbar gemacht, die Prototyp 2 (bkmp-proto-compact-hud.js)
+     beim Laden per style.display='none' dauerhaft durch die kompakte
+     Nav-Leiste ersetzt hatte - beide lagen danach uebereinander. Jetzt faellt
+     der "nicht im Kampf"-Zustand auf 'none' zurueck, wenn der Prototyp
+     aktiv ist (er verwaltet #idleDorfTabs exklusiv), statt das '' immer
+     bedingungslos zurueckzugeben. */
+  const compactHudActive = typeof BKMP_PROTO_COMPACT_HUD_ENABLED !== 'undefined' && BKMP_PROTO_COMPACT_HUD_ENABLED;
+  if (tabs) tabs.style.display = show ? 'none' : (compactHudActive ? 'none' : '');
   if (combatView) combatView.style.display = show ? '' : 'none';
   panels.forEach(p => { if (show) p.style.display = 'none'; });
   if (!show) {

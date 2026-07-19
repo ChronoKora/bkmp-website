@@ -236,6 +236,7 @@ function bkmpIdleRenderSkinsPanel() {
     const owned = bkmpVillageSkinOwned(def.id);
     const isEquipped = owned && activeVillageId === def.id;
     let actionHtml;
+    let affordHtml = '';
     if (isEquipped) {
       actionHtml = `<button type="button" class="btn-ja idle-skin-action" disabled>Ausgerüstet</button>`;
     } else if (owned) {
@@ -248,6 +249,15 @@ function bkmpIdleRenderSkinsPanel() {
       if (goldCost > 0) priceParts.push(`💰 ${bkmpIdleFormatNumber(goldCost)}`);
       if (crystalCost > 0) priceParts.push(`💎 ${bkmpIdleFormatNumber(crystalCost)}`);
       actionHtml = `<button type="button" class="btn-ja idle-skin-action idle-skin-buy" data-skin-id="${def.id}" ${affordable ? '' : 'disabled'}>${priceParts.join(' + ') || 'Kaufen'}</button>`;
+      /* Nutzerwunsch 19.07.: "mit hinzufügen wieviel man schon hat" - zeigt
+         den eigenen Bestand direkt neben dem Preis, damit sichtbar ist, wie
+         nah man am Kauf dran ist, statt nur "leistbar/nicht leistbar" zu
+         wissen. Nur die Waehrung(en) anzeigen, die der Skin tatsaechlich
+         kostet. */
+      const ownedParts = [];
+      if (goldCost > 0) ownedParts.push(`💰 ${bkmpIdleFormatNumber(bkmpIdleState.gold || 0)}`);
+      if (crystalCost > 0) ownedParts.push(`💎 ${bkmpIdleFormatNumber(bkmpIdleState.crystals || 0)}`);
+      affordHtml = `<div class="idle-skin-afford ${affordable ? 'is-affordable' : ''}">Du hast: ${ownedParts.join(' + ')}</div>`;
     } else if (def.unlock_type === 'real_money') {
       const priceEur = (Number(def.price_eur_cents || 0) / 100).toFixed(2).replace('.', ',');
       actionHtml = BKMP_REAL_MONEY_PURCHASES_ENABLED
@@ -261,6 +271,7 @@ function bkmpIdleRenderSkinsPanel() {
         <div class="idle-skin-icon">${def.icon || '🏘️'}</div>
         <div class="idle-skin-name">${escapeHtml(def.name)}</div>
         <div class="idle-skin-desc">${escapeHtml(def.description || '')}</div>
+        ${affordHtml}
         ${actionHtml}
       </div>`;
   }).join('')}</div>`;
