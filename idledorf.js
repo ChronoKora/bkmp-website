@@ -1530,6 +1530,10 @@ async function bkmpIdleCatchUpAfterHidden() {
   if (!name) return;
   bkmpIdleCancelPendingSyncTimer();
   const offlineResult = await bkmpIdleClaimOfflineProgress(name);
+  /* Claim ist durch - die zeitlich befristete Sperre (siehe visibilitychange-
+     Handler weiter unten) wird ab jetzt nicht mehr gebraucht, kann also
+     sofort wieder freigegeben werden statt bis zum 15s-Ablauf zu warten. */
+  bkmpIdleLastSeenSyncBlockedUntil = 0;
   if (offlineResult) bkmpIdleApplyOfflineResult(offlineResult);
   bkmpIdleShowOfflineCard(offlineResult);
   if (offlineResult && offlineResult.newTotals) {
@@ -1767,7 +1771,22 @@ async function bkmpIdleFlushSync() {
   }
   bkmpIdleSkipNextMerge = false;
   bkmpIdleState.playtime_seconds = Math.round(Number(bkmpIdleState.playtime_seconds || 0));
-  bkmpIdleState.last_seen_at = new Date().toISOString();
+  /* Bug-Fix 20.07. (Spieler-Report ChronoKora: "wieder 90 Min./15 Min. keine
+     AFK-Belohnung", gleiche Bug-Klasse wie die bereits gefixte "1 Min."-
+     Meldung, siehe Kommentar bei bkmpIdleCancelPendingSyncTimer, aber ein
+     Rest blieb: das Abbrechen eines noch offenen Timers hilft nur, wenn der
+     Abbruch VOR dessen Feuern laeuft. Wird der eingefrorene, ueberfaellige
+     Timer vom Browser in einer FRUEHEREN/gleichzeitigen Aufgabe abgearbeitet
+     als der visibilitychange-Listener selbst (Reihenfolge nicht garantiert,
+     Browser-/OS-abhaengig), schreibt dieser Codeblock last_seen_at=JETZT
+     bereits BEVOR bkmpIdleCancelPendingSyncTimer ueberhaupt zum Zug kommt -
+     unabhaengig davon, wie lange der Spieler wirklich weg war (erklaert,
+     warum sowohl 90 als auch nur 15 Minuten betroffen waren). Fix: zeitlich
+     befristete Sperre statt Timer-Wettlauf - siehe bkmpIdleLastSeenSyncBlockedUntil
+     (js/core/bkmp-idle-state.js), wird beim Verstecken des Tabs gesetzt
+     (also VOR jedem moeglichen Einschlafen) und laeuft spaetestens nach 15s
+     von selbst aus, kann also nie dauerhaft haengen bleiben. */
+  if (Date.now() >= bkmpIdleLastSeenSyncBlockedUntil) bkmpIdleState.last_seen_at = new Date().toISOString();
   try {
     if (typeof upsertIdlePlayerState === 'function') await upsertIdlePlayerState(bkmpIdleState);
     bkmpIdleSnapshotMergeBaseline();
@@ -2238,6 +2257,9 @@ async function bkmpIdleOpenModal() {
 
   bkmpIdleCancelPendingSyncTimer();
   const offlineResult = await bkmpIdleClaimOfflineProgress(name);
+  /* Siehe bkmpIdleCatchUpAfterHidden weiter oben - gleicher Grund, Sperre
+     sofort wieder freigeben statt bis zum 15s-Ablauf zu warten. */
+  bkmpIdleLastSeenSyncBlockedUntil = 0;
   if (offlineResult) bkmpIdleApplyOfflineResult(offlineResult);
   bkmpIdleShowOfflineCard(offlineResult);
   bkmpIdleRecomputeEffectiveStats();
@@ -2470,6 +2492,15 @@ function bkmpIdleInit() {
       bkmpPrestigeFlushSyncNow();
       bkmpIdleFlushRuneSyncNow();
       if (typeof bkmpRuneFlushPendingEquipsNow === 'function') bkmpRuneFlushPendingEquipsNow();
+      /* Muss NACH dem obigen bkmpIdleFlushSync()-Aufruf gesetzt werden (dessen
+         last_seen_at-Schreibvorgang in diesem Zug noch korrekt durchlaufen
+         soll) - siehe ausfuehrlichen Kommentar bei bkmpIdleFlushSync() in
+         idledorf.js. Sperrt jeden SPAETEREN Speichervorgang (v.a. den
+         beschriebenen eingefrorenen 4s-Timer) bis spaetestens 15s ab genau
+         JETZT (vor jedem moeglichen Einschlafen des Geraets), egal in
+         welcher Reihenfolge der Browser die ueberfaellige Aufgabe beim
+         Aufwachen abarbeitet. */
+      bkmpIdleLastSeenSyncBlockedUntil = Date.now() + 15000;
       return;
     }
     bkmpIdleCatchUpAfterHidden();

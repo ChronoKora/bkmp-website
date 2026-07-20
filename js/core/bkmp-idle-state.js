@@ -138,6 +138,16 @@ let bkmpIdleMergeInFlight = false;
    moeglicherweise noch alten Remote-Stand verschmolzen zu werden). */
 let bkmpIdleSkipNextMerge = false;
 
+/* Bug-Fix 20.07. (Spieler-Report ChronoKora: "wieder 90 Min./15 Min. keine
+   AFK-Belohnung bekommen") - siehe ausfuehrlichen Kommentar bei
+   bkmpIdleFlushSync() in idledorf.js fuer die volle Erklaerung des
+   verbleibenden Wettlaufs, den der reine Timer-Abbruch
+   (bkmpIdleCancelPendingSyncTimer) NICHT zuverlaessig gewinnen konnte.
+   Zeitstempel statt reinem Bool, damit die Sperre IMMER von selbst nach
+   spaetestens 15s ausläuft, selbst wenn keiner der Aufrufer sie je aktiv
+   zuruecksetzt (kein "fuer immer blockiert"-Risiko). */
+let bkmpIdleLastSeenSyncBlockedUntil = 0;
+
 let bkmpIdlePlayerRunes = [];
 let bkmpIdlePendingRuneDrops = [];
 let bkmpIdleRuneSyncTimer = null;
