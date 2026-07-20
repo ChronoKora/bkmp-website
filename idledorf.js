@@ -609,30 +609,6 @@ function bkmpIdleHandleDragonDefeated() {
   const prevHighestIndex = Number(bkmpIdleState.highest_dragon_index || 0);
   if (autoAdvance) bkmpIdleState.current_dragon_index += 1;
   bkmpIdleState.highest_dragon_index = Math.max(prevHighestIndex, bkmpIdleState.current_dragon_index);
-  /* Phase 5.5 (19.07.), Abschnitt 12 "Aktfreischaltung": nur wenn dieser Kill
-     TATSAECHLICH neues Terrain erreicht (highest_dragon_index steigt) UND
-     dabei die Akt-Grenze (alle 10 Stufen, siehe bkmpIdleFormatStage/
-     Stufenwahl-Popup) ueberschreitet - beim Zurueckspringen/erneuten
-     Durchspielen alter Stufen (Stufenwahl-Popup) NICHT erneut. Bewusst Karte
-     statt Zeremonie (analog "neuer Turm-Stock", nicht "Drache schluepft") -
-     bei schnellem Auto-Kampf koennten sonst alle paar Kills Vollbild-
-     Zeremonien aufploppen, was Abschnitt 20 ("kein Overheating/Dauer-
-     Unterbrechung") widerspraeche. */
-  if (autoAdvance && typeof bkmpRewardPresent === 'function' && bkmpIdleState.current_dragon_index > prevHighestIndex) {
-    const newAct = Math.floor(bkmpIdleState.current_dragon_index / 10);
-    const prevAct = Math.floor(prevHighestIndex / 10);
-    if (newAct > prevAct) {
-      bkmpRewardPresent({
-        tier: 'card',
-        rarity: 'selten',
-        icon: '🗺️',
-        title: `Akt ${newAct + 1} erreicht!`,
-        description: 'Neues Gebiet, stärkere Drachen - deine Reise geht weiter.',
-        source: 'Kampf',
-        dedupeKey: `act-${newAct}`
-      });
-    }
-  }
   bkmpIdleAddXp(boostedXp);
   bkmpIdleVillageHp = bkmpIdleEffectiveStats.hp;
   /* Nutzerwunsch (15.07.): "wo dieses Geld und XP hochploppt gerne auch so
