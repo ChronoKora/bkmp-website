@@ -1212,6 +1212,18 @@
         const page = btn.dataset.page;
         adminNavBtns.forEach(item => item.classList.toggle('active', item === btn));
         adminPages.forEach(section => section.classList.toggle('active', section.id === 'page-' + page));
+        /* Zusammen mit dem renderAll()-Fix oben (nur noch der sichtbare
+           Abschnitt wird bei jeder Aktion neu aufgebaut): einige Tabs
+           (Einnahmen/Ausgaben/Investoren/News/Uebersicht) hatten hier
+           bisher GAR KEINEN eigenen Refresh-Aufruf - ihr Inhalt war bis
+           jetzt nur "zufaellig" aktuell, weil renderAll() vorher IMMER
+           alles neu baute. Jetzt noetig: beim Wechsel auf einen Tab
+           einmal renderAll() aufrufen (baut dank obigem Fix nur noch den
+           gerade aktivierten Abschnitt echt neu, alle anderen werden
+           uebersprungen) - stellt sicher, dass jeder Tab beim Ansehen
+           wirklich den aktuellen Stand zeigt, ohne die Performance wieder
+           zu verschlechtern. */
+        renderAll();
         if (page === 'overview') refreshAdminDataFromSupabase();
         if (page === 'visitors') refreshVisitorsAdmin();
         if (page === 'wishes') refreshWishesFromSupabase();
@@ -2332,7 +2344,20 @@
         (row, item) => row.querySelector('.confirm-btn').addEventListener('click', () => approveCardCatalogEntry(item.id)));
     }
 
-    if (cardCatalogSearchInput) cardCatalogSearchInput.addEventListener('input', renderCardCatalogList);
+    /* Bug-Fix (Spieler-Meldung ChronoKora, 20.07.: "läggt extrem kurz bis ich
+       einen anderen Button drücken kann"): renderCardCatalogList() baut bei
+       jedem Aufruf drei komplette Listen (Pending/Approved/Rejected) per
+       innerHTML+createElement neu auf, inkl. neuer Event-Listener pro Zeile
+       (siehe renderCardCatalogGroup) - bei laengerer Kartenliste blockiert
+       das den Haupt-Thread bei JEDEM einzelnen Tastendruck kurz spuerbar.
+       Debounce (200ms nach dem letzten Tastendruck) statt bei jedem
+       Tastendruck neu zu rendern - Verhalten bleibt gleich (Liste filtert
+       sich weiterhin live), nur die Render-Haeufigkeit sinkt drastisch. */
+    let bkmpCardCatalogSearchDebounce = null;
+    if (cardCatalogSearchInput) cardCatalogSearchInput.addEventListener('input', () => {
+      window.clearTimeout(bkmpCardCatalogSearchDebounce);
+      bkmpCardCatalogSearchDebounce = window.setTimeout(renderCardCatalogList, 200);
+    });
 
     const cardCatalogMergeApplyBtn = document.getElementById('cardCatalogMergeApply');
     if (cardCatalogMergeApplyBtn) {
@@ -2509,22 +2534,51 @@
       URL.revokeObjectURL(url);
     }
 
+    /* Bug-Fix (Spieler-/Nutzer-Meldung ChronoKora, 20.07.: "läggt immer
+       extrem kurz bis ich einen anderen Button drücken kann" - beim
+       Durchgehen ALLER Admin-Aktionen gefunden, nicht nur bei Ausgaben):
+       renderAll() baute bisher bei JEDER einzelnen Aktion irgendwo im
+       Admin-Panel (Ausgabe hinzufuegen, Einnahme hinzufuegen, Investor
+       speichern, ...) IMMER ALLE ~12 Listen-Abschnitte komplett neu auf -
+       Einnahmen, Ausgaben, Investoren, News, Wuensche, Streamer, Wer-sind-
+       wir, PartnerShops, Kartenverkauf, Investor-Anfragen, Kartenverkauf-
+       Anfragen UND Kartendatenbank - unabhaengig davon, welcher einzelne
+       Admin-Tab gerade ueberhaupt sichtbar ist (nur EIN .admin-page-
+       Abschnitt ist je sichtbar, der Rest steht per CSS auf display:none).
+       11 von 12 Neuaufbauten waren dadurch bei jeder einzelnen Aktion
+       reine Verschwendung - das noch dazu vor bkmpEnhanceImages(document)
+       (durchsucht danach das GESAMTE Dokument erneut nach Bildern). Fix:
+       nur noch den Abschnitt neu aufbauen, der gerade tatsaechlich
+       sichtbar ist - repairMissingIds() oben deckt bereits alle
+       Datenreparaturen ab (auch die, die einzelne render*-Funktionen
+       zusaetzlich intern nochmal machten, z.B. renderPartnerShopList -
+       rein redundant, nichts geht verloren). renderOverview() bleibt
+       bewusst immer aktiv (billig, und Kopfzeilen-Summen koennten
+       theoretisch auch ausserhalb der Overview-Seite auftauchen). */
+    function bkmpAdminSectionVisible(containerId) {
+      const el = document.getElementById(containerId);
+      if (!el) return true;
+      const page = el.closest('.admin-page');
+      return !page || page.classList.contains('active');
+    }
     function renderAll() {
       repairMissingIds();
       renderOverview();
-      renderEntryList('incomeList', sortByDateDesc(data.income), item => escapeHtml(item.name), item => `${escapeHtml(formatDate(item.date))} · ${bkmpFormatCurrency(item.amount)}`, id => removeIncome(id));
-      renderEntryList('expenseList', sortByDateDesc(data.expenses), item => escapeHtml(item.name), item => `${escapeHtml(formatDate(item.date))} · ${bkmpFormatCurrency(item.amount)}`, id => removeExpense(id));
-      renderInvestorList();
-      renderNewsList();
-      renderWishAdminList();
-      renderStreamerList();
-      renderAboutBlockList();
-      if (typeof renderAboutPreview === 'function') renderAboutPreview();
-      renderPartnerShopList();
-      renderCardSaleList();
-      renderInvestorRequestList();
-      renderCardSaleRequestList();
-      renderCardCatalogList();
+      if (bkmpAdminSectionVisible('incomeList')) renderEntryList('incomeList', sortByDateDesc(data.income), item => escapeHtml(item.name), item => `${escapeHtml(formatDate(item.date))} · ${bkmpFormatCurrency(item.amount)}`, id => removeIncome(id));
+      if (bkmpAdminSectionVisible('expenseList')) renderEntryList('expenseList', sortByDateDesc(data.expenses), item => escapeHtml(item.name), item => `${escapeHtml(formatDate(item.date))} · ${bkmpFormatCurrency(item.amount)}`, id => removeExpense(id));
+      if (bkmpAdminSectionVisible('investorList')) renderInvestorList();
+      if (bkmpAdminSectionVisible('newsList')) renderNewsList();
+      if (bkmpAdminSectionVisible('wishPendingList')) renderWishAdminList();
+      if (bkmpAdminSectionVisible('streamerList')) renderStreamerList();
+      if (bkmpAdminSectionVisible('aboutBlockList')) {
+        renderAboutBlockList();
+        if (typeof renderAboutPreview === 'function') renderAboutPreview();
+      }
+      if (bkmpAdminSectionVisible('partnerShopPendingList')) renderPartnerShopList();
+      if (bkmpAdminSectionVisible('cardSaleList')) renderCardSaleList();
+      if (bkmpAdminSectionVisible('investorRequestList')) renderInvestorRequestList();
+      if (bkmpAdminSectionVisible('cardSaleRequestList')) renderCardSaleRequestList();
+      if (bkmpAdminSectionVisible('cardCatalogPendingList')) renderCardCatalogList();
       if (window.bkmpEnhanceImages) window.bkmpEnhanceImages(document);
     }
 
