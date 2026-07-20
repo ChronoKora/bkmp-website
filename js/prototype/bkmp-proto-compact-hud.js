@@ -26,14 +26,20 @@ const BKMP_PROTO_NAV_ICONS = {
   dungeon: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17V9a6 6 0 0112 0v8"/><path d="M4 17h12"/></svg>'
 };
 
-/* Phase 7.0 (20.07., Mobile-First-Redesign, Section 15/38): von 5 auf 4
-   Haupt-Tabs reduziert - Kampf/Upgrades/Drachenzucht/Dungeon sind die
-   haeufigsten Aktionen, alles andere wandert ins "Mehr"-Menue. Deckt sich
-   bewusst mit PRIMARY_TAB_IDS in bkmp-app-mode-bootstrap.js, das dieselben
-   4 IDs verwendet, um sie aus den Desktop-Gruppen-Containern zu loesen. */
+/* Phase 7.0 Nachbesserung (20.07., Nutzerwunsch nach Sichten der ersten
+   Abnahmestufe: "Fügst du denn Prestige und Skilltree wieder hinzu?",
+   Entscheidung "6 Buttons total"): von urspruenglich 4 auf 6 Haupt-Tabs
+   erweitert - Kampf/Upgrades/Skilltree/Prestige/Drachenzucht/Dungeon alle
+   dauerhaft sichtbar (statt Skilltree/Prestige im "Mehr"-Menue zu
+   verstecken). Etwas schmalere Buttons auf kleinen Handys akzeptiert,
+   siehe Nutzer-Entscheidung. Deckt sich bewusst mit PRIMARY_TAB_IDS in
+   bkmp-app-mode-bootstrap.js, das dieselben 6 IDs verwendet, um sie aus
+   den Desktop-Gruppen-Containern zu loesen. */
 const BKMP_PROTO_NAV_PRIMARY = [
   { id: 'kampf', btn: 'idleTabBtnKampf', label: 'Kampf' },
   { id: 'upgrades', btn: 'idleTabBtnUpgrades', label: 'Upgrades' },
+  { id: 'skilltree', btn: 'idleTabBtnSkilltree', label: 'Skilltree' },
+  { id: 'prestige', btn: 'idleTabBtnPrestige', label: 'Prestige' },
   { id: 'drachen', btn: 'idleTabBtnDrachen', label: 'Drachen' },
   { id: 'dungeon', btn: 'idleTabBtnDungeon', label: 'Dungeon' }
 ];
@@ -44,11 +50,9 @@ const BKMP_PROTO_NAV_PRIMARY = [
    Sheet, safe-area-bewusst) per Proxy-Klick auf #idleAppMoreBtn - diese
    flache Liste hier wird dann gar nicht mehr gerendert/verwendet. Auf
    breiten Bildschirmen (>760px, kein App-Modus) lief jenes Setup nie,
-   deshalb bleibt dieser Fallback fuer Desktop bestehen. Dieselben 11 IDs
+   deshalb bleibt dieser Fallback fuer Desktop bestehen. Dieselben 9 IDs
    wie MORE_GROUPS in bkmp-app-mode-bootstrap.js, nur ungruppiert. */
 const BKMP_PROTO_NAV_SECONDARY = [
-  { id: 'skilltree', btn: 'idleTabBtnSkilltree', label: 'Skilltree' },
-  { id: 'prestige', btn: 'idleTabBtnPrestige', label: 'Prestige' },
   { id: 'runen', btn: 'idleTabBtnRunen', label: 'Runen' },
   { id: 'erfolge', btn: 'idleTabBtnErfolge', label: 'Erfolge' },
   { id: 'arena', btn: 'idleTabBtnArena', label: 'Arena' },

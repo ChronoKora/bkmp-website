@@ -218,8 +218,11 @@ function bkmpTowerFinish(reachedWave) {
   if (bkmpTowerTimerInterval) { clearInterval(bkmpTowerTimerInterval); bkmpTowerTimerInterval = null; }
   const banner = document.getElementById('idleTurmBanner');
   if (banner) banner.style.display = 'none';
-  const stageBar = document.getElementById('idleStageBar');
-  if (stageBar) stageBar.style.display = '';
+  /* Bug-Fix (Spieler-Meldung ChronoKora, 20.07., analog beim Dungeon
+     gefunden - siehe Kommentar bei bkmpDungeonStopAuto in bkmp-dungeon.js):
+     "stageBar.style.display=''" liess die vom kompakten HUD-Prototyp
+     eigentlich dauerhaft versteckte alte Stufenleiste nach jedem Turm-
+     Lauf wieder aufleben - ersatzlos entfernt. */
 
   bkmpIdleCurrentDragon = bkmpTowerPrevDragon;
   bkmpIdleVillageHp = bkmpTowerPrevVillageHp;

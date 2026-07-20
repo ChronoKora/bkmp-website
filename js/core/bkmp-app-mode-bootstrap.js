@@ -39,27 +39,26 @@
          ECHTEN Button-Elemente, keine Kopie) in ein ausklappbares
          Menue - die Klick-Listener aus bkmpIdleInitTabs bleiben dadurch
          unveraendert erhalten, idledorf.js wird nicht angefasst. */
-      /* Phase 7.0 (20.07., Mobile-First-Redesign): auf 4 Haupt-Tabs
-         umgestellt - Kampf (Kernschleife), Upgrades (haeufigste Aktion),
-         Drachenzucht (Kernschleife), Dungeon (haeufigste Progression/
-         Schluessel-Ressource) - deckt sich mit BKMP_PROTO_NAV_PRIMARY in
-         bkmp-proto-compact-hud.js, das dieselben 4 IDs per Proxy-Klick
-         anspricht. Gilde wandert dafuer in die eigene "Gilde"-Gruppe
-         unten (zusammen mit Gilden-Tech/Gildenboss, statt vorher allein
-         oben) - inhaltlich naeher beieinander als neben Kampf/Dungeon. */
-      var PRIMARY_TAB_IDS = ['idleTabBtnKampf', 'idleTabBtnUpgrades', 'idleTabBtnDrachen', 'idleTabBtnDungeon'];
+      /* Phase 7.0 Nachbesserung (20.07., Nutzerwunsch nach Sichten der
+         ersten Abnahmestufe: "Fügst du denn Prestige und Skilltree wieder
+         hinzu?", Entscheidung "6 Buttons total"): von urspruenglich 4 auf
+         6 Haupt-Tabs erweitert - Kampf/Upgrades/Skilltree/Prestige/
+         Drachenzucht/Dungeon alle dauerhaft sichtbar. Deckt sich bewusst
+         mit BKMP_PROTO_NAV_PRIMARY in bkmp-proto-compact-hud.js, das
+         dieselben 6 IDs per Proxy-Klick anspricht. Gilde bleibt in der
+         eigenen "Gilde"-Gruppe unten (zusammen mit Gilden-Tech/Gildenboss). */
+      var PRIMARY_TAB_IDS = ['idleTabBtnKampf', 'idleTabBtnUpgrades', 'idleTabBtnSkilltree', 'idleTabBtnPrestige', 'idleTabBtnDrachen', 'idleTabBtnDungeon'];
       var tabsBar = document.getElementById('idleDorfTabs');
       var moreSheet = document.getElementById('idleAppMoreSheet');
       var moreSheetGrid = document.getElementById('idleAppMoreSheetGrid');
       if (!tabsBar || !moreSheet || !moreSheetGrid) return;
       if (document.getElementById('idleAppMoreBtn')) return; // schon eingerichtet (z.B. erneuter Aufruf)
 
-      /* Phase 7.0: Gruppen an die vom Nutzer vorgegebene Struktur
-         angeglichen (FORTSCHRITT/KAMPF UND RANG/GILDE/SAMMLUNG) - deckt
-         jetzt alle 11 nicht-primaeren Tabs ab (vorher fehlte Turm/
-         Skilltree/Prestige/Runen/Erfolge waren anders verteilt). */
+      /* Phase 7.0 Nachbesserung: Skilltree/Prestige aus "Fortschritt" raus
+         (jetzt primaer, siehe oben) - Gruppe deckt jetzt die verbleibenden
+         9 nicht-primaeren Tabs ab. */
       var MORE_GROUPS = [
-        { title: '📈 Fortschritt', ids: ['idleTabBtnSkilltree', 'idleTabBtnPrestige', 'idleTabBtnRunen', 'idleTabBtnErfolge'] },
+        { title: '📈 Fortschritt', ids: ['idleTabBtnRunen', 'idleTabBtnErfolge'] },
         { title: '⚔️ Kampf & Rang', ids: ['idleTabBtnArena', 'idleTabBtnBestenliste', 'idleTabBtnTurm'] },
         { title: '🛡️ Gilde', ids: ['idleTabBtnGilde', 'idleTabBtnGildeTech', 'idleTabBtnGildeBoss'] },
         { title: '🏆 Sammlung', ids: ['idleTabBtnSkins'] }

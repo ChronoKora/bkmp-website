@@ -845,10 +845,20 @@ function bkmpDungeonAutoFinishSequence() {
      Spieler sah das exakt wie ein wirkungsloser Klick aus. Jetzt raeumt
      diese Funktion die Anzeige selbst auf (idempotent, falls sie ueber
      bkmpDungeonFinish() bereits erledigt wurde). */
+  /* Bug-Fix (Spieler-Meldung ChronoKora, 20.07.: "Nach einem Dungeon kam
+     das Menü zum Vorschein"): dieses "stageBar.style.display=''" stammt
+     noch aus der Zeit vor dem kompakten HUD-Prototyp (js/prototype/
+     bkmp-proto-compact-hud.js) - der versteckt #idleStageBar dauerhaft
+     per style.display='none' zugunsten seiner eigenen kompakten
+     Stufenleiste. Diese alte "beim Dungeon-Ende wieder einblenden"-Zeile
+     hob genau dieses Verstecken wieder auf, sobald ein Dungeon-Lauf
+     endete - die alte, groessere Stufenleiste (mit "Bleibt auf dieser
+     Stufe"/"Zur besten Stufe springen"/"Zu bestimmter Stufe wechseln")
+     erschien dadurch mitten im Kampf-Tab. Ersatzlos entfernt - #idleStageBar
+     bleibt permanent versteckt, die kompakte Version (oben im HUD) zeigt
+     denselben Inhalt bereits. */
   const banner = document.getElementById('idleDungeonBanner');
-  const stageBar = document.getElementById('idleStageBar');
   if (banner) banner.style.display = 'none';
-  if (stageBar) stageBar.style.display = '';
   if (stats) {
     bkmpDungeonShowAutoSummary(stats, done, total);
   }
@@ -1067,10 +1077,12 @@ async function bkmpDungeonFinish(success) {
     && (bkmpDungeonAutoRunsDone + 1) < bkmpDungeonAutoRunsTotal;
 
   const banner = document.getElementById('idleDungeonBanner');
-  const stageBar = document.getElementById('idleStageBar');
   if (!willContinueAuto) {
     if (banner) banner.style.display = 'none';
-    if (stageBar) stageBar.style.display = '';
+    /* Bug-Fix (siehe ausfuehrlicher Kommentar bei bkmpDungeonStopAuto oben
+       in dieser Datei): "stageBar.style.display=''" liess hier ebenfalls
+       die alte, vom kompakten HUD-Prototyp eigentlich dauerhaft
+       versteckte Stufenleiste wieder aufleben - ersatzlos entfernt. */
   }
 
   bkmpIdleCurrentDragon = bkmpDungeonPrevDragon;
