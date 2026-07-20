@@ -1426,12 +1426,27 @@ async function bkmpIdleClaimOfflineProgress(name) {
       body: JSON.stringify({ playerName: name })
     });
     if (res.status === 401) return { authError: true };
-    if (!res.ok) return null;
+    /* Bug-Fix (Spieler-Meldung ChronoKora, 20.07.: "wieder keine AFK
+       Belohnung 90 Min. lang" - genau dieselbe Bug-Klasse wie beim
+       bereits dokumentierten Blazehunter07-Report 19.07., "550 Min. weg,
+       0 Belohnung", siehe api/claim-idle-offline-progress.js: schlaegt
+       z.B. der Drachen-Fetch dort fehl, gibt der Server bewusst einen
+       Fehler zurueck STATT last_seen_at trotzdem zu ueberschreiben -
+       "damit der Client es spaeter erneut versuchen kann" (Kommentar
+       dort). Genau dieser erneute Versuch fehlte hier aber komplett: ein
+       Server-Fehler (alles ausser 401) UND ein Netzwerkfehler (catch
+       unten) liefen bisher identisch zu "return null" wie ein simples
+       "nichts zu holen" durch - der Spieler bekam nie einen Hinweis, dass
+       sein Fortschritt weiterhin auf dem Server wartet und ein Neuladen
+       reicht. Gleiches Muster wie der bereits bestehende authError-Fix
+       direkt darueber (16.07.) - hier nur konsequent auch auf diese
+       beiden Faelle ausgeweitet. */
+    if (!res.ok) return { serverError: true };
     const data = await res.json();
-    return data && data.ok ? data : null;
+    return data && data.ok ? data : { serverError: true };
   } catch (e) {
     console.warn('Idle Dorf: Offline-Fortschritt konnte nicht abgerufen werden.', e);
-    return null;
+    return { serverError: true };
   }
 }
 
@@ -1451,6 +1466,24 @@ function bkmpIdleShowOfflineCard(result) {
     card.style.display = '';
     const closeErrBtn = document.getElementById('idleOfflineCardClose');
     if (closeErrBtn) closeErrBtn.addEventListener('click', () => { card.style.display = 'none'; });
+    return;
+  }
+  /* Bug-Fix (Spieler-Meldung ChronoKora, 20.07., siehe ausfuehrlicher
+     Kommentar bei bkmpIdleClaimOfflineProgress): vorher zeigte ein
+     Server-/Netzwerkfehler beim Abholen einfach GAR NICHTS an - der
+     Spieler dachte, sein Fortschritt sei einfach weg, obwohl der Server
+     last_seen_at bei einem Fehler bewusst NICHT ueberschreibt (siehe
+     api/claim-idle-offline-progress.js) - ein einfaches Neuladen haette
+     gereicht. Gleiches Karten-Muster wie beim authError-Fall oben, nur
+     mit passendem Text (kein Login-Problem, der Fortschritt ist noch da). */
+  if (result && result.serverError) {
+    card.innerHTML = `
+      <button type="button" class="idle-offline-close" id="idleOfflineCardClose" aria-label="Schließen">&times;</button>
+      <strong>⚠️ Offline-Fortschritt konnte gerade nicht abgerufen werden</strong>
+      <div class="idle-offline-rewards"><span>Kurzes Server-Problem - dein Fortschritt geht dadurch NICHT verloren. Bitte die Seite neu laden, dann klappt der Abruf normalerweise beim nächsten Versuch.</span></div>`;
+    card.style.display = '';
+    const closeSrvBtn = document.getElementById('idleOfflineCardClose');
+    if (closeSrvBtn) closeSrvBtn.addEventListener('click', () => { card.style.display = 'none'; });
     return;
   }
   if (!result || !result.rewards || !result.elapsedSeconds || result.elapsedSeconds < 60) { card.style.display = 'none'; return; }
@@ -2429,12 +2462,14 @@ function bkmpIdleInit() {
     bkmpIdleQueueSync(); bkmpIdleFlushSync();
     bkmpPrestigeFlushSyncNow();
     bkmpIdleFlushRuneSyncNow();
+    if (typeof bkmpRuneFlushPendingEquipsNow === 'function') bkmpRuneFlushPendingEquipsNow();
   });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       bkmpIdleQueueSync(); bkmpIdleFlushSync();
       bkmpPrestigeFlushSyncNow();
       bkmpIdleFlushRuneSyncNow();
+      if (typeof bkmpRuneFlushPendingEquipsNow === 'function') bkmpRuneFlushPendingEquipsNow();
       return;
     }
     bkmpIdleCatchUpAfterHidden();

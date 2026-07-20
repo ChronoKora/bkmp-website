@@ -141,6 +141,12 @@ let bkmpIdleSkipNextMerge = false;
 let bkmpIdlePlayerRunes = [];
 let bkmpIdlePendingRuneDrops = [];
 let bkmpIdleRuneSyncTimer = null;
+/* Bug-Fix 20.07. (Spieler-Report "Bärli": Runen nach kurzem Raus-/
+   Reintappen wieder unausgeruestet) - siehe bkmpRunePersistEquip() in
+   js/systems/bkmp-runes.js fuer die volle Erklaerung. Map von rune.id auf
+   den zuletzt gewuenschten equipped-Wert, solange die Schreibanfrage noch
+   nicht bestaetigt zurueck ist. */
+let bkmpRunePendingEquipWrites = new Map();
 let bkmpPlayerDragonEggs = [];
 let bkmpPlayerDragonNests = [];
 let bkmpPlayerDragons = [];

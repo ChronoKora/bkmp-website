@@ -898,7 +898,7 @@ function bkmpRuneToggleEquip(cid) {
   if (!rune.id && typeof bkmpIdleFlushRuneSyncNow === 'function') bkmpIdleFlushRuneSyncNow().catch(() => {});
   if (rune.equipped) {
     rune.equipped = false;
-    if (rune.id) updatePlayerRuneEquipped(rune.id, false).catch(() => {});
+    if (rune.id) bkmpRunePersistEquip(rune.id, false);
   } else {
     const conflicting = bkmpIdlePlayerRunes.filter(r => r.rune_type === rune.rune_type && r.equipped && r._cid !== cid);
     if (conflicting.length > 0) {
@@ -910,12 +910,58 @@ function bkmpRuneToggleEquip(cid) {
       return;
     }
     rune.equipped = true;
-    if (rune.id) updatePlayerRuneEquipped(rune.id, true).catch(() => {});
+    if (rune.id) bkmpRunePersistEquip(rune.id, true);
   }
   bkmpRuneCurrentlyViewing = cid;
   bkmpIdleRecomputeEffectiveStats();
   bkmpIdleRenderRunenPanel();
   bkmpIdleRenderHud();
+}
+
+/* Bug-Fix (Spieler-Report 20.07., "Bärli", zweimal am selben Tag: "Mir hat
+   es schon wieder alle Runen gelöscht" / "...war dann aus dem Spiel
+   rausgetappt und bin wieder zurück. Dann musste ich feststellen, dass die
+   Runen wieder gelöscht waren"). Anders als der Haupt-Spielstand/Prestige/
+   frisch gedroppte Runen (bkmpIdleFlushSync/bkmpPrestigeFlushSyncNow/
+   bkmpIdleFlushRuneSyncNow - alle drei werden bei visibilitychange(hidden)
+   und beforeunload erzwungen nachgeholt, siehe idledorf.js) lief ein
+   Ausruesten/Entfernen bisher NUR als reines fire-and-forget-Promise
+   (updatePlayerRuneEquipped(...).catch(()=>{})) OHNE jede Nachverfolgung.
+   Verliess der Spieler die Seite (Tab wechseln, Bildschirm sperren, App in
+   den Hintergrund - auf Mobilgeraeten wird der Tab dabei vom Betriebssystem
+   haeufig unbemerkt verworfen, fuehlt sich fuer den Spieler aber nur wie
+   "kurz raus und rein" an) GENAU in dem kurzen Fenster zwischen Klick und
+   Netzwerk-Antwort, brach der Browser die noch laufende PATCH-Anfrage ab.
+   Lokal SAH es ausgeruestet aus, in der DB kam es nie an - der naechste
+   echte Neuladevorgang (bkmpIdleLoadOrInitState) zeigte dann wieder den
+   alten (unausgeruesteten) Stand, was sich fuer den Spieler wie "geloescht"
+   anfuehlt. Fix: jede Ausruesten-Schreibanfrage wird jetzt in
+   bkmpRunePendingEquipWrites nachverfolgt, bis sie bestaetigt zurueck ist,
+   und bei jedem Verstecken/Schliessen per bkmpRuneFlushPendingEquipsNow()
+   (siehe idledorf.js, gleiche Stelle wie die drei anderen Flush-Aufrufe)
+   erneut abgeschickt - ein doppeltes PATCH auf denselben Wert ist
+   unschaedlich (idempotent), stellt aber sicher, dass die Aenderung auch
+   dann noch ankommt, wenn der allererste Versuch durch das Verlassen der
+   Seite abgebrochen wurde. */
+function bkmpRunePersistEquip(runeId, equipped) {
+  if (typeof updatePlayerRuneEquipped !== 'function' || !runeId) return;
+  bkmpRunePendingEquipWrites.set(runeId, equipped);
+  updatePlayerRuneEquipped(runeId, equipped)
+    .then(() => {
+      if (bkmpRunePendingEquipWrites.get(runeId) === equipped) bkmpRunePendingEquipWrites.delete(runeId);
+    })
+    .catch(() => {});
+}
+
+function bkmpRuneFlushPendingEquipsNow() {
+  if (!bkmpRunePendingEquipWrites.size || typeof updatePlayerRuneEquipped !== 'function') return;
+  bkmpRunePendingEquipWrites.forEach((equipped, runeId) => {
+    updatePlayerRuneEquipped(runeId, equipped)
+      .then(() => {
+        if (bkmpRunePendingEquipWrites.get(runeId) === equipped) bkmpRunePendingEquipWrites.delete(runeId);
+      })
+      .catch(() => {});
+  });
 }
 
 /* Sicherheitsnetz gegen doppelt ausgeruestete Runenarten (Spieler-Bug-
@@ -947,7 +993,7 @@ function bkmpRuneNormalizeDuplicateEquips() {
     group.slice(1).forEach(r => {
       r.equipped = false;
       fixedCount++;
-      if (r.id) updatePlayerRuneEquipped(r.id, false).catch(() => {});
+      if (r.id) bkmpRunePersistEquip(r.id, false);
     });
   });
   if (fixedCount > 0) {
