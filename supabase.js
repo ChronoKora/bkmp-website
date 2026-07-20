@@ -2331,6 +2331,129 @@ async function deleteFeedback(id) {
   return true;
 }
 
+/* ---------------- Oeffentliches Feedback-Board (Stufe 3, 21.07.2026) ----
+   Zwei GETRENNTE Tabellen von der privaten feedback-Tabelle oben (siehe
+   sql/20260721-feedback-public-board.sql fuer die volle Begruendung -
+   RLS filtert nur Zeilen, keine Spalten, daher enthaelt feedback_public
+   ausschliesslich admin-verfasste, absichtlich oeffentliche Felder).
+   Gleicher bkmpGetSupabaseClient()-Ansatz wie ueberall sonst: RLS
+   entscheidet selbststaendig, ob der/die Aufrufer:in nur veroeffentlichte
+   Zeilen sieht (anonym, normale Website) oder auch Entwuerfe (eingeloggter
+   Admin) - kein eigener "public vs. admin"-Codepfad noetig. */
+function bkmpMapFeedbackPublicFromSupabase(row) {
+  return {
+    id: row.id,
+    sourceFeedbackId: row.source_feedback_id,
+    kind: row.kind || 'bug',
+    title: row.title,
+    category: row.category,
+    status: row.status,
+    description: row.description,
+    response: row.response,
+    authorMode: row.author_mode,
+    authorDisplay: row.author_display,
+    duplicateOf: row.duplicate_of,
+    plannedRelease: row.planned_release,
+    isPublished: Boolean(row.is_published),
+    publishedAt: row.published_at,
+    resolvedAt: row.resolved_at,
+    lastPublicUpdate: row.last_public_update,
+    affectsCount: Number(row.affects_count || 0),
+    sortOrder: Number(row.sort_order || 0),
+    createdAt: row.created_at
+  };
+}
+
+async function loadFeedbackPublicList() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('feedback_public')
+    .select('id, source_feedback_id, kind, title, category, status, description, response, author_mode, author_display, duplicate_of, planned_release, is_published, published_at, resolved_at, last_public_update, affects_count, sort_order, created_at')
+    .order('last_public_update', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(bkmpMapFeedbackPublicFromSupabase);
+}
+
+/* entry.id gesetzt = Update, sonst Insert. published_at/resolved_at werden
+   nur beim UEBERGANG in den jeweiligen Zustand gesetzt (nicht bei jedem
+   Speichern neu), damit das echte erste Veroeffentlichungsdatum erhalten
+   bleibt. */
+async function upsertFeedbackPublicEntry(entry) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const nowIso = new Date().toISOString();
+  const payload = {
+    source_feedback_id: entry.sourceFeedbackId || null,
+    kind: entry.kind === 'idea' ? 'idea' : 'bug',
+    title: entry.title,
+    category: entry.category,
+    status: entry.status,
+    description: entry.description || null,
+    response: entry.response || null,
+    author_mode: entry.authorMode || 'anonymous',
+    author_display: entry.authorMode && entry.authorMode !== 'anonymous' ? (entry.authorDisplay || null) : null,
+    duplicate_of: entry.duplicateOf || null,
+    planned_release: entry.plannedRelease || null,
+    is_published: Boolean(entry.isPublished),
+    last_public_update: nowIso
+  };
+  if (entry.isPublished && !entry.publishedAt) payload.published_at = nowIso;
+  if (['behoben', 'veroeffentlicht'].includes(entry.status) && !entry.resolvedAt) payload.resolved_at = nowIso;
+
+  const select = 'id, source_feedback_id, kind, title, category, status, description, response, author_mode, author_display, duplicate_of, planned_release, is_published, published_at, resolved_at, last_public_update, affects_count, sort_order, created_at';
+  if (entry.id) {
+    const { data, error } = await client.from('feedback_public').update(payload).eq('id', entry.id).select(select).limit(1);
+    if (error) throw error;
+    const row = Array.isArray(data) ? data[0] : null;
+    return row ? bkmpMapFeedbackPublicFromSupabase(row) : null;
+  }
+  const { data, error } = await client.from('feedback_public').insert(payload).select(select).limit(1);
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : null;
+  return row ? bkmpMapFeedbackPublicFromSupabase(row) : null;
+}
+
+async function deleteFeedbackPublicEntry(id) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return false;
+  const { error } = await client.from('feedback_public').delete().eq('id', id);
+  if (error) throw error;
+  return true;
+}
+
+async function loadFeedbackPublicProgress(feedbackPublicId) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from('feedback_public_progress')
+    .select('id, feedback_public_id, text, created_at, sort_order')
+    .eq('feedback_public_id', feedbackPublicId)
+    .order('sort_order', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+async function addFeedbackPublicProgress(feedbackPublicId, text, sortOrder) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('feedback_public_progress')
+    .insert({ feedback_public_id: feedbackPublicId, text, sort_order: sortOrder || 0 })
+    .select('id, feedback_public_id, text, created_at, sort_order')
+    .limit(1);
+  if (error) throw error;
+  return Array.isArray(data) ? data[0] : null;
+}
+
+async function deleteFeedbackPublicProgress(id) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return false;
+  const { error } = await client.from('feedback_public_progress').delete().eq('id', id);
+  if (error) throw error;
+  return true;
+}
+
 async function syncCardSaleRequestsFromSupabase(targetData, onSynced, options = {}) {
   if (typeof loadCardSaleRequests !== 'function' || !bkmpGetSupabaseClient()) return false;
   try {

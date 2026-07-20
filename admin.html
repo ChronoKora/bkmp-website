@@ -20,7 +20,7 @@
 <title>BKMP — Admin</title>
 
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
-<link rel="stylesheet" href="style.css?v=20260720-feedbackboard3">
+<link rel="stylesheet" href="style.css?v=20260721-feedbackboard4">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 </head>
 <body>
@@ -901,11 +901,21 @@
             </label>
             <div class="feedback-list" id="feedbackList"></div>
           </div>
-          <!-- Oeffentliches Feedback-/Status-Board: Admin-Workflow-Vorschau
-               (Stufe 1, 20.07.2026, siehe js/ui/bkmp-feedback-board.js) -
-               reiner UI-Prototyp mit lokalen Testdaten, keine Datenbank-
-               Anbindung. Ersetzt NICHT die Liste oben. -->
-          <div class="admin-section" id="fbbAdminMock"></div>
+          <!-- Oeffentliches Feedback-/Status-Board (Stufe 3, 21.07.2026,
+               siehe js/ui/bkmp-feedback-board.js) - schreibt jetzt ECHT in
+               public.feedback_public/-_progress (Migration muss vorher in
+               Supabase gelaufen sein, siehe sql/20260721-feedback-public-board.sql).
+               Ersetzt NICHT die private Liste oben - "Öffentlich machen" dort
+               oeffnet den Editor hier. -->
+          <div class="admin-section">
+            <h3>📋 Öffentliches Feedback-Board</h3>
+            <p class="admin-help-text">Bereits veröffentlichte/entworfene Einträge. Neue entstehen über "Öffentlich machen" bei einer Einreichung oben.</p>
+            <button class="edit-btn" type="button" id="fbbAdminRefreshBtn" style="margin-bottom:1rem;">Aktualisieren</button>
+            <div class="fbb-admin-published-list" id="fbbAdminPublishedList"></div>
+          </div>
+          <div class="admin-section" id="fbbAdminEditorWrap" style="display:none;">
+            <div id="fbbAdminMock"></div>
+          </div>
         </section>
 
         <!-- Spieler-Verwaltung -->
@@ -972,7 +982,7 @@
   </div>
 
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260718-dragondex1"></script>
+  <script src="supabase.js?v=20260721-feedbackpublic1"></script>
   <script src="app.js?v=20260718-selbstverdient1"></script>
   <!-- Redesign Phase 2a (17.07.): siehe index.html fuer die Begruendung der
        festen Ladereihenfolge (bkmp-idle-state.js zuerst, bkmp-idle-
@@ -997,7 +1007,7 @@
   <script src="js/ui/bkmp-ui-components.js?v=20260719-p55b"></script>
   <!-- Feedback-/Status-Board Stufe 1 (20.07.2026) - speist hier nur die
        Admin-Workflow-Vorschau (#fbbAdminMock), reine Testdaten. -->
-  <script src="js/ui/bkmp-feedback-board.js?v=20260720-stufe1proto1"></script>
+  <script src="js/ui/bkmp-feedback-board.js?v=20260721-stufe34"></script>
   <script src="idledorf.js?v=20260720-afkracefix1"></script>
   <script src="js/core/bkmp-idle-bootstrap.js?v=20260717-p2afoundation"></script>
   <script src="mapart.js?v=20260717-kartenfirmen1"></script>
@@ -2010,6 +2020,7 @@
           <div class="feedback-card-actions">
             ${!f.isRead ? '<button class="edit-btn read-btn" type="button">Als gelesen markieren</button>' : ''}
             <button class="edit-btn archive-btn" type="button">${f.isArchived ? 'Wiederherstellen' : 'Archivieren'}</button>
+            <button class="edit-btn fbb-publicize-btn" type="button">📋 Öffentlich machen</button>
             <button class="del-btn" type="button" aria-label="Feedback löschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>
           </div>
         </div>
@@ -2021,6 +2032,16 @@
         card.querySelector('.archive-btn').addEventListener('click', () => {
           const entry = bkmpFeedbackCache.find(f => String(f.id) === id);
           toggleFeedbackArchived(id, entry ? !entry.isArchived : true);
+        });
+        /* Stufe 3 (21.07.): startet die oeffentliche Version im Editor
+           weiter unten auf derselben Seite (#fbbAdminMock), siehe
+           js/ui/bkmp-feedback-board.js - kopiert bewusst NICHTS automatisch
+           in oeffentliche Felder (nur die Kategorie als Startwert), die
+           urspruengliche Nachricht bleibt nur als Referenz sichtbar. */
+        const publicizeBtn = card.querySelector('.fbb-publicize-btn');
+        if (publicizeBtn) publicizeBtn.addEventListener('click', () => {
+          const entry = bkmpFeedbackCache.find(f => String(f.id) === id);
+          if (entry && typeof bkmpFeedbackAdminStartFromPrivate === 'function') bkmpFeedbackAdminStartFromPrivate(entry);
         });
         card.querySelector('.del-btn').addEventListener('click', () => {
           if (confirm('Dieses Feedback wirklich endgültig löschen?')) deleteFeedbackEntry(id);

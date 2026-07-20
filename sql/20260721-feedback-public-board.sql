@@ -23,6 +23,10 @@ create table if not exists public.feedback_public (
   -- unten SELECTed, ist aber kein Geheimnis (nur eine UUID ohne Bedeutung
   -- ausserhalb der eigenen DB).
   source_feedback_id uuid references public.feedback(id) on delete set null,
+  -- 'bug' | 'idea' - eigenes Feld statt aus category/status abgeleitet, da
+  -- beides je Auftrag Abschnitt 9/11 zwei getrennte Abschnitte im Board mit
+  -- teils eigenen Statuswerten sind (siehe status-Check weiter unten).
+  kind text not null default 'bug',
   title text not null,
   category text not null default 'sonstiges',
   status text not null default 'eingegangen',
@@ -48,6 +52,18 @@ create table if not exists public.feedback_public (
   sort_order integer not null default 0,
   created_at timestamptz not null default now()
 );
+
+-- Nachtrag (21.07., noch am selben Tag): "kind" wurde erst NACH der ersten
+-- Freigabe/Ausfuehrung dieser Datei ergaenzt (siehe Chat) - fuer bereits
+-- angelegte Tabellen ohne diese Spalte holt dieser ALTER es sicher/idempotent
+-- nach; bei einer komplett neuen Installation ist er ein wirkungsloser
+-- No-op (die Spalte existiert dann schon aus dem CREATE TABLE oben).
+alter table public.feedback_public add column if not exists kind text not null default 'bug';
+
+alter table public.feedback_public
+  drop constraint if exists feedback_public_kind_check;
+alter table public.feedback_public
+  add constraint feedback_public_kind_check check (kind in ('bug', 'idea'));
 
 alter table public.feedback_public
   drop constraint if exists feedback_public_category_check;

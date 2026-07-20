@@ -324,12 +324,68 @@ function bkmpFeedbackBoardWireCardClicks(container) {
   });
 }
 
+/* ---------------- Echte Daten (Stufe 4, 21.07.2026) ----------------
+   BKMP_FEEDBACK_BOARD_TEST_DATA oben bleibt nur als Referenz/Beispiel im
+   Code stehen (Stufe 1) - das Board selbst laedt ab hier ECHTE
+   veroeffentlichte Eintraege aus public.feedback_public (siehe
+   supabase.js), bricht der Ladevorgang ab (z.B. weil
+   sql/20260721-feedback-public-board.sql noch nicht ausgefuehrt wurde),
+   zeigt es einen ehrlichen Hinweis statt stillschweigend auf die
+   Testdaten zurueckzufallen - echte Besucher duerfen nie erfundene
+   Beispiel-Bugs fuer echte halten. */
+let bkmpFeedbackBoardActiveData = null;
+let bkmpFeedbackBoardLoadError = false;
+let bkmpFeedbackBoardLoading = false;
+
+async function bkmpFeedbackBoardEnsureDataLoaded() {
+  if (bkmpFeedbackBoardActiveData !== null || bkmpFeedbackBoardLoading) return;
+  if (typeof loadFeedbackPublicList !== 'function') { bkmpFeedbackBoardLoadError = true; bkmpFeedbackBoardActiveData = []; return; }
+  bkmpFeedbackBoardLoading = true;
+  try {
+    const list = await loadFeedbackPublicList();
+    const published = (list || []).filter(e => e.isPublished);
+    /* Fortschritt pro Eintrag parallel nachladen (Abschnitt 16: "zunaechst
+       nur begrenzte Anzahl laden" - bei einer ueberschaubaren Zahl
+       bekannter Bugs/Ideen unkritisch; sollte die Liste deutlich waechst,
+       waere Lazy-Load-beim-Aufklappen der naechste Optimierungsschritt). */
+    bkmpFeedbackBoardActiveData = await Promise.all(published.map(async e => {
+      let history = [];
+      try {
+        const rows = await loadFeedbackPublicProgress(e.id);
+        history = rows.map(p => ({ date: (p.created_at || '').slice(0, 10), text: p.text }));
+      } catch (err) { /* Fortschritt ist optional - Karte bleibt trotzdem nutzbar */ }
+      const duplicateTarget = e.duplicateOf ? published.find(x => x.id === e.duplicateOf) : null;
+      return {
+        id: e.id,
+        kind: e.kind === 'idea' ? 'idea' : 'bug',
+        category: e.category,
+        status: e.status,
+        title: e.title,
+        description: e.description,
+        response: e.response,
+        impact: null, affectedArea: null, workaround: null,
+        plannedRelease: e.plannedRelease,
+        lastUpdate: (e.lastPublicUpdate || e.createdAt || '').slice(0, 10),
+        duplicateOfTitle: duplicateTarget ? duplicateTarget.title : null,
+        history
+      };
+    }));
+  } catch (err) {
+    console.warn('Feedback-Board: konnte veroeffentlichte Eintraege nicht laden (Migration evtl. noch nicht ausgefuehrt).', err);
+    bkmpFeedbackBoardLoadError = true;
+    bkmpFeedbackBoardActiveData = [];
+  } finally {
+    bkmpFeedbackBoardLoading = false;
+  }
+}
+
 function bkmpFeedbackBoardRenderSummary() {
   const el = document.getElementById('feedbackStatusSummary');
   if (!el) return;
-  const knownBugs = BKMP_FEEDBACK_BOARD_TEST_DATA.filter(bkmpFeedbackBoardIsOpenKnownBug).length;
-  const inProgress = BKMP_FEEDBACK_BOARD_TEST_DATA.filter(e => ['in_arbeit', 'in_entwicklung'].includes(e.status)).length;
-  const resolved = BKMP_FEEDBACK_BOARD_TEST_DATA.filter(bkmpFeedbackBoardIsResolved).length;
+  const data = bkmpFeedbackBoardActiveData || [];
+  const knownBugs = data.filter(bkmpFeedbackBoardIsOpenKnownBug).length;
+  const inProgress = data.filter(e => ['in_arbeit', 'in_entwicklung'].includes(e.status)).length;
+  const resolved = data.filter(bkmpFeedbackBoardIsResolved).length;
   el.innerHTML = `
     <div class="fbb-summary-item"><strong>${knownBugs}</strong><span>bekannte Bug${knownBugs === 1 ? '' : 's'}</span></div>
     <div class="fbb-summary-item"><strong>${inProgress}</strong><span>in Arbeit</span></div>
@@ -352,8 +408,13 @@ function bkmpFeedbackBoardRenderFilters() {
 function bkmpFeedbackBoardRenderList() {
   const el = document.getElementById('feedbackStatusBody');
   if (!el) return;
+  if (bkmpFeedbackBoardLoading) { el.innerHTML = '<p class="fbb-empty">Lädt…</p>'; return; }
+  if (bkmpFeedbackBoardLoadError && !(bkmpFeedbackBoardActiveData || []).length) {
+    el.innerHTML = '<p class="fbb-empty">Konnte gerade nicht geladen werden. Bitte später nochmal versuchen.</p>';
+    return;
+  }
   const term = bkmpFeedbackBoardSearchTerm.trim();
-  const searched = BKMP_FEEDBACK_BOARD_TEST_DATA.filter(e => bkmpFeedbackBoardMatchesSearch(e, term));
+  const searched = (bkmpFeedbackBoardActiveData || []).filter(e => bkmpFeedbackBoardMatchesSearch(e, term));
 
   if (bkmpFeedbackBoardActiveFilter !== 'alle') {
     const items = searched.filter(e => bkmpFeedbackBoardMatchesFilter(e, bkmpFeedbackBoardActiveFilter));
@@ -382,17 +443,21 @@ function bkmpFeedbackBoardRenderList() {
    "Dialogfokus korrekt"). */
 let bkmpFeedbackBoardLastTrigger = null;
 
-function bkmpFeedbackBoardOpen(triggerEl) {
+async function bkmpFeedbackBoardOpen(triggerEl) {
   const overlay = document.getElementById('feedbackStatusOverlay');
   if (!overlay) return;
   bkmpFeedbackBoardLastTrigger = triggerEl || document.activeElement;
-  bkmpFeedbackBoardRenderSummary();
-  bkmpFeedbackBoardRenderFilters();
-  bkmpFeedbackBoardRenderList();
   overlay.classList.add('visible');
   document.body.classList.add('modal-open');
   const closeButton = document.getElementById('feedbackStatusClose');
   if (closeButton) closeButton.focus();
+  bkmpFeedbackBoardRenderFilters();
+  bkmpFeedbackBoardRenderList();
+  await bkmpFeedbackBoardEnsureDataLoaded();
+  if (overlay.classList.contains('visible')) {
+    bkmpFeedbackBoardRenderSummary();
+    bkmpFeedbackBoardRenderList();
+  }
 }
 function bkmpFeedbackBoardClose() {
   const overlay = document.getElementById('feedbackStatusOverlay');
@@ -433,47 +498,216 @@ function bkmpFeedbackBoardClose() {
 })();
 
 /* ================================================================
-   Admin-Workflow-Vorschau (Stufe 1, Auftrag Abschnitt 5) - nur ein
-   Bedien-PROTOTYP mit lokalem Arbeitsspeicher-Zustand, KEINE Datenbank-
-   Anbindung. Laeuft nur, wenn #fbbAdminMock existiert (admin.html) - auf
-   index.html ist bkmpFeedbackAdminMockInit() ein reines No-op, da das
-   Element dort nicht existiert. Bearbeitet eine Kopie EINES Testeintrags
-   (demo-3) direkt im Speicher; ein Neuladen der Seite verwirft jede
-   Aenderung wieder, absichtlich - es gibt noch keine Stelle, an der etwas
-   dauerhaft gespeichert werden koennte, bevor Stufe 2 (Datenbank) freigegeben
-   ist. Die rechte Vorschau-Spalte nutzt bewusst dieselbe
+   Admin-Workflow (Stufe 3, 21.07.2026, Auftrag Abschnitt 5) - schreibt
+   jetzt ECHT in public.feedback_public/-_progress (siehe supabase.js:
+   loadFeedbackPublicList/upsertFeedbackPublicEntry/deleteFeedbackPublicEntry/
+   loadFeedbackPublicProgress/addFeedbackPublicProgress/
+   deleteFeedbackPublicProgress). Braucht die Migration
+   sql/20260721-feedback-public-board.sql VORHER live in Supabase - bis
+   dahin liefert loadFeedbackPublicList() einen Fehler, die Liste zeigt
+   dann einen Hinweis statt eines leeren Zustands (siehe
+   bkmpFeedbackAdminRefreshPublicList unten). Laeuft nur, wenn
+   #fbbAdminPublishedList existiert (admin.html) - auf index.html sind
+   alle bkmpFeedbackAdmin*-Funktionen bewusst No-ops (Element fehlt). Die
+   Vorschau-Spalte im Editor nutzt weiterhin dieselbe
    bkmpFeedbackBoardEntryCardHtml()-Funktion wie das echte oeffentliche
-   Board oben, damit die Vorschau nie vom tatsaechlichen Aussehen abweicht. */
-let bkmpFeedbackAdminMockEntry = null;
+   Board, damit sie nie vom tatsaechlichen Aussehen abweicht. */
+let bkmpFeedbackAdminPublicCache = [];
+let bkmpFeedbackAdminCurrentEntry = null;
+let bkmpFeedbackAdminCurrentProgress = [];
+let bkmpFeedbackAdminSourcePrivate = null;
 
-function bkmpFeedbackAdminMockRefreshPreview() {
-  const card = document.getElementById('fbbAdminPreviewCard');
-  if (!card || !bkmpFeedbackAdminMockEntry) return;
-  bkmpFeedbackBoardOpenIds.add(bkmpFeedbackAdminMockEntry.id);
-  card.innerHTML = bkmpFeedbackBoardEntryCardHtml(bkmpFeedbackAdminMockEntry);
+/* Nur ein Startwert-Vorschlag, keine feste Zuordnung - der Admin kann die
+   Kategorie im Editor jederzeit selbst aendern. */
+function bkmpFeedbackAdminGuessCategory(privateCategory) {
+  if (privateCategory === 'idee') return 'idee';
+  if (privateCategory === 'kritik') return 'kritik';
+  if (privateCategory === 'bug') return 'bug';
+  return 'sonstiges';
 }
 
-function bkmpFeedbackAdminMockRender() {
+function bkmpFeedbackAdminToast(text, kind) {
+  if (typeof showAdminToast === 'function') { showAdminToast(text, kind || 'success'); return; }
+  console.log('[Feedback-Board]', text);
+}
+function bkmpFeedbackAdminErrorText(e) {
+  if (typeof supabaseErrorText === 'function') return supabaseErrorText(e);
+  return String(e && e.message || e);
+}
+
+/* Wandelt einen echten feedback_public-Datensatz + seine Fortschritts-
+   Zeilen in die Kartenform um, die bkmpFeedbackBoardEntryCardHtml()
+   erwartet (siehe Testdaten-Objekte oben fuer die Referenzform). Bewusst
+   OHNE impact/affectedArea/workaround - dafuer gibt es noch keine eigenen
+   Formularfelder, die drei Angaben bleiben also vorerst leer (die
+   Karten-Vorlage kommt ohne sie klar, siehe bkmpFeedbackBoardEntryCardHtml). */
+function bkmpFeedbackPublicEntryToCardShape(entry, progressRows) {
+  const duplicateTarget = entry.duplicateOf ? bkmpFeedbackAdminPublicCache.find(x => x.id === entry.duplicateOf) : null;
+  return {
+    id: entry.id || 'draft-preview',
+    category: entry.category,
+    status: entry.status,
+    title: entry.title || '(noch kein Titel)',
+    description: entry.description,
+    response: entry.response,
+    impact: null, affectedArea: null, workaround: null,
+    plannedRelease: entry.plannedRelease,
+    lastUpdate: (entry.lastPublicUpdate || new Date().toISOString()).slice(0, 10),
+    duplicateOfTitle: duplicateTarget ? duplicateTarget.title : null,
+    history: (progressRows || []).map(p => ({ date: (p.created_at || '').slice(0, 10), text: p.text }))
+  };
+}
+
+async function bkmpFeedbackAdminRefreshPublicList() {
+  const listEl = document.getElementById('fbbAdminPublishedList');
+  if (!listEl) return;
+  listEl.innerHTML = '<p class="admin-help-text">Lädt…</p>';
+  try {
+    const items = await loadFeedbackPublicList();
+    if (items === null) { listEl.innerHTML = '<p class="admin-help-text">Nicht eingeloggt oder Supabase nicht verfügbar.</p>'; return; }
+    bkmpFeedbackAdminPublicCache = items;
+    bkmpFeedbackAdminRenderPublishedList();
+  } catch (e) {
+    /* Haeufigster Fall vor Stufe 2: die Tabelle existiert noch nicht,
+       weil sql/20260721-feedback-public-board.sql noch nicht ausgefuehrt
+       wurde - klarer Hinweis statt kryptischer Fehlermeldung. */
+    listEl.innerHTML = `<p class="admin-help-text">Konnte nicht geladen werden (vermutlich läuft die Migration <code>sql/20260721-feedback-public-board.sql</code> noch nicht): ${bkmpFeedbackBoardEscapeHtml(bkmpFeedbackAdminErrorText(e))}</p>`;
+  }
+}
+
+function bkmpFeedbackAdminRenderPublishedList() {
+  const listEl = document.getElementById('fbbAdminPublishedList');
+  if (!listEl) return;
+  if (!bkmpFeedbackAdminPublicCache.length) {
+    listEl.innerHTML = '<p class="empty-hint">Noch keine öffentlichen Einträge. Über "📋 Öffentlich machen" bei einer Einreichung oben starten.</p>';
+    return;
+  }
+  listEl.innerHTML = bkmpFeedbackAdminPublicCache.map(e => `
+    <div class="feedback-card" data-fbb-public-id="${bkmpFeedbackBoardEscapeHtml(e.id)}">
+      <div class="feedback-card-head">
+        ${bkmpFeedbackBoardStatusBadgeHtml(e.status)}
+        ${bkmpFeedbackBoardCategoryChipHtml(e.category)}
+        <span class="feedback-card-name">${e.isPublished ? '🌐 veröffentlicht' : '📝 Entwurf'}</span>
+      </div>
+      <p class="feedback-card-message">${bkmpFeedbackBoardEscapeHtml(e.title || '(kein Titel)')}</p>
+      <div class="feedback-card-actions">
+        <button class="edit-btn fbb-edit-btn" type="button">Bearbeiten</button>
+        <button class="del-btn" type="button" aria-label="Löschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>
+      </div>
+    </div>
+  `).join('');
+  listEl.querySelectorAll('[data-fbb-public-id]').forEach(card => {
+    const id = card.dataset.fbbPublicId;
+    card.querySelector('.fbb-edit-btn').addEventListener('click', () => bkmpFeedbackAdminEditExisting(id));
+    card.querySelector('.del-btn').addEventListener('click', async () => {
+      if (!confirm('Diesen öffentlichen Eintrag wirklich endgültig löschen?')) return;
+      try {
+        await deleteFeedbackPublicEntry(id);
+        bkmpFeedbackAdminPublicCache = bkmpFeedbackAdminPublicCache.filter(x => x.id !== id);
+        bkmpFeedbackAdminRenderPublishedList();
+        if (bkmpFeedbackAdminCurrentEntry && bkmpFeedbackAdminCurrentEntry.id === id) bkmpFeedbackAdminCloseEditor();
+        bkmpFeedbackAdminToast('Eintrag gelöscht.', 'success');
+      } catch (e) {
+        bkmpFeedbackAdminToast('Konnte nicht gelöscht werden: ' + bkmpFeedbackAdminErrorText(e), 'error');
+      }
+    });
+  });
+}
+
+function bkmpFeedbackAdminStartFromPrivate(privateEntry) {
+  const wrap = document.getElementById('fbbAdminEditorWrap');
+  if (!wrap) return;
+  bkmpFeedbackAdminCurrentEntry = {
+    id: null,
+    sourceFeedbackId: privateEntry.id,
+    kind: privateEntry.category === 'idee' ? 'idea' : 'bug',
+    title: '',
+    category: bkmpFeedbackAdminGuessCategory(privateEntry.category),
+    status: 'eingegangen',
+    description: '',
+    response: '',
+    authorMode: 'anonymous',
+    authorDisplay: '',
+    duplicateOf: null,
+    plannedRelease: '',
+    isPublished: false,
+    publishedAt: null,
+    resolvedAt: null,
+    lastPublicUpdate: null
+  };
+  bkmpFeedbackAdminCurrentProgress = [];
+  bkmpFeedbackAdminSourcePrivate = privateEntry;
+  wrap.style.display = '';
+  bkmpFeedbackAdminRenderEditor();
+  wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function bkmpFeedbackAdminEditExisting(id) {
+  const wrap = document.getElementById('fbbAdminEditorWrap');
+  if (!wrap) return;
+  const entry = bkmpFeedbackAdminPublicCache.find(x => x.id === id);
+  if (!entry) return;
+  bkmpFeedbackAdminCurrentEntry = { ...entry };
+  bkmpFeedbackAdminSourcePrivate = entry.sourceFeedbackId && typeof bkmpFeedbackCache !== 'undefined'
+    ? bkmpFeedbackCache.find(f => String(f.id) === String(entry.sourceFeedbackId)) || null
+    : null;
+  wrap.style.display = '';
+  bkmpFeedbackAdminCurrentProgress = [];
+  bkmpFeedbackAdminRenderEditor();
+  wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  try {
+    bkmpFeedbackAdminCurrentProgress = await loadFeedbackPublicProgress(id);
+    bkmpFeedbackAdminRenderEditor();
+  } catch (e) {
+    bkmpFeedbackAdminToast('Fortschritt konnte nicht geladen werden: ' + bkmpFeedbackAdminErrorText(e), 'error');
+  }
+}
+
+function bkmpFeedbackAdminCloseEditor() {
+  const wrap = document.getElementById('fbbAdminEditorWrap');
+  if (wrap) wrap.style.display = 'none';
+  bkmpFeedbackAdminCurrentEntry = null;
+  bkmpFeedbackAdminCurrentProgress = [];
+  bkmpFeedbackAdminSourcePrivate = null;
+}
+
+function bkmpFeedbackAdminRenderEditor() {
   const root = document.getElementById('fbbAdminMock');
-  if (!root || !bkmpFeedbackAdminMockEntry) return;
-  const e = bkmpFeedbackAdminMockEntry;
+  if (!root || !bkmpFeedbackAdminCurrentEntry) return;
+  const e = bkmpFeedbackAdminCurrentEntry;
   const statusOptions = Object.keys(BKMP_FEEDBACK_STATUS_META).map(k =>
     `<option value="${k}" ${k === e.status ? 'selected' : ''}>${BKMP_FEEDBACK_STATUS_META[k].icon} ${bkmpFeedbackBoardEscapeHtml(BKMP_FEEDBACK_STATUS_META[k].label)}</option>`
   ).join('');
   const categoryOptions = Object.keys(BKMP_FEEDBACK_CATEGORY_META).map(k =>
     `<option value="${k}" ${k === e.category ? 'selected' : ''}>${BKMP_FEEDBACK_CATEGORY_META[k].icon} ${bkmpFeedbackBoardEscapeHtml(BKMP_FEEDBACK_CATEGORY_META[k].label)}</option>`
   ).join('');
+  const duplicateOptions = ['<option value="">— keins —</option>'].concat(
+    bkmpFeedbackAdminPublicCache.filter(x => x.id !== e.id).map(x =>
+      `<option value="${bkmpFeedbackBoardEscapeHtml(x.id)}" ${x.id === e.duplicateOf ? 'selected' : ''}>${bkmpFeedbackBoardEscapeHtml(x.title || x.id)}</option>`
+    )
+  ).join('');
+  const authorMode = e.authorMode || 'anonymous';
 
   root.innerHTML = `
-    <div class="fbb-admin-banner">🧪 <strong>Vorschau (Prototyp, Stufe 1)</strong> — reine Bedienoberfläche mit Testdaten, noch NICHT mit der Datenbank verbunden. Änderungen hier werden nicht gespeichert und gehen bei einem Neuladen verloren.</div>
+    <div class="fbb-admin-banner">📋 <strong>${e.id ? 'Eintrag bearbeiten' : 'Neue öffentliche Version'}</strong> — schreibt jetzt echt in <code>public.feedback_public</code>. Nichts wird automatisch veröffentlicht, solange "Veröffentlicht" unten nicht angehakt und gespeichert ist.</div>
+    ${bkmpFeedbackAdminSourcePrivate ? `
+    <div class="fbb-admin-source-ref">
+      <span class="fbb-admin-preview-label">🔒 Nur für dich sichtbar — ursprüngliche Einreichung (wird nie automatisch übernommen)</span>
+      <p><strong>${bkmpFeedbackAdminSourcePrivate.name ? bkmpFeedbackBoardEscapeHtml(bkmpFeedbackAdminSourcePrivate.name) : 'Anonym'}</strong> — ${bkmpFeedbackBoardEscapeHtml(bkmpFeedbackAdminSourcePrivate.message || '')}</p>
+    </div>` : ''}
     <div class="fbb-admin-grid">
       <div class="fbb-admin-form">
         <label class="fbb-admin-publish-toggle">
-          <input type="checkbox" id="fbbAdminPublish" checked>
+          <input type="checkbox" id="fbbAdminPublish" ${e.isPublished ? 'checked' : ''}>
           <span>Veröffentlicht (auf dem öffentlichen Board sichtbar)</span>
         </label>
+        <label>Art</label>
+        <div class="fbb-admin-author-modes">
+          <label><input type="radio" name="fbbAdminKind" value="bug" ${(e.kind || 'bug') === 'bug' ? 'checked' : ''}> 🐛 Bug (Abschnitt "Bekannte Bugs")</label>
+          <label><input type="radio" name="fbbAdminKind" value="idea" ${e.kind === 'idea' ? 'checked' : ''}> 💡 Idee (Abschnitt "Ideen &amp; Community-Wünsche")</label>
+        </div>
         <label for="fbbAdminTitle">Öffentlicher Titel</label>
-        <input type="text" id="fbbAdminTitle" value="${bkmpFeedbackBoardEscapeHtml(e.title)}">
+        <input type="text" id="fbbAdminTitle" value="${bkmpFeedbackBoardEscapeHtml(e.title)}" placeholder="Kurzer, klarer Titel">
         <div class="fbb-admin-form-row">
           <div>
             <label for="fbbAdminCategory">Kategorie</label>
@@ -485,21 +719,31 @@ function bkmpFeedbackAdminMockRender() {
           </div>
         </div>
         <label for="fbbAdminDesc">Öffentliche Beschreibung</label>
-        <textarea id="fbbAdminDesc" rows="3">${bkmpFeedbackBoardEscapeHtml(e.description || '')}</textarea>
+        <textarea id="fbbAdminDesc" rows="3" placeholder="Was ist passiert, in eigenen Worten">${bkmpFeedbackBoardEscapeHtml(e.description || '')}</textarea>
         <label for="fbbAdminResponse">Öffentliche Antwort</label>
-        <textarea id="fbbAdminResponse" rows="3">${bkmpFeedbackBoardEscapeHtml(e.response || '')}</textarea>
+        <textarea id="fbbAdminResponse" rows="3" placeholder="Eure Antwort/Lösung">${bkmpFeedbackBoardEscapeHtml(e.response || '')}</textarea>
         <label for="fbbAdminPlanned">Geplante Phase / Version (optional)</label>
         <input type="text" id="fbbAdminPlanned" value="${bkmpFeedbackBoardEscapeHtml(e.plannedRelease || '')}">
+        <label for="fbbAdminDuplicateOf">Duplikat von (optional)</label>
+        <select id="fbbAdminDuplicateOf">${duplicateOptions}</select>
         <label>Fortschritt</label>
         <div class="fbb-admin-history-list" id="fbbAdminHistoryList">
-          ${e.history.map(h => `<div class="fbb-admin-history-row"><span>${bkmpFeedbackBoardFormatDate(h.date)}</span><span>${bkmpFeedbackBoardEscapeHtml(h.text)}</span></div>`).join('')}
+          ${bkmpFeedbackAdminCurrentProgress.map(p => `<div class="fbb-admin-history-row" data-progress-id="${bkmpFeedbackBoardEscapeHtml(p.id)}"><span>${bkmpFeedbackBoardFormatDate((p.created_at || '').slice(0, 10))}</span><span>${bkmpFeedbackBoardEscapeHtml(p.text)}</span><button type="button" class="fbb-admin-progress-del" aria-label="Fortschrittseintrag löschen">&times;</button></div>`).join('')}
         </div>
-        <button type="button" class="edit-btn" id="fbbAdminAddHistory">+ Fortschritt hinzufügen</button>
+        ${e.id
+          ? `<div class="fbb-admin-history-add"><input type="text" id="fbbAdminNewProgressText" placeholder="Neuer Fortschrittstext…"><button type="button" class="edit-btn" id="fbbAdminAddHistory">+ Hinzufügen</button></div>`
+          : `<p class="admin-help-text">Erst speichern, dann können Fortschrittseinträge hinzugefügt werden.</p>`}
         <label style="margin-top:0.8rem;">Anzeigename</label>
         <div class="fbb-admin-author-modes">
-          <label><input type="radio" name="fbbAdminAuthorMode" value="anonymous" checked> Anonym veröffentlicht</label>
-          <label><input type="radio" name="fbbAdminAuthorMode" value="short_name"> Gekürzter Name</label>
-          <label><input type="radio" name="fbbAdminAuthorMode" value="full_name"> Vollständiger Name (nur mit ausdrücklicher Zustimmung)</label>
+          <label><input type="radio" name="fbbAdminAuthorMode" value="anonymous" ${authorMode === 'anonymous' ? 'checked' : ''}> Anonym veröffentlicht</label>
+          <label><input type="radio" name="fbbAdminAuthorMode" value="short_name" ${authorMode === 'short_name' ? 'checked' : ''}> Gekürzter Name</label>
+          <label><input type="radio" name="fbbAdminAuthorMode" value="full_name" ${authorMode === 'full_name' ? 'checked' : ''}> Vollständiger Name (nur mit ausdrücklicher Zustimmung)</label>
+        </div>
+        <input type="text" id="fbbAdminAuthorDisplay" placeholder="Anzeigename (nur bei gekürzt/vollständig)" value="${bkmpFeedbackBoardEscapeHtml(e.authorDisplay || '')}" style="display:${authorMode === 'anonymous' ? 'none' : ''};margin-top:0.4rem;">
+        <div class="fbb-admin-form-actions">
+          <button type="button" class="btn btn-primary" id="fbbAdminSaveBtn">💾 Speichern</button>
+          <button type="button" class="edit-btn" id="fbbAdminCloseBtn">Schließen</button>
+          ${e.id ? '<button type="button" class="del-btn" id="fbbAdminDeleteBtn" aria-label="Löschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>' : ''}
         </div>
       </div>
       <div class="fbb-admin-preview-pane">
@@ -508,40 +752,110 @@ function bkmpFeedbackAdminMockRender() {
       </div>
     </div>`;
 
-  const title = document.getElementById('fbbAdminTitle');
-  const category = document.getElementById('fbbAdminCategory');
-  const status = document.getElementById('fbbAdminStatus');
-  const desc = document.getElementById('fbbAdminDesc');
-  const response = document.getElementById('fbbAdminResponse');
-  const planned = document.getElementById('fbbAdminPlanned');
-  const addHistoryBtn = document.getElementById('fbbAdminAddHistory');
-
-  function bindLive(el, prop, evt) {
-    if (!el) return;
-    el.addEventListener(evt || 'input', () => {
-      bkmpFeedbackAdminMockEntry[prop] = el.value;
-      bkmpFeedbackAdminMockRefreshPreview();
-    });
+  function val(id) { const el = document.getElementById(id); return el ? el.value : ''; }
+  function syncEntryFromForm() {
+    e.title = val('fbbAdminTitle');
+    const kindEl = document.querySelector('input[name="fbbAdminKind"]:checked');
+    e.kind = kindEl ? kindEl.value : 'bug';
+    e.category = val('fbbAdminCategory');
+    e.status = val('fbbAdminStatus');
+    e.description = val('fbbAdminDesc');
+    e.response = val('fbbAdminResponse');
+    e.plannedRelease = val('fbbAdminPlanned');
+    e.duplicateOf = val('fbbAdminDuplicateOf') || null;
+    const authorEl = document.querySelector('input[name="fbbAdminAuthorMode"]:checked');
+    e.authorMode = authorEl ? authorEl.value : 'anonymous';
+    e.authorDisplay = val('fbbAdminAuthorDisplay');
+    const publishEl = document.getElementById('fbbAdminPublish');
+    e.isPublished = publishEl ? publishEl.checked : false;
   }
-  bindLive(title, 'title');
-  bindLive(category, 'category', 'change');
-  bindLive(status, 'status', 'change');
-  bindLive(desc, 'description');
-  bindLive(response, 'response');
-  bindLive(planned, 'plannedRelease');
-  if (addHistoryBtn) addHistoryBtn.addEventListener('click', () => {
-    const today = new Date().toISOString().slice(0, 10);
-    bkmpFeedbackAdminMockEntry.history.push({ date: today, text: 'Neuer Fortschrittseintrag...' });
-    bkmpFeedbackAdminMockRender();
+  function refreshPreview() {
+    syncEntryFromForm();
+    const card = document.getElementById('fbbAdminPreviewCard');
+    if (card) card.innerHTML = bkmpFeedbackBoardEntryCardHtml(bkmpFeedbackPublicEntryToCardShape(e, bkmpFeedbackAdminCurrentProgress));
+  }
+  root.querySelectorAll('input, textarea, select').forEach(el => {
+    el.addEventListener(el.tagName === 'SELECT' || el.type === 'checkbox' || el.type === 'radio' ? 'change' : 'input', refreshPreview);
+  });
+  const authorModeRadios = root.querySelectorAll('input[name="fbbAdminAuthorMode"]');
+  authorModeRadios.forEach(r => r.addEventListener('change', () => {
+    const display = document.getElementById('fbbAdminAuthorDisplay');
+    if (display) display.style.display = r.value === 'anonymous' && r.checked ? 'none' : '';
+  }));
+
+  const saveBtn = document.getElementById('fbbAdminSaveBtn');
+  if (saveBtn) saveBtn.addEventListener('click', async () => {
+    syncEntryFromForm();
+    if (!e.title.trim()) { bkmpFeedbackAdminToast('Bitte einen Titel eintragen.', 'error'); return; }
+    saveBtn.disabled = true; saveBtn.textContent = 'Speichert…';
+    try {
+      const saved = await upsertFeedbackPublicEntry(e);
+      if (saved) {
+        bkmpFeedbackAdminCurrentEntry = saved;
+        const idx = bkmpFeedbackAdminPublicCache.findIndex(x => x.id === saved.id);
+        if (idx >= 0) bkmpFeedbackAdminPublicCache[idx] = saved; else bkmpFeedbackAdminPublicCache.unshift(saved);
+        bkmpFeedbackAdminRenderPublishedList();
+        bkmpFeedbackAdminToast('Gespeichert.', 'success');
+        bkmpFeedbackAdminRenderEditor();
+      }
+    } catch (err) {
+      bkmpFeedbackAdminToast('Konnte nicht gespeichert werden: ' + bkmpFeedbackAdminErrorText(err), 'error');
+      saveBtn.disabled = false; saveBtn.textContent = '💾 Speichern';
+    }
   });
 
-  bkmpFeedbackAdminMockRefreshPreview();
+  const closeBtn = document.getElementById('fbbAdminCloseBtn');
+  if (closeBtn) closeBtn.addEventListener('click', bkmpFeedbackAdminCloseEditor);
+
+  const deleteBtn = document.getElementById('fbbAdminDeleteBtn');
+  if (deleteBtn) deleteBtn.addEventListener('click', async () => {
+    if (!confirm('Diesen öffentlichen Eintrag wirklich endgültig löschen?')) return;
+    try {
+      await deleteFeedbackPublicEntry(e.id);
+      bkmpFeedbackAdminPublicCache = bkmpFeedbackAdminPublicCache.filter(x => x.id !== e.id);
+      bkmpFeedbackAdminRenderPublishedList();
+      bkmpFeedbackAdminCloseEditor();
+      bkmpFeedbackAdminToast('Eintrag gelöscht.', 'success');
+    } catch (err) {
+      bkmpFeedbackAdminToast('Konnte nicht gelöscht werden: ' + bkmpFeedbackAdminErrorText(err), 'error');
+    }
+  });
+
+  const addHistoryBtn = document.getElementById('fbbAdminAddHistory');
+  if (addHistoryBtn) addHistoryBtn.addEventListener('click', async () => {
+    const input = document.getElementById('fbbAdminNewProgressText');
+    const text = input ? input.value.trim() : '';
+    if (!text) return;
+    try {
+      const row = await addFeedbackPublicProgress(e.id, text, bkmpFeedbackAdminCurrentProgress.length);
+      if (row) bkmpFeedbackAdminCurrentProgress.push(row);
+      bkmpFeedbackAdminRenderEditor();
+    } catch (err) {
+      bkmpFeedbackAdminToast('Fortschritt konnte nicht gespeichert werden: ' + bkmpFeedbackAdminErrorText(err), 'error');
+    }
+  });
+  root.querySelectorAll('.fbb-admin-progress-del').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const row = btn.closest('[data-progress-id]');
+      const progressId = row ? row.dataset.progressId : null;
+      if (!progressId) return;
+      try {
+        await deleteFeedbackPublicProgress(progressId);
+        bkmpFeedbackAdminCurrentProgress = bkmpFeedbackAdminCurrentProgress.filter(p => p.id !== progressId);
+        bkmpFeedbackAdminRenderEditor();
+      } catch (err) {
+        bkmpFeedbackAdminToast('Konnte nicht gelöscht werden: ' + bkmpFeedbackAdminErrorText(err), 'error');
+      }
+    });
+  });
+
+  refreshPreview();
 }
 
-function bkmpFeedbackAdminMockInit() {
-  const root = document.getElementById('fbbAdminMock');
-  if (!root) return;
-  bkmpFeedbackAdminMockEntry = JSON.parse(JSON.stringify(BKMP_FEEDBACK_BOARD_TEST_DATA.find(x => x.id === 'demo-3')));
-  bkmpFeedbackAdminMockRender();
-}
-bkmpFeedbackAdminMockInit();
+(function bkmpFeedbackAdminInit() {
+  const listEl = document.getElementById('fbbAdminPublishedList');
+  if (!listEl) return;
+  const refreshBtn = document.getElementById('fbbAdminRefreshBtn');
+  if (refreshBtn) refreshBtn.addEventListener('click', bkmpFeedbackAdminRefreshPublicList);
+  bkmpFeedbackAdminRefreshPublicList();
+})();
