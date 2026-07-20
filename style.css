@@ -11212,6 +11212,27 @@ html.bkmp-app-mode .idle-app-more-sheet-group-title:first-child {
   html.bkmp-app-mode .idle-dmg-float { font-size: clamp(16px, 5vw, 28px); }
   html.bkmp-app-mode .idle-dmg-crit { font-size: clamp(20px, 6vw, 34px); }
 
+  /* Bug-Fix (Spieler-Meldung ChronoKora, 20.07.: "Damage-Zahlen hängen
+     beim Dungeon unter dem Balken halb"): Schadenszahlen starten bei
+     top:-6px und schweben ueber ihre Animation (idleDmgFloat, siehe
+     Basis-Regel weiter oben in dieser Datei) bis zu weitere 34px nach
+     oben - im Dungeon nimmt der Banner (#idleDungeonBanner) zusaetzlichen
+     Platz oberhalb des Schlachtfelds weg, wodurch auf schmalen Bildschirmen
+     weniger Luft ueber dem mittig ausgerichteten Dorf/Drachen bleibt, bevor
+     .idle-battlefields eigenes overflow:hidden die Zahl oben abschneidet.
+     Bewusst nur hier (mobil) statt an der globalen Animation geaendert -
+     Konnte das exakte Zusammenspiel ohne echten Spieler-Account/-Geraet
+     nicht 1:1 nachstellen, dies reduziert das Risiko unabhaengig von der
+     genauen Ursache, ohne die Desktop-Optik anzutasten (dort nicht
+     gemeldet). Kuerzerer Schwebeweg (-34px -> -20px) + kleiner positiver
+     Start-Versatz statt des leicht negativen halten die Zahl zuverlaessig
+     innerhalb des Schlachtfelds. */
+  .idle-dmg-float { top: 4px; }
+  @keyframes idleDmgFloat {
+    0% { opacity: 1; transform: translate(-50%, 0); }
+    100% { opacity: 0; transform: translate(-50%, -20px); }
+  }
+
   /* ---- Kampf-Log als Bottom-Sheet (Abschnitt 14): Inhalt/Filter-Logik
      unveraendert (siehe bkmpIdleLog in idledorf.js), nur die Verpackung
      ist neu. Gleiches Sheet-Muster wie #idleAppMoreSheet (fixed inset,
