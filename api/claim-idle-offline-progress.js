@@ -180,6 +180,44 @@ module.exports = async function handler(req, res) {
       return send(res, 502, { error: 'dragons_unavailable' });
     }
 
+    /* Bug-Fix (Spieler-Report ChronoKora 20.07., mit Screenshot: 46 Min.
+       weg, 0 Belohnung, dabei eine "Niederlage gegen Yaksha der
+       Drachenboss"-Meldung) - die Simulation kannte bisher nur Angriff/
+       Verteidigung/Krit (siehe attack/defense/critChance/critDamage oben),
+       nicht aber die drei Magie-Skilltree-Effekte, die im LIVE-Tick
+       (bkmpIdleTick, idledorf.js) tatsaechlich mitkaempfen: Brand (elem_fire,
+       DoT), Blitzschlag (elem_lightning, Bonusschlag) und die passive Dorf-
+       HP-Regeneration (villageRegenPct, aus shield_regen/repair_speed_pct/
+       heal_pct). Bei stark in den Magie-Zweig investierten Spielern kann
+       das den Unterschied zwischen "gewinnt live problemlos" und "verliert
+       hier in der vereinfachten Simulation" ausmachen - und da ein
+       verlorener Kampf unten nur um EINE Stufe zurueckfaellt (siehe
+       killIndex weiter unten), konnte ein breiter, unmodellierter Kraft-
+       unterschied das gesamte Zeitbudget in einer langen Rueckzugs-Schleife
+       verbrennen, ohne je wieder einen gewinnbaren Kampf zu finden - daher
+       exakt 0 Belohnung fuer die komplette Abwesenheit, unabhaengig von der
+       Dauer. Gleiche eigenstaendige/vereinfachte Kopie wie schon bei
+       selectDragonKindId/growthMult oben (siehe Datei-Kopf-Kommentar) -
+       deckt nur den Skilltree-Anteil dieser drei Effekte ab (Upgrades/
+       Titel/Prestige/Gilden-Tech/Runen tragen laut aktuellem Datenstand
+       nichts zu elem_fire/elem_lightning/shield_regen/repair_speed_pct/
+       heal_pct bei), keine neue Migration noetig (skill_allocations ist
+       bereits Teil der oben per "*" geladenen Zeile). */
+    const skillNodesRes = await sbFetch(serviceKey, `idle_skill_nodes?select=id,effect_type,effect_value_per_rank`);
+    const skillNodes = skillNodesRes.ok ? await skillNodesRes.json() : [];
+    const skillAlloc = state.skill_allocations || {};
+    const magicTotals = {};
+    (Array.isArray(skillNodes) ? skillNodes : []).forEach(node => {
+      const rank = Number(skillAlloc[node.id] || 0);
+      if (rank <= 0) return;
+      magicTotals[node.effect_type] = (magicTotals[node.effect_type] || 0) + rank * Number(node.effect_value_per_rank || 0);
+    });
+    // Deckel wie im Client (bkmpIdleRecomputeEffectiveStats): Math.min(60, t('elem_fire'/'elem_lightning')).
+    const fireChancePct = Math.max(0, Math.min(60, magicTotals.elem_fire || 0));
+    const lightningChancePct = Math.max(0, Math.min(60, magicTotals.elem_lightning || 0));
+    // Gleiche Gewichtung wie villageRegenPct im Client.
+    const villageRegenPct = Math.max(0, (magicTotals.shield_regen || 0) * 0.4 + (magicTotals.repair_speed_pct || 0) * 0.3 + (magicTotals.heal_pct || 0) * 0.3);
+
     // Zwei-seitige Erwartungswert-Simulation: der Drache schlaegt bei jedem
     // Treffer bis auf den letzten (der ihn toetet) zurueck, genau wie im
     // Live-Tick (bkmpIdleTick: erst Spieler-Treffer, dann - falls der
@@ -234,33 +272,62 @@ module.exports = async function handler(req, res) {
     const xpBonus = Number(state.xp_bonus || 0);
     const lootBonus = Number(state.loot_bonus || 0);
     const budgetSeconds = elapsedSeconds * efficiency;
+    // Erwartete Bonusschaden-Quelle pro Treffer aus Brand/Blitzschlag (siehe
+    // bkmpIdleTick: Brand = attack*0.18 fuer 4 Ticks bei fireChancePct%
+    // Chance, Blitzschlag = attack*0.6 bei lightningChancePct% Chance je
+    // Tick) - vereinfacht als steady-state Erwartungswert pro Treffer statt
+    // die Mehr-Tick-Auffrisch-Mechanik des Brands 1:1 nachzubilden.
+    const expectedMagicDmgPerHit = attack * ((fireChancePct / 100) * 0.18 + (lightningChancePct / 100) * 0.6);
+    // Passive Dorf-Regeneration je Tick (siehe bkmpIdleTick: villageRegenPct
+    // heilt jeden Tick einen Teil der Dorf-Max-HP) - reduziert den NETTO-
+    // Schaden, den das Dorf pro Gegenschlag tatsaechlich behaelt.
+    const regenPerTick = villageMaxHp * (villageRegenPct / 100);
 
     let guard = 0;
+    let consecutiveDefeats = 0;
     while (simulatedSeconds < budgetSeconds && guard < 200000) {
       guard += 1;
       const dragon = dragonStatsAt(killIndex, dragons, dragonCfg);
       if (!dragon) break;
-      const dmgPerHit = Math.max(1, attack * expectedCritMult - (dragon.archetype.base_defense || 0) * 0.5);
+      const dmgPerHit = Math.max(1, attack * expectedCritMult - (dragon.archetype.base_defense || 0) * 0.5 + expectedMagicDmgPerHit);
       const hitsNeeded = Math.max(1, Math.ceil(dragon.maxHp / dmgPerHit));
       const timeToKill = hitsNeeded * secondsPerTick;
       if (simulatedSeconds + timeToKill > budgetSeconds) break;
 
       // Gegenschlaege: auf allen Treffern AUSSER dem letzten (der toetet),
-      // wie im Live-Tick.
+      // wie im Live-Tick. Regen wirkt JEDEN Tick dagegen, genau wie live.
       const dragonDmgPerHit = Math.max(1, dragon.attack * dragonExpectedCritMult - defense * 0.5);
-      const villageHpLoss = Math.max(0, hitsNeeded - 1) * dragonDmgPerHit;
+      const netDragonDmgPerHit = Math.max(0, dragonDmgPerHit - regenPerTick);
+      const villageHpLoss = Math.max(0, hitsNeeded - 1) * netDragonDmgPerHit;
       if (villageHpLoss >= villageHp) {
         // Dieser Kampf wuerde das Dorf toeten - genau wie live
-        // (bkmpIdleHandleDefeat): NICHT komplett aufgeben, sondern eine
-        // Stufe zurueckfallen, Dorf-HP zuruecksetzen und dort weitergrinden.
+        // (bkmpIdleHandleDefeat): NICHT komplett aufgeben, sondern
+        // zurueckfallen, Dorf-HP zuruecksetzen und dort weitergrinden.
         // Vorher wurde hier hart abgebrochen, was bei einer einzigen zu
         // starken Stufe die GESAMTE Offline-Zeit auf 0 Belohnung setzte,
         // obwohl man im Livespiel einfach eine Stufe tiefer weiterfarmt.
-        const ticksUntilDefeat = Math.max(1, Math.ceil(villageHp / dragonDmgPerHit));
+        const ticksUntilDefeat = Math.max(1, Math.ceil(villageHp / Math.max(1, netDragonDmgPerHit)));
         const timeLost = ticksUntilDefeat * secondsPerTick;
         if (simulatedSeconds + timeLost > budgetSeconds) break;
         simulatedSeconds += timeLost;
-        if (autoAdvance) killIndex = Math.max(0, killIndex - 1);
+        /* Bug-Fix (Spieler-Report ChronoKora 20.07., siehe Kommentar bei
+           fireChancePct/lightningChancePct/villageRegenPct oben): frueher
+           IMMER nur 1 Stufe pro Niederlage zurueck - bei einem breiten,
+           unmodellierten Kraftunterschied (z.B. Magie-Boni, oder einfach
+           ein zu hoher Sprung ueber viele Stufen) konnte das ganze
+           Zeitbudget in einer langen Rueckzugs-Schleife verbrennen, ohne
+           je einen gewinnbaren Kampf zu finden - 0 Belohnung fuer die
+           komplette Abwesenheit, unabhaengig von deren Laenge. Jetzt:
+           exponentiell wachsender Rueckzug bei mehreren Niederlagen in
+           Folge (1, 2, 4, 8, ...) - findet einen gewinnbaren Kampf
+           spaetestens nach ~log2(killIndex) statt bis zu killIndex
+           einzelnen Schritten, ohne das normale "faellt eine Stufe
+           zurueck"-Verhalten beim ERSTEN Fehlschlag zu aendern. Wird bei
+           jedem erfolgreichen Kill (siehe consecutiveDefeats=0 unten)
+           wieder auf 1 zurueckgesetzt. */
+        consecutiveDefeats += 1;
+        const retreatStep = Math.min(killIndex, Math.pow(2, consecutiveDefeats - 1));
+        if (autoAdvance) killIndex = Math.max(0, killIndex - retreatStep);
         villageHp = villageMaxHp;
         continue;
       }
@@ -268,6 +335,7 @@ module.exports = async function handler(req, res) {
       simulatedSeconds += timeToKill;
       villageHp -= villageHpLoss;
       villageHp = Math.min(villageMaxHp, villageHp);
+      consecutiveDefeats = 0;
 
       const goldGrowth = growthMult(rewardCfg.goldGrowthPerKill, rewardCfg.goldGrowthExponent, killIndex);
       const xpGrowth = growthMult(rewardCfg.xpGrowthPerKill, rewardCfg.xpGrowthExponent, killIndex);
