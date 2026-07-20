@@ -1142,6 +1142,9 @@ function bkmpIdleLog(msg, skipToast) {
     line.textContent = msg;
     log.prepend(line);
     while (log.children.length > 20) log.removeChild(log.lastChild);
+    /* Phase 7.0 (20.07.): Badge-Punkt am mobilen Kampf-Log-Sheet-Button,
+       falls das Sheet gerade geschlossen ist (siehe bkmp-hud.js). */
+    if (typeof bkmpIdleCombatLogMarkUnseen === 'function') bkmpIdleCombatLogMarkUnseen();
   }
   if (!skipToast && typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(msg, 3200);
 }

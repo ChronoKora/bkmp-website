@@ -18,27 +18,46 @@ const BKMP_PROTO_NAV_ICONS = {
   upgrades: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10 16V4M4 10l6-6 6 6"/></svg>',
   skilltree: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14v-4M10 10L5 6M10 10l5-4"/><circle cx="10" cy="16" r="1.8"/><circle cx="5" cy="5" r="1.8"/><circle cx="15" cy="5" r="1.8"/></svg>',
   prestige: '<svg viewBox="0 0 20 20" fill="currentColor" stroke="none"><path d="M10 2l1.8 6.2L18 10l-6.2 1.8L10 18l-1.8-6.2L2 10l6.2-1.8z"/></svg>',
-  runen: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><polygon points="10,2 17,6 17,14 10,18 3,14 3,6"/><circle cx="10" cy="10" r="1.8" fill="currentColor" stroke="none"/></svg>'
+  runen: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><polygon points="10,2 17,6 17,14 10,18 3,14 3,6"/><circle cx="10" cy="10" r="1.8" fill="currentColor" stroke="none"/></svg>',
+  /* Phase 7.0: 2 neue Icons fuer die geaenderte Primaer-Navigation (siehe
+     BKMP_PROTO_NAV_PRIMARY unten) - gleicher schlichter Strich-Stil wie
+     die bestehenden 5, kein Emoji. */
+  drachen: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3c3 0 5 5 5 9a5 5 0 01-10 0c0-4 2-9 5-9z"/></svg>',
+  dungeon: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17V9a6 6 0 0112 0v8"/><path d="M4 17h12"/></svg>'
 };
 
+/* Phase 7.0 (20.07., Mobile-First-Redesign, Section 15/38): von 5 auf 4
+   Haupt-Tabs reduziert - Kampf/Upgrades/Drachenzucht/Dungeon sind die
+   haeufigsten Aktionen, alles andere wandert ins "Mehr"-Menue. Deckt sich
+   bewusst mit PRIMARY_TAB_IDS in bkmp-app-mode-bootstrap.js, das dieselben
+   4 IDs verwendet, um sie aus den Desktop-Gruppen-Containern zu loesen. */
 const BKMP_PROTO_NAV_PRIMARY = [
   { id: 'kampf', btn: 'idleTabBtnKampf', label: 'Kampf' },
   { id: 'upgrades', btn: 'idleTabBtnUpgrades', label: 'Upgrades' },
+  { id: 'drachen', btn: 'idleTabBtnDrachen', label: 'Drachen' },
+  { id: 'dungeon', btn: 'idleTabBtnDungeon', label: 'Dungeon' }
+];
+/* Nur noch der DESKTOP-Fallback fuer das "Mehr"-Menue (siehe
+   bkmpProtoChudToggleMoreMenu): auf schmalen Bildschirmen, auf denen
+   bkmpIdleSetupMobileTabOverflow() bereits lief (bkmp-app-mode-bootstrap.js),
+   uebernimmt stattdessen das echte, gruppierte #idleAppMoreSheet (Bottom-
+   Sheet, safe-area-bewusst) per Proxy-Klick auf #idleAppMoreBtn - diese
+   flache Liste hier wird dann gar nicht mehr gerendert/verwendet. Auf
+   breiten Bildschirmen (>760px, kein App-Modus) lief jenes Setup nie,
+   deshalb bleibt dieser Fallback fuer Desktop bestehen. Dieselben 11 IDs
+   wie MORE_GROUPS in bkmp-app-mode-bootstrap.js, nur ungruppiert. */
+const BKMP_PROTO_NAV_SECONDARY = [
   { id: 'skilltree', btn: 'idleTabBtnSkilltree', label: 'Skilltree' },
   { id: 'prestige', btn: 'idleTabBtnPrestige', label: 'Prestige' },
-  { id: 'runen', btn: 'idleTabBtnRunen', label: 'Runen' }
-];
-const BKMP_PROTO_NAV_SECONDARY = [
+  { id: 'runen', btn: 'idleTabBtnRunen', label: 'Runen' },
   { id: 'erfolge', btn: 'idleTabBtnErfolge', label: 'Erfolge' },
-  { id: 'skins', btn: 'idleTabBtnSkins', label: 'Dorf-Skins' },
-  { id: 'bestenliste', btn: 'idleTabBtnBestenliste', label: 'Bestenliste' },
-  { id: 'drachen', btn: 'idleTabBtnDrachen', label: 'Drachenzucht' },
-  { id: 'dungeon', btn: 'idleTabBtnDungeon', label: 'Dungeon' },
-  { id: 'turm', btn: 'idleTabBtnTurm', label: 'Turm' },
   { id: 'arena', btn: 'idleTabBtnArena', label: 'Arena' },
+  { id: 'bestenliste', btn: 'idleTabBtnBestenliste', label: 'Bestenliste' },
+  { id: 'turm', btn: 'idleTabBtnTurm', label: 'Turm' },
   { id: 'gilde', btn: 'idleTabBtnGilde', label: 'Gilde' },
   { id: 'gildetech', btn: 'idleTabBtnGildeTech', label: 'Gilden-Tech' },
-  { id: 'gildeboss', btn: 'idleTabBtnGildeBoss', label: 'Gildenboss' }
+  { id: 'gildeboss', btn: 'idleTabBtnGildeBoss', label: 'Gildenboss' },
+  { id: 'skins', btn: 'idleTabBtnSkins', label: 'Dorf-Skins' }
 ];
 
 let bkmpProtoChudActivePollStarted = false;
@@ -65,9 +84,22 @@ function bkmpProtoChudBuildNav() {
     });
   });
 
+  /* Phase 7.0 (Section 15/17): auf schmalen Bildschirmen, auf denen
+     bkmpIdleSetupMobileTabOverflow() (bkmp-app-mode-bootstrap.js) schon
+     lief, existiert bereits ein echtes, gruppiertes Bottom-Sheet
+     (#idleAppMoreSheet, mit safe-area-Handling, Backdrop-Klick, ESC,
+     Android-Zurueck-Integration - alles bereits fertig verdrahtet dort).
+     Der "Mehr"-Button proxied in diesem Fall EINFACH auf den echten
+     #idleAppMoreBtn, statt ein zweites/eigenes Menue zu zeigen - vermeidet
+     genau die vom Auftrag verbotene doppelte Mobil-Struktur. Auf breiten
+     Bildschirmen (>760px, kein App-Modus) existiert #idleAppMoreBtn nicht
+     (jenes Setup lief dort nie) - dort bleibt das eigene, flache Dropdown-
+     Menue unten als Fallback bestehen (unveraendertes Desktop-Verhalten). */
   const moreBtn = document.getElementById('bkmpProtoNavMoreBtn');
   if (moreBtn) moreBtn.addEventListener('click', (e) => {
     e.stopPropagation();
+    const realMoreBtn = document.getElementById('idleAppMoreBtn');
+    if (realMoreBtn) { realMoreBtn.click(); return; }
     const open = moreMenuEl.style.display !== 'none';
     if (open) bkmpProtoChudCloseMoreMenu(); else bkmpProtoChudOpenMoreMenu();
   });
@@ -153,6 +185,14 @@ function bkmpProtoChudActivateTab(realBtnId) {
 
 function bkmpProtoChudSyncActiveNav() {
   const active = typeof bkmpIdleActiveTab !== 'undefined' ? bkmpIdleActiveTab : null;
+  /* Phase 7.0: auf schmalen Bildschirmen zeigt #bkmpProtoNavMoreBtn den
+     Aktiv-Zustand des echten #idleAppMoreBtn (dessen eigener
+     MutationObserver in bkmp-app-mode-bootstrap.js schon korrekt
+     mitfuehrt, sobald einer der ins Sheet verschobenen Tabs aktiv ist) -
+     einfach gespiegelt statt ein zweites Mal berechnet. */
+  const realMoreBtn = document.getElementById('idleAppMoreBtn');
+  const protoMoreBtn = document.getElementById('bkmpProtoNavMoreBtn');
+  if (realMoreBtn && protoMoreBtn) protoMoreBtn.classList.toggle('active', realMoreBtn.classList.contains('active'));
   document.querySelectorAll('#bkmpProtoNavPrimary .bkmp-proto-nav-btn, #bkmpProtoNavMoreMenu .bkmp-proto-nav-more-item').forEach(el => {
     el.classList.toggle('active', el.dataset.protoTab === active);
   });
@@ -383,6 +423,12 @@ function bkmpProtoChudInit() {
   bkmpProtoChudSyncActiveNav();
   bkmpProtoChudRenderHud();
   bkmpProtoChudRenderStageBar();
+
+  // Phase 7.0 (20.07.): Kampf-Log-Bottom-Sheet-Wiring (siehe
+  // bkmpIdleCombatLogInit in js/ui/bkmp-hud.js) - hier statt dort
+  // aufgerufen, weil dieser Init-Punkt bereits garantiert nach dem
+  // gesamten DOM-Aufbau (index.html) laeuft, genau wie der Rest oben.
+  if (typeof bkmpIdleCombatLogInit === 'function') bkmpIdleCombatLogInit();
 }
 
 bkmpProtoChudInit();

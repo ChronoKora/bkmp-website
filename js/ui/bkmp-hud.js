@@ -502,3 +502,70 @@ function bkmpIdleHandleDragonClick(e) {
     bkmpIdleBroadcastCombatState();
   }
 }
+
+/* ---------------- Phase 7.0 (20.07.): Kampf-Log als Bottom-Sheet (mobil) ----------------
+   Reine Darstellungs-Huelle um das bestehende #idleDorfLog (siehe
+   bkmpIdleLog in idledorf.js) - Log-Inhalt/Filter-Checkbox komplett
+   unveraendert, nur ob/wie sie sichtbar sind aendert sich. Auf Desktop
+   wirkungslos (Umschalt-Button ist dort per CSS ausgeblendet, das Sheet
+   faellt auf einen normalen Block im Dokumentfluss zurueck, siehe
+   style.css @media(max-width:768px)). */
+let bkmpIdleCombatLogHasUnseen = false;
+function bkmpIdleCombatLogMarkUnseen() {
+  const sheet = document.getElementById('idleCombatLogSheet');
+  if (sheet && sheet.classList.contains('open')) return; // sichtbar - kein Badge noetig
+  bkmpIdleCombatLogHasUnseen = true;
+  const badge = document.getElementById('idleCombatLogBadge');
+  if (badge) badge.style.display = 'inline-block';
+}
+/* Bug-Fix (beim eigenen Testen per getComputedStyle gefunden): das Sheet
+   sitzt im Markup bewusst INNERHALB von #idlePanelKampf (damit es auf
+   Desktop unveraendert an Ort und Stelle im Dokumentfluss rendert, siehe
+   index.html-Kommentar dort). #idlePanelKampf ist aber ein direktes Kind
+   von .idle-dorf-card und bekommt darueber position:relative;z-index:1
+   (".idle-dorf-overlay .idle-dorf-card > *", siehe style.css) - das
+   erzeugt einen eigenen Stacking-Context, in dem JEDES z-index (auch das
+   eigene z-index:49 des Sheets) gefangen bleibt: .joke-buttons (Schliessen/
+   Fuer-Streamer-Zeile) ist ein GESCHWISTER von #idlePanelKampf mit
+   gleichem z-index:1, steht aber SPAETER im DOM und malt dadurch trotzdem
+   ueber das gesamte #idlePanelKampf inkl. Sheet drüber - unabhaengig vom
+   eigenen z-index. Exakt dieselbe Ursache/derselbe Fix wie beim "Mehr"-
+   Menue (siehe bkmpProtoChudEscapeToOverlay in bkmp-proto-compact-hud.js):
+   das Sheet wird beim OEFFNEN einmalig zu einem echten Geschwister auf
+   #idleDorfOverlay-Ebene umgehaengt (Portal-Pattern) - auf Desktop nie
+   ausgeloest, da der dafuer noetige Umschalt-Button dort per CSS
+   ausgeblendet bleibt. */
+function bkmpIdleCombatLogEscapeToOverlay(sheetEl) {
+  const overlay = document.getElementById('idleDorfOverlay');
+  if (sheetEl && overlay && sheetEl.parentElement !== overlay) overlay.appendChild(sheetEl);
+}
+function bkmpIdleCombatLogOpen() {
+  const sheet = document.getElementById('idleCombatLogSheet');
+  const btn = document.getElementById('idleCombatLogToggleBtn');
+  bkmpIdleCombatLogEscapeToOverlay(sheet);
+  if (sheet) sheet.classList.add('open');
+  if (btn) btn.setAttribute('aria-expanded', 'true');
+  bkmpIdleCombatLogHasUnseen = false;
+  const badge = document.getElementById('idleCombatLogBadge');
+  if (badge) badge.style.display = 'none';
+}
+function bkmpIdleCombatLogClose() {
+  const sheet = document.getElementById('idleCombatLogSheet');
+  const btn = document.getElementById('idleCombatLogToggleBtn');
+  if (sheet) sheet.classList.remove('open');
+  if (btn) btn.setAttribute('aria-expanded', 'false');
+}
+function bkmpIdleCombatLogInit() {
+  const toggleBtn = document.getElementById('idleCombatLogToggleBtn');
+  const closeBtn = document.getElementById('idleCombatLogCloseBtn');
+  const sheet = document.getElementById('idleCombatLogSheet');
+  if (!toggleBtn || !sheet) return;
+  toggleBtn.addEventListener('click', () => {
+    if (sheet.classList.contains('open')) bkmpIdleCombatLogClose(); else bkmpIdleCombatLogOpen();
+  });
+  if (closeBtn) closeBtn.addEventListener('click', bkmpIdleCombatLogClose);
+  sheet.addEventListener('click', (e) => { if (e.target === sheet) bkmpIdleCombatLogClose(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && sheet.classList.contains('open')) bkmpIdleCombatLogClose();
+  });
+}

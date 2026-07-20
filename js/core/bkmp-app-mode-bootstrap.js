@@ -39,27 +39,30 @@
          ECHTEN Button-Elemente, keine Kopie) in ein ausklappbares
          Menue - die Klick-Listener aus bkmpIdleInitTabs bleiben dadurch
          unveraendert erhalten, idledorf.js wird nicht angefasst. */
-      /* Nutzer-Wunsch nach Live-Test: nur noch 3 grosse Haupt-Tabs
-         statt 5 - Kampf (Kernschleife), Dungeon (haeufigste
-         Progression/Schluessel-Ressource), Gilde (sozial + Gildenboss).
-         Dorf-Skins/Drachenzucht wandern zu den anderen 9 ins
-         Mehr-Menue - seltener gecheckte Sammel-/Kosmetik-Bereiche. */
-      var PRIMARY_TAB_IDS = ['idleTabBtnKampf', 'idleTabBtnDungeon', 'idleTabBtnGilde'];
+      /* Phase 7.0 (20.07., Mobile-First-Redesign): auf 4 Haupt-Tabs
+         umgestellt - Kampf (Kernschleife), Upgrades (haeufigste Aktion),
+         Drachenzucht (Kernschleife), Dungeon (haeufigste Progression/
+         Schluessel-Ressource) - deckt sich mit BKMP_PROTO_NAV_PRIMARY in
+         bkmp-proto-compact-hud.js, das dieselben 4 IDs per Proxy-Klick
+         anspricht. Gilde wandert dafuer in die eigene "Gilde"-Gruppe
+         unten (zusammen mit Gilden-Tech/Gildenboss, statt vorher allein
+         oben) - inhaltlich naeher beieinander als neben Kampf/Dungeon. */
+      var PRIMARY_TAB_IDS = ['idleTabBtnKampf', 'idleTabBtnUpgrades', 'idleTabBtnDrachen', 'idleTabBtnDungeon'];
       var tabsBar = document.getElementById('idleDorfTabs');
       var moreSheet = document.getElementById('idleAppMoreSheet');
       var moreSheetGrid = document.getElementById('idleAppMoreSheetGrid');
       if (!tabsBar || !moreSheet || !moreSheetGrid) return;
       if (document.getElementById('idleAppMoreBtn')) return; // schon eingerichtet (z.B. erneuter Aufruf)
 
-      /* Recherche-Ergaenzung: verwandte Punkte im "Mehr"-Menue nach
-         Kategorie gruppieren statt als eine flache 3x3-Liste (siehe
-         NN/g-Subnavigations-Muster) - macht 9 Eintraege deutlich
-         schneller erfassbar. */
+      /* Phase 7.0: Gruppen an die vom Nutzer vorgegebene Struktur
+         angeglichen (FORTSCHRITT/KAMPF UND RANG/GILDE/SAMMLUNG) - deckt
+         jetzt alle 11 nicht-primaeren Tabs ab (vorher fehlte Turm/
+         Skilltree/Prestige/Runen/Erfolge waren anders verteilt). */
       var MORE_GROUPS = [
-        { title: '📈 Fortschritt', ids: ['idleTabBtnUpgrades', 'idleTabBtnSkilltree', 'idleTabBtnPrestige', 'idleTabBtnRunen'] },
-        { title: '⚔️ Kampf & Rang', ids: ['idleTabBtnArena', 'idleTabBtnBestenliste'] },
-        { title: '🛡️ Gilde', ids: ['idleTabBtnGildeTech', 'idleTabBtnGildeBoss'] },
-        { title: '🏆 Sammlung', ids: ['idleTabBtnErfolge', 'idleTabBtnSkins', 'idleTabBtnDrachen'] }
+        { title: '📈 Fortschritt', ids: ['idleTabBtnSkilltree', 'idleTabBtnPrestige', 'idleTabBtnRunen', 'idleTabBtnErfolge'] },
+        { title: '⚔️ Kampf & Rang', ids: ['idleTabBtnArena', 'idleTabBtnBestenliste', 'idleTabBtnTurm'] },
+        { title: '🛡️ Gilde', ids: ['idleTabBtnGilde', 'idleTabBtnGildeTech', 'idleTabBtnGildeBoss'] },
+        { title: '🏆 Sammlung', ids: ['idleTabBtnSkins'] }
       ];
       var allTabs = Array.prototype.slice.call(tabsBar.querySelectorAll('.idle-dorf-tab'));
       var byId = {};

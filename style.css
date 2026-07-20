@@ -11020,7 +11020,13 @@ html.bkmp-app-mode .idle-app-more-sheet-group-title:first-child {
 }
 .bkmp-proto-stagebar-icon-btn.is-on { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); }
 
-@media (max-width: 760px) {
+/* Phase 7.0 Nachbesserung (20.07., beim eigenen Testen bei 800x369
+   gefunden): reines max-width:760px erreicht viele quer gehaltene
+   Telefone nicht (haeufig 700-950px breit) - ohne die Landscape-
+   Bedingung blieb u.a. die fixierte Bottom-Nav (#bkmpProtoCompactNav
+   weiter unten in diesem Block) im Querformat wirkungslos und fiel in
+   den normalen Dokumentfluss zurueck. Komma = ODER-Verknuepfung. */
+@media (max-width: 760px), (max-height: 500px) and (orientation: landscape) {
   .bkmp-proto-chud-row { flex-wrap: wrap; }
   .bkmp-proto-chud-xp { flex-basis: 100%; order: 3; }
   /* FIX (18.07., beim Testen gefunden): "left:0" drehte den Anker auf die
@@ -11030,14 +11036,212 @@ html.bkmp-app-mode .idle-app-more-sheet-group-title:first-child {
      RECHTS weiter ueber die Kartenkante hinaus, statt nach links in den
      vorhandenen Platz hinein. right:0 (aus der Basisregel geerbt) ist
      die richtige Ankerseite fuer JEDE Fensterbreite - hier nur noch die
-     Spaltenzahl/Breite fuer schmale Bildschirme anpassen. */
+     Spaltenzahl/Breite fuer schmale Bildschirme anpassen. Gilt nur noch
+     als Desktop-Fallback-Dropdown (siehe bkmpProtoChudBuildNav) - auf
+     schmalen Bildschirmen mit echtem App-Modus-Setup wird stattdessen
+     #idleAppMoreSheet geoeffnet, diese Regeln hier greifen dann gar nicht. */
   .bkmp-proto-nav-more-menu { grid-template-columns: 1fr; width: min(200px, calc(100vw - 2rem)); }
-  .bkmp-proto-nav-btn span.bkmp-proto-nav-label { display: none; }
-  .bkmp-proto-nav-btn { padding: 0.42rem 0.55rem; min-height: 44px; }
   .bkmp-proto-stagebar-btn { font-size: 0.7rem; padding: 0.3rem 0.5rem; min-height: 44px; }
   /* a11y: 44x44px Mindest-Touch-Ziel (gleiche Konvention wie Section B/C) */
   .bkmp-proto-chud-icon-btn, .bkmp-proto-nav-more-btn, .bkmp-proto-stagebar-icon-btn { min-width: 44px; min-height: 44px; }
+
+  /* Phase 7.0 (20.07., Mobile-First-Redesign, Section 15/18): echte
+     fixierte Bottom-Navigation statt einer im Dokumentfluss mitscrollenden
+     Zeile - vorher hatte .bkmp-proto-nav ueberhaupt kein position:fixed,
+     obwohl der Auftrag genau das explizit verlangt ("fixe mobile Bottom-
+     Navigation"). Gleiches Muster wie die bereits bestehende App-Modus-
+     Bottom-Leiste (html.bkmp-app-mode .idle-dorf-tabs, siehe weiter oben
+     in dieser Datei) - dieselbe Karte hat dort bereits transform:none!
+     important erzwungen (".idle-dorf-overlay .idle-dorf-card" im selben
+     @media-Block), sonst wuerde die eigene Oeffnen-Animation der Karte
+     "position:fixed" hier in "relativ zur Karte" statt "relativ zum
+     Viewport" verwandeln (CSS containing-block-Regel bei transform auf
+     einem Vorfahren) - kein zusaetzlicher Fix noetig, gilt automatisch
+     auch fuer dieses neue fixierte Element, weil es im selben Karten-
+     Teilbaum haengt.
+     ZWEITE Spezifitaets-Falle (beim Testen per getComputedStyle
+     gefunden): ".idle-dorf-overlay .idle-dorf-card > *" (Spezifitaet
+     0,0,2,0, siehe weiter oben in dieser Datei) erzwingt position:relative
+     auf JEDES direkte Kind der Karte, darunter auch dieses Nav-Element -
+     schlaegt eine reine ".bkmp-proto-nav"-Klassenregel (0,0,1,0) unabhaengig
+     von der Position im Stylesheet. Deshalb hier zusaetzlich per ID
+     (#bkmpProtoCompactNav, Spezifitaet 0,1,1,0) angesprochen. */
+  #bkmpProtoCompactNav.bkmp-proto-nav {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 50;
+    margin-bottom: 0;
+    gap: 0.3rem;
+    padding: 0.4rem 0.5rem calc(0.45rem + env(safe-area-inset-bottom));
+    background: linear-gradient(180deg, transparent, rgba(10, 8, 20, .55) 25%, rgba(10, 8, 20, .92));
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  .bkmp-proto-nav-primary { flex: 1; justify-content: space-around; gap: 0.2rem; }
+  .bkmp-proto-nav-btn {
+    flex: 1 1 0; min-width: 0;
+    flex-direction: column; justify-content: center; gap: 0.15rem;
+    padding: 0.3rem 0.2rem; min-height: 52px;
+  }
+  .bkmp-proto-nav-btn span.bkmp-proto-nav-label { font-size: 0.62rem; white-space: nowrap; }
+  .bkmp-proto-nav-more-wrap { flex: 1 1 0; min-width: 0; margin-left: 0; }
+  .bkmp-proto-nav-more-btn {
+    width: 100%; height: 100%;
+    display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 0.15rem;
+    padding: 0.3rem 0.2rem; min-height: 52px;
+    background: transparent; border-color: transparent;
+    font-size: 0.62rem;
+  }
+  .bkmp-proto-nav-more-btn.active { color: var(--gold); background: color-mix(in srgb, var(--gold) 12%, transparent); border-color: color-mix(in srgb, var(--gold) 35%, transparent); }
+  /* Content darf nicht hinter der jetzt fixierten Leiste enden - dieselbe
+     Reservierung wie html.bkmp-app-mode .idle-dorf-overlay .idle-dorf-card
+     (padding-bottom: calc(6rem + safe-area)) im selben Block weiter oben
+     deckt diese ~60-70px hohe Leiste bereits mit ab, kein weiterer Wert
+     noetig. */
 }
 @media (prefers-reduced-motion: reduce) {
   .bkmp-proto-chud-icon-btn, .bkmp-proto-nav-btn, .bkmp-proto-nav-more-btn { transition: none; }
+}
+
+/* ============================================================
+   PHASE 7.0 (20.07.) - Mobile-First-Redesign, erste Abnahmestufe
+   (Auftrag Abschnitt 38): Schlachtfeld/Dorf/Drache/HP-Leisten/
+   Schadenszahlen/Kampf-Log-Sheet. Alle anderen Tabs folgen erst nach
+   Freigabe (Abschnitt 39). Reine Darstellung, keine Spielwerte/Formeln
+   geaendert (Abschnitt 40). Bewusst als eigener, klar markierter Block
+   ans Dateiende angehaengt (gleiches Isolations-Muster wie "Prototyp 2"
+   oben) - Quellreihenfolge gibt ihm automatisch Vorrang vor den
+   aelteren, bereits bestehenden .idle-battlefield/.idle-village/
+   .idle-dragon/.idle-dmg-float-Regeln weiter oben in dieser Datei, ohne
+   dass eine einzige davon angefasst/geloescht werden musste (geringstes
+   Risiko fuer Desktop-Regressionen). Die vorbestehenden zwei sich
+   teilweise ueberschneidenden html.bkmp-app-mode .idle-battlefield-
+   Bloecke (~Zeile 9033 und ~9467, letzterer gewinnt schon heute in der
+   Kaskade) wurden bewusst NICHT konsolidiert - beide sind unconditional
+   (kein @media), ein Fehler beim blinden Zusammenfuehren haette sofort
+   Desktop-Optik veraendert. Bleibt als dokumentiertes Aufraeum-Follow-up
+   fuer Phase 7 (siehe CLAUDE.md-Backlog), nicht Teil dieser Stufe. */
+
+.idle-combat-log-toggle {
+  display: none;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.5rem 0;
+  padding: 0.55rem 0.8rem;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 44px;
+}
+.idle-combat-log-badge {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--gold, #c9a24b);
+}
+
+/* Portrait ODER Querformat-Telefon (Abschnitt 29): reines max-width:768px
+   greift bei einem quer gehaltenen Telefon oft NICHT (viele Telefone sind
+   im Querformat 700-950px breit, z.B. 932px bei einem grossen iPhone) -
+   beim eigenen Testen bei 800x369 gefunden: ohne die Breiten-Bedingung
+   blieb die fixierte Bottom-Nav aus und fiel zurueck in den normalen
+   Dokumentfluss, obwohl das Schlachtfeld selbst (siehe eigene
+   @media(max-height:500px)-Regel weiter unten) schon korrekt kompakter
+   wurde - halbe Umstellung, HUD/Nav sahen weiterhin nach Desktop aus.
+   Komma-getrennt = ODER-Verknuepfung zwischen den beiden Bedingungen. */
+@media (max-width: 768px), (max-height: 500px) and (orientation: landscape) {
+  /* ---- Schlachtfeld: Untergrenze/Obergrenze fuer die schon bestehende
+     Flex-Wachsen-Groesse (Abschnitt 6). WICHTIG (beim Testen per
+     getComputedStyle gefunden): html.bkmp-app-mode #idlePanelKampf
+     .idle-battlefield setzt bereits "flex:1 1 auto!important;min-height:
+     0!important" (Kommentar dort: "APP-MODUS REDESIGN PHASE 13", loest
+     bewusst den alten Bug "riesige leere Flaeche unters Schlachtfeld" -
+     das Feld waechst seitdem per Flexbox, um genau den nach HUD/Nav/
+     Aktionsleiste uebrigen Platz zu fuellen, KEIN fester height-Wert.
+     Ein einfaches height:clamp(...) waere von diesem !important
+     ignoriert worden UND haette den Bug wieder reaktiviert. Deshalb hier
+     bewusst dieselbe Selektor-Spezifitaet (html.bkmp-app-mode
+     #idlePanelKampf .idle-battlefield) + eigenes !important, aber nur als
+     Ober-/Untergrenze um das bestehende Wachsen herum - kein height,
+     das Wachsen bleibt erhalten. */
+  html.bkmp-app-mode #idlePanelKampf .idle-battlefield {
+    min-height: clamp(340px, 54dvh, 620px) !important;
+    max-height: 620px !important;
+    width: 100%;
+  }
+  /* ---- Dorf/Drache-Breite (Abschnitt 7/8): Drache als "Gegner" bewusst
+     sichtbar groesser als das Dorf, beide innerhalb der vorgegebenen
+     Bandbreite (Dorf 38-48%, Drache 45-65%). */
+  html.bkmp-app-mode .idle-village { width: 42%; }
+  html.bkmp-app-mode .idle-dragon { width: 50%; }
+
+  /* ---- HP-Leisten (Abschnitt 9/10): Mindestschriftgroesse fuer die
+     Zahlenanzeige (vorher 0.7rem/11.2px, am unteren Rand der Vorgabe). */
+  .idle-hp-label { font-size: 0.75rem; }
+
+  /* ---- Schadenszahlen (Abschnitt 11): responsiv statt fixer rem-Werte,
+     exakte Bandbreite aus dem Auftrag. Bleiben weiterhin Kinder von
+     #idleDragon/#idleVillage (siehe bkmpIdleSpawnProjectile/
+     bkmpIdleSpawnClickDamage in js/ui/bkmp-hud.js) - spawnen also bereits
+     am Drachen/Dorf selbst, nicht frei schwebend irgendwo im Fenster. */
+  html.bkmp-app-mode .idle-dmg-float { font-size: clamp(16px, 5vw, 28px); }
+  html.bkmp-app-mode .idle-dmg-crit { font-size: clamp(20px, 6vw, 34px); }
+
+  /* ---- Kampf-Log als Bottom-Sheet (Abschnitt 14): Inhalt/Filter-Logik
+     unveraendert (siehe bkmpIdleLog in idledorf.js), nur die Verpackung
+     ist neu. Gleiches Sheet-Muster wie #idleAppMoreSheet (fixed inset,
+     Backdrop, translateY-Animation, safe-area-Padding). */
+  .idle-combat-log-toggle { display: flex; }
+  .idle-combat-log-sheet {
+    position: fixed; inset: 0; z-index: 49;
+    display: flex; align-items: flex-end; justify-content: center;
+    background: rgba(0, 0, 0, 0);
+    pointer-events: none;
+    transition: background .25s ease;
+  }
+  .idle-combat-log-sheet.open { background: rgba(0, 0, 0, .55); pointer-events: auto; }
+  .idle-combat-log-sheet-card {
+    width: 100%;
+    max-height: 58dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: .9rem 1rem calc(1rem + env(safe-area-inset-bottom));
+    background: var(--paper);
+    border-top: 1px solid var(--line);
+    border-radius: 22px 22px 0 0;
+    box-shadow: 0 -20px 50px rgba(0, 0, 0, .4);
+    transform: translateY(100%);
+    transition: transform .3s cubic-bezier(.32, .72, 0, 1);
+  }
+  .idle-combat-log-sheet.open .idle-combat-log-sheet-card { transform: translateY(0); }
+  .idle-combat-log-sheet-handle {
+    width: 42px; height: 4px; border-radius: 999px;
+    background: var(--line); margin: 0 auto .8rem;
+  }
+  .idle-combat-log-sheet-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: .6rem; font-weight: 800; font-size: .95rem;
+  }
+  .idle-combat-log-close {
+    width: 36px; height: 36px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--paper-2); color: var(--muted);
+    font-size: 1rem; cursor: pointer;
+  }
+}
+
+/* ---- Querformat (Abschnitt 29): kompakteres, breiteres Schlachtfeld auf
+   kurzen Bildschirmen (Telefon quer) statt der hohen Portrait-Bandbreite
+   von oben - eigene, engere @media-Bedingung (max-height statt Breite),
+   greift nur bei tatsaechlich flachen Viewports, nicht auf Tablet-
+   Querformat (das bleibt bei der Portrait-Bandbreite, ausreichend Platz
+   vorhanden). */
+@media (max-height: 500px) and (orientation: landscape) {
+  /* Gleiche Spezifitaets-/!important-Ueberlegung wie beim Portrait-Block
+     oben (html.bkmp-app-mode #idlePanelKampf .idle-battlefield). */
+  html.bkmp-app-mode #idlePanelKampf .idle-battlefield {
+    min-height: clamp(200px, 62dvh, 360px) !important;
+    max-height: 360px !important;
+  }
 }

@@ -108,7 +108,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260720-moresheetfix1">
+<link rel="stylesheet" href="style.css?v=20260720-phase7stage1e">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 </head>
 <body>
@@ -761,11 +761,32 @@
         </div>
 
         <button type="button" class="idle-adfree-btn" id="idleAdFreeBtn" style="display:none;">AD-Free &ndash; nur 99$</button>
-        <label class="idle-dorf-log-filter" for="idleLogLegendaryOnlyToggle">
-          <input type="checkbox" id="idleLogLegendaryOnlyToggle">
-          Nur legendäre Runenfunde im Log
-        </label>
-        <div class="idle-dorf-log" id="idleDorfLog"></div>
+
+        <!-- Phase 7.0 (20.07., Mobile-First-Redesign): auf schmalen
+             Bildschirmen ist das Kampf-Log jetzt standardmaessig
+             geschlossen (Bottom-Sheet) statt permanent Platz unter dem
+             Schlachtfeld zu belegen - auf Desktop unveraendert direkt
+             sichtbar (Umschalt-Button + Sheet-Huelle sind nur mobil
+             wirksam, siehe style.css). #idleDorfLog/die Filter-Checkbox
+             und ihre gesamte Logik (bkmpIdleLog etc.) bleiben exakt wie
+             zuvor - reine Darstellungs-Verpackung. -->
+        <button type="button" class="idle-combat-log-toggle" id="idleCombatLogToggleBtn" aria-expanded="false" aria-controls="idleCombatLogSheet">
+          📜 Kampf-Log <span class="idle-combat-log-badge" id="idleCombatLogBadge" style="display:none;"></span>
+        </button>
+        <div class="idle-combat-log-sheet" id="idleCombatLogSheet">
+          <div class="idle-combat-log-sheet-card">
+            <div class="idle-combat-log-sheet-handle"></div>
+            <div class="idle-combat-log-sheet-header">
+              <span>📜 Kampf-Log</span>
+              <button type="button" class="idle-combat-log-close" id="idleCombatLogCloseBtn" aria-label="Kampf-Log schließen">✕</button>
+            </div>
+            <label class="idle-dorf-log-filter" for="idleLogLegendaryOnlyToggle">
+              <input type="checkbox" id="idleLogLegendaryOnlyToggle">
+              Nur legendäre Runenfunde im Log
+            </label>
+            <div class="idle-dorf-log" id="idleDorfLog"></div>
+          </div>
+        </div>
       </div>
 
       <div class="idle-dorf-panel" id="idlePanelUpgrades" style="display:none;"></div>
@@ -1407,18 +1428,18 @@
   <script src="js/systems/bkmp-skilltree.js?v=20260717-p2bfoundation" defer></script>
   <script src="js/systems/bkmp-cosmetics.js?v=20260719-fixbatch3" defer></script>
   <script src="js/systems/bkmp-events.js?v=20260719-p55g" defer></script>
-  <script src="js/ui/bkmp-hud.js?v=20260720-realtimethrottle1" defer></script>
+  <script src="js/ui/bkmp-hud.js?v=20260720-phase7stage1d" defer></script>
   <script src="js/systems/bkmp-leaderboard.js?v=20260717-p2cfoundation" defer></script>
   <script src="js/ui/bkmp-ui-components.js?v=20260719-p55b" defer></script>
   <script src="js/ui/bkmp-reward-presenter.js?v=20260719-p55e" defer></script>
-  <script src="idledorf.js?v=20260719-fixbatch6" defer></script>
+  <script src="idledorf.js?v=20260720-phase7stage1" defer></script>
   <script src="mapart.js?v=20260717-kartenfirmen1" defer></script>
   <script src="js/core/bkmp-idle-bootstrap.js?v=20260717-p2afoundation" defer></script>
   <script src="js/core/bkmp-site.js?v=20260720-pollfix1" defer></script>
-  <script src="js/core/bkmp-app-mode-bootstrap.js?v=20260719-fixbatch1" defer></script>
+  <script src="js/core/bkmp-app-mode-bootstrap.js?v=20260720-phase7stage1" defer></script>
   <!-- PROTOTYP 2 (18.07., isoliert & jederzeit entfernbar) - siehe Kommentar
        in js/prototype/bkmp-proto-compact-hud.js. Laedt bewusst zuletzt. -->
-  <script src="js/prototype/bkmp-proto-compact-hud.js?v=20260719-fxtoggles2" defer></script>
+  <script src="js/prototype/bkmp-proto-compact-hud.js?v=20260720-phase7stage1" defer></script>
 
 </body>
 </html>
