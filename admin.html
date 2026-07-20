@@ -20,7 +20,7 @@
 <title>BKMP — Admin</title>
 
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
-<link rel="stylesheet" href="style.css?v=20260720-dmgclipfix1">
+<link rel="stylesheet" href="style.css?v=20260720-feedbackboard3">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 </head>
 <body>
@@ -901,6 +901,11 @@
             </label>
             <div class="feedback-list" id="feedbackList"></div>
           </div>
+          <!-- Oeffentliches Feedback-/Status-Board: Admin-Workflow-Vorschau
+               (Stufe 1, 20.07.2026, siehe js/ui/bkmp-feedback-board.js) -
+               reiner UI-Prototyp mit lokalen Testdaten, keine Datenbank-
+               Anbindung. Ersetzt NICHT die Liste oben. -->
+          <div class="admin-section" id="fbbAdminMock"></div>
         </section>
 
         <!-- Spieler-Verwaltung -->
@@ -990,6 +995,9 @@
   <script src="js/ui/bkmp-hud.js?v=20260720-phase7stage1d"></script>
   <script src="js/systems/bkmp-leaderboard.js?v=20260717-p2cfoundation"></script>
   <script src="js/ui/bkmp-ui-components.js?v=20260719-p55b"></script>
+  <!-- Feedback-/Status-Board Stufe 1 (20.07.2026) - speist hier nur die
+       Admin-Workflow-Vorschau (#fbbAdminMock), reine Testdaten. -->
+  <script src="js/ui/bkmp-feedback-board.js?v=20260720-stufe1proto1"></script>
   <script src="idledorf.js?v=20260720-afkracefix1"></script>
   <script src="js/core/bkmp-idle-bootstrap.js?v=20260717-p2afoundation"></script>
   <script src="mapart.js?v=20260717-kartenfirmen1"></script>

@@ -108,7 +108,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260720-dmgclipfix1">
+<link rel="stylesheet" href="style.css?v=20260720-feedbackboard3">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 </head>
 <body>
@@ -160,9 +160,17 @@
       <img id="bkmpBonkImg" src="assets/bonk-idle.png" alt="" width="56" height="56" decoding="async">
       <span class="bonk-count" id="bkmpBonkCount" aria-hidden="true"></span>
     </button>
-    <button class="pill-btn feedback-btn" id="feedbackButton" type="button" aria-label="Feedback geben">
-      <span aria-hidden="true">💬</span><span class="feedback-btn-label">Feedback</span>
-    </button>
+    <div class="feedback-btn-group">
+      <button class="pill-btn feedback-btn" id="feedbackButton" type="button" aria-label="Feedback geben">
+        <span aria-hidden="true">💬</span><span class="feedback-btn-label">Feedback</span>
+      </button>
+      <!-- Neues Feedback-/Status-Board (Stufe 1, 20.07.2026, reiner UI-Prototyp
+           mit lokalen Testdaten, siehe js/ui/bkmp-feedback-board.js) - ersetzt
+           NICHT den Button links, oeffnet ein eigenes, separates Panel. -->
+      <button class="pill-btn feedback-status-btn" id="feedbackStatusButton" type="button" aria-label="Bekannte Bugs und Feedback-Status ansehen">
+        <span aria-hidden="true">📋</span><span class="feedback-btn-label">Status</span>
+      </button>
+    </div>
     <img class="opsucht-logo" src="assets/opsucht-logo.webp" alt="OPSUCHT.net" width="130" height="41">
   </div>
 
@@ -1261,6 +1269,13 @@
           <option value="bug">🐛 Bug</option>
           <option value="sonstiges">📌 Sonstiges</option>
         </select>
+        <!-- Duplikat-Vermeidung (Auftrag Abschnitt 12, Stufe 1) - reiner
+             Hinweis, blockiert das Formular NICHT. Oeffnet dasselbe
+             #feedbackStatusOverlay wie der Button oben im Kopfbereich. -->
+        <div class="feedback-duplicate-hint">
+          <span>Prüfe bitte kurz, ob dein Problem bereits bekannt ist.</span>
+          <button type="button" class="feedback-duplicate-hint-btn" id="feedbackViewKnownBugsBtn">Bekannte Bugs ansehen</button>
+        </div>
         <label for="feedbackMessage">Nachricht</label>
         <textarea id="feedbackMessage" placeholder="Was möchtest du uns sagen?" rows="5" maxlength="2000"></textarea>
         <label for="feedbackImageFile">Bild (optional)</label>
@@ -1276,6 +1291,32 @@
           <button class="btn-ja" id="feedbackSuccessClose" type="button">Schließen</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       Oeffentliches Feedback-, Bug- und Entwicklungsboard (Stufe 1,
+       20.07.2026) - reiner UI-Prototyp mit lokalen Testdaten, siehe
+       js/ui/bkmp-feedback-board.js. Ersetzt NICHT #feedbackOverlay oben
+       (private Einreichung bleibt unveraendert der einzige Einreichweg).
+       Kein role="dialog" mit trap-Fokus-Bibliothek noetig - einfacher,
+       eigener Fokus-/Escape-Handler in bkmp-feedback-board.js, gleiches
+       Grundmuster wie die bestehenden .joke-overlay-Popups.
+       ============================================================ -->
+  <div class="joke-overlay feedback-status-overlay" id="feedbackStatusOverlay">
+    <div class="fbb-panel" id="feedbackStatusPanel" role="dialog" aria-modal="true" aria-labelledby="feedbackStatusTitle">
+      <div class="fbb-panel-handle" aria-hidden="true"></div>
+      <div class="fbb-header">
+        <h3 id="feedbackStatusTitle">📋 Feedback &amp; Status</h3>
+        <button type="button" class="fbb-close" id="feedbackStatusClose" aria-label="Schließen">&times;</button>
+      </div>
+      <div class="fbb-summary" id="feedbackStatusSummary"></div>
+      <div class="fbb-controls">
+        <div class="fbb-filters" id="feedbackStatusFilters" role="tablist" aria-label="Nach Status filtern"></div>
+        <input type="search" class="fbb-search" id="feedbackStatusSearch" placeholder="🔍 Titel oder Beschreibung durchsuchen…" aria-label="Feedback durchsuchen">
+      </div>
+      <div class="fbb-scroll" id="feedbackStatusBody"></div>
+      <p class="fbb-footnote">Nur ausgewählte, vom Team freigegebene Einträge sind hier sichtbar. Alles, was du einreichst, bleibt zunächst privat.</p>
     </div>
   </div>
 
@@ -1436,6 +1477,9 @@
   <script src="mapart.js?v=20260717-kartenfirmen1" defer></script>
   <script src="js/core/bkmp-idle-bootstrap.js?v=20260717-p2afoundation" defer></script>
   <script src="js/core/bkmp-site.js?v=20260720-pollfix1" defer></script>
+  <!-- Feedback-/Status-Board Stufe 1 (20.07.2026) - eigenstaendig, reine
+       lokale Testdaten, siehe Datei-Kopf-Kommentar. -->
+  <script src="js/ui/bkmp-feedback-board.js?v=20260720-stufe1proto1" defer></script>
   <script src="js/core/bkmp-app-mode-bootstrap.js?v=20260720-nav6btn1" defer></script>
   <!-- PROTOTYP 2 (18.07., isoliert & jederzeit entfernbar) - siehe Kommentar
        in js/prototype/bkmp-proto-compact-hud.js. Laedt bewusst zuletzt. -->
