@@ -1519,6 +1519,7 @@ async function bkmpIdleCatchUpAfterHidden() {
   if (typeof bkmpRaidShouldShowCombatView === 'function' && bkmpRaidShouldShowCombatView()) return;
   const name = typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : '';
   if (!name) return;
+  bkmpIdleCancelPendingSyncTimer();
   const offlineResult = await bkmpIdleClaimOfflineProgress(name);
   if (offlineResult) bkmpIdleApplyOfflineResult(offlineResult);
   bkmpIdleShowOfflineCard(offlineResult);
@@ -1536,6 +1537,30 @@ function bkmpIdleQueueSync() {
   bkmpIdleSyncPending = true;
   if (bkmpIdleSyncTimer) return;
   bkmpIdleSyncTimer = window.setTimeout(() => { bkmpIdleSyncTimer = null; bkmpIdleFlushSync(); }, 4000);
+}
+
+/* Bug-Fix (Spieler-Report 20.07., ChronoKora: "0 Uhr aufgehört, Offline-
+   Fortschritt zeigt nur 1 Minute"): ein noch offener 4s-Debounce-Timer
+   (siehe bkmpIdleQueueSync) wird vom Browser/Betriebssystem beim
+   Zuklappen/Einschlafen des Geraets NICHT abgebrochen, sondern nur
+   eingefroren - er feuert stattdessen sofort erneut, sobald das Geraet
+   aufwacht, ohne die verstrichene Zeit "nachzuholen". Passierte das kurz
+   VOR dem Zuklappen (letzter Kill schreibt last_seen_at noch nicht,
+   startet nur den 4s-Timer), lief beim Aufwachen exakt folgendes Rennen:
+   der eingefrorene Timer feuert bkmpIdleFlushSync() und schreibt
+   last_seen_at=JETZT (Aufwach-Zeitpunkt) - NOCH BEVOR die eigentliche
+   Offline-Fortschritt-Abfrage (bkmpIdleClaimOfflineProgress, siehe
+   bkmpIdleCatchUpAfterHidden/bkmpIdleOpenModal) den alten, echten Stand
+   vom Server lesen konnte. Die komplette Abwesenheitszeit ging dadurch
+   verloren, der Server sah nur die Sekunden zwischen dem Ueberschreiben
+   und der Abfrage selbst ("1 Min."). Fix: jeden noch offenen Timer VOR
+   dem Offline-Claim verwerfen (nicht mehr fluschen) - bkmpIdleSyncPending
+   bleibt dabei bewusst unangetastet, der naechste echte Spielzustands-
+   wechsel (naechster Kill/Kauf) plant ganz normal wieder einen neuen
+   Timer. Keine Daten gehen verloren, nur die verfruehte Schreibaktion
+   direkt vor dem Auslesen wird verhindert. */
+function bkmpIdleCancelPendingSyncTimer() {
+  if (bkmpIdleSyncTimer) { window.clearTimeout(bkmpIdleSyncTimer); bkmpIdleSyncTimer = null; }
 }
 
 function bkmpIdleSnapshotMergeBaseline() {
@@ -2202,6 +2227,7 @@ async function bkmpIdleOpenModal() {
   bkmpIdleRecomputeEffectiveStats();
   bkmpIdleSyncLockedTabVisuals();
 
+  bkmpIdleCancelPendingSyncTimer();
   const offlineResult = await bkmpIdleClaimOfflineProgress(name);
   if (offlineResult) bkmpIdleApplyOfflineResult(offlineResult);
   bkmpIdleShowOfflineCard(offlineResult);

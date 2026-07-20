@@ -147,6 +147,36 @@
       bkmpIdleSetupMobileTabOverflow();
     }
 
+    /* Bug-Fix (Spieler-Meldungen 19./20.07., "seltsamer Balken" mitten in
+       Skilltree/Gilde/anderen Tabs auf normaler Desktop-Breite): #idleAppMoreSheet
+       steht im Markup als direktes Kind von .idle-dorf-card - genau wie beim
+       "Mehr"-Menue-Fund oben (siehe KRITISCHER FUND-Kommentar bei
+       "html.bkmp-app-mode .idle-dorf-overlay .idle-dorf-card {transform:none!
+       important}" in style.css) macht die Oeffnen-"Pop"-Transform der Karte
+       (.joke-overlay.visible .joke-card, IMMER aktiv solange das Fenster offen
+       ist, nicht nur waehrend der Animation) die Karte zum neuen Bezugsrahmen
+       fuer jedes position:fixed-Kind darin. Der bestehende transform:none!
+       important-Fix greift nur innerhalb @media(max-width:760px) UND nur im
+       echten App-Modus (html.bkmp-app-mode.zone-game) - bei normaler
+       Website-Breite (Desktop, wo die Pop-Animation bewusst erhalten bleiben
+       soll, siehe deren eigene Begruendung) bleibt die Luecke bestehen: das
+       Sheet (inkl. seines Griff-Balkens, sichtbar auch ohne .open, da nur ein
+       Teil der falsch berechneten "geschlossen"-Position noch ins Bild ragt)
+       haengt dadurch an der Kartenposition statt am echten Bildschirmrand -
+       genau der gemeldete Balken mitten im Tab-Inhalt. Fix: dasselbe
+       Portal-Muster wie beim "Mehr"-Menue selbst (siehe
+       bkmpProtoChudEscapeToOverlay in bkmp-proto-compact-hud.js) und dem
+       Kampf-Log-Sheet (bkmpIdleCombatLogEscapeToOverlay in bkmp-hud.js) -
+       das Sheet wird EINMALIG beim Laden (unconditional, jede Breite) zu
+       einem echten Geschwister von .idle-dorf-card auf #idleDorfOverlay-Ebene
+       umgehaengt, bevor es je sichtbar wird. Rein strukturell, keine
+       CSS-Klasse/Funktionalitaet aendert sich dadurch. */
+    (function () {
+      var sheet = document.getElementById('idleAppMoreSheet');
+      var overlay = document.getElementById('idleDorfOverlay');
+      if (sheet && overlay && sheet.parentElement !== overlay) overlay.appendChild(sheet);
+    })();
+
     /* Ressourcen-Kacheln in der Portrait-HUD antippen = direkt zum
        passenden Tab springen (Nutzer-Wunsch: Ressourcenleiste soll mehr
        als reine Anzeige sein). Nutzt Event-Delegation auf #idleDorfHud

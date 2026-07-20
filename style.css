@@ -11141,6 +11141,16 @@ html.bkmp-app-mode .idle-app-more-sheet-group-title:first-child {
   width: 8px; height: 8px; border-radius: 50%;
   background: var(--gold, #c9a24b);
 }
+/* Bug-Fix (beim eigenen Testen bei 1920px gefunden, noch nicht deployed):
+   .idle-combat-log-sheet-handle/-header (Griff-Balken + "Kampf-Log"-Titel-
+   zeile mit Schliessen-Button) hatten bisher GAR KEINE Basis-Regel - ohne
+   das @media(max-width:768px) weiter unten (das erst position:fixed +
+   Sheet-Optik daraus macht) rendern sie einfach als normale, IMMER
+   sichtbare Bloecke im Dokumentfluss. Auf Desktop soll die Umhuellung
+   komplett wirkungslos bleiben (nur Checkbox+Log wie vor Phase 7.0) - die
+   beiden neuen Kindelemente muessen dafuer explizit ausgeblendet werden,
+   nicht nur der Umschalt-Button (der hat diese Basis-Regel bereits oben). */
+.idle-combat-log-sheet-handle, .idle-combat-log-sheet-header { display: none; }
 
 /* Portrait ODER Querformat-Telefon (Abschnitt 29): reines max-width:768px
    greift bei einem quer gehaltenen Telefon oft NICHT (viele Telefone sind
@@ -11217,6 +11227,7 @@ html.bkmp-app-mode .idle-app-more-sheet-group-title:first-child {
   }
   .idle-combat-log-sheet.open .idle-combat-log-sheet-card { transform: translateY(0); }
   .idle-combat-log-sheet-handle {
+    display: block;
     width: 42px; height: 4px; border-radius: 999px;
     background: var(--line); margin: 0 auto .8rem;
   }
