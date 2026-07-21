@@ -6644,6 +6644,14 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 .idle-arena-opponent-name { font-weight: 700; color: var(--ink); flex: 1 1 auto; min-width: 100px; }
 .idle-arena-opponent-rating { font-weight: 700; color: #fb923c; }
 .idle-arena-opponent-record { font-size: 0.8rem; color: var(--muted); }
+/* Geschaetzte Gewinnchance (Spieler-Wunsch 21.07., Lilith57 im Minecraft-
+   Chat: "ich mag nicht so gern raetselraten") - Farbe ist nur ein
+   zusaetzlicher, schnell erfassbarer Hinweis, der Prozentwert selbst
+   traegt die eigentliche Information (nie ausschliesslich ueber Farbe). */
+.idle-arena-opponent-chance { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 0.85rem; }
+.idle-arena-chance-good { color: #4ade80; }
+.idle-arena-chance-even { color: #fbbf24; }
+.idle-arena-chance-bad { color: #f87171; }
 .idle-arena-attack-btn { margin-left: auto; font-size: 0.82rem; padding: 0.35rem 0.8rem; }
 .idle-arena-history .idle-dungeon-best { font-weight: 500; font-size: 0.85rem; margin-bottom: 0.3rem; }
 
@@ -9844,6 +9852,7 @@ html.bkmp-app-mode .idle-dorf-panel .idle-arena-opponent-rating {
   font-weight: 700;
 }
 html.bkmp-app-mode .idle-dorf-panel .idle-arena-opponent-record,
+html.bkmp-app-mode .idle-dorf-panel .idle-arena-opponent-chance,
 html.bkmp-app-mode .idle-dorf-panel .idle-guild-activity-entry,
 html.bkmp-app-mode .idle-dorf-panel .idle-guild-chat-msg,
 html.bkmp-app-mode .idle-dorf-panel .idle-guild-request-pending,

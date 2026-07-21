@@ -58,6 +58,21 @@ async function bkmpArenaLoadAll() {
   bkmpArenaLoading = false;
 }
 
+/* Geschaetzte Gewinnchance (Spieler-Wunsch, Minecraft-Chat 21.07.,
+   Lilith57: "ich mag nicht so gern raetselraten, ob ich wen schlagen
+   kann") - exakt dieselbe Formel wie arena_attack() serverseitig
+   (supabase-idle-arena.sql: Angriff zaehlt am meisten, HP/Verteidigung
+   etwas weniger), damit die Anzeige nie von der tatsaechlichen Chance
+   abweicht. Reiner Erwartungswert - der echte Kampf bleibt weiterhin
+   ein Zufallswurf (random() < winChance), keine Garantie. */
+function bkmpArenaPowerScore(attack, defense, hp) {
+  return Math.max(1, Number(attack || 0) * 2 + Number(defense || 0) + Number(hp || 0) * 0.3);
+}
+function bkmpArenaEstimateWinChancePct(myPower, theirPower) {
+  const chance = myPower / (myPower + theirPower);
+  return Math.round(Math.max(0, Math.min(1, chance)) * 100);
+}
+
 function bkmpArenaFormatTime(iso) {
   if (!iso) return '';
   try { return new Date(iso).toLocaleString('de-DE'); } catch (e) { return ''; }
@@ -186,14 +201,21 @@ async function bkmpIdleRenderArenaPanel() {
     <div class="idle-arena-opponents">
       <h4 style="margin-top:1rem;">Gegner in deiner Nähe</h4>
       ${attacksLeft === 0 ? '<p class="empty-hint">Tageslimit erreicht - morgen um 0 Uhr geht es weiter.</p>' : ''}
-      ${bkmpArenaOpponents.length === 0 ? '<p class="empty-hint">Noch keine anderen Spieler in der Arena. Schau später nochmal vorbei.</p>' : bkmpArenaOpponents.map(o => `
+      ${bkmpArenaOpponents.length === 0 ? '<p class="empty-hint">Noch keine anderen Spieler in der Arena. Schau später nochmal vorbei.</p>' : bkmpArenaOpponents.map(o => {
+        const myPower = bkmpArenaPowerScore(bkmpIdleState ? bkmpIdleState.attack : 0, bkmpIdleState ? bkmpIdleState.defense : 0, bkmpIdleState ? bkmpIdleState.hp : 0);
+        const theirPower = bkmpArenaPowerScore(o.attack, o.defense, o.hp);
+        const winChancePct = bkmpArenaEstimateWinChancePct(myPower, theirPower);
+        const chanceTone = winChancePct >= 60 ? 'idle-arena-chance-good' : winChancePct >= 40 ? 'idle-arena-chance-even' : 'idle-arena-chance-bad';
+        return `
         <div class="idle-arena-opponent-card" data-opponent-uid="${escapeHtml(o.authUserId)}">
           <span class="idle-arena-opponent-name">${escapeHtml(o.displayName)}</span>
           <span class="idle-arena-opponent-rating">🏅 ${o.rating}</span>
           <span class="idle-arena-opponent-record">${o.wins}S/${o.losses}N</span>
+          <span class="idle-arena-opponent-chance ${chanceTone}" title="Geschätzte Gewinnchance anhand eurer aktuellen Kampfwerte - kein Versprechen, der Kampf bleibt ein Zufallswurf.">🎲 ~${winChancePct}%</span>
           <button type="button" class="btn-ja idle-arena-attack-btn" ${bkmpArenaAttacking || attacksLeft === 0 ? 'disabled' : ''}>${bkmpArenaAttacking === o.authUserId ? '⏳...' : '⚔️ Angreifen'}</button>
         </div>
-      `).join('')}
+      `;
+      }).join('')}
     </div>
     <div class="idle-arena-history">
       <h4 style="margin-top:1rem;">Letzte Kämpfe</h4>

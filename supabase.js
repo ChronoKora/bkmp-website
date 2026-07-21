@@ -4001,9 +4001,16 @@ async function bkmpArenaGetOpponents(myAuthUserId, myRating, limit) {
      Dorf-Skin fuer die Kampfanimation, siehe supabase-idle-village-skin-
      sync.sql) - arena_ratings wird nur noch zum ANREICHERN um echtes
      Rating/Sieg-Niederlage-Verhaeltnis danebengelegt, wo schon vorhanden. */
+  /* attack/defense/hp mitladen (Spieler-Wunsch, Minecraft-Chat 21.07.,
+     Lilith57: "ich mag nicht so gern raetselraten, ob ich wen schlagen
+     kann") - dieselben Spalten, die arena_attack() serverseitig fuer die
+     Gewinnchance verwendet (siehe supabase-idle-arena.sql), werden bei
+     jedem bkmpIdleRecomputeEffectiveStats() bereits vollstaendig
+     (inkl. Runen/Skilltree/Prestige/Upgrades) in idle_player_state
+     gespiegelt - kein neues Feld, keine Migration noetig. */
   const { data: stateRows, error: stateError } = await client
     .from('idle_player_state')
-    .select('auth_user_id, display_name, active_village_skin')
+    .select('auth_user_id, display_name, active_village_skin, attack, defense, hp')
     .not('auth_user_id', 'is', null)
     .neq('auth_user_id', selfId)
     .limit(200);
@@ -4021,6 +4028,9 @@ async function bkmpArenaGetOpponents(myAuthUserId, myRating, limit) {
       authUserId: row.auth_user_id,
       displayName: row.display_name,
       activeVillageSkin: row.active_village_skin || 'standard',
+      attack: Number(row.attack || 0),
+      defense: Number(row.defense || 0),
+      hp: Number(row.hp || 0),
       rating: Number(rating ? rating.rating : 1000),
       wins: Number(rating ? rating.wins : 0),
       losses: Number(rating ? rating.losses : 0)
