@@ -1654,7 +1654,48 @@ async function bkmpIdleMergeRemoteSpendableFields() {
      gegenueber einer zweiten Tabelle. */
   const remoteHighest = Number(remote.highest_dragon_index || 0);
   const remoteLevel = Number(remote.level || 0);
-  const prestigeHappenedElsewhere = remoteHighest < Number(baseline.highest_dragon_index || 0) || remoteLevel < Number(baseline.level || 0);
+  const levelLooksLikeReset = remoteHighest < Number(baseline.highest_dragon_index || 0) || remoteLevel < Number(baseline.level || 0);
+  /* KRITISCHER FEHLER-FIX (Spieler-Report 21.07., Baerli: "Lvl 2018 -> nach
+     F5 Lvl 2001, keine Moeglichkeit mehr in irgendein Menu zu gehen"):
+     "remote < baseline" allein ist KEIN verlaessliches Reset-Signal, wie der
+     Kommentar oben behauptet - das ist genauso der Normalzustand, wenn eine
+     ZWEITE Session (Twitch-Seite oder ein zweites Geraet/Tab, siehe
+     bkmp-guild.js-Aufrufstelle, laeuft mittlerweile auch auf der normalen
+     Hauptseite nach jedem Gildenboss-Sieg) einen aelteren, noch nicht
+     nachgezogenen Snapshot ueberschrieben hat, oder wenn die eigenen Saves
+     eine Weile fehlgeschlagen sind (siehe "Speichern fehlgeschlagen"-Toast
+     unten in bkmpIdleFlushSync) - in BEIDEN Faellen ist das KEIN Prestige,
+     nur ein staler Fremd-/Eigen-Stand, und das bisherige bedingungslose
+     Ueberschreiben hat dabei echten, laengst erspielten Fortschritt
+     (Level/XP/Ressourcen/Skillpunkte/Stufe) einfach geloescht - nicht auf
+     einen runden Reset-Wert, sondern auf genau den Stand des letzten stalen
+     Snapshots (erklaert den unrunden Sprung 2018 -> 2001 statt auf Stufe 1).
+     Fix: den tatsaechlichen, monoton wachsenden prestige_level-Zaehler
+     (idle_prestige_state, siehe bkmpPrestigeState) zusaetzlich als
+     Bestaetigung verlangen - nur ein ECHTER Prestige-Aufstieg erhoeht ihn.
+     Faellt diese Pruefung genau in die kurze Schreibreihenfolge-Luecke
+     zwischen den beiden Tabellen (siehe Race-Erklaerung oben, urspruenglicher
+     13.07.-Bug), wird der echte Reset einfach beim naechsten turnusmaessigen
+     Abgleich (wenige Sekunden spaeter) nachgeholt - deutlich harmloser als
+     das jetzige Fehlerbild, das echten Fortschritt sofort und dauerhaft
+     loescht. Bei einem stalen (nicht echten) Reset-Verdacht wird jetzt
+     einfach NICHTS an level/xp/current_dragon_index/highest_dragon_index
+     ueberschrieben (unten faellt der Ablauf in den normalen "else"-Zweig,
+     der diese monotonen Felder nie absenkt) - der naechste eigene Autosave
+     schreibt den bereits korrekten, hoeheren lokalen Stand ganz normal fort. */
+  let remotePrestigeCheck = null;
+  let prestigeHappenedElsewhere = false;
+  if (levelLooksLikeReset) {
+    try {
+      remotePrestigeCheck = typeof loadIdlePrestigeState === 'function' ? await loadIdlePrestigeState(bkmpIdleState.name_key) : null;
+      const remotePrestigeLevel = remotePrestigeCheck ? Number(remotePrestigeCheck.prestige_level || 0) : -1;
+      const ourPrestigeLevel = bkmpPrestigeState ? Number(bkmpPrestigeState.prestige_level || 0) : 0;
+      prestigeHappenedElsewhere = remotePrestigeLevel > ourPrestigeLevel;
+    } catch (e) {
+      /* Bestaetigung nicht erreichbar - im Zweifel NICHT ueberschreiben. */
+      prestigeHappenedElsewhere = false;
+    }
+  }
   let stageChangedByRemote = false;
   if (prestigeHappenedElsewhere) {
     ['level', 'xp', 'gold', 'wood', 'stone', 'crystals', 'essence', 'skill_points_available', 'skill_points_spent', 'current_dragon_index', 'highest_dragon_index'].forEach(key => {
@@ -1663,15 +1704,9 @@ async function bkmpIdleMergeRemoteSpendableFields() {
     bkmpIdleState.skill_allocations = remote.skill_allocations || {};
     bkmpIdleState.upgrade_purchases = remote.upgrade_purchases || {};
     bkmpIdleState.auto_advance = remote.auto_advance !== false;
-    /* Den zugehoerigen, ebenfalls neuen Prestige-Baum-Stand mituebernehmen -
-       falls die zweite Tabelle in genau diesem Moment noch den alten Wert
-       zeigt (siehe Race-Erklaerung oben), holt der naechste turnusmaessige
-       Abgleich (spaetestens 4-20s spaeter, ueber bkmpPrestigeMergeRemoteSpendable)
-       das korrekt nach - hier keine eigene Vorbedingung mehr dafuer. */
-    try {
-      const remotePrestige = typeof loadIdlePrestigeState === 'function' ? await loadIdlePrestigeState(bkmpIdleState.name_key) : null;
-      if (remotePrestige) { bkmpPrestigeState = remotePrestige; bkmpPrestigeSnapshotMergeBaseline(); }
-    } catch (e) { /* naechster Abgleich versucht es erneut */ }
+    /* remotePrestigeCheck wurde oben bereits geladen (Bestaetigungs-
+       Abfrage) - kein zweiter Request noetig. */
+    if (remotePrestigeCheck) { bkmpPrestigeState = remotePrestigeCheck; bkmpPrestigeSnapshotMergeBaseline(); }
     /* Bug-Fix 18.07. (Section B, "Runen ueberleben Prestige"): Runen
        gehen seit der Aenderung an bkmpPrestigeExecuteReset NICHT mehr
        verloren - der bisherige Code hier ging noch von der alten Annahme
