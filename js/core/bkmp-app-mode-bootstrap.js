@@ -146,6 +146,48 @@
       bkmpIdleSetupMobileTabOverflow();
     }
 
+    /* Bug-Fix (Spieler-Meldung ChronoKora 21.07., Screenshot: komplette
+       Tab-Gruppen-Leiste fehlt bei 1920x1080): die Annahme im Kommentar
+       oben ("das Fenster wird waehrend eines laufenden Groessenwechsels
+       i.d.R. nicht offen sein") trifft nicht den eigentlich haeufigen Fall
+       - viele Browserfenster starten schmal (<=760px) und werden ERST
+       DANACH maximiert, oft noch bevor der Spieler das Idle-Dorf ueberhaupt
+       zum ersten Mal oeffnet. bkmpIdleSetupMobileTabOverflow() hat zu
+       diesem fruehen Zeitpunkt schon unwiderruflich die echten
+       .idle-dorf-tab-group-Container aus dem DOM entfernt (siehe .remove()
+       oben) - eine spaetere Verbreiterung des Fensters kann diese
+       zerstoerten Container nicht zurueckholen: die Desktop-CSS-Gruppierung
+       findet nichts mehr zum Greifen, "Kampf" haengt einzeln mit 0x0px in
+       der Leiste, die restlichen 9 Tabs stecken im fuer Desktop nie
+       vorgesehenen "Mehr"-Sheet fest (verifiziert per getComputedStyle:
+       schmal laden -> ohne Neuladen verbreitern -> groupCount 0).
+       Sauberes Zurueckbauen waere aufwaendig (Original-Gruppierung muesste
+       komplett neu rekonstruiert werden, ohne die von idledorf.js
+       gesetzten Klick-Listener zu verlieren) - stattdessen ein einfacher,
+       robuster Fix: einmaliges Neuladen, sobald die Seite tatsaechlich
+       (wieder) Desktop-Breite hat, NACHDEM die zerstoerende Umbaumassnahme
+       schon gelaufen ist. Debounce verhindert mehrfaches Neuladen waehrend
+       eines Zieh-Vorgangs, sessionStorage-Flag verhindert eine
+       Neulade-Schleife, falls das Fenster danach wieder verkleinert wird.
+       Echter App-Modus ausgenommen - dort ist die kompakte Nav die
+       ABSICHTLICH dauerhafte Struktur, unabhaengig von der Breite. */
+    if (!window.BKMP_APP_MODE) {
+      var bkmpTabOverflowResizeTimer = null;
+      window.addEventListener('resize', function () {
+        if (bkmpTabOverflowResizeTimer) window.clearTimeout(bkmpTabOverflowResizeTimer);
+        bkmpTabOverflowResizeTimer = window.setTimeout(function () {
+          var isDesktopNow = window.matchMedia('(min-width: 761px)').matches;
+          var wasCollapsedIntoMobileShape = !!document.getElementById('idleAppMoreBtn');
+          if (!isDesktopNow || !wasCollapsedIntoMobileShape) return;
+          try {
+            if (sessionStorage.getItem('bkmpTabOverflowReloaded') === '1') return;
+            sessionStorage.setItem('bkmpTabOverflowReloaded', '1');
+          } catch (e) {}
+          location.reload();
+        }, 400);
+      }, { passive: true });
+    }
+
     /* Bug-Fix (Spieler-Meldungen 19./20.07., "seltsamer Balken" mitten in
        Skilltree/Gilde/anderen Tabs auf normaler Desktop-Breite): #idleAppMoreSheet
        steht im Markup als direktes Kind von .idle-dorf-card - genau wie beim
