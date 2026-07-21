@@ -142,7 +142,7 @@ module.exports = async function handler(req, res) {
     const state = Array.isArray(stateRows) ? stateRows[0] : null;
     if (!state) return send(res, 200, { ok: true, elapsedSeconds: 0, rewards: null, newTotals: null });
 
-    const configRes = await sbFetch(serviceKey, `idle_game_config?key=in.(offline_progress,dragon_scaling,reward_scaling,boss_scaling)&select=key,value`);
+    const configRes = await sbFetch(serviceKey, `idle_game_config?key=in.(offline_progress,dragon_scaling,reward_scaling,boss_scaling,rare_spawn)&select=key,value`);
     const configRows = configRes.ok ? await configRes.json() : [];
     const config = {};
     (Array.isArray(configRows) ? configRows : []).forEach(row => { config[row.key] = row.value; });
@@ -150,6 +150,8 @@ module.exports = async function handler(req, res) {
     const bossCfg = config.boss_scaling || { minibossHpMult: 1.8, minibossAtkMult: 1.3, minibossRewardMult: 2, bossHpMult: 3.2, bossAtkMult: 1.7, bossRewardMult: 4 };
     const dragonCfg = { ...(config.dragon_scaling || { hpGrowthPerKill: 0.05, hpGrowthExponent: 1.15, atkGrowthPerKill: 0.045, atkGrowthExponent: 1.1 }), ...bossCfg };
     const rewardCfg = { ...(config.reward_scaling || { goldGrowthPerKill: 0.05, goldGrowthExponent: 1.2, xpGrowthPerKill: 0.05, xpGrowthExponent: 1.2 }), ...bossCfg };
+    const rareCfg = config.rare_spawn || { chancePct: 8 };
+    const rareChance = Math.max(0, Math.min(100, Number(rareCfg.chancePct != null ? rareCfg.chancePct : 8))) / 100;
 
     const lastSeenIso = state.last_seen_at;
     const lastSeenMs = Date.parse(lastSeenIso);
@@ -178,6 +180,38 @@ module.exports = async function handler(req, res) {
        verbrennen. */
     if (!dragonsRes.ok || !Array.isArray(dragons) || dragons.length === 0) {
       return send(res, 502, { error: 'dragons_unavailable' });
+    }
+
+    /* Bug-Fix (Spieler-Report Crocodilandy927, 20.07.: "Man bekommt keine
+       Gems und Essenzen mehr, wenn man offline ist") - selectDragonKindId()
+       oben setzt die "seltene" Drachen-Chance (schattendrache/wuffdrache -
+       die einzigen Nicht-Boss/Miniboss-Quellen fuer Kristalle/Essenz, siehe
+       idle_dragons: jeder normale Standarddrache hat crystal/essence_
+       reward_base=0) bewusst deterministisch auf "nie" statt zufaellig zu
+       wuerfeln (Kommentar dort: "Rauschen ohne echten Mehrwert"). Live
+       wuerfelt bkmpIdleSelectDragonKindId() dagegen bei JEDEM Nicht-Boss/
+       Miniboss-Kill eine echte rare_spawn.chancePct%-Chance (Standard 8%,
+       siehe idle_game_config) - bei laengeren Abwesenheiten mit vielen
+       simulierten Kills ist das kein Rauschen mehr, sondern ein spuerbarer,
+       systematisch fehlender Einnahmepfad. Fix: Erwartungswert der seltenen
+       Drachen (Durchschnitt ueber den ganzen "rare"-Pool, damit neue
+       seltene Arten automatisch mitgezaehlt werden) wird weiter unten pro
+       simuliertem Nicht-Boss/Miniboss-Kill anteilig zu allen
+       Belohnungsarten dazugerechnet - aendert NICHTS an HP/Angriff/Dauer
+       der Simulation (bleibt beim naeherungsweise korrekten Standard-
+       Drachen), nur an den Ressourcen-Betraegen. */
+    const rarePool = dragons.filter(d => d.spawn_rule === 'rare');
+    const rareAvg = { gold: 0, xp: 0, wood: 0, stone: 0, crystals: 0, essence: 0 };
+    if (rarePool.length) {
+      rarePool.forEach(d => {
+        rareAvg.gold += Number(d.gold_reward_base || 0);
+        rareAvg.xp += Number(d.xp_reward_base || 0);
+        rareAvg.wood += Number(d.wood_reward_base || 0);
+        rareAvg.stone += Number(d.stone_reward_base || 0);
+        rareAvg.crystals += Number(d.crystal_reward_base || 0);
+        rareAvg.essence += Number(d.essence_reward_base || 0);
+      });
+      Object.keys(rareAvg).forEach(k => { rareAvg[k] = (rareAvg[k] / rarePool.length) * rareChance; });
     }
 
     /* Bug-Fix (Spieler-Report ChronoKora 20.07., mit Screenshot: 46 Min.
@@ -268,6 +302,13 @@ module.exports = async function handler(req, res) {
     let kills = 0;
     let bossKills = 0;
     let goldGain = 0, xpGain = 0, woodGain = 0, stoneGain = 0, crystalGain = 0, essenceGain = 0;
+    /* Rohe (nicht pro Kill gerundete) Summe fuer den seltenen-Drachen-
+       Erwartungswert - bei z.B. 0,08 erwarteten Kristallen pro Kill wuerde
+       Math.round() JEDEN einzelnen Kill auf 0 abrunden und die komplette
+       Ausbeute verschwinden lassen, selbst wenn die Summe ueber hunderte
+       Kills (z.B. 176*0,08=14) laengst spuerbar waere. Nur EINMAL am Ende
+       gerundet, siehe direkt nach der while-Schleife unten. */
+    let rareGoldRaw = 0, rareXpRaw = 0, rareWoodRaw = 0, rareStoneRaw = 0, rareCrystalRaw = 0, rareEssenceRaw = 0;
     const goldBonus = Number(state.gold_bonus || 0);
     const xpBonus = Number(state.xp_bonus || 0);
     const lootBonus = Number(state.loot_bonus || 0);
@@ -346,10 +387,30 @@ module.exports = async function handler(req, res) {
       stoneGain += Math.round((dragon.archetype.stone_reward_base || 0) * (1 + lootBonus / 100));
       crystalGain += Math.round((dragon.archetype.crystal_reward_base || 0) * (1 + lootBonus / 100));
       essenceGain += Math.round((dragon.archetype.essence_reward_base || 0) * (1 + lootBonus / 100));
+      /* Erwartungswert der seltenen Drachen (siehe rareAvg-Kommentar oben) -
+         nur auf Stufen, auf denen live ueberhaupt eine Chance auf einen
+         seltenen Drachen bestuende (kein Boss/Miniboss - die haben dort
+         laut bkmpIdleSelectDragonKindId() Vorrang und schliessen "rare"
+         fuer diesen Kill aus). */
+      if (!dragon.bossTier) {
+        rareGoldRaw += rareAvg.gold * goldGrowth * (1 + goldBonus / 100);
+        rareXpRaw += rareAvg.xp * xpGrowth * (1 + xpBonus / 100);
+        rareWoodRaw += rareAvg.wood * (1 + lootBonus / 100);
+        rareStoneRaw += rareAvg.stone * (1 + lootBonus / 100);
+        rareCrystalRaw += rareAvg.crystals * (1 + lootBonus / 100);
+        rareEssenceRaw += rareAvg.essence * (1 + lootBonus / 100);
+      }
       kills += 1;
       if (dragon.isBoss) bossKills += 1;
       if (autoAdvance) killIndex += 1;
     }
+
+    goldGain += Math.round(rareGoldRaw);
+    xpGain += Math.round(rareXpRaw);
+    woodGain += Math.round(rareWoodRaw);
+    stoneGain += Math.round(rareStoneRaw);
+    crystalGain += Math.round(rareCrystalRaw);
+    essenceGain += Math.round(rareEssenceRaw);
 
     let level = Number(state.level || 1);
     let xp = Number(state.xp || 0) + xpGain;

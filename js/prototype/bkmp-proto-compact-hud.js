@@ -362,6 +362,20 @@ function bkmpProtoChudCloseFxMenu() {
 
 function bkmpProtoChudInit() {
   if (!BKMP_PROTO_COMPACT_HUD_ENABLED) return;
+  /* Bug-Fix (Spieler-Report Crocodilandy927, 20.07.: "auf dem PC nervt es,
+     wenn man immer auf Mehr druecken muss um alle Menuepunkte zu sehen")
+     - lief bisher UNCONDITIONAL auf jeder Breite, auch auf vollem Desktop,
+     und versteckte dort die alte, vollstaendige Tableiste (#idleDorfTabs,
+     zeigt auf Desktop dank System C/@media(min-width:761px) ohnehin schon
+     ALLE Tabs gruppiert ohne "Mehr" - kam aber nie zum Zug, weil dieses
+     kompakte Nav sie unconditional ausblendete). Gleiche Bedingung wie
+     bkmpIdleSetupMobileTabOverflow() in bkmp-app-mode-bootstrap.js (dort
+     bewusst dokumentiert: einmalig bei Ladezeit geprueft, nicht live auf
+     resize, da die Idle-Dorf-Tableiste in einem Modal liegt, das i.d.R.
+     nicht waehrend eines laufenden Groessenwechsels offen ist) - auf
+     breitem Desktop bleibt die alte Anzeige jetzt einfach unangetastet,
+     dieses ganze Prototyp-Nav wird dort gar nicht erst aktiviert. */
+  if (!window.BKMP_APP_MODE && !window.matchMedia('(max-width: 760px)').matches) return;
   // Alte Anzeige verstecken (nicht loeschen - bleibt vollstaendiger
   // Fallback, falls der Prototyp spaeter deaktiviert wird), neue zeigen.
   const oldHud = document.getElementById('idleDorfHud');
