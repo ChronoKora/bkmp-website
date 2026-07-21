@@ -266,6 +266,24 @@ function bkmpRaidHandlePrepRealtimeChange(change) {
   if (countEl) countEl.textContent = bkmpRaidFormatParticipantCount(Number(change.row.participant_count || 0));
 }
 
+/* Phase 7.1 Stufe 3 (21.07., Nutzer-Auftrag "Raidboss-Banner drastisch
+   verkleinern"): sessionStorage-Flag pro Raid-ID (nicht global) - ein
+   minimiertes Banner bleibt fuer DIESE Vorbereitungsphase minimiert, ein
+   NEUER Raidboss (neue raidId) zeigt den Hinweis automatisch wieder voll
+   an, wie im Auftrag verlangt ("keine wichtige Raidbossmeldung dauerhaft
+   verstecken"). Reiner Anzeige-Zustand, keine Aenderung an Timer/Beitritt. */
+function bkmpRaidBannerMinimizeKey(raidId) { return 'bkmpRaidBannerMin_' + raidId; }
+function bkmpRaidBannerIsMinimized(raidId) {
+  try { return sessionStorage.getItem(bkmpRaidBannerMinimizeKey(raidId)) === '1'; } catch (e) { return false; }
+}
+function bkmpRaidBannerSetMinimized(raidId, minimized) {
+  try { sessionStorage.setItem(bkmpRaidBannerMinimizeKey(raidId), minimized ? '1' : '0'); } catch (e) {}
+  const banner = document.getElementById('raidJoinBanner');
+  if (banner) banner.classList.toggle('raid-join-banner-minimized', minimized);
+  const btn = document.getElementById('raidBannerMinimizeBtn');
+  if (btn) { btn.textContent = minimized ? '⌃' : '⌄'; btn.setAttribute('aria-expanded', String(!minimized)); btn.title = minimized ? 'Raidboss-Hinweis ausklappen' : 'Raidboss-Hinweis minimieren'; }
+}
+
 async function bkmpRaidRenderJoinBanner() {
   const banner = document.getElementById('raidJoinBanner');
   if (!banner) return;
@@ -273,22 +291,39 @@ async function bkmpRaidRenderJoinBanner() {
   if (info.phase !== 'prep') { banner.style.display = 'none'; return; }
   if (bkmpRaidIsGuildBossHourBerlin(new Date(info.fightStartsAt))) {
     banner.style.display = '';
-    banner.innerHTML = `<div class="raid-join-banner-title">🛡️ Der Weltboss pausiert diese Stunde - Fokus liegt auf dem Gildenboss um 20 Uhr!</div>`;
+    banner.className = 'raid-join-banner';
+    banner.innerHTML = `<span class="raid-join-banner-icon" aria-hidden="true">🛡️</span><span class="raid-join-banner-title">Weltboss pausiert diese Stunde - Fokus liegt auf dem Gildenboss um 20 Uhr!</span>`;
     return;
   }
 
   const joined = bkmpRaidHasJoined(info.raidId);
+  const minimized = bkmpRaidBannerIsMinimized(info.raidId);
   banner.style.display = '';
+  banner.className = 'raid-join-banner' + (minimized ? ' raid-join-banner-minimized' : '');
+  /* Einzeilige Kompakt-Leiste statt bisherigem Hero-Banner: Icon, Titel+
+     Teilnehmerzahl in EINEM Textblock (statt eigener .raid-join-banner-
+     participants-Zeile mit "flex-basis:100%" - genau das hat bisher immer
+     eine dritte Zeile erzwungen, egal wie viel Platz noch da war), dann
+     Countdown, dann Beitreten-Button, dann Minimieren-Schalter. Dieselben
+     drei Element-IDs (raidBannerCountdown/raidBannerParticipants/
+     raidJoinBtn) bleiben erhalten - die bestehende Tick-/Teilnehmerzahl-
+     Aktualisierung (siehe weiter oben in dieser Datei) greift unveraendert
+     darauf zu, nur die umgebende Struktur ist neu. */
   banner.innerHTML = `
-    <div class="raid-join-banner-title">🐉 Ein mächtiger Raidboss erscheint in wenigen Minuten!</div>
-    <div class="raid-join-banner-countdown" id="raidBannerCountdown">${bkmpRaidFormatCountdown(info.msUntilFightStart)}</div>
+    <button type="button" class="raid-join-banner-minimize" id="raidBannerMinimizeBtn" aria-label="Raidboss-Hinweis minimieren" aria-expanded="${minimized ? 'false' : 'true'}" title="${minimized ? 'Raidboss-Hinweis ausklappen' : 'Raidboss-Hinweis minimieren'}">${minimized ? '⌃' : '⌄'}</button>
+    <span class="raid-join-banner-icon" aria-hidden="true">🐉</span>
+    <span class="raid-join-banner-text">
+      <span class="raid-join-banner-title">Raidboss startet bald</span><span class="raid-join-banner-participants" id="raidBannerParticipants"></span>
+    </span>
+    <span class="raid-join-banner-countdown" id="raidBannerCountdown">${bkmpRaidFormatCountdown(info.msUntilFightStart)}</span>
     ${joined
-      ? '<div class="raid-join-banner-joined">✅ Du bist angemeldet - der Kampf beginnt automatisch.</div>'
-      : '<button type="button" class="btn-ja raid-join-banner-btn" id="raidJoinBtn">Jetzt beitreten</button>'}
-    <div class="raid-join-banner-participants" id="raidBannerParticipants"></div>
+      ? '<span class="raid-join-banner-joined">✅ Angemeldet</span>'
+      : '<button type="button" class="btn-ja raid-join-banner-btn" id="raidJoinBtn">Beitreten</button>'}
   `;
   const joinBtn = document.getElementById('raidJoinBtn');
   if (joinBtn) joinBtn.addEventListener('click', () => bkmpRaidJoin(info.raidId));
+  const minimizeBtn = document.getElementById('raidBannerMinimizeBtn');
+  if (minimizeBtn) minimizeBtn.addEventListener('click', () => bkmpRaidBannerSetMinimized(info.raidId, !bkmpRaidBannerIsMinimized(info.raidId)));
 
   /* Live-Updates fuer die Teilnehmerzahl waehrend das Banner offen bleibt -
      vorher wurde die Zahl nur EINMAL beim Oeffnen geladen und blieb dann

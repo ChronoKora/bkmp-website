@@ -5503,12 +5503,12 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  margin-bottom: 0.55rem;
-  padding: 0.45rem 0.75rem;
+  margin-bottom: 0.4rem;
+  padding: 0.32rem 0.65rem;
   border-radius: 12px;
   background: var(--paper);
   border: 1px solid var(--line);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
 }
 /* Phase 7.1 (21.07., Nutzer-Auftrag "Stufensteuerung als kompakte Toolbar,
    alles moeglichst in einer Zeile"): zwei Teilprobleme, beide noetig.
@@ -5712,6 +5712,26 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
    dedizierte Schliessen-Button oben rechts (#idleDorfCloseX) bleibt
    ohnehin jederzeit erreichbar - dieser Footer ist die zweite, redundante
    Variante, keine Funktion wird entfernt, nur verkleinert. */
+/* Phase 7.1 Stufe 3 (21.07.): App-Install/Streamer sind keine .btn-ja/
+   .btn-nein-Pillenbuttons mehr (siehe index.html) - kleine, unauffaellige
+   Textlinks statt einer vollen Buttonreihe, minimaler vertikaler Platz
+   (Auftrag: "maximal 8-16px Abstand, keine grosse Buttonreihe"). */
+.idle-dorf-footer-links { justify-content: center; gap: 1.1rem !important; margin-top: 0.3rem !important; padding-top: 0.5rem; border-top: 1px solid var(--line); }
+.idle-dorf-footer-links .idle-app-link-btn,
+.idle-dorf-footer-links .idle-stream-help-btn {
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: var(--muted) !important;
+  font-size: 0.74rem !important;
+  font-weight: 600 !important;
+  padding: 0.2rem 0.3rem !important;
+  min-height: 0 !important;
+  text-decoration: none;
+  cursor: pointer;
+}
+.idle-dorf-footer-links .idle-app-link-btn:hover,
+.idle-dorf-footer-links .idle-stream-help-btn:hover { color: var(--ink) !important; text-decoration: underline; }
 .idle-dorf-card .joke-buttons { gap: 0.5rem; margin-top: 0.4rem; }
 /* Nachtrag (21.07., beim eigenen Testen gefunden): "html.bkmp-app-mode
    .joke-card .btn-ja/.btn-nein{min-height:44px;padding:.7rem 1.2rem}"
@@ -5767,11 +5787,29 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
      Kampfwerte/-logik betroffen. */
   min-height: clamp(240px, 36dvh, 460px);
 }
-@media (max-height: 800px) {
-  .idle-battlefield { min-height: clamp(220px, 30dvh, 340px); }
+/* Phase 7.1 Stufe 3 (21.07., Nutzer-Auftrag "Height-based Compact Mode",
+   Abschnitt 15): ersetzt die beiden einfachen Battlefield-only-Breakpoints
+   von Stufe 1 durch ein dreistufiges System (900\780\700px), das bei
+   geringer Fensterhoehe zusaetzlich HUD-Chips/Navigation/Stufenleiste
+   verdichtet, nicht nur das Kampffeld - genau wie im Auftrag verlangt.
+   Kein transform:scale() auf dem Gesamt-Overlay (Auftrag verbietet das
+   explizit) - jede Regel skaliert ihr eigenes Element gezielt. */
+@media (max-height: 900px) {
+  .idle-battlefield { min-height: clamp(230px, 32dvh, 360px); }
+  .idle-dorf-tab { min-height: 28px !important; }
 }
-@media (max-height: 650px) {
-  .idle-battlefield { min-height: 210px; }
+@media (max-height: 780px) {
+  .idle-battlefield { min-height: clamp(210px, 28dvh, 300px); }
+  html.bkmp-app-mode .idle-hud-top { padding: .3rem .5rem !important; }
+  html.bkmp-app-mode .idle-hud-flow { margin-top: .22rem !important; }
+  html.bkmp-app-mode .idle-hud-flow span { padding: .18rem .42rem !important; }
+  .idle-stage-bar { padding: 0.24rem 0.55rem !important; margin-bottom: 0.3rem !important; }
+  .idle-dorf-tabs { gap: 0.28rem 0.4rem !important; }
+}
+@media (max-height: 700px) {
+  .idle-battlefield { min-height: 200px; }
+  html.bkmp-app-mode .idle-hud-level-badge { width: 38px !important; height: 38px !important; }
+  .idle-dorf-tab { min-height: 26px !important; padding: 0.2rem 0.5rem !important; }
 }
 /* Gerahmtes Panel um Dorf-/Drachenbild: statt einer flachen --paper-2-Box
    ein dezenter Gold-Verlaufsrahmen (gleiche Zweischicht-Technik wie
@@ -5779,17 +5817,22 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
    border-box), passend zum "Fantasy-Buch"-Look der restlichen Seite -
    ohne die Animation der grossen Modal-Karte, damit es waehrend des
    Kampfes (staendige HP-Updates/Hit-Flashes) nicht unruhig wirkt. */
+/* Phase 7.1 Stufe 3 (21.07., Nutzer-Auftrag "Kampfszene nicht mehr wie
+   zwei getrennte Screenshots"): der bisherige eigene Goldrahmen +
+   --paper-Hintergrund + Schlagschatten JEDES der beiden Container war
+   genau der Grund, warum Dorf/Drache wie zwei separate Bildkarten statt
+   einer gemeinsamen Szene wirkten - beide sitzen jetzt randlos direkt auf
+   dem gemeinsamen Kampffeld-Hintergrund (siehe .idle-battlefield weiter
+   unten, hat bereits seinen eigenen radialen Verlauf als Arena-Kulisse).
+   Village 46%/Dragon 52% (statt beide 42%) - der Auftrag will das Dorf
+   etwas kleiner als den Gegner, siehe Abschnitt 9. */
 .idle-village, .idle-dragon {
   position: relative;
   text-align: center;
-  width: 42%;
-  border-radius: 16px;
-  padding: 0.8rem 0.6rem;
-  border: 1.5px solid transparent;
-  background: linear-gradient(180deg, var(--paper-2), var(--paper-3)) padding-box,
-              linear-gradient(135deg, var(--gold), color-mix(in srgb, var(--gold) 25%, transparent)) border-box;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+  padding: 0.4rem 0.3rem;
 }
+.idle-village { width: 46%; }
+.idle-dragon { width: 52%; }
 
 /* ---- Sprite-Grafiken (echte SpriteSheets statt Emoji) ----
    Jedes Sheet ist ein vertikaler Stapel aus 4 gleich hohen Frames
@@ -7660,35 +7703,36 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 .idle-dorf-tab-group-buttons { display: contents; }
 .idle-dorf-tab-group-label { display: none; }
 
+/* Phase 7.1 Stufe 3 (21.07., Nutzer-Auftrag "Navigation von Gruppenkarten
+   befreien... keine vier einzelnen Navigationskarten... maximal zwei
+   Navigationszeilen"): die vier sichtbaren Gruppenkarten (Basis/Sammlung/
+   Herausforderungen/Gilde) sind komplett entfernt - .idle-dorf-tab-group
+   bleibt jetzt AUCH auf Desktop-Breite "display:contents" (wie im mobilen
+   Grundzustand), .idle-dorf-tabs selbst ist der einzige Flex-Wrap-
+   Container fuer alle 15 Tabs. Bewusst OHNE komplett neuen "Mehr"-
+   Dropdown-Mechanismus (der Auftrag erlaubt das explizit als Alternative:
+   "Alternativ darf eine zweite kompakte Zeile verwendet werden") - ein
+   zweiter, von System B (bkmpIdleSetupMobileTabOverflow, siehe bkmp-app-
+   mode-bootstrap.js) unabhaengiger DOM-Verschiebe-Mechanismus haette das
+   erst in derselben Nacht gefundene "Fenster startet schmal, Buttons
+   verschwinden beim Verbreitern"-Bugmuster (siehe Fix 13 oben) erneut
+   riskiert. Bei 15 kompakten Tabs (~90px Durchschnittsbreite inkl. Icon+
+   Label) passen bei typischer Kartenbreite (~1080px) rechnerisch ~11-12
+   pro Zeile - alle 15 bleiben damit zuverlaessig innerhalb von zwei
+   Zeilen, ohne Gruppenrahmen/-ueberschriften, klar sichtbar, keine
+   Funktion versteckt. */
 @media (min-width: 761px) {
-  .idle-dorf-tabs { gap: 0.5rem 0.7rem; padding: 0 0.1rem 0.5rem; align-items: flex-start; }
+  .idle-dorf-tabs { gap: 0.4rem 0.5rem; padding: 0 0.1rem 0.4rem; align-items: flex-start; }
+  .idle-dorf-tab-group { display: contents; }
+  .idle-dorf-tab-group-buttons { display: contents; }
+  .idle-dorf-tab-group-label { display: none; }
   .idle-dorf-tab {
     flex: 0 1 auto;
-    min-width: 96px;
-    padding: 0.55rem 0.85rem;
-    font-size: 0.8rem;
+    min-width: 0;
+    padding: 0.4rem 0.7rem;
+    font-size: 0.78rem;
+    min-height: 34px;
   }
-  .idle-dorf-tab-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.32rem;
-    flex-shrink: 0;
-    padding: 0.45rem 0.55rem 0.5rem;
-    border-radius: 14px;
-    background: color-mix(in srgb, var(--paper-2) 45%, transparent);
-    border: 1px solid color-mix(in srgb, var(--line) 65%, transparent);
-  }
-  .idle-dorf-tab-group-label {
-    display: block;
-    font-family: var(--font-body);
-    font-size: 0.64rem;
-    font-weight: 700;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-    color: var(--muted);
-    padding-left: 0.2rem;
-  }
-  .idle-dorf-tab-group-buttons { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 }
 /* Nachtrag (21.07., Spieler-Wunsch ChronoKora zum gequetschten Kampfbereich
    bei 1920x1080: "Mach doch einfach oben alle Button viel schmaler von der
@@ -7701,16 +7745,12 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
    oben) - auf echtem Desktop mit Maus nicht noetig, hier bewusst kleiner.
    Gibt der Kampfbereich direkt darunter spuerbar mehr Hoehe zurueck, ohne
    die mobile/Tablet-Touch-Groesse anzutasten. */
+/* Nachtrag Stufe 3: seit dem Wegfall der Gruppenkarten (siehe oben) sind
+   .idle-dorf-tab-group/-buttons/-label hier wirkungslos (display:contents
+   traegt kein Padding/Gap) - nur noch die Tabs/Zeilen-Werte selbst
+   zusaetzlich verengt. */
 @media (min-width: 1000px) {
-  /* Phase 7.1 (21.07., Nutzer-Auftrag "Navigation max. zwei kompakte
-     Zeilen, kleinere Gruppenabstaende"): .idle-dorf-tabs' eigener
-     Zeilen-Abstand (gap) kommt on top zu jeder Gruppe-Karte - hier
-     zusaetzlich zur Gruppen-internen Verdichtung von heute Nacht
-     verengt. */
-  .idle-dorf-tabs { gap: 0.4rem 0.6rem; }
-  .idle-dorf-tab-group { padding: 0.28rem 0.4rem 0.3rem; gap: 0.18rem; }
-  .idle-dorf-tab-group-label { font-size: 0.58rem; }
-  .idle-dorf-tab-group-buttons { gap: 0.28rem; }
+  .idle-dorf-tabs { gap: 0.35rem 0.5rem; }
   .idle-dorf-tab {
     min-height: 30px;
     padding: 0.26rem 0.6rem;
@@ -9134,6 +9174,50 @@ html.bkmp-app-mode .idle-hud-resources span {
   background: linear-gradient(135deg, rgba(255, 215, 106, .16), rgba(255, 140, 61, .08));
   border-color: color-mix(in srgb, var(--app-gold) 40%, transparent);
 }
+/* Phase 7.1 Stufe 3 (21.07., Nutzer-Auftrag "Kampfwerte und Ressourcen
+   gemeinsam, horizontaler kompakter Flow"): ersetzt die bisherigen zwei
+   getrennten Zeilen (.idle-hud-stats + .idle-hud-resources, je eigene
+   margin-top) durch EINEN gemeinsamen Flow-Container (siehe
+   bkmpIdleRenderHud in js/ui/bkmp-hud.js) - spart eine der beiden
+   Zeilenabstaende ein, Ressourcen-Chips bleiben optisch leicht abgesetzt
+   (Farbverlauf) statt durch eine echte zweite Zeile getrennt zu sein. */
+html.bkmp-app-mode .idle-hud-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .3rem;
+  margin-top: .3rem;
+}
+html.bkmp-app-mode .idle-hud-flow span {
+  display: inline-flex;
+  align-items: center;
+  gap: .28rem;
+  padding: .22rem .5rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .05);
+  border: 1px solid rgba(255, 255, 255, .09);
+  font-size: .72rem;
+  font-weight: 700;
+  color: var(--app-ink);
+  font-variant-numeric: tabular-nums;
+}
+html.bkmp-app-mode .idle-hud-flow span:nth-last-child(-n+6) {
+  background: linear-gradient(135deg, rgba(255, 215, 106, .16), rgba(255, 140, 61, .08));
+  border-color: color-mix(in srgb, var(--app-gold) 40%, transparent);
+}
+/* Spezifitaet bewusst hoeher als "html.bkmp-app-mode .idle-hud-flow span"
+   oben (zusaetzliche Klasse UND "span" im Selektor) - sonst gewinnt die
+   allgemeine Pillen-Optik (Padding/Rahmen/Radius) und der Trenner sieht
+   wie ein weiterer Chip statt einer duennen Linie aus. */
+html.bkmp-app-mode .idle-hud-flow span.idle-hud-flow-sep {
+  width: 1px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  align-self: stretch;
+  background: rgba(255, 255, 255, .16);
+  margin: .1rem .05rem;
+}
 @keyframes appHudPop {
   from { transform: scale(.7); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
@@ -9333,31 +9417,58 @@ html.bkmp-app-mode .idle-dorf-panel textarea {
    kleinen, separaten Timer im App-Modus-Bootstrap-Skript (index.html)
    gesetzt, der nur bkmpRaidGetPhaseInfo() ausliest (rein lesend, schon
    global vorhanden) - idledorf.js bleibt auch hierfuer unangetastet. */
+/* Phase 7.1 Stufe 3 (21.07., Nutzer-Auftrag "Raidboss-Banner drastisch
+   verkleinern, eine einzige Zeile"): kompletter Umbau von einem grossen,
+   mehrzeiligen Hero-Banner (vorher: eigene Ueberschrift-Zeile + Countdown-
+   Zeile + "flex-basis:100%"-erzwungene Teilnehmerzahl-Zeile = 3 Zeilen,
+   ~100px) zu einer echten Einzeilen-Leiste. "flex-basis:100%" auf
+   .raid-join-banner-participants war der Hauptverursacher der dritten
+   Zeile - jetzt Teil desselben Textblocks wie der Titel (siehe
+   bkmpRaidRenderJoinBanner in bkmp-raid.js), kein eigenes Flex-Item mehr. */
 html.bkmp-app-mode .raid-join-banner {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: .7rem;
-  margin-bottom: .7rem;
-  padding: .9rem 1rem;
-  border-radius: 18px;
+  gap: .5rem;
+  margin-bottom: .5rem;
+  padding: .5rem .7rem;
+  border-radius: 12px;
   background: linear-gradient(120deg, rgba(74, 42, 122, .35), rgba(60, 230, 224, .12));
   border: 1.5px solid color-mix(in srgb, var(--app-cyan) 40%, transparent);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, .4);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .3);
   transition: border-color .3s ease, background .3s ease;
+  min-height: 46px;
 }
-html.bkmp-app-mode .raid-join-banner-title {
+html.bkmp-app-mode .raid-join-banner-icon { flex: none; font-size: 1.1rem; line-height: 1; }
+html.bkmp-app-mode .raid-join-banner-minimize {
+  order: 99;
+  flex: none;
+  width: 22px; height: 22px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--app-cyan) 35%, transparent);
+  background: rgba(255, 255, 255, .05);
+  color: var(--app-muted);
+  font-size: .75rem;
+  cursor: pointer;
+  padding: 0;
+}
+html.bkmp-app-mode .raid-join-banner-text {
   flex: 1 1 auto;
-  min-width: 55%;
-  font-weight: 800;
-  font-size: .92rem;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 700;
+  font-size: .82rem;
   color: var(--app-ink);
 }
+html.bkmp-app-mode .raid-join-banner-participants { font-size: .78rem; color: var(--app-muted); font-weight: 600; }
+html.bkmp-app-mode .raid-join-banner-participants:not(:empty)::before { content: ' · '; }
 html.bkmp-app-mode .raid-join-banner-countdown {
   flex: none;
   font-family: 'Fraunces', serif;
-  font-size: 1.5rem;
+  font-size: 1.05rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   color: var(--app-cyan);
@@ -9365,26 +9476,27 @@ html.bkmp-app-mode .raid-join-banner-countdown {
 }
 html.bkmp-app-mode .raid-join-banner-btn {
   flex: none;
-  padding: .8rem 1.4rem !important;
-  font-size: .95rem !important;
+  padding: .35rem .8rem !important;
+  font-size: .8rem !important;
   border-radius: 999px !important;
   background: linear-gradient(135deg, var(--app-gold), var(--app-orange)) !important;
   box-shadow: var(--app-glow-gold);
   border: none !important;
   color: #2b1600 !important;
   font-weight: 800 !important;
+  min-height: 0 !important;
 }
 html.bkmp-app-mode .raid-join-banner-joined {
   flex: none;
   font-weight: 700;
   color: var(--app-green);
-  font-size: .85rem;
+  font-size: .78rem;
 }
-html.bkmp-app-mode .raid-join-banner-participants {
-  flex-basis: 100%;
-  font-size: .74rem;
-  color: var(--app-muted);
-}
+/* Minimiert: nur Icon/Countdown/Beitreten-Button bleiben sichtbar (siehe
+   Auftrag "nur Icon, Countdown und Beitreten anzeigen") - Titel+
+   Teilnehmerzahl ausgeblendet, kein Layoutplatz dafuer reserviert. */
+html.bkmp-app-mode .raid-join-banner.raid-join-banner-minimized .raid-join-banner-text { display: none; }
+html.bkmp-app-mode .raid-join-banner.raid-join-banner-minimized { min-height: 0; padding: .35rem .6rem; }
 html.bkmp-app-mode .raid-join-banner.raid-urgent {
   border-color: var(--app-red);
   background: linear-gradient(120deg, rgba(255, 59, 92, .3), rgba(255, 140, 61, .14));
@@ -9601,9 +9713,24 @@ html.bkmp-app-mode .idle-battlefield {
   border: 1px solid rgba(255, 255, 255, .1);
   box-shadow: inset 0 0 60px rgba(0, 0, 0, .5);
 }
-html.bkmp-app-mode .idle-village,
-html.bkmp-app-mode .idle-dragon {
+/* Phase 7.1 Stufe 3 (21.07., Nutzer-Auftrag "Dorf 44-48%, Drache 48-56%"):
+   diese Regel (nicht die gleichnamige weiter oben in der Datei, die durch
+   die spaetere Position hier ueberschrieben wird - verifiziert per
+   CSSOM-Rule-Matching) ist die tatsaechlich wirksame Fassung - macht
+   beide Container bereits randlos/hintergrundlos (praktisch schon "eine
+   gemeinsame Szene" statt zwei Karten). Vorher hier ebenfalls 46%/46%
+   (symmetrisch) - jetzt asymmetrisch, Drache als "Gegner" bewusst etwas
+   groesser. */
+html.bkmp-app-mode .idle-village {
   width: 46%;
+  background: none;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 0;
+}
+html.bkmp-app-mode .idle-dragon {
+  width: 52%;
   background: none;
   border: none;
   box-shadow: none;

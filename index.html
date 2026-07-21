@@ -108,7 +108,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260721-phase71compact4">
+<link rel="stylesheet" href="style.css?v=20260721-phase71stage3a">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 </head>
 <body>
@@ -822,10 +822,17 @@
            Button-Leiste, als ganz normaler .btn-nein-Pillenbutton -
            gleiches Muster wie ueberall sonst auf der Seite (z.B. die
            "❓ Hilfe"-Buttons), statt eines separaten Text-Links. -->
-      <div class="joke-buttons">
-        <a class="btn-nein idle-app-link-btn" id="idleAppLinkBtn" href="/app">📲 Als App installieren</a>
-        <button class="btn-nein idle-stream-help-btn" id="idleStreamHelpBtn" type="button">📡 Für Streamer</button>
-        <button class="btn-ja" id="idleDorfClose" type="button">Schlie&szlig;en</button>
+      <!-- Phase 7.1 Stufe 3 (21.07., Nutzer-Auftrag "Schliessen ausschliesslich
+           oben rechts, permanenter Footer entfaellt"): der textuelle
+           "Schliessen"-Button ist entfernt (rein redundant - #idleDorfCloseX
+           oben rechts deckt exakt dieselbe Funktion bereits ab, eigener
+           Klick-Listener dort unveraendert vorhanden, siehe idledorf.js).
+           App-Install/Streamer bleiben als kleine, einzeilige Restleiste
+           bestehen (Auftrag erlaubt das explizit als Fallback: "maximal
+           8-16px Abstand, keine grosse Buttonreihe"). -->
+      <div class="joke-buttons idle-dorf-footer-links">
+        <a class="idle-app-link-btn" id="idleAppLinkBtn" href="/app">📲 Als App installieren</a>
+        <button class="idle-stream-help-btn" id="idleStreamHelpBtn" type="button">📡 Für Streamer</button>
       </div>
     </div>
 
@@ -1461,7 +1468,7 @@
   <script src="js/systems/bkmp-breeding.js?v=20260719-p55b" defer></script>
   <script src="js/systems/bkmp-guild.js?v=20260717-p51perf2" defer></script>
   <script src="js/systems/bkmp-runes.js?v=20260720-runeequipfix1" defer></script>
-  <script src="js/systems/bkmp-raid.js?v=20260719-fixbatch2" defer></script>
+  <script src="js/systems/bkmp-raid.js?v=20260721-phase71stage3a" defer></script>
   <script src="js/systems/bkmp-tower.js?v=20260720-stagebarfix1" defer></script>
   <script src="js/systems/bkmp-prestige.js?v=20260718-runedupfix1" defer></script>
   <script src="js/systems/bkmp-arena.js?v=20260721-arenachance1" defer></script>
@@ -1469,11 +1476,11 @@
   <script src="js/systems/bkmp-skilltree.js?v=20260717-p2bfoundation" defer></script>
   <script src="js/systems/bkmp-cosmetics.js?v=20260719-fixbatch3" defer></script>
   <script src="js/systems/bkmp-events.js?v=20260719-p55g" defer></script>
-  <script src="js/ui/bkmp-hud.js?v=20260721-phase71compact1" defer></script>
+  <script src="js/ui/bkmp-hud.js?v=20260721-phase71stage3a" defer></script>
   <script src="js/systems/bkmp-leaderboard.js?v=20260717-p2cfoundation" defer></script>
   <script src="js/ui/bkmp-ui-components.js?v=20260719-p55b" defer></script>
   <script src="js/ui/bkmp-reward-presenter.js?v=20260719-p55e" defer></script>
-  <script src="idledorf.js?v=20260721-phase71compact1" defer></script>
+  <script src="idledorf.js?v=20260721-phase71stage3a" defer></script>
   <script src="mapart.js?v=20260717-kartenfirmen1" defer></script>
   <script src="js/core/bkmp-idle-bootstrap.js?v=20260717-p2afoundation" defer></script>
   <script src="js/core/bkmp-site.js?v=20260720-pollfix1" defer></script>

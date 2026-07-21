@@ -119,6 +119,38 @@ Bei 1280×720 (Auftrag nennt das explizit als Ziel-Laptop-Größe) passt jetzt a
 - Hierarchische Haupt-Kategorien in der Navigation (z.B. "Gilde" anklicken -> erst dann Unterpunkte) - bereits in Bug 12 oben als bewusst zurueckgestellte Idee vermerkt.
 - Alle anderen Tabs (Upgrades/Skilltree/Prestige/Runen/Erfolge/etc.) folgen erst nach Freigabe dieser Stufe, wie im Auftrag verlangt.
 
+### Phase 7.1 Stufe 3 (21.07.2026) — Raidbanner, Navigation, Kampfszene final komprimiert
+
+Nutzer-Auftrag: Nachbesserung nach Stufe-1-Feedback (Raidbanner zu dominant, HUD/Navigation weiterhin zu viele Zeilen, Dorf/Drache wirken wie zwei getrennte Screenshots, permanenter Footer, Kampf beginnt zu weit unten). **Nichts committed/gepusht/deployed, keine Spielwerte/Raidboss-Timer/Kampfwerte veraendert.** Git-Status vor Beginn geprueft: sauber, `main`, Commit `4e3cbe6`.
+
+**Umsetzung:**
+- **Raidbanner** (`js/systems/bkmp-raid.js`, `bkmpRaidRenderJoinBanner()`): kompletter Umbau von 3 Zeilen (~100px) auf 1 Zeile (49px, Ziel 46-58px). Ursache der 3. Zeile: `.raid-join-banner-participants{flex-basis:100%}` erzwang IMMER eine eigene volle Zeile - jetzt Teil desselben Textblocks wie der Titel. Minimieren-Button neu (`bkmpRaidBannerSetMinimized()`), Zustand pro Raid-ID in sessionStorage (nicht global) - ein neuer Raidboss zeigt den Hinweis automatisch wieder voll. Verifiziert: Minimiert-Test zeigt Text korrekt `display:none`, Hoehe 49px->44px.
+- **Navigation** (`style.css`, `@media(min-width:761px)`): die 4 Gruppenkarten (Basis/Sammlung/Herausforderungen/Gilde) sind entfernt - `.idle-dorf-tab-group` bleibt jetzt auch auf Desktop `display:contents` (wie mobil), alle 15 Tabs flach in `.idle-dorf-tabs` als EINEN Flex-Wrap-Container. Bewusst OHNE neuen "Mehr"-Dropdown-Mechanismus - der Auftrag erlaubt explizit "Alternativ darf eine zweite kompakte Zeile verwendet werden", und ein zweiter, von System B unabhaengiger DOM-Verschiebe-Mechanismus haette das erst in derselben Nacht gefundene "Fenster startet schmal, Buttons verschwinden beim Verbreitern"-Bugmuster erneut riskiert (siehe Bug 13 oben). Verifiziert: 15/15 Tabs sichtbar, echte 2 Zeilen (65px) - eine anfangs gemessene "3. Zeile" war nur der 2px-Hover-Lift-Effekt des aktiven Tabs, kein echter Umbruch.
+- **Kampfszene** (`style.css`, zwei konkurrierende `html.bkmp-app-mode .idle-village/.idle-dragon`-Bloecke gefunden, siehe unten): die eigene Goldrahmen-Karte JEDES Containers war der Hauptgrund fuer "zwei getrennte Screenshots" - beide sitzen jetzt randlos auf dem gemeinsamen Kampffeld-Hintergrund. Dorf 46%/Drache 52% (vorher symmetrisch 46%/46%).
+- **HUD** (`js/ui/bkmp-hud.js`, `bkmpIdleRenderHud()`): Kampfwerte+Ressourcen zu einem gemeinsamen `.idle-hud-flow`-Container zusammengefuehrt (vorher zwei komplett getrennte Zeilen) - spart eine Zeilenabstand-Ebene, Ressourcen bleiben farblich abgesetzt statt durch eine echte Zeile getrennt.
+- **Footer**: `#idleDorfClose` ("Schliessen"-Button) entfernt - rein redundant, `#idleDorfCloseX` oben rechts deckt dieselbe Funktion bereits ab (eigener, unangetasteter Klick-Listener). App-Install/Streamer als kleine Textlinks statt Pillenbuttons (36px statt vorher 42px).
+- **Height-Breakpoints**: von 2 auf 3 Stufen erweitert (900/780/700px), verdichten jetzt zusaetzlich HUD/Navigation/Stufenleiste, nicht nur das Kampffeld.
+
+**Zwei weitere Selektor-Spezifitaets-Konflikte gefunden** (gleiches Muster wie die zwei bereits in Stufe 1 gefundenen - nicht nur behauptet, per CSSOM-Rule-Matching verifiziert):
+1. Village/Dragon-Breite: zwei fast identische `html.bkmp-app-mode .idle-village, .idle-dragon`-Bloecke existieren (Zeile ~9200 UND ~9654) - der ERSTE (aeltere) setzt noch einen eigenen Goldrahmen, der SPAETERE (gleiche Spezifitaet, gewinnt per Cascade-Reihenfolge) macht beide bereits randlos. Die tatsaechlich wirksame Regel war also schon "richtig", nur die Breiten-Werte (46%/46%) mussten auf 46%/52% angepasst werden - direktes Aendern der ERSTEN (nicht wirksamen) Regel haette gar nichts bewirkt.
+2. (Bereits in Stufe 1 dokumentiert, hier nur als Muster-Bestaetigung relevant.)
+
+**Vorher/Nachher bei 1366×768** (per realistischem Mock-Zustand + injizierten Test-Markup direkt ueber die echten Render-Funktionen gemessen, `getBoundingClientRect`):
+
+| Bereich | Ziel (Auftrag) | Nachher |
+|---|---|---|
+| Raidbanner | 46-58px, 1 Zeile | **49px, 1 Zeile** |
+| HUD | 94-110px | **94px** |
+| Navigation | 42-82px, max. 2 Zeilen | **65px, 2 Zeilen** (15/15 Tabs sichtbar) |
+| Stufenleiste | 46-52px | **52px** |
+| Kampffeld-Y (mit Raidbanner) | spaetestens Y=400 | **Y=365** |
+| Kampffeld-Y (ohne Raidbanner) | - | **Y=317** |
+| Footer | kein permanenter Footer / max. 8-16px | **36px** (kleine Textlinks, kein Pillenbutton mehr) |
+
+**Verifiziert:** keine Konsolenfehler bei 1366×768/390×844, Mobile-Shell unangetastet (Bottom-Nav/kompaktes HUD weiterhin `display:flex/block`, Desktop-Tabs weiterhin `display:none`), Syntax-/Brace-Check sauber.
+
+**Nicht umgesetzt (bewusst, fuer eine spaetere Stufe):** HP-Balken bleiben in ihrer bisherigen Position unter dem Sprite statt als echtes Overlay auf dem Motiv - eine echte Ueberlagerung braucht sorgfaeltige Kontrast-/Lesbarkeitspruefung pro Drachen-Skin, mehr visuelle Iteration als in dieser Runde moeglich. Schadenszahlen-Trefferpunkte nicht gesondert nachgemessen (keine strukturelle Aenderung an ihrer Positionierungsbasis vorgenommen, daher kein neues Risiko erwartet, aber auch nicht explizit neu verifiziert). Kein neuer "Mehr"-Dropdown fuer die Navigation (siehe oben, bewusste Risikoabwaegung).
+
 ## Öffentliches Feedback-, Bug- und Entwicklungsboard (neuer Auftrag, 20.07.2026) — Stufe 1-4 fertig, live
 
 Neues Feature, komplett getrennt vom Redesign-Plan oben. Nutzer-Auftrag: öffentlicher Bereich, in dem ausgewählte Feedback-Einreichungen mit Admin-Antwort/Status/Fortschritt sichtbar sind — Spieler sollen sehen, dass Feedback gelesen wird, bekannte Bugs transparent kommuniziert werden, doppelte Meldungen sinken.

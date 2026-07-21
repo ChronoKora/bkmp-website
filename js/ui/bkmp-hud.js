@@ -350,8 +350,8 @@ function bkmpIdleRenderHud() {
         <div class="idle-xp-label">${Math.floor(bkmpIdleState.xp)} / ${xpNeeded} XP</div>
       </div>
     </div>
-    ${s ? `
-    <div class="idle-hud-stats">
+    <div class="idle-hud-flow">
+      ${s ? `
       <span title="Angriff">⚔️ ${bkmpIdleFormatNumber(Math.round(s.attack))}</span>
       <span title="Verteidigung">🛡️ ${bkmpIdleFormatNumber(Math.round(s.defense))}</span>
       <span title="Maximale Leben">❤️ ${bkmpIdleFormatNumber(Math.round(s.hp))}</span>
@@ -359,8 +359,7 @@ function bkmpIdleRenderHud() {
       <span title="Kritischer Schaden">💥 ${Math.round(s.critDamage)}%</span>
       <span title="Angriffstempo (Angriffe pro Sekunde)">⚡ ${(1000 / (s.tickIntervalMs || 900)).toFixed(2)}/s</span>
       <span title="Glücksfaktor (Bonus auf Runen-/Ressourcen-Drops, aus Upgrades/Skills/Titeln/Runen zusammen)">🍀 +${(s.lootBonus || 0).toFixed(1)}%</span>
-    </div>` : ''}
-    <div class="idle-hud-resources">
+      <span class="idle-hud-flow-sep" aria-hidden="true"></span>` : ''}
       <span>💰 ${bkmpIdleFormatNumber(bkmpIdleState.gold)}</span>
       <span>🌳 ${bkmpIdleFormatNumber(bkmpIdleState.wood)}</span>
       <span>🗿 ${bkmpIdleFormatNumber(bkmpIdleState.stone)}</span>
