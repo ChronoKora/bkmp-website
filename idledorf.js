@@ -1914,20 +1914,45 @@ function bkmpIdleAccrueProductionBuildings() {
   BKMP_IDLE_PRODUCTION_BUILDINGS.forEach(def => {
     const level = Number(bkmpIdleState[def.levelKey] || 0);
     const last = Date.parse(bkmpIdleState[def.tsKey] || now) || now;
-    const hoursElapsed = Math.min(BKMP_IDLE_PRODUCTION_MAX_OFFLINE_HOURS, Math.max(0, (now - last) / 3600000));
+    const rawHoursElapsed = Math.max(0, (now - last) / 3600000);
+    const wasCapped = rawHoursElapsed > BKMP_IDLE_PRODUCTION_MAX_OFFLINE_HOURS;
+    const hoursElapsed = Math.min(BKMP_IDLE_PRODUCTION_MAX_OFFLINE_HOURS, rawHoursElapsed);
     if (hoursElapsed <= 0) return;
-    const gained = hoursElapsed * bkmpIdleProductionBuildingRatePerHour(def, level);
-    if (def.resource === 'xp') {
-      if (gained >= 1) bkmpIdleAddXp(Math.floor(gained));
-    } else {
-      /* Math.floor wie bei fruit/meat oben - gold/wood/stone/crystals/essence
-         sind ebenfalls bigint-Spalten, ein Bruchteil wuerde denselben
-         "kompletter Speicherversuch schlaegt fehl"-Bug ausloesen (siehe
-         Kommentar bei bkmpIdleAccrueBuildingResources). */
-      bkmpIdleState[def.resource] = Math.floor(Number(bkmpIdleState[def.resource] || 0) + gained);
-      if (def.resource === 'gold') bkmpIdleState.total_gold_earned = Number(bkmpIdleState.total_gold_earned || 0) + Math.floor(gained);
+    const ratePerHour = bkmpIdleProductionBuildingRatePerHour(def, level);
+    const gained = hoursElapsed * ratePerHour;
+    const wholeGained = Math.floor(gained);
+    if (wholeGained > 0) {
+      if (def.resource === 'xp') {
+        bkmpIdleAddXp(wholeGained);
+      } else {
+        /* Math.floor wie bei fruit/meat oben - gold/wood/stone/crystals/essence
+           sind ebenfalls bigint-Spalten, ein Bruchteil wuerde denselben
+           "kompletter Speicherversuch schlaegt fehl"-Bug ausloesen (siehe
+           Kommentar bei bkmpIdleAccrueBuildingResources). */
+        bkmpIdleState[def.resource] = Number(bkmpIdleState[def.resource] || 0) + wholeGained;
+        if (def.resource === 'gold') bkmpIdleState.total_gold_earned = Number(bkmpIdleState.total_gold_earned || 0) + wholeGained;
+      }
     }
-    bkmpIdleState[def.tsKey] = new Date(now).toISOString();
+    /* 21.07.: tsKey NICHT mehr unconditional auf "jetzt" springen lassen.
+       bkmpIdleRefreshLiveTabs() ruft diese Funktion bei JEDEM Drachen-Kill
+       waehrend aktivem Spielen auf (max. alle 300ms, siehe dort) - bei
+       niedrigstufigen Gebaeuden (z.B. Kristallmine Stufe 0 = 3/Std.) ergibt
+       ein einzelner Aufruf einen Bruchteil weit unter 1, der durch Math.floor
+       verworfen wird. Wurde die Zeitmarke trotzdem sofort auf "jetzt"
+       gesetzt, war dieser Bruchteil fuer immer weg - bei durchgehend
+       geoeffnetem Upgrades-Tab waehrend des Kampfes produzierte das Gebaeude
+       dadurch faktisch NIE etwas, unabhaengig vom Offline-Status. Fix: nur so
+       viel Zeit "verbrauchen", wie tatsaechlich in eine ganze Einheit
+       umgewandelt wurde - der Rest bleibt fuer den naechsten Aufruf stehen
+       und summiert sich ganz normal auf. Der 72h-Cap-Zweck (Abwesenheit
+       darueber hinaus verfaellt bewusst) bleibt erhalten: wurde tatsaechlich
+       gecappt, springt die Zeitmarke wie bisher hart auf "jetzt". */
+    if (wasCapped) {
+      bkmpIdleState[def.tsKey] = new Date(now).toISOString();
+    } else if (wholeGained > 0) {
+      const hoursConsumed = wholeGained / ratePerHour;
+      bkmpIdleState[def.tsKey] = new Date(last + hoursConsumed * 3600000).toISOString();
+    }
   });
 }
 function bkmpIdleBuyProductionBuilding(id) {
