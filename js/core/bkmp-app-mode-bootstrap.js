@@ -167,10 +167,23 @@
        robuster Fix: einmaliges Neuladen, sobald die Seite tatsaechlich
        (wieder) Desktop-Breite hat, NACHDEM die zerstoerende Umbaumassnahme
        schon gelaufen ist. Debounce verhindert mehrfaches Neuladen waehrend
-       eines Zieh-Vorgangs, sessionStorage-Flag verhindert eine
-       Neulade-Schleife, falls das Fenster danach wieder verkleinert wird.
-       Echter App-Modus ausgenommen - dort ist die kompakte Nav die
-       ABSICHTLICH dauerhafte Struktur, unabhaengig von der Breite. */
+       eines Zieh-Vorgangs. Echter App-Modus ausgenommen - dort ist die
+       kompakte Nav die ABSICHTLICH dauerhafte Struktur, unabhaengig von
+       der Breite.
+       Nachbesserung (21.07., Spieler-Test ChronoKora: "im Localhost sehe
+       ich sie, aber nicht auf der normalen Website" - derselbe Browser-Tab
+       lief die ganze Nacht ueber fuer wiederholte Tests): die urspruengliche
+       Fassung nutzte ein DAUERHAFTES sessionStorage-Flag ("nur einmal pro
+       Tab-Sitzung neu laden") - bei einem einzelnen kurzen Test reicht das,
+       aber sobald derselbe Tab die schmal-dann-breit-Situation ein ZWEITES
+       Mal durchlebt (z.B. wiederholtes Testen, Fenster mehrfach verkleinert/
+       vergroessert), war die Sperre bereits "verbraucht" und der echte,
+       neue Fall wurde faelschlich uebersprungen - identisches Symptom wie
+       der urspruengliche Bug, nur durch die eigene Absicherung verursacht.
+       Fix: zeitbasiertes Abklingen (10s) statt Dauersperre - verhindert
+       weiterhin eine Neulade-Schleife waehrend eines einzelnen Zieh-
+       Vorgangs, heilt sich aber bei jedem SPAETEREN echten Auftreten
+       erneut selbst. */
     if (!window.BKMP_APP_MODE) {
       var bkmpTabOverflowResizeTimer = null;
       window.addEventListener('resize', function () {
@@ -180,8 +193,9 @@
           var wasCollapsedIntoMobileShape = !!document.getElementById('idleAppMoreBtn');
           if (!isDesktopNow || !wasCollapsedIntoMobileShape) return;
           try {
-            if (sessionStorage.getItem('bkmpTabOverflowReloaded') === '1') return;
-            sessionStorage.setItem('bkmpTabOverflowReloaded', '1');
+            var lastReloadAt = Number(sessionStorage.getItem('bkmpTabOverflowReloadedAt') || 0);
+            if (Date.now() - lastReloadAt < 10000) return;
+            sessionStorage.setItem('bkmpTabOverflowReloadedAt', String(Date.now()));
           } catch (e) {}
           location.reload();
         }, 400);
