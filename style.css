@@ -7580,7 +7580,7 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 .idle-dorf-tab-group-label { display: none; }
 
 @media (min-width: 761px) {
-  .idle-dorf-tabs { gap: 0.6rem 0.8rem; padding: 0 0.1rem 0.6rem; align-items: flex-start; }
+  .idle-dorf-tabs { gap: 0.5rem 0.7rem; padding: 0 0.1rem 0.5rem; align-items: flex-start; }
   .idle-dorf-tab {
     flex: 0 1 auto;
     min-width: 96px;
@@ -7608,6 +7608,28 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
     padding-left: 0.2rem;
   }
   .idle-dorf-tab-group-buttons { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+}
+/* Nachtrag (21.07., Spieler-Wunsch ChronoKora zum gequetschten Kampfbereich
+   bei 1920x1080: "Mach doch einfach oben alle Button viel schmaler von der
+   Hoehe?"): eigene, dichtere Fassung NUR ab einer echten Desktop-Breite
+   (min-width:1000px, bewusst enger als die 761px-Grenze oben - bei knapp
+   761px-1000px brechen die 4 Gruppen ohnehin schon in mehrere Zeilen um,
+   dort wuerde eine kleinere min-height allein nicht viel bringen, aber
+   das Risiko fuer Tablet-Touch-Ziele unnoetig erhoehen). min-height 44px
+   war fuer Touch-Ziele gedacht (mobile Basisregel, siehe .idle-dorf-tab
+   oben) - auf echtem Desktop mit Maus nicht noetig, hier bewusst kleiner.
+   Gibt der Kampfbereich direkt darunter spuerbar mehr Hoehe zurueck, ohne
+   die mobile/Tablet-Touch-Groesse anzutasten. */
+@media (min-width: 1000px) {
+  .idle-dorf-tab-group { padding: 0.32rem 0.45rem 0.35rem; gap: 0.22rem; }
+  .idle-dorf-tab-group-label { font-size: 0.58rem; }
+  .idle-dorf-tab-group-buttons { gap: 0.3rem; }
+  .idle-dorf-tab {
+    min-height: 32px;
+    padding: 0.3rem 0.65rem;
+    font-size: 0.76rem;
+    min-width: 0;
+  }
 }
 
 /* ---- Schlachtfeld: Arena statt Info-Box ---- */
