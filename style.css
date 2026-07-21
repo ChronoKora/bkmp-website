@@ -10702,7 +10702,29 @@ html.bkmp-app-mode .achievements-subtab {
    das umgedreht: das Schlachtfeld waechst (passend zum urspruenglichen
    Wunsch "Kampf soll mindestens 70% der Bildschirmhoehe einnehmen"), das
    Log wird zu einem kleinen, fest begrenzten Streifen am unteren Rand. */
-html.bkmp-app-mode #idlePanelKampf {
+/* Nachtrag (21.07., Spieler-Meldung ChronoKora bei 1920x1080: Kampfbereich
+   gequetscht): dieser ganze Block setzte "flex:1 1 auto" + "min-height:0",
+   damit das Schlachtfeld den UeBRIGEN Platz der Karte fuellt - das
+   funktioniert aber NUR, wenn die Karte (.idle-dorf-card) selbst eine
+   ECHTE, von aussen vorgegebene Hoehe hat (sonst gibt es keinen "uebrigen
+   Platz" zu verteilen, die Karte schrumpft stattdessen einfach auf ihren
+   Inhalt und das Schlachtfeld bekommt nur sein eigenes Minimum). Das ist
+   nur in zwei Faellen gegeben: echter Vollbild-App-Modus (html.bkmp-app-
+   mode.zone-game, siehe eigene .idle-dorf-card-Regel weiter oben, IMMER
+   100vh unabhaengig von der Breite) ODER die mobile Karten-Regel
+   @media(max-width:640px) (ebenfalls explizit height:100dvh). Auf der
+   normalen Website in normaler Fensterbreite (html.bkmp-app-mode OHNE
+   zone-game, wie hier) hat die Karte dagegen nur ein max-height:95vh
+   (Inhalts-Hoehe mit Deckel) - "min-height:0!important" hat dort also
+   nicht "wachsen lassen" bewirkt, sondern schlicht die alte, verlaessliche
+   .idle-battlefield{min-height:220px}-Untergrenze (Basisregel weiter oben
+   in dieser Datei) ausgehebelt, ohne dass echter Wachstumsraum da war -
+   das Schlachtfeld fiel auf sein reines Inhalts-Minimum zurueck (~150px
+   bei 1920x1080). Fix: auf ".zone-game" verengt (echter App-Modus, hat
+   immer echte Hoehe) + eigene Kopie fuer die mobile Kartenbreite ergaenzt -
+   auf normaler Desktop-Website-Breite greift jetzt wieder die alte
+   220px-Untergrenze der Basisregel, kein Quetschen mehr. */
+html.bkmp-app-mode.zone-game #idlePanelKampf {
   /* Nur DIESES Panel darf im Flex-Layout der Karte (siehe oben)
      wachsen - alle anderen Panels bleiben bei ihrer Phase-6-Regel
      (Hoehe = Inhalt, kein Wachsen), damit deren Leerflaechen-Fix nicht
@@ -10710,14 +10732,14 @@ html.bkmp-app-mode #idlePanelKampf {
   flex: 1 1 auto !important;
   min-height: 0 !important;
 }
-html.bkmp-app-mode .idle-dorf-panel:not(#idlePanelKampf) {
+html.bkmp-app-mode.zone-game .idle-dorf-panel:not(#idlePanelKampf) {
   flex: 0 0 auto !important;
 }
-html.bkmp-app-mode #idlePanelKampf .idle-battlefield {
+html.bkmp-app-mode.zone-game #idlePanelKampf .idle-battlefield {
   flex: 1 1 auto !important;
   min-height: 0 !important;
 }
-html.bkmp-app-mode #idlePanelKampf .idle-dorf-log {
+html.bkmp-app-mode.zone-game #idlePanelKampf .idle-dorf-log {
   flex: 0 0 auto !important;
   /* Bug-Fix 18.07.: siehe Kommentar bei der Basis-Regel .idle-dorf-log -
      dieselbe Wachsen-bei-neuer-Zeile-Ursache, hier per !important auf
@@ -10725,6 +10747,31 @@ html.bkmp-app-mode #idlePanelKampf .idle-dorf-log {
   min-height: 13vh;
   max-height: 13vh;
   margin-top: .6rem;
+}
+@media (max-width: 640px) {
+  /* Mobile Website-Ansicht (Modal ueber der normalen Seite, kein echter
+     App-Modus): .idle-dorf-card bekommt hier ueber die eigene
+     @media(max-width:640px)-Regel weiter oben ebenfalls explizit
+     height:100dvh - dieselbe Wachsen-Logik wie oben greift hier also
+     genauso korrekt, nur eben an die Breite statt an .zone-game
+     gebunden. */
+  html.bkmp-app-mode #idlePanelKampf {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+  }
+  html.bkmp-app-mode .idle-dorf-panel:not(#idlePanelKampf) {
+    flex: 0 0 auto !important;
+  }
+  html.bkmp-app-mode #idlePanelKampf .idle-battlefield {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+  }
+  html.bkmp-app-mode #idlePanelKampf .idle-dorf-log {
+    flex: 0 0 auto !important;
+    min-height: 13vh;
+    max-height: 13vh;
+    margin-top: .6rem;
+  }
 }
 
 /* Bottom-Navigation auf 3 Haupt-Tabs + Mehr reduziert (Nutzer-Wunsch) -
@@ -11172,7 +11219,15 @@ html.bkmp-app-mode .idle-app-more-sheet-group-title:first-child {
    komplett wirkungslos bleiben (nur Checkbox+Log wie vor Phase 7.0) - die
    beiden neuen Kindelemente muessen dafuer explizit ausgeblendet werden,
    nicht nur der Umschalt-Button (der hat diese Basis-Regel bereits oben). */
-.idle-combat-log-sheet-handle, .idle-combat-log-sheet-header { display: none; }
+/* Nachtrag (21.07., Spieler-Meldung ChronoKora: Kampfbereich bei 1920x1080
+   gequetscht): der obige Fix deckte nur die beiden Kindelemente ab, aber
+   #idleCombatLogSheet SELBST (der Wrapper) hatte ebenfalls keine
+   Basis-Regel - rendert dadurch auf jeder Breite als normaler, 171px hoher
+   Block mitten im Kampf-Tab statt unsichtbar zu bleiben, bis die mobile
+   Media Query weiter unten ihn zu position:fixed macht. Frisst dabei dem
+   per Flexbox wachsenden .idle-battlefield (Phase 13) genau den Platz weg,
+   den es eigentlich bekommen sollte. */
+.idle-combat-log-sheet, .idle-combat-log-sheet-handle, .idle-combat-log-sheet-header { display: none; }
 
 /* Portrait ODER Querformat-Telefon (Abschnitt 29): reines max-width:768px
    greift bei einem quer gehaltenen Telefon oft NICHT (viele Telefone sind
