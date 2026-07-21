@@ -847,12 +847,19 @@ function bkmpIdleRenderStageBar() {
      spawnen zufaellig (siehe Bug-Fix bkmpIdleSpawnDragon) und duerfen dem
      Spieler nicht als garantierte kommende Stufe angezeigt werden. */
   const nextBossStageIdx = Math.ceil((current + 1) / 25) * 25 - 1;
+  /* Kompaktere Beschriftung (Phase 7.1, Nutzer-Vorgabe "Stufe 114-8 · Gesamt
+     1.200 · Nächster Boss 114-9"): reiner Textkuerzung, dieselben drei
+     bereits berechneten Werte (current/bkmpIdleLifetimeStageCount/
+     nextBossStageIdx) - keine neue Berechnung, keine Wertaenderung. Kuerzer
+     hilft der Stufenleiste, auf typischen Laptop-Breiten (1366px) als EINE
+     Zeile zu bleiben statt auf zwei Zeilen umzubrechen (siehe
+     .idle-stage-label flex:1 1 auto;min-width:0 in style.css). */
   el.innerHTML = `
-    <span class="idle-stage-label">Stufe <strong>${bkmpIdleFormatStage(current)}</strong> · Insgesamt erreichte Stufen: <strong>${bkmpIdleFormatNumber(bkmpIdleLifetimeStageCount())}</strong> · 👑 Nächster Boss: <strong>Stufe ${bkmpIdleFormatStage(nextBossStageIdx)}</strong></span>
+    <span class="idle-stage-label">Stufe <strong>${bkmpIdleFormatStage(current)}</strong> · Gesamt <strong>${bkmpIdleFormatNumber(bkmpIdleLifetimeStageCount())}</strong> · 👑 Boss <strong>${bkmpIdleFormatStage(nextBossStageIdx)}</strong></span>
     <div class="idle-stage-buttons">
-      <button type="button" class="btn-nein idle-stage-btn" id="idleStageAutoAdvanceBtn">${autoAdvance ? '⬆️ Steigt automatisch auf' : '📍 Bleibt auf dieser Stufe'}</button>
-      ${highest > current ? `<button type="button" class="btn-ja idle-stage-btn" id="idleStageJumpBtn" ${jumpDisabled}>Zur besten Stufe springen</button>` : ''}
-      <button type="button" class="btn-nein idle-stage-btn" id="idleStagePickerBtn" ${jumpDisabled}>🗺️ Zu bestimmter Stufe wechseln</button>
+      <button type="button" class="btn-nein idle-stage-btn" id="idleStageAutoAdvanceBtn">${autoAdvance ? '⬆️ Automatisch' : '📍 Bleibt hier'}</button>
+      ${highest > current ? `<button type="button" class="btn-ja idle-stage-btn" id="idleStageJumpBtn" ${jumpDisabled}>Beste Stufe</button>` : ''}
+      <button type="button" class="btn-nein idle-stage-btn" id="idleStagePickerBtn" ${jumpDisabled}>🗺️ Stufe wählen</button>
     </div>`;
   const autoBtn = document.getElementById('idleStageAutoAdvanceBtn');
   if (autoBtn) autoBtn.addEventListener('click', bkmpIdleToggleAutoAdvance);

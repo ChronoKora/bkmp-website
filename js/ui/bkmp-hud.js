@@ -368,6 +368,22 @@ function bkmpIdleRenderHud() {
       <span>🧪 ${bkmpIdleFormatNumber(bkmpIdleState.essence)}</span>
       <span>🐉 ${bkmpIdleFormatNumber(bkmpIdleState.dragon_kills)} besiegt</span>
     </div>`;
+  /* Phase 7.1 (21.07., Nutzer-Auftrag "Effektmodus darf keine eigene Zeile
+     mehr belegen"): #idleFxModeBtn lebt statisch in index.html als
+     Geschwister von .idle-stage-bar/.idle-battlefield (NICHT als Kind von
+     #idleDorfHud) - genau deshalb ueberlebt es die obige innerHTML-
+     Ersetzung unbeschadet und kann hier per Portal-Muster (identisch zu
+     #idleAppMoreSheet/#idleCombatLogSheet an anderer Stelle) in die frisch
+     gebaute .idle-hud-top eingehaengt werden, statt eine eigene 44px-Zeile
+     zwischen Stufenleiste und Schlachtfeld zu belegen. Muss bei JEDEM
+     Hud-Render erneut passieren (nicht nur einmalig), weil .idle-hud-top
+     selbst jedes Mal neu erzeugt wird. Klick-Listener aus bkmpFxInit()
+     bleiben unangetastet (appendChild verschiebt das echte Element, keine
+     Kopie). Nur im Desktop-Zweig - die mobile/App-Kachel-Vorlage oben hat
+     bereits ihr eigenes Icon (#bkmpProtoChudFxBtn). */
+  const fxBtn = document.getElementById('idleFxModeBtn');
+  const hudTop = hud.querySelector('.idle-hud-top');
+  if (fxBtn && hudTop) hudTop.appendChild(fxBtn);
   /* PROTOTYP 2 (18.07., entfernbar): siehe Kommentar im App-Modus-Zweig
      oben - gleiches Prinzip fuer die Desktop-Vorlage. */
   if (typeof bkmpProtoChudRenderHud === 'function') bkmpProtoChudRenderHud();
