@@ -1224,6 +1224,31 @@ function bkmpRuneSyncDrawerPosition() {
   const drawerWidth = drawer.offsetWidth || 360;
   const maxLeft = window.innerWidth - drawerWidth - 8;
   drawer.style.left = Math.max(0, Math.min(Math.round(rect.right), maxLeft)) + 'px';
+
+  /* Bug-Fix (Playwright-Testbericht 21.07., Phase 7.2): der Balken sass
+     bisher fix bei "top:50%" (style.css), also mittig auf der GANZEN
+     Fensterhoehe zentriert - auf ueblichen Laptop-Hoehen (<=800px) legte
+     sich sein 74vh/640px hoher Panel-Bereich dadurch ueber die Tab-Leiste
+     am OBEREN Kartenrand (z-index:56, hoeher als alles im Fenster), obwohl
+     bkmpRuneSyncDrawerVisibility() beim Tab-Wechsel korrekt die
+     "visible"-Klasse entfernt - das Problem war rein die Position WAEHREND
+     der Balken (kurz) offen ist, nicht das Ein-/Ausblenden selbst. Ein
+     Testklick auf einen von ihm ueberdeckten Tab (z.B. Dungeon) griff
+     dadurch nie durch, genau wie bei einem echten Spieler mit Maus - die
+     einzigen Tabs, mit denen sich der Balken wieder schliessen liesse,
+     lagen selbst darunter. Jetzt wird die Tab-Leiste live gemessen und der
+     Balken IMMER darunter verankert (gleiches Rand-Prinzip wie links: passt
+     er nicht mehr vollstaendig in den restlichen Platz, ruckt er so weit
+     wie moeglich hoch, ohne die Tabs jemals zu ueberdecken). */
+  const tabs = document.getElementById('idleDorfTabs');
+  if (tabs) {
+    const tabsRect = tabs.getBoundingClientRect();
+    const drawerHeight = drawer.offsetHeight || 0;
+    const minTop = tabsRect.bottom + 8;
+    const maxTop = Math.max(minTop, window.innerHeight - drawerHeight - 8);
+    drawer.style.top = Math.round(Math.min(minTop, maxTop)) + 'px';
+    drawer.style.transform = 'none';
+  }
 }
 
 function bkmpRuneToggleDrawer() {

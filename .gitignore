@@ -17,3 +17,11 @@ Thumbs.db
 # mit einem breiten "git add" mitgenommen werden.
 .tmp*/
 *.bak
+
+# Bkmp - Phase 7.2 (21.07.): Playwright-Testberichte/-Artefakte (HTML-Report,
+# Screenshots, Videos, Traces) sind generierte Ausgaben, kein Quellcode - die
+# Testdateien selbst (tests/**/*.js, playwright.config.js, package.json)
+# bleiben versioniert.
+tests/report/
+playwright-report/
+test-results/
