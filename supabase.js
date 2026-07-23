@@ -2964,13 +2964,16 @@ async function redeemPlushieCode(code, playerName) {
   return { ok: response.ok, status: response.status, body: body || {} };
 }
 
-/* Admin-only: Codes anlegen/auflisten (RLS erlaubt das nur eingeloggten Admins). */
+/* Admin-only: Codes anlegen/auflisten (RLS erlaubt das nur eingeloggten Admins).
+   reward_kind/skin_id (23.07., Dorf-Skin-Codes) mit ausgewaehlt/zurueckgegeben -
+   siehe sql/20260723-code-redeemable-village-skins.sql. reward_kind hat einen
+   DB-seitigen Default('plushie'), bestehende Codes brauchen dafuer kein Backfill. */
 async function loadPlushieCodes() {
   const client = bkmpGetSupabaseClient();
   if (!client) return null;
   const { data, error } = await client
     .from('plushie_codes')
-    .select('id, code, plushie_id, note, is_redeemed, redeemed_by_display_name, redeemed_at, created_at, created_by_admin')
+    .select('id, code, plushie_id, skin_id, reward_kind, note, is_redeemed, redeemed_by_display_name, redeemed_at, created_at, created_by_admin')
     .order('created_at', { ascending: false });
   if (error) throw error;
   return data || [];
@@ -2982,7 +2985,7 @@ async function createPlushieCodes(rows) {
   const { data, error } = await client
     .from('plushie_codes')
     .insert(rows)
-    .select('id, code, plushie_id, note');
+    .select('id, code, plushie_id, skin_id, reward_kind, note');
   if (error) throw error;
   return data || [];
 }

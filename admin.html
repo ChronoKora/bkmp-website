@@ -606,7 +606,7 @@
         <section class="admin-page" id="page-plushies">
           <div class="admin-section">
             <h2>Pl&uuml;shie Codes</h2>
-            <p class="admin-help-text">Erstelle einmalig nutzbare Codes f&uuml;r einen Pl&uuml;shie, z.&nbsp;B. f&uuml;r eine Verlosung. Spieler l&ouml;sen den Code auf der Website unter "Erfolge &rarr; Pl&uuml;shies" ein.</p>
+            <p class="admin-help-text">Erstelle einmalig nutzbare Codes f&uuml;r einen Pl&uuml;shie ODER einen Dorf-Skin, z.&nbsp;B. f&uuml;r eine Verlosung. Spieler l&ouml;sen den Code auf der Website unter "Erfolge &rarr; Pl&uuml;shies" ein.</p>
 
             <div class="admin-help-text" style="display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap;">
               <span>Neue Bilder im Ordner <code>assets/plushies/</code> abgelegt? Einmal scannen, dann tauchen sie &uuml;berall automatisch auf.</span>
@@ -615,11 +615,24 @@
 
             <div class="form-grid form-grid-3">
               <div>
-                <label for="plushieCodeSelect">Pl&uuml;shie</label>
-                <select id="plushieCodeSelect"></select>
+                <label for="plushieCodeRewardKind">Belohnungsart</label>
+                <select id="plushieCodeRewardKind">
+                  <option value="plushie">Pl&uuml;shie</option>
+                  <option value="village_skin">Dorf-Skin</option>
+                </select>
               </div>
               <div><label for="plushieCodeCount">Anzahl Codes</label><input type="number" id="plushieCodeCount" value="1" min="1" max="200"></div>
               <div><label for="plushieCodeNote">Notiz (optional)</label><input type="text" id="plushieCodeNote" placeholder="z. B. Yaksha Verlosung"></div>
+            </div>
+            <div class="form-grid form-grid-3">
+              <div id="plushieCodePlushieField">
+                <label for="plushieCodeSelect">Pl&uuml;shie</label>
+                <select id="plushieCodeSelect"></select>
+              </div>
+              <div id="plushieCodeSkinField" style="display:none;">
+                <label for="plushieCodeSkinSelect">Dorf-Skin</label>
+                <select id="plushieCodeSkinSelect"></select>
+              </div>
             </div>
             <button class="btn btn-primary" id="generatePlushieCodes">Codes generieren</button>
 
@@ -631,7 +644,7 @@
 
             <h3 style="margin-top:1.4rem;">Alle Codes <span class="cardcatalog-admin-count" id="plushieCodesCount"></span></h3>
             <div class="form-grid form-grid-2">
-              <div><label for="plushieCodesFilterPlushie">Nach Pl&uuml;shie filtern</label>
+              <div><label for="plushieCodesFilterPlushie">Nach Belohnung filtern</label>
                 <select id="plushieCodesFilterPlushie"><option value="">Alle</option></select>
               </div>
               <div><label for="plushieCodesFilterStatus">Nach Status filtern</label>
@@ -982,7 +995,7 @@
   </div>
 
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260723-presencegate1"></script>
+  <script src="supabase.js?v=20260723-skincodes1"></script>
   <script src="app.js?v=20260718-selbstverdient1"></script>
   <!-- Redesign Phase 2a (17.07.): siehe index.html fuer die Begruendung der
        festen Ladereihenfolge (bkmp-idle-state.js zuerst, bkmp-idle-
@@ -3910,16 +3923,41 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       const prefix = (plushie ? plushie.name.split(' ')[0] : plushieId).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8) || 'CODE';
       return `${prefix}-${bkmpRandomCodeSegment(4)}-${bkmpRandomCodeSegment(4)}`;
     }
+    /* Dorf-Skin-Variante (23.07., "Pluschie-Code-System auf Dorf-Skins
+       erweitern") - eigene Funktion statt bkmpGeneratePlushieCode() zu
+       veraendern, damit die bestehende Daily-Events-Wiederverwendung
+       weiter unten (dailyRerollCodeBtn, laeuft ausschliesslich gegen
+       Pluschies) unangetastet bleibt. */
+    function bkmpGenerateSkinCode(skinId) {
+      const skin = bkmpAdminVillageSkins.find(s => s.id === skinId);
+      const prefix = (skin ? skin.name.split(' ')[0] : skinId).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8) || 'SKIN';
+      return `${prefix}-${bkmpRandomCodeSegment(4)}-${bkmpRandomCodeSegment(4)}`;
+    }
 
     let plushieCodesCache = [];
+    let bkmpAdminVillageSkins = [];
 
     function populatePlushieDropdowns() {
       const select = document.getElementById('plushieCodeSelect');
-      const filterSelect = document.getElementById('plushieCodesFilterPlushie');
       if (select) select.innerHTML = BKMP_PLUSHIES.map(p => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)}</option>`).join('');
-      if (filterSelect) filterSelect.innerHTML = '<option value="">Alle</option>' + BKMP_PLUSHIES.map(p => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)}</option>`).join('');
+      populateRewardFilterDropdown();
     }
-    populatePlushieDropdowns();
+    function populateVillageSkinDropdown() {
+      const select = document.getElementById('plushieCodeSkinSelect');
+      if (select) select.innerHTML = bkmpAdminVillageSkins.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)}</option>`).join('');
+      populateRewardFilterDropdown();
+    }
+    /* Ein gemeinsamer Filter fuer beide Belohnungsarten (23.07.) - Pluschie-
+       IDs und Skin-IDs koennen nicht kollidieren (getrennte Tabellen/Praefixe
+       in der Praxis), renderPlushieCodesList() prueft beim Filtern beide
+       Felder gegen denselben gewaehlten Wert. */
+    function populateRewardFilterDropdown() {
+      const filterSelect = document.getElementById('plushieCodesFilterPlushie');
+      if (!filterSelect) return;
+      const plushieOptions = BKMP_PLUSHIES.map(p => `<option value="${escapeHtml(p.id)}">🧸 ${escapeHtml(p.name)}</option>`).join('');
+      const skinOptions = bkmpAdminVillageSkins.map(s => `<option value="${escapeHtml(s.id)}">🏘️ ${escapeHtml(s.name)}</option>`).join('');
+      filterSelect.innerHTML = '<option value="">Alle</option>' + plushieOptions + skinOptions;
+    }
 
     async function bkmpRefreshPlushieDefinitionsAdmin() {
       if (typeof loadPlushies !== 'function' || !bkmpGetSupabaseClient()) return;
@@ -3935,6 +3973,32 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       }
     }
     bkmpRefreshPlushieDefinitionsAdmin();
+
+    /* Dorf-Skin-Katalog (23.07.) - admin.html hatte bisher UEBERHAUPT keine
+       Dorf-Skin-Anbindung (neue Skins wurden bislang ausschliesslich per
+       Hand-SQL angelegt, siehe CLAUDE.md) - nur fuer die Code-Zuordnung hier
+       geladen, kein voller Verwaltungsbereich. */
+    async function bkmpRefreshVillageSkinsAdmin() {
+      if (typeof loadVillageSkinsCatalog !== 'function' || !bkmpGetSupabaseClient()) return;
+      try {
+        const rows = await loadVillageSkinsCatalog();
+        bkmpAdminVillageSkins = rows || [];
+        populateVillageSkinDropdown();
+        renderPlushieCodesList();
+      } catch (e) {
+        console.warn('Dorf-Skin-Liste konnte nicht geladen werden.', e);
+      }
+    }
+    bkmpRefreshVillageSkinsAdmin();
+
+    const plushieCodeRewardKindEl = document.getElementById('plushieCodeRewardKind');
+    if (plushieCodeRewardKindEl) {
+      plushieCodeRewardKindEl.addEventListener('change', () => {
+        const isSkin = plushieCodeRewardKindEl.value === 'village_skin';
+        document.getElementById('plushieCodePlushieField').style.display = isSkin ? 'none' : '';
+        document.getElementById('plushieCodeSkinField').style.display = isSkin ? '' : 'none';
+      });
+    }
 
     const scanPlushieFolderBtn = document.getElementById('scanPlushieFolder');
     if (scanPlushieFolderBtn) {
@@ -3986,20 +4050,25 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
     const generatePlushieCodesBtn = document.getElementById('generatePlushieCodes');
     if (generatePlushieCodesBtn) {
       generatePlushieCodesBtn.addEventListener('click', async () => {
+        const rewardKind = document.getElementById('plushieCodeRewardKind').value === 'village_skin' ? 'village_skin' : 'plushie';
         const plushieId = document.getElementById('plushieCodeSelect').value;
+        const skinId = document.getElementById('plushieCodeSkinSelect').value;
+        const targetId = rewardKind === 'village_skin' ? skinId : plushieId;
         const count = Math.max(1, Math.min(200, Number(document.getElementById('plushieCodeCount').value) || 1));
         const note = document.getElementById('plushieCodeNote').value.trim();
-        if (!plushieId) return;
+        if (!targetId) return;
         generatePlushieCodesBtn.disabled = true;
         generatePlushieCodesBtn.textContent = 'Wird erstellt...';
         try {
           const seen = new Set();
           const rows = [];
           while (rows.length < count) {
-            const code = bkmpGeneratePlushieCode(plushieId);
+            const code = rewardKind === 'village_skin' ? bkmpGenerateSkinCode(targetId) : bkmpGeneratePlushieCode(targetId);
             if (seen.has(code)) continue;
             seen.add(code);
-            rows.push({ code, plushie_id: plushieId, note });
+            rows.push(rewardKind === 'village_skin'
+              ? { code, reward_kind: 'village_skin', skin_id: targetId, note }
+              : { code, reward_kind: 'plushie', plushie_id: targetId, note });
           }
           const created = await createPlushieCodes(rows);
           const genList = document.getElementById('plushieCodesGeneratedList');
@@ -4018,8 +4087,10 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
             });
           }
           if (genWrap) genWrap.style.display = created.length ? '' : 'none';
-          const plushieName = (BKMP_PLUSHIES.find(p => p.id === plushieId) || {}).name || plushieId;
-          showAdminToast(`${created.length} Code(s) für ${plushieName} erstellt.`, 'success');
+          const rewardName = rewardKind === 'village_skin'
+            ? ((bkmpAdminVillageSkins.find(s => s.id === targetId) || {}).name || targetId)
+            : ((BKMP_PLUSHIES.find(p => p.id === targetId) || {}).name || targetId);
+          showAdminToast(`${created.length} Code(s) für ${rewardName} erstellt.`, 'success');
           document.getElementById('plushieCodeNote').value = '';
           refreshPlushieCodesList();
         } catch (e) {
@@ -4057,10 +4128,10 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       const el = document.getElementById('plushieCodesList');
       const countEl = document.getElementById('plushieCodesCount');
       if (!el) return;
-      const filterPlushie = document.getElementById('plushieCodesFilterPlushie').value;
+      const filterReward = document.getElementById('plushieCodesFilterPlushie').value;
       const filterStatus = document.getElementById('plushieCodesFilterStatus').value;
       let rows = plushieCodesCache;
-      if (filterPlushie) rows = rows.filter(r => r.plushie_id === filterPlushie);
+      if (filterReward) rows = rows.filter(r => r.plushie_id === filterReward || r.skin_id === filterReward);
       if (filterStatus === 'open') rows = rows.filter(r => !r.is_redeemed);
       if (filterStatus === 'redeemed') rows = rows.filter(r => r.is_redeemed);
       if (countEl) countEl.textContent = `(${rows.length})`;
@@ -4070,10 +4141,13 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       }
       el.innerHTML = '';
       rows.forEach(row => {
-        const plushie = BKMP_PLUSHIES.find(p => p.id === row.plushie_id);
+        const isSkinReward = row.reward_kind === 'village_skin';
+        const rewardName = isSkinReward
+          ? ((bkmpAdminVillageSkins.find(s => s.id === row.skin_id) || {}).name || row.skin_id)
+          : ((BKMP_PLUSHIES.find(p => p.id === row.plushie_id) || {}).name || row.plushie_id);
         const status = row.is_redeemed ? 'Eingelöst' : 'Offen';
         const meta = [
-          plushie ? plushie.name : row.plushie_id,
+          (isSkinReward ? '🏘️ ' : '🧸 ') + rewardName,
           status,
           row.is_redeemed ? `von ${row.redeemed_by_display_name || '?'} am ${new Date(row.redeemed_at).toLocaleDateString('de-DE')}` : '',
           row.note ? `Notiz: ${row.note}` : ''

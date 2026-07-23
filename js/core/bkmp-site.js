@@ -3749,6 +3749,26 @@
         console.warn('Konnte Pluschies nicht laden.', e);
       }
     }
+    /* Dorf-Skin-Aequivalent zu bkmpRefreshOwnedPlushies() (23.07.) - der
+       Code-Einloese-Bereich liegt auf der normalen Website (Achievements-
+       Sektion), nicht im Idle-Dorf-Fenster selbst - bkmpPlayerVillageSkins/
+       bkmpVillageSkinsCatalog (js/core/bkmp-idle-state.js) sind trotzdem
+       global verfuegbar, auch wenn das Idle-Dorf in dieser Sitzung noch nie
+       geoeffnet wurde (dann bleiben sie einfach leere Arrays - die normale
+       Ladeschleife in idledorf.js laedt beim naechsten echten Oeffnen ohnehin
+       frisch aus der DB, hier nur ein Best-Effort-Sofort-Update fuer den
+       Fall, dass das Fenster bereits offen war). */
+    async function bkmpRefreshOwnedVillageSkinAfterRedeem() {
+      const name = bkmpGetMcName();
+      if (!name || typeof loadPlayerVillageSkins !== 'function' || !bkmpGetSupabaseClient()) return;
+      try {
+        const owned = await loadPlayerVillageSkins(name);
+        bkmpPlayerVillageSkins = Array.isArray(owned) ? owned.map(r => r.skin_id) : [];
+        if (typeof bkmpIdleRenderSkinsPanel === 'function') bkmpIdleRenderSkinsPanel();
+      } catch (e) {
+        console.warn('Dorf-Skin-Besitz konnte nicht aktualisiert werden.', e);
+      }
+    }
     function renderPlushiesPanel() {
       const el = document.getElementById('plushiesList');
       if (!el) return;
@@ -3797,17 +3817,29 @@
         bkmpShowPlushieMsg('', false);
         try {
           const { ok, body } = await redeemPlushieCode(code, name);
-          if (ok && body.ok) {
+          if (ok && body.ok && body.rewardKind === 'village_skin') {
+            /* Dorf-Skin-Zweig (23.07., "Pluschie-Code-System auf Dorf-Skins
+               erweitern") - Katalogname aus bkmpVillageSkinsCatalog (js/core/
+               bkmp-idle-state.js, ueberall global verfuegbar), auch wenn das
+               Idle-Dorf in dieser Sitzung noch nie geoeffnet wurde (dann
+               bleibt der Katalog leer, Fallback-Text greift). */
+            const skinCatalog = typeof bkmpVillageSkinsCatalog !== 'undefined' ? bkmpVillageSkinsCatalog : [];
+            const skin = skinCatalog.find(s => s.id === body.skinId);
+            bkmpShowPlushieMsg(`Du hast den Dorf-Skin "${skin ? skin.name : 'einen neuen Dorf-Skin'}" freigeschaltet! Er wartet im Idle-Dorf unter "Dorf-Skins" auf dich.`, false);
+            plushieCodeInput.value = '';
+            await bkmpRefreshOwnedVillageSkinAfterRedeem();
+          } else if (ok && body.ok) {
             const plushie = BKMP_PLUSHIES.find(p => p.id === body.plushieId);
             bkmpShowPlushieMsg(`Du hast ${plushie ? plushie.name : 'einen neuen Plüshie'} freigeschaltet!`, false);
             plushieCodeInput.value = '';
             await bkmpRefreshOwnedPlushies();
             renderPlushiesPanel();
           } else {
+            const isSkinReward = body.rewardKind === 'village_skin';
             const errorMap = {
               invalid_code: 'Dieser Code ist ungültig.',
               already_redeemed: 'Dieser Code wurde bereits eingelöst.',
-              already_owned: 'Du hast diesen Plüshie schon freigeschaltet.',
+              already_owned: isSkinReward ? 'Du hast diesen Dorf-Skin schon freigeschaltet.' : 'Du hast diesen Plüshie schon freigeschaltet.',
               missing_name: 'Bitte trag zuerst deinen Minecraft-Namen ein.',
               missing_code: 'Bitte gib einen Code ein.',
               missing_token: 'Bitte melde dich zuerst mit deinem Account an.',

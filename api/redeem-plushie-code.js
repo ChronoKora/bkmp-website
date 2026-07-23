@@ -9,7 +9,7 @@
    umgeht RLS) und prueft alles server-seitig:
    - Code existiert?
    - Code schon eingeloest?
-   - Pluschie schon im Besitz? (Code wird dann NICHT verbraucht)
+   - Belohnung schon im Besitz? (Code wird dann NICHT verbraucht)
    - Atomares "Beanspruchen" des Codes (UPDATE ... WHERE is_redeemed = false),
      damit zwei gleichzeitige Versuche mit demselben Code nicht beide
      durchgehen.
@@ -21,6 +21,14 @@
    Access-Token des Aufrufers gegen /auth/v1/user geprueft (wie in
    api/claim-map-order.js) und der name_key kommt serverseitig aus
    player_stats.
+
+   ERWEITERUNG (23.07., Nutzerwunsch "Dorf-Skin ins Pluschie-Code-System mit
+   einbauen"): plushie_codes.reward_kind unterscheidet jetzt 'plushie'
+   (bisheriges, unveraendertes Verhalten - Insert in user_plushies) von
+   'village_skin' (neu - Insert in idle_player_village_skins, gleiche Tabelle/
+   gleicher Ownership-Vertrag wie ein normaler Gold-Kauf im Spiel, siehe
+   unlockPlayerVillageSkin in supabase.js). Siehe
+   sql/20260723-code-redeemable-village-skins.sql fuer das Schema.
 
    Braucht die Umgebungsvariable SUPABASE_SERVICE_ROLE_KEY in Vercel.
    ============================================================ */
@@ -88,7 +96,7 @@ module.exports = async function handler(req, res) {
     const playerName = profile.display_name || profile.name_key;
 
     // 1) Code nachschlagen
-    const lookupRes = await sbFetch(serviceKey, `plushie_codes?code=eq.${encodeURIComponent(rawCode)}&select=id,plushie_id,is_redeemed,is_reusable&limit=1`);
+    const lookupRes = await sbFetch(serviceKey, `plushie_codes?code=eq.${encodeURIComponent(rawCode)}&select=id,plushie_id,skin_id,reward_kind,is_redeemed,is_reusable&limit=1`);
     if (!lookupRes.ok) {
       const detail = await lookupRes.text().catch(() => '');
       return send(res, 502, { error: 'lookup_failed', detail: detail.slice(0, 300) });
@@ -99,14 +107,23 @@ module.exports = async function handler(req, res) {
     const isReusable = Boolean(codeRow.is_reusable);
     if (!isReusable && codeRow.is_redeemed) return send(res, 409, { error: 'already_redeemed' });
 
+    const rewardKind = codeRow.reward_kind === 'village_skin' ? 'village_skin' : 'plushie';
     const plushieId = codeRow.plushie_id;
+    const skinId = codeRow.skin_id;
 
     // 2) Schon im Besitz? Dann Code NICHT verbrauchen, nur freundlich melden.
-    const ownedRes = await sbFetch(serviceKey, `user_plushies?name_key=eq.${encodeURIComponent(nameKey)}&plushie_id=eq.${encodeURIComponent(plushieId)}&select=id&limit=1`);
+    //    Zwei unterschiedliche Ownership-Tabellen je nach reward_kind - siehe
+    //    Datei-Kopf-Kommentar. idle_player_village_skins ist an auth_user_id
+    //    gebunden (nicht nur name_key), user.id kommt bereits vom Auth-Check
+    //    oben.
+    const ownedQuery = rewardKind === 'village_skin'
+      ? `idle_player_village_skins?auth_user_id=eq.${encodeURIComponent(user.id)}&skin_id=eq.${encodeURIComponent(skinId)}&select=id&limit=1`
+      : `user_plushies?name_key=eq.${encodeURIComponent(nameKey)}&plushie_id=eq.${encodeURIComponent(plushieId)}&select=id&limit=1`;
+    const ownedRes = await sbFetch(serviceKey, ownedQuery);
     if (ownedRes.ok) {
       const ownedRows = await ownedRes.json();
       if (Array.isArray(ownedRows) && ownedRows.length > 0) {
-        return send(res, 409, { error: 'already_owned', plushieId });
+        return send(res, 409, { error: 'already_owned', rewardKind, plushieId, skinId });
       }
     }
 
@@ -140,18 +157,23 @@ module.exports = async function handler(req, res) {
 
     // 4) Freischaltung eintragen (on-conflict ignorieren fuer den seltenen
     //    Fall gleichzeitiger Anfragen mit unterschiedlichen Codes fuer
-    //    denselben Pluschie).
-    const insertRes = await sbFetch(serviceKey, 'user_plushies', {
+    //    dieselbe Belohnung). Zwei Zieltabellen je nach reward_kind - siehe
+    //    Datei-Kopf-Kommentar.
+    const insertTarget = rewardKind === 'village_skin' ? 'idle_player_village_skins' : 'user_plushies';
+    const insertBody = rewardKind === 'village_skin'
+      ? { name_key: nameKey, auth_user_id: user.id, skin_id: skinId }
+      : { name_key: nameKey, display_name: playerName, plushie_id: plushieId };
+    const insertRes = await sbFetch(serviceKey, insertTarget, {
       method: 'POST',
       headers: { Prefer: 'resolution=ignore-duplicates' },
-      body: JSON.stringify({ name_key: nameKey, display_name: playerName, plushie_id: plushieId })
+      body: JSON.stringify(insertBody)
     });
     if (!insertRes.ok) {
       const detail = await insertRes.text().catch(() => '');
       return send(res, 502, { error: 'unlock_failed', detail: detail.slice(0, 300) });
     }
 
-    return send(res, 200, { ok: true, plushieId });
+    return send(res, 200, { ok: true, rewardKind, plushieId, skinId });
   } catch (error) {
     return send(res, 502, { error: 'unexpected', detail: String(error && error.message || error).slice(0, 300) });
   }
