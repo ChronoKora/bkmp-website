@@ -223,6 +223,26 @@
       bkmpTabOverflowResizeTimer = window.setTimeout(bkmpIdleSyncTabOverflowForViewport, 200);
     }, { passive: true });
 
+    /* Bug-Fix (Spieler-Meldung 23.07., ChronoKora: "kurz raus aus dem Game
+       und wieder reingetabbt" - Tab-Leiste danach wieder weg, trotz breitem
+       Desktop-Fenster, keine manuelle Groessenaenderung): ein backgroundeter/
+       minimierter Tab kann `window.innerWidth`/`matchMedia()` in manchen
+       Browsern unzuverlaessig melden, waehrend ein waehrend dieser Zeit noch
+       laufender (oder verzoegert nachgeholter) Resize-Callback trotzdem den
+       obigen Debounce-Timer ausloest und bkmpIdleSyncTabOverflowForViewport()
+       dadurch mit einer moeglicherweise falschen Breite auswertet. Statt die
+       genaue Ursache in jedem Browser einzeln nachzuvollziehen: bei JEDER
+       Rueckkehr zum Tab (visibilitychange, nicht mehr hidden) einmal
+       unbedingt neu abgleichen - das nutzt garantiert die echte, aktuelle
+       Fensterbreite im Vordergrund und heilt jeden waehrend des Hintergrund-
+       Zeitraums entstandenen Fehlzustand selbst, unabhaengig von der
+       genauen Ursache. bkmpTabOverflowCurrentlyCompact-Cache in
+       bkmpIdleSyncTabOverflowForViewport() sorgt weiterhin dafuer, dass bei
+       tatsaechlich unveraendertem Zustand nichts unnoetig neu aufgebaut wird. */
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) bkmpIdleSyncTabOverflowForViewport();
+    });
+
     /* Bug-Fix (Spieler-Meldungen 19./20.07., "seltsamer Balken" mitten in
        Skilltree/Gilde/anderen Tabs auf normaler Desktop-Breite): #idleAppMoreSheet
        steht im Markup als direktes Kind von .idle-dorf-card - genau wie beim

@@ -2288,6 +2288,28 @@ async function bkmpIdleOpenModal() {
   overlay.classList.add('visible');
   document.body.classList.add('modal-open');
   bkmpIdleModalOpen = true;
+  /* Bug-Fix (23.07., ChronoKora: "Spiel zu auf der Website was gemacht und
+     Spiel wieder geöffnet" - Tab-Leiste (Kampf/Upgrades/...) danach weg,
+     obwohl HUD korrekt anzeigt): bkmpIdleSyncTabOverflowForViewport()/
+     bkmpProtoChudSyncVisibility() (bkmp-app-mode-bootstrap.js/bkmp-proto-
+     compact-hud.js) laufen bisher nur beim Laden, bei 'resize' und (seit
+     heute) bei 'visibilitychange' - keiner dieser drei deckt "Fenster
+     schliessen, waehrend des Geschlossenseins aendert sich am echten
+     Fenster etwas (Zoom-Stufe, ein Scrollbalken erscheint/verschwindet
+     durch anderen Seiteninhalt, o.ae.), Fenster wieder oeffnen" ab - das
+     Idle-Dorf-Fenster bleibt technisch die ganze Zeit im DOM, nur eben
+     unsichtbar, es "resized" beim Schliessen/Oeffnen nie im Sinne eines
+     echten Browser-Events. Statt die genaue Ursache in jedem Fall
+     nachzuvollziehen: bei JEDEM Oeffnen des Fensters einmal unbedingt mit
+     der garantiert aktuellen Fensterbreite neu abgleichen - das deckt
+     diesen Fall zusaetzlich zu den bereits bestehenden dreien ab. Guard
+     (typeof-Check) noetig, da bkmp-app-mode-bootstrap.js/bkmp-proto-
+     compact-hud.js erst NACH idledorf.js laden (siehe Ladereihenfolge-
+     Kommentar in index.html) - zum Zeitpunkt eines echten Klicks laengst
+     vorhanden, aber idledorf.js soll keine harte Ladereihenfolge-Annahme
+     nach vorne machen. */
+  if (typeof bkmpIdleSyncTabOverflowForViewport === 'function') bkmpIdleSyncTabOverflowForViewport();
+  if (typeof bkmpProtoChudSyncVisibility === 'function') bkmpProtoChudSyncVisibility();
   /* Nutzer-Meldung: "laggt kurz, dann springen Bilder vom Raidboss fuer
      Millisekunden durch". Ursache gefunden: das Fenster wird HIER schon
      sichtbar, bevor auch nur ein einziger Render-Aufruf unten gelaufen ist

@@ -510,3 +510,13 @@ window.addEventListener('resize', function () {
   if (bkmpProtoChudResizeTimer) window.clearTimeout(bkmpProtoChudResizeTimer);
   bkmpProtoChudResizeTimer = window.setTimeout(bkmpProtoChudSyncVisibility, 200);
 }, { passive: true });
+
+/* Bug-Fix (23.07., gleiche Ursache/gleicher Fix wie bkmpIdleSyncTabOverflow-
+   ForViewport() in bkmp-app-mode-bootstrap.js - siehe Kommentar dort):
+   Rueckkehr zu einem zuvor backgroundeten/minimierten Tab kann einen
+   Resize-Callback mit unzuverlaessiger Fensterbreite ausgeloest haben -
+   bei JEDER Rueckkehr (visibilitychange, nicht mehr hidden) einmal
+   unbedingt mit der garantiert echten Vordergrund-Breite neu abgleichen. */
+document.addEventListener('visibilitychange', function () {
+  if (!document.hidden) bkmpProtoChudSyncVisibility();
+});
