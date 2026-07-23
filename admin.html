@@ -1722,19 +1722,76 @@
       }
     }
 
+/* Eigenes Begruendungs-Fenster statt window.prompt() (23.07., Nutzerwunsch
+   "das Ablehnen gerne auch in ein schönes Fenster verbauen" - der native
+   Browser-Prompt sah je nach Betriebssystem/Chrome-Theme unpassend aus,
+   siehe Screenshot). Nutzt dasselbe bkmpUiModalHtml()/bkmpUiTrapFocus()
+   (js/ui/bkmp-ui-components.js, Phase 3) wie das 1x-Entscheidungs-Popup in
+   bkmp-site.js - admin.html laedt dieselbe Komponenten-Datei bereits.
+   Promise-basiert mit demselben Vertrag wie window.prompt(): loest mit dem
+   getrimmten Text auf (auch leer erlaubt) oder mit null bei Abbrechen/ESC/
+   Klick daneben. Mehrzeiliges <textarea> statt einzeiligem <input> - echte
+   Verbesserung gegenueber dem alten Prompt, nicht nur optisch. */
+function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placeholder }) {
+  return new Promise((resolve) => {
+    const domId = 'bkmpAdminPromptText';
+    const stale = document.getElementById(domId + 'Overlay');
+    if (stale) stale.remove();
+    const html = bkmpUiModalHtml({
+      id: domId,
+      titleHtml: escapeHtml(titleText),
+      bodyHtml: `
+        <label for="${domId}Input" style="display:block; font-size:0.85rem; color:var(--muted); margin-bottom:0.5rem; text-align:left;">${escapeHtml(labelText)}</label>
+        <textarea id="${domId}Input" rows="3" placeholder="${escapeHtml(placeholder || '')}" style="width:100%; resize:vertical; font-family:inherit; font-size:0.9rem; padding:0.6rem 0.75rem; border-radius:10px; border:1px solid var(--line); background:var(--paper-2); color:var(--ink);"></textarea>
+      `,
+      buttonsHtml: `
+        <button type="button" class="btn-nein" id="${domId}CancelBtn">Abbrechen</button>
+        <button type="button" class="btn-ja" id="${domId}ConfirmBtn">${escapeHtml(confirmText || 'Bestätigen')}</button>
+      `
+    });
+    document.body.insertAdjacentHTML('beforeend', html);
+    const overlay = document.getElementById(domId + 'Overlay');
+    const input = document.getElementById(domId + 'Input');
+    bkmpUiTrapFocus(overlay);
+    requestAnimationFrame(() => { overlay.classList.add('visible'); input.focus(); });
+
+    let settled = false;
+    function close(result) {
+      if (settled) return;
+      settled = true;
+      overlay.classList.remove('visible');
+      setTimeout(() => overlay.remove(), 300);
+      document.removeEventListener('keydown', onKeydown);
+      resolve(result);
+    }
+    function onKeydown(e) {
+      if (e.key === 'Escape') close(null);
+      else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) close(input.value.trim());
+    }
+    document.addEventListener('keydown', onKeydown);
+    document.getElementById(domId + 'CancelBtn').addEventListener('click', () => close(null));
+    document.getElementById(domId + 'ConfirmBtn').addEventListener('click', () => close(input.value.trim()));
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(null); });
+  });
+}
+
     /* Begruendung (23.07., Nutzerwunsch "bei Investoren Abgelehnt mit
        Begruendung die ich schreibe"): wird dem Absender spaeter ueber die
        get_investor_request_status()-RPC im 1x-Popup angezeigt (siehe
        sql/20260723-request-decision-notify.sql + bkmp-site.js). Abbrechen
-       (Prompt mit "Abbrechen" verlassen, liefert null) lehnt NICHT ab -
-       leerer Text ist dagegen erlaubt (nicht jeder Admin will/muss immer
-       eine Begruendung schreiben). */
+       (null) lehnt NICHT ab - leerer Text ist dagegen erlaubt (nicht jeder
+       Admin will/muss immer eine Begruendung schreiben). */
     async function rejectInvestorRequest(id) {
       if (typeof updateInvestorRequestStatus !== 'function' || !bkmpGetSupabaseClient()) {
         showAdminToast('Supabase ist gerade nicht verbunden.', 'error');
         return;
       }
-      const reason = window.prompt('Begründung für die Ablehnung (wird dem Absender angezeigt, kann leer bleiben):', '');
+      const reason = await bkmpAdminPromptTextModal({
+        titleText: 'Anfrage ablehnen',
+        labelText: 'Begründung für die Ablehnung (wird dem Absender angezeigt, kann leer bleiben):',
+        confirmText: 'Ablehnen',
+        placeholder: 'z. B. Betrag zu niedrig für den gewünschten Zeitraum'
+      });
       if (reason === null) return;
       try {
         const updated = await updateInvestorRequestStatus(id, 'rejected', reason.trim());
