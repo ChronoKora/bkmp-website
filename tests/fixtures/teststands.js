@@ -91,10 +91,27 @@ function teststandB(startTimeMs) {
     prestige_level: 0, prestige_points: 0, prestige_points_spent: 0,
     prestige_allocations: {}, updated_at: fx.nowIso
   });
+  // rune_type MUSS eine echte Slot-ID sein (window.BKMP_RUNE_SLOTS in
+  // bkmp-runes.js: slot1=Kraftrune..slot6=Gluecksrune), rarity ein echtes
+  // window.BKMP_RUNE_RARITIES-Element (gray/green/blue/purple/gold) - beide
+  // Listen waren anfangs mit erfundenen deutschen Slugs befuellt ("wucht",
+  // "selten", ...), die die UI nie einer echten Slot-Definition zuordnen
+  // konnte (BKMP_RUNE_SLOTS.find(...) lief ins Leere). Gefunden, weil ein
+  // Save-Load-Test 30s auf einen nie erscheinenden Slot-Tab-Selektor wartete.
+  //
+  // id MUSS ein STRING sein: sql/supabase-idle-runes.sql:19 definiert
+  // "id uuid primary key" - PostgREST/JSON serialisiert uuid immer als
+  // String. rune._cid (idledorf.js) wird direkt von r.id uebernommen und
+  // spaeter per data-cid="${_cid}" ins DOM geschrieben - dataset.cid liefert
+  // beim Auslesen IMMER einen String zurueck. Ein numerischer Fixture-Wert
+  // (5001 statt "5001") liess bkmpRuneToggleEquip()s "r._cid === cid"-
+  // Vergleich (===, kein lockeres ==) still scheitern - der Ausruesten-
+  // Klick tat sichtbar nichts, ohne jeden Fehler. Reiner Mock-Fidelity-Bug,
+  // keiner der echten App - gefunden per JS-State-Vergleich vor/nach Klick.
   fx.tables.idle_player_runes.push(
-    { id: 5001, name_key: fx.nameKey, auth_user_id: fx.authUserId, rune_type: 'wucht', rarity: 'selten', rolled_value: 12, equipped: true, upgrade_level: 2, substats: [], created_at: fx.nowIso },
-    { id: 5002, name_key: fx.nameKey, auth_user_id: fx.authUserId, rune_type: 'glueck', rarity: 'episch', rolled_value: 18, equipped: true, upgrade_level: 1, substats: [], created_at: fx.nowIso },
-    { id: 5003, name_key: fx.nameKey, auth_user_id: fx.authUserId, rune_type: 'wucht', rarity: 'gewoehnlich', rolled_value: 5, equipped: false, upgrade_level: 0, substats: [], created_at: fx.nowIso }
+    { id: 'qa-rune-5001', name_key: fx.nameKey, auth_user_id: fx.authUserId, rune_type: 'slot5', rarity: 'blue', rolled_value: 12, equipped: true, upgrade_level: 2, substats: [], created_at: fx.nowIso },
+    { id: 'qa-rune-5002', name_key: fx.nameKey, auth_user_id: fx.authUserId, rune_type: 'slot6', rarity: 'purple', rolled_value: 18, equipped: true, upgrade_level: 1, substats: [], created_at: fx.nowIso },
+    { id: 'qa-rune-5003', name_key: fx.nameKey, auth_user_id: fx.authUserId, rune_type: 'slot5', rarity: 'gray', rolled_value: 5, equipped: false, upgrade_level: 0, substats: [], created_at: fx.nowIso }
   );
   return fx;
 }
@@ -145,15 +162,16 @@ function teststandC(startTimeMs) {
     prestige_level: 6, prestige_points: 340, prestige_points_spent: 300,
     prestige_allocations: { prestige_point_bonus_pct: 10, gold_bonus_pct: 20 }, updated_at: fx.nowIso
   });
-  // 6 belegte Runenslots (je ein Rune-Typ genau einmal ausgeruestet) + ein paar unbelegte im Inventar.
-  const runeTypes = ['wucht', 'glueck', 'schild', 'tempo', 'macht', 'weisheit'];
+  // 6 belegte Runenslots (alle 6 echten Slot-IDs genau einmal ausgeruestet,
+  // siehe window.BKMP_RUNE_SLOTS in bkmp-runes.js) + ein paar unbelegte im Inventar.
+  const runeTypes = ['slot1', 'slot2', 'slot3', 'slot4', 'slot5', 'slot6'];
   fx.tables.idle_player_runes.push(...runeTypes.map((type, idx) => ({
-    id: 6000 + idx, name_key: fx.nameKey, auth_user_id: fx.authUserId,
-    rune_type: type, rarity: 'mythisch', rolled_value: 40 + idx, equipped: true, upgrade_level: 12, substats: [], created_at: fx.nowIso
+    id: `qa-rune-6${idx}`, name_key: fx.nameKey, auth_user_id: fx.authUserId,
+    rune_type: type, rarity: 'gold', rolled_value: 40 + idx, equipped: true, upgrade_level: 12, substats: [], created_at: fx.nowIso
   })));
   fx.tables.idle_player_runes.push(
-    { id: 6100, name_key: fx.nameKey, auth_user_id: fx.authUserId, rune_type: 'wucht', rarity: 'episch', rolled_value: 20, equipped: false, upgrade_level: 5, substats: [], created_at: fx.nowIso },
-    { id: 6101, name_key: fx.nameKey, auth_user_id: fx.authUserId, rune_type: 'glueck', rarity: 'selten', rolled_value: 14, equipped: false, upgrade_level: 3, substats: [], created_at: fx.nowIso }
+    { id: 'qa-rune-6100', name_key: fx.nameKey, auth_user_id: fx.authUserId, rune_type: 'slot5', rarity: 'purple', rolled_value: 20, equipped: false, upgrade_level: 5, substats: [], created_at: fx.nowIso },
+    { id: 'qa-rune-6101', name_key: fx.nameKey, auth_user_id: fx.authUserId, rune_type: 'slot6', rarity: 'blue', rolled_value: 14, equipped: false, upgrade_level: 3, substats: [], created_at: fx.nowIso }
   );
   return fx;
 }
@@ -184,12 +202,13 @@ function teststandD(startTimeMs) {
     prestige_level: 1, prestige_points: -10, prestige_points_spent: 0,
     prestige_allocations: {}, updated_at: fx.nowIso
   });
-  // Doppelt ausgeruestete Runenart (zwei "wucht"-Runen gleichzeitig equipped=true) - genau der
-  // ungueltige Zustand aus CLAUDE.md-Bugfix 4 (20.07.), den die App beim naechsten Laden bereinigen soll.
+  // Doppelt ausgeruestete Runenart (zwei "slot5"/Wuchtrune-Runen gleichzeitig
+  // equipped=true) - genau der ungueltige Zustand aus CLAUDE.md-Bugfix 4
+  // (20.07.), den die App beim naechsten Laden bereinigen soll.
   fx.tables.idle_player_runes.push(
-    { id: 7001, name_key: fx.nameKey, auth_user_id: fx.authUserId, rune_type: 'wucht', rarity: 'episch', rolled_value: 22, equipped: true, upgrade_level: 4, substats: [], created_at: fx.nowIso },
-    { id: 7002, name_key: fx.nameKey, auth_user_id: fx.authUserId, rune_type: 'wucht', rarity: 'selten', rolled_value: 11, equipped: true, upgrade_level: 1, substats: [], created_at: fx.nowIso },
-    { id: 7003, name_key: fx.nameKey, auth_user_id: fx.authUserId, rune_type: 'glueck', rarity: 'gewoehnlich', rolled_value: -3, equipped: true, upgrade_level: 0, substats: null, created_at: fx.nowIso }
+    { id: 'qa-rune-7001', name_key: fx.nameKey, auth_user_id: fx.authUserId, rune_type: 'slot5', rarity: 'purple', rolled_value: 22, equipped: true, upgrade_level: 4, substats: [], created_at: fx.nowIso },
+    { id: 'qa-rune-7002', name_key: fx.nameKey, auth_user_id: fx.authUserId, rune_type: 'slot5', rarity: 'blue', rolled_value: 11, equipped: true, upgrade_level: 1, substats: [], created_at: fx.nowIso },
+    { id: 'qa-rune-7003', name_key: fx.nameKey, auth_user_id: fx.authUserId, rune_type: 'slot6', rarity: 'gray', rolled_value: -3, equipped: true, upgrade_level: 0, substats: null, created_at: fx.nowIso }
   );
   return fx;
 }
@@ -224,16 +243,16 @@ function teststandE(startTimeMs) {
     prestige_level: 60, prestige_points: 999999, prestige_points_spent: 999000,
     prestige_allocations: { prestige_point_bonus_pct: 60 }, updated_at: fx.nowIso
   });
-  // Volles Runeninventar - 300 Runen, 6 davon ausgeruestet (je ein Typ).
-  const runeTypes = ['wucht', 'glueck', 'schild', 'tempo', 'macht', 'weisheit'];
+  // Volles Runeninventar - 300 Runen, 6 davon ausgeruestet (je eine echte Slot-ID).
+  const runeTypes = ['slot1', 'slot2', 'slot3', 'slot4', 'slot5', 'slot6'];
   const runes = runeTypes.map((type, idx) => ({
-    id: 9000 + idx, name_key: fx.nameKey, auth_user_id: fx.authUserId,
-    rune_type: type, rarity: 'mythisch', rolled_value: 50, equipped: true, upgrade_level: 15, substats: [], created_at: fx.nowIso
+    id: `qa-rune-9${idx}`, name_key: fx.nameKey, auth_user_id: fx.authUserId,
+    rune_type: type, rarity: 'gold', rolled_value: 50, equipped: true, upgrade_level: 15, substats: [], created_at: fx.nowIso
   }));
   for (let i = 0; i < 294; i++) {
     runes.push({
-      id: 9100 + i, name_key: fx.nameKey, auth_user_id: fx.authUserId,
-      rune_type: runeTypes[i % runeTypes.length], rarity: 'gewoehnlich', rolled_value: 5 + (i % 10),
+      id: `qa-rune-9${100 + i}`, name_key: fx.nameKey, auth_user_id: fx.authUserId,
+      rune_type: runeTypes[i % runeTypes.length], rarity: 'gray', rolled_value: 5 + (i % 10),
       equipped: false, upgrade_level: 0, substats: [], created_at: fx.nowIso
     });
   }

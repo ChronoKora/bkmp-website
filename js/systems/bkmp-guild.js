@@ -791,13 +791,13 @@ async function bkmpIdleRenderGildePanel() {
         <h4>🛡️ Gilde gründen</h4>
         <p>Schließ dich mit anderen Spielern zusammen: gemeinsame Kasse, Kassen-Meilensteine geben ALLEN Mitgliedern dauerhafte Boni. Gründung kostet <strong>500.000 Gold</strong> (wird direkt zur Startkasse deiner neuen Gilde).</p>
         <div class="idle-guild-create-row">
-          <input type="text" id="idleGuildNameInput" placeholder="Gildenname" maxlength="32">
-          <input type="text" id="idleGuildTagInput" placeholder="Kürzel (max. 5)" maxlength="5" style="max-width:110px;">
+          <input type="text" id="idleGuildNameInput" placeholder="Gildenname" aria-label="Gildenname" maxlength="32">
+          <input type="text" id="idleGuildTagInput" placeholder="Kürzel (max. 5)" aria-label="Gilden-Kürzel" maxlength="5" style="max-width:110px;">
           <button type="button" class="btn-ja idle-guild-create-btn" id="idleGuildCreateBtn" ${bkmpGuildBusy ? 'disabled' : ''}>Gründen (500.000 Gold)</button>
         </div>
         <p style="margin-top:0.8rem;">Hast du einen Einladungscode für eine private Gilde bekommen?</p>
         <div class="idle-guild-create-row">
-          <input type="text" id="idleGuildCodeInput" placeholder="Einladungscode" maxlength="8" style="text-transform:uppercase;">
+          <input type="text" id="idleGuildCodeInput" placeholder="Einladungscode" aria-label="Einladungscode" maxlength="8" style="text-transform:uppercase;">
           <button type="button" class="btn-nein idle-guild-join-code-btn" id="idleGuildJoinCodeBtn" ${bkmpGuildBusy ? 'disabled' : ''}>Beitreten</button>
         </div>
       </div>

@@ -29,7 +29,22 @@ function makeFakeJwt(payload) {
 
 function issueSession(store, user) {
   const nowMs = store.clock.nowMs();
-  const expiresIn = 3600;
+  /* Deliberately long-lived (real Supabase sessions expire in ~3600s) -
+     time-travel suites (dungeon/login-streak/offline-afk) advance this
+     store's virtual clock by hours to weeks. The BROWSER's own Date.now()
+     never moves (no useFakeClock in most of these tests - the thing under
+     test is server-side regen logic, not client-side clock display), so it
+     has no reason to proactively refresh a token that still looks fresh to
+     it; the resulting mismatch made an old-but-still-cached token look
+     expired to THIS mock (whose "now" jumped) well before the browser would
+     ever consider refreshing it, causing a 401 that supabase-js retries
+     reactively - usually invisible, but a multi-call test sequence around
+     the exact moment of a big time-jump could observe a transiently stale
+     response. Found via a dungeon daily-bonus test that consistently read
+     stale data right after a 25h store.clock.advance(); a 401 for
+     dungeon_get_all_status showed up in the network log at that exact
+     point once actually looked for. */
+  const expiresIn = 3600 * 24 * 365 * 50; // 50 years
   const expiresAtSeconds = Math.floor((nowMs + expiresIn * 1000) / 1000);
   const accessToken = makeFakeJwt({
     sub: user.id,

@@ -18,7 +18,80 @@
        breiten Viewports unangetastet: dort zeigt die neue gruppierte
        Desktop-Tableiste (siehe style.css) ohnehin alle 14 Tabs unveraendert
        nebeneinander, kein Ueberlauf-Menue noetig. */
-    function bkmpIdleSetupMobileTabOverflow() {
+    /* KOMPLETT-UMBAU (23.07., dringende Spieler-Meldungsflut "Tabs
+       verschwinden/nicht klickbar ueber mehrere Faelle: Kampf, Gilde,
+       Runen, Bestenliste, Prestige, Skilltree, Drachenzucht, Turm,
+       Dungeon, Weltboss", Nutzer-Entscheidung "Punkt 3" - die saubere
+       strukturelle Loesung statt eines weiteren Pflasters):
+       Root Cause war, dass diese ganze Umverteilung bisher NUR EINMAL beim
+       Laden lief und dabei UNWIDERRUFLICH echte DOM-Knoten verschob (6
+       Haupt-Tabs bleiben in #idleDorfTabs, 9 wandern in #idleAppMoreSheet)
+       und die .idle-dorf-tab-group-Container entfernte. Passte das Fenster
+       zum Ladezeitpunkt zufaellig ins schmale/App-Muster (z.B. Browser noch
+       nicht maximiert, Snap-Layout, Zoom/DPI, oder echter App-Modus/PWA -
+       dort per Absicht IMMER kompakt, siehe bkmpIdleWantCompactTabNav()
+       unten), waren 9 der 15 Tabs von da an bis zu einem vollstaendigen
+       Neuladen nur noch ueber "Mehr" erreichbar. Ein frueheres
+       Resize->Reload-Sicherheitsnetz (siehe Git-Historie) hat das nur
+       UNVOLLSTAENDIG aufgefangen: lief nie im echten App-Modus (dort
+       bewusst deaktiviert - genau die von mehreren Spielern gemeldeten
+       Faelle "Handy/installierte App zeigt kaum noch Tabs"), reagierte nur
+       auf ein echtes 'resize'-Event (nicht auf Zoom/DPI/Snap-Faelle, die
+       das nicht zuverlaessig feuern) und riss den Spieler bei jedem Treffer
+       per vollem Seiten-Reload aus seinem Spielstand.
+       Jetzt: dieselbe Umverteilung ist ein JEDERZEIT sicher wiederholbarer
+       Soll-Zustand-Abgleich (bkmpIdleSyncTabOverflowForViewport), der beim
+       Laden UND bei jeder relevanten Breitenaenderung (debounced 'resize'-
+       Listener, siehe unten) erneut ausgefuehrt wird und in BEIDE
+       Richtungen funktioniert - kein Reload mehr noetig, kein dauerhaft
+       verlorener Tab mehr moeglich, greift jetzt auch im echten App-Modus
+       (die dortige Absicht "immer kompakt" bleibt erhalten, siehe
+       bkmpIdleWantCompactTabNav()). Die .idle-dorf-tab-group-Container
+       muessen dafuer nicht mehr rekonstruiert werden: seit Phase 7.1 Stufe 3
+       ist ".idle-dorf-tab-group{display:contents}" ohnehin UNBEDINGT (nicht
+       mehr nur mobil) - die 15 Tabs sind strukturell schon eine flache
+       Liste, die alten Gruppen-Huellen werden weiterhin einmalig beim
+       ersten Aufbau entfernt (rein kosmetisch, spart ein paar leere
+       DOM-Knoten), muessen aber nie wieder hergestellt werden. */
+    var BKMP_TAB_OVERFLOW_PRIMARY_IDS = ['idleTabBtnKampf', 'idleTabBtnUpgrades', 'idleTabBtnSkilltree', 'idleTabBtnPrestige', 'idleTabBtnDrachen', 'idleTabBtnDungeon'];
+    var BKMP_TAB_OVERFLOW_GROUPS = [
+      { title: '📈 Fortschritt', ids: ['idleTabBtnRunen', 'idleTabBtnErfolge'] },
+      { title: '⚔️ Kampf & Rang', ids: ['idleTabBtnArena', 'idleTabBtnBestenliste', 'idleTabBtnTurm'] },
+      { title: '🛡️ Gilde', ids: ['idleTabBtnGilde', 'idleTabBtnGildeTech', 'idleTabBtnGildeBoss'] },
+      { title: '🏆 Sammlung', ids: ['idleTabBtnSkins'] }
+    ];
+    var bkmpTabOverflowAllIdsInOrder = null;
+    var bkmpTabOverflowBuilt = false;
+    var bkmpTabOverflowCurrentlyCompact = null;
+
+    /* Breite allein reicht nicht: breite-aber-flache Quer-Handys (haeufig
+       700-950px breit, siehe schon der Phase-7.0-Fund zu #bkmpProtoCompactNav
+       weiter unten in style.css, "(max-height:500px) and (orientation:
+       landscape)") wuerden von einem reinen max-width:760px-Check nie erfasst
+       - dieselbe Bedingung wie die CSS-Fixierung des Kompakt-Nav muss hier
+       exakt gespiegelt sein, sonst zeigt sich (beim 23.07.-Umbau gefunden,
+       existierte vorher genauso) auf so einem Geraet die alte Desktop-
+       Tableiste in einem viel zu flachen Fenster statt der dafuer gebauten
+       kompakten Fassung. */
+    function bkmpIdleWantCompactTabNav() {
+      return !!(window.BKMP_APP_MODE
+        || window.matchMedia('(max-width: 760px)').matches
+        || window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches);
+    }
+
+    /* Einmaliger Aufbau: Icon/Label-Split, "Mehr"-Button + Listener,
+       urspruengliche Tab-Reihenfolge merken. Absichtlich UNBEDINGT (nicht
+       mehr an eine Breite gebunden) - baut nur inerte Struktur, entscheidet
+       selbst nichts ueber Sichtbarkeit (das macht ausschliesslich
+       bkmpIdleSyncTabOverflowForViewport, jederzeit erneut aufrufbar). */
+    function bkmpIdleBuildMobileTabOverflowUi() {
+      if (bkmpTabOverflowBuilt) return;
+      var tabsBar = document.getElementById('idleDorfTabs');
+      var moreSheet = document.getElementById('idleAppMoreSheet');
+      var moreSheetGrid = document.getElementById('idleAppMoreSheetGrid');
+      if (!tabsBar || !moreSheet || !moreSheetGrid) return;
+      bkmpTabOverflowBuilt = true;
+
       /* Bottom-Navigation-Optik (Phase 3): teilt "⚔️ Kampf" einmalig in
          Icon-Zeile + Label-Zeile auf, rein fuer die Darstellung. Das
          Button-Element selbst (ID, Klick-Listener aus bkmpIdleInitTabs)
@@ -32,83 +105,27 @@
           '<span class="idle-dorf-tab-label">' + match[2] + '</span>';
       });
 
-      /* Bottom-Navigation "Mehr"-Menue (Nutzerwunsch nach dem ersten
-         Live-Test: "Buttons unten muessen viel groesser, die wichtigsten
-         gross, ein Mehr-Button fuer den Rest"). Nur die Haupt-Tabs bleiben
-         unten, der Rest wandert per appendChild (verschiebt die
-         ECHTEN Button-Elemente, keine Kopie) in ein ausklappbares
-         Menue - die Klick-Listener aus bkmpIdleInitTabs bleiben dadurch
-         unveraendert erhalten, idledorf.js wird nicht angefasst. */
-      /* Phase 7.0 Nachbesserung (20.07., Nutzerwunsch nach Sichten der
-         ersten Abnahmestufe: "Fügst du denn Prestige und Skilltree wieder
-         hinzu?", Entscheidung "6 Buttons total"): von urspruenglich 4 auf
-         6 Haupt-Tabs erweitert - Kampf/Upgrades/Skilltree/Prestige/
-         Drachenzucht/Dungeon alle dauerhaft sichtbar. Deckt sich bewusst
-         mit BKMP_PROTO_NAV_PRIMARY in bkmp-proto-compact-hud.js, das
-         dieselben 6 IDs per Proxy-Klick anspricht. Gilde bleibt in der
-         eigenen "Gilde"-Gruppe unten (zusammen mit Gilden-Tech/Gildenboss). */
-      var PRIMARY_TAB_IDS = ['idleTabBtnKampf', 'idleTabBtnUpgrades', 'idleTabBtnSkilltree', 'idleTabBtnPrestige', 'idleTabBtnDrachen', 'idleTabBtnDungeon'];
-      var tabsBar = document.getElementById('idleDorfTabs');
-      var moreSheet = document.getElementById('idleAppMoreSheet');
-      var moreSheetGrid = document.getElementById('idleAppMoreSheetGrid');
-      if (!tabsBar || !moreSheet || !moreSheetGrid) return;
-      if (document.getElementById('idleAppMoreBtn')) return; // schon eingerichtet (z.B. erneuter Aufruf)
+      /* Urspruengliche Reihenfolge merken, BEVOR irgendetwas verschoben
+         wird - das ist die kanonische Liste, in die bei Desktop-Breite
+         jederzeit zurueckgestellt wird. */
+      bkmpTabOverflowAllIdsInOrder = Array.prototype.slice.call(tabsBar.querySelectorAll('.idle-dorf-tab')).map(function (btn) { return btn.id; });
 
-      /* Phase 7.0 Nachbesserung: Skilltree/Prestige aus "Fortschritt" raus
-         (jetzt primaer, siehe oben) - Gruppe deckt jetzt die verbleibenden
-         9 nicht-primaeren Tabs ab. */
-      var MORE_GROUPS = [
-        { title: '📈 Fortschritt', ids: ['idleTabBtnRunen', 'idleTabBtnErfolge'] },
-        { title: '⚔️ Kampf & Rang', ids: ['idleTabBtnArena', 'idleTabBtnBestenliste', 'idleTabBtnTurm'] },
-        { title: '🛡️ Gilde', ids: ['idleTabBtnGilde', 'idleTabBtnGildeTech', 'idleTabBtnGildeBoss'] },
-        { title: '🏆 Sammlung', ids: ['idleTabBtnSkins'] }
-      ];
-      var allTabs = Array.prototype.slice.call(tabsBar.querySelectorAll('.idle-dorf-tab'));
-      var byId = {};
-      allTabs.forEach(function (btn) { byId[btn.id] = btn; });
-
-      /* Desktop gruppiert die 15 Tabs seit Phase 5.1 (zweite Struktur-
-         Korrektur) in echte Container (.idle-dorf-tab-group > -label +
-         -buttons, siehe index.html/style.css) statt einer flachen Liste.
-         Mobil gilt weiterhin die eigene, aeltere 3-Haupt-Tabs+Mehr-Logik
-         hier unten - deshalb zuerst die 3 Haupt-Tabs aus ihren Desktop-
-         Gruppen-Containern "auspacken" (appendChild verschiebt das ECHTE
-         Element an das Ende von tabsBar, keine Kopie) und danach jeden
-         jetzt leeren Gruppen-Container entfernen. So bleibt exakt dieselbe
-         flache Mobil-Struktur wie vor der Desktop-Gruppierung erhalten,
-         ohne dass die Desktop-Struktur dafuer verschlechtert werden muss. */
-      PRIMARY_TAB_IDS.forEach(function (id) { if (byId[id]) tabsBar.appendChild(byId[id]); });
-
-      MORE_GROUPS.forEach(function (group) {
-        var present = group.ids.filter(function (id) { return byId[id] && PRIMARY_TAB_IDS.indexOf(id) === -1; });
-        if (!present.length) return;
-        var heading = document.createElement('div');
-        heading.className = 'idle-app-more-sheet-group-title';
-        heading.textContent = group.title;
-        moreSheetGrid.appendChild(heading);
-        present.forEach(function (id) { moreSheetGrid.appendChild(byId[id]); });
-      });
-      /* Sicherheitsnetz: jeder Tab, der aus irgendeinem Grund in
-         keiner Gruppe oben gelistet ist, landet trotzdem im Menue
-         (ungruppiert am Ende) statt spurlos zu verschwinden. */
-      allTabs.forEach(function (btn) {
-        if (PRIMARY_TAB_IDS.indexOf(btn.id) === -1 && !moreSheetGrid.contains(btn)) {
-          moreSheetGrid.appendChild(btn);
-        }
-      });
-
-      /* Jetzt leere Desktop-Gruppen-Huellen (Label + leerer Buttons-Container,
-         nachdem alle echten Tabs oben herausgeloest wurden) restlos entfernen -
-         sonst blieben leere, aber weiterhin sichtbare Ueberschriften/Rahmen
-         in der mobilen Leiste zurueck. */
-      Array.prototype.slice.call(tabsBar.querySelectorAll('.idle-dorf-tab-group')).forEach(function (group) {
-        group.remove();
-      });
+      /* Desktop gruppiert die 15 Tabs seit Phase 5.1 in Container
+         (.idle-dorf-tab-group > -label + -buttons, siehe index.html/
+         style.css) - seit Phase 7.1 Stufe 3 sind diese Huellen aber auf
+         JEDER Breite "display:contents" (rein struktureller Marker ohne
+         eigene Optik), die echten Tabs koennen also gefahrlos als direkte
+         Kinder von tabsBar herausgeloest werden (appendChild verschiebt
+         das ECHTE Element, keine Kopie) - danach die jetzt leeren Huellen
+         entfernen. */
+      bkmpTabOverflowAllIdsInOrder.forEach(function (id) { var el = document.getElementById(id); if (el) tabsBar.appendChild(el); });
+      Array.prototype.slice.call(tabsBar.querySelectorAll('.idle-dorf-tab-group')).forEach(function (group) { group.remove(); });
 
       var moreBtn = document.createElement('button');
       moreBtn.type = 'button';
       moreBtn.id = 'idleAppMoreBtn';
       moreBtn.className = 'idle-dorf-tab';
+      moreBtn.style.display = 'none'; // bkmpIdleSyncTabOverflowForViewport entscheidet
       moreBtn.innerHTML = '<span class="idle-dorf-tab-icon">☰</span><span class="idle-dorf-tab-label">Mehr</span>';
       tabsBar.appendChild(moreBtn);
 
@@ -137,70 +154,74 @@
         moreBtn.classList.toggle('active', activeInMenu);
       }).observe(moreSheetGrid, { attributes: true, attributeFilter: ['class'], subtree: true });
     }
-    /* Bei jedem Laden auf schmalen Viewports ausfuehren (Startseite UND
-       /app) - derselbe Breakpoint wie die Bottom-Nav-CSS oben. Bewusst
-       einmalig bei Ladezeit geprueft statt live auf resize zu reagieren
-       (die Idle-Dorf-Tableiste existiert in einem Modal, das i.d.R. nicht
-       waehrend eines laufenden Fenster-Groessenwechsels offen ist). */
-    if (window.BKMP_APP_MODE || window.matchMedia('(max-width: 760px)').matches) {
-      bkmpIdleSetupMobileTabOverflow();
+
+    /* Jederzeit sicher wiederholbarer Soll-Zustand-Abgleich: verschiebt (nur
+       bei tatsaechlichem Wechsel, siehe bkmpTabOverflowCurrentlyCompact-
+       Cache, damit nicht bei jedem Resize-Tick unnoetig im DOM gewuehlt
+       wird) die 9 "sekundaeren" Tabs zwischen #idleDorfTabs und dem
+       gruppierten "Mehr"-Sheet hin und her - komplett reversibel, kein
+       Reload noetig. Wird beim Laden UND bei jeder relevanten
+       Breitenaenderung aufgerufen (siehe Resize-Listener unten). */
+    function bkmpIdleSyncTabOverflowForViewport() {
+      bkmpIdleBuildMobileTabOverflowUi();
+      if (!bkmpTabOverflowBuilt) return;
+      var wantCompact = bkmpIdleWantCompactTabNav();
+      if (wantCompact === bkmpTabOverflowCurrentlyCompact) return;
+      bkmpTabOverflowCurrentlyCompact = wantCompact;
+
+      var tabsBar = document.getElementById('idleDorfTabs');
+      var moreSheet = document.getElementById('idleAppMoreSheet');
+      var moreSheetGrid = document.getElementById('idleAppMoreSheetGrid');
+      var moreBtn = document.getElementById('idleAppMoreBtn');
+      if (!tabsBar || !moreSheet || !moreSheetGrid || !moreBtn) return;
+
+      if (wantCompact) {
+        moreSheetGrid.querySelectorAll('.idle-app-more-sheet-group-title').forEach(function (h) { h.remove(); });
+        BKMP_TAB_OVERFLOW_PRIMARY_IDS.forEach(function (id) { var el = document.getElementById(id); if (el) tabsBar.appendChild(el); });
+        tabsBar.appendChild(moreBtn);
+        BKMP_TAB_OVERFLOW_GROUPS.forEach(function (group) {
+          var present = group.ids.filter(function (id) { return !!document.getElementById(id); });
+          if (!present.length) return;
+          var heading = document.createElement('div');
+          heading.className = 'idle-app-more-sheet-group-title';
+          heading.textContent = group.title;
+          moreSheetGrid.appendChild(heading);
+          present.forEach(function (id) { moreSheetGrid.appendChild(document.getElementById(id)); });
+        });
+        /* Sicherheitsnetz: jeder Tab, der aus irgendeinem Grund in
+           keiner Gruppe oben gelistet ist, landet trotzdem im Menue
+           (ungruppiert am Ende) statt spurlos zu verschwinden. */
+        bkmpTabOverflowAllIdsInOrder.forEach(function (id) {
+          if (BKMP_TAB_OVERFLOW_PRIMARY_IDS.indexOf(id) === -1) {
+            var el = document.getElementById(id);
+            if (el && !moreSheetGrid.contains(el)) moreSheetGrid.appendChild(el);
+          }
+        });
+        moreBtn.style.display = '';
+      } else {
+        bkmpTabOverflowAllIdsInOrder.forEach(function (id) { var el = document.getElementById(id); if (el) tabsBar.appendChild(el); });
+        moreSheetGrid.querySelectorAll('.idle-app-more-sheet-group-title').forEach(function (h) { h.remove(); });
+        moreBtn.style.display = 'none';
+        if (moreSheet.classList.contains('open')) moreSheet.classList.remove('open');
+      }
     }
 
-    /* Bug-Fix (Spieler-Meldung ChronoKora 21.07., Screenshot: komplette
-       Tab-Gruppen-Leiste fehlt bei 1920x1080): die Annahme im Kommentar
-       oben ("das Fenster wird waehrend eines laufenden Groessenwechsels
-       i.d.R. nicht offen sein") trifft nicht den eigentlich haeufigen Fall
-       - viele Browserfenster starten schmal (<=760px) und werden ERST
-       DANACH maximiert, oft noch bevor der Spieler das Idle-Dorf ueberhaupt
-       zum ersten Mal oeffnet. bkmpIdleSetupMobileTabOverflow() hat zu
-       diesem fruehen Zeitpunkt schon unwiderruflich die echten
-       .idle-dorf-tab-group-Container aus dem DOM entfernt (siehe .remove()
-       oben) - eine spaetere Verbreiterung des Fensters kann diese
-       zerstoerten Container nicht zurueckholen: die Desktop-CSS-Gruppierung
-       findet nichts mehr zum Greifen, "Kampf" haengt einzeln mit 0x0px in
-       der Leiste, die restlichen 9 Tabs stecken im fuer Desktop nie
-       vorgesehenen "Mehr"-Sheet fest (verifiziert per getComputedStyle:
-       schmal laden -> ohne Neuladen verbreitern -> groupCount 0).
-       Sauberes Zurueckbauen waere aufwaendig (Original-Gruppierung muesste
-       komplett neu rekonstruiert werden, ohne die von idledorf.js
-       gesetzten Klick-Listener zu verlieren) - stattdessen ein einfacher,
-       robuster Fix: einmaliges Neuladen, sobald die Seite tatsaechlich
-       (wieder) Desktop-Breite hat, NACHDEM die zerstoerende Umbaumassnahme
-       schon gelaufen ist. Debounce verhindert mehrfaches Neuladen waehrend
-       eines Zieh-Vorgangs. Echter App-Modus ausgenommen - dort ist die
-       kompakte Nav die ABSICHTLICH dauerhafte Struktur, unabhaengig von
-       der Breite.
-       Nachbesserung (21.07., Spieler-Test ChronoKora: "im Localhost sehe
-       ich sie, aber nicht auf der normalen Website" - derselbe Browser-Tab
-       lief die ganze Nacht ueber fuer wiederholte Tests): die urspruengliche
-       Fassung nutzte ein DAUERHAFTES sessionStorage-Flag ("nur einmal pro
-       Tab-Sitzung neu laden") - bei einem einzelnen kurzen Test reicht das,
-       aber sobald derselbe Tab die schmal-dann-breit-Situation ein ZWEITES
-       Mal durchlebt (z.B. wiederholtes Testen, Fenster mehrfach verkleinert/
-       vergroessert), war die Sperre bereits "verbraucht" und der echte,
-       neue Fall wurde faelschlich uebersprungen - identisches Symptom wie
-       der urspruengliche Bug, nur durch die eigene Absicherung verursacht.
-       Fix: zeitbasiertes Abklingen (10s) statt Dauersperre - verhindert
-       weiterhin eine Neulade-Schleife waehrend eines einzelnen Zieh-
-       Vorgangs, heilt sich aber bei jedem SPAETEREN echten Auftreten
-       erneut selbst. */
-    if (!window.BKMP_APP_MODE) {
-      var bkmpTabOverflowResizeTimer = null;
-      window.addEventListener('resize', function () {
-        if (bkmpTabOverflowResizeTimer) window.clearTimeout(bkmpTabOverflowResizeTimer);
-        bkmpTabOverflowResizeTimer = window.setTimeout(function () {
-          var isDesktopNow = window.matchMedia('(min-width: 761px)').matches;
-          var wasCollapsedIntoMobileShape = !!document.getElementById('idleAppMoreBtn');
-          if (!isDesktopNow || !wasCollapsedIntoMobileShape) return;
-          try {
-            var lastReloadAt = Number(sessionStorage.getItem('bkmpTabOverflowReloadedAt') || 0);
-            if (Date.now() - lastReloadAt < 10000) return;
-            sessionStorage.setItem('bkmpTabOverflowReloadedAt', String(Date.now()));
-          } catch (e) {}
-          location.reload();
-        }, 400);
-      }, { passive: true });
-    }
+    bkmpIdleSyncTabOverflowForViewport();
+
+    /* Bei jeder relevanten Breitenaenderung erneut abgleichen (debounced,
+       200ms) - ersetzt den frueheren Resize->Reload-Notnagel komplett:
+       kein Seiten-Reload mehr, kein verlorener Spielstand, greift jetzt
+       auch im echten App-Modus (dort bleibt bkmpIdleWantCompactTabNav()
+       durch window.BKMP_APP_MODE ohnehin unabhaengig von der Breite immer
+       true - die Absicht "App = immer kompakt" bleibt unangetastet, der
+       fruehere Totalausschluss vom Resize-Handling war fuer diesen Zweck
+       nie noetig, da die Funktion selbst schon fruehzeitig abbricht, wenn
+       sich am Soll-Zustand nichts aendert). */
+    var bkmpTabOverflowResizeTimer = null;
+    window.addEventListener('resize', function () {
+      if (bkmpTabOverflowResizeTimer) window.clearTimeout(bkmpTabOverflowResizeTimer);
+      bkmpTabOverflowResizeTimer = window.setTimeout(bkmpIdleSyncTabOverflowForViewport, 200);
+    }, { passive: true });
 
     /* Bug-Fix (Spieler-Meldungen 19./20.07., "seltsamer Balken" mitten in
        Skilltree/Gilde/anderen Tabs auf normaler Desktop-Breite): #idleAppMoreSheet

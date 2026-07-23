@@ -49,8 +49,14 @@ const test = base.test.extend({
     await server.close();
   },
 
-  page: async ({ page, store }, use) => {
-    await page.route(SUPABASE_HOST_PATTERN, async (route) => {
+  /* Routed on the CONTEXT, not the single `page` fixture: a page.route()
+     only covers that one page object, but save-load.spec.js's multi-tab
+     test opens a second page via context.newPage() to check that a change
+     saved in one tab is visible in another after reload - that second page
+     needs the exact same interception or its requests would go straight to
+     the real network (found while writing that test, not after it failed). */
+  context: async ({ context, store }, use) => {
+    await context.route(SUPABASE_HOST_PATTERN, async (route) => {
       const request = route.request();
       const method = request.method();
       if (method === 'OPTIONS') {
@@ -75,7 +81,7 @@ const test = base.test.extend({
         body: JSON.stringify(result.json)
       });
     });
-    await use(page);
+    await use(context);
   },
 
   qaClock: async ({ page, useFakeClock, fixtureData }, use) => {
@@ -109,6 +115,38 @@ async function loginThroughForm(page, fixtureData) {
   await base.expect(overlay).not.toHaveClass(/visible/, { timeout: 15000 });
 }
 
+/* bkmpIdleOpenModal() adds the "visible" class to #idleDorfOverlay BEFORE
+   awaiting bkmpIdleEnsureConfigLoaded()/bkmpIdleLoadOrInitState() (idledorf.js
+   ~2286-2308) - intentional, so the window appears instantly while content
+   loads behind an "idle-dorf-loading" class instead of popping in late. That
+   means a test asserting only on the "visible" class can still see
+   bkmpIdleState as null for a brief window - found because every test that
+   read bkmpIdleState right after opening intermittently crashed with
+   "Cannot read properties of null". Wait for the real readiness signal
+   instead of the class alone. */
+async function waitForIdleStateReady(page) {
+  // bkmpIdleState is declared with `let` at the top of a classic script
+  // (js/core/bkmp-idle-state.js) - a global LEXICAL binding, not a `window`
+  // property, so `window.bkmpIdleState` is always undefined even once it's
+  // set. Reference the bare name instead (resolves fine via the page's
+  // global scope). Found because the fix for the null-state race above
+  // itself timed out 15s instead of resolving quickly.
+  await page.waitForFunction(() => typeof bkmpIdleState !== 'undefined' && bkmpIdleState != null, null, { timeout: 15000 });
+}
+
+/* bkmpIdleCurrentDragon is only assigned by bkmpIdleSpawnDragon(), called
+   AFTER bkmpIdleState finishes loading (idledorf.js's bkmpIdleOpenModal:
+   offline-progress claim, then "if (!bkmpIdleCurrentDragon)
+   bkmpIdleSpawnDragon()") - waitForIdleStateReady alone still leaves a real
+   (if brief) window where bkmpIdleCurrentDragon is null. Any combat test
+   that reads it via a raw page.evaluate() right after opening can hit that
+   window - DOM-assertion-based tests (expect(locator)...) accidentally
+   survive it because Playwright's own polling/retry buys enough time,
+   which is what let this race go unnoticed in earlier suites. */
+async function waitForDragonReady(page) {
+  await page.waitForFunction(() => typeof bkmpIdleCurrentDragon !== 'undefined' && bkmpIdleCurrentDragon != null, null, { timeout: 15000 });
+}
+
 /* DEFAULT entry point for Stage-1 functional tests: the plain marketing
    site (no ?app=idledorf), logging in through the real "Wer bist du?" form
    and then clicking the real #idleDorfButton CTA - no shortcut/bypass.
@@ -130,6 +168,7 @@ async function openAndLogin(page, qaBaseURL, fixtureData) {
   const idleDorfOverlay = page.locator('#idleDorfOverlay');
   await page.locator('#idleDorfButton').click();
   await base.expect(idleDorfOverlay).toHaveClass(/visible/, { timeout: 15000 });
+  await waitForIdleStateReady(page);
 }
 
 /* App-mode entry point (auto-opens the idle-dorf overlay, see index.html's
@@ -155,6 +194,7 @@ async function openAppMode(page, qaBaseURL, fixtureData) {
     await page.reload();
   }
   await base.expect(idleDorfOverlay).toHaveClass(/visible/, { timeout: 15000 });
+  await waitForIdleStateReady(page);
 }
 
-module.exports = { test, expect, openAndLogin, openAppMode, SUPABASE_HOST_PATTERN };
+module.exports = { test, expect, openAndLogin, openAppMode, waitForIdleStateReady, waitForDragonReady, SUPABASE_HOST_PATTERN };

@@ -44,14 +44,19 @@ const BKMP_PROTO_NAV_PRIMARY = [
   { id: 'dungeon', btn: 'idleTabBtnDungeon', label: 'Dungeon' }
 ];
 /* Nur noch der DESKTOP-Fallback fuer das "Mehr"-Menue (siehe
-   bkmpProtoChudToggleMoreMenu): auf schmalen Bildschirmen, auf denen
-   bkmpIdleSetupMobileTabOverflow() bereits lief (bkmp-app-mode-bootstrap.js),
-   uebernimmt stattdessen das echte, gruppierte #idleAppMoreSheet (Bottom-
-   Sheet, safe-area-bewusst) per Proxy-Klick auf #idleAppMoreBtn - diese
-   flache Liste hier wird dann gar nicht mehr gerendert/verwendet. Auf
-   breiten Bildschirmen (>760px, kein App-Modus) lief jenes Setup nie,
-   deshalb bleibt dieser Fallback fuer Desktop bestehen. Dieselben 9 IDs
-   wie MORE_GROUPS in bkmp-app-mode-bootstrap.js, nur ungruppiert. */
+   bkmpProtoChudToggleMoreMenu): sobald dieses Kompakt-Nav sichtbar ist
+   (bkmpProtoChudSyncVisibility, bkmp-proto-compact-hud.js), uebernimmt
+   stattdessen das echte, gruppierte #idleAppMoreSheet (Bottom-Sheet,
+   safe-area-bewusst) per Proxy-Klick auf #idleAppMoreBtn - diese flache
+   Liste hier wird dann gar nicht mehr gerendert/verwendet. #idleAppMoreBtn
+   existiert seit dem Umbau vom 23.07. IMMER im DOM (bkmp-app-mode-
+   bootstrap.js baut ihn unbedingt auf), auf Desktop-Breite aber
+   display:none UND unerreichbar, weil das gesamte Kompakt-Nav selbst dann
+   versteckt ist - dieser eigene, flache Dropdown-Fallback bleibt deshalb
+   trotzdem als echter Ersatz bestehen fuer den (heute eher theoretischen)
+   Fall, dass dieses Kompakt-Nav sichtbar waere, ohne dass jenes Setup
+   gelaufen ist. Dieselben 9 IDs wie BKMP_TAB_OVERFLOW_GROUPS in
+   bkmp-app-mode-bootstrap.js, nur ungruppiert. */
 const BKMP_PROTO_NAV_SECONDARY = [
   { id: 'runen', btn: 'idleTabBtnRunen', label: 'Runen' },
   { id: 'erfolge', btn: 'idleTabBtnErfolge', label: 'Erfolge' },
@@ -88,17 +93,17 @@ function bkmpProtoChudBuildNav() {
     });
   });
 
-  /* Phase 7.0 (Section 15/17): auf schmalen Bildschirmen, auf denen
-     bkmpIdleSetupMobileTabOverflow() (bkmp-app-mode-bootstrap.js) schon
-     lief, existiert bereits ein echtes, gruppiertes Bottom-Sheet
-     (#idleAppMoreSheet, mit safe-area-Handling, Backdrop-Klick, ESC,
-     Android-Zurueck-Integration - alles bereits fertig verdrahtet dort).
-     Der "Mehr"-Button proxied in diesem Fall EINFACH auf den echten
-     #idleAppMoreBtn, statt ein zweites/eigenes Menue zu zeigen - vermeidet
-     genau die vom Auftrag verbotene doppelte Mobil-Struktur. Auf breiten
-     Bildschirmen (>760px, kein App-Modus) existiert #idleAppMoreBtn nicht
-     (jenes Setup lief dort nie) - dort bleibt das eigene, flache Dropdown-
-     Menue unten als Fallback bestehen (unveraendertes Desktop-Verhalten). */
+  /* Phase 7.0 (Section 15/17): existiert bereits ein echtes, gruppiertes
+     Bottom-Sheet (#idleAppMoreSheet, mit safe-area-Handling, Backdrop-
+     Klick, ESC, Android-Zurueck-Integration - alles bereits fertig
+     verdrahtet in bkmp-app-mode-bootstrap.js), proxied der "Mehr"-Button
+     hier EINFACH auf den echten #idleAppMoreBtn, statt ein zweites/eigenes
+     Menue zu zeigen - vermeidet genau die vom Auftrag verbotene doppelte
+     Mobil-Struktur. #idleAppMoreBtn existiert seit dem Umbau vom 23.07.
+     immer, ist aber auf Desktop-Breite display:none und ueber dieses (dort
+     ebenfalls versteckte) Kompakt-Nav nicht erreichbar - der eigene,
+     flache Dropdown-Fallback direkt darunter bleibt fuer diesen Fall
+     bestehen. */
   const moreBtn = document.getElementById('bkmpProtoNavMoreBtn');
   if (moreBtn) moreBtn.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -360,39 +365,41 @@ function bkmpProtoChudCloseFxMenu() {
   if (btn) btn.setAttribute('aria-expanded', 'false');
 }
 
-function bkmpProtoChudInit() {
-  if (!BKMP_PROTO_COMPACT_HUD_ENABLED) return;
-  /* Bug-Fix (Spieler-Report Crocodilandy927, 20.07.: "auf dem PC nervt es,
-     wenn man immer auf Mehr druecken muss um alle Menuepunkte zu sehen")
-     - lief bisher UNCONDITIONAL auf jeder Breite, auch auf vollem Desktop,
-     und versteckte dort die alte, vollstaendige Tableiste (#idleDorfTabs,
-     zeigt auf Desktop dank System C/@media(min-width:761px) ohnehin schon
-     ALLE Tabs gruppiert ohne "Mehr" - kam aber nie zum Zug, weil dieses
-     kompakte Nav sie unconditional ausblendete). Gleiche Bedingung wie
-     bkmpIdleSetupMobileTabOverflow() in bkmp-app-mode-bootstrap.js (dort
-     bewusst dokumentiert: einmalig bei Ladezeit geprueft, nicht live auf
-     resize, da die Idle-Dorf-Tableiste in einem Modal liegt, das i.d.R.
-     nicht waehrend eines laufenden Groessenwechsels offen ist) - auf
-     breitem Desktop bleibt die alte Anzeige jetzt einfach unangetastet,
-     dieses ganze Prototyp-Nav wird dort gar nicht erst aktiviert. */
-  if (!window.BKMP_APP_MODE && !window.matchMedia('(max-width: 760px)').matches) return;
-  // Alte Anzeige verstecken (nicht loeschen - bleibt vollstaendiger
-  // Fallback, falls der Prototyp spaeter deaktiviert wird), neue zeigen.
-  const oldHud = document.getElementById('idleDorfHud');
-  const oldTabs = document.getElementById('idleDorfTabs');
-  const oldStageBar = document.getElementById('idleStageBar');
-  const oldFxBtn = document.getElementById('idleFxModeBtn');
-  if (oldHud) oldHud.style.display = 'none';
-  if (oldTabs) oldTabs.style.display = 'none';
-  if (oldStageBar) oldStageBar.style.display = 'none';
-  if (oldFxBtn) oldFxBtn.style.display = 'none';
+var bkmpProtoChudSetupDone = false;
+var bkmpProtoChudCompactActive = null;
 
-  const newHud = document.getElementById('bkmpProtoCompactHud');
-  const newNav = document.getElementById('bkmpProtoCompactNav');
-  const newStageBar = document.getElementById('bkmpProtoCompactStageBar');
-  if (newHud) newHud.style.display = '';
-  if (newNav) newNav.style.display = '';
-  if (newStageBar) newStageBar.style.display = '';
+/* Muss exakt dieselbe Bedingung wie bkmpIdleWantCompactTabNav() in
+   bkmp-app-mode-bootstrap.js UND die CSS-Fixierung von #bkmpProtoCompactNav
+   (style.css) verwenden - sonst zeigt sich auf breite-aber-flache Quer-
+   Handys (haeufig 700-950px breit) die alte Desktop-HUD/Tableiste in einem
+   viel zu flachen Fenster statt der dafuer gebauten kompakten Fassung
+   (23.07. gefunden, siehe Kommentar dort, existierte vorher genauso). */
+function bkmpProtoChudWantCompact() {
+  return !!(window.BKMP_APP_MODE
+    || window.matchMedia('(max-width: 760px)').matches
+    || window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches);
+}
+
+/* UMBAU (23.07., dringende Spieler-Meldungsflut "Tabs verschwinden/nicht
+   klickbar", Nutzer-Entscheidung "Punkt 3" - die saubere strukturelle
+   Loesung statt eines weiteren Pflasters): diese Funktion lief bisher NUR
+   EINMAL beim Laden und brach bei breitem Erstladen sofort ab (Bug-Fix
+   Crocodilandy927 unten) - dadurch wurde das komplette Kompakt-Nav
+   (Listener, "Mehr"-Aufbau, Intervall) NIE aufgebaut, wenn die Seite
+   zufaellig breit startete. Ein SPAETERES Verschmalern (z.B. echtes
+   Handy im Querformat gedreht, Browser verkleinert) blieb dadurch
+   wirkungslos - die alte Desktop-HUD/Tableiste (#idleDorfHud/#idleDorfTabs)
+   blieb unsichtbar-inkompatibel stehen, ohne dass je auf die kompakte
+   Fassung umgeschaltet wurde. Jetzt in zwei Teile gesplittet: Aufbau
+   (bkmpProtoChudSetup, einmalig, UNBEDINGT - baut nur inerte Struktur,
+   entscheidet nichts ueber Sichtbarkeit) und Sichtbarkeits-Abgleich
+   (bkmpProtoChudSyncVisibility, jederzeit sicher wiederholbar, an einen
+   debounced 'resize'-Listener gekoppelt, siehe Dateiende) - funktioniert
+   jetzt in BEIDE Richtungen ohne Reload, genau wie das analoge
+   bkmpIdleSyncTabOverflowForViewport() in bkmp-app-mode-bootstrap.js. */
+function bkmpProtoChudSetup() {
+  if (!BKMP_PROTO_COMPACT_HUD_ENABLED || bkmpProtoChudSetupDone) return;
+  bkmpProtoChudSetupDone = true;
 
   bkmpProtoChudBuildNav();
 
@@ -449,4 +456,57 @@ function bkmpProtoChudInit() {
   if (typeof bkmpIdleCombatLogInit === 'function') bkmpIdleCombatLogInit();
 }
 
-bkmpProtoChudInit();
+/* Jederzeit sicher wiederholbarer Sichtbarkeits-Abgleich zwischen der
+   alten Desktop-HUD/Tableiste/Stufenleiste und dieser kompakten Fassung -
+   ersetzt den frueheren Einmal-Bail-out, der bei breitem Erstladen die
+   kompakte UI nie aufgebaut und bei schmalem Erstladen die alte Anzeige
+   nie wieder zurueckgeholt hat (siehe Kommentar an bkmpProtoChudSetup
+   oben). Nur bei tatsaechlichem Wechsel aktiv (bkmpProtoChudCompactActive-
+   Cache), damit nicht bei jedem Resize-Tick unnoetig umgeschaltet wird. */
+function bkmpProtoChudSyncVisibility() {
+  if (!BKMP_PROTO_COMPACT_HUD_ENABLED) return;
+  bkmpProtoChudSetup();
+  const wantCompact = bkmpProtoChudWantCompact();
+  if (wantCompact === bkmpProtoChudCompactActive) return;
+  bkmpProtoChudCompactActive = wantCompact;
+
+  // Alte Anzeige verstecken (nicht loeschen - bleibt vollstaendiger
+  // Fallback, falls der Prototyp spaeter deaktiviert wird), neue zeigen -
+  // oder umgekehrt, je nachdem, was jetzt gebraucht wird.
+  const oldHud = document.getElementById('idleDorfHud');
+  const oldTabs = document.getElementById('idleDorfTabs');
+  const oldStageBar = document.getElementById('idleStageBar');
+  const oldFxBtn = document.getElementById('idleFxModeBtn');
+  const newHud = document.getElementById('bkmpProtoCompactHud');
+  const newNav = document.getElementById('bkmpProtoCompactNav');
+  const newStageBar = document.getElementById('bkmpProtoCompactStageBar');
+
+  if (wantCompact) {
+    if (oldHud) oldHud.style.display = 'none';
+    if (oldTabs) oldTabs.style.display = 'none';
+    if (oldStageBar) oldStageBar.style.display = 'none';
+    if (oldFxBtn) oldFxBtn.style.display = 'none';
+    if (newHud) newHud.style.display = '';
+    if (newNav) newNav.style.display = '';
+    if (newStageBar) newStageBar.style.display = '';
+    bkmpProtoChudSyncActiveNav();
+    bkmpProtoChudRenderHud();
+    bkmpProtoChudRenderStageBar();
+  } else {
+    if (newHud) newHud.style.display = 'none';
+    if (newNav) newNav.style.display = 'none';
+    if (newStageBar) newStageBar.style.display = 'none';
+    if (oldHud) oldHud.style.display = '';
+    if (oldTabs) oldTabs.style.display = '';
+    if (oldStageBar) oldStageBar.style.display = '';
+    if (oldFxBtn) oldFxBtn.style.display = '';
+  }
+}
+
+bkmpProtoChudSyncVisibility();
+
+var bkmpProtoChudResizeTimer = null;
+window.addEventListener('resize', function () {
+  if (bkmpProtoChudResizeTimer) window.clearTimeout(bkmpProtoChudResizeTimer);
+  bkmpProtoChudResizeTimer = window.setTimeout(bkmpProtoChudSyncVisibility, 200);
+}, { passive: true });
