@@ -5221,14 +5221,20 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
    das Fenster wurde bisher sichtbar, WAEHREND im Hintergrund noch Daten
    nachgeladen wurden, wodurch kurz der Stand von der letzten Sitzung (z.B.
    noch der Raid-Kampf-Tab) durchschimmerte, bevor die frischen Daten den
-   richtigen Tab zeigten. .idle-dorf-loading blendet HUD/Stufenleiste/
-   Tableiste/alle Panels/Beitritts-Banner/Willkommen-zurueck-Karte per
-   visibility (NICHT display) aus, damit beim Aufdecken kein Layout-Sprung
-   entsteht - betrifft Website UND App-Modus gleichermassen, da der Bug in
-   der gemeinsamen Oeffnen-Logik liegt, nicht im Redesign. */
-.idle-dorf-card.idle-dorf-loading #idleDorfHud,
-.idle-dorf-card.idle-dorf-loading #idleStageBar,
-.idle-dorf-card.idle-dorf-loading #idleDorfTabs,
+   richtigen Tab zeigten.
+
+   KORREKTUR (Phase 7.3, 23.07., kritischer Repair "Navigations-Buttons
+   verschwinden"): urspruenglich blendete diese Klasse HUD/Stufenleiste/
+   Tableiste ZUSAETZLICH zu den Panels aus - genau die drei Elemente, die
+   der Auftrag als "permanente Huelle" einstuft und die niemals durch einen
+   Ladezustand verschwinden duerfen (Video-Beweis: leeres "Laedt..."-Overlay
+   ganz ohne HUD/Nav beim Wiederoeffnen). Jetzt bleibt NUR noch der
+   tatsaechlich dynamische Inhalt (Panels/Beitritts-Banner/Willkommen-
+   zurueck-Karte) waehrend des Ladens verborgen - HUD/Stufenleiste/Tableiste
+   bleiben immer sichtbar (zeigen beim Wiederoeffnen kurz den letzten
+   bekannten Stand statt zu verschwinden, bei einem echten Erstladen bleiben
+   sie einfach leer bis zum ersten Render - beides kein "leerer Overlay-
+   Zustand" im vom Auftrag verbotenen Sinne). */
 .idle-dorf-card.idle-dorf-loading .idle-dorf-panel,
 .idle-dorf-card.idle-dorf-loading .raid-join-banner,
 .idle-dorf-card.idle-dorf-loading .idle-dorf-offline-card {

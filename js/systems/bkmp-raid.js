@@ -377,9 +377,35 @@ function bkmpRaidToggleCombatView(show) {
      Nav-Leiste ersetzt hatte - beide lagen danach uebereinander. Jetzt faellt
      der "nicht im Kampf"-Zustand auf 'none' zurueck, wenn der Prototyp
      aktiv ist (er verwaltet #idleDorfTabs exklusiv), statt das '' immer
-     bedingungslos zurueckzugeben. */
-  const compactHudActive = typeof BKMP_PROTO_COMPACT_HUD_ENABLED !== 'undefined' && BKMP_PROTO_COMPACT_HUD_ENABLED;
-  if (tabs) tabs.style.display = show ? 'none' : (compactHudActive ? 'none' : '');
+     bedingungslos zurueckzugeben.
+
+     KRITISCHER BUG-FIX (Phase 7.3, 23.07., "Navigations-Buttons
+     verschwinden"): die urspruengliche Pruefung oben nutzte
+     BKMP_PROTO_COMPACT_HUD_ENABLED - ein STATISCHES "ist das Kompakt-HUD-
+     Prototyp-Skript ueberhaupt geladen"-Flag, das in Produktion IMMER true
+     ist, VOLLKOMMEN UNABHAENGIG von der aktuellen Bildschirmbreite. Dadurch
+     wurde #idleDorfTabs bei JEDEM Schliessen (bkmpIdleCloseModal laeuft
+     IMMER durch bkmpRaidStopCombatView, siehe oben) unconditional auf
+     display:none gesetzt - auch auf breitem Desktop, wo die kompakte Nav
+     nie sichtbar sein soll. bkmpProtoChudSyncVisibility()'s eigener Cache
+     (bkmpProtoChudCompactActive, "ist die kompakte Nav GERADE JETZT aktiv")
+     erkannte beim naechsten Oeffnen keinen Wechsel (Breite war die ganze
+     Zeit "Desktop") und stellte #idleDorfTabs deshalb NIE wieder her - die
+     Desktop-Tableiste blieb dauerhaft leer (0x0px), die kompakte Nav war ja
+     auch nie eingeblendet worden (fuer sie besteht exakt derselbe Fehler
+     nicht - sie wird separat ueber bkmpProtoChudCompactActive gesteuert).
+     Per Video-Beweis + Playwright-Regressionstest (tests/e2e/nav-
+     persistence.spec.js) bestaetigt: 7 von 8 Tests schlugen mit genau
+     diesem Symptom fehl (desktopTabs.display:"none", width:0, height:0),
+     der letzte direkte bkmpRaidStopCombatView()-Aufruf ganz ohne jedes
+     Oeffnen/Schliessen reproduzierte denselben Fehler identisch - beweist,
+     dass die Ursache exakt hier liegt, keine Race Condition anderswo. Fix:
+     die tatsaechliche, dynamische Sichtbarkeits-Entscheidung
+     (bkmpProtoChudCompactActive) statt des statischen Lade-Flags pruefen -
+     nur wenn die kompakte Nav GERADE JETZT die sichtbare ist, bleibt
+     #idleDorfTabs auf 'none', sonst wird es immer auf '' zurueckgesetzt. */
+  const compactNavCurrentlyActive = typeof bkmpProtoChudCompactActive !== 'undefined' && bkmpProtoChudCompactActive === true;
+  if (tabs) tabs.style.display = show ? 'none' : (compactNavCurrentlyActive ? 'none' : '');
   if (combatView) combatView.style.display = show ? '' : 'none';
   panels.forEach(p => { if (show) p.style.display = 'none'; });
   if (!show) {
