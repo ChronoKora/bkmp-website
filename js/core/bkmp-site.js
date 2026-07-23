@@ -2148,9 +2148,10 @@
         }
 
         bkmpCompressImageFile(file).then(image => {
-          bkmpSubmitViaApi('card_sale_requests', { minecraft_name: name, discord }, image).then(() => {
+          bkmpSubmitViaApi('card_sale_requests', { minecraft_name: name, discord }, image).then(row => {
             bkmpStartSubmitCooldown('cardsalerequest');
             resetBtn();
+            if (row && row.id && typeof bkmpAddPendingRequestId === 'function') bkmpAddPendingRequestId(BKMP_PENDING_CARD_SALE_KEY, row.id);
             if (cardSaleRequestFormView) cardSaleRequestFormView.style.display = 'none';
             if (cardSaleRequestSuccessView) cardSaleRequestSuccessView.style.display = '';
           }).catch(e => {
@@ -2694,9 +2695,10 @@
         }
 
         if (typeof saveInvestorRequest === 'function' && bkmpGetSupabaseClient()) {
-          saveInvestorRequest(request).then(() => {
+          saveInvestorRequest(request).then(id => {
             bkmpStartSubmitCooldown('investorrequest');
             resetSubmitBtn();
+            if (id && typeof bkmpAddPendingRequestId === 'function') bkmpAddPendingRequestId(BKMP_PENDING_INVESTOR_KEY, id);
             investorRequestFormView.style.display = 'none';
             investorRequestSuccessView.style.display = '';
           }).catch(e => {
@@ -2709,6 +2711,118 @@
           alert('Deine Anfrage konnte gerade nicht gesendet werden, da keine Verbindung zur Datenbank besteht.');
         }
       });
+    }
+
+    /* ---------------- Anfrage-Entscheidung: 1x-Popup-Benachrichtigung (23.07.) ----------------
+       Nutzerwunsch: Absender einer Kartenverkaufs-/Investoren-Anfrage sollen
+       erfahren, ob bestätigt/abgelehnt wurde, sobald sie wieder auf der
+       Seite sind - als einmaliges Popup. Beide Anfrage-Tabellen sind per
+       RLS bewusst NICHT oeffentlich lesbar (nur is_active_admin(), siehe
+       jeweilige *-schema.sql) und die Einreichung selbst ist komplett
+       anonym (nur Minecraft-Name/Discord, kein Account) - es gibt also
+       keinen Server-seitigen Weg, "wer bin ich" zu wissen. Stattdessen:
+       die ID der eigenen Anfrage wird beim Einreichen lokal gemerkt (siehe
+       bkmpAddPendingRequestId-Aufrufe an den beiden Einreichungs-Stellen
+       oben), und bei jedem Seitenaufruf ueber eine enge, nur genau diese
+       eine ID beantwortende RPC (get_card_sale_request_status/
+       get_investor_request_status, siehe supabase.js + sql/20260723-
+       request-decision-notify.sql) nachgefragt, ob inzwischen entschieden
+       wurde. Rein client-seitig (localStorage) - ein anderes Geraet/ein
+       geleerter Browser-Speicher kann die Benachrichtigung nicht mehr
+       zustellen, dieselbe Einschraenkung wie bei jeder anonymen Anfrage
+       ohne Account-Bindung. */
+    const BKMP_PENDING_CARD_SALE_KEY = 'bkmp-pending-card-sale-requests';
+    const BKMP_PENDING_INVESTOR_KEY = 'bkmp-pending-investor-requests';
+
+    function bkmpGetPendingRequestIds(key) {
+      try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { return []; }
+    }
+    function bkmpAddPendingRequestId(key, id) {
+      if (!id) return;
+      const ids = bkmpGetPendingRequestIds(key);
+      if (ids.includes(id)) return;
+      ids.push(id);
+      try { localStorage.setItem(key, JSON.stringify(ids)); } catch (e) {}
+    }
+    function bkmpRemovePendingRequestId(key, id) {
+      const ids = bkmpGetPendingRequestIds(key).filter(x => x !== id);
+      try { localStorage.setItem(key, JSON.stringify(ids)); } catch (e) {}
+    }
+
+    /* Nacheinander statt gleichzeitig, falls ein Besucher mehrere offene
+       Anfragen hatte, die alle in derselben Sitzung entschieden wurden. */
+    let bkmpRequestDecisionQueue = [];
+    function bkmpQueueRequestDecisionPopup(titleText, bodyText, kind) {
+      bkmpRequestDecisionQueue.push({ titleText, bodyText, kind });
+      if (bkmpRequestDecisionQueue.length === 1) bkmpShowNextRequestDecisionPopup();
+    }
+    function bkmpShowNextRequestDecisionPopup() {
+      const next = bkmpRequestDecisionQueue[0];
+      if (!next) return;
+      bkmpShowRequestDecisionPopup(next.titleText, next.bodyText, next.kind);
+    }
+    function bkmpShowRequestDecisionPopup(titleText, bodyText, kind) {
+      const domId = 'bkmpRequestDecision';
+      const stale = document.getElementById(domId + 'Overlay');
+      if (stale) stale.remove();
+      const html = typeof bkmpUiModalHtml === 'function' ? bkmpUiModalHtml({
+        id: domId,
+        titleHtml: escapeHtml(titleText),
+        bodyHtml: `<p style="white-space:pre-line; line-height:1.5;">${escapeHtml(bodyText)}</p>`,
+        buttonsHtml: `<button type="button" class="btn-ja" id="${domId}CloseBtn">Verstanden</button>`,
+        extraClass: kind === 'success' ? 'bkmp-request-decision-success' : 'bkmp-request-decision-rejected'
+      }) : '';
+      if (!html) return;
+      document.body.insertAdjacentHTML('beforeend', html);
+      const overlay = document.getElementById(domId + 'Overlay');
+      if (!overlay) return;
+      if (typeof bkmpUiTrapFocus === 'function') bkmpUiTrapFocus(overlay);
+      requestAnimationFrame(() => overlay.classList.add('visible'));
+      function close() {
+        overlay.classList.remove('visible');
+        setTimeout(() => overlay.remove(), 300);
+        bkmpRequestDecisionQueue.shift();
+        bkmpShowNextRequestDecisionPopup();
+      }
+      const closeBtn = document.getElementById(domId + 'CloseBtn');
+      if (closeBtn) closeBtn.addEventListener('click', close);
+      overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+    }
+
+    const BKMP_CARD_SALE_ACCEPT_TEXT = 'Deine Verkaufsanfrage wurde angenommen!\n\nPacke 10 Bundles zusammen und kontaktiere ChronoKora/ChronoYaksha Ingame.';
+    const BKMP_CARD_SALE_REJECT_TEXT = 'Deine Verkaufsanfrage wurde leider abgelehnt.';
+    const BKMP_INVESTOR_ACCEPT_TEXT = 'Deine Investoren-Anfrage wurde angenommen!\n\nZahle das Geld an ChronoKora/ChronoYaksha (CB1).';
+    const BKMP_INVESTOR_REJECT_TEXT = 'Deine Investoren-Anfrage wurde leider abgelehnt.';
+
+    async function bkmpCheckPendingRequestDecisions() {
+      if (!bkmpGetSupabaseClient()) return;
+      const cardIds = bkmpGetPendingRequestIds(BKMP_PENDING_CARD_SALE_KEY);
+      for (const id of cardIds) {
+        try {
+          const status = typeof getCardSaleRequestStatus === 'function' ? await getCardSaleRequestStatus(id) : null;
+          if (status === 'confirmed') {
+            bkmpQueueRequestDecisionPopup('🎉 Verkaufsanfrage angenommen', BKMP_CARD_SALE_ACCEPT_TEXT, 'success');
+            bkmpRemovePendingRequestId(BKMP_PENDING_CARD_SALE_KEY, id);
+          } else if (status === 'rejected') {
+            bkmpQueueRequestDecisionPopup('Verkaufsanfrage abgelehnt', BKMP_CARD_SALE_REJECT_TEXT, 'rejected');
+            bkmpRemovePendingRequestId(BKMP_PENDING_CARD_SALE_KEY, id);
+          }
+        } catch (e) { console.warn('Status der Verkaufsanfrage konnte nicht geprüft werden.', e); }
+      }
+      const investorIds = bkmpGetPendingRequestIds(BKMP_PENDING_INVESTOR_KEY);
+      for (const id of investorIds) {
+        try {
+          const result = typeof getInvestorRequestStatus === 'function' ? await getInvestorRequestStatus(id) : null;
+          if (result && result.status === 'confirmed') {
+            bkmpQueueRequestDecisionPopup('🎉 Investoren-Anfrage angenommen', BKMP_INVESTOR_ACCEPT_TEXT, 'success');
+            bkmpRemovePendingRequestId(BKMP_PENDING_INVESTOR_KEY, id);
+          } else if (result && result.status === 'rejected') {
+            const text = result.rejectReason ? (BKMP_INVESTOR_REJECT_TEXT + '\n\nBegründung: ' + result.rejectReason) : BKMP_INVESTOR_REJECT_TEXT;
+            bkmpQueueRequestDecisionPopup('Investoren-Anfrage abgelehnt', text, 'rejected');
+            bkmpRemovePendingRequestId(BKMP_PENDING_INVESTOR_KEY, id);
+          }
+        } catch (e) { console.warn('Status der Investoren-Anfrage konnte nicht geprüft werden.', e); }
+      }
     }
 
     /* ---------------- MC-Name Identity + Erfolge ---------------- */
@@ -3039,6 +3153,7 @@
 
     bkmpTrackDayVisited();
     bkmpTrackTimeBasedFlags();
+    bkmpCheckPendingRequestDecisions();
 
     let bkmpTimeTrackStart = document.visibilityState === 'visible' ? Date.now() : null;
     function bkmpFlushTimeSpent() {

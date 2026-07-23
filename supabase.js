@@ -2128,6 +2128,7 @@ function bkmpMapInvestorRequestFromSupabase(row) {
     sharePercent: Number(row.share_percent || 0),
     periodMonths: Number(row.period_months || 0),
     status: row.status || 'pending',
+    rejectReason: row.reject_reason || '',
     isRead: Boolean(row.is_read),
     createdAt: row.created_at ? Date.parse(row.created_at) : 0,
     createdAtIso: row.created_at || '',
@@ -2150,9 +2151,15 @@ async function saveInvestorRequest(item) {
   const client = bkmpGetSupabaseClient();
   if (!client) throw new Error('Supabase ist nicht verbunden.');
   const payload = { ...bkmpMapInvestorRequestToSupabase(item), status: 'pending' };
-  const { error } = await client.from('investor_requests').insert(payload);
+  /* .select('id').single() (23.07., 1x-Popup-Benachrichtigung bei
+     Entscheidung): der Aufrufer merkt sich diese ID lokal (siehe
+     BKMP_PENDING_INVESTOR_REQUESTS_KEY in bkmp-site.js), um spaeter per
+     get_investor_request_status()-RPC nachzufragen, ob schon entschieden
+     wurde - ohne diese ID gaebe es keine Moeglichkeit, eine anonyme
+     Anfrage spaeter wiederzufinden. */
+  const { data, error } = await client.from('investor_requests').insert(payload).select('id').single();
   if (error) throw error;
-  return true;
+  return data ? data.id : null;
 }
 
 async function loadInvestorRequests() {
@@ -2166,14 +2173,21 @@ async function loadInvestorRequests() {
   return (data || []).map(bkmpMapInvestorRequestFromSupabase);
 }
 
-async function updateInvestorRequestStatus(id, status) {
+/* rejectReason (23.07., Nutzerwunsch "bei Ablehnen mit Begründung, die
+   ich schreibe"): nur beim Ablehnen relevant, wird beim Bestaetigen
+   ignoriert (bleibt ein evtl. frueherer Wert unangetastet stehen - kein
+   echter Anwendungsfall dafuer, dass eine bereits abgelehnte Anfrage
+   danach nochmal bestaetigt wird, also kein Aufraeum-Bedarf). */
+async function updateInvestorRequestStatus(id, status, rejectReason) {
   const client = bkmpGetSupabaseClient();
   if (!client) return null;
+  const payload = { status };
+  if (status === 'rejected' && rejectReason) payload.reject_reason = rejectReason;
   const { data, error } = await client
     .from('investor_requests')
-    .update({ status })
+    .update(payload)
     .eq('id', id)
-    .select('id, name, minecraft_name, anonymous, amount, share_percent, period_months, status, is_read, created_at')
+    .select('id, name, minecraft_name, anonymous, amount, share_percent, period_months, status, reject_reason, is_read, created_at')
     .limit(1);
   if (error) throw error;
   const row = Array.isArray(data) ? data[0] : null;
@@ -2282,6 +2296,33 @@ async function deleteCardSaleRequest(id) {
   const { error } = await client.from('card_sale_requests').delete().eq('id', id);
   if (error) throw error;
   return true;
+}
+
+/* ---------------- Anfrage-Status-Abfrage fuer anonyme Absender (23.07., 1x-Popup-Benachrichtigung) ----------------
+   Weder investor_requests noch card_sale_requests sind per RLS oeffentlich
+   lesbar (siehe jeweilige *-schema.sql - nur is_active_admin() darf select).
+   Damit ein anonymer Absender trotzdem erfahren kann, ob SEINE (per lokal
+   gespeicherter ID bekannte) Anfrage inzwischen bestaetigt/abgelehnt wurde,
+   ohne die Tabellen selbst breiter zu oeffnen (sonst koennte jeder Besucher
+   alle Anfragen aller Spieler einsehen), laufen diese beiden engen
+   SECURITY-DEFINER-RPCs (siehe sql/20260723-request-decision-notify.sql):
+   sie geben ausschliesslich Status (+ Ablehnungsgrund) fuer GENAU EINE,
+   per ID angefragte Zeile zurueck - kein Listing, keine anderen Felder. */
+async function getCardSaleRequestStatus(id) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client.rpc('get_card_sale_request_status', { p_id: id });
+  if (error) throw error;
+  return data || null;
+}
+
+async function getInvestorRequestStatus(id) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client.rpc('get_investor_request_status', { p_id: id });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  return row ? { status: row.status || '', rejectReason: row.reject_reason || '' } : null;
 }
 
 /* ---------------- Feedback (Admin-only, siehe supabase-feedback-schema.sql) ---------------- */

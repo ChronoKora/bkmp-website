@@ -982,7 +982,7 @@
   </div>
 
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260721-arenachance1"></script>
+  <script src="supabase.js?v=20260723-requestnotify1"></script>
   <script src="app.js?v=20260718-selbstverdient1"></script>
   <!-- Redesign Phase 2a (17.07.): siehe index.html fuer die Begruendung der
        festen Ladereihenfolge (bkmp-idle-state.js zuerst, bkmp-idle-
@@ -1722,14 +1722,23 @@
       }
     }
 
+    /* Begruendung (23.07., Nutzerwunsch "bei Investoren Abgelehnt mit
+       Begruendung die ich schreibe"): wird dem Absender spaeter ueber die
+       get_investor_request_status()-RPC im 1x-Popup angezeigt (siehe
+       sql/20260723-request-decision-notify.sql + bkmp-site.js). Abbrechen
+       (Prompt mit "Abbrechen" verlassen, liefert null) lehnt NICHT ab -
+       leerer Text ist dagegen erlaubt (nicht jeder Admin will/muss immer
+       eine Begruendung schreiben). */
     async function rejectInvestorRequest(id) {
       if (typeof updateInvestorRequestStatus !== 'function' || !bkmpGetSupabaseClient()) {
         showAdminToast('Supabase ist gerade nicht verbunden.', 'error');
         return;
       }
+      const reason = window.prompt('Begründung für die Ablehnung (wird dem Absender angezeigt, kann leer bleiben):', '');
+      if (reason === null) return;
       try {
-        const updated = await updateInvestorRequestStatus(id, 'rejected');
-        data.investorRequests = data.investorRequests.map(r => r.id === id ? (updated || { ...r, status: 'rejected' }) : r);
+        const updated = await updateInvestorRequestStatus(id, 'rejected', reason.trim());
+        data.investorRequests = data.investorRequests.map(r => r.id === id ? (updated || { ...r, status: 'rejected', rejectReason: reason.trim() }) : r);
         bkmpSaveData(data);
         renderAll();
         showAdminToast('Anfrage abgelehnt.', 'success');
