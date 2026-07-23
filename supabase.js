@@ -4979,17 +4979,39 @@ function bkmpUnsubscribeFromRaidInstance() {
    ASCII-sichere, aber weiterhin eindeutige/stabile Kanal-Kennung -
    Sender (hier) und Empfaenger (bkmpSubscribeToCombatState) nutzen
    beide dieselbe Umwandlung, landen also weiterhin im selben Kanal. */
+/* Realtime-Kosten-Fix (23.07., Supabase-Dashboard: 19,5M von 5M inkludierten
+   Realtime Messages verbraucht). Der 3s-Throttle vom 20.07. (siehe
+   BKMP_IDLE_COMBAT_BROADCAST_MIN_MS in bkmp-hud.js) senkte die Rate bereits
+   um ~grob 4x, aendert aber nichts an der eigentlichen Ursache: JEDER
+   eingeloggte Spieler sendet dauerhaft, unabhaengig davon, ob ueberhaupt
+   irgendwer zusieht - nur eine kleine Minderheit oeffnet je das OBS-Mini-
+   Overlay (idle-stream-mini.html). Fix: Realtime PRESENCE auf demselben
+   Kanal - der Empfaenger (bkmpSubscribeToCombatState unten) meldet sich per
+   channel.track() als "anwesend", sobald er sich verbindet; der Sender
+   beobachtet das per presence-"sync"-Event und ueberspringt das Senden
+   komplett, solange presenceState() leer ist. Kein Poll noetig - Presence
+   aktualisiert sich serverseitig automatisch bei jedem Verbinden/Trennen
+   (auch bei Tab-Schliessen ohne sauberes unsubscribe). Reduziert das
+   Sendevolumen fuer die grosse Mehrheit der Spieler (die den Overlay nie
+   oeffnen) auf praktisch null, ohne dass Streamer, die ihn offen haben,
+   irgendetwas davon merken. */
 let bkmpCombatSendChannel = null;
 let bkmpCombatSendChannelName = null;
+let bkmpCombatBroadcastHasListener = false;
 function bkmpBroadcastCombatState(nameKey, payload) {
   const client = bkmpGetSupabaseClient();
   if (!client || !nameKey) return;
   if (!bkmpCombatSendChannel || bkmpCombatSendChannelName !== nameKey) {
     if (bkmpCombatSendChannel) bkmpCombatSendChannel.unsubscribe();
     bkmpCombatSendChannelName = nameKey;
+    bkmpCombatBroadcastHasListener = false;
     bkmpCombatSendChannel = client.channel('combat-' + encodeURIComponent(nameKey));
+    bkmpCombatSendChannel.on('presence', { event: 'sync' }, () => {
+      bkmpCombatBroadcastHasListener = Object.keys(bkmpCombatSendChannel.presenceState()).length > 0;
+    });
     bkmpCombatSendChannel.subscribe();
   }
+  if (!bkmpCombatBroadcastHasListener) return;
   bkmpCombatSendChannel.send({ type: 'broadcast', event: 'state', payload }).catch(() => {});
 }
 
@@ -4998,9 +5020,13 @@ function bkmpSubscribeToCombatState(nameKey, onState) {
   bkmpUnsubscribeFromCombatState();
   const client = bkmpGetSupabaseClient();
   if (!client || !nameKey) return;
-  bkmpCombatReceiveChannel = client.channel('combat-' + encodeURIComponent(nameKey))
+  bkmpCombatReceiveChannel = client.channel('combat-' + encodeURIComponent(nameKey), { config: { presence: { key: 'viewer' } } })
     .on('broadcast', { event: 'state' }, ({ payload }) => onState(payload))
-    .subscribe();
+    .subscribe(async (status) => {
+      if (status === 'SUBSCRIBED' && bkmpCombatReceiveChannel) {
+        try { await bkmpCombatReceiveChannel.track({ online: true }); } catch (e) {}
+      }
+    });
 }
 function bkmpUnsubscribeFromCombatState() {
   if (bkmpCombatReceiveChannel) { bkmpCombatReceiveChannel.unsubscribe(); bkmpCombatReceiveChannel = null; }

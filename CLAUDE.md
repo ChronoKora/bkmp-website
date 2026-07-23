@@ -199,6 +199,22 @@ Neues Feature, ausgelöst durch Admin-Panel-Screenshot ("Verkaufsanfragen") + Nu
 
 **Nicht geprüft / offen:** die eigentliche RPC-Antwort gegen die echte Datenbank (SQL-Datei wurde nicht ausgeführt - Popup-Logik lief nur gegen gemockte Rückgabewerte). Kein echter Spieler-Login möglich (Sicherheitsregel), daher kein Test des kompletten Einreichen-→-Admin-entscheidet-→-Popup-erscheint-Kreislaufs mit echten Daten. **Vor Nutzung: `sql/20260723-request-decision-notify.sql` im Supabase-Dashboard ausführen**, danach idealerweise einmal mit einer echten Test-Anfrage durchspielen.
 
+## Realtime-Kosten Stufe 2: Presence-gesteuerte Kampf-Broadcasts (23.07.2026)
+
+Auslöser: Supabase-Dashboard-Screenshot "Realtime Messages usage" - 19,5M von 5M inkludierten Nachrichten verbraucht (14,5M Overage), Nutzerfrage "Können wir hier noch was reduzieren?". Der 3s-Throttle vom 20.07. (siehe `[[project_bkmp_realtime_overage_2026-07-20]]`-Memory, `BKMP_IDLE_COMBAT_BROADCAST_MIN_MS` in `js/ui/bkmp-hud.js`) ist seitdem live und wirkt sichtbar (Tagesrate fiel von ~3,6-4M auf ~0,9-1,2M nach dem 19.07.), löst die eigentliche Ursache aber nicht: **jeder eingeloggte Spieler sendet dauerhaft alle 3s, unabhängig davon, ob überhaupt irgendwer zusieht** - nur eine kleine Minderheit öffnet je das OBS-Mini-Overlay (`idle-stream-mini.html`).
+
+**Fix (`supabase.js`, `bkmpBroadcastCombatState`/`bkmpSubscribeToCombatState`):** Realtime PRESENCE auf demselben Kanal. Der Empfänger (`idle-stream-mini.html`, via `bkmpSubscribeToCombatState`) meldet sich per `channel.track({online:true})` als anwesend, sobald die Verbindung steht. Der Sender beobachtet das per `presence`-`sync`-Event (`bkmpCombatBroadcastHasListener`, aktualisiert bei jedem Sync) und überspringt `.send()` komplett, solange `presenceState()` leer ist - kein Poll, Presence aktualisiert sich serverseitig automatisch bei jedem Verbinden/Trennen (auch bei hartem Tab-Schließen ohne sauberes `unsubscribe()`). Reduziert das Sendevolumen für die große Mehrheit der Spieler (die den Overlay nie öffnen) auf praktisch null, ohne dass Streamer mit offenem Overlay irgendetwas davon merken (Updates kommen weiterhin sofort, keine zusätzliche Verzögerung).
+
+**Verifiziert (echte Supabase-Realtime-Infrastruktur, zwei echte Browser-Tabs, kein Mock):**
+1. Sender-Tab ruft `bkmpBroadcastCombatState()` SOFORT nach Kanal-Erstellung auf (bevor Presence-Sync durchlaufen konnte) → `bkmpCombatBroadcastHasListener` korrekt `false`, nichts gesendet.
+2. Empfänger-Tab ruft `bkmpSubscribeToCombatState()` auf und trackt Presence → nach ~3s echtem WebSocket-Roundtrip zeigt der Sender-Tab `bkmpCombatBroadcastHasListener === true`.
+3. Sender broadcastet erneut → Empfänger empfängt GENAU diese eine Nachricht (die erste, verworfene, kam nachweislich nie an - `window.__received` enthielt nur den zweiten Payload).
+4. Empfänger ruft `bkmpUnsubscribeFromCombatState()` auf (simuliert Overlay schließen) → Sender erkennt das automatisch per Presence-"leave" innerhalb ~2,5s, `bkmpCombatBroadcastHasListener` fällt korrekt zurück auf `false`.
+
+Keine Konsolenfehler in beiden Tabs während der gesamten Testreihe. `node --check supabase.js` sauber. Cache-Busting `supabase.js?v=20260723-presencegate1` in allen 3 einbindenden HTML-Dateien gesetzt.
+
+**Nicht geprüft:** kein echter Zwei-Spieler-Streamer-Testfall (ein echter Account im Hauptspiel + derselbe Name im echten OBS-Overlay) - die obige Verifikation deckt exakt denselben Code-Pfad ab (gleiche Kanal-Topic-Logik, gleiche Presence-Mechanik), aber ohne echten Login/echte Spieldaten. Nächste 24-48h Supabase-Dashboard beobachten, um den tatsächlichen Rückgang zu bestätigen.
+
 ## Phase 7.2 — Automatisierte Playwright-E2E-Testsuite (21.07.2026, Stufe 1 komplett fertig)
 
 Nutzer-Auftrag: 43-Abschnitte-Brief (nicht in CLAUDE.md dupliziert) — vollständige automatisierte End-to-End-Testsuite für das gesamte Idle-Drachendorf, da manuelle Prüfungen immer wieder neue Fehler finden. Ausdrücklich nur die **erste Umsetzungsstufe** (Auftrag Abschnitt 41, 14 Punkte) verlangt, DANACH zuerst einen Bericht zeigen, nicht blind weiterbauen (Abschnitt 37/42). **Nichts gepusht/deployed, keine Produktionsdaten verändert, kein Production-Supabase-Zugriff.** Git-Status vor Beginn geprüft: sauber, `main`, deckungsgleich mit `origin/main`, Commit `c637d3d`.
