@@ -9105,7 +9105,16 @@ html.bkmp-app-mode .idle-hud-level-badge {
   background: radial-gradient(circle at 35% 30%, var(--app-gold), var(--app-gold-deep));
   box-shadow: var(--app-glow-gold), inset 0 -3px 6px rgba(0, 0, 0, .35);
   color: #2b1600;
-  animation: appHudPop .35s ease;
+  /* KEIN appHudPop-Einblend-Effekt (Spieler-Meldung 23.07.: "Level wie auch
+     Streak blinken jedes mal auf nach einem Drachen tot") - derselbe, schon
+     einmal fuer .idle-res-chip dokumentierte Grund (siehe Kommentar dort):
+     bkmpIdleRenderHud() baut #idleDorfHud bei JEDEM Aufruf (Tick, Kill,
+     Ressourcen-Aenderung) komplett per innerHTML neu, jedes Badge ist also
+     technisch immer ein frisch eingefuegtes Element - eine Animation auf
+     Einfuegen spielt dadurch bei JEDEM Render erneut ab, nicht nur bei
+     echten Wertaenderungen. War hier (und bei .idle-hud-streak-badge/
+     .idle-hud-stats span/.idle-hud-resources span direkt unten) bisher
+     uebersehen worden. */
 }
 html.bkmp-app-mode .idle-hud-level-num { font-family: 'Fraunces', serif; font-weight: 700; font-size: 1.05rem; line-height: 1; }
 html.bkmp-app-mode .idle-hud-level-tag { font-size: .5rem; text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
@@ -9121,7 +9130,7 @@ html.bkmp-app-mode .idle-hud-streak-badge {
   font-weight: 700;
   font-size: .78rem;
   box-shadow: var(--app-glow-red);
-  animation: appHudPop .35s ease;
+  /* KEIN appHudPop - siehe Kommentar bei .idle-hud-level-badge oben. */
 }
 html.bkmp-app-mode .idle-hud-xp-wrap { flex: 1; min-width: 0; }
 html.bkmp-app-mode .idle-hud-skillpoints {
@@ -9168,7 +9177,9 @@ html.bkmp-app-mode .idle-hud-resources span {
   font-weight: 700;
   color: var(--app-ink);
   font-variant-numeric: tabular-nums;
-  animation: appHudPop .3s ease;
+  /* KEIN appHudPop - siehe Kommentar bei .idle-hud-level-badge weiter oben
+     (Spieler-Meldung 23.07.: "Level wie auch Streak blinken jedes mal auf
+     nach einem Drachen tot" - dieselbe Ursache trifft auch diese Kacheln). */
 }
 html.bkmp-app-mode .idle-hud-resources span {
   background: linear-gradient(135deg, rgba(255, 215, 106, .16), rgba(255, 140, 61, .08));
