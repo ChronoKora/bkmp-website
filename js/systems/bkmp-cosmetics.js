@@ -432,7 +432,7 @@ function bkmpIdleSetTitleUnlockedAt(id) {
 }
 function bkmpIdleTitleUnlockedSticky(title, ctx) {
   if (!title.unlockCustom) return false;
-  if (Boolean(title.unlockCustom(ctx))) { bkmpIdleSetTitleUnlockedAt(title.id); return true; }
+  if (title.unlockCustom(ctx)) { bkmpIdleSetTitleUnlockedAt(title.id); return true; }
   return Boolean(bkmpIdleGetTitleUnlockedAtMap()[title.id]);
 }
 
@@ -459,7 +459,7 @@ function bkmpIdleSetCosmeticUnlockedAt(id) {
 }
 function bkmpIdleCosmeticUnlockedSticky(cosmetic, ctx) {
   if (!cosmetic.unlockCustom) return false;
-  if (Boolean(cosmetic.unlockCustom(ctx))) { bkmpIdleSetCosmeticUnlockedAt(cosmetic.id); return true; }
+  if (cosmetic.unlockCustom(ctx)) { bkmpIdleSetCosmeticUnlockedAt(cosmetic.id); return true; }
   return Boolean(bkmpIdleGetCosmeticUnlockedAtMap()[cosmetic.id]);
 }
 

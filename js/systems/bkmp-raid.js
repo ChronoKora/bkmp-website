@@ -840,6 +840,23 @@ async function bkmpRaidSyncIdleStateAfterFinish() {
     bkmpIdleState.total_gold_earned = remote.total_gold_earned;
     bkmpIdleState.crystals = remote.crystals;
     bkmpIdleState.xp = remote.xp;
+    /* Stabilitaets-/Testabdeckungsphase (24.07.2026, siehe CLAUDE.md "Phase 4") -
+       echter, beim eigenen Testen gefundener Bug: raid_finish() (siehe
+       sql/supabase-raid-boss-reward-share.sql, 18.07.) vergibt bei einem Sieg
+       zusaetzlich zu Gold/Kristallen/XP auch Holz/Stein/Essenz - dieser
+       Abgleich hier wurde bei der 18.07.-Erweiterung nie um die drei neuen
+       Felder ergaenzt. Ohne sie blieb bkmpIdleState.wood/stone/essence nach
+       einem Raid-Sieg auf dem alten (niedrigeren) Stand - der naechste ganz
+       normale Autosave (naechster Drachenkill, Tab-Wechsel, Fenster
+       schliessen - passiert IMMER frueher oder spaeter) haette die
+       serverseitig bereits korrekt gutgeschriebene Holz-/Stein-/Essenz-
+       Belohnung dabei still wieder mit dem veralteten Client-Stand
+       ueberschrieben und dauerhaft geloescht - exakt dieselbe Bugklasse wie
+       die bereits mehrfach in diesem Projekt dokumentierten Reward-Sync-
+       Luecken (siehe z.B. den Raid-Gold-Fix vom 10.07.). */
+    bkmpIdleState.wood = remote.wood;
+    bkmpIdleState.stone = remote.stone;
+    bkmpIdleState.essence = remote.essence;
     bkmpIdleRenderHud();
   } catch (e) { console.warn('Raid: Spielstand nach Raid-Ende nicht abgeglichen.', e); }
 }

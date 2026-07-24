@@ -3143,6 +3143,7 @@
             try { if (typeof bkmpPrestigeFlushSyncNow === 'function') await bkmpPrestigeFlushSyncNow(); } catch (e2) {}
             try { await bkmpSyncPlayerStatsNow(); } catch (e2) {}
             alert('Du wurdest auf einem anderen Gerät angemeldet. Diese Sitzung wird jetzt beendet.');
+            if (typeof bkmpGuildStopPresenceHeartbeat === 'function') bkmpGuildStopPresenceHeartbeat();
             try { await bkmpPlayerLogout(); } catch (e2) {}
             bkmpSetMcName('');
             window.location.reload();
@@ -4709,6 +4710,7 @@
       achievementsChangeNameBtn.addEventListener('click', async () => {
         achievementsChangeNameBtn.disabled = true;
         if (typeof bkmpStopSessionWatch === 'function') bkmpStopSessionWatch();
+        if (typeof bkmpGuildStopPresenceHeartbeat === 'function') bkmpGuildStopPresenceHeartbeat();
         try { await bkmpPlayerLogout(); } catch (e) { console.warn('Ausloggen fehlgeschlagen.', e); }
         bkmpSetMcName('');
         /* Spieler-Wunsch (14.07., nach mehreren Umgehungsversuchen ueber

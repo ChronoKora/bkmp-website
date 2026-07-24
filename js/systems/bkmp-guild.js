@@ -179,6 +179,32 @@ function bkmpGuildStartPresenceHeartbeat() {
   bkmpGuildPresenceHeartbeatTimer = window.setInterval(bkmpPlayerHeartbeat, BKMP_GUILD_PRESENCE_HEARTBEAT_MS);
 }
 
+/* Stabilitätsphase (24.07.2026, siehe CLAUDE.md) - behebt das bereits
+   dokumentierte MEDIUM-Finding ("setInterval ohne clearInterval").
+   bkmpGuildStartPresenceHeartbeat() guardete bereits korrekt gegen
+   mehrfaches Starten (siehe if oben) - der eigentliche Fehler war das
+   komplette FEHLEN einer Gegenstück-Funktion: bkmpPlayerLogout() (supabase.js)
+   räumt die Supabase-Session ab, lässt den bereits laufenden Timer aber
+   unangetastet weiterlaufen. Der "Konto wechseln"-Button (bkmp-site.js,
+   achievementsChangeNameBtn) ruft bkmpPlayerLogout() OHNE anschließenden
+   location.reload() auf - der Timer feuert danach fuer den Rest der
+   Tab-Sitzung alle 25s weiter, jedes Mal mit einer laengst ungueltigen/
+   fehlenden Session (bkmpGetPlayerAuthClient() liefert denselben, bereits
+   gecachten Client-Objekt-Verweis auch nach signOut() zurueck - der
+   `if (!client) return`-Guard in bkmpPlayerHeartbeat() faengt den
+   Logout-Fall also NICHT ab) - unnoetige, dauerhaft fehlschlagende
+   Netzwerkaufrufe. Der zweite bestehende bkmpPlayerLogout()-Aufrufer
+   (Sitzung-anderswo-uebernommen-Kick, bkmp-site.js) ruft direkt danach
+   bereits location.reload() auf - ein echter Browser-Teardown beendet
+   jeden setInterval ohnehin sofort, dort war also nie ein Leck moeglich.
+   Absichtlich KEIN Stop beim Verlassen einer Gilde: der Heartbeat ist
+   Konto-Praesenz (player_presence), nicht gildengebunden - ein Spieler
+   ausserhalb jeder Gilde soll weiterhin als "online" gelten, ein Stopp
+   dort waere eine erfundene, nicht angeforderte Verhaltensaenderung. */
+function bkmpGuildStopPresenceHeartbeat() {
+  if (bkmpGuildPresenceHeartbeatTimer) { window.clearInterval(bkmpGuildPresenceHeartbeatTimer); bkmpGuildPresenceHeartbeatTimer = null; }
+}
+
 function bkmpGuildFormatPresence(lastSeenAt) {
   if (!lastSeenAt) return '⚫ Nie online gewesen';
   const diffMs = Date.now() - new Date(lastSeenAt).getTime();

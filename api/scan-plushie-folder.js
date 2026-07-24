@@ -27,7 +27,7 @@ function send(res, status, payload) {
 function bkmpTitleCaseFromFilename(base) {
   const cleaned = base
     .replace(/[_-]?plushie$/i, '')
-    .replace(/[_\-]+/g, ' ')
+    .replace(/[_-]+/g, ' ')
     .trim();
   const name = cleaned
     .split(' ')

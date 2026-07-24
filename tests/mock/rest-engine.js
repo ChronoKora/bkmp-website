@@ -78,13 +78,64 @@ function applyOrder(rows, searchParams) {
   return sorted;
 }
 
-function applySelect(rows, searchParams) {
+/* Phase 4 (24.07.2026, siehe CLAUDE.md) - Raid/Weltboss + Gildenboss
+   brauchen als ERSTE Tabellen in dieser Suite PostgREST's eingebettete
+   Fremdtabellen-Syntax (supabase.js: loadRaidState()/loadGuildBossInstance()
+   lesen z.B. "..., raid_bosses(name, sprite_key, gold_reward, ...)" auf
+   raid_instances, um den Bossnamen/die Beloehnung mitzuladen, statt eines
+   zweiten Requests). Bisher schnitt applySelect() das select-Argument naiv
+   an JEDEM Komma - haette "raid_bosses(name, sprite_key, ...)" mitten in
+   der Klammer zerrissen und garantiert falsche/leere Spalten geliefert.
+   Ohne echte FK-Metadaten (dieser Mock kennt keine echten Constraints) wird
+   die Fremdschluessel-Beziehung hier bewusst eng/explizit aufgelistet statt
+   generisch "erraten" - deckt exakt die zwei tatsaechlich im Code
+   verwendeten Einbettungen ab, kein genereller PostgREST-Join-Parser. */
+const EMBED_FK_MAP = {
+  raid_instances: { raid_bosses: { fk: 'boss_id', pk: 'id' } },
+  guild_boss_instances: { guild_bosses: { fk: 'boss_id', pk: 'id' } }
+};
+
+// Comma-Split, das Klammer-Inhalte (eingebettete Tabellen) nicht aufbricht.
+function splitSelectTopLevel(select) {
+  const parts = [];
+  let depth = 0;
+  let current = '';
+  for (const ch of select) {
+    if (ch === '(') depth++;
+    if (ch === ')') depth--;
+    if (ch === ',' && depth === 0) { parts.push(current.trim()); current = ''; }
+    else current += ch;
+  }
+  if (current.trim()) parts.push(current.trim());
+  return parts;
+}
+
+function applySelect(rows, searchParams, tableName, store) {
   const select = searchParams.get('select');
   if (!select || select === '*') return rows;
-  const cols = select.split(',').map(c => c.trim());
+  const parts = splitSelectTopLevel(select);
+  const plainCols = [];
+  const embeds = [];
+  parts.forEach(part => {
+    const m = /^(\w+)\(([^)]*)\)$/.exec(part);
+    if (m) embeds.push({ embedTable: m[1], cols: m[2].split(',').map(c => c.trim()).filter(Boolean) });
+    else plainCols.push(part);
+  });
+  const embedDefs = embeds.map(e => {
+    const rel = EMBED_FK_MAP[tableName] && EMBED_FK_MAP[tableName][e.embedTable];
+    return { ...e, rel, embedRows: rel && store ? getTable(store, e.embedTable) : [] };
+  });
   return rows.map(row => {
     const out = {};
-    cols.forEach(c => { out[c] = row[c]; });
+    plainCols.forEach(c => { out[c] = row[c]; });
+    embedDefs.forEach(({ embedTable, cols, rel, embedRows }) => {
+      if (!rel) { out[embedTable] = null; return; }
+      const match = embedRows.find(r => r[rel.pk] === row[rel.fk]);
+      if (!match) { out[embedTable] = null; return; }
+      const picked = {};
+      cols.forEach(c => { picked[c] = match[c]; });
+      out[embedTable] = picked;
+    });
     return out;
   });
 }
@@ -108,7 +159,7 @@ function handleRestRequest(store, { method, tableName, searchParams, body, heade
     let result = applyFilters(rows, searchParams);
     result = applyOrder(result, searchParams);
     result = applyLimitOffset(result, searchParams);
-    result = applySelect(result, searchParams);
+    result = applySelect(result, searchParams, tableName, store);
     return { status: 200, json: result };
   }
 
@@ -128,13 +179,13 @@ function handleRestRequest(store, { method, tableName, searchParams, body, heade
         affected.push(row);
       }
     });
-    return { status: 201, json: applySelect(affected, searchParams) };
+    return { status: 201, json: applySelect(affected, searchParams, tableName, store) };
   }
 
   if (method === 'PATCH') {
     const matches = applyFilters(rows, searchParams);
     matches.forEach(row => Object.assign(row, body));
-    return { status: 200, json: applySelect(matches, searchParams) };
+    return { status: 200, json: applySelect(matches, searchParams, tableName, store) };
   }
 
   if (method === 'DELETE') {

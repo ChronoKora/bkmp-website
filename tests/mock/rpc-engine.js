@@ -77,6 +77,37 @@ function dungeonRegenCalc(keys, lastKeyAtMs, nowMs) {
   return { newKeys, newLastKeyAtMs };
 }
 
+function berlinDateStrCompact(epochMs) {
+  const p = berlinParts(epochMs);
+  const pad = n => String(n).padStart(2, '0');
+  return `${p.year}${pad(p.month)}${pad(p.day)}`;
+}
+
+// 'YYYYMMDDHH24' UTC -> epoch ms, mirrors to_timestamp(p_raid_id,'YYYYMMDDHH24') at time zone 'UTC'.
+function parseRaidIdToMs(raidId) {
+  if (!/^\d{10}$/.test(String(raidId || ''))) return NaN;
+  const y = Number(raidId.slice(0, 4));
+  const mo = Number(raidId.slice(4, 6));
+  const d = Number(raidId.slice(6, 8));
+  const h = Number(raidId.slice(8, 10));
+  return Date.UTC(y, mo - 1, d, h, 0, 0, 0);
+}
+
+// Deckt beide Weltboss-/Gildenboss-Schaden-RPCs ab: greatest(0, round(p_amount))
+// mit anschliessender Bereichs-/Deckel-Pruefung wie in raid_deal_damage()/
+// guild_boss_deal_damage() (200000 Anti-Cheat-Deckel pro Treffer). Postgres'
+// numeric-Typ sortiert NaN als groesser als jeder andere Wert (anders als
+// IEEE754/JS) - "greatest(0, round(NaN))" wuerde dort also bereits NaN liefern
+// UND "NaN > 200000" waere dort wahr (faengt sich also serverseitig von
+// selbst). JS folgt IEEE754 (jeder NaN-Vergleich ist false) - ohne expliziten
+// Number.isFinite()-Check wuerde ein manipulierter NaN/Infinity-Betrag hier
+// sonst lautlos durchrutschen statt korrekt abgelehnt zu werden.
+function clampDamageAmount(rawAmount) {
+  const n = Number(rawAmount);
+  if (!Number.isFinite(n)) return NaN;
+  return Math.max(0, Math.round(n));
+}
+
 function findNameKeyForUid(store, uid) {
   const row = getTable(store, 'idle_player_state').find(r => r.auth_user_id === uid);
   return row ? row.name_key : null;
@@ -96,6 +127,93 @@ function rpcError(message) {
   const err = new Error(message);
   err.isRpcError = true;
   return err;
+}
+
+/* Phase 4 (24.07.2026, siehe CLAUDE.md) - raid_finish() (interner Helfer,
+   nie direkt vom Client aufgerufen, nur ueber raid_deal_damage()/
+   raid_boss_attack_tick()'s "perform"). Belohnungs-Anteil-Formel aus
+   sql/supabase-raid-boss-reward-share.sql (18.07., authoritative - ersetzt
+   die aeltere Pauschal-Fassung aus supabase-raid-boss-schema.sql). Bewusst
+   NICHT portiert: die seltenen RNG-Kosmetik-Nebenwirkungen (5% Zerator-
+   Pluschie-Code, 1% Zerathordorf-Skin, je 1% Gold-/Exp-Boost) - eigenstaendige,
+   fuer die Kern-Testabdeckung (Schaden/HP/Cooldown/Belohnungsanteil/Claim)
+   nicht entscheidende Nebenpfade, siehe tests/FEATURE_MATRIX.md fuer die
+   ehrliche Lueckenangabe. Idempotenz-Guard (status muss 'fighting' sein)
+   identisch zur SQL-Fassung - ein zweiter Aufruf fuer denselben Raid ist
+   ein sicheres No-Op. */
+function raidFinishInternal(store, raidId, result) {
+  const inst = getTable(store, 'raid_instances').find(r => r.id === raidId);
+  if (!inst || inst.status !== 'fighting') return;
+  inst.status = result;
+  inst.ended_at = store.clock.nowIso();
+  if (result !== 'won') return;
+
+  const participants = getTable(store, 'raid_participants').filter(p => p.raid_id === raidId);
+  const totalDamage = Number(inst.total_damage || 0);
+  const boss = getTable(store, 'raid_bosses').find(b => b.id === inst.boss_id) || {};
+  const flawless = Number(inst.city_max_hp) > 0 && Number(inst.city_hp) >= Number(inst.city_max_hp);
+  let mvp = null;
+  participants.forEach(p => { if (!mvp || Number(p.damage_dealt) > Number(mvp.damage_dealt)) mvp = p; });
+
+  const playerStates = getTable(store, 'idle_player_state');
+  const raidStats = getTable(store, 'raid_player_stats');
+  participants.forEach(p => {
+    const share = totalDamage > 0 ? Number(p.damage_dealt) / totalDamage : 0;
+    const player = playerStates.find(ps => ps.auth_user_id === p.auth_user_id);
+    if (player) {
+      const addGold = Math.round(Number(boss.gold_reward || 0) * share);
+      player.gold = Number(player.gold || 0) + addGold;
+      player.total_gold_earned = Number(player.total_gold_earned || 0) + addGold;
+      player.crystals = Number(player.crystals || 0) + Math.round(Number(boss.gem_reward || 0) * share);
+      player.xp = Number(player.xp || 0) + Math.round(Number(boss.xp_reward || 0) * share);
+      player.wood = Number(player.wood || 0) + Math.round(Number(boss.wood_reward || 0) * share);
+      player.stone = Number(player.stone || 0) + Math.round(Number(boss.stone_reward || 0) * share);
+      player.essence = Number(player.essence || 0) + Math.round(Number(boss.essence_reward || 0) * share);
+    }
+    const s = raidStats.find(r => r.auth_user_id === p.auth_user_id);
+    if (s) {
+      s.total_bosses_defeated = Number(s.total_bosses_defeated || 0) + 1;
+      if (mvp && p.auth_user_id === mvp.auth_user_id) s.total_mvp_count = Number(s.total_mvp_count || 0) + 1;
+      if (flawless) s.total_flawless_wins = Number(s.total_flawless_wins || 0) + 1;
+      s.updated_at = store.clock.nowIso();
+    }
+  });
+}
+
+/* guild_boss_finish() (interner Helfer) - Formel 1:1 aus
+   sql/supabase-guild-boss.sql (guild_boss_finish ist dort die einzige/
+   aktuelle Fassung, weder von -ambiguous-status-fix.sql noch -damage-sync-
+   fix.sql noch -reward-increase.sql/-retro-payout.sql erneut definiert -
+   Letztere beiden aendern nur Daten bzw. sind ein einmaliges Backfill-Skript,
+   keine Funktionsaenderung). Nur Gold/Kristalle (kein Holz/Stein/Essenz wie
+   beim Weltboss-Raid) - nur an Teilnehmer MIT Schaden > 0, exakt wie im
+   SQL-"where ... and damage_dealt > 0"-Filter. */
+function guildBossFinishInternal(store, instanceId, result) {
+  const inst = getTable(store, 'guild_boss_instances').find(r => r.id === instanceId);
+  if (!inst || inst.status !== 'fighting') return;
+  inst.status = result;
+  inst.ended_at = store.clock.nowIso();
+  if (result !== 'won') return;
+
+  const boss = getTable(store, 'guild_bosses').find(b => b.id === inst.boss_id) || {};
+  const guild = getTable(store, 'guilds').find(g => g.id === inst.guild_id);
+  if (guild) guild.bosses_defeated = Number(guild.bosses_defeated || 0) + 1;
+  getTable(store, 'guild_activity_log').push({ id: store.nextId(), guild_id: inst.guild_id, kind: 'boss_defeated', created_at: store.clock.nowIso() });
+
+  const totalDamage = Number(inst.total_damage || 0);
+  const participants = getTable(store, 'guild_boss_participants').filter(p => p.instance_id === instanceId && Number(p.damage_dealt) > 0);
+  const playerStates = getTable(store, 'idle_player_state');
+  const stats = getTable(store, 'guild_boss_player_stats');
+  participants.forEach(p => {
+    const share = totalDamage > 0 ? Number(p.damage_dealt) / totalDamage : 0;
+    const player = playerStates.find(ps => ps.auth_user_id === p.auth_user_id);
+    if (player) {
+      player.gold = Number(player.gold || 0) + Math.round(Number(boss.gold_reward || 0) * share);
+      player.crystals = Number(player.crystals || 0) + Math.round(Number(boss.gem_reward || 0) * share);
+    }
+    const s = stats.find(r => r.auth_user_id === p.auth_user_id);
+    if (s) s.total_bosses_defeated = Number(s.total_bosses_defeated || 0) + 1;
+  });
 }
 
 const RPC_HANDLERS = {
@@ -500,6 +618,316 @@ const RPC_HANDLERS = {
       }
     });
     return null;
+  },
+
+  /* Stabilitaets-/Testabdeckungsphase (24.07.2026, siehe CLAUDE.md "Phase 4") -
+     player_heartbeat: 1:1 aus sql/supabase-guild-extension-foundation.sql
+     (einzige Fassung, nie ersetzt). Kontostatus, NICHT gildengebunden. */
+  player_heartbeat(store, uid) {
+    const rows = getTable(store, 'player_presence');
+    let row = rows.find(r => r.auth_user_id === uid);
+    if (!row) { row = { auth_user_id: uid }; rows.push(row); }
+    row.last_seen_at = store.clock.nowIso();
+    return null;
+  },
+
+  /* Weltboss-/Raid-Kernmechanik - originalgetreuer Port der jeweils
+     aktuellsten Fassung:
+       - raid_join: sql/20260719-fix-raid-guildboss-hour-check.sql (prueft die
+         Gildenboss-Stunden-Sperre gegen die START-Stunde DES RAIDS, nicht
+         "jetzt" - ersetzt die frühere Fassung aus supabase-raid-pause-
+         guildboss-hour.sql, die exakt diesen Bug hatte)
+       - raid_deal_damage/raid_boss_attack_tick: sql/supabase-raid-boss-
+         combined-latest.sql (konsolidiert damage-sync-fix.sql's own_*-
+         Rueckgabespalten MIT balance-v2/v3/v4's 5%-Gegenangriff-Balance -
+         siehe CLAUDE.md/Dateikommentar dort fuer die urspruengliche
+         Divergenz zwischen beiden unabhaengig entstandenen Fassungen)
+       - raid_finish: interner Helfer, siehe raidFinishInternal() oben. */
+  raid_join(store, uid, params) {
+    const raidId = String(params.p_raid_id || '');
+    const fightStartsMs = parseRaidIdToMs(raidId);
+    if (!Number.isFinite(fightStartsMs)) throw rpcError('invalid_raid_id');
+    const prepStartsMs = fightStartsMs - 5 * 60000;
+    const nowMs = store.clock.nowMs();
+
+    if (berlinParts(fightStartsMs).hour === 20) throw rpcError('raid_paused_guild_boss_hour');
+    if (nowMs < prepStartsMs || nowMs >= fightStartsMs) throw rpcError('not_in_prep_window');
+
+    const player = getTable(store, 'idle_player_state').find(r => r.auth_user_id === uid);
+    if (!player) throw rpcError('no_idle_state');
+
+    const instances = getTable(store, 'raid_instances');
+    let inst = instances.find(r => r.id === raidId);
+    if (!inst) {
+      const bosses = getTable(store, 'raid_bosses');
+      const boss = bosses.find(b => b.active !== false) || bosses[0];
+      if (!boss) throw rpcError('no_active_boss');
+      inst = {
+        id: raidId, boss_id: boss.id,
+        boss_max_hp: Number(boss.base_hp), boss_hp: Number(boss.base_hp),
+        city_max_hp: 0, city_hp: 0, city_attack: 0, city_defense: 0,
+        status: 'prep',
+        fight_starts_at: new Date(fightStartsMs).toISOString(),
+        fight_ends_at: new Date(fightStartsMs + 55 * 60000).toISOString(),
+        next_boss_attack_at: new Date(fightStartsMs).toISOString(),
+        started_fight_at: null, ended_at: null,
+        participant_count: 0, total_damage: 0, last_counter_hp: null
+      };
+      instances.push(inst);
+    }
+
+    const participants = getTable(store, 'raid_participants');
+    let p = participants.find(r => r.raid_id === raidId && r.auth_user_id === uid);
+    if (p) {
+      p.attack = Number(player.attack || 0); p.defense = Number(player.defense || 0);
+      p.hp = Number(player.hp || 0); p.display_name = player.display_name;
+    } else {
+      p = {
+        raid_id: raidId, auth_user_id: uid, display_name: player.display_name,
+        attack: Number(player.attack || 0), defense: Number(player.defense || 0), hp: Number(player.hp || 0),
+        damage_dealt: 0, crits_landed: 0, clicks_landed: 0, joined_at: store.clock.nowIso()
+      };
+      participants.push(p);
+    }
+
+    // Boss-/Stadt-HP nur waehrend 'prep' neu skalieren (echtes SQL: "where
+    // ... and status='prep'" in der UPDATE-Klausel - ein spaeterer erneuter
+    // raid_join()-Aufruf nach Kampfbeginn darf laufende HP nicht zuruecksetzen).
+    if (inst.status === 'prep') {
+      const mine = participants.filter(r => r.raid_id === raidId);
+      const totalHp = mine.reduce((s, r) => s + Number(r.hp || 0), 0);
+      const totalAttack = mine.reduce((s, r) => s + Number(r.attack || 0), 0);
+      const totalDefense = mine.reduce((s, r) => s + Number(r.defense || 0), 0);
+      const boss = getTable(store, 'raid_bosses').find(b => b.id === inst.boss_id) || {};
+      inst.city_max_hp = totalHp; inst.city_hp = totalHp;
+      inst.city_attack = totalAttack; inst.city_defense = totalDefense;
+      inst.participant_count = mine.length;
+      const scaledHp = Math.max(Number(boss.base_hp || 0), Math.round(totalAttack * Number(boss.hp_scale_per_attack || 150)));
+      inst.boss_max_hp = scaledHp; inst.boss_hp = scaledHp;
+    }
+
+    const raidStats = getTable(store, 'raid_player_stats');
+    let stats = raidStats.find(s => s.auth_user_id === uid);
+    if (stats) { stats.total_raids_joined = Number(stats.total_raids_joined || 0) + 1; stats.display_name = player.display_name; }
+    else {
+      stats = {
+        auth_user_id: uid, display_name: player.display_name, total_raids_joined: 1,
+        total_bosses_defeated: 0, total_damage_dealt: 0, total_mvp_count: 0, total_flawless_wins: 0, best_single_raid_damage: 0
+      };
+      raidStats.push(stats);
+    }
+
+    const boss = getTable(store, 'raid_bosses').find(b => b.id === inst.boss_id) || {};
+    return {
+      city_hp: inst.city_hp, city_max_hp: inst.city_max_hp,
+      boss_hp: inst.boss_hp, boss_max_hp: inst.boss_max_hp,
+      boss_name: boss.name, sprite_key: boss.sprite_key
+    };
+  },
+
+  raid_deal_damage(store, uid, params) {
+    const raidId = params.p_raid_id;
+    const amount = clampDamageAmount(params.p_amount);
+    if (!Number.isFinite(amount) || amount <= 0 || amount > 200000) throw rpcError('invalid_amount');
+    const isCrit = !!params.p_is_crit;
+    const isClick = !!params.p_is_click;
+
+    const p = getTable(store, 'raid_participants').find(r => r.raid_id === raidId && r.auth_user_id === uid);
+    if (!p) throw rpcError('not_a_participant');
+
+    const inst = getTable(store, 'raid_instances').find(r => r.id === raidId);
+    if (!inst) throw rpcError('raid_not_found');
+    if (inst.status !== 'fighting') throw rpcError('raid_not_active');
+
+    inst.boss_hp = Math.max(0, Number(inst.boss_hp) - amount);
+    inst.total_damage = Number(inst.total_damage || 0) + amount;
+    p.damage_dealt = Number(p.damage_dealt || 0) + amount;
+    p.crits_landed = Number(p.crits_landed || 0) + (isCrit ? 1 : 0);
+    p.clicks_landed = Number(p.clicks_landed || 0) + (isClick ? 1 : 0);
+
+    const raidStats = getTable(store, 'raid_player_stats').find(s => s.auth_user_id === uid);
+    if (raidStats) {
+      raidStats.total_damage_dealt = Number(raidStats.total_damage_dealt || 0) + amount;
+      raidStats.best_single_raid_damage = Math.max(Number(raidStats.best_single_raid_damage || 0), p.damage_dealt);
+    }
+
+    if (inst.boss_hp <= 0) {
+      raidFinishInternal(store, raidId, 'won');
+      return { boss_hp: inst.boss_hp, status: inst.status, own_damage_dealt: p.damage_dealt, own_crits_landed: p.crits_landed, own_clicks_landed: p.clicks_landed };
+    }
+
+    // Gegenangriff nur alle 5% Boss-HP-Fortschritt (Balance-v2/v3/v4).
+    const bossMaxHp = Number(inst.boss_max_hp);
+    const lastCounter = inst.last_counter_hp == null ? bossMaxHp : Number(inst.last_counter_hp);
+    if (lastCounter - inst.boss_hp >= bossMaxHp * 0.05) {
+      const cityDmg = Math.max(1, Math.round(Number(inst.city_max_hp) * 0.014));
+      inst.city_hp = Math.max(0, Number(inst.city_hp) - cityDmg);
+      inst.last_counter_hp = inst.boss_hp;
+      if (inst.city_hp <= 0) raidFinishInternal(store, raidId, 'lost');
+    }
+
+    return { boss_hp: inst.boss_hp, status: inst.status, own_damage_dealt: p.damage_dealt, own_crits_landed: p.crits_landed, own_clicks_landed: p.clicks_landed };
+  },
+
+  raid_boss_attack_tick(store, uid, params) {
+    const raidId = params.p_raid_id;
+    if (!getTable(store, 'raid_participants').some(r => r.raid_id === raidId && r.auth_user_id === uid)) throw rpcError('not_a_participant');
+
+    const inst = getTable(store, 'raid_instances').find(r => r.id === raidId);
+    if (!inst) throw rpcError('raid_not_found');
+
+    const nowMs = store.clock.nowMs();
+    const fightStartsMs = Date.parse(inst.fight_starts_at);
+    const fightEndsMs = Date.parse(inst.fight_ends_at);
+
+    if (inst.status === 'prep' && nowMs >= fightStartsMs) {
+      inst.status = 'fighting';
+      inst.started_fight_at = inst.started_fight_at || store.clock.nowIso();
+    }
+
+    if (inst.status === 'fighting' && nowMs >= fightEndsMs) {
+      raidFinishInternal(store, raidId, 'expired');
+      return { city_hp: inst.city_hp, boss_hp: inst.boss_hp, status: inst.status };
+    }
+
+    if (inst.status === 'fighting') {
+      const nextAttackMs = Date.parse(inst.next_boss_attack_at);
+      if (nextAttackMs <= nowMs) {
+        const dmg = Math.max(1, Math.round(Number(inst.city_max_hp) * 0.014));
+        const boss = getTable(store, 'raid_bosses').find(b => b.id === inst.boss_id) || {};
+        const intervalSecs = Math.max(1.5, Number(boss.attack_interval_seconds || 6) * Number(inst.boss_hp) / Math.max(1, Number(inst.boss_max_hp)));
+        inst.city_hp = Math.max(0, Number(inst.city_hp) - dmg);
+        inst.next_boss_attack_at = new Date(nowMs + intervalSecs * 1000).toISOString();
+        if (inst.city_hp <= 0) raidFinishInternal(store, raidId, 'lost');
+      }
+    }
+
+    return { city_hp: inst.city_hp, boss_hp: inst.boss_hp, status: inst.status };
+  },
+
+  /* Gildenboss-Kernmechanik - originalgetreuer Port der jeweils aktuellsten
+     Fassung:
+       - guild_boss_join: sql/supabase-guild-boss-ambiguous-status-fix.sql
+         (behebt "column reference is ambiguous" der Basisversion - reine
+         SQL-Alias-Korrektur, Spiellogik selbst unveraendert)
+       - guild_boss_deal_damage: sql/supabase-guild-boss-damage-sync-fix.sql
+         (own_*-Rueckgabespalten, baut auf der ambiguous-status-fix.sql-Fassung
+         auf, "1:1 uebernommen" laut eigenem Dateikommentar)
+       - guild_boss_finish: sql/supabase-guild-boss.sql (einzige Fassung,
+         siehe guildBossFinishInternal() oben). supabase-guild-boss-reward-
+         increase.sql aendert nur Daten (gold_reward/gem_reward auf
+         5.000.000/20.000), keine Funktionsaenderung - in der Teststand-
+         Fixture direkt mit den erhoehten Werten geseedet.
+     Absichtlich UNGEPRUEFT gegen aktuelle guild_members-Mitgliedschaft in
+     guild_boss_deal_damage() - exakt wie im echten SQL (nur guild_boss_
+     participants wird geprueft), ein Spieler, der NACH dem Beitritt die
+     Gilde verlaesst, kann also weiter Schaden einreichen. Kein Bug, echtes
+     bestehendes Verhalten - nicht "repariert", nur nachgebildet. */
+  guild_boss_join(store, uid) {
+    const members = getTable(store, 'guild_members');
+    const me = members.find(m => m.auth_user_id === uid);
+    if (!me) throw rpcError('not_in_guild');
+    const guildId = me.guild_id;
+
+    const player = getTable(store, 'idle_player_state').find(r => r.auth_user_id === uid);
+    if (!player) throw rpcError('no_idle_state');
+
+    const nowMs = store.clock.nowMs();
+    const midnightMs = berlinMidnightMs(nowMs);
+    const windowStartMs = midnightMs + 20 * 3600 * 1000;
+    const windowEndMs = windowStartMs + 3600 * 1000;
+    const prepStartMs = windowStartMs - 5 * 60000;
+    if (nowMs < prepStartMs || nowMs >= windowEndMs) throw rpcError('not_in_window');
+
+    const instanceId = guildId + '-' + berlinDateStrCompact(nowMs);
+    const instances = getTable(store, 'guild_boss_instances');
+    let inst = instances.find(r => r.id === instanceId);
+    if (!inst) {
+      const bosses = getTable(store, 'guild_bosses');
+      const boss = bosses.find(b => b.active !== false) || bosses[0];
+      if (!boss) throw rpcError('no_boss_configured');
+      const memberUids = new Set(members.filter(m => m.guild_id === guildId).map(m => m.auth_user_id));
+      const totalAttack = getTable(store, 'idle_player_state')
+        .filter(ps => memberUids.has(ps.auth_user_id))
+        .reduce((s, ps) => s + Number(ps.attack || 0), 0);
+      const scaledHp = Math.max(Number(boss.base_hp), Math.round(totalAttack * Number(boss.hp_scale_per_attack || 150)));
+      inst = {
+        id: instanceId, guild_id: guildId, boss_id: boss.id,
+        boss_max_hp: scaledHp, boss_hp: scaledHp, status: 'prep',
+        fight_starts_at: new Date(windowStartMs).toISOString(),
+        fight_ends_at: new Date(windowEndMs).toISOString(),
+        started_fight_at: null, ended_at: null,
+        participant_count: 0, total_damage: 0
+      };
+      instances.push(inst);
+      const guild = getTable(store, 'guilds').find(g => g.id === guildId);
+      if (guild) guild.boss_attempts = Number(guild.boss_attempts || 0) + 1;
+    }
+
+    if (nowMs >= windowStartMs && inst.status === 'prep') {
+      inst.status = 'fighting';
+      inst.started_fight_at = inst.started_fight_at || store.clock.nowIso();
+    }
+
+    const participants = getTable(store, 'guild_boss_participants');
+    let p = participants.find(r => r.instance_id === instanceId && r.auth_user_id === uid);
+    if (!p) {
+      p = { instance_id: instanceId, auth_user_id: uid, display_name: player.display_name, damage_dealt: 0, crits_landed: 0, clicks_landed: 0, joined_at: store.clock.nowIso() };
+      participants.push(p);
+    }
+    inst.participant_count = participants.filter(r => r.instance_id === instanceId).length;
+
+    const statsRows = getTable(store, 'guild_boss_player_stats');
+    let s = statsRows.find(r => r.auth_user_id === uid);
+    if (s) { s.total_fights_joined = Number(s.total_fights_joined || 0) + 1; s.display_name = player.display_name; }
+    else {
+      s = { auth_user_id: uid, display_name: player.display_name, total_fights_joined: 1, total_bosses_defeated: 0, total_damage_dealt: 0, best_single_fight_damage: 0 };
+      statsRows.push(s);
+    }
+
+    const boss = getTable(store, 'guild_bosses').find(b => b.id === inst.boss_id) || {};
+    return {
+      instance_id: inst.id, boss_hp: inst.boss_hp, boss_max_hp: inst.boss_max_hp, status: inst.status,
+      boss_name: boss.name, sprite_key: boss.sprite_key,
+      fight_starts_at: inst.fight_starts_at, fight_ends_at: inst.fight_ends_at
+    };
+  },
+
+  guild_boss_deal_damage(store, uid, params) {
+    const instanceId = params.p_instance_id;
+    const amount = clampDamageAmount(params.p_amount);
+    if (!Number.isFinite(amount) || amount <= 0 || amount > 200000) throw rpcError('invalid_amount');
+    const isCrit = !!params.p_is_crit;
+    const isClick = !!params.p_is_click;
+
+    const p = getTable(store, 'guild_boss_participants').find(r => r.instance_id === instanceId && r.auth_user_id === uid);
+    if (!p) throw rpcError('not_a_participant');
+
+    const inst = getTable(store, 'guild_boss_instances').find(r => r.id === instanceId);
+    if (!inst) throw rpcError('boss_not_found');
+    if (inst.status !== 'fighting') throw rpcError('boss_not_active');
+
+    const nowMs = store.clock.nowMs();
+    if (nowMs >= Date.parse(inst.fight_ends_at)) {
+      guildBossFinishInternal(store, instanceId, 'expired');
+      return { boss_hp: inst.boss_hp, status: inst.status, own_damage_dealt: p.damage_dealt, own_crits_landed: p.crits_landed, own_clicks_landed: p.clicks_landed };
+    }
+
+    inst.boss_hp = Math.max(0, Number(inst.boss_hp) - amount);
+    inst.total_damage = Number(inst.total_damage || 0) + amount;
+    p.damage_dealt = Number(p.damage_dealt || 0) + amount;
+    p.crits_landed = Number(p.crits_landed || 0) + (isCrit ? 1 : 0);
+    p.clicks_landed = Number(p.clicks_landed || 0) + (isClick ? 1 : 0);
+
+    const stats = getTable(store, 'guild_boss_player_stats').find(s => s.auth_user_id === uid);
+    if (stats) {
+      stats.total_damage_dealt = Number(stats.total_damage_dealt || 0) + amount;
+      stats.best_single_fight_damage = Math.max(Number(stats.best_single_fight_damage || 0), p.damage_dealt);
+    }
+
+    if (inst.boss_hp <= 0) guildBossFinishInternal(store, instanceId, 'won');
+
+    return { boss_hp: inst.boss_hp, status: inst.status, own_damage_dealt: p.damage_dealt, own_crits_landed: p.crits_landed, own_clicks_landed: p.clicks_landed };
   }
 };
 
