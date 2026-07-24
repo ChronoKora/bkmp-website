@@ -7,18 +7,63 @@
    localStorage als Fallback.
    ============================================================ */
 
-const SUPABASE_URL = 'https://zgknyrwzpohvfdweomxf.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_RuiDW15_3cI0cQZ8WlzoWg_DhGU9r6f';
+const BKMP_PROD_SUPABASE_URL = 'https://zgknyrwzpohvfdweomxf.supabase.co';
+const BKMP_PROD_SUPABASE_ANON_KEY = 'sb_publishable_RuiDW15_3cI0cQZ8WlzoWg_DhGU9r6f';
+
+/* Lokaler QA-/Mock-Modus (24.07.2026, siehe CLAUDE.md und index.html's
+   window.BKMP_QA_MODE-Gate): window.BKMP_QA_MODE kann NUR auf
+   localhost/127.0.0.1 mit ?qa=1 jemals true sein (siehe index.html) - auf
+   der echten deployten Website ist dieser Zweig strukturell tot. Wenn aktiv,
+   zeigen BEIDE Konstanten auf den lokalen QA-Mock-Server (tests/mock/, per
+   scripts/qa-server.js gestartet) statt auf das echte Supabase-Projekt -
+   kein Speicherzugriff verlaesst in diesem Fall jemals localhost. Der
+   Mock-Server dient dieselbe Website UND die Mock-API vom selben Origin,
+   deshalb reicht location.origin. Der Anon-Key-Wert selbst wird vom Mock
+   nicht geprueft (siehe tests/mock/auth-engine.js), ein Platzhalter genuegt. */
+const SUPABASE_URL = (typeof window !== 'undefined' && window.BKMP_QA_MODE)
+  ? window.location.origin
+  : BKMP_PROD_SUPABASE_URL;
+const SUPABASE_ANON_KEY = (typeof window !== 'undefined' && window.BKMP_QA_MODE)
+  ? 'qa-mock-anon-key'
+  : BKMP_PROD_SUPABASE_ANON_KEY;
 
 let bkmpSupabaseClient = null;
 
 function bkmpIsSupabaseConfigured() {
+  /* QA-Mock-Server laeuft ueber gewoehnliches http:// auf localhost (kein
+     TLS-Zertifikat fuer ein lokales Test-Tool noetig/sinnvoll) - der
+     https-Zwang gilt deshalb nur ausserhalb des QA-Modus. window.BKMP_QA_MODE
+     kann wie oben nie auf der echten Website true sein. */
+  const allowedScheme = (typeof window !== 'undefined' && window.BKMP_QA_MODE)
+    ? /^https?:\/\//
+    : /^https:\/\//;
   return Boolean(
     SUPABASE_URL &&
     SUPABASE_ANON_KEY &&
-    SUPABASE_URL.startsWith('https://') &&
+    allowedScheme.test(SUPABASE_URL) &&
     !SUPABASE_URL.includes('/rest/v1')
   );
+}
+
+/* QA-Grundlage Phase 2 (24.07.2026) - Verteidigung in der Tiefe: der lokale
+   QA-Mock-Server laeuft strukturell IMMER auf einer anderen Origin
+   (127.0.0.1:<Port>) als die echte Website - der Browser trennt localStorage
+   ohnehin streng pro Origin, ein Schluessel-Zusammenstoss mit einer echten
+   Spieler-Sitzung ist dadurch bereits unmoeglich. Trotzdem bekommt der
+   QA-Modus zusaetzlich einen EIGENEN storageKey-Namensraum - eine zweite,
+   unabhaengige Absicherung, falls jemand versehentlich denselben Origin fuer
+   beides nutzen wuerde.
+
+   WICHTIG (beim eigenen Aendern gefunden, bevor es committet wurde): NIEMALS
+   ausserhalb des QA-Modus einen storageKey setzen, der vorher keiner war -
+   supabase-js persistiert Sessions unter genau dem konfigurierten Schluessel;
+   ein neu hinzugefuegter storageKey wuerde die Session JEDES echten,
+   bereits eingeloggten Spielers beim naechsten Besuch unauffindbar machen
+   (stiller Logout). bkmpQaStorageKey(undefined) gibt deshalb bewusst
+   "undefined" zurueck, nicht irgendeinen Produktions-Namen - der Aufrufer
+   liefert dann GAR KEIN "auth"-Feld mit, exakt wie vor dieser Aenderung. */
+function bkmpQaStorageKey(qaSuffix) {
+  return (typeof window !== 'undefined' && window.BKMP_QA_MODE) ? ('bkmp-qa-' + qaSuffix) : undefined;
 }
 
 function bkmpGetSupabaseClient() {
@@ -28,7 +73,10 @@ function bkmpGetSupabaseClient() {
     return null;
   }
   if (!bkmpSupabaseClient) {
-    bkmpSupabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const qaKey = bkmpQaStorageKey('customer-auth');
+    bkmpSupabaseClient = qaKey
+      ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { storageKey: qaKey } })
+      : window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   }
   return bkmpSupabaseClient;
 }
@@ -321,7 +369,7 @@ function bkmpGetPlayerAuthClient() {
   if (!bkmpIsSupabaseConfigured() || !window.supabase) return null;
   if (!bkmpPlayerAuthClient) {
     bkmpPlayerAuthClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: { storageKey: 'bkmp-player-auth' },
+      auth: { storageKey: bkmpQaStorageKey('player-auth') || 'bkmp-player-auth' },
       /* Bug-Report 17.07.: "Gold wird immer zurueckgesetzt beim Reload."
          Ursache: der beforeunload/visibilitychange-Speicherversuch (siehe
          idledorf.js bkmpIdleFlushSync) ist ein ASYNCHRONER fetch() - Browser

@@ -260,6 +260,66 @@ function teststandE(startTimeMs) {
   return fx;
 }
 
-const TESTSTANDS = { A: teststandA, B: teststandB, C: teststandC, D: teststandD, E: teststandE };
+/* TESTSTAND F - unmittelbar VOR der ersten Prestige-Freischaltung:
+   highest_dragon_index=99, ein Punkt unter der echten Schwelle
+   (bkmpPrestigeRequiredStage(0) === 100, siehe js/systems/bkmp-prestige.js:26-28
+   - 100 + prestige_level*50). Deckt den Auftrag-Schritt-4-Punkt 3 ab (Phase 2,
+   24.07.2026) - der Prestige-Button MUSS hier noch verborgen/deaktiviert sein;
+   ein einzelner weiterer Sieg (highest_dragon_index->100) muss ihn freischalten. */
+function teststandF(startTimeMs) {
+  const fx = baseFixture(startTimeMs, 'QaVorPrestF', 'qa-user-f-0000');
+  fx.tables.idle_player_state.push(makePlayerStateRow(fx.authUserId, fx.nameKey, fx.nowIso, {
+    display_name: fx.displayName,
+    level: 95, xp: 45000, gold: 900000,
+    attack: 600, defense: 90, hp: 3200,
+    dragon_kills: 4200, boss_kills: 160,
+    current_dragon_index: 99, highest_dragon_index: 99,
+    skill_points_available: 2, skill_points_spent: 20
+  }));
+  fx.tables.idle_prestige_state.push({
+    name_key: fx.nameKey, display_name: fx.displayName,
+    prestige_level: 0, prestige_points: 0, prestige_points_spent: 0,
+    prestige_allocations: {}, updated_at: fx.nowIso
+  });
+  return fx;
+}
+
+/* TESTSTAND G - keine Dungeon-Schluessel (0/5 in ALLEN 7 Dungeon-Typen).
+   Deckt Auftrag-Schritt-4-Punkt 14 ab. dungeon_keys wird von
+   tests/mock/rpc-engine.js's dungeon_get_all_status() sonst beim ersten
+   Aufruf PRO Spieler faul mit {keys:5, last_key_at_ms:jetzt} angelegt (siehe
+   ensureDungeonRow()) - hier bewusst VORAB mit keys:0 UND einem last_key_at_ms
+   direkt am Rand des aktuellen 4h-Berlin-Slots geseedet (nicht laengst
+   vergangen), damit der Zustand beim allerersten Laden wirklich 0/5 zeigt
+   und nicht durch zwischenzeitlich verstrichene Slot-Grenzen sofort wieder
+   regeneriert. dungeon-time.spec.js:51 erreicht denselben Zustand bisher nur
+   INDIREKT ueber mehrfachen echten Schluesselverbrauch waehrend des Tests -
+   dieser Teststand macht "startet bereits bei 0" als eigenen, sofort
+   ladbaren Ausgangszustand testbar. */
+function teststandG(startTimeMs) {
+  const fx = baseFixture(startTimeMs, 'QaKeineSchlG', 'qa-user-g-0000');
+  fx.tables.idle_player_state.push(makePlayerStateRow(fx.authUserId, fx.nameKey, fx.nowIso, {
+    display_name: fx.displayName,
+    level: 60, xp: 12000, gold: 300000,
+    dragon_kills: 1800, boss_kills: 70,
+    current_dragon_index: 55, highest_dragon_index: 55
+  }));
+  fx.tables.idle_prestige_state.push({
+    name_key: fx.nameKey, display_name: fx.displayName,
+    prestige_level: 0, prestige_points: 0, prestige_points_spent: 0,
+    prestige_allocations: {}, updated_at: fx.nowIso
+  });
+  const DUNGEON_TYPES = ['gold', 'exp', 'egg', 'meat', 'fruit', 'gem', 'rune'];
+  fx.tables.dungeon_keys = DUNGEON_TYPES.map(type => ({
+    auth_user_id: fx.authUserId, dungeon_type: type, keys: 0, last_key_at_ms: startTimeMs
+  }));
+  fx.tables.dungeon_progress = DUNGEON_TYPES.map(type => ({
+    auth_user_id: fx.authUserId, dungeon_type: type,
+    highest_difficulty: 'leicht', total_completions: 0, total_defeats: 0, total_keys_spent: 5
+  }));
+  return fx;
+}
+
+const TESTSTANDS = { A: teststandA, B: teststandB, C: teststandC, D: teststandD, E: teststandE, F: teststandF, G: teststandG };
 
 module.exports = { TESTSTANDS, emailFromName, QA_PASSWORD };

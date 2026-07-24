@@ -1,6 +1,21 @@
 const fs = require('fs');
 const path = require('path');
 const { test, expect, openAndLogin } = require('../helpers/qa-fixtures');
+
+/* QA-Grundlage Phase 2 (24.07.2026) - echter Fund beim Ausfuehren dieser
+   Suite gegen ALLE 3 konfigurierten Projekte (vorher nur je einzeln/nur
+   chromium-desktop geprueft, siehe CLAUDE.md): diese Datei klickt echte
+   Desktop-Tab-Buttons (#idleTabBtnXxx) per Playwrights .click() (verlangt
+   Sichtbarkeit) - auf mobile-small/mobile-large sind diese Knoten absichtlich
+   unsichtbar (kompakte Navigation ersetzt sie, siehe mobile-smoke.spec.js),
+   der Klick haengt dadurch bis zum 30s-Timeout. KEIN App-Bug (die kompakte
+   Navigation funktioniert korrekt, siehe mobile-smoke.spec.js) - die Datei
+   wurde nur nie fuer Mobil-Projekte geschrieben. Gleicher Skip-Schutz wie
+   mobile-smoke.spec.js, nur umgekehrt - verhindert falsche rote
+   Fehlschlaege statt eines echten Fehlers zu verstecken. */
+test.beforeEach(async ({}, testInfo) => {
+  test.skip(/^mobile-/.test(testInfo.project.name), 'Nutzt echte Desktop-Tab-Klicks - siehe Kommentar oben, mobile-smoke.spec.js deckt die kompakte Navigation ab');
+});
 const { IDLE_TABS } = require('../helpers/selectors');
 const { collectInteractiveElements } = require('../helpers/inventory');
 

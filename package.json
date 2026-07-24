@@ -4,6 +4,18 @@
   "version": "0.0.0",
   "description": "Dev-only Playwright E2E test harness for the BKMP idle-dorf. NOT part of the deployed site (no build step, no runtime dependency) - see tests/README.md and CLAUDE.md Phase 7.2.",
   "scripts": {
+    "qa:server": "node scripts/qa-server.js",
+    "qa:smoke": "playwright test tests/e2e/qa-mode-smoke.spec.js tests/e2e/qa-mode-security.spec.js --project=chromium-desktop --project=mobile-small",
+    "qa:navigation": "playwright test tests/e2e/navigation.spec.js tests/e2e/nav-persistence.spec.js tests/e2e/mobile-smoke.spec.js --project=chromium-desktop --project=mobile-small --project=mobile-large",
+    "qa:features": "playwright test tests/e2e/combat.spec.js tests/e2e/runes.spec.js tests/e2e/dungeon-time.spec.js tests/e2e/prestige.spec.js tests/e2e/buttons-inventory.spec.js tests/e2e/arena.spec.js tests/e2e/guild.spec.js --project=chromium-desktop",
+    "qa:time": "playwright test tests/e2e/login-streak.spec.js tests/e2e/offline-afk.spec.js tests/e2e/dungeon-time.spec.js --project=chromium-desktop",
+    "qa:persistence": "playwright test tests/e2e/save-load.spec.js --project=chromium-desktop",
+    "qa:visual": "playwright test tests/e2e/visual.spec.js --grep @visual-checks --project=chromium-desktop",
+    "qa:static": "node scripts/static-checks.js && eslint . && npm audit",
+    "qa:soak": "playwright test tests/e2e/soak.spec.js --grep @soak-short --project=chromium-desktop",
+    "qa:soak:long": "playwright test tests/e2e/soak.spec.js --grep @soak-long --project=chromium-desktop",
+    "qa:full": "npm run qa:static && playwright test tests/e2e/ --grep-invert \"@soak-long|@visual-baseline\" --project=chromium-desktop --project=mobile-small --project=mobile-large --workers=1",
+    "qa:report": "playwright show-report tests/report/html",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:smoke": "playwright test --grep @smoke",
@@ -20,6 +32,7 @@
     "test:e2e:report": "playwright show-report"
   },
   "devDependencies": {
-    "@playwright/test": "^1.61.1"
+    "@playwright/test": "^1.61.1",
+    "eslint": "^9.39.5"
   }
 }

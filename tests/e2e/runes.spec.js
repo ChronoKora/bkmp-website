@@ -9,6 +9,15 @@ const { test, expect, openAndLogin } = require('../helpers/qa-fixtures');
    einzelnen test()-Callback, das wirft zur Laufzeit) - deshalb ein eigenes
    describe je Teststand statt eines gemeinsamen Blocks. */
 
+/* QA-Grundlage Phase 2 (24.07.2026) - siehe identischer Kommentar in
+   buttons-inventory.spec.js: diese Datei klickt #idleTabBtnRunen per echtem
+   Playwright-.click() (verlangt Sichtbarkeit), auf mobile-*-Projekten ist
+   der Knoten korrekt unsichtbar (kompakte Navigation) - 30s-Timeout, kein
+   App-Bug. Top-Level-Hook, gilt fuer alle 4 describe-Bloecke dieser Datei. */
+test.beforeEach(async ({}, testInfo) => {
+  test.skip(/^mobile-/.test(testInfo.project.name), 'Nutzt echte Desktop-Tab-Klicks - siehe Kommentar oben, mobile-smoke.spec.js deckt die kompakte Navigation ab');
+});
+
 test.describe('Runensystem - Teststand D (beschaedigte Daten)', () => {
   test.use({ teststand: 'D' });
 

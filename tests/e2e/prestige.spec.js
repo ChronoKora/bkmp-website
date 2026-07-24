@@ -1,5 +1,14 @@
 const { test, expect, openAndLogin, waitForDragonReady } = require('../helpers/qa-fixtures');
 
+/* QA-Grundlage Phase 2 (24.07.2026) - siehe identischer Kommentar in
+   buttons-inventory.spec.js: diese Datei klickt #idleTabBtnPrestige per
+   echtem Playwright-.click() (verlangt Sichtbarkeit), auf mobile-*-Projekten
+   ist der Knoten korrekt unsichtbar (kompakte Navigation) - 30s-Timeout,
+   kein App-Bug. */
+test.beforeEach(async ({}, testInfo) => {
+  test.skip(/^mobile-/.test(testInfo.project.name), 'Nutzt echte Desktop-Tab-Klicks - siehe Kommentar oben, mobile-smoke.spec.js deckt die kompakte Navigation ab');
+});
+
 /* Auftrag Abschnitt 15: Prestige. Laeuft gegen die echte
    bkmpPrestigeExecuteReset() (idledorf.js/bkmp-prestige.js), kein Test-
    Doppel der Reset-Logik. Mindest-Drachenstufe fuer Prestige-Level 0 ist
@@ -127,6 +136,31 @@ test.describe('Prestige', () => {
   test('Reload nach dem Aufstieg behaelt den neuen (zurueckgesetzten) Stand', async ({ page, qaBaseURL, fixtureData }) => {
     await openAndLogin(page, qaBaseURL, fixtureData);
     await waitForDragonReady(page);
+    /* Stabilitaets-Fix (Sicherheits-/Stabilitaetsphase 24.07.2026, siehe
+       CLAUDE.md): ohne diesen Stop lief der Auto-Tick-Kampf-Loop waehrend
+       des GESAMTEN Tests weiter - auch NACH bkmpPrestigeExecuteReset(), das
+       den Drachen-Index korrekt auf 0 zuruecksetzt UND sofort einen neuen,
+       sehr schwachen Drachen spawnt (bkmpIdleSpawnDragon(), bkmp-prestige.js:
+       568). Der Reset selbst schreibt gold=0 korrekt und sofort
+       (bkmpIdleFlushSyncNow() wird awaited), aber der weiterlaufende Loop
+       kann DANACH unbemerkt bereits den naechsten Kill einstreichen -
+       page.reload() loest dabei den 'beforeunload'-Handler (idledorf.js:
+       2572) aus, der bkmpIdleQueueSync()+bkmpIdleFlushSync() SOFORT (nicht
+       erst nach 4s-Debounce) mit dem dann AKTUELLEN (nicht mehr 0) Gold-Wert
+       feuert - das ueberschreibt den sauberen Reset-Wert im Mock-Server, je
+       nachdem ob dieser Schreibvorgang die Navigation noch rechtzeitig
+       erreicht (erklaert die Seltenheit/Sporadik). Per eigens gebautem
+       Diagnose-Test empirisch UND DETERMINISTISCH bestaetigt (nicht nur
+       vermutet): 5/5 Wiederholungen mit erzwungenem Wartefenster zeigten
+       exakt denselben stehengebliebenen Gold-Wert nach dem Reload wie
+       unmittelbar vor dem Reload (z.B. 15 vor Reload -> 15 nach Reload,
+       nie 0). Gleiches Grundmuster wie der combat.spec.js-Fix oben in
+       dieser Session: der Hintergrund-Loop ist fuer DIESEN Test nur eine
+       unbeabsichtigte Stoerquelle (getestet wird der Reset-Bestand nach
+       Reload, nicht das Zusammenspiel mit dem Auto-Tick) - kein
+       force:true/waitForTimeout/laengeres Timeout noetig, kein App-Code
+       angefasst. */
+    await page.evaluate(() => bkmpIdleStopLoop());
     await page.evaluate(() => { bkmpIdleState.highest_dragon_index = 150; });
     await page.locator('#idleTabBtnPrestige').click();
     await page.evaluate(() => bkmpIdleRenderPrestigePanel());

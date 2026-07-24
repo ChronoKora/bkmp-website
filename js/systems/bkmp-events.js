@@ -95,12 +95,22 @@ function bkmpIdleGetStreakData() {
 function bkmpIdleSaveStreakData(data) {
   try { localStorage.setItem(BKMP_IDLE_STREAK_KEY, JSON.stringify(data)); } catch (e) {}
 }
+/* GameClock-Migration (24.07.2026, siehe CLAUDE.md/js/core/bkmp-game-clock.js):
+   bewusst die ERSTE (und fuer Phase 1 einzige) migrierte Zeitstelle - rein
+   clientseitig (localStorage, kein Server-Schreibzugriff), macht diesen
+   Tageswechsel-Check im lokalen QA-Modus per Panel-Zeitsprung testbar, ohne
+   echte Tage abwarten zu muessen. bkmpGetGameNow() ist ausserhalb des
+   QA-Modus IMMER identisch zu Date.now() (siehe Datei-Kommentar dort) - kein
+   Verhaltensunterschied im normalen Spiel. Alle anderen Date.now()/new
+   Date()-Stellen (Kampf-Tick, Offline-Claim, Sync-Sperren in idledorf.js)
+   sind ABSICHTLICH nicht migriert, siehe CLAUDE.md. */
 function bkmpIdleCheckDailyStreak() {
   if (!bkmpIdleState) return;
+  const gameNow = typeof bkmpGetGameNow === 'function' ? bkmpGetGameNow() : Date.now();
   const data = bkmpIdleGetStreakData();
-  const today = bkmpIdleDateStr(new Date());
+  const today = bkmpIdleDateStr(new Date(gameNow));
   if (data.lastDate === today) return;
-  const yesterday = bkmpIdleDateStr(new Date(Date.now() - 86400000));
+  const yesterday = bkmpIdleDateStr(new Date(gameNow - 86400000));
   const newCount = data.lastDate === yesterday ? Number(data.count || 0) + 1 : 1;
   bkmpIdleSaveStreakData({ count: newCount, lastDate: today });
   const goldBonus = Math.min(10000, 500 * newCount);

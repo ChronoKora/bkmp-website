@@ -7,7 +7,13 @@
    side (see CLAUDE.md Phase 7.2 report for why this shape was chosen over a
    dedicated QA Supabase project). */
 
-const base = require('@playwright/test');
+/* base kommt seit der Sicherheitsverstaerkung vor Phase-3-Abschluss
+   (24.07.2026) aus network-guard.js statt direkt aus @playwright/test - das
+   ist ein bereits um die globale Netzwerksperre erweitertes `test`-Objekt
+   (siehe dort). Diese Datei muss dafuer sonst nichts aendern: base.test/
+   base.expect verhalten sich exakt gleich, nur mit der Sperre als
+   zusaetzlicher, automatischer Vorfahren-Fixture. */
+const base = require('./network-guard');
 const { createStore, seedStore } = require('../mock/store');
 const { route: mockRoute } = require('../mock/router');
 const { createTestServer } = require('../mock/server');
@@ -81,6 +87,27 @@ const test = base.test.extend({
         body: JSON.stringify(result.json)
       });
     });
+
+    /* Echter, vorher nie bemerkter Lueckenfund (Sicherheitsverstaerkung
+       24.07.2026, siehe CLAUDE.md): der Kommentar oben am Dateikopf
+       behauptete "Nothing here ever talks to the real Supabase project" -
+       stimmte fuer normale HTTP-Anfragen (siehe context.route() oben), aber
+       NICHT fuer das Realtime-WebSocket. supabase-js versucht bei JEDEM
+       Idle-Dorf-Oeffnen unbedingt eine Verbindung zu wss://<prod-host>/
+       realtime/v1/websocket - das ging bisher, unbeobachtet, tatsaechlich
+       an den ECHTEN Produktions-Host (schlug dort vermutlich lautlos fehl/
+       wurde nie beobachtet, da kein Test je page.on('websocket') darauf
+       geprueft hat). Erst network-guard.js's neue globale Sperre (siehe
+       dort) hat das beim ersten vollen Regressionslauf sichtbar gemacht -
+       nicht als falscher Fehlalarm, sondern als echten, jetzt geschlossenen
+       Luecke. Fix: exakt dieselbe Domain wie oben wird jetzt auch fuers
+       WebSocket lokal gemockt (kein connectToServer() => Playwright oeffnet
+       den Socket rein clientseitig, ohne jede echte Verbindung) - stiller,
+       nachrichtenloser No-Op-Accept, identisches Prinzip wie der bestehende
+       Realtime-Handshake in tests/mock/server.js ("kein Framing/Message-
+       Handling, bleibt nur still verbunden"). */
+    await context.routeWebSocket(/^wss:\/\/zgknyrwzpohvfdweomxf\.supabase\.co\//, () => {});
+
     await use(context);
   },
 
@@ -197,4 +224,50 @@ async function openAppMode(page, qaBaseURL, fixtureData) {
   await waitForIdleStateReady(page);
 }
 
-module.exports = { test, expect, openAndLogin, openAppMode, waitForIdleStateReady, waitForDragonReady, SUPABASE_HOST_PATTERN };
+/* QA-Grundlage Phase 2 (24.07.2026) - gemeinsamer Browserfehler-Sammler.
+   Bisher hatte nur eine Teilmenge der Spec-Dateien eigene, leicht
+   unterschiedliche page.on('console'/'pageerror')-Mitschnitte gebaut (siehe
+   CLAUDE.md-Bericht) - dieser Helfer buendelt console.error/pageerror/
+   unbehandelte Promise-Rejections/fehlgeschlagene Requests/HTTP 4xx-5xx an
+   EINER Stelle, mit einer bewusst KLEINEN, dokumentierten Allowlist (kein
+   pauschales Ignorieren). Bestehende, bereits gruene Spec-Dateien mit
+   eigenem Muster wurden NICHT rueckwirkend umgebaut (Risiko/Aufwand fuer
+   diese Phase nicht gerechtfertigt) - neue Tests sollten das hier nutzen. */
+const KNOWN_HARMLESS_CONSOLE_PATTERNS = [
+  // Marketing-Seiten-Datenlader warnen bewusst (console.warn, nicht error),
+  // wenn eine der optionalen Referenztabellen im Mock leer ist (siehe
+  // tests/mock/reference-data.js) - kein Fehler, nur ein Hinweis.
+  /Supabase enthaelt keine /
+];
+
+function attachErrorCapture(page) {
+  const consoleErrors = [];
+  const failedRequests = [];
+  const httpErrors = [];
+  page.on('pageerror', err => consoleErrors.push('pageerror: ' + String(err)));
+  page.on('console', msg => {
+    if (msg.type() !== 'error') return;
+    const text = msg.text();
+    if (KNOWN_HARMLESS_CONSOLE_PATTERNS.some(re => re.test(text))) return;
+    consoleErrors.push(text);
+  });
+  page.on('requestfailed', req => {
+    failedRequests.push(`${req.method()} ${req.url()} :: ${req.failure() && req.failure().errorText}`);
+  });
+  page.on('response', res => {
+    if (res.status() >= 400) httpErrors.push(`${res.status()} ${res.request().method()} ${res.url()}`);
+  });
+  return {
+    consoleErrors, failedRequests, httpErrors,
+    assertClean(context) {
+      base.expect(consoleErrors, `${context || ''}: Konsolenfehler:\n${consoleErrors.join('\n')}`).toEqual([]);
+      base.expect(failedRequests, `${context || ''}: fehlgeschlagene Requests:\n${failedRequests.join('\n')}`).toEqual([]);
+      base.expect(httpErrors, `${context || ''}: HTTP-Fehlerantworten:\n${httpErrors.join('\n')}`).toEqual([]);
+    }
+  };
+}
+
+module.exports = {
+  test, expect, openAndLogin, openAppMode, waitForIdleStateReady, waitForDragonReady, SUPABASE_HOST_PATTERN,
+  attachErrorCapture, KNOWN_HARMLESS_CONSOLE_PATTERNS
+};

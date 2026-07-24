@@ -995,7 +995,11 @@
   </div>
 
   <script src="assets/vendor/supabase-js.min.js"></script>
-  <script src="supabase.js?v=20260723-skincodes1"></script>
+  <!-- QA-Testgrundlage (24.07.2026, siehe CLAUDE.md) - reiner No-Op hier,
+       da admin.html kein window.BKMP_QA_MODE-Gate setzt; macht nur
+       bkmpGetGameNow() fuer bkmp-events.js verfuegbar (identisch Date.now()). -->
+  <script src="js/core/bkmp-game-clock.js?v=20260724-qafoundation1"></script>
+  <script src="supabase.js?v=20260724-qaphase2security1"></script>
   <script src="app.js?v=20260718-selbstverdient1"></script>
   <!-- Redesign Phase 2a (17.07.): siehe index.html fuer die Begruendung der
        festen Ladereihenfolge (bkmp-idle-state.js zuerst, bkmp-idle-
@@ -1014,7 +1018,7 @@
   <script src="js/systems/bkmp-meister.js?v=20260717-p2bfoundation"></script>
   <script src="js/systems/bkmp-skilltree.js?v=20260717-p2bfoundation"></script>
   <script src="js/systems/bkmp-cosmetics.js?v=20260719-fixbatch3"></script>
-  <script src="js/systems/bkmp-events.js?v=20260719-p55g"></script>
+  <script src="js/systems/bkmp-events.js?v=20260724-qafoundation1"></script>
   <script src="js/ui/bkmp-hud.js?v=20260721-phase71stage3a"></script>
   <script src="js/systems/bkmp-leaderboard.js?v=20260717-p2cfoundation"></script>
   <script src="js/ui/bkmp-ui-components.js?v=20260719-p55b"></script>

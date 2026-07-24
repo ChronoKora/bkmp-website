@@ -1,4 +1,16 @@
 const { test, expect, openAndLogin } = require('../helpers/qa-fixtures');
+
+/* QA-Grundlage Phase 2 (24.07.2026) - siehe identischer Kommentar in
+   buttons-inventory.spec.js: diese Datei klickt #idleTabBtnXxx per echtem
+   Playwright-.click() (verlangt Sichtbarkeit), auf mobile-*-Projekten sind
+   diese Knoten korrekt unsichtbar (kompakte Navigation) - 30s-Timeout, kein
+   App-Bug. Die kompakte Navigation selbst wird bereits von
+   mobile-smoke.spec.js/nav-persistence.spec.js/qa-mode-smoke.spec.js
+   (nutzen echte DOM-.click()-Aufrufe statt Playwrights Sichtbarkeits-
+   pruefung) auf mobile-small/mobile-large abgedeckt. */
+test.beforeEach(async ({}, testInfo) => {
+  test.skip(/^mobile-/.test(testInfo.project.name), 'Nutzt echte Desktop-Tab-Klicks - siehe Kommentar oben, mobile-smoke.spec.js/nav-persistence.spec.js decken die kompakte Navigation ab');
+});
 const { IDLE_TABS } = require('../helpers/selectors');
 
 test.describe('Idle-Dorf Navigation @smoke', () => {

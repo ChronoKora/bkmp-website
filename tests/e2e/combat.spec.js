@@ -98,6 +98,36 @@ test.describe('Kampfsystem', () => {
     await waitForDragonReady(page);
     const before = await page.evaluate(() => ({ kills: bkmpIdleState.dragon_kills, highest: bkmpIdleState.highest_dragon_index }));
 
+    /* Stabilitaets-Fix (Sicherheits-/Stabilitaetsphase 24.07.2026, siehe
+       CLAUDE.md): ohne diesen Stop lief der Auto-Tick-Kampf-Loop waehrend
+       des gesamten Tests im Hintergrund weiter und traf den Drachen alle
+       ~900ms selbst - jeder dieser Treffer haengt bkmpIdleSpawnHitFlash()
+       zufolge die Klasse .idle-hit-flash an #idleDragon (idledorf.js:735),
+       deren CSS-Animation `idleHitFlash` GENAU auf #idleDragon selbst einen
+       echten transform:scale(...)-Verlauf abspielt (style.css:6044-6049) -
+       das exakte Element, das gleich per .click() angesprochen wird. Per
+       eigens gebautem Diagnose-Test empirisch bestaetigt (nicht nur
+       vermutet): className/transform/BoundingClientRect von #idleDragon
+       aendern sich dadurch fortlaufend, className blieb ueber 4s Messung
+       fast durchgehend "...idle-hit-flash", transform pendelte zwischen
+       "none" und "matrix(scale,...)" - Playwrights eigene Klick-
+       Stabilitaetspruefung (verlangt zwei aufeinanderfolgende Frames mit
+       UNVERAENDERTER BoundingClientRect) konvergiert dadurch auf WebKit
+       (mobile-large) oft nicht innerhalb des 30s-Test-Timeouts (reproduziert
+       10/20 Laeufe). Gleichzeitig per direktem, Playwright-Stabilitaet
+       umgehendem DOM-Klick MITTEN in der Animation bestaetigt: ein echter
+       Tastendruck/Klick wird vom Spiel voellig normal verarbeitet (HP sank
+       sofort sichtbar) - betrifft also nachweislich NUR Playwrights eigene
+       Pruefung, nie einen echten Nutzer. Der bereits benachbarte Test
+       "manueller Klick..." (Zeile 40 oben) ruft bkmpIdleStopLoop() bereits
+       genau aus diesem Grund auf und flaked deshalb nie - hier fehlte der
+       identische, bereits etablierte Aufruf schlicht. Der Hintergrund-Loop
+       ist fuer DIESEN Test ohnehin nur eine unbeabsichtigte Stoerquelle
+       (getestet wird der manuelle Todesstoss, nicht das Zusammenspiel mit
+       dem Auto-Tick) - kein force:true, keine Wartezeit, keine App-
+       Aenderung noetig. */
+    await page.evaluate(() => bkmpIdleStopLoop());
+
     // Direkt auf 1 HP setzen statt viele echte Ticks abzuwarten - der
     // eigentliche Uebergang (bkmpIdleHandleDragonDefeated) ist echter
     // Produktionscode, nur das "HP fast leer" wird abgekuerzt.

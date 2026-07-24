@@ -39,6 +39,28 @@
   })();
 </script>
 <script>
+  /* Lokaler QA-/Mock-Modus (Testgrundlage, 24.07.2026, siehe CLAUDE.md).
+     Zwei UNABHAENGIGE Bedingungen muessen beide zutreffen, bevor
+     window.BKMP_QA_MODE jemals true wird:
+       1. Hostname ist localhost/127.0.0.1/::1 (bewusst KEIN Domain-Name-
+          Vergleich mit der echten Produktionsdomain - eine Positivliste
+          "nur diese Hosts duerfen" ist sicherer als eine Negativliste
+          "alle ausser diesem einen Host", die bei einer kuenftigen
+          Domainaenderung stillschweigend durchlaessig wuerde).
+       2. Der Query-String enthaelt ausdruecklich ?qa=1.
+     Auf der echten, deployten Website (bkinvestment.de/vercel.app) ist
+     Bedingung 1 strukturell nie erfuellt - der Modus kann dort technisch
+     nicht aktiviert werden, unabhaengig vom Query-String. supabase.js
+     liest dieses Flag, um in diesem Fall NIE das echte Supabase-Projekt zu
+     kontaktieren (siehe Kommentar dort). */
+  (function () {
+    var host = location.hostname;
+    var isLocalHost = host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '';
+    var qaParam = new URLSearchParams(location.search).get('qa') === '1';
+    window.BKMP_QA_MODE = !!(isLocalHost && qaParam);
+  })();
+</script>
+<script>
   // Verhindert Aufblitzen: Theme wird gesetzt, bevor die Seite gerendert wird.
   (function () {
     // Der App-Modus zeigt immer das dunkle Standard-Design, unabhaengig von
@@ -104,7 +126,23 @@
 <meta name="twitter:description" content="Transparente Einblicke in Einnahmen, Investoren, News, Kartenideen und PartnerShops rund um den Bkmp Minecraft-Server.">
 <meta name="twitter:image" content="https://bkinvestment.de/assets/top-banner.png">
 
-<link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
+<script>
+  /* QA-Grundlage Phase 2 (24.07.2026) - echter, beim Sicherheitsaudit
+     gefundener Fund: ein statisches <link rel="preconnect"> zur
+     Produktions-Domain wird vom Browser SOFORT beim Parsen ausgefuehrt (DNS+
+     TCP+TLS-Handshake, keine Nutzdaten) - unabhaengig von window.BKMP_QA_MODE,
+     das erst in einem <script> weiter oben gesetzt wird. Trotz "keine
+     Nutzdaten" widerspricht das der Zusicherung "im QA-Modus strukturell
+     unerreichbar" woertlich. Fix: das <link> wird jetzt per JS eingefuegt,
+     NUR wenn window.BKMP_QA_MODE nicht aktiv ist - auf der echten Website
+     (BKMP_QA_MODE immer false) identisches Verhalten wie vorher. */
+  if (!window.BKMP_QA_MODE) {
+    var preconnect = document.createElement('link');
+    preconnect.rel = 'preconnect';
+    preconnect.href = 'https://zgknyrwzpohvfdweomxf.supabase.co';
+    document.head.appendChild(preconnect);
+  }
+</script>
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
@@ -175,7 +213,7 @@
   </div>
 
   <div class="top-actions">
-    <button class="pill-btn idle-dorf-btn" id="idleDorfButton" type="button" aria-label="Idle Drachen Dorf öffnen">
+    <button class="pill-btn idle-dorf-btn" id="idleDorfButton" data-testid="idle-dorf-open-button" type="button" aria-label="Idle Drachen Dorf öffnen">
       <span aria-hidden="true">🏰</span><span class="idle-dorf-btn-label"> Idle Drachen Dorf</span><span class="raid-btn-countdown" id="raidBtnCountdown" style="display:none;"></span>
     </button>
 
@@ -652,8 +690,8 @@
         <div class="bkmp-proto-chud-fx-menu" id="bkmpProtoChudFxMenu" style="display:none;"></div>
       </div>
 
-      <nav class="bkmp-proto-nav" id="bkmpProtoCompactNav" style="display:none;">
-        <div class="bkmp-proto-nav-primary" id="bkmpProtoNavPrimary"></div>
+      <nav class="bkmp-proto-nav" id="bkmpProtoCompactNav" data-testid="idle-compact-nav" style="display:none;">
+        <div class="bkmp-proto-nav-primary" id="bkmpProtoNavPrimary" data-testid="idle-compact-nav-primary"></div>
         <div class="bkmp-proto-nav-more-wrap">
           <button type="button" class="bkmp-proto-nav-more-btn" id="bkmpProtoNavMoreBtn" aria-haspopup="true" aria-expanded="false">⋯ Mehr</button>
           <div class="bkmp-proto-nav-more-menu" id="bkmpProtoNavMoreMenu" style="display:none;"></div>
@@ -694,40 +732,40 @@
         <div class="raid-result-card" id="raidResultCard" style="display:none;"></div>
       </div>
 
-      <div class="idle-dorf-tabs" id="idleDorfTabs">
+      <div class="idle-dorf-tabs" id="idleDorfTabs" data-testid="idle-tabs-bar">
         <div class="idle-dorf-tab-group">
           <div class="idle-dorf-tab-group-label" aria-hidden="true">Basis</div>
           <div class="idle-dorf-tab-group-buttons">
-            <button type="button" class="idle-dorf-tab active" id="idleTabBtnKampf">&#9876;&#65039; Kampf</button>
-            <button type="button" class="idle-dorf-tab" id="idleTabBtnUpgrades">&#11014;&#65039; Upgrades</button>
-            <button type="button" class="idle-dorf-tab" id="idleTabBtnSkilltree">&#127795; Skilltree</button>
-            <button type="button" class="idle-dorf-tab" id="idleTabBtnPrestige">&#127756; Prestige</button>
+            <button type="button" class="idle-dorf-tab active" id="idleTabBtnKampf" data-testid="idle-tab-kampf">&#9876;&#65039; Kampf</button>
+            <button type="button" class="idle-dorf-tab" id="idleTabBtnUpgrades" data-testid="idle-tab-upgrades">&#11014;&#65039; Upgrades</button>
+            <button type="button" class="idle-dorf-tab" id="idleTabBtnSkilltree" data-testid="idle-tab-skilltree">&#127795; Skilltree</button>
+            <button type="button" class="idle-dorf-tab" id="idleTabBtnPrestige" data-testid="idle-tab-prestige">&#127756; Prestige</button>
           </div>
         </div>
         <div class="idle-dorf-tab-group">
           <div class="idle-dorf-tab-group-label" aria-hidden="true">Sammlung</div>
           <div class="idle-dorf-tab-group-buttons">
-            <button type="button" class="idle-dorf-tab" id="idleTabBtnErfolge">&#127942; Erfolge</button>
-            <button type="button" class="idle-dorf-tab" id="idleTabBtnRunen">🔮 Runen</button>
-            <button type="button" class="idle-dorf-tab" id="idleTabBtnSkins">🖼️ Dorf-Skins</button>
-            <button type="button" class="idle-dorf-tab" id="idleTabBtnBestenliste">&#128202; Bestenliste</button>
-            <button type="button" class="idle-dorf-tab" id="idleTabBtnDrachen">🐉 Drachenzucht</button>
+            <button type="button" class="idle-dorf-tab" id="idleTabBtnErfolge" data-testid="idle-tab-erfolge">&#127942; Erfolge</button>
+            <button type="button" class="idle-dorf-tab" id="idleTabBtnRunen" data-testid="idle-tab-runen">🔮 Runen</button>
+            <button type="button" class="idle-dorf-tab" id="idleTabBtnSkins" data-testid="idle-tab-skins">🖼️ Dorf-Skins</button>
+            <button type="button" class="idle-dorf-tab" id="idleTabBtnBestenliste" data-testid="idle-tab-bestenliste">&#128202; Bestenliste</button>
+            <button type="button" class="idle-dorf-tab" id="idleTabBtnDrachen" data-testid="idle-tab-drachen">🐉 Drachenzucht</button>
           </div>
         </div>
         <div class="idle-dorf-tab-group">
           <div class="idle-dorf-tab-group-label" aria-hidden="true">Herausforderungen</div>
           <div class="idle-dorf-tab-group-buttons">
-            <button type="button" class="idle-dorf-tab" id="idleTabBtnDungeon">🏛️ Dungeon</button>
-            <button type="button" class="idle-dorf-tab" id="idleTabBtnTurm">🗼 Turm</button>
-            <button type="button" class="idle-dorf-tab" id="idleTabBtnArena">⚔️ Arena</button>
+            <button type="button" class="idle-dorf-tab" id="idleTabBtnDungeon" data-testid="idle-tab-dungeon">🏛️ Dungeon</button>
+            <button type="button" class="idle-dorf-tab" id="idleTabBtnTurm" data-testid="idle-tab-turm">🗼 Turm</button>
+            <button type="button" class="idle-dorf-tab" id="idleTabBtnArena" data-testid="idle-tab-arena">⚔️ Arena</button>
           </div>
         </div>
         <div class="idle-dorf-tab-group">
           <div class="idle-dorf-tab-group-label" aria-hidden="true">Gilde</div>
           <div class="idle-dorf-tab-group-buttons">
-            <button type="button" class="idle-dorf-tab" id="idleTabBtnGilde">🛡️ Gilde</button>
-            <button type="button" class="idle-dorf-tab" id="idleTabBtnGildeTech">🌳 Gilden-Tech</button>
-            <button type="button" class="idle-dorf-tab" id="idleTabBtnGildeBoss">🐲 Gildenboss</button>
+            <button type="button" class="idle-dorf-tab" id="idleTabBtnGilde" data-testid="idle-tab-gilde">🛡️ Gilde</button>
+            <button type="button" class="idle-dorf-tab" id="idleTabBtnGildeTech" data-testid="idle-tab-gildetech">🌳 Gilden-Tech</button>
+            <button type="button" class="idle-dorf-tab" id="idleTabBtnGildeBoss" data-testid="idle-tab-gildeboss">🐲 Gildenboss</button>
           </div>
         </div>
       </div>
@@ -1452,7 +1490,12 @@
   </div>
 
   <script src="assets/vendor/supabase-js.min.js" defer></script>
-  <script src="supabase.js?v=20260723-skincodes1" defer></script>
+  <!-- QA-Testgrundlage (24.07.2026, siehe CLAUDE.md) - vor supabase.js, weil
+       supabase.js beim ersten bkmpGetSupabaseClient()-Aufruf window.BKMP_QA_MODE
+       liest. window.BKMP_QA_MODE selbst wird noch frueher gesetzt (Kopf-Skript
+       oben, vor jedem <script src>). Reiner No-Op ausserhalb des QA-Modus. -->
+  <script src="js/core/bkmp-game-clock.js?v=20260724-qafoundation1" defer></script>
+  <script src="supabase.js?v=20260724-qaphase2security1" defer></script>
   <script src="app.js?v=20260718-selbstverdient1" defer></script>
   <!-- Redesign Phase 2a (17.07.): idledorf.js in geteilten Zustand + Subsysteme
        zerlegt. Ladereihenfolge ist bewusst fest: bkmp-idle-state.js zuerst
@@ -1475,7 +1518,7 @@
   <script src="js/systems/bkmp-meister.js?v=20260717-p2bfoundation" defer></script>
   <script src="js/systems/bkmp-skilltree.js?v=20260717-p2bfoundation" defer></script>
   <script src="js/systems/bkmp-cosmetics.js?v=20260719-fixbatch3" defer></script>
-  <script src="js/systems/bkmp-events.js?v=20260719-p55g" defer></script>
+  <script src="js/systems/bkmp-events.js?v=20260724-qafoundation1" defer></script>
   <script src="js/ui/bkmp-hud.js?v=20260721-phase71stage3a" defer></script>
   <script src="js/systems/bkmp-leaderboard.js?v=20260717-p2cfoundation" defer></script>
   <script src="js/ui/bkmp-ui-components.js?v=20260719-p55b" defer></script>
@@ -1491,6 +1534,10 @@
   <!-- PROTOTYP 2 (18.07., isoliert & jederzeit entfernbar) - siehe Kommentar
        in js/prototype/bkmp-proto-compact-hud.js. Laedt bewusst zuletzt. -->
   <script src="js/prototype/bkmp-proto-compact-hud.js?v=20260723-visibilityresync1" defer></script>
+  <!-- QA-Testgrundlage (24.07.2026, siehe CLAUDE.md) - laedt zuletzt, tut
+       ausserhalb von window.BKMP_QA_MODE (nur localhost + ?qa=1) komplett
+       nichts. Eigenstaendig, kein Redesign-/Business-Logic-Code. -->
+  <script src="js/dev/bkmp-qa-panel.js?v=20260724-qafoundation3" defer></script>
 
 </body>
 </html>

@@ -1,5 +1,14 @@
 const { test, expect, openAndLogin, waitForIdleStateReady } = require('../helpers/qa-fixtures');
 
+/* QA-Grundlage Phase 2 (24.07.2026) - siehe identischer Kommentar in
+   buttons-inventory.spec.js: mehrere Tests hier klicken #idleTabBtnRunen
+   per echtem Playwright-.click() (verlangt Sichtbarkeit), auf
+   mobile-*-Projekten ist der Knoten korrekt unsichtbar (kompakte
+   Navigation) - 30s-Timeout, kein App-Bug. */
+test.beforeEach(async ({}, testInfo) => {
+  test.skip(/^mobile-/.test(testInfo.project.name), 'Nutzt echte Desktop-Tab-Klicks - siehe Kommentar oben, mobile-smoke.spec.js deckt die kompakte Navigation ab');
+});
+
 /* Auftrag Abschnitt 9: Speichern/Laden/Synchronisieren. Jeder Test folgt
    demselben Muster (Zustand aendern -> speichern lassen -> Reload ->
    vergleichen), ueber echte Produktionsfunktionen - bkmpIdleFlushSyncNow()
