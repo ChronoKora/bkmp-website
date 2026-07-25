@@ -1156,6 +1156,102 @@ async function bkmpRuneSellAllDuplicates() {
   bkmpIdleQueueSync();
 }
 
+/* Neuer, SLOT-UEBERGREIFENDER Sammelverkauf nach Seltenheit (25.07.2026,
+   Massnahme gegen unbegrenzt wachsende Runen-Lager - siehe idledorf.js's
+   Ladeblock-Kommentar/CLAUDE.md "meine Runen sind komplett weg"). Anders
+   als bkmpRuneSellAllDuplicates() oben (nur der gerade aktive Slot-Reiter)
+   verkauft das ALLE unausgeruesteten Runen EINER Seltenheit ueber ALLE 6
+   Slot-Typen gleichzeitig - der direkte Weg, ein bereits sehr grosses
+   Lager (bestaetigt: mehrere tausend Zeilen bei zwei echten Spielern) in
+   einem Klick zu leeren, statt 6x einzeln je Slot-Reiter. Laedt bewusst
+   zuerst die vollstaendige (unabhaengig von der 300er-Anzeige-Obergrenze
+   der normalen Lager-Ansicht) rarity-gefilterte Liste, um den Gold-Wert
+   EXAKT (dieselbe bkmpRuneSellValue()-Formel wie beim Einzelverkauf) statt
+   nur geschaetzt zu berechnen - Loeschung selbst laeuft danach serverseitig
+   per Filter (deleteRunesByRarity), nicht per id-Liste. */
+async function bkmpRuneSellAllByRarity(rarity) {
+  if (!bkmpIdleState || !rarity) return;
+  const rarityDef = window.BKMP_RUNE_RARITIES.find(r => r.id === rarity);
+  if (!rarityDef) return;
+  let rows;
+  try {
+    rows = typeof loadRunesForBulkSellByRarity === 'function' ? await loadRunesForBulkSellByRarity(bkmpIdleState.name_key, rarity) : [];
+  } catch (e) {
+    console.warn('Sammelverkauf nach Seltenheit: Laden fehlgeschlagen.', e);
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Verkauf fehlgeschlagen - bitte erneut versuchen.', 3600);
+    return;
+  }
+  if (!Array.isArray(rows) || !rows.length) {
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`Keine unausgerüsteten ${rarityDef.name} zum Verkaufen.`, 2600);
+    return;
+  }
+  const totalValue = rows.reduce((sum, r) => sum + bkmpRuneSellValue({ rarity, upgrade_level: r.upgrade_level, substats: r.substats }), 0);
+  const confirmed = await bkmpConfirmDialog(
+    `💰 ${rows.length}× ${rarityDef.name} verkaufen?`,
+    `Verkauft ALLE ${rows.length} unausgerüsteten ${rarityDef.name} über alle Rüstungsplätze hinweg für insgesamt ${bkmpIdleFormatNumber(totalValue)} Gold.\n\n⚠️ Das gilt auch für bereits aufgewertete Runen, die du evtl. noch als 2. Rune fürs Verschmelzen oder den Aufstieg brauchst - nicht rückgängig machbar.`,
+    'Ja, verkaufen',
+    'Abbrechen'
+  );
+  if (!confirmed) return;
+  let deleted = false;
+  try {
+    deleted = typeof deleteRunesByRarity === 'function' ? await deleteRunesByRarity(bkmpIdleState.name_key, rarity) : false;
+  } catch (e) {
+    console.warn('Sammelverkauf nach Seltenheit: Löschen fehlgeschlagen.', e);
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Verkauf fehlgeschlagen - bitte erneut versuchen.', 3600);
+    return;
+  }
+  if (!deleted) return;
+  bkmpIdlePlayerRunes = bkmpIdlePlayerRunes.filter(r => !(r.rarity === rarity && !r.equipped));
+  bkmpIdleState.gold += totalValue;
+  if (bkmpRuneCurrentlyViewing && !bkmpIdlePlayerRunes.some(r => r._cid === bkmpRuneCurrentlyViewing)) bkmpRuneCurrentlyViewing = null;
+  bkmpIdleLog(`💰 ${rows.length}× ${rarityDef.name} (alle Plätze) verkauft für ${bkmpIdleFormatNumber(totalValue)} Gold.`);
+  if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`💰 ${rows.length}× verkauft: +${bkmpIdleFormatNumber(totalValue)} Gold`, 3200);
+  /* Lager wurde gerade fuer diese Seltenheit komplett geleert - ein
+     evtl. "es gibt noch mehr"-Hinweis waere jetzt sofort veraltet. Ein
+     erneutes echtes Laden (naechstes Oeffnen/Reload) bewertet das ohnehin
+     wieder korrekt neu. */
+  bkmpIdleRuneInventoryCapped = false;
+  bkmpIdleRenderHud();
+  bkmpIdleRenderRunenPanel();
+  bkmpIdleQueueSync();
+}
+
+/* Erneutes Laden nach einem fehlgeschlagenen Versuch (siehe idledorf.js's
+   Ladeblock) - ruft denselben zweigeteilten Lade-Pfad wie beim normalen
+   Oeffnen erneut auf, ohne den Rest des Ladeablaufs (Prestige/Event-
+   Drachen/etc.) zu wiederholen. */
+async function bkmpRuneRetryLoad() {
+  if (!bkmpIdleState || !bkmpIdleState.name_key) return;
+  const name = bkmpIdleState.name_key;
+  bkmpIdleRuneLoadError = false;
+  let equippedRows = null;
+  let unequippedRows = null;
+  try {
+    equippedRows = typeof loadEquippedPlayerRunes === 'function' ? await loadEquippedPlayerRunes(name) : [];
+  } catch (e) {
+    console.warn('Erneutes Laden: ausgeruestete Runen fehlgeschlagen.', e);
+    bkmpIdleRuneLoadError = true;
+  }
+  try {
+    unequippedRows = typeof loadUnequippedPlayerRunesCapped === 'function' ? await loadUnequippedPlayerRunesCapped(name, 300) : [];
+  } catch (e) {
+    console.warn('Erneutes Laden: Runen-Lager fehlgeschlagen.', e);
+    bkmpIdleRuneLoadError = true;
+  }
+  bkmpIdleRuneInventoryCapped = Array.isArray(unequippedRows) && unequippedRows.length >= 300;
+  if (equippedRows !== null || unequippedRows !== null) {
+    bkmpIdlePlayerRunes = [
+      ...(Array.isArray(equippedRows) ? equippedRows : []),
+      ...(Array.isArray(unequippedRows) ? unequippedRows : [])
+    ].map(r => ({ ...r, _cid: r.id, upgrade_level: Number(r.upgrade_level || 0), substats: Array.isArray(r.substats) ? r.substats : [] }));
+  }
+  if (typeof bkmpRuneNormalizeDuplicateEquips === 'function') bkmpRuneNormalizeDuplicateEquips();
+  if (!bkmpIdleRuneLoadError && typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('✅ Runen erfolgreich geladen.', 2600);
+  else if (bkmpIdleRuneLoadError && typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('⚠️ Erneut fehlgeschlagen - bitte später nochmal versuchen.', 3600);
+  bkmpIdleRenderRunenPanel();
+}
+
 function bkmpRuneFuseSelectionHTML(slot) {
   const sel = bkmpRuneFuseSelection;
   const rarity = window.BKMP_RUNE_RARITIES.find(r => r.id === sel.rarityId);
@@ -1741,9 +1837,38 @@ function bkmpIdleRenderRunenPanel() {
     return sum + Math.floor(c / 3);
   }, 0);
   const autoAscendPairCount = bkmpRuneAutoAscendPairs(slotOwned).length;
+  /* Bugfix 25.07.2026 (siehe idledorf.js's Ladeblock-Kommentar): Hinweis-
+     Banner, sobald das ungenutzte Lager an der Ladeobergrenze haengt (also
+     sicher noch mehr Runen in der Datenbank liegen als hier angezeigt) oder
+     der letzte Ladeversuch (teilweise) fehlgeschlagen ist - vorher gab es
+     in beiden Faellen ueberhaupt keinen sichtbaren Hinweis, das leere/
+     unvollstaendige Ergebnis wirkte wie echter Datenverlust. */
+  const capOrErrorBannerHtml = (bkmpIdleRuneInventoryCapped || bkmpIdleRuneLoadError) ? `
+    <div class="idle-runen-cap-banner">
+      <span>${bkmpIdleRuneLoadError
+        ? '⚠️ Runen konnten nicht vollständig geladen werden.'
+        : 'ℹ️ Zeige nur die wertvollsten Runen aus deinem Lager - du hast noch mehr. Nutze "Lager aufräumen" unten, um Platz zu schaffen.'}</span>
+      ${bkmpIdleRuneLoadError ? '<button type="button" class="btn-nein idle-runen-retry-btn" id="idleRuneRetryLoadBtn">🔄 Erneut laden</button>' : ''}
+    </div>
+  ` : '';
+  /* Slot-uebergreifender Sammelverkauf nach Seltenheit (kein 'gold' - die
+     seltenste/wertvollste Stufe soll nie versehentlich in einem Klick
+     komplett verschwinden). Immer sichtbar, nicht nur bei grossem Lager -
+     praeventiv nutzbar, bevor eine Sammlung ueberhaupt so gross wird. */
+  const rarityCleanupRowHtml = `
+    <div class="idle-runen-rarity-cleanup-row">
+      <span class="idle-runen-rarity-cleanup-label">🧹 Lager aufräumen (alle Plätze):</span>
+      ${window.BKMP_RUNE_RARITIES.filter(r => r.id !== 'gold').map(r => `
+        <button type="button" class="btn-nein idle-runen-rarity-sell-btn" data-rarity="${r.id}" style="--rune-color:${r.color}" title="Alle unausgerüsteten ${escapeHtml(r.name)} über alle Rüstungsplätze hinweg verkaufen">
+          ${escapeHtml(r.name)}
+        </button>
+      `).join('')}
+    </div>
+  `;
   drawerContent.innerHTML = `
+    ${capOrErrorBannerHtml}
     <div class="idle-runen-inventory-header">
-      <h4 class="idle-sammlung-subheading">🎒 ${escapeHtml(activeSlot.name)}-Lager <span class="idle-sammlung-count">${slotOwned.length} von ${totalOwned} gesamt</span></h4>
+      <h4 class="idle-sammlung-subheading">🎒 ${escapeHtml(activeSlot.name)}-Lager <span class="idle-sammlung-count">${slotOwned.length} von ${totalOwned} gesamt${bkmpIdleRuneInventoryCapped ? '+' : ''}</span></h4>
       <div class="idle-runen-inventory-header-actions">
         <button type="button" class="btn-nein idle-runen-autofuse-btn" id="idleRuneAutoFuseBtn" ${autoFuseGroupCount ? '' : 'disabled'}>
           🔥 Auto-Schmelzen (${autoFuseGroupCount})
@@ -1756,6 +1881,7 @@ function bkmpIdleRenderRunenPanel() {
         </button>
       </div>
     </div>
+    ${rarityCleanupRowHtml}
     <div class="idle-runen-inventory-scroll">
       <div class="idle-runen-inventory" id="idleRunenInventory">
       ${slotOwned.length ? slotOwned.map(r => {
@@ -1825,4 +1951,7 @@ function bkmpIdleRenderRunenPanel() {
   if (autoAscendBtn) autoAscendBtn.addEventListener('click', bkmpRuneAutoAscendAll);
   const runenHelpBtn = document.getElementById('idleRunenHelpBtn');
   if (runenHelpBtn) runenHelpBtn.addEventListener('click', bkmpIdleOpenRunenHelp);
+  const retryLoadBtn = document.getElementById('idleRuneRetryLoadBtn');
+  if (retryLoadBtn) retryLoadBtn.addEventListener('click', bkmpRuneRetryLoad);
+  drawerContent.querySelectorAll('.idle-runen-rarity-sell-btn').forEach(btn => btn.addEventListener('click', () => bkmpRuneSellAllByRarity(btn.dataset.rarity)));
 }

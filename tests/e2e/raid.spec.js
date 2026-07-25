@@ -526,4 +526,59 @@ test.describe('Weltboss-/Raid-Kernmechanik', () => {
     expect(player.stone).toBe(50000);
     expect(player.essence).toBe(2000);
   });
+
+  /* REGRESSION (25.07.2026, Nutzer-Auftrag "Minimierungs-Button am
+     Raidboss-Banner entfernen"): der Knopf (bkmpRaidBannerSetMinimized(),
+     #raidBannerMinimizeBtn) brachte laut Nutzer kaum Nutzen, sparte
+     praktisch keinen Platz und wirkte optisch stoerend - vollstaendig
+     entfernt (Markup in bkmpRaidRenderJoinBanner(), Event-Handling, der
+     sessionStorage-Minimierungs-Zustand selbst, sowie die zugehoerigen
+     CSS-Regeln .raid-join-banner-minimize/.raid-join-banner-minimized).
+     Dieser Test prueft, dass der Banner trotzdem weiterhin vollstaendig
+     funktioniert (Timer, Anmeldestatus in beiden Zustaenden) UND dass der
+     Knopf wirklich nirgends mehr im DOM auftaucht - weder vor noch nach
+     einem Beitritt. */
+  test('REGRESSION: Raidboss-Banner zeigt Timer+Status ohne Minimierungs-Button', async ({ page, qaServer }) => {
+    /* bkmpRaidGetPhaseInfo() (js/systems/bkmp-raid.js) nutzt ohne explizites
+       `now`-Argument die ECHTE Browser-Wanduhr (new Date()), NICHT
+       qaServer.store.clock (das nur die serverseitigen RPCs betrifft, siehe
+       Datei-Kopfkommentar oben) - der Banner selbst wird ausschliesslich
+       darüber gerendert, welcher Raid GERADE JETZT (echte Uhrzeit) laeuft.
+       Ohne eine gefakte Browser-Uhr wuerde der Banner den (uninteressanten)
+       Raid der tatsaechlichen aktuellen Stunde zeigen, nicht RAID_ID/
+       FIGHT_START_MS aus der Fixture - Playwrights eigene Clock-API friert
+       die Browser-Uhr exakt auf denselben Zeitpunkt ein, den auch
+       qaServer.store.clock/die Fixture-Zeitstempel schon nutzen (identisches
+       Muster wie login-streak.spec.js/dungeon-time.spec.js). */
+    await page.clock.install({ time: FIGHT_START_MS - 3 * 60000 });
+    await login(page, qaServer, ATTACKER_NAME);
+
+    const banner = page.locator('#raidJoinBanner');
+    await expect(banner).toBeVisible();
+    await expect(page.locator('#raidBannerMinimizeBtn')).toHaveCount(0);
+    await expect(page.locator('.raid-join-banner-minimize')).toHaveCount(0);
+
+    // Timer sichtbar und nicht leer.
+    const countdown = page.locator('#raidBannerCountdown');
+    await expect(countdown).toBeVisible();
+    await expect(countdown).not.toHaveText('');
+
+    // Status vor dem Beitritt: Beitreten-Button sichtbar, keine
+    // "Angemeldet"-Anzeige.
+    await expect(page.locator('#raidJoinBtn')).toBeVisible();
+    await expect(banner.locator('.raid-join-banner-joined')).toHaveCount(0);
+
+    // Nach dem Beitritt: Status wechselt korrekt auf "Angemeldet", der
+    // Knopf bleibt weiterhin komplett abwesend (Beweis, dass er nicht nur
+    // im Anfangszustand fehlt, sondern bei JEDEM Neu-Rendern des Banners).
+    await page.evaluate((raidId) => window.bkmpRaidJoin(raidId), RAID_ID);
+    await expect(page.locator('#raidJoinBtn')).toHaveCount(0);
+    await expect(banner.locator('.raid-join-banner-joined')).toBeVisible();
+    await expect(banner.locator('.raid-join-banner-joined')).toContainText('Angemeldet');
+    await expect(page.locator('#raidBannerMinimizeBtn')).toHaveCount(0);
+    await expect(page.locator('.raid-join-banner-minimize')).toHaveCount(0);
+
+    // Kein CSS-Rest der entfernten Funktion mehr aktiv.
+    await expect(banner).not.toHaveClass(/raid-join-banner-minimized/);
+  });
 });

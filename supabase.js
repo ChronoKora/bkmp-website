@@ -3307,6 +3307,92 @@ async function loadPlayerRunes(name) {
   return Array.isArray(data) ? data : [];
 }
 
+/* Bugfix 25.07.2026 (Spieler-Meldung "meine Runen sind komplett weg",
+   bestaetigt bei BagonTr01/Nilo3628): loadPlayerRunes() oben holt IMMER die
+   KOMPLETTE Tabellenzeile fuer name_key auf einmal, ohne jede Begrenzung -
+   Spieler, die nie unbenutzte Drops verkaufen/verschmelzen, sammeln ueber
+   Wochen zehntausende Zeilen an (bestaetigt: 7.541 bzw. 15.632 Zeilen bei
+   den beiden gemeldeten Accounts, jeweils nur 6 davon ausgeruestet). Eine
+   Antwort dieser Groesse (mehrere MB JSON, jede Zeile traegt zusaetzlich ein
+   substats-Array) schlaegt bei jedem Netzwerk-Haenger fehl (echter,
+   reproduzierter Konsolenfehler "sw.js: Failed to fetch" bei einem der
+   beiden Spieler) - idledorf.js's Ladefunktion setzte den kompletten
+   lokalen Runenbestand danach unconditional auf [] zurueck (nur ein
+   console.warn, dem Spieler nie angezeigt) - SIEHT fuer den Spieler wie
+   Datenverlust aus, obwohl in der Datenbank nachweislich nichts fehlt.
+   Fix, zweigeteilt (ersetzt den Aufruf oben im normalen Ladepfad, siehe
+   idledorf.js): ausgeruestete Runen sind IMMER hoechstens 6 Zeilen (ein
+   eigener, garantiert kleiner Abruf, der praktisch nie an der Groesse
+   scheitern kann) - der grosse, potenziell riesige Rest wird nur noch
+   BEGRENZT und nach Wert sortiert geladen (die wertvollsten zuerst, damit
+   ein gekapptes Ergebnis trotzdem die fuers Verschmelzen/Aufsteigen
+   interessanten Runen zeigt, nicht zufaellige). */
+async function loadEquippedPlayerRunes(name) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !name) return [];
+  const { data, error } = await client
+    .from('idle_player_runes')
+    .select('id, rune_type, rarity, rolled_value, equipped, upgrade_level, substats, created_at')
+    .eq('name_key', String(name).trim().toLowerCase())
+    .eq('equipped', true);
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+}
+
+async function loadUnequippedPlayerRunesCapped(name, limit) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !name) return [];
+  const { data, error } = await client
+    .from('idle_player_runes')
+    .select('id, rune_type, rarity, rolled_value, equipped, upgrade_level, substats, created_at')
+    .eq('name_key', String(name).trim().toLowerCase())
+    .eq('equipped', false)
+    .order('upgrade_level', { ascending: false })
+    .order('rolled_value', { ascending: false })
+    .limit(limit || 300);
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+}
+
+/* Fuer den neuen "Alle <Seltenheit> verkaufen"-Sammelverkauf (slot-
+   uebergreifend, siehe bkmpRuneSellAllByRarity in bkmp-runes.js) - holt
+   bewusst NUR die drei fuer bkmpRuneSellValue() noetigen Felder (kein
+   rune_type/created_at/name_key/auth_user_id), um die Antwortgroesse bei
+   einem sehr grossen Lager so klein wie moeglich zu halten. Kein
+   Zeilenlimit hier - dieser Aufruf laeuft nur bei einer bewussten,
+   einmaligen Spieler-Aktion (nicht bei jedem Laden), ein groesserer,
+   einmaliger Abruf ist dafuer vertretbar. */
+async function loadRunesForBulkSellByRarity(name, rarity) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !name || !rarity) return [];
+  const { data, error } = await client
+    .from('idle_player_runes')
+    .select('rolled_value, upgrade_level, substats')
+    .eq('name_key', String(name).trim().toLowerCase())
+    .eq('equipped', false)
+    .eq('rarity', rarity);
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
+}
+
+/* Loescht per FILTER (rarity+equipped=false), nicht per id-Liste - ein
+   ".in('id', [...])" mit zehntausenden Eintraegen waere selbst wieder ein
+   sehr grosser Request/URL. Owner-Schreibzugriff (RLS: auth_user_id =
+   auth.uid()) reicht als Sicherheit, name_key+rarity+equipped grenzen den
+   Filter zusaetzlich clientseitig ein. */
+async function deleteRunesByRarity(name, rarity) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client || !name || !rarity) return false;
+  const { error } = await client
+    .from('idle_player_runes')
+    .delete()
+    .eq('name_key', String(name).trim().toLowerCase())
+    .eq('equipped', false)
+    .eq('rarity', rarity);
+  if (error) throw error;
+  return true;
+}
+
 async function insertPlayerRunes(nameKey, runes) {
   if (!Array.isArray(runes) || !runes.length) return [];
   const client = bkmpGetPlayerAuthClient();

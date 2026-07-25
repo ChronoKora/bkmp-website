@@ -280,26 +280,70 @@ async function bkmpIdleLoadOrInitState(name) {
   }
   /* Runen sind ein Bonus-System oben drauf, kein Kernfortschritt wie
      bkmpIdleState/bkmpPrestigeState oben - ein Ladefehler blockiert das
-     Spiel deshalb bewusst NICHT, sondern startet einfach mit einem leeren
-     Runen-Lager (Migration evtl. noch nicht ausgefuehrt). */
-  bkmpIdlePlayerRunes = [];
-  bkmpIdlePendingRuneDrops = [];
-  try {
-    const remoteRunes = typeof loadPlayerRunes === 'function' ? await loadPlayerRunes(name) : [];
-    /* _cid: stabile CLIENT-seitige Kennung fuer UI-Referenzen (Ansehen/
-       Aufwerten/Ausruesten) - unabhaengig von .id, das bei frisch
-       gedroppten, noch nicht synchronisierten Runen zunaechst null ist
-       (siehe bkmpIdleMaybeDropRune). Bei geladenen Runen ist die echte DB-id
-       stabil, wird hier also 1:1 uebernommen. */
-    bkmpIdlePlayerRunes = Array.isArray(remoteRunes) ? remoteRunes.map(r => ({
+     Spiel deshalb bewusst NICHT.
+     BUGFIX 25.07.2026 (Spieler-Meldung "meine Runen sind komplett weg",
+     bestaetigt bei BagonTr01/Nilo3628, siehe CLAUDE.md): die fruehere
+     Fassung lud ALLE Runen-Zeilen unbegrenzt in EINEM Aufruf und setzte den
+     kompletten lokalen Bestand bei JEDEM Fehler (auch einem reinen
+     Netzwerk-Haenger) auf [] zurueck - nur ein stilles console.warn, nie dem
+     Spieler angezeigt. Bei einem sehr grossen, nie geleerten Lager (real
+     bestaetigt: 7.541 bzw. 15.632 Zeilen) wird die Server-Antwort mehrere MB
+     gross und scheitert dadurch bei jedem Netzwerk-Haenger deutlich
+     haeufiger (echter, reproduzierter Konsolenfehler "sw.js: Failed to
+     fetch" bei einem der beiden Spieler) - fuer den Spieler nicht von
+     echtem Datenverlust zu unterscheiden, obwohl in der Datenbank
+     nachweislich nichts fehlte.
+     Fix: zwei UNABHAENGIGE Ladevorgaenge statt einem. Ausgeruestete Runen
+     (garantiert hoechstens 6 Zeilen, praktisch nie zu gross zum Laden) und
+     das ungenutzte Lager (potenziell riesig, deshalb nach Wert gekappt -
+     siehe loadUnequippedPlayerRunesCapped) laufen in getrennten try/catch-
+     Bloecken. Schlaegt einer fehl, bleibt der jeweils ANDERE trotzdem
+     erhalten - der wichtigste Fall (Kampfausruestung) ist damit fast immer
+     sicher, selbst wenn das grosse Lager gerade nicht ladbar ist. KEIN
+     stilles Leeren mehr bei einem Fehler: bkmpIdleRuneLoadError signalisiert
+     dem Runen-Tab, einen sichtbaren Hinweis+Retry-Button statt eines leeren
+     Lagers zu zeigen. */
+  const BKMP_RUNE_INVENTORY_CAP = 300;
+  function bkmpIdleNormalizeRuneRow(r) {
+    return {
       ...r,
       _cid: r.id,
       upgrade_level: Number(r.upgrade_level || 0),
       substats: Array.isArray(r.substats) ? r.substats : []
-    })) : [];
+    };
+  }
+  let bkmpIdleLoadedEquippedRunes = null;
+  let bkmpIdleLoadedUnequippedRunes = null;
+  bkmpIdleRuneLoadError = false;
+  try {
+    bkmpIdleLoadedEquippedRunes = typeof loadEquippedPlayerRunes === 'function' ? await loadEquippedPlayerRunes(name) : [];
   } catch (e) {
-    console.warn('Idle Dorf: Runen konnten nicht geladen werden (Migration evtl. noch nicht ausgefuehrt - siehe supabase-idle-runes.sql / supabase-idle-runes-v2.sql).', e);
+    console.warn('Idle Dorf: ausgeruestete Runen konnten nicht geladen werden (Netzwerkfehler oder Migration evtl. noch nicht ausgefuehrt).', e);
+    bkmpIdleRuneLoadError = true;
+  }
+  try {
+    bkmpIdleLoadedUnequippedRunes = typeof loadUnequippedPlayerRunesCapped === 'function' ? await loadUnequippedPlayerRunesCapped(name, BKMP_RUNE_INVENTORY_CAP) : [];
+  } catch (e) {
+    console.warn('Idle Dorf: Runen-Lager konnte nicht geladen werden (Netzwerkfehler oder Migration evtl. noch nicht ausgefuehrt).', e);
+    bkmpIdleRuneLoadError = true;
+  }
+  bkmpIdleRuneInventoryCapped = Array.isArray(bkmpIdleLoadedUnequippedRunes) && bkmpIdleLoadedUnequippedRunes.length >= BKMP_RUNE_INVENTORY_CAP;
+  /* Nur ueberschreiben, was tatsaechlich (auch nur teilweise) geladen
+     werden konnte - bei einem KOMPLETTEN Fehlschlag (beide null) bleibt ein
+     bereits vorhandener bkmpIdlePlayerRunes-Bestand aus einer frueheren
+     Sitzung im selben Tab erhalten statt auf [] zu springen. Bei einem
+     echten Erstladen (noch nie zuvor befuellt) ist [] unvermeidlich korrekt. */
+  if (bkmpIdleLoadedEquippedRunes !== null || bkmpIdleLoadedUnequippedRunes !== null) {
+    bkmpIdlePlayerRunes = [
+      ...(Array.isArray(bkmpIdleLoadedEquippedRunes) ? bkmpIdleLoadedEquippedRunes : []),
+      ...(Array.isArray(bkmpIdleLoadedUnequippedRunes) ? bkmpIdleLoadedUnequippedRunes : [])
+    ].map(bkmpIdleNormalizeRuneRow);
+  } else if (!Array.isArray(bkmpIdlePlayerRunes)) {
     bkmpIdlePlayerRunes = [];
+  }
+  bkmpIdlePendingRuneDrops = [];
+  if (bkmpIdleRuneLoadError && typeof bkmpShowJannikToast === 'function') {
+    bkmpShowJannikToast('⚠️ Runen konnten nicht vollständig geladen werden - im Runen-Tab erneut versuchen.', 5000);
   }
   /* Bug-Fix 18.07.: heilt ungueltige Altzustaende (z.B. 2x Wuchtrune
      gleichzeitig ausgeruestet) automatisch bei jedem Laden, siehe

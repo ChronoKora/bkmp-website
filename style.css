@@ -4021,6 +4021,27 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
    aendert minimal die Breite - tabular-nums haelt auch das stabil. */
 .idle-runen-sell-all-btn, .idle-runen-autofuse-btn, .idle-runen-autoascend-btn { font-size: 0.76rem; padding: 0.4rem 0.7rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .idle-runen-sell-all-btn:disabled, .idle-runen-autofuse-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+/* Bugfix 25.07.2026 (Spieler-Meldung "meine Runen sind komplett weg" -
+   siehe idledorf.js/bkmp-runes.js Kommentare): Hinweis-Banner, wenn das
+   Lager an der Ladeobergrenze haengt oder das Laden (teilweise)
+   fehlgeschlagen ist, plus der neue slot-uebergreifende Sammelverkauf nach
+   Seltenheit. */
+.idle-runen-cap-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.6rem;
+  flex-wrap: wrap; font-size: 0.78rem; color: var(--muted);
+  background: rgba(249, 115, 22, 0.12); border: 1px solid rgba(249, 115, 22, 0.35);
+  border-radius: 10px; padding: 0.5rem 0.7rem; margin: 0.4rem 0 0.6rem;
+}
+.idle-runen-cap-banner .idle-runen-retry-btn { font-size: 0.74rem; padding: 0.3rem 0.6rem; white-space: nowrap; }
+.idle-runen-rarity-cleanup-row {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem;
+  margin: 0.4rem 0 0.6rem; font-size: 0.76rem;
+}
+.idle-runen-rarity-cleanup-label { color: var(--muted); margin-right: 0.2rem; white-space: nowrap; }
+.idle-runen-rarity-sell-btn {
+  font-size: 0.72rem; padding: 0.3rem 0.6rem; white-space: nowrap;
+  border-left: 3px solid var(--rune-color, var(--muted));
+}
 .idle-sammlung-count { font-size: 0.75rem; font-weight: 400; color: var(--muted); font-family: 'Inter', sans-serif; }
 .idle-title-bonus-list { display: grid; gap: 0.5rem; margin-top: 0.6rem; }
 .idle-title-bonus-list .achievement-row { align-items: center; }
@@ -9465,19 +9486,6 @@ html.bkmp-app-mode .raid-join-banner {
   min-height: 46px;
 }
 html.bkmp-app-mode .raid-join-banner-icon { flex: none; font-size: 1.1rem; line-height: 1; }
-html.bkmp-app-mode .raid-join-banner-minimize {
-  order: 99;
-  flex: none;
-  width: 22px; height: 22px;
-  display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 6px;
-  border: 1px solid color-mix(in srgb, var(--app-cyan) 35%, transparent);
-  background: rgba(255, 255, 255, .05);
-  color: var(--app-muted);
-  font-size: .75rem;
-  cursor: pointer;
-  padding: 0;
-}
 html.bkmp-app-mode .raid-join-banner-text {
   flex: 1 1 auto;
   min-width: 0;
@@ -9517,11 +9525,6 @@ html.bkmp-app-mode .raid-join-banner-joined {
   color: var(--app-green);
   font-size: .78rem;
 }
-/* Minimiert: nur Icon/Countdown/Beitreten-Button bleiben sichtbar (siehe
-   Auftrag "nur Icon, Countdown und Beitreten anzeigen") - Titel+
-   Teilnehmerzahl ausgeblendet, kein Layoutplatz dafuer reserviert. */
-html.bkmp-app-mode .raid-join-banner.raid-join-banner-minimized .raid-join-banner-text { display: none; }
-html.bkmp-app-mode .raid-join-banner.raid-join-banner-minimized { min-height: 0; padding: .35rem .6rem; }
 html.bkmp-app-mode .raid-join-banner.raid-urgent {
   border-color: var(--app-red);
   background: linear-gradient(120deg, rgba(255, 59, 92, .3), rgba(255, 140, 61, .14));

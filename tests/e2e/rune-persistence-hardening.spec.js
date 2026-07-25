@@ -116,34 +116,74 @@ test.describe('Bug 1 - Reload/Logout-Login/Prestige/Kontowechsel (Teststand C)',
 test.describe('Bug 1 - fehlgeschlagene/leere/verspaetete Ladeantwort schreibt NIE einen leeren Zustand zurueck (Teststand C)', () => {
   test.use({ teststand: 'C' });
 
-  test('einmalig fehlgeschlagene Runen-Ladeanfrage: Client zeigt fuer diese Sitzung leer, DB bleibt unangetastet, naechster Erfolgs-Ladevorgang zeigt wieder alle Runen', async ({ page, context, qaBaseURL, fixtureData, store }) => {
+  /* NACHTRAG 25.07.2026 (Fortsetzung derselben Untersuchung - siehe
+     tests/e2e/rune-inventory-scale.spec.js fuer den vollen Bericht): das
+     Laden lief zum Zeitpunkt dieses Tests noch als EIN EINZIGER Aufruf
+     (loadPlayerRunes) - ein Fehlschlag setzte bkmpIdlePlayerRunes damals
+     immer komplett auf [] zurueck, was der Test unten urspruenglich als
+     "sicheres, absturzfreies Verhalten" bestaetigte. GENAU dieses
+     Verhalten stellte sich aber als der eigentliche Bug heraus (siehe
+     idledorf.js's Ladeblock-Kommentar): bei echten Spielern mit einem sehr
+     grossen, nie geleerten Lager (bestaetigt: 7.541 bzw. 15.632 Zeilen bei
+     zwei realen Accounts) fuehrte GENAU dieser Rueckfall auf [] dazu, dass
+     das KOMPLETTE sichtbare Runen-Set nach einem simplen Netzwerk-Haenger
+     verschwand - fuer den Spieler nicht von echtem Datenverlust zu
+     unterscheiden. Der Ladepfad ist seitdem in ZWEI unabhaengige Aufrufe
+     aufgeteilt (ausgeruestete Runen + gekapptes Lager, siehe
+     loadEquippedPlayerRunes/loadUnequippedPlayerRunesCapped in supabase.js)
+     - ein Fehlschlag des EINEN loescht nicht mehr automatisch den ANDEREN.
+     Die beiden folgenden Tests ersetzen den alten, jetzt ueberholten Test
+     und pruefen stattdessen genau dieses neue, robustere Verhalten. */
+  test('ausgeruestete Runen schlagen fehl, das (kleine) Lager laedt trotzdem - kein Totalausfall mehr', async ({ page, context, qaBaseURL, fixtureData, store }) => {
     const runeCountBefore = store.tables.idle_player_runes.length;
-    let runesRequestCount = 0;
+    let equippedFailuresLeft = 1; // nur der ERSTE Versuch schlaegt fehl, siehe Reload-Teil unten
     await context.route('**/rest/v1/idle_player_runes*', async (route) => {
-      if (route.request().method() === 'GET') {
-        runesRequestCount += 1;
-        if (runesRequestCount === 1) {
-          return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'simulated transient failure' }) });
-        }
+      const url = route.request().url();
+      if (route.request().method() === 'GET' && url.includes('equipped=eq.true') && equippedFailuresLeft > 0) {
+        equippedFailuresLeft -= 1;
+        return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'simulated transient failure' }) });
       }
       return route.fallback();
     });
 
     await openAndLogin(page, qaBaseURL, fixtureData);
     await waitForDragonReady(page);
-    // Client zeigt fuer DIESE Sitzung korrekt ein leeres Lager (bkmpIdlePlayerRunes bleibt beim
-    // urspruenglichen []-Initialwert, siehe idledorf.js:285 + catch-Block) - kein Absturz.
-    expect(await runeLevels(page)).toEqual([]);
-    // ENTSCHEIDEND: die DB selbst wurde durch diesen Ladefehler NICHT veraendert - kein Delete/Upsert
-    // mit leerem Array laeuft irgendwo im Ladepfad (siehe idledorf.js:285-303, reiner In-Memory-Fallback).
+    // Ausgeruestete Runen fehlen fuer DIESE Sitzung (ihr eigener Abruf schlug fehl) - aber das
+    // (unabhaengig geladene) Lager ist trotzdem da, kein kompletter Blackout mehr.
+    const loadError = await page.evaluate(() => bkmpIdleRuneLoadError);
+    expect(loadError).toBe(true);
+    expect((await runeLevels(page)).length).toBeGreaterThan(0);
+    // DB bleibt in jedem Fall unangetastet - reiner Lesefehler, kein Schreibzugriff.
     expect(store.tables.idle_player_runes.length).toBe(runeCountBefore);
 
-    // Naechster (erfolgreicher) Ladevorgang zeigt wieder alle Runen - kein dauerhafter Schaden.
+    // Naechster (erfolgreicher) Ladevorgang zeigt wieder alle Runen inkl. Ausruestung.
     await page.reload();
     await page.locator('#idleDorfButton').click();
     await expect(page.locator('#idleDorfOverlay')).toHaveClass(/visible/, { timeout: 15000 });
     await waitForDragonReady(page);
     expect((await runeLevels(page)).length).toBe(runeCountBefore);
+    expect(await page.evaluate(() => bkmpIdleRuneLoadError)).toBe(false);
+  });
+
+  test('das (potenziell riesige) Lager schlägt fehl, die 6 ausgeruesteten Runen bleiben trotzdem sichtbar', async ({ page, context, qaBaseURL, fixtureData, store }) => {
+    const runeCountBefore = store.tables.idle_player_runes.length;
+    await context.route('**/rest/v1/idle_player_runes*', async (route) => {
+      const url = route.request().url();
+      if (route.request().method() === 'GET' && url.includes('equipped=eq.false')) {
+        return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'simulated transient failure' }) });
+      }
+      return route.fallback();
+    });
+
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    const loadError = await page.evaluate(() => bkmpIdleRuneLoadError);
+    expect(loadError).toBe(true);
+    // GENAU DAS ist der eigentliche Fix: die kampfrelevanten ausgeruesteten Runen bleiben sichtbar,
+    // selbst wenn das (potenziell riesige) restliche Lager gerade nicht ladbar ist.
+    const equipped = await page.evaluate(() => bkmpIdlePlayerRunes.filter(r => r.equipped).length);
+    expect(equipped).toBe(6); // Teststand C: alle 6 Slots real belegt
+    expect(store.tables.idle_player_runes.length).toBe(runeCountBefore);
   });
 
   test('leere Serverantwort (0 Zeilen, kein Fehler) wird korrekt als "keine Runen" behandelt, keine falsche Fehlermeldung, keine DB-Aenderung', async ({ page, context, qaBaseURL, fixtureData, store }) => {

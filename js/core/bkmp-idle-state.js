@@ -155,6 +155,17 @@ let bkmpIdleLastSeenSyncBlockedUntil = 0;
 
 let bkmpIdlePlayerRunes = [];
 let bkmpIdlePendingRuneDrops = [];
+/* Bugfix 25.07.2026 (siehe idledorf.js's Ladeblock + bkmpIdleRenderRunenPanel
+   in js/systems/bkmp-runes.js): true, sobald das ungenutzte Lager beim
+   Laden auf die Obergrenze gestossen ist (also sicher noch mehr Runen in
+   der Datenbank liegen, als lokal geladen wurden) - steuert den Hinweis-
+   Banner + die "Alle <Seltenheit> verkaufen"-Schnellaktionen im Runen-Tab. */
+let bkmpIdleRuneInventoryCapped = false;
+/* true, wenn der letzte Ladeversuch (teilweise) fehlgeschlagen ist - steuert
+   einen sichtbaren Hinweis im Runen-Tab statt eines rein stillen
+   console.warn (der bisherige Bug: der Spieler bekam davon nie etwas mit,
+   das leere/unvollstaendige Ergebnis sah wie echter Datenverlust aus). */
+let bkmpIdleRuneLoadError = false;
 let bkmpIdleRuneSyncTimer = null;
 /* Bug-Fix 20.07. (Spieler-Report "Bärli": Runen nach kurzem Raus-/
    Reintappen wieder unausgeruestet) - siehe bkmpRunePersistEquip() in
