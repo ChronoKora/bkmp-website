@@ -117,7 +117,44 @@ grant execute on function public.rename_player_account(text) to authenticated;
 -- Loeschung, keine Werteaenderung ausser name_key/display_name) - siehe
 -- CLAUDE.md-Bericht fuer die Empfehlung, dies erst nach Pruefung im
 -- Dashboard auszufuehren.
+--
+-- NACHBESSERUNG (25.07.2026, echter Fehlschlag beim ersten Ausfuehrungs-
+-- versuch: "duplicate key value violates unique constraint idle_player_
+-- runes_one_equipped_per_type", Key (thiano, slot3)): ein Spieler, der sich
+-- VOR diesem Fix mehrfach umbenannt hat, kann unter mehreren alten Namen
+-- JEWEILS eine eigene ausgeruestete Rune desselben Typs haben (jede alte
+-- Namensversion hatte ihren eigenen, lokal gueltigen "eine ausgeruestet pro
+-- Typ"-Zustand, siehe sql/20260718-fix-rune-duplicate-equip.sql). Ein
+-- blindes Zusammenfuehren aller alten Namen auf den aktuellen Namen in
+-- einem Schritt kollidiert dann mit genau dieser Regel. Schritt A loest das
+-- VORAB - identische Bereinigungslogik wie 20260718 (rechnerisch staerkste
+-- Rune bleibt ausgeruestet: Hauptwert*(1+Aufwertungsstufe*0.08), bei
+-- Gleichstand die aeltere Zeile), nur diesmal ueber ALLE Namensversionen
+-- desselben Spielers (auth_user_id) hinweg statt nur innerhalb eines
+-- einzelnen name_key. Fuer die grosse Mehrheit der Spieler (nie umbenannt,
+-- oder nur einmal ohne Konflikt) aendert Schritt A nichts - rein additive
+-- Absicherung, kein Risiko fuer bereits korrekte Spielstaende.
 -- ============================================================
+
+-- Schritt A: Ausruestungs-Konflikte VOR dem Zusammenfuehren aufloesen.
+with target as (
+  select
+    r.id,
+    row_number() over (
+      partition by ps.auth_user_id, r.rune_type
+      order by (r.rolled_value * (1 + r.upgrade_level * 0.08)) desc, r.created_at asc
+    ) as rn
+  from public.idle_player_runes r
+  join public.player_stats ps on ps.auth_user_id = r.auth_user_id
+  where r.equipped = true
+)
+update public.idle_player_runes r
+set equipped = false
+from target
+where r.id = target.id
+  and target.rn > 1;
+
+-- Schritt B: jetzt konfliktfrei - name_key auf den aktuellen Stand ziehen.
 update public.idle_player_runes r
 set name_key = ps.name_key
 from public.player_stats ps
@@ -143,7 +180,7 @@ set name_key = h.new_name_key, display_name = h.new_name
 from (
   select distinct on (lower(old_name)) lower(old_name) as old_name_key, lower(new_name) as new_name_key, new_name
   from public.player_name_history
-  order by lower(old_name), created_at desc
+  order by lower(old_name), changed_at desc
 ) h
 where p.name_key = h.old_name_key
   and not exists (
