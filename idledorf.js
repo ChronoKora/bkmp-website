@@ -1320,7 +1320,16 @@ const BKMP_IDLE_EFFECT_LABELS = {
   defense_pct: v => `+${v}% Verteidigung`,
   hp_pct: v => `+${v}% Leben`,
   crit_damage_pct: v => `+${v}% Krit-Schaden`,
-  prestige_point_bonus_pct: v => `+${v}% Prestige-Punkte`
+  prestige_point_bonus_pct: v => `+${v}% Prestige-Punkte`,
+  /* Bugfix 25.07.2026 (Nutzerbericht: Erfolg "Gildenboss-Bezwinger" zeigt
+     keinen erkennbaren Vorteil): boss_dmg_pct wird von zwei echten Titeln
+     genutzt (idletitle_guild_boss10/idletitle_raid_boss100 weiter unten in
+     dieser Datei), fehlte hier aber - bkmpIdleFormatTitleBonus() gab dadurch
+     lautlos '' zurueck, sowohl im Sammlung-Tab (bkmpIdleBuildTitleBonusListHtml)
+     als auch in der neuen Erfolgs-Karten-Anzeige (bkmpAchievementLinkedTitleBonus,
+     js/core/bkmp-site.js) - der Bonus existierte immer echt, war nur nirgends
+     als Text sichtbar. */
+  boss_dmg_pct: v => `+${v}% Bossschaden`
 };
 
 /* NACHBESSERUNG (Spieler-Wunsch 13.07.: "Sammlung und Erfolge sind 1zu1

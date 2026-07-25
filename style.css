@@ -3978,6 +3978,14 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 .achievement-title { font-weight: 700; font-size: 0.9rem; }
 .achievement-desc { font-size: 0.8rem; color: var(--muted); margin-top: 0.1rem; line-height: 1.4; }
 .achievement-unlocked-at { font-size: 0.7rem; color: var(--muted); opacity: 0.75; margin-top: 0.25rem; }
+/* Bugfix 25.07.2026 (Nutzerbericht "Gildenboss-Bezwinger" zeigt keinen
+   Vorteil) - macht den echten, bereits vorhandenen Titel-Bonus (siehe
+   bkmpAchievementLinkedTitleBonus in js/core/bkmp-site.js) auf der
+   Erfolgs-Karte sichtbar. Gesperrt-Zustand bewusst gedaempft (opacity),
+   nicht wie .achievement-desc komplett ausgegraut - der Bonuswert selbst
+   bleibt lesbar, auch wenn er noch nicht aktiv ist. */
+.achievement-bonus { font-size: 0.75rem; color: var(--gold); margin-top: 0.2rem; font-weight: 600; }
+.achievement-row.locked .achievement-bonus { opacity: 0.65; }
 .achievement-progress {
   margin-top: 0.4rem;
   height: 5px;

@@ -428,6 +428,16 @@ function bkmpRuneFindAscendFodder(rune) {
 function bkmpRuneAscend(cid) {
   const rune = bkmpIdlePlayerRunes.find(r => r._cid === cid);
   if (!rune || !bkmpIdleState || !bkmpRuneCanAscend(rune)) return;
+  /* Bugfix-Durchlauf 25.07.2026 (Nutzerbericht "Runen komplett weg", u.a.
+     Level 22/23): derselbe Race wie bereits bei bkmpRuneUpgrade/
+     bkmpRuneInstantUpgrade gefixt (siehe deren Kommentare) fehlte hier -
+     eine Rune ohne echte DB-id (frisch gedroppt/verschmolzen, Insert noch
+     nicht zurueck) haette ihren Aufstieg nur lokal erhalten (updatePlayerRune
+     Upgrade unten laeuft nur "if (rune.id)"); schliesst der Spieler den Tab
+     in genau diesem Fenster, war der Aufstieg serverseitig nie angekommen.
+     Erzwingt denselben sofortigen Speicherversuch statt auf den naechsten
+     Timer zu warten. */
+  if (!rune.id && typeof bkmpIdleFlushRuneSyncNow === 'function') bkmpIdleFlushRuneSyncNow().catch(() => {});
   const fodder = bkmpRuneFindAscendFodder(rune);
   if (!fodder) {
     if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`🌟 Brauchst eine zweite +${Number(rune.upgrade_level || 0)} Legendäre desselben Slots zum Verbrauchen.`, 3200);

@@ -39,6 +39,22 @@ const IDLE_GAME_CONFIG = [
   { key: 'rare_spawn', value: { chancePct: 8 } }
 ];
 
+/* Village-Skin-Katalog (idle_village_skins) - Phase 6 (25.07.2026), reale
+   Zeilen 1:1 aus den jeweiligen sql/supabase-idle-village-skins-*.sql-Dateien
+   uebernommen (id/unlock_type/Preise/Schwellenwerte-Hinweistexte), NICHT
+   erfunden - deckt jeden real existierenden unlock_type ab (free/purchase/
+   achievement/boss_drop/real_money/code). Nur eine repraesentative Auswahl
+   der ueber 16 echten Skins, nicht der komplette Katalog. */
+const IDLE_VILLAGE_SKINS = [
+  { id: 'standard', name: 'Standarddorf', description: 'Das gute alte Dorf, wie es schon immer aussah.', icon: '🏘️', image_file: 'assets/dragons/dorf.png', video_file: 'assets/village/startdorf.mp4', unlock_type: 'free', price_gold: 0, price_crystals: 0, price_eur_cents: 0, unlock_hint: '', sort_order: 0, frame_count: 1, frame_aspect_w: 2124, frame_aspect_h: 976, active: true },
+  { id: 'eisdorf', name: 'Eis Dorf', description: 'Ein vereistes Dorf inmitten glitzernder Schnee- und Eislandschaften.', icon: '❄️', image_file: '', video_file: 'assets/village/eisdorf.mp4', unlock_type: 'purchase', price_gold: 150000, price_crystals: 0, price_eur_cents: 0, unlock_hint: '', sort_order: 10, frame_count: 1, frame_aspect_w: 2458, frame_aspect_h: 844, active: true },
+  { id: 'pilzdorf', name: 'Pilzdorf', description: 'Ein leuchtendes Pilzdorf unter violettem Himmel - mit sanft schimmernden Ambiente-Details.', icon: '🍄', image_file: 'assets/village/pilzdorf.png', video_file: 'assets/village/pilzdorf.mp4', unlock_type: 'purchase', price_gold: 2500000, price_crystals: 0, price_eur_cents: 0, unlock_hint: '', sort_order: 1, frame_count: 3, frame_aspect_w: 2208, frame_aspect_h: 940, active: true },
+  { id: 'zerstoertesdorf', name: 'Zerstörtes Dorf', description: 'Die rauchenden Ruinen unzaehliger verlorener Schlachten gegen die Drachen.', icon: '🏚️', image_file: '', video_file: 'assets/village/zerstoertesdorf.mp4', unlock_type: 'achievement', price_gold: 0, price_crystals: 0, price_eur_cents: 0, unlock_hint: '15.000x gegen Drachen verloren.', sort_order: 6, frame_count: 1, frame_aspect_w: 2618, frame_aspect_h: 792, active: true },
+  { id: 'yakshasheimat', name: 'Yakshas Heimat', description: 'Das Reich des Drachenboss Yaksha.', icon: '👑', image_file: '', video_file: 'assets/village/yakshasheimat.mp4', unlock_type: 'boss_drop', price_gold: 0, price_crystals: 0, price_eur_cents: 0, unlock_hint: '50.000x den Boss Yaksha besiegen.', sort_order: 8, frame_count: 1, frame_aspect_w: 2344, frame_aspect_h: 886, active: true },
+  { id: 'steampunkdorf', name: 'Steampunk Dorf', description: 'Ein Dorf voller Zahnraeder, Dampfmaschinen und messingglaenzender Technik.', icon: '⚙️', image_file: '', video_file: 'assets/village/steampunkdorf.mp4', unlock_type: 'real_money', price_gold: 0, price_crystals: 0, price_eur_cents: 199, unlock_hint: '', sort_order: 12, frame_count: 1, frame_aspect_w: 16, frame_aspect_h: 9, active: true },
+  { id: 'kallejuniordorf', name: 'KalleJunior Dorf', description: 'Ein Dorf ganz im Zeichen von KalleJunior.', icon: '🏡', image_file: '', video_file: 'assets/village/kallejuniordorf.mp4', unlock_type: 'code', price_gold: 0, price_crystals: 0, price_eur_cents: 0, unlock_hint: 'Nur per Einlöse-Code erhältlich.', sort_order: 16, frame_count: 1, frame_aspect_w: 1912, frame_aspect_h: 1084, active: true }
+];
+
 const IDLE_SKILL_NODES = [
   { id: 'elem_fire', active: true, branch: 'magie', sort_order: 1, effect_type: 'elem_fire', effect_value_per_rank: 5, max_rank: 6 },
   { id: 'elem_lightning', active: true, branch: 'magie', sort_order: 2, effect_type: 'elem_lightning', effect_value_per_rank: 5, max_rank: 6 },
@@ -54,8 +70,9 @@ function cloneReferenceTables() {
   return {
     idle_dragons: IDLE_DRAGONS.map(d => ({ ...d })),
     idle_game_config: IDLE_GAME_CONFIG.map(c => ({ ...c })),
-    idle_skill_nodes: IDLE_SKILL_NODES.map(n => ({ ...n }))
+    idle_skill_nodes: IDLE_SKILL_NODES.map(n => ({ ...n })),
+    idle_village_skins: IDLE_VILLAGE_SKINS.map(s => ({ ...s }))
   };
 }
 
-module.exports = { IDLE_DRAGONS, IDLE_GAME_CONFIG, IDLE_SKILL_NODES, cloneReferenceTables };
+module.exports = { IDLE_DRAGONS, IDLE_GAME_CONFIG, IDLE_SKILL_NODES, IDLE_VILLAGE_SKINS, cloneReferenceTables };

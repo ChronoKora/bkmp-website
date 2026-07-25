@@ -340,6 +340,21 @@ function bkmpIdleRenderHud() {
     return;
   }
 
+  /* Bugfix 25.07.2026 (Nutzerbericht: "Effekte"-Schalter verschwindet ~1s
+     nach dem Oeffnen): der Portal-Kommentar unten ("ueberlebt die innerHTML-
+     Ersetzung unbeschadet") stimmt nur beim ALLERERSTEN Render, wo der
+     Button noch an seiner urspruenglichen statischen Position AUSSERHALB
+     von #idleDorfHud lebt. Ab dem zweiten Render ist er (durch genau
+     diesen Portal-Code) bereits ein Kind von #idleDorfHud - "hud.innerHTML
+     = ..." zerstoert dann den echten Knoten unwiderruflich, BEVOR die
+     spaetere "document.getElementById('idleFxModeBtn')"-Zeile ueberhaupt
+     laeuft (die findet danach nichts mehr). Fix: den Button IMMER zuerst
+     herausloesen (falls er gerade in #idleDorfHud haengt), bevor
+     innerHTML laeuft - "remove()" trennt nur die Elternbindung, zerstoert
+     das Element/seine Listener nicht. */
+  const fxBtnBeforeWipe = document.getElementById('idleFxModeBtn');
+  if (fxBtnBeforeWipe && hud.contains(fxBtnBeforeWipe)) fxBtnBeforeWipe.remove();
+
   hud.innerHTML = `
     <div class="idle-hud-top">
       <div class="idle-hud-level-badge"><span class="idle-hud-level-num">${bkmpIdleState.level}</span><span class="idle-hud-level-tag">Level</span></div>
@@ -370,19 +385,23 @@ function bkmpIdleRenderHud() {
   /* Phase 7.1 (21.07., Nutzer-Auftrag "Effektmodus darf keine eigene Zeile
      mehr belegen"): #idleFxModeBtn lebt statisch in index.html als
      Geschwister von .idle-stage-bar/.idle-battlefield (NICHT als Kind von
-     #idleDorfHud) - genau deshalb ueberlebt es die obige innerHTML-
-     Ersetzung unbeschadet und kann hier per Portal-Muster (identisch zu
+     #idleDorfHud) und wird hier per Portal-Muster (identisch zu
      #idleAppMoreSheet/#idleCombatLogSheet an anderer Stelle) in die frisch
-     gebaute .idle-hud-top eingehaengt werden, statt eine eigene 44px-Zeile
+     gebaute .idle-hud-top eingehaengt, statt eine eigene 44px-Zeile
      zwischen Stufenleiste und Schlachtfeld zu belegen. Muss bei JEDEM
      Hud-Render erneut passieren (nicht nur einmalig), weil .idle-hud-top
-     selbst jedes Mal neu erzeugt wird. Klick-Listener aus bkmpFxInit()
-     bleiben unangetastet (appendChild verschiebt das echte Element, keine
-     Kopie). Nur im Desktop-Zweig - die mobile/App-Kachel-Vorlage oben hat
-     bereits ihr eigenes Icon (#bkmpProtoChudFxBtn). */
-  const fxBtn = document.getElementById('idleFxModeBtn');
+     selbst jedes Mal neu erzeugt wird - siehe fxBtnBeforeWipe weiter oben,
+     das den echten Knoten VOR der innerHTML-Ersetzung heraustrennt, statt
+     sich (wie frueher) auf ein erneutes getElementById NACH der Ersetzung
+     zu verlassen (das Element ist ab dem zweiten Render bereits ein Kind
+     von #idleDorfHud - ein document.getElementById an dieser Stelle wuerde
+     ab dann immer null liefern, da innerHTML den Knoten laengst zerstoert
+     haette). Klick-Listener aus bkmpFxInit() bleiben unangetastet
+     (appendChild verschiebt das echte Element, keine Kopie). Nur im
+     Desktop-Zweig - die mobile/App-Kachel-Vorlage oben hat bereits ihr
+     eigenes Icon (#bkmpProtoChudFxBtn). */
   const hudTop = hud.querySelector('.idle-hud-top');
-  if (fxBtn && hudTop) hudTop.appendChild(fxBtn);
+  if (fxBtnBeforeWipe && hudTop) hudTop.appendChild(fxBtnBeforeWipe);
   /* PROTOTYP 2 (18.07., entfernbar): siehe Kommentar im App-Modus-Zweig
      oben - gleiches Prinzip fuer die Desktop-Vorlage. */
   if (typeof bkmpProtoChudRenderHud === 'function') bkmpProtoChudRenderHud();

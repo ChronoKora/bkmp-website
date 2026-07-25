@@ -163,10 +163,30 @@ const BKMP_DUNGEON_SEASONAL_BONUS_MULT = 1.5;
    Balance-Kommentar weiter unten) - linear pro Welle wachsend, mit
    rewardMult skaliert, +20% bei vollstaendigem Erfolg. Wird fuer alle
    "kontinuierlichen" Belohnungstypen (Gold/EXP/Fleisch/Frucht/Edelstein) als
-   Basis genutzt, nur der per-Welle-Basiswert unterscheidet sich je Typ. */
+   Basis genutzt, nur der per-Welle-Basiswert unterscheidet sich je Typ.
+
+   Bugfix-Durchlauf 25.07.2026 (Nutzerbericht "Edelstein-Dungeon auf
+   höchster Stufe gab keinen Loot"): der urspruengliche Aufruf hat
+   perWaveBase bereits VOR dem Aufruf hart auf eine Ganzzahl gerundet
+   (Math.round((s.attack||10)*0.005) im 'gem'-Zweig von
+   bkmpDungeonGrantReward), UND jede einzelne Welle hier innen wurde
+   zusaetzlich fuer sich gerundet - bei Edelsteinen ist der Koeffizient
+   (0.005) verglichen mit Gold (5)/EXP (3) klein genug, dass ein
+   durchschnittlicher/niedriger Angriffswert schon VOR jeder Multiplikation
+   auf exakt 0 abrundet und dadurch die GESAMTE Belohnung ueber alle Wellen
+   hinweg bei 0 bleibt (0 * irgendeine Wellenzahl/irgendein Multiplikator =
+   0) - unabhaengig davon, ob 10 oder 25 Wellen geschafft wurden. Exakt
+   dieselbe Bug-Klasse wie die bereits am 20.07. behobenen seltenen
+   Drachen-Drops in der Offline-Simulation ("bei ~0.08 erwarteten
+   Kristallen pro Kill wuerde Math.round() pro Kill sonst konsequent auf 0
+   abrunden") - hier wie dort: erst NACH der Summierung ueber alle Wellen
+   einmal runden, nicht pro Welle. Betrifft rechnerisch auch Gold/EXP/
+   Fleisch/Frucht, dort aber folgenlos (ihre Koeffizienten sind gross genug,
+   dass die Wellensumme praktisch nie auf 0 abrundet) - reine
+   Praezisionsverbesserung fuer diese, keine Balance-Aenderung. */
 function bkmpDungeonBaseAmount(perWaveBase, wavesCleared, rewardMult, success) {
   let total = 0;
-  for (let w = 1; w <= wavesCleared; w++) total += Math.round(perWaveBase * (1 + 0.08 * (w - 1)));
+  for (let w = 1; w <= wavesCleared; w++) total += perWaveBase * (1 + 0.08 * (w - 1));
   total = Math.round(total * rewardMult);
   if (success) total = Math.round(total * 1.2);
   return total;
@@ -308,7 +328,11 @@ function bkmpDungeonGrantReward(type, difficulty, wavesCleared, success, dailyBo
        Produktionsgebaeude (Kristallmine kostet pro Rate-Einheit ca. 266x so
        viel Gold wie die Goldmine, siehe BKMP_IDLE_PRODUCTION_BUILDINGS in
        idledorf.js) - keine willkuerlich frei erfundene Zahl. */
-    let gems = bkmpDungeonBaseAmount(Math.round((s.attack || 10) * 0.005), wavesCleared, difficulty.rewardMult, success);
+    /* KEIN Math.round() mehr auf den per-Welle-Basiswert VOR dem Aufruf (siehe
+       Bugfix-Kommentar an bkmpDungeonBaseAmount) - bei Koeffizient 0.005 rundet das
+       fuer viele reale Angriffswerte schon hier auf 0, wodurch die gesamte Belohnung
+       ueber alle Wellen hinweg bei 0 blieb. */
+    let gems = bkmpDungeonBaseAmount((s.attack || 10) * 0.005, wavesCleared, difficulty.rewardMult, success);
     summary.gems = Math.round(gems * dailyMult);
     summary.gold = bkmpDungeonBaseAmount(Math.round((s.attack || 10) * 1.2), wavesCleared, difficulty.rewardMult, success);
   } else if (type === 'egg') {

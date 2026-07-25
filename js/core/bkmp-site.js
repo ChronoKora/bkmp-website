@@ -4288,7 +4288,21 @@
       if (typeof bkmpSyncPlayerStats === 'function') bkmpSyncPlayerStats(unlockedCount, force);
     }
 
-    const BKMP_ACHIEVEMENT_CATEGORY_ORDER = ['Karten', 'Kartenideen', 'Zeit & Treue', 'Vielfalt', 'Bonk', 'Idle Dorf', 'Runen', 'Weltboss', 'Arena', 'Plüshies', 'Meilensteine', 'Easter Eggs', 'Sonstiges'];
+    /* Bug gefunden 25.07.2026 (Phase 6 QA, Erfolgssystem-Analyse): drei
+       Kategorien, die echte Erfolgs-Objekte tatsaechlich tragen ('Gilde' -
+       js/systems/bkmp-guild.js, 'Drachenzucht' - idledorf.js,
+       'Feedback' - 4 gestaffelte Gruppen weiter oben in dieser Datei),
+       fehlten hier komplett. renderAchievementsPanel() iteriert NUR ueber
+       diese feste Liste (filtert BKMP_ACHIEVEMENTS pro Eintrag) - Erfolge
+       mit einer hier fehlenden Kategorie zaehlten zwar korrekt zu
+       unlockedCount/BKMP_ACHIEVEMENTS.length, wurden aber NIE angezeigt,
+       liessen sich also nie einsehen (>30 betroffene Erfolge: 9x Gilde,
+       12x Drachenzucht, ~10-15x Feedback in 4 gestaffelten Gruppen). Reiner
+       Anzeige-Fix (keine Werte/Schwellen/Belohnungen geaendert) -
+       Regressionstest in tests/e2e/achievements.spec.js prueft seitdem,
+       dass JEDE in BKMP_ACHIEVEMENTS vorkommende category auch hier
+       gelistet ist. */
+    const BKMP_ACHIEVEMENT_CATEGORY_ORDER = ['Karten', 'Kartenideen', 'Zeit & Treue', 'Vielfalt', 'Bonk', 'Idle Dorf', 'Runen', 'Weltboss', 'Arena', 'Gilde', 'Drachenzucht', 'Plüshies', 'Meilensteine', 'Easter Eggs', 'Feedback', 'Sonstiges'];
     const bkmpAchievementCategoryOpen = {};
 
     function bkmpFormatRelativeTime(iso) {
@@ -4303,6 +4317,35 @@
       const days = Math.floor(hours / 24);
       if (days < 30) return `vor ${days} Tag${days === 1 ? '' : 'en'}`;
       return new Date(iso).toLocaleDateString('de-DE');
+    }
+
+    /* Bugfix-Durchlauf 25.07.2026 (Nutzerbericht: beim Erfolg "Gildenboss-
+       Bezwinger" ist nicht erkennbar, welchen Vorteil der Spieler erhaelt).
+       Befund: die Erfolgs-Definition selbst (BKMP_GUILD_ACHIEVEMENTS_EXTRA,
+       js/systems/bkmp-guild.js) traegt bewusst KEIN Belohnungsfeld (Kommentar
+       dort: "kein Titel/Kosmetik-Reward verknuepft, genau wie bei Weltboss/
+       Arena") - das stimmt fuer das Erfolgs-Objekt selbst, ignoriert aber,
+       dass es SEHR WOHL einen echten Dauerbonus gibt: window.BKMP_IDLE_TITLES
+       (idledorf.js) definiert einen gleichnamigen TITEL 'idletitle_guild_
+       boss10' mit effectType:'boss_dmg_pct', effectValue:4 (+4% Bossschaden,
+       dauerhaft bei jedem freigeschalteten Gildenboss-Titel aktiv, siehe
+       bkmpIdleTitleEffectTotals) - nur eben NIRGENDS auf der Erfolgs-Karte
+       selbst sichtbar, nur im separaten Titel-Tab. Betrifft nicht nur diesen
+       einen Erfolg: guild_member/guild_leader/guild_level_10 haben exakt
+       dasselbe Muster (identisch benannter Titel MIT echtem Bonus). Fix:
+       generische Verknuepfung ueber den Namen (die einzige im Code bereits
+       vorhandene, nicht erfundene Zuordnung - Erfolge referenzieren keine
+       Titel-ID) - macht den ECHTEN, bereits existierenden Bonus auf der
+       Erfolgs-Karte sichtbar, erfindet keinen neuen. Erfolge ohne
+       gleichnamigen Bonus-Titel (die meisten - z.B. reine Weltboss-/Arena-
+       Sammlungserfolge ohne Titel-Pendant) zeigen weiterhin korrekt gar
+       keinen Vorteilstext - das ist fuer sie kein Fehler, sondern korrekt
+       rein kosmetisch/Sammlung. */
+    function bkmpAchievementLinkedTitleBonus(achievement) {
+      if (!Array.isArray(window.BKMP_IDLE_TITLES)) return '';
+      const title = window.BKMP_IDLE_TITLES.find(t => t.name === achievement.title && t.effectType);
+      if (!title) return '';
+      return typeof bkmpIdleFormatTitleBonus === 'function' ? bkmpIdleFormatTitleBonus(title) : '';
     }
 
     function renderAchievementsPanel() {
@@ -4323,11 +4366,24 @@
         const rows = items.map(a => {
           const unlocked = bkmpAchievementUnlocked(a, ctx);
           const progress = a.progress ? a.progress(ctx) : null;
+          /* Bug gefunden 25.07.2026 (Phase 6 QA): bei progress[1]===0 (z.B.
+             "Streaming-Marathon", wenn aktuell kein Streamer konfiguriert
+             ist - eligible.length kann 0 sein) ergab progress[0]/progress[1]
+             eine Division durch 0 (NaN), Math.min(100, NaN) bleibt NaN -
+             der Fortschrittsbalken bekam ein ungueltiges "width:NaN%". Reiner
+             Anzeige-Fix (0 Ziel = 0% statt NaN%, passt zum check(ctx), das
+             fuer eligible.length===0 ebenfalls false/gesperrt liefert - kein
+             widerspruechliches "100% aber gesperrt"). */
+          const progressPct = progress && progress[1] > 0 ? Math.min(100, (progress[0] / progress[1]) * 100) : 0;
           const progressHtml = progress ? `
-            <div class="achievement-progress"><div class="achievement-progress-bar" style="width:${Math.min(100, (progress[0] / progress[1]) * 100)}%"></div></div>
+            <div class="achievement-progress"><div class="achievement-progress-bar" style="width:${progressPct}%"></div></div>
             <span class="achievement-progress-label">${Math.min(progress[0], progress[1])}/${progress[1]}</span>` : '';
           const displayTitle = unlocked && a.revealName ? a.revealName : a.title;
           const unlockedAtLabel = unlocked ? (bkmpFormatAchievementUnlockedAt(a.id) || 'Datum unbekannt') : '';
+          const linkedBonus = bkmpAchievementLinkedTitleBonus(a);
+          const bonusHtml = linkedBonus
+            ? `<div class="achievement-bonus">${unlocked ? '🏅' : '🔒'} Titel-Bonus: ${escapeHtml(linkedBonus)}${unlocked ? '' : ' (nach Freischaltung aktiv)'}</div>`
+            : '';
           return `
             <div class="achievement-row ${unlocked ? 'unlocked' : 'locked'}">
               ${newAchievementBadge(a.id)}
@@ -4335,6 +4391,7 @@
               <div class="achievement-body">
                 <div class="achievement-title">${escapeHtml(displayTitle)}</div>
                 <div class="achievement-desc">${a.hint ? escapeHtml(a.hint) : escapeHtml(a.desc)}</div>
+                ${bonusHtml}
                 ${unlocked ? `<div class="achievement-unlocked-at">Freigeschaltet am ${escapeHtml(unlockedAtLabel)}</div>` : ''}
                 ${progressHtml}
               </div>

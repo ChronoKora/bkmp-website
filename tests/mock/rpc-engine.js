@@ -216,7 +216,104 @@ function guildBossFinishInternal(store, instanceId, result) {
   });
 }
 
+/* Bugfix-Durchlauf 25.07.2026 (dringender Nutzerauftrag, siehe CLAUDE.md) -
+   originalgetreuer Port von rename_player_account() aus der zuletzt
+   ausgefuehrten Fassung sql/supabase-player-name-blocklist.sql (create or
+   replace ueber v2/v3 - diese Datei ist die aktuelle/massgebliche). Bewusst
+   1:1 inklusive der real existierenden LUECKE: aktualisiert player_stats/
+   idle_player_state/user_plushies/auth.users, aber NICHT idle_player_runes/
+   idle_prestige_state/idle_player_village_skins (alle drei filtern beim
+   Laden strikt nach name_key, siehe supabase.js loadPlayerRunes/
+   loadIdlePrestigeState/loadPlayerVillageSkins) - genau diese Luecke soll
+   der Reproduktionstest beweisen, bevor sie gefixt wird. is_name_blocked()
+   (separate, hier nicht sicherheitsrelevante Pruefung) bewusst NICHT
+   nachgebaut - fuer diesen Bug irrelevant. */
+function renamePlayerAccountCurrentBuggyBehavior(store, uid, params) {
+  const newName = String(params.p_new_name || '').trim();
+  const newKey = newName.toLowerCase();
+  if (!newKey || newKey.length > 32) throw rpcError('invalid_name');
+  const playerStats = getTable(store, 'player_stats');
+  const oldRow = playerStats.find(r => r.auth_user_id === uid);
+  if (!oldRow) throw rpcError('no_account');
+  if (oldRow.name_key === newKey) throw rpcError('same_name');
+  if (oldRow.last_name_change_at && (store.clock.nowMs() - Date.parse(oldRow.last_name_change_at)) < 30 * 24 * 3600 * 1000) {
+    throw rpcError('cooldown_active');
+  }
+  const conflict = playerStats.find(r => r.name_key === newKey);
+  if (conflict && conflict.auth_user_id !== uid) throw rpcError('name_taken');
+
+  const oldKey = oldRow.name_key;
+  const oldDisplayName = oldRow.display_name;
+  getTable(store, 'player_name_history').push({ id: store.nextId(), auth_user_id: uid, old_name: oldDisplayName, new_name: newName, created_at: store.clock.nowIso() });
+
+  oldRow.name_key = newKey;
+  oldRow.display_name = newName;
+  oldRow.last_name_change_at = store.clock.nowIso();
+
+  const stateRow = getTable(store, 'idle_player_state').find(r => r.auth_user_id === uid);
+  if (stateRow) { stateRow.name_key = newKey; stateRow.display_name = newName; }
+
+  getTable(store, 'user_plushies').filter(r => r.name_key === oldKey).forEach(r => { r.name_key = newKey; r.display_name = newName; });
+
+  const authUser = [...store.authUsersByEmail.values()].find(u => u.id === uid);
+  if (authUser) authUser.user_metadata = { ...(authUser.user_metadata || {}), display_name: newName };
+
+  // ABSICHTLICH NICHT aktualisiert (siehe Funktionskommentar) - idle_player_runes/idle_prestige_state/idle_player_village_skins.
+  return null;
+}
+
+/* Originalgetreuer Port des VORGESCHLAGENEN Fixes (sql/20260725-fix-rename-
+   name-key-propagation.sql, NICHT gegen die echte Produktions-DB
+   ausgefuehrt) - identisch zu renamePlayerAccountCurrentBuggyBehavior oben,
+   nur mit den drei zusaetzlichen UPDATEs aus der neuen Migration. Absichtlich
+   NICHT unter dem echten RPC-Namen registriert (der echte Produktionscode
+   soll weiterhin die aktuell tatsaechlich deployte, fehlerhafte Fassung
+   durchlaufen) - nur ueber den Test-Namen 'rename_player_account_fixed_
+   preview' erreichbar, ausschliesslich fuer den Beweis, dass die
+   vorgeschlagene Migration die Luecke tatsaechlich schliesst, BEVOR der
+   Nutzer sie live ausfuehrt. */
+function renamePlayerAccountFixedPreview(store, uid, params) {
+  const newName = String(params.p_new_name || '').trim();
+  const newKey = newName.toLowerCase();
+  if (!newKey || newKey.length > 32) throw rpcError('invalid_name');
+  const playerStats = getTable(store, 'player_stats');
+  const oldRow = playerStats.find(r => r.auth_user_id === uid);
+  if (!oldRow) throw rpcError('no_account');
+  if (oldRow.name_key === newKey) throw rpcError('same_name');
+  if (oldRow.last_name_change_at && (store.clock.nowMs() - Date.parse(oldRow.last_name_change_at)) < 30 * 24 * 3600 * 1000) {
+    throw rpcError('cooldown_active');
+  }
+  const conflict = playerStats.find(r => r.name_key === newKey);
+  if (conflict && conflict.auth_user_id !== uid) throw rpcError('name_taken');
+
+  const oldKey = oldRow.name_key;
+  const oldDisplayName = oldRow.display_name;
+  getTable(store, 'player_name_history').push({ id: store.nextId(), auth_user_id: uid, old_name: oldDisplayName, new_name: newName, created_at: store.clock.nowIso() });
+
+  oldRow.name_key = newKey;
+  oldRow.display_name = newName;
+  oldRow.last_name_change_at = store.clock.nowIso();
+
+  const stateRow = getTable(store, 'idle_player_state').find(r => r.auth_user_id === uid);
+  if (stateRow) { stateRow.name_key = newKey; stateRow.display_name = newName; }
+
+  getTable(store, 'user_plushies').filter(r => r.name_key === oldKey).forEach(r => { r.name_key = newKey; r.display_name = newName; });
+
+  // NEU (25.07.2026-Fix): dieselben drei Systeme, die die Buggy-Fassung uebersehen hat.
+  getTable(store, 'idle_player_runes').filter(r => r.name_key === oldKey).forEach(r => { r.name_key = newKey; });
+  getTable(store, 'idle_prestige_state').filter(r => r.name_key === oldKey).forEach(r => { r.name_key = newKey; r.display_name = newName; });
+  getTable(store, 'idle_player_village_skins').filter(r => r.name_key === oldKey).forEach(r => { r.name_key = newKey; });
+
+  const authUser = [...store.authUsersByEmail.values()].find(u => u.id === uid);
+  if (authUser) authUser.user_metadata = { ...(authUser.user_metadata || {}), display_name: newName };
+
+  return null;
+}
+
 const RPC_HANDLERS = {
+  rename_player_account(store, uid, params) { return renamePlayerAccountCurrentBuggyBehavior(store, uid, params); },
+  rename_player_account_fixed_preview(store, uid, params) { return renamePlayerAccountFixedPreview(store, uid, params); },
+
   dungeon_get_all_status(store, uid) {
     const nameKey = findNameKeyForUid(store, uid);
     if (!nameKey) throw rpcError('no_player_state');
