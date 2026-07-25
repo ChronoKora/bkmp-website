@@ -57,6 +57,11 @@ let bkmpIdleLoopTimerMs = 900;
 let bkmpIdleModalOpen = false;
 let bkmpIdleSyncPending = false;
 let bkmpIdleSyncTimer = null;
+/* Serialisiert ueberlappende bkmpIdleFlushSync()-Aufrufe (siehe dortiger
+   Kommentar) - haelt die Promise des GERADE laufenden Speichervorgangs, damit
+   ein zweiter, waehrenddessen gestarteter Aufruf zuerst darauf wartet statt
+   einen eigenen, parallelen Netzwerk-Request loszuschicken. */
+let bkmpIdleFlushInFlight = null;
 let bkmpIdleLastSaveFailToastAt = 0;
 let bkmpIdleConfigLoaded = false;
 /* Sieg-Status der seltenen Event-Drachen (siehe supabase-idle-event-

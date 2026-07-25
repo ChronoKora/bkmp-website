@@ -401,12 +401,58 @@ const RPC_HANDLERS = {
          ersetzt die fest-20-Version aus den jeweiligen Basisdateien)
        - request_guild_join/cancel_guild_join_request: sql/supabase-guild-
          join-requests.sql (unveraendert von dort - keine neuere Fassung)
-       - leave_guild/kick_guild_member/set_guild_member_role/contribute_gold:
-         sql/supabase-idle-guilds.sql (Basisversion ist hier bereits die
-         einzige/aktuelle - keine spaetere Datei ersetzt sie)
-     Bewusst NICHT portiert (siehe tests/FEATURE_MATRIX.md/CLAUDE.md): Einlade-
-     Codes, Gilden-Chat, Gildenplatz-Kauf, Technologie-Baum, taegliche Quests,
-     Gildenboss - eigener, groesserer Umfang, fuer eine spaetere Stufe. */
+
+     Phase 5 (24.07.2026, siehe CLAUDE.md) - Reihenfolge der Gildensystem-
+     SQL-Dateien per Inhalt rekonstruiert (git-Commit-Zeitstempel sind fuer
+     ALLE Dateien identisch - Sammel-Import am 19.07., keine Aussagekraft
+     ueber die tatsaechliche Entstehungsreihenfolge). Eigene, im Dateikopf
+     hinterlegte "Phase A/D/E/F/G"-Kennzeichnung + explizite "Baut auf ...
+     auf"-Abhaengigkeitshinweise ergeben zusammen eine eindeutige Kette:
+     extension-foundation(A) -> idle-guilds-settings-chat (Chat+Sichtbarkeit/
+     Einladungscode-Grundlage, KEIN Phase-Buchstabe) -> guild-roles-veteran(D,
+     fuehrt die Veteran-Rolle ein UND redefiniert zwei Funktionen aus der
+     Chat-Datei) -> guild-tech-tree(E) -> guild-quests(F) [+ guild-quests-fix.sql
+     + guild-quest-contribute-fix.sql, beide inhaltlich reine Bugfixes ohne
+     eigene Phase-Kennzeichnung] -> guild-join-requests.sql (nennt explizit
+     ALLE vier vorherigen Dateien als Abhaengigkeit) -> guild-extra-slots.sql
+     (G folgt separat als Gildenboss, siehe Phase 4) - portiert:
+       - set_guild_member_role: sql/supabase-guild-roles-veteran.sql (fuegt
+         'veteran' als gueltige Zielrolle hinzu - ersetzt die reine
+         officer/member-Fassung aus supabase-idle-guilds.sql. ECHTER
+         Mock-Nachzuegler-Fund: der bestehende Phase-3-Mock nutzte noch die
+         AELTERE, veteran-unbewusste Fassung - siehe Root-Cause-Kommentar
+         direkt am gefixten Handler unten).
+       - get_my_guild_invite_code: sql/supabase-guild-roles-veteran.sql
+         (leader/officer/veteran duerfen einsehen - ersetzt die reine
+         Anfuehrer-Fassung aus supabase-idle-guilds-settings-chat.sql).
+       - regenerate_guild_invite_code/update_guild_settings: sql/supabase-
+         idle-guilds-settings-chat.sql (keine spaetere Fassung gefunden -
+         bleibt Anfuehrer-exklusiv, absichtlich NICHT auf Veteran erweitert,
+         siehe Dateikommentar dort: "Den Code neu zu ERZEUGEN bleibt bewusst
+         Anfuehrer-exklusiv").
+       - send_guild_chat_message/delete_guild_chat_message: erstere aus
+         supabase-idle-guilds-settings-chat.sql (keine spaetere Fassung),
+         letztere komplett NEU aus supabase-guild-roles-veteran.sql (Veteran-
+         Moderationsrecht, existierte vorher gar nicht).
+       - guild_tech_upgrade: sql/supabase-guild-tech-tree.sql (einzige
+         Fassung).
+       - guild_quest_ensure_today/guild_quest_contribute: sql/supabase-guild-
+         quest-contribute-fix.sql ist die massgebliche Fassung fuer
+         contribute (stiller No-Op statt Exception bei fehlender
+         Mitgliedschaft, numeric+round() statt direktem bigint-Cast fuer
+         Dezimalwerte) - ensure_today aus supabase-guild-quests-fix.sql
+         (inhaltlich identisch zur bereits im Basis-File dokumentierten
+         Ambiguitaets-Korrektur).
+       - buy_guild_slot: sql/supabase-guild-extra-slots.sql (einzige
+         Fassung).
+       - leave_guild/kick_guild_member/contribute_gold: sql/supabase-idle-
+         guilds.sql (Basisversion ist hier bereits die einzige/aktuelle -
+         keine spaetere Datei ersetzt sie)
+     Bewusst NICHT portiert (ausserhalb des Phase-5-Auftragsumfangs):
+     update_guild_banner/update_guild_goal (sql/supabase-guild-banner.sql,
+     sql/supabase-guild-goal.sql - rein kosmetische Zusatzfelder, nicht Teil
+     der 5 angefragten Systeme), Gildenchat-Realtime-Zustellung (siehe
+     eigener Kommentar bei send_guild_chat_message unten). */
   create_guild(store, uid, params) {
     const name = String(params.p_name || '').trim();
     const tag = String(params.p_tag || '').trim().toUpperCase();
@@ -526,10 +572,20 @@ const RPC_HANDLERS = {
     return null;
   },
 
+  /* Phase 5 (24.07.2026) - Root-Cause-Fund: dieser Handler stammte noch aus
+     Phase 3 (portiert aus der Basisversion in sql/supabase-idle-guilds.sql,
+     die nur 'officer'/'member' als gueltige Zielrolle kennt) - zu diesem
+     Zeitpunkt war supabase-guild-roles-veteran.sql (fuehrt 'veteran' ein
+     und redefiniert genau diese Funktion) noch nicht beruecksichtigt worden.
+     Reiner Mock-Nachzuegler, kein Bug im echten App-/SQL-Code (beide waren
+     immer schon konsistent zueinander) - ohne diesen Fix wuerde JEDE
+     Befoerderung zu Veteran im Mock faelschlich mit invalid_role scheitern,
+     obwohl BKMP_GUILD_ROLE_LADDER (bkmp-guild.js) das als echten,
+     regulaeren Schritt anbietet. */
   set_guild_member_role(store, uid, params) {
     const targetUid = params.p_target_auth_user_id;
     const newRole = params.p_new_role;
-    if (!['officer', 'member'].includes(newRole)) throw rpcError('invalid_role');
+    if (!['officer', 'veteran', 'member'].includes(newRole)) throw rpcError('invalid_role');
     const members = getTable(store, 'guild_members');
     const me = members.find(m => m.auth_user_id === uid && m.role === 'leader');
     if (!me) throw rpcError('not_authorized');
@@ -615,6 +671,264 @@ const RPC_HANDLERS = {
       if (r.auth_user_id === req.auth_user_id && r.status === 'pending' && r.id !== requestId) {
         r.status = 'cancelled';
         r.decided_at = store.clock.nowIso();
+      }
+    });
+    return null;
+  },
+
+  /* Phase 5 (24.07.2026, siehe CLAUDE.md) - Einladungen/Sichtbarkeit
+     (sql/supabase-idle-guilds-settings-chat.sql + sql/supabase-guild-roles-
+     veteran.sql, siehe Herleitungs-Kommentar oben bei create_guild). */
+  get_my_guild_invite_code(store, uid) {
+    const members = getTable(store, 'guild_members');
+    const me = members.find(m => m.auth_user_id === uid && ['leader', 'officer', 'veteran'].includes(m.role));
+    if (!me) throw rpcError('not_authorized');
+    const guild = getTable(store, 'guilds').find(g => g.id === me.guild_id);
+    return guild ? (guild.invite_code || null) : null;
+  },
+
+  regenerate_guild_invite_code(store, uid) {
+    const members = getTable(store, 'guild_members');
+    const me = members.find(m => m.auth_user_id === uid && m.role === 'leader');
+    if (!me) throw rpcError('not_authorized');
+    const guild = getTable(store, 'guilds').find(g => g.id === me.guild_id);
+    const code = Math.random().toString(36).slice(2, 10).toUpperCase().padEnd(8, 'X').slice(0, 8);
+    guild.invite_code = code;
+    return code;
+  },
+
+  update_guild_settings(store, uid, params) {
+    const members = getTable(store, 'guild_members');
+    const me = members.find(m => m.auth_user_id === uid && m.role === 'leader');
+    if (!me) throw rpcError('not_authorized');
+    const guild = getTable(store, 'guilds').find(g => g.id === me.guild_id);
+    const description = String(params.p_description == null ? '' : params.p_description).trim().slice(0, 200);
+    const isPublic = !!params.p_is_public;
+    let code = null;
+    if (!isPublic) {
+      code = guild.invite_code || (Math.random().toString(36).slice(2, 10).toUpperCase().padEnd(8, 'X').slice(0, 8));
+    }
+    guild.description = description;
+    guild.is_public = isPublic;
+    guild.invite_code = code || guild.invite_code || null;
+    return code;
+  },
+
+  join_guild_by_code(store, uid, params) {
+    const code = String(params.p_code || '').trim().toUpperCase();
+    const members = getTable(store, 'guild_members');
+    if (members.some(m => m.auth_user_id === uid)) throw rpcError('already_in_guild');
+    const player = getTable(store, 'idle_player_state').find(r => r.auth_user_id === uid);
+    if (!player) throw rpcError('no_idle_state');
+    const guild = getTable(store, 'guilds').find(g => g.invite_code === code);
+    if (!guild) throw rpcError('invalid_code');
+    if (guild.member_count >= 20 + (guild.bonus_member_slots || 0)) throw rpcError('guild_full');
+
+    members.push({
+      auth_user_id: uid, guild_id: guild.id, name_key: player.name_key,
+      display_name: player.display_name, role: 'member', contributed_gold: 0, joined_at: store.clock.nowIso()
+    });
+    guild.member_count += 1;
+    getTable(store, 'guild_activity_log').push({ id: store.nextId(), guild_id: guild.id, kind: 'join', actor_name: player.display_name, created_at: store.clock.nowIso() });
+    return guild.id;
+  },
+
+  /* Phase 5 (24.07.2026) - Gildenchat (sql/supabase-idle-guilds-settings-
+     chat.sql + delete_guild_chat_message aus sql/supabase-guild-roles-
+     veteran.sql). Bewusst KEIN echtes Realtime-Ereignis ausgeloest -
+     bkmpSubscribeToGuildChat() (supabase.js) haengt an postgres_changes auf
+     guild_chat_messages; der lokale Mock-Realtime-Server (siehe
+     tests/mock/server.js) akzeptiert WebSocket-Verbindungen nur still ohne
+     jedes Message-Framing (identisches, bereits etabliertes Prinzip wie bei
+     Raid/Gildenboss) - ein Test, der auf ein Live-Update wartet, wuerde
+     also nie eins bekommen; alle Chat-Tests lesen stattdessen ueber
+     loadGuildChatMessages()/window.bkmpGuildGetChatMessages() erneut, exakt
+     wie ein Spieler es nach einem manuellen Neuladen des Panels saehe. */
+  send_guild_chat_message(store, uid, params) {
+    const message = String(params.p_message == null ? '' : params.p_message).trim();
+    if (!message || message.length > 300) throw rpcError('invalid_message');
+    const members = getTable(store, 'guild_members');
+    const me = members.find(m => m.auth_user_id === uid);
+    if (!me) throw rpcError('not_in_guild');
+    getTable(store, 'guild_chat_messages').push({
+      id: 'qa-chatmsg-' + store.nextId(), guild_id: me.guild_id, auth_user_id: uid,
+      display_name: me.display_name, message, created_at: store.clock.nowIso()
+    });
+    return null;
+  },
+
+  delete_guild_chat_message(store, uid, params) {
+    const messageId = params.p_message_id;
+    const members = getTable(store, 'guild_members');
+    const me = members.find(m => m.auth_user_id === uid);
+    if (!me || !['leader', 'officer', 'veteran'].includes(me.role)) throw rpcError('not_authorized');
+    const messages = getTable(store, 'guild_chat_messages');
+    const msg = messages.find(m => m.id === messageId);
+    if (!msg || msg.guild_id !== me.guild_id) throw rpcError('not_a_member');
+    messages.splice(messages.indexOf(msg), 1);
+    return null;
+  },
+
+  /* Phase 5 (24.07.2026) - Gilden-Technologie (sql/supabase-guild-tech-
+     tree.sql, einzige Fassung). 9 gueltige tech_id-Werte + Kostenkurve
+     (200000 * 1,4^Stufe) serverseitig hart hinterlegt, exakt wie im echten
+     SQL - dem Client wird nie vertraut. */
+  guild_tech_upgrade(store, uid, params) {
+    const techId = params.p_tech_id;
+    const validTechIds = ['attack', 'defense', 'gold', 'crit_chance', 'crit_damage', 'boss_damage', 'rune_luck', 'xp', 'prestige'];
+    if (!validTechIds.includes(techId)) throw rpcError('invalid_tech');
+    const members = getTable(store, 'guild_members');
+    const me = members.find(m => m.auth_user_id === uid);
+    if (!me || !['leader', 'officer'].includes(me.role)) throw rpcError('not_authorized');
+    const guild = getTable(store, 'guilds').find(g => g.id === me.guild_id);
+
+    const levels = getTable(store, 'guild_tech_levels');
+    let levelRow = levels.find(r => r.guild_id === me.guild_id && r.tech_id === techId);
+    const currentLevel = levelRow ? Number(levelRow.level || 0) : 0;
+    if (currentLevel >= 20) throw rpcError('max_level');
+
+    const cost = Math.round(200000 * Math.pow(1.4, currentLevel));
+    const treasury = Number(guild.treasury_gold || 0);
+    if (treasury < cost) throw rpcError('insufficient_treasury');
+
+    guild.treasury_gold = treasury - cost;
+    if (levelRow) levelRow.level = currentLevel + 1;
+    else { levelRow = { guild_id: me.guild_id, tech_id: techId, level: 1 }; levels.push(levelRow); }
+
+    getTable(store, 'guild_activity_log').push({
+      id: store.nextId(), guild_id: me.guild_id, kind: 'tech_upgrade',
+      actor_name: me.display_name, value: levelRow.level, extra: techId, created_at: store.clock.nowIso()
+    });
+    return { new_level: levelRow.level, treasury_gold: guild.treasury_gold };
+  },
+
+  /* Phase 5 (24.07.2026) - Gildenplaetze dazukaufen (sql/supabase-guild-
+     extra-slots.sql, einzige Fassung). Gleiches Rechte-/Kosten-Prinzip wie
+     guild_tech_upgrade oben. */
+  buy_guild_slot(store, uid) {
+    const members = getTable(store, 'guild_members');
+    const me = members.find(m => m.auth_user_id === uid);
+    if (!me || !['leader', 'officer'].includes(me.role)) throw rpcError('not_authorized');
+    const guild = getTable(store, 'guilds').find(g => g.id === me.guild_id);
+
+    const currentBonus = Number(guild.bonus_member_slots || 0);
+    if (currentBonus >= 10) throw rpcError('max_slots');
+
+    const cost = Math.round(400000 * Math.pow(1.5, currentBonus));
+    const treasury = Number(guild.treasury_gold || 0);
+    if (treasury < cost) throw rpcError('insufficient_treasury');
+
+    guild.treasury_gold = treasury - cost;
+    guild.bonus_member_slots = currentBonus + 1;
+
+    getTable(store, 'guild_activity_log').push({
+      id: store.nextId(), guild_id: me.guild_id, kind: 'slot_purchase',
+      actor_name: me.display_name, value: 20 + guild.bonus_member_slots, created_at: store.clock.nowIso()
+    });
+    return { new_bonus_slots: guild.bonus_member_slots, treasury_gold: guild.treasury_gold };
+  },
+
+  /* Phase 5 (24.07.2026) - Taegliche Gildenquests. guild_quest_ensure_today:
+     sql/supabase-guild-quests-fix.sql (Ambiguitaets-Fix, inhaltlich
+     identisch zur bereits im Basis-File dokumentierten Loesung).
+     guild_quest_contribute: sql/supabase-guild-quest-contribute-fix.sql
+     (massgebliche Fassung - stiller No-Op statt Exception bei fehlender
+     Mitgliedschaft, numeric+round() Delta-Parsing statt direktem
+     bigint-Cast). "3 Quests/Tag, zufaellig aus 4 Typen" nutzt store.rng()
+     (seedbar, faellt ohne Seed auf Math.random() zurueck - identisches
+     Prinzip wie arena_attack() in Phase 3) statt echtem Math.random()
+     direkt, damit ein Test bei Bedarf einen festen Seed fuer eine
+     vorhersagbare Quest-Auswahl setzen kann. */
+  guild_quest_ensure_today(store, uid) {
+    const members = getTable(store, 'guild_members');
+    const me = members.find(m => m.auth_user_id === uid);
+    if (!me) throw rpcError('not_in_guild');
+    const today = berlinDateStr(store.clock.nowMs());
+    const quests = getTable(store, 'guild_daily_quests');
+    const existing = quests.filter(q => q.guild_id === me.guild_id && q.quest_date === today);
+    if (existing.length === 0) {
+      const types = ['dragon_kills', 'gold_earned', 'arena_wins', 'prestige_ups'];
+      const pool = types.slice();
+      const chosen = [];
+      for (let i = 0; i < 3 && pool.length; i++) {
+        const idx = Math.floor(store.rng() * pool.length);
+        chosen.push(pool.splice(idx, 1)[0]);
+      }
+      const targetFor = (type) => {
+        switch (type) {
+          case 'dragon_kills': return 300 + Math.floor(store.rng() * 500);
+          case 'gold_earned': return 1000000 + Math.floor(store.rng() * 4000000);
+          case 'arena_wins': return 50 + Math.floor(store.rng() * 100);
+          case 'prestige_ups': return 5 + Math.floor(store.rng() * 15);
+          default: return 0;
+        }
+      };
+      chosen.forEach((type, i) => {
+        quests.push({
+          id: 'qa-quest-' + store.nextId(), guild_id: me.guild_id, quest_date: today,
+          quest_type: type, target: targetFor(type), progress: 0, tier: i + 1,
+          completed: false, created_at: store.clock.nowIso()
+        });
+      });
+    }
+    return quests
+      .filter(q => q.guild_id === me.guild_id && q.quest_date === today)
+      .sort((a, b) => a.tier - b.tier)
+      .map(q => ({ id: q.id, quest_type: q.quest_type, target: q.target, progress: q.progress, tier: q.tier, completed: q.completed }));
+  },
+
+  guild_quest_contribute(store, uid, params) {
+    const members = getTable(store, 'guild_members');
+    const me = members.find(m => m.auth_user_id === uid);
+    if (!me) return null; // stiller No-Op, siehe Dateikommentar (quest-contribute-fix.sql)
+    const today = berlinDateStr(store.clock.nowMs());
+    const quests = getTable(store, 'guild_daily_quests');
+    const deltas = params.p_deltas && typeof params.p_deltas === 'object' ? params.p_deltas : {};
+
+    Object.keys(deltas).forEach(key => {
+      const rawDelta = Number(deltas[key]);
+      const delta = Number.isFinite(rawDelta) ? Math.round(rawDelta) : NaN;
+      if (!Number.isFinite(delta) || delta <= 0) return;
+
+      const quest = quests.find(q => q.guild_id === me.guild_id && q.quest_date === today && q.quest_type === key && !q.completed);
+      if (!quest) return;
+
+      const newProgress = Math.min(quest.target, quest.progress + delta);
+      const justCompleted = newProgress >= quest.target;
+      quest.progress = newProgress;
+      quest.completed = justCompleted;
+
+      if (justCompleted) {
+        getTable(store, 'guild_activity_log').push({ id: store.nextId(), guild_id: me.guild_id, kind: 'quest_completed', extra: key, created_at: store.clock.nowIso() });
+        const rewardGold = quest.tier === 1 ? 2000 : quest.tier === 2 ? 6000 : 15000;
+        const rewardCrystals = quest.tier === 1 ? 20 : quest.tier === 2 ? 50 : 100;
+        const guildMembers = members.filter(m => m.guild_id === me.guild_id);
+        const playerStates = getTable(store, 'idle_player_state');
+        const runes = getTable(store, 'idle_player_runes');
+        const prestigeStates = getTable(store, 'idle_prestige_state');
+        guildMembers.forEach(member => {
+          const ps = playerStates.find(p => p.auth_user_id === member.auth_user_id);
+          if (ps) { ps.gold = Number(ps.gold || 0) + rewardGold; ps.crystals = Number(ps.crystals || 0) + rewardCrystals; }
+          if (quest.tier === 2) {
+            for (let i = 0; i < 2; i++) {
+              const rarity = store.rng() < 0.5 ? 'blue' : 'purple';
+              runes.push({
+                id: 'qa-quest-rune-' + store.nextId(), name_key: member.name_key, auth_user_id: member.auth_user_id,
+                rune_type: 'slot' + (1 + Math.floor(store.rng() * 6)), rarity, rolled_value: rarity === 'purple' ? 6.8 : 4.8,
+                equipped: false, upgrade_level: 0, substats: [], created_at: store.clock.nowIso()
+              });
+            }
+          } else if (quest.tier === 3) {
+            runes.push({
+              id: 'qa-quest-rune-' + store.nextId(), name_key: member.name_key, auth_user_id: member.auth_user_id,
+              rune_type: 'slot' + (1 + Math.floor(store.rng() * 6)), rarity: 'gold', rolled_value: 10,
+              equipped: false, upgrade_level: 0, substats: [], created_at: store.clock.nowIso()
+            });
+            let prestige = prestigeStates.find(p => p.name_key === member.name_key);
+            if (prestige) prestige.prestige_points = Number(prestige.prestige_points || 0) + 10;
+            else prestigeStates.push({ name_key: member.name_key, display_name: member.display_name, prestige_level: 0, prestige_points: 10, prestige_points_spent: 0, prestige_allocations: {}, updated_at: store.clock.nowIso() });
+          }
+        });
       }
     });
     return null;

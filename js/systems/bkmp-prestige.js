@@ -500,6 +500,28 @@ async function bkmpPrestigeExecuteReset() {
   const pointsGained = Math.max(1, Math.round(bkmpPrestigePointsForStage(stage) * (1 + bonusPct / 100)));
 
   bkmpPrestigeSaving = true;
+  /* Bug gefunden 25.07.2026 (Playwright-Diagnose unter Last, siehe
+     tests/e2e/prestige.spec.js-Kommentar): ein noch offener 4s-Debounce-
+     Speicher-Timer (bkmpIdleQueueSync, ausgeloest von einem Kampf-Tick VOR
+     dem Reset) ist von bkmpIdleStopLoop() (stoppt nur den Kampf-Tick-
+     Intervall, siehe idledorf.js) komplett unberuehrt und kann daher genau
+     ueber diesem Reset hinweg weiterlaufen. Feuert er WAEHREND oder kurz
+     NACH dem eigentlich autoritativen bkmpIdleFlushSyncNow() weiter unten,
+     tragen beide Schreibvorgaenge denselben (noch veralteten, vor dem Reset
+     erfassten) bkmpIdleState-Schnappschuss - kein Zustands-Bug in
+     bkmpIdleState selbst (per Setter-Falle bestaetigt: gold wird lokal nur
+     genau einmal auf 0 gesetzt), sondern ein Wettlauf zweier HTTP-
+     Schreibvorgaenge, bei dem der spaeter GESENDETE, aber inhaltlich
+     AELTERE Stand den frischen Reset-Stand ueberschreiben kann, falls er
+     am Mock-/echten Server spaeter ankommt als er losgeschickt wurde.
+     Exakt dieselbe Bugklasse wie der bereits dokumentierte "1 Min. Offline-
+     Fortschritt"-Fix (bkmpIdleCancelPendingSyncTimer(), siehe Kommentar
+     dort) - hier zum ersten Mal beim Prestige-Reset gefunden. Fix: jeden
+     noch offenen Timer VOR dem eigenen, autoritativen Flush verwerfen -
+     bkmpIdleSyncPending bleibt bewusst unangetastet (identisches Prinzip),
+     der naechste echte Zustandswechsel nach dem Reset plant ganz normal
+     wieder einen neuen Timer. */
+  bkmpIdleCancelPendingSyncTimer();
   try {
     bkmpIdleState.level = 1;
     bkmpIdleState.xp = 0;

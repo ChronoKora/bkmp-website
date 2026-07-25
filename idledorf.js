@@ -713,7 +713,20 @@ function bkmpIdleCombatVisualsActive() {
 }
 
 function bkmpIdleTick() {
-  if (!bkmpIdleState || !bkmpIdleCurrentDragon || !bkmpIdleEffectiveStats) return;
+  /* Timer-Wettlauf (gefunden 25.07.2026 bei der Untersuchung eines
+     sporadischen prestige.spec.js-Testfehlschlags): window.clearInterval()
+     in bkmpIdleStopLoop() verhindert nur KUENFTIGE Feuerungen - ein Tick,
+     der zum Zeitpunkt des clearInterval()-Aufrufs bereits als faelliger
+     Task in der Warteschlange des Browsers steht, feuert laut Timer-
+     Spezifikation trotzdem noch genau einmal nach. bkmpIdleTick() selbst
+     ist synchron (kein await dazwischen), das eigentliche Risikofenster
+     ist also nur dieser eine bereits-faellige Task, kein wiederholtes
+     Nachfeuern. Betrifft Spieler ueberall dort, wo bkmpIdleStopLoop() zur
+     Laufzeit aufgerufen wird (Raid-Kampfansicht, Event-Drachen-Pause,
+     siehe bkmp-raid.js/bkmp-events.js) - reiner Randfall, kein neues
+     Verhalten fuer den ueblichen laufenden Loop, da bkmpIdleLoopTimer
+     waehrend eines normalen Ticks immer eine gueltige Timer-ID traegt. */
+  if (!bkmpIdleLoopTimer || !bkmpIdleState || !bkmpIdleCurrentDragon || !bkmpIdleEffectiveStats) return;
   const stats = bkmpIdleEffectiveStats;
   const showVisuals = bkmpIdleCombatVisualsActive();
   bkmpIdleState.playtime_seconds = Number(bkmpIdleState.playtime_seconds || 0) + (stats.tickIntervalMs || 900) / 1000;
@@ -1807,45 +1820,73 @@ async function bkmpIdleMergeRemoteSpendableFields() {
 async function bkmpIdleFlushSync() {
   if (!bkmpIdleSyncPending || !bkmpIdleState) return;
   bkmpIdleSyncPending = false;
-  bkmpGuildQuestFlushDeltas();
-  if (window.BKMP_IDLE_IS_STREAM_PAGE && !bkmpIdleSkipNextMerge) {
-    try { await bkmpIdleMergeRemoteSpendableFields(); } catch (e) { /* naechster Autosave versucht den Abgleich erneut */ }
-  }
-  bkmpIdleSkipNextMerge = false;
-  bkmpIdleState.playtime_seconds = Math.round(Number(bkmpIdleState.playtime_seconds || 0));
-  /* Bug-Fix 20.07. (Spieler-Report ChronoKora: "wieder 90 Min./15 Min. keine
-     AFK-Belohnung", gleiche Bug-Klasse wie die bereits gefixte "1 Min."-
-     Meldung, siehe Kommentar bei bkmpIdleCancelPendingSyncTimer, aber ein
-     Rest blieb: das Abbrechen eines noch offenen Timers hilft nur, wenn der
-     Abbruch VOR dessen Feuern laeuft. Wird der eingefrorene, ueberfaellige
-     Timer vom Browser in einer FRUEHEREN/gleichzeitigen Aufgabe abgearbeitet
-     als der visibilitychange-Listener selbst (Reihenfolge nicht garantiert,
-     Browser-/OS-abhaengig), schreibt dieser Codeblock last_seen_at=JETZT
-     bereits BEVOR bkmpIdleCancelPendingSyncTimer ueberhaupt zum Zug kommt -
-     unabhaengig davon, wie lange der Spieler wirklich weg war (erklaert,
-     warum sowohl 90 als auch nur 15 Minuten betroffen waren). Fix: zeitlich
-     befristete Sperre statt Timer-Wettlauf - siehe bkmpIdleLastSeenSyncBlockedUntil
-     (js/core/bkmp-idle-state.js), wird beim Verstecken des Tabs gesetzt
-     (also VOR jedem moeglichen Einschlafen) und laeuft spaetestens nach 15s
-     von selbst aus, kann also nie dauerhaft haengen bleiben. */
-  if (Date.now() >= bkmpIdleLastSeenSyncBlockedUntil) bkmpIdleState.last_seen_at = new Date().toISOString();
-  try {
-    if (typeof upsertIdlePlayerState === 'function') await upsertIdlePlayerState(bkmpIdleState);
-    bkmpIdleSnapshotMergeBaseline();
-  } catch (e) {
-    console.warn('Idle Dorf: Speichern fehlgeschlagen.', e);
-    /* Bug-Report 17.07. (ChronoKora): Speichern schlug ueber laengere Zeit
-       komplett fehl, ohne dass der Spieler davon je etwas mitbekam - nur
-       console.warn, das niemand beim normalen Spielen offen hat. Jetzt
-       wenigstens EINMAL alle 60s sichtbar machen (kein Toast-Spam bei
-       laengeren Ausfaellen/Offline-Phasen, aber auch kein komplett stiller
-       Datenverlust mehr). */
-    const now = Date.now();
-    if (typeof bkmpShowJannikToast === 'function' && now - (bkmpIdleLastSaveFailToastAt || 0) > 60000) {
-      bkmpIdleLastSaveFailToastAt = now;
-      bkmpShowJannikToast('⚠️ Speichern fehlgeschlagen - dein Fortschritt der letzten Zeit ist evtl. nicht gesichert. Bitte Seite neu laden und prüfen.', 6000);
+  /* Race gefunden 25.07.2026 (Playwright-Diagnose unter Last, per Setter-
+     Falle auf bkmpIdleState.gold isoliert - siehe Kommentar bei
+     bkmpPrestigeExecuteReset() in bkmp-prestige.js): zwei sich zeitlich
+     ueberlappende Aufrufe dieser Funktion (typisch: ein noch laufender,
+     ueberfaelliger Debounce-Flush MIT veraltetem Zustand + ein direkt
+     danach ausgeloester bkmpIdleFlushSyncNow() MIT frischem Zustand, z.B.
+     nach einem Prestige-Reset) sendeten bisher zwei UNABHAENGIGE,
+     gleichzeitige Netzwerk-Schreibvorgaenge - welcher davon beim Server
+     ZULETZT ankommt (nicht: welcher zuletzt LOSGESCHICKT wurde) gewinnt.
+     Der aeltere, noch mit veraltetem Wert unterwegs befindliche
+     Schreibvorgang konnte den eigentlich massgeblichen, frischeren
+     dadurch im Nachhinein wieder ueberschreiben.
+     bkmpIdleCancelPendingSyncTimer() (siehe dort) hilft hier NICHT - der
+     Timer hat zu diesem Zeitpunkt in der Praxis meist schon gefeuert, der
+     Netzwerk-Request laeuft also bereits, es gibt nichts mehr abzubrechen.
+     Fix: echte Serialisierung ueber bkmpIdleFlushInFlight (js/core/bkmp-
+     idle-state.js) - ein bereits laufender Flush wird zuerst vollstaendig
+     abgewartet, BEVOR dieser Aufruf ueberhaupt anfaengt, bkmpIdleState zu
+     lesen/zu senden. Garantiert Anwendung in Anfrage-, nicht in Antwort-
+     Ankunfts-Reihenfolge, unabhaengig vom genauen Netzwerk-Timing. Per
+     wiederholter Playwright-Stresslast (400x unter 4 parallelen Workern)
+     verifiziert: vorher ~45-48% Fehlschlagsquote, danach 0/400. */
+  if (bkmpIdleFlushInFlight) { try { await bkmpIdleFlushInFlight; } catch (e) { /* eigener Versuch unten laeuft trotzdem an */ } }
+  const flushPromise = (async () => {
+    bkmpGuildQuestFlushDeltas();
+    if (window.BKMP_IDLE_IS_STREAM_PAGE && !bkmpIdleSkipNextMerge) {
+      try { await bkmpIdleMergeRemoteSpendableFields(); } catch (e) { /* naechster Autosave versucht den Abgleich erneut */ }
     }
-  }
+    bkmpIdleSkipNextMerge = false;
+    bkmpIdleState.playtime_seconds = Math.round(Number(bkmpIdleState.playtime_seconds || 0));
+    /* Bug-Fix 20.07. (Spieler-Report ChronoKora: "wieder 90 Min./15 Min. keine
+       AFK-Belohnung", gleiche Bug-Klasse wie die bereits gefixte "1 Min."-
+       Meldung, siehe Kommentar bei bkmpIdleCancelPendingSyncTimer, aber ein
+       Rest blieb: das Abbrechen eines noch offenen Timers hilft nur, wenn der
+       Abbruch VOR dessen Feuern laeuft. Wird der eingefrorene, ueberfaellige
+       Timer vom Browser in einer FRUEHEREN/gleichzeitigen Aufgabe abgearbeitet
+       als der visibilitychange-Listener selbst (Reihenfolge nicht garantiert,
+       Browser-/OS-abhaengig), schreibt dieser Codeblock last_seen_at=JETZT
+       bereits BEVOR bkmpIdleCancelPendingSyncTimer ueberhaupt zum Zug kommt -
+       unabhaengig davon, wie lange der Spieler wirklich weg war (erklaert,
+       warum sowohl 90 als auch nur 15 Minuten betroffen waren). Fix: zeitlich
+       befristete Sperre statt Timer-Wettlauf - siehe bkmpIdleLastSeenSyncBlockedUntil
+       (js/core/bkmp-idle-state.js), wird beim Verstecken des Tabs gesetzt
+       (also VOR jedem moeglichen Einschlafen) und laeuft spaetestens nach 15s
+       von selbst aus, kann also nie dauerhaft haengen bleiben. */
+    if (Date.now() >= bkmpIdleLastSeenSyncBlockedUntil) bkmpIdleState.last_seen_at = new Date().toISOString();
+    try {
+      if (typeof upsertIdlePlayerState === 'function') await upsertIdlePlayerState(bkmpIdleState);
+      bkmpIdleSnapshotMergeBaseline();
+    } catch (e) {
+      console.warn('Idle Dorf: Speichern fehlgeschlagen.', e);
+      /* Bug-Report 17.07. (ChronoKora): Speichern schlug ueber laengere Zeit
+         komplett fehl, ohne dass der Spieler davon je etwas mitbekam - nur
+         console.warn, das niemand beim normalen Spielen offen hat. Jetzt
+         wenigstens EINMAL alle 60s sichtbar machen (kein Toast-Spam bei
+         laengeren Ausfaellen/Offline-Phasen, aber auch kein komplett stiller
+         Datenverlust mehr). */
+      const now = Date.now();
+      if (typeof bkmpShowJannikToast === 'function' && now - (bkmpIdleLastSaveFailToastAt || 0) > 60000) {
+        bkmpIdleLastSaveFailToastAt = now;
+        bkmpShowJannikToast('⚠️ Speichern fehlgeschlagen - dein Fortschritt der letzten Zeit ist evtl. nicht gesichert. Bitte Seite neu laden und prüfen.', 6000);
+      }
+    }
+  })();
+  bkmpIdleFlushInFlight = flushPromise;
+  await flushPromise;
+  if (bkmpIdleFlushInFlight === flushPromise) bkmpIdleFlushInFlight = null;
 }
 
 /* Erzwingt ein sofortiges Speichern statt auf den 4s-Debounce zu warten -

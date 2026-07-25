@@ -54,6 +54,53 @@ test.describe('Kampfsystem', () => {
     expect(killIndexAfter).toBeGreaterThanOrEqual(0);
   });
 
+  test('REGRESSION: ein bereits faelliger Tick feuert nach bkmpIdleStopLoop() nicht mehr nach (Timer-Wettlauf, 25.07.2026)', async ({ page, qaBaseURL, fixtureData }) => {
+    // Gefunden bei der Untersuchung eines sporadischen prestige.spec.js-
+    // Fehlschlags (voller Regressionslauf, gold=1 statt 0 nach einem Reset+
+    // Reload): window.clearInterval() in bkmpIdleStopLoop() verhindert nur
+    // KUENFTIGE Feuerungen - ein bereits als faellig eingereihter Tick
+    // feuert laut Timer-Spec trotzdem noch einmal nach. bkmpIdleTick()
+    // (idledorf.js) hat dafuer jetzt einen Guard (`!bkmpIdleLoopTimer`)
+    // bekommen. Dieser Test simuliert genau das Risikofenster deterministisch
+    // (direkter bkmpIdleTick()-Aufruf NACH bkmpIdleStopLoop(), ohne auf eine
+    // echte, seltene Timer-Race zu warten) statt auf ein zufaelliges
+    // Wiederauftreten zu hoffen.
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    await page.evaluate(() => bkmpIdleStopLoop());
+
+    const before = await page.evaluate(() => ({
+      dragonHp: bkmpIdleCurrentDragon.hp,
+      villageHp: bkmpIdleVillageHp,
+      gold: bkmpIdleState.gold,
+      kills: bkmpIdleState.dragon_kills
+    }));
+    // Simuliert einen Tick, der laut Browser-Timer-Warteschlange bereits
+    // faellig war, BEVOR clearInterval() ihn stoppen konnte - genau der Fall,
+    // den ein reiner clearInterval()-Aufruf laut Spezifikation nicht
+    // rueckwirkend verhindern kann.
+    await page.evaluate(() => bkmpIdleTick());
+
+    const after = await page.evaluate(() => ({
+      dragonHp: bkmpIdleCurrentDragon.hp,
+      villageHp: bkmpIdleVillageHp,
+      gold: bkmpIdleState.gold,
+      kills: bkmpIdleState.dragon_kills
+    }));
+    expect(after).toEqual(before);
+
+    // Positivkontrolle: derselbe direkte bkmpIdleTick()-Aufruf bewirkt bei
+    // LAUFENDEM Loop weiterhin sichtbar etwas - der Guard blockiert nur den
+    // gestoppten Zustand, kein genereller Tick-Ausfall.
+    await page.evaluate(() => bkmpIdleStartLoop());
+    await page.evaluate(() => bkmpIdleTick());
+    const afterRunning = await page.evaluate(() => ({
+      dragonHp: bkmpIdleCurrentDragon.hp,
+      villageHp: bkmpIdleVillageHp
+    }));
+    expect(afterRunning).not.toEqual(before);
+  });
+
   test('der Auto-Tick fuegt ueber die Zeit Schaden zu, ohne dass geklickt wird', async ({ page, qaBaseURL, fixtureData }) => {
     await openAndLogin(page, qaBaseURL, fixtureData);
     await waitForDragonReady(page);
