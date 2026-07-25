@@ -31,6 +31,23 @@
 -- function, keine Datenaenderung beim reinen Ausfuehren dieser Datei -
 -- die UPDATEs laufen nur, wenn ein Spieler sich als naechstes tatsaechlich
 -- umbenennt).
+--
+-- SICHERHEITSAUDIT (25.07.2026, auf Nutzerwunsch VOR einem etwaigen
+-- erneuten Lauf durchgefuehrt): siehe sql/20260725-fix-rename-name-key-
+-- propagation-PREVIEW.sql fuer eine reine Vorschau OHNE Aenderungen und
+-- sql/20260725-fix-rename-name-key-propagation-POSTCHECK.sql fuer die
+-- Pruefung danach. Alle drei Backfills nutzen ausschliesslich eindeutige
+-- Zuordnungen (auth_user_id fuer Runen/Dorf-Skins - per Unique-Index
+-- player_stats_auth_user_id_idx strukturell eindeutig; fuer Prestige eine
+-- verschaerfte, nur-eindeutige Namens-Historien-Kette, siehe Schritt C
+-- unten) - mehrdeutige Faelle werden bewusst NICHT automatisch angefasst.
+-- Die gesamte Migration (Funktion + alle drei Backfills) laeuft in EINER
+-- expliziten Transaktion (begin/commit ganz unten) - schlaegt irgendetwas
+-- fehl, wird alles zurueckgerollt, nichts bleibt in einem Zwischenzustand
+-- haengen (zusaetzlich zu Supabase SQL Editors ohnehin schon impliziter
+-- Transaktion pro Ausfuehrung - hier bewusst explizit gemacht).
+
+begin;
 
 create or replace function public.rename_player_account(p_new_name text)
 returns void
@@ -168,21 +185,41 @@ where v.auth_user_id = ps.auth_user_id
   and v.name_key is distinct from ps.name_key;
 
 -- idle_prestige_state hat keine auth_user_id-Spalte - Backfill laeuft
--- deshalb ueber die player_name_history-Tabelle (jede historische alt-name ->
--- neu-name-Zuordnung, siehe insert oben in derselben Funktion), nicht ueber
--- eine direkte Fremdschluessel-Verknuepfung. Nur Zeilen, deren name_key
--- exakt einem HISTORISCHEN alten Namen entspricht UND fuer die noch keine
--- Zeile unter dem neuesten Namen existiert, werden umbenannt (verhindert
--- eine faelschliche Zusammenfuehrung zweier unabhaengiger Spieler, falls ein
--- alter Name zwischenzeitlich von jemand anderem uebernommen wurde).
-update public.idle_prestige_state p
-set name_key = h.new_name_key, display_name = h.new_name
-from (
-  select distinct on (lower(old_name)) lower(old_name) as old_name_key, lower(new_name) as new_name_key, new_name
+-- deshalb ueber die player_name_history-Tabelle, nicht ueber eine direkte
+-- Fremdschluessel-Verknuepfung wie bei Runen/Dorf-Skins.
+--
+-- NACHBESSERUNG 3 (25.07.2026, Sicherheitsaudit VOR einem etwaigen erneuten
+-- Lauf, kein Fehlschlag diesmal, sondern ein bewusst gefundenes Risiko):
+-- die urspruengliche Fassung nahm bei mehreren Kandidaten fuer denselben
+-- alten Namen einfach die ZEITLICH JUENGSTE Umbenennung - das kann falsch
+-- sein, wenn derselbe Name-STRING im Laufe der Zeit von MEHREREN
+-- VERSCHIEDENEN echten Spielern benutzt wurde (Spieler A verlaesst "alice",
+-- Spieler B nimmt spaeter "alice" an und verlaesst es wieder) - eine
+-- verwaiste idle_prestige_state-Zeile unter "alice" waere dann nicht mehr
+-- sicher A oder B zuzuordnen. Schritt C prueft das jetzt zusaetzlich ueber
+-- old_name_usage (Bedingung: der alte Name darf in der GESAMTEN Historie
+-- nur bei GENAU EINEM auth_user_id auftauchen) - nur dann wird automatisch
+-- zugeordnet. Mehrdeutige Faelle bleiben bewusst unangetastet (sichtbar in
+-- der PREVIEW-Datei, Abfrage 2).
+with old_name_usage as (
+  select lower(old_name) as old_name_key, count(distinct auth_user_id) as distinct_owners
   from public.player_name_history
-  order by lower(old_name), changed_at desc
-) h
-where p.name_key = h.old_name_key
-  and not exists (
-    select 1 from public.idle_prestige_state p2 where p2.name_key = h.new_name_key
-  );
+  group by lower(old_name)
+),
+rename_mapping as (
+  select distinct on (lower(h.old_name))
+    lower(h.old_name) as old_name_key, lower(h.new_name) as new_name_key, h.new_name
+  from public.player_name_history h
+  order by lower(h.old_name), h.changed_at desc
+)
+update public.idle_prestige_state p
+set name_key = m.new_name_key, display_name = m.new_name
+from rename_mapping m
+join old_name_usage u on u.old_name_key = m.old_name_key
+where p.name_key = m.old_name_key
+  and u.distinct_owners = 1                                                              -- alter Name eindeutig einem einzigen Konto zuordenbar
+  and not exists (select 1 from public.player_stats ps3 where ps3.name_key = p.name_key)  -- alter Name aktuell bei niemandem mehr aktiv
+  and exists (select 1 from public.player_stats ps4 where ps4.name_key = m.new_name_key)  -- Zielkonto existiert wirklich
+  and not exists (select 1 from public.idle_prestige_state p2 where p2.name_key = m.new_name_key); -- Ziel noch frei
+
+commit;
