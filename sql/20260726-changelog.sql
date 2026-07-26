@@ -100,3 +100,15 @@ select '2026-07-26', 'fix',
 where not exists (
   select 1 from public.changelog_entries where entry_date = '2026-07-26' and title = '"Auto-Schmelzen" erkannte Runen im Lager nicht'
 );
+
+-- ============================================================
+-- Dringender Fix (26.07.2026, Spieler-Meldungen Danw_90 + Kaledoss):
+-- Speichern schlug über Level 2000 dauerhaft fehl.
+-- ============================================================
+insert into public.changelog_entries (entry_date, category, title, description)
+select '2026-07-26', 'fix',
+  'Speichern schlug über Level 2000 dauerhaft fehl',
+  'Ab Level 2001 konnte der Spielstand nicht mehr gespeichert werden - eine alte, viel zu niedrig angesetzte Sicherheitsgrenze in der Datenbank hat jeden Speicherversuch abgelehnt. Eure Daten waren dabei nie in Gefahr, der zuletzt erfolgreich gespeicherte Stand blieb erhalten - Speichern funktioniert jetzt auch weit über Level 2000 hinaus wieder normal.'
+where not exists (
+  select 1 from public.changelog_entries where entry_date = '2026-07-26' and title = 'Speichern schlug über Level 2000 dauerhaft fehl'
+);
