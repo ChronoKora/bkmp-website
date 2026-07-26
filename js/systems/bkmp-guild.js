@@ -58,9 +58,19 @@ function bkmpGuildTechCostForLevel(currentLevel) {
    serverseitig (gleiches Prinzip wie bei den bestehenden 9 Zweigen). */
 const BKMP_GUILD_TECH_TIER = {
   STANDARD: { maxLevel: 20, baseCost: 200000, growth: 1.4 },
-  LOW5: { maxLevel: 5, baseCost: 350000, growth: 1.6 },
-  MED10: { maxLevel: 10, baseCost: 300000, growth: 1.35 },
-  TOGGLE: { maxLevel: 1, baseCost: 1500000, growth: 1 }
+  /* Nachbesserung (26.07., Spieler-Feedback: bei einer Multi-Milliarden-
+     Kasse waren alle 10 neuen Zweige mit ~40M Gold komplett durchgekauft -
+     spuerbar zu billig). Maximalstufen deutlich angehoben + Kostenkurven
+     neu kalibriert: Maxen ALLER 10 neuen Zweige kostet jetzt zusammen
+     ca. 4,36 Mrd. Gold (vorher ca. 40M) - ein echtes, langfristiges Ziel
+     statt Wechselgeld. LOW5/MED10 in LOW/MED umbenannt (Maximalstufe ist
+     nicht mehr 5/10), STANDARD_V2 ist eine EIGENE, von der bestehenden
+     STANDARD-Kurve der urspruenglichen 9 Zweige getrennte Kopie (die
+     alten 9 Zweige bleiben unangetastet). */
+  LOW: { maxLevel: 15, baseCost: 600000, growth: 1.5 },
+  MED: { maxLevel: 25, baseCost: 350000, growth: 1.28 },
+  STANDARD_V2: { maxLevel: 35, baseCost: 250000, growth: 1.18 },
+  TOGGLE: { maxLevel: 1, baseCost: 8000000, growth: 1 }
 };
 function bkmpGuildTechTierDef(tier) {
   return { ...(BKMP_GUILD_TECH_TIER[tier] || BKMP_GUILD_TECH_TIER.STANDARD) };
@@ -68,21 +78,49 @@ function bkmpGuildTechTierDef(tier) {
 function bkmpGuildTechExtCostForLevel(def, currentLevel) {
   return Math.round(def.baseCost * Math.pow(def.growth, currentLevel));
 }
+/* ---------------- Paragon-Fortfuehrung nach der Maximalstufe (26.07.) ----------------
+   Identisches Prinzip wie BKMP_PRESTIGE_PARAGON_* in bkmp-prestige.js:
+   nach der (jetzt deutlich hoeheren) Maximalstufe geht es mit einem
+   schwaecheren Bonus (4% des normalen Rang-Effekts) und einer steileren,
+   aber am Ende der normalen Kurve ANSETZENDEN Kostenkurve weiter (+0,15
+   auf das Wachstum) - haelt die Kasse auch nach dem vollen Ausbau
+   dauerhaft relevant, statt sie wieder komplett brachliegen zu lassen.
+   Gespeichert als eigene, synthetische tech_id "<id>__paragon" im
+   bereits bestehenden flachen guild_tech_levels-Schema (identischer
+   Trick wie __dragon_souls/__ascension_level im Spieler-Prestige-JSONB)
+   - keine neue Tabelle/Spalte noetig. BEWUSST NICHT fuer die 2 TOGGLE-
+   Zweige (Streak-Schutz/Willkommenspaket) - ein reiner Ein/Aus-Schalter
+   hat keine sinnvolle "noch mehr davon"-Fortsetzung. */
+const BKMP_GUILD_TECH_PARAGON_MAX_RANK = 1000;
+const BKMP_GUILD_TECH_PARAGON_EFFECT_RATIO = 0.04;
+const BKMP_GUILD_TECH_PARAGON_GROWTH_BONUS = 0.15;
+function bkmpGuildTechParagonKey(techId) { return `${techId}__paragon`; }
+function bkmpGuildTechParagonEffectPerRank(tech) { return tech.effectPerRank * BKMP_GUILD_TECH_PARAGON_EFFECT_RATIO; }
+/* Kosten setzen nahtlos an der letzten NORMALEN Stufe an (baseCost*growth^(maxLevel-1)),
+   danach mit dem gebumpten Wachstum weiter - siehe sql/20260726-guild-tech-
+   rebalance-paragon.sql fuer die serverseitig hart hinterlegten, hier
+   identisch nachgerechneten Basiswerte pro Zweig. */
+function bkmpGuildTechParagonCost(tech, currentParagonRank) {
+  const lastNormalLevelCost = tech.baseCost * Math.pow(tech.growth, tech.maxLevel - 1);
+  const growth = tech.growth + BKMP_GUILD_TECH_PARAGON_GROWTH_BONUS;
+  const raw = lastNormalLevelCost * Math.pow(growth, currentParagonRank + 1);
+  return Number.isFinite(raw) && raw < Number.MAX_SAFE_INTEGER ? Math.round(raw) : Number.MAX_SAFE_INTEGER;
+}
 /* effectType/effectPerRank statt statKey/perLevel (Namenskonvention
    angeglichen an BKMP_PRESTIGE_UPGRADES) - die 9 STANDARD-Zweige oben
    bleiben bewusst unangetastet (eigenes, bereits laenger etabliertes
    Schema), keine Notwendigkeit, funktionierenden Code umzubauen. */
 const BKMP_GUILD_TECH_CATALOG_EXT = [
-  { id: 'guild_kriegsrat', label: 'Kriegsrat', icon: '🗡️', desc: '+1 zusätzlicher Arena-Angriff pro Tag (über das normale 10x-Tageslimit hinaus) pro Stufe.', effectType: 'arenaExtraAttempts', effectPerRank: 1, ...bkmpGuildTechTierDef('LOW5') },
-  { id: 'guild_turm_vorreiter', label: 'Turm-Vorreiter', icon: '🗼', desc: 'Die höchste je von einem Mitglied erreichte Turmstufe gibt der GESAMTEN Gilde einen kleinen Dauerbonus auf Angriff/Verteidigung/Gold (+0,05% pro 10 Turmstufen des Vorreiters, pro Stufe dieser Technologie).', effectType: 'towerChampionPctPer10', effectPerRank: 0.05, ...bkmpGuildTechTierDef('MED10') },
-  { id: 'guild_brutbeschleuniger', label: 'Brutbeschleuniger', icon: '🥚', desc: 'Verkürzt die Brutzeit neuer Drachen und senkt die Opfergabe-Kosten seltener Eier für alle Mitglieder um 1% pro Stufe.', effectType: 'broodSpeedPct', effectPerRank: 1, ...bkmpGuildTechTierDef('STANDARD') },
-  { id: 'guild_schmiede', label: 'Gildenschmiede', icon: '⚒️', desc: 'Günstigere Runen-Aufwertungskosten für alle Mitglieder (1% pro Stufe).', effectType: 'runeUpgradeDiscountPct', effectPerRank: 1, ...bkmpGuildTechTierDef('STANDARD') },
-  { id: 'guild_autokauf', label: 'Gilden-Autokauf', icon: '🤖', desc: '+2 automatische Käufe pro Tick für alle Mitglieder, pro Stufe.', effectType: 'autobuyExtraPurchases', effectPerRank: 2, ...bkmpGuildTechTierDef('MED10') },
-  { id: 'guild_nachtwache', label: 'Nachtwache', icon: '🌙', desc: '+0,5 Std. Offline-Fortschritts-Deckel für alle Mitglieder, pro Stufe (max. +5 Std.).', effectType: 'offlineCapExtraHours', effectPerRank: 0.5, ...bkmpGuildTechTierDef('MED10') },
-  { id: 'guild_streak_schutz', label: 'Streak-Schutz', icon: '🛡️', desc: 'Ein ausgelassener Tag setzt die Login-Serie nur um eine Stufe zurück statt komplett auf 1.', effectType: 'streakProtectUnlock', effectPerRank: 1, ...bkmpGuildTechTierDef('TOGGLE') },
-  { id: 'guild_stadtmauer', label: 'Stadtmauer', icon: '🏯', desc: 'Erhöht den eigenen HP-Beitrag zur gemeinsamen Stadt-HP beim Beitritt zu einem Weltboss-Raid um 1% pro Stufe.', effectType: 'raidCityHpPct', effectPerRank: 1, ...bkmpGuildTechTierDef('MED10') },
-  { id: 'guild_aufstiegsvorbereitung', label: 'Aufstiegsvorbereitung', icon: '🌌', desc: 'Senkt die Mindestanforderungen für die zweite Prestige-Ebene ("Aufstieg") für alle Mitglieder um 2% pro Stufe.', effectType: 'ascensionThresholdDiscountPct', effectPerRank: 2, ...bkmpGuildTechTierDef('LOW5') },
-  { id: 'guild_willkommenspaket', label: 'Willkommenspaket', icon: '🎁', desc: 'Neue Mitglieder erhalten in den ersten 3 Tagen nach dem Beitritt +10% auf Angriff/Verteidigung/Gold.', effectType: 'newMemberBonusUnlock', effectPerRank: 1, ...bkmpGuildTechTierDef('TOGGLE') }
+  { id: 'guild_kriegsrat', label: 'Kriegsrat', icon: '🗡️', desc: '+1 zusätzlicher Arena-Angriff pro Tag (über das normale 10x-Tageslimit hinaus) pro Stufe.', effectType: 'arenaExtraAttempts', effectPerRank: 1, paragonEligible: true, ...bkmpGuildTechTierDef('LOW') },
+  { id: 'guild_turm_vorreiter', label: 'Turm-Vorreiter', icon: '🗼', desc: 'Die höchste je von einem Mitglied erreichte Turmstufe gibt der GESAMTEN Gilde einen kleinen Dauerbonus auf Angriff/Verteidigung/Gold (+0,05% pro 10 Turmstufen des Vorreiters, pro Stufe dieser Technologie).', effectType: 'towerChampionPctPer10', effectPerRank: 0.05, paragonEligible: true, ...bkmpGuildTechTierDef('MED') },
+  { id: 'guild_brutbeschleuniger', label: 'Brutbeschleuniger', icon: '🥚', desc: 'Verkürzt die Brutzeit neuer Drachen und senkt die Opfergabe-Kosten seltener Eier für alle Mitglieder um 1% pro Stufe.', effectType: 'broodSpeedPct', effectPerRank: 1, paragonEligible: true, ...bkmpGuildTechTierDef('STANDARD_V2') },
+  { id: 'guild_schmiede', label: 'Gildenschmiede', icon: '⚒️', desc: 'Günstigere Runen-Aufwertungskosten für alle Mitglieder (1% pro Stufe).', effectType: 'runeUpgradeDiscountPct', effectPerRank: 1, paragonEligible: true, ...bkmpGuildTechTierDef('STANDARD_V2') },
+  { id: 'guild_autokauf', label: 'Gilden-Autokauf', icon: '🤖', desc: '+2 automatische Käufe pro Tick für alle Mitglieder, pro Stufe.', effectType: 'autobuyExtraPurchases', effectPerRank: 2, paragonEligible: true, ...bkmpGuildTechTierDef('MED') },
+  { id: 'guild_nachtwache', label: 'Nachtwache', icon: '🌙', desc: '+0,5 Std. Offline-Fortschritts-Deckel für alle Mitglieder, pro Stufe.', effectType: 'offlineCapExtraHours', effectPerRank: 0.5, paragonEligible: true, ...bkmpGuildTechTierDef('MED') },
+  { id: 'guild_streak_schutz', label: 'Streak-Schutz', icon: '🛡️', desc: 'Ein ausgelassener Tag setzt die Login-Serie nur um eine Stufe zurück statt komplett auf 1.', effectType: 'streakProtectUnlock', effectPerRank: 1, paragonEligible: false, ...bkmpGuildTechTierDef('TOGGLE') },
+  { id: 'guild_stadtmauer', label: 'Stadtmauer', icon: '🏯', desc: 'Erhöht den eigenen HP-Beitrag zur gemeinsamen Stadt-HP beim Beitritt zu einem Weltboss-Raid um 1% pro Stufe.', effectType: 'raidCityHpPct', effectPerRank: 1, paragonEligible: true, ...bkmpGuildTechTierDef('MED') },
+  { id: 'guild_aufstiegsvorbereitung', label: 'Aufstiegsvorbereitung', icon: '🌌', desc: 'Senkt die Mindestanforderungen für die zweite Prestige-Ebene ("Aufstieg") für alle Mitglieder um 2% pro Stufe.', effectType: 'ascensionThresholdDiscountPct', effectPerRank: 2, paragonEligible: true, ...bkmpGuildTechTierDef('LOW') },
+  { id: 'guild_willkommenspaket', label: 'Willkommenspaket', icon: '🎁', desc: 'Neue Mitglieder erhalten in den ersten 3 Tagen nach dem Beitritt +10% auf Angriff/Verteidigung/Gold.', effectType: 'newMemberBonusUnlock', effectPerRank: 1, paragonEligible: false, ...bkmpGuildTechTierDef('TOGGLE') }
 ];
 const BKMP_GUILD_NEW_MEMBER_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
 const BKMP_GUILD_NEW_MEMBER_BONUS_PCT = 10;
@@ -148,22 +186,37 @@ async function bkmpGuildRefreshTreasuryBonusCache() {
        Berechnung (siehe unten), werden hier bewusst uebersprungen. */
     BKMP_GUILD_TECH_CATALOG_EXT.forEach(tech => {
       if (tech.effectType === 'towerChampionPctPer10' || tech.effectType === 'newMemberBonusUnlock') return;
-      techTotals[tech.effectType] = (levels[tech.id] || 0) * tech.effectPerRank;
+      let total = (levels[tech.id] || 0) * tech.effectPerRank;
+      /* Rebalance (26.07.): Paragon-Fortfuehrung nach der Maximalstufe -
+         zaehlt nur, wenn der Zweig ueberhaupt Paragon-faehig ist (nicht
+         Streak-Schutz/Willkommenspaket) UND die Maximalstufe bereits
+         erreicht ist (Paragon-Raenge koennen serverseitig ohnehin nur
+         gekauft werden, sobald die Basis-Stufe voll ist, siehe
+         guild_tech_upgrade()-Aequivalent fuer "<id>__paragon"). */
+      if (tech.paragonEligible) {
+        const paragonLevel = levels[bkmpGuildTechParagonKey(tech.id)] || 0;
+        total += paragonLevel * bkmpGuildTechParagonEffectPerRank(tech);
+      }
+      techTotals[tech.effectType] = total;
     });
 
     /* Turm-Vorreiter: haengt zusaetzlich von der hoechsten je erreichten
        Turmstufe UNTER ALLEN Mitgliedern ab, nicht nur vom Rang selbst -
        braucht eine gezielte idle_player_state-Abfrage ueber die bereits
        geladene Mitgliederliste (siehe loadGuildTowerChampionWave,
-       supabase.js). Deckel bei 25% haelt den Bonus im selben moderaten
-       Rahmen wie die uebrigen Gilden-Boni, trotz des theoretisch
-       unbegrenzten Turms. */
+       supabase.js). Rebalance (26.07.): Deckel von 25% auf 50% anghoben,
+       proportional zur von 10 auf 25 angehobenen Maximalstufe (sonst
+       waeren die zusaetzlichen 15 Stufen bei einer normalen Turmstufe
+       wirkungslos gewesen) - Paragon-Raenge zaehlen als Bruchteil einer
+       normalen Stufe (4% pro Rang) in dieselbe Formel hinein. */
     const turmVorreiterLevel = levels['guild_turm_vorreiter'] || 0;
+    const turmVorreiterParagon = levels[bkmpGuildTechParagonKey('guild_turm_vorreiter')] || 0;
+    const turmVorreiterEffectiveLevel = turmVorreiterLevel + turmVorreiterParagon * BKMP_GUILD_TECH_PARAGON_EFFECT_RATIO;
     let towerChampionPct = 0;
-    if (mine && turmVorreiterLevel > 0 && typeof loadGuildTowerChampionWave === 'function') {
+    if (mine && turmVorreiterEffectiveLevel > 0 && typeof loadGuildTowerChampionWave === 'function') {
       try {
         const championWave = await loadGuildTowerChampionWave(mine.members.map(m => m.authUserId));
-        towerChampionPct = Math.min(25, Math.floor(championWave / 10) * turmVorreiterLevel * 0.05);
+        towerChampionPct = Math.min(50, Math.floor(championWave / 10) * turmVorreiterEffectiveLevel * 0.05);
       } catch (e) { /* Netzwerkfehler - Bonus bleibt 0 statt eines veralteten Werts */ }
     }
     techTotals.towerChampionPct = towerChampionPct;
@@ -1590,6 +1643,25 @@ async function bkmpIdleRenderGildeTechPanel() {
         const maxed = level >= tech.maxLevel;
         const cost = bkmpGuildTechExtCostForLevel(tech, level);
         const canAfford = g.treasuryGold >= cost;
+        /* Rebalance (26.07.): Paragon-Fortfuehrung, sobald die (jetzt
+           deutlich hoehere) Maximalstufe erreicht ist - nur fuer die 8
+           dafuer geeigneten Zweige (nicht Streak-Schutz/Willkommenspaket). */
+        let maxedExtraHtml = '<span class="idle-guild-tech-maxed">✅ Maximalstufe</span>';
+        if (maxed && tech.paragonEligible) {
+          const paragonKey = bkmpGuildTechParagonKey(tech.id);
+          const paragonRank = bkmpGuildTechLevels[paragonKey] || 0;
+          const paragonMaxed = paragonRank >= BKMP_GUILD_TECH_PARAGON_MAX_RANK;
+          const paragonCost = bkmpGuildTechParagonCost(tech, paragonRank);
+          const paragonCanAfford = g.treasuryGold >= paragonCost;
+          maxedExtraHtml = `
+            <span class="idle-guild-tech-maxed">✅ Maximalstufe</span>
+            <div class="idle-guild-tech-paragon">
+              <div class="idle-guild-tech-paragon-rank">🌟 Paragon-Rang ${bkmpIdleFormatNumber(paragonRank)}</div>
+              ${paragonMaxed
+                ? '<span class="idle-guild-tech-maxed">Paragon-Maximalrang</span>'
+                : `<button type="button" class="btn-ja idle-guild-tech-paragon-btn" data-tech-id="${paragonKey}" ${!canUpgrade || !paragonCanAfford || bkmpGuildBusy ? 'disabled' : ''}>+Paragon: ${bkmpIdleFormatNumber(paragonCost)} 💰</button>`}
+            </div>`;
+        }
         return `
           <div class="idle-guild-tech-card">
             <div class="idle-guild-tech-icon">${tech.icon}</div>
@@ -1598,7 +1670,7 @@ async function bkmpIdleRenderGildeTechPanel() {
             <div class="idle-guild-tech-bonus">${bkmpGuildTechExtBonusDisplay(tech, level)}</div>
             <div class="idle-guild-tech-desc">${escapeHtml(tech.desc)}</div>
             ${maxed
-              ? '<span class="idle-guild-tech-maxed">✅ Maximalstufe</span>'
+              ? maxedExtraHtml
               : `<button type="button" class="btn-ja idle-guild-tech-upgrade-btn" data-tech-id="${tech.id}" ${!canUpgrade || !canAfford || bkmpGuildBusy ? 'disabled' : ''}>${bkmpIdleFormatNumber(cost)} 💰</button>`}
           </div>
         `;
@@ -1606,7 +1678,7 @@ async function bkmpIdleRenderGildeTechPanel() {
     </div>
   `;
 
-  panel.querySelectorAll('.idle-guild-tech-upgrade-btn').forEach(btn => {
+  panel.querySelectorAll('.idle-guild-tech-upgrade-btn, .idle-guild-tech-paragon-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const techId = btn.dataset.techId;
       if (!techId || bkmpGuildBusy) return;
@@ -1617,8 +1689,11 @@ async function bkmpIdleRenderGildeTechPanel() {
           bkmpGuildTechLevels[techId] = result.newLevel;
           bkmpGuildState.guild.treasuryGold = result.treasuryGold;
           bkmpGuildRefreshTreasuryBonusCache();
-          const techDef = BKMP_GUILD_TECH_CATALOG.find(t => t.id === techId) || BKMP_GUILD_TECH_CATALOG_EXT.find(t => t.id === techId);
-          if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`🌳 ${techDef ? techDef.label : techId} auf Stufe ${result.newLevel}!`, 3000);
+          const isParagon = techId.endsWith('__paragon');
+          const baseTechId = isParagon ? techId.slice(0, -'__paragon'.length) : techId;
+          const techDef = BKMP_GUILD_TECH_CATALOG.find(t => t.id === baseTechId) || BKMP_GUILD_TECH_CATALOG_EXT.find(t => t.id === baseTechId);
+          const label = techDef ? techDef.label : baseTechId;
+          if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(isParagon ? `🌟 ${label}: Paragon-Rang ${result.newLevel}!` : `🌳 ${label} auf Stufe ${result.newLevel}!`, 3000);
         }
       } catch (e) {
         if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(e.message, 3400);

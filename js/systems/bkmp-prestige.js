@@ -977,7 +977,12 @@ function bkmpAscensionEffectTotals() {
    Basiswerte - sonst waere das exakt derselbe Anzeige/Realitaet-
    Mismatch-Bug wie der beim Arena-Tageslimit gefundene. */
 function bkmpAscensionEffectiveThresholds() {
-  const discountPct = Math.min(10, typeof bkmpGuildTechBonus === 'function' ? bkmpGuildTechBonus('ascensionThresholdDiscountPct') : 0);
+  // Gilden-Technologie v2 (26.07., Rebalance): Deckel von 10% auf 35%
+  // angehoben, nachdem die Maximalstufe von 5 auf 15 (x2%) gestiegen ist -
+  // bewusst deutlich unter 100%, damit die Aufstiegs-Voraussetzung eine
+  // echte Huerde bleibt (kein triviales Freischalten), etwas Spielraum
+  // ueber die reinen 30% der Maximalstufe hinaus fuer Paragon-Raenge.
+  const discountPct = Math.min(35, typeof bkmpGuildTechBonus === 'function' ? bkmpGuildTechBonus('ascensionThresholdDiscountPct') : 0);
   const mult = 1 - discountPct / 100;
   return {
     minPrestigeLevel: Math.max(1, Math.round(BKMP_ASCENSION_MIN_PRESTIGE_LEVEL * mult)),

@@ -889,24 +889,34 @@ const RPC_HANDLERS = {
     const techId = params.p_tech_id;
     /* Gilden-Technologie v2 (26.07.2026, siehe sql/20260726-guild-tech-
        branches-v2.sql) - die 9 STANDARD-Zweige behalten EXAKT ihre
-       bisherigen Werte (20/200000/1,4), die 10 neuen Zweige bekommen
-       eigene Maximalstufen/Kostenkurven (analog BKMP_PRESTIGE_TIER). */
+       bisherigen Werte (20/200000/1,4). Rebalance (26.07., siehe
+       sql/20260726-guild-tech-rebalance-paragon.sql): die 8 nicht-TOGGLE
+       neuen Zweige bekamen deutlich hoehere Maximalstufen/Kosten + eine
+       Paragon-Fortfuehrung ("<id>__paragon", max. Rang 1000) danach. */
     const TECH_TIERS = {
       attack: { max: 20, base: 200000, growth: 1.4 }, defense: { max: 20, base: 200000, growth: 1.4 },
       gold: { max: 20, base: 200000, growth: 1.4 }, crit_chance: { max: 20, base: 200000, growth: 1.4 },
       crit_damage: { max: 20, base: 200000, growth: 1.4 }, boss_damage: { max: 20, base: 200000, growth: 1.4 },
       rune_luck: { max: 20, base: 200000, growth: 1.4 }, xp: { max: 20, base: 200000, growth: 1.4 },
       prestige: { max: 20, base: 200000, growth: 1.4 },
-      guild_kriegsrat: { max: 5, base: 350000, growth: 1.6 },
-      guild_turm_vorreiter: { max: 10, base: 300000, growth: 1.35 },
-      guild_brutbeschleuniger: { max: 20, base: 200000, growth: 1.4 },
-      guild_schmiede: { max: 20, base: 200000, growth: 1.4 },
-      guild_autokauf: { max: 10, base: 300000, growth: 1.35 },
-      guild_nachtwache: { max: 10, base: 300000, growth: 1.35 },
-      guild_streak_schutz: { max: 1, base: 1500000, growth: 1 },
-      guild_stadtmauer: { max: 10, base: 300000, growth: 1.35 },
-      guild_aufstiegsvorbereitung: { max: 5, base: 350000, growth: 1.6 },
-      guild_willkommenspaket: { max: 1, base: 1500000, growth: 1 }
+      guild_kriegsrat: { max: 15, base: 600000, growth: 1.5 },
+      guild_aufstiegsvorbereitung: { max: 15, base: 600000, growth: 1.5 },
+      guild_turm_vorreiter: { max: 25, base: 350000, growth: 1.28 },
+      guild_autokauf: { max: 25, base: 350000, growth: 1.28 },
+      guild_nachtwache: { max: 25, base: 350000, growth: 1.28 },
+      guild_stadtmauer: { max: 25, base: 350000, growth: 1.28 },
+      guild_brutbeschleuniger: { max: 35, base: 250000, growth: 1.18 },
+      guild_schmiede: { max: 35, base: 250000, growth: 1.18 },
+      guild_streak_schutz: { max: 1, base: 8000000, growth: 1 },
+      guild_willkommenspaket: { max: 1, base: 8000000, growth: 1 },
+      'guild_kriegsrat__paragon': { max: 1000, base: 289009968, growth: 1.65, baseTechId: 'guild_kriegsrat' },
+      'guild_aufstiegsvorbereitung__paragon': { max: 1000, base: 289009968, growth: 1.65, baseTechId: 'guild_aufstiegsvorbereitung' },
+      'guild_turm_vorreiter__paragon': { max: 1000, base: 187259282, growth: 1.43, baseTechId: 'guild_turm_vorreiter' },
+      'guild_autokauf__paragon': { max: 1000, base: 187259282, growth: 1.43, baseTechId: 'guild_autokauf' },
+      'guild_nachtwache__paragon': { max: 1000, base: 187259282, growth: 1.43, baseTechId: 'guild_nachtwache' },
+      'guild_stadtmauer__paragon': { max: 1000, base: 187259282, growth: 1.43, baseTechId: 'guild_stadtmauer' },
+      'guild_brutbeschleuniger__paragon': { max: 1000, base: 92422965, growth: 1.33, baseTechId: 'guild_brutbeschleuniger' },
+      'guild_schmiede__paragon': { max: 1000, base: 92422965, growth: 1.33, baseTechId: 'guild_schmiede' }
     };
     const tier = TECH_TIERS[techId];
     if (!tier) throw rpcError('invalid_tech');
@@ -916,6 +926,12 @@ const RPC_HANDLERS = {
     const guild = getTable(store, 'guilds').find(g => g.id === me.guild_id);
 
     const levels = getTable(store, 'guild_tech_levels');
+    if (tier.baseTechId) {
+      const baseTier = TECH_TIERS[tier.baseTechId];
+      const baseRow = levels.find(r => r.guild_id === me.guild_id && r.tech_id === tier.baseTechId);
+      const baseLevel = baseRow ? Number(baseRow.level || 0) : 0;
+      if (baseLevel < baseTier.max) throw rpcError('base_not_maxed');
+    }
     let levelRow = levels.find(r => r.guild_id === me.guild_id && r.tech_id === techId);
     const currentLevel = levelRow ? Number(levelRow.level || 0) : 0;
     if (currentLevel >= tier.max) throw rpcError('max_level');

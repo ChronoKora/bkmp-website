@@ -42,7 +42,7 @@ test.describe('Gilden-Technologie v2 - Read-Side ueber direkte Cache-Injektion (
     expect(after.sac.gold).toBeLessThan(before.sac.gold);
   });
 
-  test('Gildenschmiede senkt Runen-Aufwertungskosten, gedeckelt bei 20%', async ({ page, qaBaseURL, fixtureData }) => {
+  test('Gildenschmiede senkt Runen-Aufwertungskosten, gedeckelt bei 40% (Rebalance 26.07., vorher 20%)', async ({ page, qaBaseURL, fixtureData }) => {
     await openAndLogin(page, qaBaseURL, fixtureData);
     await waitForDragonReady(page);
     const rune = { rarity: 'blue', upgrade_level: 3 };
@@ -51,10 +51,10 @@ test.describe('Gilden-Technologie v2 - Read-Side ueber direkte Cache-Injektion (
     const discounted = await page.evaluate((r) => bkmpIdleRuneUpgradeCost(r), rune);
     expect(discounted).toBeLessThan(baseCost);
     expect(discounted).toBeCloseTo(Math.round(baseCost * 0.85), 0);
-    // Deckel: 999% im Cache darf trotzdem nie mehr als 20% Rabatt geben.
+    // Deckel: 999% im Cache darf trotzdem nie mehr als 40% Rabatt geben.
     await setCache(page, { runeUpgradeDiscountPct: 999 });
     const cappedCost = await page.evaluate((r) => bkmpIdleRuneUpgradeCost(r), rune);
-    expect(cappedCost).toBeCloseTo(Math.round(baseCost * 0.8), 0);
+    expect(cappedCost).toBeCloseTo(Math.round(baseCost * 0.6), 0);
   });
 
   test('Gilden-Autokauf erhoeht den Kaufdeckel pro Tick zusaetzlich zu Prestige', async ({ page, qaBaseURL, fixtureData }) => {
@@ -66,7 +66,7 @@ test.describe('Gilden-Technologie v2 - Read-Side ueber direkte Cache-Injektion (
     expect(after - before).toBe(12);
   });
 
-  test('Aufstiegsvorbereitung senkt alle 3 Aufstiegs-Schwellen, gedeckelt bei 10%', async ({ page, qaBaseURL, fixtureData }) => {
+  test('Aufstiegsvorbereitung senkt alle 3 Aufstiegs-Schwellen, gedeckelt bei 35% (Rebalance 26.07., vorher 10%)', async ({ page, qaBaseURL, fixtureData }) => {
     await openAndLogin(page, qaBaseURL, fixtureData);
     await waitForDragonReady(page);
     const baseThresholds = await page.evaluate(() => bkmpAscensionEffectiveThresholds());
@@ -92,6 +92,15 @@ test.describe('Gilden-Technologie v2 - Read-Side ueber direkte Cache-Injektion (
     });
     expect(eligibility.withDiscount).toBe(true);
     expect(eligibility.withoutDiscount).toBe(false);
+
+    // Deckel (Rebalance 26.07.): 10%->35% angehoben, nachdem die
+    // Maximalstufe von 5 auf 15 (x2%=30%) gestiegen ist - 999% im Cache
+    // darf trotzdem nie mehr als 35% Rabatt geben.
+    await setCache(page, { ascensionThresholdDiscountPct: 999 });
+    const capped = await page.evaluate(() => bkmpAscensionEffectiveThresholds());
+    expect(capped.minPrestigeLevel).toBe(Math.max(1, Math.round(10 * 0.65)));
+    expect(capped.minPointsSpent).toBe(Math.round(500 * 0.65));
+    expect(capped.minLifetimeStage).toBe(Math.round(5000 * 0.65));
   });
 });
 

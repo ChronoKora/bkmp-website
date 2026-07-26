@@ -99,23 +99,56 @@ async function buyTech(page, techId, times) {
 }
 
 test.describe('Gilden-Technologie v2 - generische Zweig-Infrastruktur', () => {
-  test('Kostenkurve/Maximalstufe je Tier korrekt durchgesetzt (LOW5 vs. MED10 vs. TOGGLE)', async ({ page, qaServer }) => {
+  test('Kostenkurve/Maximalstufe je Tier korrekt durchgesetzt (LOW vs. MED vs. TOGGLE, Rebalance 26.07.)', async ({ page, qaServer }) => {
     await login(page, qaServer, LEADER_NAME);
-    // LOW5 (Kriegsrat): max. 5 Stufen, Basis 350000, Wachstum 1.6.
+    // LOW (Kriegsrat): max. 15 Stufen (Rebalance, vorher 5), Basis 600000, Wachstum 1.5.
     const kriegsrat1 = await buyTech(page, 'guild_kriegsrat');
     expect(kriegsrat1.newLevel).toBe(1);
-    expect(50000000 - kriegsrat1.treasuryGold).toBe(350000);
-    await buyTech(page, 'guild_kriegsrat', 4); // insgesamt 5 Kaeufe -> Stufe 5, Maximalstufe
+    expect(50000000 - kriegsrat1.treasuryGold).toBe(600000);
+    // Maxen aller 15 Stufen kostet insgesamt ca. 524M - deutlich mehr als die
+    // Standard-Fixture-Kasse (50M), daher hier gezielt aufgestockt (reine
+    // Testvorbereitung, kein Produktivwert).
+    qaServer.store.tables.guilds.find(g => g.id === 'g1').treasury_gold = 1000000000;
+    await buyTech(page, 'guild_kriegsrat', 14); // insgesamt 15 Kaeufe -> Stufe 15, Maximalstufe
     let threw = null;
     try { await page.evaluate(() => window.bkmpGuildTechUpgrade('guild_kriegsrat')); } catch (e) { threw = String(e.message || e); }
     expect(threw).toMatch(/Maximalstufe/);
 
-    // TOGGLE (Streak-Schutz): max. 1 Stufe, fester Preis 1.500.000.
+    // TOGGLE (Streak-Schutz): max. 1 Stufe, fester Preis 8.000.000 (Rebalance, vorher 1.500.000).
     const toggle1 = await buyTech(page, 'guild_streak_schutz');
     expect(toggle1.newLevel).toBe(1);
     let toggleThrew = null;
     try { await page.evaluate(() => window.bkmpGuildTechUpgrade('guild_streak_schutz')); } catch (e) { toggleThrew = String(e.message || e); }
     expect(toggleThrew).toMatch(/Maximalstufe/);
+  });
+
+  test('Paragon-Fortfuehrung: erst ab Maximalstufe kaufbar, laeuft mit steigenden Kosten weiter (max. Rang 1000)', async ({ page, qaServer }) => {
+    await login(page, qaServer, LEADER_NAME);
+    qaServer.store.tables.guilds.find(g => g.id === 'g1').treasury_gold = 5000000000;
+
+    // Paragon VOR Erreichen der normalen Maximalstufe muss abgelehnt werden.
+    let tooEarly = null;
+    try { await page.evaluate(() => window.bkmpGuildTechUpgrade('guild_kriegsrat__paragon')); } catch (e) { tooEarly = String(e.message || e); }
+    expect(tooEarly).toBeTruthy();
+
+    await buyTech(page, 'guild_kriegsrat', 15); // volle Maximalstufe
+    const beforeParagon = qaServer.store.tables.guilds.find(g => g.id === 'g1').treasury_gold;
+    const paragon1 = await buyTech(page, 'guild_kriegsrat__paragon');
+    expect(paragon1.newLevel).toBe(1);
+    // Erste Paragon-Stufe kostet exakt die vorab berechnete Basis (siehe
+    // sql/20260726-guild-tech-rebalance-paragon.sql / bkmpGuildTechParagonCost()).
+    expect(beforeParagon - paragon1.treasuryGold).toBe(289009968);
+
+    const paragon2 = await buyTech(page, 'guild_kriegsrat__paragon');
+    expect(paragon2.newLevel).toBe(2);
+    expect(paragon2.treasuryGold).toBeLessThan(paragon1.treasuryGold); // Kosten steigen weiter (Wachstum 1.65)
+
+    // bkmpGuildTechBonus() muss den Paragon-Anteil (4% des normalen
+    // Effekts pro Rang) zusaetzlich zum normalen Maximalstufen-Effekt zeigen.
+    await page.evaluate(() => bkmpGuildRefreshTreasuryBonusCache());
+    const bonus = await page.evaluate(() => bkmpGuildTechBonus('arenaExtraAttempts'));
+    // 15 normale Stufen x 1 + 2 Paragon-Raenge x 0,04 = 15,08
+    expect(bonus).toBeCloseTo(15.08, 5);
   });
 
   test('Nur Anfuehrer/Stellvertreter duerfen einen neuen Zweig kaufen (RPC selbst, nicht nur UI)', async ({ page, qaServer }) => {
@@ -239,14 +272,15 @@ test.describe('Gilden-Technologie v2 - Turm-Vorreiter (client-berechneter Champi
     expect(attackWithBonus).toBeGreaterThan(attackWithoutBonus);
   });
 
-  test('Deckel bei 25% greift auch bei extrem hoher Turmstufe', async ({ page, qaServer }) => {
+  test('Deckel bei 50% (Rebalance, vorher 25%) greift auch bei extrem hoher Turmstufe', async ({ page, qaServer }) => {
     await login(page, qaServer, LEADER_NAME);
+    qaServer.store.tables.guilds.find(g => g.id === 'g1').treasury_gold = 1000000000;
     const memberRow = qaServer.store.tables.idle_player_state.find(r => r.auth_user_id === MEMBER_UID);
     memberRow.turm_highest_wave = 100000; // absurd hoch
-    await buyTech(page, 'guild_turm_vorreiter', 10); // Maximalstufe
+    await buyTech(page, 'guild_turm_vorreiter', 25); // Maximalstufe (Rebalance, vorher 10)
     await page.evaluate(() => bkmpGuildRefreshTreasuryBonusCache());
     const bonus = await page.evaluate(() => bkmpGuildTechBonus('towerChampionPct'));
-    expect(bonus).toBe(25);
+    expect(bonus).toBe(50);
   });
 });
 
