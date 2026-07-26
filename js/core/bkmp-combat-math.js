@@ -217,8 +217,53 @@ function bkmpIdleSkillEffectTotals(skillAllocations, skillDefs) {
   return totals;
 }
 
+/* Progression-Rebalance Phase 3 (26.07.2026): Kosten oberhalb der Softcap-
+   Schwellen (siehe BKMP_IDLE_UPGRADE_SOFTCAP_CFG/bkmpIdleUpgradeSoftcapCfg,
+   idledorf.js) wachsen staerker - der Kosten-EXPONENT selbst wird ab
+   softCap1/softCap2 mit costMultiplierAfterSoftCap1/2 multipliziert (nicht
+   nur ein einmaliger Preissprung, sondern eine dauerhaft steilere Kurve
+   fuer jeden weiteren Rang in dieser Zone). Ausserhalb jeder konfigurierten
+   Zone (kein Eintrag in der Cfg-Map) exakt das alte Verhalten - reiner
+   Erweiterungs-, kein Bruch-Fix. */
 function bkmpIdleUpgradeCost(def, currentLevel) {
-  return Math.round(def.baseCost * bkmpIdleGrowthMult(def.costRate, def.costExponent, currentLevel));
+  const cfg = typeof bkmpIdleUpgradeSoftcapCfg === 'function' ? bkmpIdleUpgradeSoftcapCfg(def) : null;
+  let costExponent = def.costExponent;
+  if (cfg) {
+    if (currentLevel >= cfg.softCap2) costExponent = def.costExponent * cfg.costMultiplierAfterSoftCap2;
+    else if (currentLevel >= cfg.softCap1) costExponent = def.costExponent * cfg.costMultiplierAfterSoftCap1;
+  }
+  const raw = def.baseCost * bkmpIdleGrowthMult(def.costRate, costExponent, currentLevel);
+  /* Prestige-Knoten "Haendlergeschick" (Zweig Wirtschaft, 26.07.2026):
+     Rabatt auf normale Upgrade-Kosten, gedeckelt bei 40% (Konfigwert im
+     Knoten selbst schon auf max. 20% begrenzt - zusaetzliche 40%-Kappung
+     hier als Sicherheitsnetz, falls der Knoten spaeter erweitert wird). */
+  const discountPct = typeof bkmpPrestigeBonus === 'function' ? Math.min(40, bkmpPrestigeBonus('upgrade_cost_reduction_pct')) : 0;
+  return Math.max(1, Math.round(raw * (1 - discountPct / 100)));
+}
+/* Geschlossene Form (kein Loop ueber bis zu 20.000 Raenge bei jedem Aufruf -
+   bkmpIdleRecomputeEffectiveStats laeuft haeufig, siehe Aufrufstellen):
+   summiert effectPerLevel ueber drei Zonen (voller Bonus bis softCap1,
+   bonusMultiplierAfterSoftCap1 zwischen softCap1/softCap2, bonusMultiplier
+   AfterSoftCap2 danach) - additiv PRO RANG, bereits gekaufte Raenge vor
+   einer Schwelle behalten also immer ihren vollen Wert (keine rueckwirkende
+   Kuerzung, nur der GRENZNUTZEN weiterer Raenge sinkt). */
+function bkmpIdleUpgradeEffectAtLevel(def, level) {
+  const cfg = typeof bkmpIdleUpgradeSoftcapCfg === 'function' ? bkmpIdleUpgradeSoftcapCfg(def) : { softCap1: def.maxLevel, softCap2: def.maxLevel, bonusMultiplierAfterSoftCap1: 1, bonusMultiplierAfterSoftCap2: 1 };
+  const lvl = Math.max(0, Math.min(level, def.maxLevel));
+  const seg1 = Math.min(lvl, cfg.softCap1);
+  const seg2 = Math.max(0, Math.min(lvl, cfg.softCap2) - cfg.softCap1);
+  const seg3 = Math.max(0, lvl - cfg.softCap2);
+  return def.effectPerLevel * (seg1 + seg2 * cfg.bonusMultiplierAfterSoftCap1 + seg3 * cfg.bonusMultiplierAfterSoftCap2);
+}
+/* Marginaler Bonus, den GENAU DER NAECHSTE Kauf bringen wuerde (fuer die
+   UI, "naechster Bonus" - Phase 3 Auftragsvorgabe) - anders als
+   bkmpIdleUpgradeEffectAtLevel (Gesamtsumme) liefert das hier nur die Rate
+   an GENAU dieser Stelle im Rang. */
+function bkmpIdleUpgradeMarginalEffectPerLevel(def, level) {
+  const cfg = typeof bkmpIdleUpgradeSoftcapCfg === 'function' ? bkmpIdleUpgradeSoftcapCfg(def) : { softCap1: def.maxLevel, softCap2: def.maxLevel, bonusMultiplierAfterSoftCap1: 1, bonusMultiplierAfterSoftCap2: 1 };
+  if (level >= cfg.softCap2) return def.effectPerLevel * cfg.bonusMultiplierAfterSoftCap2;
+  if (level >= cfg.softCap1) return def.effectPerLevel * cfg.bonusMultiplierAfterSoftCap1;
+  return def.effectPerLevel;
 }
 function bkmpIdleUpgradeEffectTotals(purchases) {
   const totals = {};
@@ -226,7 +271,7 @@ function bkmpIdleUpgradeEffectTotals(purchases) {
   BKMP_IDLE_UPGRADES.forEach(def => {
     const level = Number(p[def.id] || 0);
     if (level <= 0) return;
-    totals[def.effectType] = (totals[def.effectType] || 0) + level * def.effectPerLevel;
+    totals[def.effectType] = (totals[def.effectType] || 0) + bkmpIdleUpgradeEffectAtLevel(def, level);
   });
   return totals;
 }

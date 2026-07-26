@@ -1815,6 +1815,41 @@ function bkmpIdleRenderRunenHelp() {
   `;
 }
 
+/* Prestige-Knoten "Gespeicherte Ausrüstungssets" (Zweig Automation,
+   26.07.2026): EIN clientseitiger Schnellspeicher-Slot (localStorage, pro
+   Spieler-Name_key - keine neue SQL-Spalte/-Tabelle noetig) fuer die
+   aktuelle Slot->Rune-Zuordnung. Wiederherstellen ruft ausschliesslich die
+   bereits bestehende bkmpRuneToggleEquip()-Funktion auf (kein zweiter,
+   eigener Ausruestungs-Codepfad) - rustet zuerst alles ab, was nicht mehr
+   zum gespeicherten Set gehoert, dann das gespeicherte Set an. Runen ohne
+   noch vorhandene _cid (z.B. inzwischen verschmolzen/verkauft) werden
+   beim Wiederherstellen einfach uebersprungen, kein Fehler. */
+function bkmpRuneLoadoutStorageKey() {
+  const name = bkmpIdleState ? bkmpIdleState.name_key : 'guest';
+  return `bkmp-idle-rune-loadout-${name}`;
+}
+function bkmpRuneHasSavedLoadout() {
+  try { return !!localStorage.getItem(bkmpRuneLoadoutStorageKey()); } catch (e) { return false; }
+}
+function bkmpRuneSaveLoadout() {
+  const equippedCids = bkmpIdlePlayerRunes.filter(r => r.equipped && r.id).map(r => ({ slot: r.rune_type, id: r.id }));
+  try { localStorage.setItem(bkmpRuneLoadoutStorageKey(), JSON.stringify(equippedCids)); } catch (e) {}
+  if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('💾 Aktuelle Ausrüstung gespeichert.', 2600);
+  bkmpIdleRenderRunenPanel();
+}
+function bkmpRuneRestoreLoadout() {
+  let saved = [];
+  try { saved = JSON.parse(localStorage.getItem(bkmpRuneLoadoutStorageKey()) || '[]'); } catch (e) { saved = []; }
+  if (!Array.isArray(saved) || saved.length === 0) return;
+  const targetIds = new Set(saved.map(s => s.id));
+  bkmpIdlePlayerRunes.filter(r => r.equipped && r.id && !targetIds.has(r.id)).forEach(r => bkmpRuneToggleEquip(r._cid));
+  saved.forEach(entry => {
+    const rune = bkmpIdlePlayerRunes.find(r => r.id === entry.id);
+    if (rune && !rune.equipped) bkmpRuneToggleEquip(rune._cid);
+  });
+  if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('♻️ Gespeicherte Ausrüstung wiederhergestellt.', 2600);
+}
+
 function bkmpIdleRenderRunenPanel() {
   const panel = document.getElementById('idlePanelRunen');
   const drawerContent = document.getElementById('idleRuneDrawerContent');
@@ -1840,9 +1875,14 @@ function bkmpIdleRenderRunenPanel() {
   }
   const viewingRune = slotOwned.find(r => r._cid === bkmpRuneCurrentlyViewing) || null;
 
+  const loadoutUnlocked = typeof bkmpPrestigeBonus === 'function' && bkmpPrestigeBonus('rune_loadout_unlock') > 0;
   panel.innerHTML = `
     <div class="idle-runen-header-row">
       <button type="button" class="btn-nein idle-runen-help-btn" id="idleRunenHelpBtn">❓ Hilfe</button>
+      ${loadoutUnlocked ? `
+        <button type="button" class="btn-nein idle-runen-loadout-btn" id="idleRuneSaveLoadoutBtn" title="Aktuelle Ausrüstung als Schnellspeicher-Slot merken">💾 Set speichern</button>
+        <button type="button" class="btn-nein idle-runen-loadout-btn" id="idleRuneRestoreLoadoutBtn" title="Gespeicherte Ausrüstung wiederherstellen" ${bkmpRuneHasSavedLoadout() ? '' : 'disabled'}>♻️ Set laden</button>
+      ` : ''}
     </div>
     <div class="idle-runen-slot-tabs" id="idleRunenSlotTabs">
       ${window.BKMP_RUNE_SLOTS.map(slot => {
@@ -2015,6 +2055,10 @@ function bkmpIdleRenderRunenPanel() {
   if (autoAscendBtn) autoAscendBtn.addEventListener('click', bkmpRuneAutoAscendAll);
   const runenHelpBtn = document.getElementById('idleRunenHelpBtn');
   if (runenHelpBtn) runenHelpBtn.addEventListener('click', bkmpIdleOpenRunenHelp);
+  const saveLoadoutBtn = document.getElementById('idleRuneSaveLoadoutBtn');
+  if (saveLoadoutBtn) saveLoadoutBtn.addEventListener('click', bkmpRuneSaveLoadout);
+  const restoreLoadoutBtn = document.getElementById('idleRuneRestoreLoadoutBtn');
+  if (restoreLoadoutBtn) restoreLoadoutBtn.addEventListener('click', bkmpRuneRestoreLoadout);
   const retryLoadBtn = document.getElementById('idleRuneRetryLoadBtn');
   if (retryLoadBtn) retryLoadBtn.addEventListener('click', bkmpRuneRetryLoad);
   drawerContent.querySelectorAll('.idle-runen-rarity-sell-btn').forEach(btn => btn.addEventListener('click', () => bkmpRuneSellAllByRarity(btn.dataset.rarity)));

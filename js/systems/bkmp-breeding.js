@@ -124,11 +124,19 @@ function bkmpDragonSkillBonus(key) {
   const totals = bkmpIdleSkillEffectTotals(bkmpIdleState.skill_allocations, bkmpIdleSkillDefs);
   return totals[key] || 0;
 }
+/* Progression-Rebalance Phase 5 (26.07.2026): Prestige-Gegenstueck zu
+   bkmpDragonSkillBonus() - identisches Muster, liest aus dem Prestige-Baum
+   statt dem Skilltree. Wird an denselben Stellen ADDITIV neben dem
+   bestehenden Skilltree-Bonus verwendet (drachenwissen/schnelle_reifung/
+   zuchtsegen, Zweig "Drachen"). */
+function bkmpDragonPrestigeBonus(key) {
+  return typeof bkmpPrestigeBonus === 'function' ? bkmpPrestigeBonus(key) : 0;
+}
 
 /* ---------------- Nester ---------------- */
 function bkmpDragonNestCost(slotIndex) {
   const base = BKMP_DRAGON_NEST_GOLD_COSTS[slotIndex - 1] ?? (BKMP_DRAGON_NEST_GOLD_COSTS[BKMP_DRAGON_NEST_GOLD_COSTS.length - 1] * 4);
-  const reductionPct = Math.min(40, bkmpDragonSkillBonus('nest_cost_pct'));
+  const reductionPct = Math.min(40, bkmpDragonSkillBonus('nest_cost_pct') + bkmpDragonPrestigeBonus('nest_cost_pct'));
   return Math.round(base * (1 - reductionPct / 100));
 }
 
@@ -217,7 +225,7 @@ async function bkmpDragonAssignEggToNest(nestId, eggId) {
 /* Brut-Pfad: Reduktion gedeckelt bei 40% (Vorgabe: "Brutzeit darf niemals
    auf null reduziert werden... zentrale maximale Reduzierung"). */
 function bkmpDragonEffectiveBroodSeconds(species) {
-  const reductionPct = Math.min(40, bkmpDragonSkillBonus('brood_time_pct'));
+  const reductionPct = Math.min(40, bkmpDragonSkillBonus('brood_time_pct') + bkmpDragonPrestigeBonus('brood_time_pct'));
   return species.brood_seconds * (1 - reductionPct / 100);
 }
 function bkmpDragonNestReady(nest) {
@@ -309,7 +317,7 @@ function bkmpDragonStorageCapacity() {
   const bought = bkmpDragonStorageExpansionsBought();
   let cap = BKMP_DRAGON_STORAGE_BASE;
   for (let i = 0; i < bought && i < BKMP_DRAGON_STORAGE_EXPANSIONS.length; i++) cap += BKMP_DRAGON_STORAGE_EXPANSIONS[i].addSlots;
-  return cap + Math.round(bkmpDragonSkillBonus('dragon_storage_flat'));
+  return cap + Math.round(bkmpDragonSkillBonus('dragon_storage_flat') + bkmpDragonPrestigeBonus('dragon_storage_flat'));
 }
 function bkmpDragonExpandStorage() {
   const bought = bkmpDragonStorageExpansionsBought();
@@ -335,7 +343,12 @@ async function bkmpDragonFeed(dragonId, amount) {
   const stock = Number(bkmpIdleState[dragon.food_preference] || 0);
   const feedAmount = Math.min(amount, stock, species.growth_points_required - dragon.growth_points);
   if (feedAmount <= 0) return;
-  bkmpIdleState[dragon.food_preference] -= feedAmount;
+  /* Prestige-Knoten "Sparsame Fuetterung" (Zweig Drachen): Chance, dass
+     dieser Fuetterungs-Vorgang kein Futter verbraucht - reiner Ressourcen-
+     Sparbonus, das Wachstum selbst (growth_points) ist davon unberuehrt. */
+  const feedSaveChancePct = Math.min(75, bkmpDragonPrestigeBonus('feed_save_chance_pct'));
+  const feedSaved = feedSaveChancePct > 0 && Math.random() * 100 < feedSaveChancePct;
+  if (!feedSaved) bkmpIdleState[dragon.food_preference] -= feedAmount;
   dragon.growth_points = Math.min(species.growth_points_required, dragon.growth_points + feedAmount);
   bkmpIdleRenderHud();
   bkmpIdleQueueSync();
@@ -411,7 +424,7 @@ function bkmpDragonGrantCompanionBattleXp(amount) {
   if (!dragon) return;
   const species = bkmpDragonSpeciesById(dragon.species_id);
   if (!species) return;
-  const bonusPct = bkmpDragonSubstatBonus('dragon_xp_bonus_pct') + bkmpDragonSkillBonus('dragon_xp_pct');
+  const bonusPct = bkmpDragonSubstatBonus('dragon_xp_bonus_pct') + bkmpDragonSkillBonus('dragon_xp_pct') + bkmpDragonPrestigeBonus('dragon_xp_pct');
   const gained = Math.round(amount * (1 + bonusPct / 100));
   dragon.battle_xp = Math.min(species.battle_xp_required, dragon.battle_xp + gained);
   updatePlayerDragon(dragon.id, { battle_xp: dragon.battle_xp }).catch(() => {});
@@ -567,7 +580,11 @@ const BKMP_DRAGON_RESOURCE_CAP_BASE = 2000;
 const BKMP_DRAGON_BUILDING_MAX_LEVEL = 30;
 function bkmpDragonResourceRatePerHour(kind, level) {
   const companionBonusPct = bkmpDragonSubstatBonus(kind === 'fruit' ? 'fruit_bonus_pct' : 'meat_bonus_pct');
-  const skillBonusPct = bkmpDragonSkillBonus(kind === 'fruit' ? 'fruit_prod_pct' : 'meat_prod_pct');
+  /* Progression-Rebalance Phase 5 (26.07.2026): 'futtermeister' (Zweig
+     Drachen) wirkt bewusst auf BEIDE Ressourcen aus einem einzigen Knoten
+     (effectType 'fruit_meat_prod_pct') - gleiches Muster wie 'reiche_ernte'
+     bei Holz/Stein (siehe idledorf.js). */
+  const skillBonusPct = bkmpDragonSkillBonus(kind === 'fruit' ? 'fruit_prod_pct' : 'meat_prod_pct') + bkmpDragonPrestigeBonus('fruit_meat_prod_pct');
   /* Spieler-Vorgabe 17.07. nachts ("Spätere Prestige-Stufen erhöhen
      zusätzlich sämtliche Produktionsgebäude prozentual"): Obstgarten/
      Jagdhütte zaehlen als Produktionsgebaeude genau wie die neuen 6
@@ -585,7 +602,9 @@ function bkmpDragonResourceCap(level) {
    nicht in den gemeinsamen t()-Topf gehoert. Kostenkurve nutzt trotzdem
    dieselbe bkmpIdleGrowthMult-Formel wie alle anderen Upgrades. */
 function bkmpDragonBuildingCost(level) {
-  return Math.round(2000 * bkmpIdleGrowthMult(0.28, 2.1, level));
+  const raw = 2000 * bkmpIdleGrowthMult(0.28, 2.1, level);
+  const discountPct = typeof bkmpPrestigeBonus === 'function' ? Math.min(40, bkmpPrestigeBonus('building_cost_reduction_pct')) : 0;
+  return Math.max(1, Math.round(raw * (1 - discountPct / 100)));
 }
 async function bkmpDragonUpgradeBuilding(kind) {
   if (!bkmpIdleState) return;
@@ -899,18 +918,39 @@ function bkmpIdleRollAdultDragonStats(species) {
 }
 
 /* ---------------- Effekt-Totals fuer bkmpIdleRecomputeEffectiveStats ---------------- */
+/* Progression-Rebalance Phase 5 (26.07.2026): 4 neue Prestige-Knoten aus
+   Zweig "Drachen" wirken NUR, solange ein erwachsener Begleitdrache aktiv
+   ist ("solange ein Begleitdrache aktiv ist") - das ergibt sich hier
+   automatisch aus dem bereits bestehenden fruehen "kein Begleiter -> leere
+   Totals"-Ausstieg, ohne eine eigene Praesenzpruefung noetig zu machen.
+   drachenmacht/maechtige_abstammung/aktiver_begleiter multiplizieren die
+   VOM BEGLEITER SELBST beigetragenen Werte (nicht die des Spielers
+   insgesamt) - passive_bindung speist stattdessen direkt in die
+   Dorf-Regeneration (siehe bkmpIdleRecomputeEffectiveStats, villageRegenPct). */
 function bkmpIdleDragonCompanionEffectTotals() {
   const totals = {};
   const dragon = bkmpPlayerDragons.find(d => d.is_companion && d.stage === 'adult');
   if (!dragon) return totals;
-  if (dragon.stat_attack) totals.attack_flat = (totals.attack_flat || 0) + bkmpDragonAscendedMainStat(dragon, dragon.stat_attack);
-  if (dragon.stat_defense) totals.defense_flat = (totals.defense_flat || 0) + bkmpDragonAscendedMainStat(dragon, dragon.stat_defense);
-  if (dragon.stat_hp) totals.hp_flat = (totals.hp_flat || 0) + bkmpDragonAscendedMainStat(dragon, dragon.stat_hp);
+  const prestigeTotals = typeof bkmpPrestigeEffectTotals === 'function' ? bkmpPrestigeEffectTotals(bkmpPrestigeState ? bkmpPrestigeState.prestige_allocations : null) : {};
+  const mainStatBoostPct = Math.min(200, (prestigeTotals.companion_stat_pct || 0) + (prestigeTotals.companion_all_stat_pct || 0));
+  const attackBoostPct = mainStatBoostPct + Math.min(200, prestigeTotals.companion_dmg_pct || 0);
+  const substatBoostPct = Math.min(200, prestigeTotals.companion_all_stat_pct || 0);
+  if (dragon.stat_attack) totals.attack_flat = (totals.attack_flat || 0) + bkmpDragonAscendedMainStat(dragon, dragon.stat_attack) * (1 + attackBoostPct / 100);
+  if (dragon.stat_defense) totals.defense_flat = (totals.defense_flat || 0) + bkmpDragonAscendedMainStat(dragon, dragon.stat_defense) * (1 + mainStatBoostPct / 100);
+  if (dragon.stat_hp) totals.hp_flat = (totals.hp_flat || 0) + bkmpDragonAscendedMainStat(dragon, dragon.stat_hp) * (1 + mainStatBoostPct / 100);
   (dragon.substats || []).forEach(s => {
     if (['fruit_bonus_pct', 'meat_bonus_pct', 'dragon_xp_bonus_pct'].includes(s.stat)) return;
-    totals[s.stat] = (totals[s.stat] || 0) + Number(s.value || 0);
+    totals[s.stat] = (totals[s.stat] || 0) + Number(s.value || 0) * (1 + substatBoostPct / 100);
   });
   return totals;
+}
+/* Passive Bindung (Prestige, Zweig Drachen) - Bonus existiert nur, solange
+   ein erwachsener Begleitdrache aktiv ist, siehe Kommentar oben. */
+function bkmpDragonCompanionPassiveRegenPct() {
+  const dragon = bkmpPlayerDragons.find(d => d.is_companion && d.stage === 'adult');
+  if (!dragon) return 0;
+  const prestigeTotals = typeof bkmpPrestigeEffectTotals === 'function' ? bkmpPrestigeEffectTotals(bkmpPrestigeState ? bkmpPrestigeState.prestige_allocations : null) : {};
+  return Number(prestigeTotals.companion_passive_regen_pct || 0);
 }
 
 function bkmpIdleRenderDragonsPanel() {

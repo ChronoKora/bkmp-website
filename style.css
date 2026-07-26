@@ -4064,8 +4064,10 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 .achievements-card .joke-buttons { margin-top: 1rem; justify-content: space-between; }
 
 /* ---------------- Runen-Tab (siehe idledorf.js) ---------------- */
-.idle-runen-header-row { display: flex; justify-content: flex-end; margin-bottom: 0.7rem; }
+.idle-runen-header-row { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: flex-end; margin-bottom: 0.7rem; }
 .idle-runen-help-btn { padding: 0.4rem 0.8rem; font-size: 0.76rem; white-space: nowrap; }
+.idle-runen-loadout-btn { padding: 0.4rem 0.7rem; font-size: 0.72rem; white-space: nowrap; }
+.idle-runen-loadout-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 /* Hauptzeile im Runen-Tab: Kreis links, Detail-/Aktionsbox rechts daneben
    (Nutzer-Wunsch, 15.07.: "links das Runenkreis, rechts daneben die Stats
    der Rune"). Das Lager selbst sitzt NICHT mehr hier, sondern im
@@ -6391,6 +6393,17 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 .idle-upgrade-effect-arrow { color: var(--muted); }
 .idle-upgrade-effect-next { color: var(--gold); font-weight: 600; }
 .idle-upgrade-card.is-maxed .idle-upgrade-effect-current { color: var(--gold); font-weight: 600; }
+/* Progression-Rebalance Phase 3/4 (26.07.2026): Softcap-Zone/Meilenstein-
+   Hinweis - bewusst kleiner/gedaempfter als die Effekt-Zeilen (Zusatzinfo,
+   nicht der Haupt-Blickfang der Karte). */
+.idle-upgrade-zone-note { font-size: 0.68rem; color: var(--muted); overflow-wrap: break-word; }
+.idle-upgrade-milestone-note { font-size: 0.68rem; color: var(--gold); overflow-wrap: break-word; }
+/* Progression-Rebalance Phase 10 (26.07.2026): Gebaeude-Ueberladung. */
+.idle-building-overload-row { margin-bottom: 0.8rem; }
+.idle-building-overload-active { font-size: 0.78rem; color: var(--gold); font-weight: 600; margin-bottom: 0.4rem; }
+.idle-building-overload-tiers { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.idle-building-overload-btn { padding: 0.35rem 0.6rem; font-size: 0.72rem; }
+.idle-building-overload-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .idle-upgrade-buy { width: 100%; padding: 0.4rem 0.6rem; font-size: 0.78rem; margin-top: auto; }
 .idle-upgrade-buy:disabled { opacity: 0.5; cursor: not-allowed; }
 .idle-upgrade-section-title { font-size: 0.95rem; margin: 1.2rem 0 0.6rem; }
@@ -6588,6 +6601,23 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 @media (max-width: 640px) {
   .idle-prestige-columns { grid-template-columns: 1fr; }
 }
+
+/* Progression-Rebalance Phase 5-8/14 (26.07.2026): Zweig-Tabs + Meilenstein-
+   Zusammenfassung + Paragon-Reihe im erweiterten Prestige-Baum. */
+.idle-prestige-section-milestones { border-color: color-mix(in srgb, #a78bfa 30%, var(--line)); }
+.idle-prestige-milestone-summary { font-weight: 600; color: var(--ink); margin-bottom: 0.2rem; }
+.idle-prestige-branch-tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.5rem 0 0.8rem; }
+.idle-prestige-branch-tab { padding: 0.4rem 0.7rem; font-size: 0.78rem; border-radius: 999px; border: 1px solid var(--line); background: var(--paper); color: var(--muted); cursor: pointer; }
+.idle-prestige-branch-tab.active { border-color: var(--gold); color: var(--gold); font-weight: 600; }
+.idle-prestige-branch-tab.is-locked { opacity: 0.55; cursor: not-allowed; }
+.idle-upgrade-card.idle-prestige-needs-sql { border-color: color-mix(in srgb, #f59e0b 35%, var(--line)); }
+.idle-prestige-paragon-row { font-size: 0.74rem; color: #c4b5fd; margin: -0.2rem 0 0.1rem; }
+.idle-prestige-buy-paragon { width: 100%; padding: 0.35rem 0.6rem; font-size: 0.74rem; }
+.idle-prestige-buy-paragon:disabled { opacity: 0.5; cursor: not-allowed; }
+.idle-prestige-tab-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 14px; height: 14px; padding: 0 3px; margin-left: 0.3rem; border-radius: 999px; background: #f87171; color: #1a0a0a; font-size: 0.62rem; font-weight: 800; vertical-align: middle; }
+.idle-prestige-allocate-btn { margin: 0.4rem 0 0.8rem; }
+.idle-prestige-section-ascension { border-color: color-mix(in srgb, #facc15 35%, var(--line)); }
+.idle-ascension-btn { width: 100%; margin-top: 0.4rem; }
 
 /* ---- Section C (18.07.): Prestige-Bestaetigungsdialog (2-stufig, siehe
    #idlePrestigeConfirmOverlay in index.html - ein Overlay, zwei per

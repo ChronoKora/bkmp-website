@@ -71,9 +71,25 @@ function bkmpIdleMaintenancePoll() {
    gewaehlt, dass Stufe 50 (alte Obergrenze) noch aehnlich viel kostet wie
    vorher, die neue Obergrenze aber ein spuerbares Langzeitziel bleibt statt
    unerreichbar zu sein. */
+/* Progression-Rebalance Phase 2 (26.07.2026, siehe PROGRESSION_REBALANCE_PHASE1.md):
+   Caps nochmal deutlich angehoben (500->2.500 / 5.000->20.000 / 100->150
+   bzw. 500 je nach Typ) - Ausgangslage war ein per echten Produktionsdaten
+   (Spieler Danw_90, Stufe ~3200) bewiesenes Problem: das ALTE Cap 500 war
+   in nur 3 Minuten Spielzeit erreichbar, das naiv 5-fach erhoehte Cap 2.500
+   in nur 1,8 Stunden (siehe Simulationstabelle in PROGRESSION_REBALANCE_
+   PHASE1.md Abschnitt 12) - eine reine Cap-Erhoehung OHNE das neue Softcap-
+   System weiter unten (BKMP_IDLE_UPGRADE_SOFTCAP_CFG) wuerde das Problem
+   also nur um Stunden verschieben, nicht loesen. 'crit' (Krit-CHANCE, keine
+   Prozent-Menge) bekommt bewusst NUR ein moderates Cap 150 statt der vollen
+   5x/500er-Regel - die absolute Krit-Chance ist an anderer Stelle
+   (bkmpIdleRecomputeEffectiveStats, Math.min(75,...)) ohnehin hart auf 75%
+   gedeckelt, ein hoeheres lokales Upgrade-Cap waere fuer die meisten
+   Spieler bereits durch andere Quellen (Skilltree/Runen/Titel) wirkungslos
+   - "keine Prozentwerte, die das Spiel numerisch zerstoeren, Werte nicht
+   blind linear fortfuehren" (Auftrag Phase 2). */
 const BKMP_IDLE_UPGRADES = [
-  { id: 'atk', name: 'Waffenschmiede', desc: '+1 Angriff pro Stufe.', icon: '⚔️', resource: 'gold', baseCost: 35, costRate: 0.25, costExponent: 2.3, effectType: 'attack_flat', effectPerLevel: 1, maxLevel: 500 },
-  { id: 'def', name: 'Rüstkammer', desc: '+1 Verteidigung pro Stufe.', icon: '🛡️', resource: 'gold', baseCost: 35, costRate: 0.25, costExponent: 2.3, effectType: 'defense_flat', effectPerLevel: 1, maxLevel: 500 },
+  { id: 'atk', name: 'Waffenschmiede', desc: '+1 Angriff pro Stufe.', icon: '⚔️', resource: 'gold', baseCost: 35, costRate: 0.25, costExponent: 2.3, effectType: 'attack_flat', effectPerLevel: 1, maxLevel: 2500 },
+  { id: 'def', name: 'Rüstkammer', desc: '+1 Verteidigung pro Stufe.', icon: '🛡️', resource: 'gold', baseCost: 35, costRate: 0.25, costExponent: 2.3, effectType: 'defense_flat', effectPerLevel: 1, maxLevel: 2500 },
   /* maxLevel 500 -> 5000 (Balance-Audit-Fix 16.07.): hp_flat/defense_flat
      sind FLACHE Boni ohne gemeinsamen Prozent-Deckel (im Unterschied zu
      z.B. crit_chance/loot_chance_pct weiter unten) - ihr relativer Nutzen
@@ -83,17 +99,17 @@ const BKMP_IDLE_UPGRADES = [
      Verwendungszweck mehr, wurden aber von den Produktionsgebaeuden
      weiter unbegrenzt nachproduziert - jetzt ein echtes Langzeitziel statt
      einer toten Ressource. */
-  { id: 'hp', name: 'Vorratshaus', desc: '+5 Leben pro Stufe.', icon: '❤️', resource: 'wood', baseCost: 25, costRate: 0.22, costExponent: 2.2, effectType: 'hp_flat', effectPerLevel: 5, maxLevel: 5000 },
-  { id: 'walls', name: 'Steinmauern', desc: '+1 Verteidigung pro Stufe.', icon: '🧱', resource: 'stone', baseCost: 25, costRate: 0.22, costExponent: 2.2, effectType: 'defense_flat', effectPerLevel: 1, maxLevel: 5000 },
-  { id: 'crit', name: 'Zielübung', desc: '+1 Krit-Chance pro Stufe.', icon: '🎯', resource: 'essence', baseCost: 6, costRate: 0.2, costExponent: 1.8, effectType: 'crit_chance_flat', effectPerLevel: 1, maxLevel: 100 },
+  { id: 'hp', name: 'Vorratshaus', desc: '+5 Leben pro Stufe.', icon: '❤️', resource: 'wood', baseCost: 25, costRate: 0.22, costExponent: 2.2, effectType: 'hp_flat', effectPerLevel: 5, maxLevel: 20000 },
+  { id: 'walls', name: 'Steinmauern', desc: '+1 Verteidigung pro Stufe.', icon: '🧱', resource: 'stone', baseCost: 25, costRate: 0.22, costExponent: 2.2, effectType: 'defense_flat', effectPerLevel: 1, maxLevel: 20000 },
+  { id: 'crit', name: 'Zielübung', desc: '+1 Krit-Chance pro Stufe.', icon: '🎯', resource: 'essence', baseCost: 6, costRate: 0.2, costExponent: 1.8, effectType: 'crit_chance_flat', effectPerLevel: 1, maxLevel: 150 },
   /* NACHBESSERUNG (Spieler-Report 13.07.: "ich bin schon bei 🍀 +49% obwohl
      ich noch keine Runen habe, das muss runter skaliert werden") - maxLevel
      300 x effectPerLevel 2 ergab bis zu +600% aus JEWEILS NUR EINEM einzigen
      Upgrade, obendrauf zu Skilltree/Titeln/Runen. Auf denselben Rahmen wie
      'crit' oben gebracht (maxLevel 100 x 1%/Stufe = max +100% pro Upgrade) -
      zusaetzlich zur harten Gesamt-Obergrenze in bkmpIdleRecomputeEffectiveStats. */
-  { id: 'crystal_gold', name: 'Kristallschliff', desc: '+1% Gold-Ausbeute pro Stufe.', icon: '💎', resource: 'crystals', baseCost: 5, costRate: 0.22, costExponent: 2, effectType: 'gold_prod_pct', effectPerLevel: 1, maxLevel: 100 },
-  { id: 'essence_loot', name: 'Essenzbindung', desc: '+1% Lootchance pro Stufe.', icon: '🧪', resource: 'essence', baseCost: 4, costRate: 0.22, costExponent: 2, effectType: 'loot_chance_pct', effectPerLevel: 1, maxLevel: 100 },
+  { id: 'crystal_gold', name: 'Kristallschliff', desc: '+1% Gold-Ausbeute pro Stufe.', icon: '💎', resource: 'crystals', baseCost: 5, costRate: 0.22, costExponent: 2, effectType: 'gold_prod_pct', effectPerLevel: 1, maxLevel: 500 },
+  { id: 'essence_loot', name: 'Essenzbindung', desc: '+1% Lootchance pro Stufe.', icon: '🧪', resource: 'essence', baseCost: 4, costRate: 0.22, costExponent: 2, effectType: 'loot_chance_pct', effectPerLevel: 1, maxLevel: 500 },
   /* Neu (Balance-Audit-Fix 16.07.): 'crit' und 'essence_loot' oben sind
      Essenz's einzige bisherige Sinks, fuettern aber beide einen gedeckelten
      Pott (crit_chance absolut auf 75, loot_chance_pct auf 300% - siehe
@@ -101,7 +117,7 @@ const BKMP_IDLE_UPGRADES = [
      Essenzkern schliesst dieselbe Luecke wie 'hp'/'walls' oben, nur fuer
      Essenz statt Holz/Stein - flacher, ungedeckelter Angriffsbonus als
      echtes Langzeitziel. */
-  { id: 'essence_core', name: 'Essenzkern', desc: '+2 Angriff pro Stufe.', icon: '🔮', resource: 'essence', baseCost: 8, costRate: 0.22, costExponent: 2.0, effectType: 'attack_flat', effectPerLevel: 2, maxLevel: 5000 },
+  { id: 'essence_core', name: 'Essenzkern', desc: '+2 Angriff pro Stufe.', icon: '🔮', resource: 'essence', baseCost: 8, costRate: 0.22, costExponent: 2.0, effectType: 'attack_flat', effectPerLevel: 2, maxLevel: 20000 },
   /* Nutzerwunsch 19.07.: "Diamanten Verhärtung wie essenzkern Angriff nur
      mit Verteidigung - weil du sonst keine Ausgabe mehr mit Diamanten
      hast.. sie liegen nur noch rum". Genau dieselbe Luecke wie bei
@@ -111,8 +127,101 @@ const BKMP_IDLE_UPGRADES = [
      essence_core (keine neu erfundenen Balance-Werte) - nur Ressource
      (crystals statt essence) und Effekt (Verteidigung statt Angriff)
      getauscht. */
-  { id: 'crystal_defense', name: 'Diamantenhärtung', desc: '+2 Verteidigung pro Stufe.', icon: '💠', resource: 'crystals', baseCost: 8, costRate: 0.22, costExponent: 2.0, effectType: 'defense_flat', effectPerLevel: 2, maxLevel: 5000 }
+  { id: 'crystal_defense', name: 'Diamantenhärtung', desc: '+2 Verteidigung pro Stufe.', icon: '💠', resource: 'crystals', baseCost: 8, costRate: 0.22, costExponent: 2.0, effectType: 'defense_flat', effectPerLevel: 2, maxLevel: 20000 }
 ];
+
+/* Progression-Rebalance Phase 3 (26.07.2026): zentrale, pro Upgrade
+   konfigurierbare Softcap-Zonen statt eines einzelnen harten Stopps bei
+   maxLevel. Jedes Upgrade behaelt maxLevel als absoluten Endpunkt, bekommt
+   aber zwei innere Schwellen: bis softCap1 voller Bonus (100%) zu normalen
+   Kosten; zwischen softCap1 und softCap2 sinkt der Bonus PRO NEU GEKAUFTEM
+   RANG auf bonusMultiplierAfterSoftCap1 (bereits gekaufte Raenge VOR der
+   Schwelle behalten ihren vollen Wert - additiv pro Rang, keine
+   rueckwirkende Kuerzung), gleichzeitig steigt der Kosten-Exponent um
+   costMultiplierAfterSoftCap1 (staerkere Kostensteigerung). Ab softCap2
+   nochmal reduzierter Bonus/staerkere Kosten. Ergebnis: es bleibt IMMER
+   etwas kaufbar (kein harter Fortschrittsstopp vor maxLevel), aber der
+   Grenznutzen sinkt spuerbar. softCap1/softCap2 fuer atk/def/hp/walls
+   orientieren sich an den im Auftrag genannten Beispielwerten (25%/50%
+   des jeweiligen neuen Caps), Details siehe PROGRESSION_REBALANCE_PHASE1.md
+   Abschnitt 12 (Simulationsbeweis: ohne Softcaps erreicht ein Level-2000-
+   Spieler mit echten Produktionsdaten sogar das 5-fach erhoehte Cap noch
+   in unter 2 Stunden). Kein Upgrade in dieser Map -> Standardverhalten
+   (volle Rate bis maxLevel, kein Softcap) - sicherer Default fuer
+   kuenftige neue Upgrades, die hier bewusst noch nicht eingetragen sind. */
+/* Nachbesserung (Phase 15 Balance-Simulation, 26.07.2026): die urspruenglich
+   gewaehlten Kosten-Multiplikatoren (1.35/1.7 auf den Kosten-EXPONENTEN,
+   nicht auf die Kosten selbst) klangen moderat, ergaben aber bei genauerem
+   Nachrechnen fuer den LETZTEN Rang (2.500) eine ~31.784-fache Verteuerung
+   gegenueber Rang 624 - selbst ein Endgame-Spieler mit den echten Danw_90-
+   Produktionsdaten haette dafuer ueber 750 TAGE gebraucht (siehe scripts/
+   balance-sim/phase15-softcap-validation.js) - das waere in der Praxis
+   wieder ein harter Stopp gewesen, nur zahlenmaessig als "Softcap" verkleidet.
+   Gemildert auf 1.08/1.18 - ergibt am Ende noch eine reale, aber deutlich
+   vernuenftigere ~346-fache Verteuerung (letzter Rang fuer einen Endgame-
+   Spieler ca. 8 Std., fuer einen Level-2000-Spieler ca. 1 Tag) - spuerbar
+   langsamer als vorher, aber kein monatelanger/jahrelanger Stillstand. */
+const BKMP_IDLE_UPGRADE_SOFTCAP_CFG = {
+  atk: { softCap1: 625, softCap2: 1250, bonusMultiplierAfterSoftCap1: 0.5, bonusMultiplierAfterSoftCap2: 0.25, costMultiplierAfterSoftCap1: 1.08, costMultiplierAfterSoftCap2: 1.18 },
+  def: { softCap1: 625, softCap2: 1250, bonusMultiplierAfterSoftCap1: 0.5, bonusMultiplierAfterSoftCap2: 0.25, costMultiplierAfterSoftCap1: 1.08, costMultiplierAfterSoftCap2: 1.18 },
+  hp: { softCap1: 5000, softCap2: 10000, bonusMultiplierAfterSoftCap1: 0.5, bonusMultiplierAfterSoftCap2: 0.25, costMultiplierAfterSoftCap1: 1.08, costMultiplierAfterSoftCap2: 1.18 },
+  walls: { softCap1: 5000, softCap2: 10000, bonusMultiplierAfterSoftCap1: 0.5, bonusMultiplierAfterSoftCap2: 0.25, costMultiplierAfterSoftCap1: 1.08, costMultiplierAfterSoftCap2: 1.18 },
+  essence_core: { softCap1: 5000, softCap2: 10000, bonusMultiplierAfterSoftCap1: 0.5, bonusMultiplierAfterSoftCap2: 0.25, costMultiplierAfterSoftCap1: 1.08, costMultiplierAfterSoftCap2: 1.18 },
+  crystal_defense: { softCap1: 5000, softCap2: 10000, bonusMultiplierAfterSoftCap1: 0.5, bonusMultiplierAfterSoftCap2: 0.25, costMultiplierAfterSoftCap1: 1.08, costMultiplierAfterSoftCap2: 1.18 },
+  crit: { softCap1: 75, softCap2: 120, bonusMultiplierAfterSoftCap1: 0.5, bonusMultiplierAfterSoftCap2: 0.25, costMultiplierAfterSoftCap1: 1.06, costMultiplierAfterSoftCap2: 1.14 },
+  crystal_gold: { softCap1: 250, softCap2: 400, bonusMultiplierAfterSoftCap1: 0.5, bonusMultiplierAfterSoftCap2: 0.25, costMultiplierAfterSoftCap1: 1.06, costMultiplierAfterSoftCap2: 1.14 },
+  essence_loot: { softCap1: 250, softCap2: 400, bonusMultiplierAfterSoftCap1: 0.5, bonusMultiplierAfterSoftCap2: 0.25, costMultiplierAfterSoftCap1: 1.06, costMultiplierAfterSoftCap2: 1.14 }
+};
+function bkmpIdleUpgradeSoftcapCfg(def) {
+  return BKMP_IDLE_UPGRADE_SOFTCAP_CFG[def.id] || { softCap1: def.maxLevel, softCap2: def.maxLevel, bonusMultiplierAfterSoftCap1: 1, bonusMultiplierAfterSoftCap2: 1, costMultiplierAfterSoftCap1: 1, costMultiplierAfterSoftCap2: 1 };
+}
+
+/* Progression-Rebalance Phase 4 (26.07.2026): Upgrade-Meilensteine.
+   Deterministisch aus dem Rang berechenbar (keine eigene Claim-Funktion,
+   kein extra gespeicherter Zustand noetig, ueberlebt Reload automatisch,
+   kann nie doppelt vergeben werden) - reiner "wie viele der festen
+   Meilenstein-Raenge liegen bei Rang X bereits dahinter"-Zaehler. Jedes
+   Upgrade bekommt einen KOMPLEMENTAEREN Bonus-Typ (nicht seinen eigenen
+   Haupteffekt nochmal) als kleinen Zusatzanreiz - z.B. Waffenschmiede
+   (Angriff) gibt bei jedem Meilenstein etwas Bossschaden statt einfach
+   noch mehr Angriff. BKMP_IDLE_UPGRADE_MILESTONE_RANKS wird pro Upgrade
+   automatisch auf dessen eigenes maxLevel gekappt (bkmpIdleUpgradeMilestonesForDef)
+   - ein Upgrade mit Cap 150 (crit) bekommt dadurch automatisch nur die
+   Meilensteine 25/50/100, nicht 500/1000. */
+const BKMP_IDLE_UPGRADE_MILESTONE_RANKS = [25, 50, 100, 500, 1000];
+const BKMP_IDLE_UPGRADE_MILESTONE_BONUS = {
+  atk: { effectType: 'boss_dmg_pct', perMilestone: 1 },
+  def: { effectType: 'defense_pct', perMilestone: 1 },
+  hp: { effectType: 'hp_pct', perMilestone: 1 },
+  walls: { effectType: 'defense_pct', perMilestone: 1 },
+  crit: { effectType: 'crit_damage_pct', perMilestone: 2 },
+  crystal_gold: { effectType: 'gold_prod_pct', perMilestone: 2 },
+  essence_loot: { effectType: 'loot_chance_pct', perMilestone: 2 },
+  essence_core: { effectType: 'attack_pct', perMilestone: 1 },
+  crystal_defense: { effectType: 'defense_pct', perMilestone: 1 }
+};
+function bkmpIdleUpgradeMilestonesForDef(def) {
+  return BKMP_IDLE_UPGRADE_MILESTONE_RANKS.filter(m => m <= def.maxLevel);
+}
+function bkmpIdleUpgradeMilestonesReached(def, level) {
+  return bkmpIdleUpgradeMilestonesForDef(def).filter(m => level >= m).length;
+}
+function bkmpIdleUpgradeNextMilestone(def, level) {
+  return bkmpIdleUpgradeMilestonesForDef(def).find(m => level < m) || null;
+}
+function bkmpIdleUpgradeMilestoneEffectTotals(purchases) {
+  const totals = {};
+  const p = purchases || {};
+  BKMP_IDLE_UPGRADES.forEach(def => {
+    const cfg = BKMP_IDLE_UPGRADE_MILESTONE_BONUS[def.id];
+    if (!cfg) return;
+    const level = Number(p[def.id] || 0);
+    const reached = bkmpIdleUpgradeMilestonesReached(def, level);
+    if (reached <= 0) return;
+    totals[cfg.effectType] = (totals[cfg.effectType] || 0) + reached * cfg.perMilestone;
+  });
+  return totals;
+}
 
 /* ---------------- Fallback-Daten (falls SQL-Migration noch nicht lief / Supabase nicht erreichbar) ---------------- */
 
@@ -388,7 +497,20 @@ function bkmpIdleRecomputeEffectiveStats() {
   const prestigeTotals = bkmpPrestigeEffectTotals(bkmpPrestigeState ? bkmpPrestigeState.prestige_allocations : null);
   const runeTotals = bkmpIdleRuneEffectTotals();
   const dragonTotals = bkmpIdleDragonCompanionEffectTotals();
-  const t = key => (skillTotals[key] || 0) + (upgradeTotals[key] || 0) + (titleTotals[key] || 0) + (prestigeTotals[key] || 0) + (runeTotals[key] || 0) + (dragonTotals[key] || 0);
+  /* Progression-Rebalance Phase 4 (26.07.2026): deterministische Upgrade-
+     Meilensteine (siehe bkmpIdleUpgradeMilestoneEffectTotals oben) fliessen
+     wie jede andere Quelle einfach mit in denselben Sammel-Pott. */
+  const upgradeMilestoneTotals = typeof bkmpIdleUpgradeMilestoneEffectTotals === 'function' ? bkmpIdleUpgradeMilestoneEffectTotals(bkmpIdleState.upgrade_purchases) : {};
+  /* Progression-Rebalance Phase 7 (26.07.2026): Prestige-Meilensteine
+     (nach insgesamt investierten Punkten, siehe bkmpPrestigeMilestone*
+     in bkmp-prestige.js) fliessen wie jede andere Quelle in denselben
+     Sammel-Pott. */
+  const prestigeMilestoneTotals = typeof bkmpPrestigeMilestoneEffectTotals === 'function' ? bkmpPrestigeMilestoneEffectTotals(bkmpPrestigeState ? Number(bkmpPrestigeState.prestige_points_spent || 0) : 0) : {};
+  /* Progression-Rebalance Phase 9 (26.07.2026): Drachenseelen-Boni (zweite
+     Prestige-Ebene "Aufstieg") fliessen wie jede andere Quelle in denselben
+     Sammel-Pott. */
+  const ascensionTotals = typeof bkmpAscensionEffectTotals === 'function' ? bkmpAscensionEffectTotals() : {};
+  const t = key => (skillTotals[key] || 0) + (upgradeTotals[key] || 0) + (titleTotals[key] || 0) + (prestigeTotals[key] || 0) + (runeTotals[key] || 0) + (dragonTotals[key] || 0) + (upgradeMilestoneTotals[key] || 0) + (prestigeMilestoneTotals[key] || 0) + (ascensionTotals[key] || 0);
   const prevMaxHp = bkmpIdleEffectiveStats ? bkmpIdleEffectiveStats.hp : null;
   const prevTickMs = bkmpIdleEffectiveStats ? bkmpIdleEffectiveStats.tickIntervalMs : null;
   /* extra_archer (Dorf) und ballista_unlock (Dorf) hatten vorher gar keinen
@@ -424,7 +546,18 @@ function bkmpIdleRecomputeEffectiveStats() {
   const guildTechTotals = bkmpIdleGetGuildTechCache();
   const gt = key => guildTechTotals[key] || 0;
   const guildPrestigeBonusPct = gt('prestigePct');
-  const attackPctTotal = Math.min(500, t('attack_pct') + t('extra_archer') * 6 + prestigeLevelBonusPct + guildBonusPct + gt('attackPct') + guildPrestigeBonusPct);
+  /* Progression-Rebalance Phase 2 (26.07.2026): die Sammel-Pott-Obergrenzen
+     (500/400/300/300) stammen aus einer Zeit vor den hier erweiterten
+     Upgrade-Caps UND dem in Phase 5 stark vergroesserten Prestige-Baum -
+     ohne Anhebung waeren die neuen, hoeheren Einzel-Cap-Werte (z.B.
+     crystal_gold jetzt bis zu +500% statt +100%) fuer jeden Spieler, der
+     den Pott bereits anderweitig fuellt (Skilltree/Prestige/Gilden-Tech),
+     komplett wirkungslos - genau das in PROGRESSION_REBALANCE_PHASE1.md
+     Abschnitt 1 dokumentierte Risiko. Deckel grosszuegig auf das ca.
+     4-5-fache angehoben (proportional zur Groessenordnung der neuen
+     Upgrade-/Prestige-Caps), NICHT entfernt - bleibt weiterhin eine echte
+     Obergrenze gegen Zahlenexplosion, nur auf einem zeitgemaessen Niveau. */
+  const attackPctTotal = Math.min(2000, t('attack_pct') + t('extra_archer') * 6 + prestigeLevelBonusPct + guildBonusPct + gt('attackPct') + guildPrestigeBonusPct);
   const attackFlatTotal = t('attack_flat') + t('ballista_unlock') * 8;
   bkmpIdleEffectiveStats = {
     attack: (base.attack + attackFlatTotal) * (1 + attackPctTotal / 100),
@@ -434,23 +567,28 @@ function bkmpIdleRecomputeEffectiveStats() {
        sind alle gedeckelt, dieser hier war es nicht) - da Schaden im Kampf
        als FESTER Abzug (0.5 * defense) statt prozentual gerechnet wird,
        haette unbegrenztes defense_pct jeden Kampf (inkl. Dungeon) trivial
-       machen koennen. 400 spiegelt den bestehenden Deckel von hp_pct/
-       goldBonus/xpBonus weiter unten. */
-    defense: (base.defense + t('defense_flat')) * (1 + Math.min(400, t('defense_pct') + guildBonusPct + gt('defensePct')) / 100),
+       machen koennen. 2000 spiegelt den (Phase 2, 26.07.) angehobenen
+       Deckel von goldBonus/xpBonus weiter unten. */
+    defense: (base.defense + t('defense_flat')) * (1 + Math.min(2000, t('defense_pct') + guildBonusPct + gt('defensePct')) / 100),
     hp: Math.round((base.hp + t('hp_flat')) * (1 + (t('hp_pct') + prestigeLevelBonusPct + guildPrestigeBonusPct) / 100)),
     critChance: Math.min(75, base.critChance + t('crit_chance_flat') + t('crit_chance_pct') + gt('critChancePct')),
-    critDamage: base.critDamage + Math.min(300, t('crit_damage_flat') + t('crit_damage_pct') + gt('critDamagePct')),
-    goldBonus: Math.min(400, base.goldBonus + t('gold_prod_pct') + t('gold_find_pct') + prestigeLevelBonusPct + guildBonusPct + gt('goldPct') + guildPrestigeBonusPct),
-    xpBonus: Math.min(400, base.xpBonus + t('xp_pct') + prestigeLevelBonusPct + gt('xpPct') + guildPrestigeBonusPct),
-    lootBonus: Math.min(300, base.lootBonus + t('loot_chance_pct')),
+    critDamage: base.critDamage + Math.min(900, t('crit_damage_flat') + t('crit_damage_pct') + gt('critDamagePct')),
+    goldBonus: Math.min(2000, base.goldBonus + t('gold_prod_pct') + t('gold_find_pct') + prestigeLevelBonusPct + guildBonusPct + gt('goldPct') + guildPrestigeBonusPct),
+    xpBonus: Math.min(2000, base.xpBonus + t('xp_pct') + prestigeLevelBonusPct + gt('xpPct') + guildPrestigeBonusPct),
+    lootBonus: Math.min(1500, base.lootBonus + t('loot_chance_pct')),
     /* Gilden-Technologie "Bossschaden" - siehe bkmpIdleApplyBossDamageBonus,
        wirkt NUR an den Boss-Kampfstellen (Weltboss-Raid, Gildenboss), nicht
        auf den normalen Drachen-Schaden hier. */
     bossDamageBonus: gt('bossDamagePct') + t('boss_dmg_pct'),
     /* Ab hier: Effekte, die vorher komplett wirkungslos im Skilltree lagen
        (kompletter Magie-Zweig + Teile von Burg/Wirtschaft). */
-    woodBonus: t('wood_prod_pct'),
-    stoneBonus: t('stone_prod_pct'),
+    /* 'wood_stone_prod_pct' (Prestige-Knoten "Reiche Ernte", Zweig Wirtschaft)
+       wirkt bewusst auf BEIDE Ressourcen gleichzeitig - ein einzelner
+       effectType kann in diesem Datenmodell nur EINEN Pool speisen, hier
+       daher an beiden Stellen einzeln addiert statt ueber t() automatisch
+       verteilt. */
+    woodBonus: t('wood_prod_pct') + t('wood_stone_prod_pct'),
+    stoneBonus: t('stone_prod_pct') + t('wood_stone_prod_pct'),
     offlineBonus: t('offline_income_pct'),
     /* Angriffsgeschwindigkeit: schnellerer Auto-Tick statt eines weiteren
        reinen Schadens-Multiplikators - fuehlt sich im UI tatsaechlich nach
@@ -462,7 +600,7 @@ function bkmpIdleRecomputeEffectiveStats() {
        ein Kill-Bonus waere also wirkungslos gewesen. Als zusaetzliche
        Tick-Regeneration macht der Knoten dagegen bei laengeren Kaempfen
        (Bosse, hohe Stufen) einen echten Unterschied. */
-    villageRegenPct: t('shield_regen') * 0.4 + t('repair_speed_pct') * 0.3 + t('heal_pct') * 0.3,
+    villageRegenPct: t('shield_regen') * 0.4 + t('repair_speed_pct') * 0.3 + t('heal_pct') * 0.3 + (typeof bkmpDragonCompanionPassiveRegenPct === 'function' ? bkmpDragonCompanionPassiveRegenPct() : 0),
     magicResistPct: Math.min(75, t('magic_resist_pct')),
     fireChancePct: Math.min(60, t('elem_fire')),
     iceChancePct: Math.min(60, t('elem_ice')),
@@ -629,14 +767,29 @@ function bkmpIdleHandleDragonDefeated() {
   const xpBoost = typeof bkmpDungeonBoostMultiplier === 'function' ? bkmpDungeonBoostMultiplier('exp') : 1;
   const boostedGold = goldBoost > 1 ? Math.round(rewards.gold * goldBoost) : rewards.gold;
   const boostedXp = xpBoost > 1 ? Math.round(rewards.xp * xpBoost) : rewards.xp;
-  bkmpIdleState.gold += boostedGold;
-  bkmpIdleState.total_gold_earned += boostedGold;
-  bkmpIdleState.wood += rewards.wood;
-  bkmpIdleState.stone += rewards.stone;
-  bkmpIdleState.crystals += rewards.crystals;
-  bkmpIdleState.essence += rewards.essence;
+  /* Progression-Rebalance Phase 5 (26.07.2026): Prestige-Knoten
+     "Kristalladern"/"Essenzstrom" (Zweig Wirtschaft) erhoehen die aus
+     Kaempfen erhaltene Kristall-/Essenzmenge; "Schatzsucher" (Zweig
+     Wirtschaft) gibt eine Chance auf komplett verdoppelte Beute (alle
+     Ressourcen dieses einen Kills). Angewendet NACH dem bestehenden Boost-
+     System, VOR der eigentlichen Gutschrift. */
+  const crystalFindPct = typeof bkmpPrestigeBonus === 'function' ? bkmpPrestigeBonus('crystal_find_pct') : 0;
+  const essenceFindPct = typeof bkmpPrestigeBonus === 'function' ? bkmpPrestigeBonus('essence_find_pct') : 0;
+  let finalGold = boostedGold, finalWood = rewards.wood, finalStone = rewards.stone;
+  let finalCrystals = crystalFindPct > 0 ? Math.round(rewards.crystals * (1 + crystalFindPct / 100)) : rewards.crystals;
+  let finalEssence = essenceFindPct > 0 ? Math.round(rewards.essence * (1 + essenceFindPct / 100)) : rewards.essence;
+  const doubleLootChancePct = typeof bkmpPrestigeBonus === 'function' ? Math.min(75, bkmpPrestigeBonus('double_loot_chance_pct')) : 0;
+  if (doubleLootChancePct > 0 && Math.random() * 100 < doubleLootChancePct) {
+    finalGold *= 2; finalWood *= 2; finalStone *= 2; finalCrystals *= 2; finalEssence *= 2;
+  }
+  bkmpIdleState.gold += finalGold;
+  bkmpIdleState.total_gold_earned += finalGold;
+  bkmpIdleState.wood += finalWood;
+  bkmpIdleState.stone += finalStone;
+  bkmpIdleState.crystals += finalCrystals;
+  bkmpIdleState.essence += finalEssence;
   bkmpIdleState.dragon_kills += 1;
-  bkmpGuildQuestAddDelta('gold_earned', boostedGold);
+  bkmpGuildQuestAddDelta('gold_earned', finalGold);
   bkmpGuildQuestAddDelta('dragon_kills', 1);
   if (bkmpIdleCurrentDragon.isBoss) bkmpIdleState.boss_kills += 1;
   /* Yakshas-Heimat-Skin braucht Siege GENAU gegen diesen einen Boss
@@ -667,7 +820,7 @@ function bkmpIdleHandleDragonDefeated() {
      Niederlage, Aufstieg) bleiben ueber bkmpIdleLog erhalten (jetzt
      zusaetzlich als Toast, siehe dort), damit nichts Wichtiges verloren
      geht. */
-  document.dispatchEvent(new CustomEvent('bkmpIdleRewardGained', { detail: { gold: boostedGold, xp: boostedXp, isBoss: !!bkmpIdleCurrentDragon.isBoss } }));
+  document.dispatchEvent(new CustomEvent('bkmpIdleRewardGained', { detail: { gold: finalGold, xp: boostedXp, isBoss: !!bkmpIdleCurrentDragon.isBoss } }));
   bkmpIdleSpawnDragon();
   bkmpIdleUpdateVillageHpBar();
   bkmpIdleRenderHud();
@@ -776,6 +929,7 @@ function bkmpIdleTick() {
   bkmpIdleState.playtime_seconds = Number(bkmpIdleState.playtime_seconds || 0) + (stats.tickIntervalMs || 900) / 1000;
 
   if (bkmpIdleGetAutoBuy()) bkmpIdleAutoBuyUpgrades();
+  if (typeof bkmpIdleRunAutomationToggles === 'function') bkmpIdleRunAutomationToggles();
 
   /* Schildgenerator/Reparaturtempo (Burg): passive Regeneration der
      Stadt-Lebenspunkte - vorher wirkungslos, effect_type wurde nie
@@ -785,12 +939,33 @@ function bkmpIdleTick() {
     bkmpIdleVillageHp = Math.min(stats.hp, bkmpIdleVillageHp + stats.hp * (stats.villageRegenPct / 100));
   }
 
-  const vRoll = bkmpIdleDamageRoll(stats.attack, stats.critChance, stats.critDamage, bkmpIdleCurrentDragon.defense);
+  /* Progression-Rebalance Phase 5 (26.07.2026), Zweig Kampf:
+     "Ruestungsbrecher" (defense_ignore_pct) reduziert die fuer den
+     Schadenswurf verwendete gegnerische Verteidigung; "Ueberwaeltigung"
+     (elite_dmg_pct) wirkt NUR waehrend Dungeon-/Turm-Laeufen (dieselbe
+     Tick-/Schadenswurf-Funktion treibt beide an, siehe bkmpIdleHandle
+     DragonDefeated() weiter unten, das je nach bkmpDungeonActive/
+     bkmpTowerActive verzweigt); "Doppelschlag" (double_hit_chance_pct)
+     wuerfelt eine Chance auf einen zweiten, vollen Treffer direkt danach. */
+  const defenseIgnorePct = Math.min(90, typeof bkmpPrestigeBonus === 'function' ? bkmpPrestigeBonus('defense_ignore_pct') : 0);
+  const effectiveDragonDefense = Math.max(0, (bkmpIdleCurrentDragon.defense || 0) * (1 - defenseIgnorePct / 100));
+  const eliteDmgPct = (bkmpDungeonActive || bkmpTowerActive) && typeof bkmpPrestigeBonus === 'function' ? bkmpPrestigeBonus('elite_dmg_pct') : 0;
+  const eliteMult = 1 + Math.max(0, eliteDmgPct) / 100;
+  const vRoll = bkmpIdleDamageRoll(stats.attack * eliteMult, stats.critChance, stats.critDamage, effectiveDragonDefense);
   bkmpIdleCurrentDragon.hp = Math.max(0, bkmpIdleCurrentDragon.hp - vRoll.amount);
   if (showVisuals) {
     bkmpIdleSpawnProjectile('arrow', vRoll.amount, vRoll.isCrit);
     bkmpIdleSpawnHitFlash('idleDragon');
     bkmpIdleUpdateDragonHpBar();
+  }
+  const doubleHitChancePct = typeof bkmpPrestigeBonus === 'function' ? Math.min(75, bkmpPrestigeBonus('double_hit_chance_pct')) : 0;
+  if (bkmpIdleCurrentDragon.hp > 0 && doubleHitChancePct > 0 && Math.random() * 100 < doubleHitChancePct) {
+    const secondRoll = bkmpIdleDamageRoll(stats.attack * eliteMult, stats.critChance, stats.critDamage, effectiveDragonDefense);
+    bkmpIdleCurrentDragon.hp = Math.max(0, bkmpIdleCurrentDragon.hp - secondRoll.amount);
+    if (showVisuals) {
+      bkmpIdleSpawnProjectile('arrow', secondRoll.amount, secondRoll.isCrit);
+      bkmpIdleUpdateDragonHpBar();
+    }
   }
 
   /* Feuer (magie_feuer/magie_meister): Chance, einen Brand aufzufrischen,
@@ -928,6 +1103,30 @@ function bkmpIdleRenderStageBar() {
      berechneten Werte zusaetzlich in die kompakte Stufenleiste - kein
      neuer Wert, reiner No-op wenn der Prototyp inaktiv ist. */
   if (typeof bkmpProtoChudRenderStageBar === 'function') bkmpProtoChudRenderStageBar();
+}
+
+/* Bugfix 26.07.2026 (Spieler-Report: nach einem Dungeon-/Turm-Lauf sind die
+   Stufenleisten-Buttons "Automatisch"/"Beste Stufe"/"Stufe waehlen"
+   dauerhaft weg): bkmpDungeonStart()/bkmpTowerStart() setzen #idleStageBar
+   fuer die Dauer des Laufs direkt auf style.display='none' (ausserhalb
+   jeder Koordination mit bkmpProtoChudSyncVisibility(), siehe bkmp-proto-
+   compact-hud.js). Das Wiedereinblenden danach (bkmpDungeonFinish()/
+   bkmpTowerFinish()) wurde am 20.07. ERSATZLOS entfernt, mit der (nur
+   fuer den kompakten Mobil-Modus richtigen) Begruendung "die alte
+   Stufenleiste soll dauerhaft versteckt bleiben, die kompakte Version
+   zeigt denselben Inhalt schon" - das gilt aber NUR, wenn der kompakte
+   HUD-Prototyp gerade aktiv ist (bkmpProtoChudCompactActive). Auf
+   normaler Desktop-Breite IST #idleStageBar die einzige sichtbare
+   Stufenleiste - ein direkter Start-Aufruf hidet sie dort korrekt fuer
+   die Laufdauer, aber OHNE einen Restore-Aufruf bleibt sie fuer den Rest
+   der Sitzung unsichtbar, weil bkmpProtoChudSyncVisibility() ihren
+   eigenen Cache (bkmpProtoChudCompactActive) nie als "geaendert" erkennt
+   (der direkte style.display-Zugriff der Dungeon-/Turm-Funktionen laeuft
+   an diesem Cache komplett vorbei). Gleiches Muster/gleicher Fix wie
+   bkmpRaidToggleCombatView() in Phase 7.3 (siehe bkmp-raid.js) - dynamischer
+   Live-Zustand statt einer einmal getroffenen Annahme. */
+function bkmpIdleStageBarWantedVisible() {
+  return !(typeof bkmpProtoChudCompactActive !== 'undefined' && bkmpProtoChudCompactActive === true);
 }
 
 /* ---------------- Stufenwahl-Popup ----------------
@@ -1203,18 +1402,86 @@ function bkmpIdleGetAutoBuy() {
 function bkmpIdleSetAutoBuy(on) {
   try { localStorage.setItem(BKMP_IDLE_AUTOBUY_KEY, on ? '1' : '0'); } catch (e) {}
 }
+/* Progression-Rebalance Phase 11 (26.07.2026): Auto-Kauf an die neuen,
+   deutlich hoeheren Caps/Softcaps angepasst.
+   1) Der bisherige feste Deckel (50 Kaeufe/Tick) skaliert jetzt mit dem
+      Prestige-Knoten "Massenkauf"/"Erweiterter Auto-Kauf"/"Auto-Kauf
+      mehrerer Stufen" (alle drei teilen sich effectType
+      'autobuy_extra_purchases', siehe bkmp-prestige.js) - ohne diese
+      Knoten unveraendert 50, exakt das alte Verhalten.
+   2) Softcap-Bewusstsein: bevorzugt bei GLEICH GUENSTIGEN Optionen
+      Upgrades, die noch NICHT in einer reduzierten Softcap-Zone stecken -
+      verhindert, dass Auto-Kauf blind Ressourcen in bereits stark
+      abgeschwaechte Raenge steckt, waehrend andere Upgrades noch vollen
+      Grenznutzen haetten. Reine Prioritaets-Sortierung, kein Kaufverbot -
+      ist ein Upgrade in der Softcap-Zone trotzdem die einzige/guenstigste
+      Option, wird es weiterhin gekauft (kein Ressourcen-Stillstand). */
+/* Progression-Rebalance Phase 5 (26.07.2026), Zweig Automation: drei
+   einfache Automations-Toggles (automatische Runenaufwertung/Ei-
+   Ausbruetung/Raid-Beitritt) - laufen gebuendelt in einer einzigen,
+   zeitgedrosselten Funktion (max. alle 10s, nicht bei jedem Tick), da
+   keiner der drei Effekte einen schnelleren Reaktionszeitraum braucht und
+   das unnoetige Mehrfach-Auswerten pro Sekunde vermeidet. Jede der drei
+   nutzt exakt dieselbe Produktionsfunktion wie ein manueller Klick - keine
+   zweite, "automatische" Kopie der jeweiligen Spiellogik. */
+let bkmpIdleAutomationLastRunAt = 0;
+const BKMP_IDLE_AUTOMATION_INTERVAL_MS = 10000;
+function bkmpIdleRunAutomationToggles() {
+  if (!bkmpIdleState || typeof bkmpPrestigeBonus !== 'function') return;
+  const now = Date.now();
+  if (now - bkmpIdleAutomationLastRunAt < BKMP_IDLE_AUTOMATION_INTERVAL_MS) return;
+  bkmpIdleAutomationLastRunAt = now;
+
+  if (bkmpPrestigeBonus('auto_rune_upgrade_unlock') > 0 && typeof bkmpIdlePlayerRunes !== 'undefined' && typeof bkmpRuneUpgrade === 'function') {
+    const equipped = bkmpIdlePlayerRunes.filter(r => r.equipped && Number(r.upgrade_level || 0) < (typeof BKMP_RUNE_MAX_LEVEL !== 'undefined' ? BKMP_RUNE_MAX_LEVEL : 15));
+    const affordable = equipped
+      .map(r => ({ r, cost: typeof bkmpIdleRuneUpgradeCost === 'function' ? bkmpIdleRuneUpgradeCost(r) : Infinity }))
+      .filter(({ cost }) => (bkmpIdleState.gold || 0) >= cost)
+      .sort((a, b) => a.cost - b.cost);
+    if (affordable.length > 0) bkmpRuneUpgrade(affordable[0].r._cid);
+  }
+
+  if (bkmpPrestigeBonus('auto_egg_nest_unlock') > 0 && typeof bkmpPlayerDragonNests !== 'undefined' && typeof bkmpPlayerDragonEggs !== 'undefined' && typeof bkmpDragonAssignEggToNest === 'function') {
+    const freeNest = bkmpPlayerDragonNests.find(n => !n.egg_id);
+    if (freeNest && bkmpPlayerDragonEggs.length > 0) {
+      const rarityOrder = { legendaer: 3, episch: 2, selten: 1, standard: 0 };
+      const bestEgg = [...bkmpPlayerDragonEggs].sort((a, b) => (rarityOrder[b.rarity] || 0) - (rarityOrder[a.rarity] || 0))[0];
+      if (bestEgg) bkmpDragonAssignEggToNest(freeNest.id, bestEgg.id);
+    }
+  }
+
+  if (bkmpPrestigeBonus('auto_raid_join_unlock') > 0 && typeof bkmpRaidGetPhaseInfo === 'function' && typeof bkmpRaidHasJoined === 'function' && typeof bkmpRaidJoin === 'function') {
+    const info = bkmpRaidGetPhaseInfo();
+    if (info.phase === 'prep' && info.raidId && !bkmpRaidHasJoined(info.raidId)) bkmpRaidJoin(info.raidId);
+  }
+}
+
+function bkmpIdleAutoBuyMaxPurchasesPerTick() {
+  const bonus = typeof bkmpPrestigeBonus === 'function' ? Math.max(0, Math.round(bkmpPrestigeBonus('autobuy_extra_purchases'))) : 0;
+  return 50 + bonus;
+}
+function bkmpIdleUpgradeInSoftcapZone(def, level) {
+  const cfg = bkmpIdleUpgradeSoftcapCfg(def);
+  return level >= cfg.softCap1;
+}
 function bkmpIdleAutoBuyUpgrades() {
   if (!bkmpIdleState) return;
+  const maxPerTick = bkmpIdleAutoBuyMaxPurchasesPerTick();
   let guard = 0;
-  while (guard < 50) {
+  while (guard < maxPerTick) {
     guard++;
     const purchases = bkmpIdleState.upgrade_purchases || {};
     const affordable = BKMP_IDLE_UPGRADES
       .map(def => ({ def, level: Number(purchases[def.id] || 0) }))
       .filter(({ def, level }) => level < def.maxLevel)
-      .map(({ def, level }) => ({ def, cost: bkmpIdleUpgradeCost(def, level) }))
+      .map(({ def, level }) => ({ def, level, cost: bkmpIdleUpgradeCost(def, level) }))
       .filter(({ def, cost }) => (bkmpIdleState[def.resource] || 0) >= cost)
-      .sort((a, b) => a.cost - b.cost);
+      .sort((a, b) => {
+        const aInSoftcap = bkmpIdleUpgradeInSoftcapZone(a.def, a.level) ? 1 : 0;
+        const bInSoftcap = bkmpIdleUpgradeInSoftcapZone(b.def, b.level) ? 1 : 0;
+        if (aInSoftcap !== bInSoftcap) return aInSoftcap - bInSoftcap; // volle Zone zuerst
+        return a.cost - b.cost;
+      });
     if (affordable.length === 0) break;
     bkmpIdleBuyUpgrade(affordable[0].def.id);
   }
@@ -1251,7 +1518,7 @@ function bkmpIdleUpgradeEffectLabel(effectType, value) {
 }
 
 function bkmpIdleUpgradeCardHtml(opts) {
-  const { icon, name, level, maxLevel, maxed, cost, affordable, resourceEmoji, currentLabel, nextLabel, buyClass, buyDataAttr } = opts;
+  const { icon, name, level, maxLevel, maxed, cost, affordable, resourceEmoji, currentLabel, nextLabel, buyClass, buyDataAttr, zoneNote, milestoneNote } = opts;
   return `
     <div class="idle-upgrade-card${maxed ? ' is-maxed' : ''}">
       <div class="idle-upgrade-card-head">
@@ -1265,6 +1532,8 @@ function bkmpIdleUpgradeCardHtml(opts) {
         <div class="idle-upgrade-effect-line idle-upgrade-effect-current">${currentLabel}</div>
         ${!maxed ? `<div class="idle-upgrade-effect-line idle-upgrade-effect-next"><span class="idle-upgrade-effect-arrow" aria-hidden="true">→</span> ${nextLabel}</div>` : ''}
       </div>
+      ${zoneNote ? `<div class="idle-upgrade-zone-note">${zoneNote}</div>` : ''}
+      ${milestoneNote ? `<div class="idle-upgrade-milestone-note">${milestoneNote}</div>` : ''}
       <button type="button" class="btn-ja idle-upgrade-buy ${buyClass}" ${buyDataAttr} ${maxed || !affordable ? 'disabled' : ''}>
         ${maxed ? 'Maximal' : `${resourceEmoji} ${bkmpIdleFormatNumber(cost)}`}
       </button>
@@ -1291,11 +1560,28 @@ function bkmpIdleRenderUpgradesPanel() {
     const maxed = level >= def.maxLevel;
     const cost = maxed ? 0 : bkmpIdleUpgradeCost(def, level);
     const affordable = !maxed && (bkmpIdleState[def.resource] || 0) >= cost;
+    /* Progression-Rebalance Phase 3/4 (26.07.2026): Softcap-Zone +
+       naechster Meilenstein sichtbar machen (Auftrags-Vorgabe "UI muss
+       zeigen: aktueller Rang, naechster Bonus, Softcap-Bereich,
+       verringerter Bonus pro Rang, naechster Meilenstein, tatsaechliche
+       Kosten"). currentLabel/nextLabel nutzen jetzt die softcap-bewusste
+       Gesamtsumme statt der alten simplen level*effectPerLevel-Rechnung. */
+    const softcapCfg = bkmpIdleUpgradeSoftcapCfg(def);
+    const inSoftcapZone = softcapCfg.softCap1 < def.maxLevel;
+    let zoneNote = '';
+    if (inSoftcapZone && !maxed) {
+      if (level >= softcapCfg.softCap2) zoneNote = `🔻 Softcap-Zone 2: nur noch ${Math.round(softcapCfg.bonusMultiplierAfterSoftCap2 * 100)}% Bonus/Stufe, stark steigende Kosten`;
+      else if (level >= softcapCfg.softCap1) zoneNote = `🔻 Softcap-Zone 1: nur noch ${Math.round(softcapCfg.bonusMultiplierAfterSoftCap1 * 100)}% Bonus/Stufe, steigende Kosten (Zone 2 ab Stufe ${bkmpIdleFormatNumber(softcapCfg.softCap2)})`;
+      else zoneNote = `Voller Bonus bis Stufe ${bkmpIdleFormatNumber(softcapCfg.softCap1)}, danach reduzierter Grenznutzen`;
+    }
+    const nextMilestone = bkmpIdleUpgradeNextMilestone(def, level);
+    const milestoneNote = nextMilestone ? `🏅 Nächster Meilenstein bei Stufe ${bkmpIdleFormatNumber(nextMilestone)}` : '';
     return bkmpIdleUpgradeCardHtml({
       icon: def.icon, name: def.name, level, maxLevel: def.maxLevel, maxed, cost, affordable,
       resourceEmoji: bkmpIdleResourceEmoji(def.resource),
-      currentLabel: level > 0 ? bkmpIdleUpgradeEffectLabel(def.effectType, level * def.effectPerLevel) : 'Noch kein Effekt',
-      nextLabel: bkmpIdleUpgradeEffectLabel(def.effectType, (level + 1) * def.effectPerLevel),
+      currentLabel: level > 0 ? bkmpIdleUpgradeEffectLabel(def.effectType, bkmpIdleFormatNumber(bkmpIdleUpgradeEffectAtLevel(def, level))) : 'Noch kein Effekt',
+      nextLabel: bkmpIdleUpgradeEffectLabel(def.effectType, bkmpIdleFormatNumber(bkmpIdleUpgradeEffectAtLevel(def, level + 1))),
+      zoneNote, milestoneNote,
       buyClass: '', buyDataAttr: `data-upgrade-id="${def.id}"`
     });
   }).join('')}</div>
@@ -1320,6 +1606,19 @@ function bkmpIdleRenderUpgradesPanel() {
       });
     }).join('')}</div>
     <h4 class="idle-upgrade-section-title">Produktionsgebäude</h4>
+    ${(() => {
+      const boostMult = bkmpIdleProductionBoostActiveMultiplier();
+      const boostState = bkmpIdleBuildingOverloadState();
+      const remainingMs = Math.max(0, Number(boostState.until || 0) - Date.now());
+      return `<div class="idle-building-overload-row">
+        ${boostMult > 1 ? `<div class="idle-building-overload-active">⚡ Überladung aktiv: ${boostMult}x Produktion, noch ${Math.ceil(remainingMs / 60000)} Min.</div>` : ''}
+        <div class="idle-building-overload-tiers">${BKMP_IDLE_BUILDING_OVERLOAD_TIERS.map(tier => {
+          const cost = bkmpIdleBuildingOverloadCost(tier);
+          const affordable = (bkmpIdleState.gold || 0) >= cost;
+          return `<button type="button" class="btn-nein idle-building-overload-btn" data-overload-hours="${tier.hours}" ${affordable ? '' : 'disabled'}>⚡ ${tier.hours}Std. ${tier.mult}x (${bkmpIdleFormatNumber(cost)} 💰)</button>`;
+        }).join('')}</div>
+      </div>`;
+    })()}
     <div class="idle-upgrade-grid">${BKMP_IDLE_PRODUCTION_BUILDINGS.map(def => {
       const level = Number(bkmpIdleState[def.levelKey] || 0);
       const maxed = level >= BKMP_IDLE_PRODUCTION_BUILDING_MAX_LEVEL;
@@ -1338,6 +1637,7 @@ function bkmpIdleRenderUpgradesPanel() {
   panel.querySelectorAll('.idle-upgrade-buy').forEach(btn => btn.addEventListener('click', () => bkmpIdleBuyUpgrade(btn.dataset.upgradeId)));
   panel.querySelectorAll('.idle-dragon-building-upgrade').forEach(btn => btn.addEventListener('click', () => bkmpDragonUpgradeBuilding(btn.dataset.kind)));
   panel.querySelectorAll('.idle-production-building-buy').forEach(btn => btn.addEventListener('click', () => bkmpIdleBuyProductionBuilding(btn.dataset.buildingId)));
+  panel.querySelectorAll('.idle-building-overload-btn').forEach(btn => btn.addEventListener('click', () => bkmpIdleBuyBuildingOverload(Number(btn.dataset.overloadHours))));
   const autoBuyToggle = document.getElementById('idleAutoBuyToggle');
   if (autoBuyToggle) {
     autoBuyToggle.addEventListener('change', () => {
@@ -1615,6 +1915,75 @@ async function bkmpIdleCatchUpAfterHidden() {
     bkmpIdleUpdateVillageHpBar();
     bkmpIdleUpdateDragonHpBar();
   }
+}
+
+/* OBS-Stream-Bugfix (26.07.2026, Spieler-Meldung mit Screenshot: "kein
+   ersichtlicher Fortschritt im Overlay, wenn das Hauptfenster im
+   Hintergrund ist - nur die Animation bewegt sich"). Root Cause: der
+   normale Kampf-Loop (bkmpIdleTick(), setInterval) laeuft zwar bewusst
+   auch bei einer nur unfokussierten Registerkarte weiter (siehe Kommentar
+   bei bkmpIdleBroadcastCombatState in bkmp-hud.js), Browser drosseln
+   setInterval in einer WIRKLICH verdeckten/hintergrund-inaktiven Karte
+   aber unabhaengig vom Code (Chrome "Intensive Throttling" - nach
+   laengerer Zeit im Hintergrund bis auf ca. 1x/Minute) - bei einer
+   stundenlangen Streaming-Session (Hauptfenster bleibt bewusst
+   unfokussiert, waehrend OBS nur idle-stream-mini.html einfaengt) faellt
+   der Tick dadurch faktisch komplett aus, das Overlay zeigt seitdem nur
+   noch seine eigenen, unabhaengigen CSS-Deko-Animationen.
+
+   Fix (bewusst klein gehalten, siehe Nutzer-Entscheidung "leichter
+   periodischer Nachhol-Broadcast" statt Web-Worker-Kampf-Loop): waehrend
+   der Tab versteckt ist UND tatsaechlich ein Overlay-Zuschauer verbunden
+   ist (bkmpCombatBroadcastHasListener, Presence-gestuetzt, siehe
+   supabase.js), laeuft ein separates, weit selteneres Intervall, das
+   dieselbe bereits bestehende Server-Nachhol-Berechnung nutzt
+   (bkmpIdleClaimOfflineProgress - dieselbe Formel wie beim normalen
+   Offline-Claim, inkl. des bestehenden 60s-Mindestabstands und der
+   optimistischen Sperre gegen Doppel-Gutschrift) und danach EINMALIG
+   broadcastet. Auch dieses eigene Intervall unterliegt derselben
+   Browser-Drosselung - das ist hier aber unschaedlich: selbst ein auf
+   ca. 1x/Minute gedrosseltes Intervall reicht locker ueber der 60s-
+   Mindestgrenze der Nachhol-Berechnung, der Zuschauer sieht dadurch
+   weiterhin regelmaessig echten (wenn auch nicht mehr Tick-fluessigen,
+   sondern in Schueben springenden) Fortschritt statt eines eingefrorenen
+   Bildes - klar besser als vorher, ohne den Kampf-Loop selbst anzufassen
+   oder zusaetzliche Serverlast fuer die grosse Mehrheit der NICHT
+   streamenden Spieler zu erzeugen (fuer die bricht die Pruefung sofort auf
+   bkmpCombatBroadcastHasListener===false ab). */
+const BKMP_IDLE_BACKGROUND_STREAM_CATCHUP_MS = 20000;
+function bkmpIdleStartBackgroundStreamCatchup() {
+  if (bkmpIdleBackgroundStreamCatchupTimer) return;
+  bkmpIdleBackgroundStreamCatchupTimer = window.setInterval(bkmpIdleBackgroundStreamCatchupTick, BKMP_IDLE_BACKGROUND_STREAM_CATCHUP_MS);
+}
+function bkmpIdleStopBackgroundStreamCatchup() {
+  if (bkmpIdleBackgroundStreamCatchupTimer) { window.clearInterval(bkmpIdleBackgroundStreamCatchupTimer); bkmpIdleBackgroundStreamCatchupTimer = null; }
+}
+async function bkmpIdleBackgroundStreamCatchupTick() {
+  if (!document.hidden) return;
+  if (typeof bkmpCombatBroadcastHasListener === 'undefined' || !bkmpCombatBroadcastHasListener) return;
+  if (!bkmpIdleModalOpen || !bkmpIdleState || !bkmpIdleCurrentDragon) return;
+  /* Dieselben Sonderfaelle wie bkmpIdleCatchUpAfterHidden() ausschliessen -
+     das Offline-Modell simuliert ausschliesslich die normale Drachen-
+     Stufen-Kletterei, nicht Dungeon/Turm/Raid-Sonderkaempfe. */
+  if (bkmpDungeonActive || bkmpDungeonAutoActive() || bkmpTowerActive) return;
+  if (typeof bkmpRaidShouldShowCombatView === 'function' && bkmpRaidShouldShowCombatView()) return;
+  const name = typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : '';
+  if (!name) return;
+  const stageBefore = Number(bkmpIdleState.current_dragon_index || 0);
+  const offlineResult = await bkmpIdleClaimOfflineProgress(name);
+  if (!document.hidden) return; // waehrenddessen sichtbar geworden - bkmpIdleCatchUpAfterHidden() uebernimmt bereits den regulaeren Weg
+  if (!offlineResult || !offlineResult.newTotals) return; // <60s seit dem letzten Claim oder Fehler - kein Update noetig
+  bkmpIdleApplyOfflineResult(offlineResult);
+  bkmpIdleRecomputeEffectiveStats();
+  const stageAfter = Number(bkmpIdleState.current_dragon_index || 0);
+  if (stageAfter !== stageBefore) {
+    /* Neuer Drache faellig - bkmpIdleSpawnDragon() baut ihn korrekt fuer die
+       neue Stufe auf UND broadcastet (force=true) selbst, siehe dortiger
+       Code - kein zusaetzlicher manueller Broadcast-Aufruf noetig. */
+    bkmpIdleSpawnDragon();
+  }
+  // Sonst: 60s+ vergangen, aber (noch) kein Kill in dem kurzen Fenster - der
+  // bestehende Drache/HP-Stand ist unveraendert korrekt, kein Broadcast noetig.
 }
 
 /* ---------------- Sync ---------------- */
@@ -1965,6 +2334,17 @@ async function bkmpIdleFlushSyncNow() {
    Ungenutzte Zeit darueber hinaus verfaellt (kein Nachtrag beim naechsten
    Besuch), _collected_at wird trotzdem auf "jetzt" gesetzt. */
 const BKMP_IDLE_PRODUCTION_MAX_OFFLINE_HOURS = 72;
+/* Prestige-Knoten "Zeitdehnung" (Zweig Wirtschaft, 26.07.2026): erhoeht die
+   anrechenbare Obergrenze fuer die Produktionsgebaeude-/Obstgarten-/
+   Jagdhuetten-Aufholung (rein clientseitig - NICHT der server-seitig
+   durchgesetzte 12h-Kampf-Offline-Deckel in api/claim-idle-offline-
+   progress.js, der bleibt laut Projektregel unveraendert/eingefroren).
+   Gedeckelt auf +300h zusaetzlich, damit die Obergrenze rechnerisch endlich
+   bleibt. */
+function bkmpIdleEffectiveProductionOfflineCapHours() {
+  const bonusHours = typeof bkmpPrestigeBonus === 'function' ? Math.min(300, bkmpPrestigeBonus('offline_building_cap_hours_bonus')) : 0;
+  return BKMP_IDLE_PRODUCTION_MAX_OFFLINE_HOURS + Math.max(0, bonusHours);
+}
 function bkmpIdleAccrueBuildingResources() {
   if (!bkmpIdleState) return;
   const now = Date.now();
@@ -1972,7 +2352,7 @@ function bkmpIdleAccrueBuildingResources() {
     const levelKey = kind === 'fruit' ? 'obstgarten_level' : 'jagdhuette_level';
     const tsKey = kind + '_collected_at';
     const last = Date.parse(bkmpIdleState[tsKey] || now) || now;
-    const hoursElapsed = Math.min(BKMP_IDLE_PRODUCTION_MAX_OFFLINE_HOURS, Math.max(0, (now - last) / 3600000));
+    const hoursElapsed = Math.min(bkmpIdleEffectiveProductionOfflineCapHours(), Math.max(0, (now - last) / 3600000));
     if (hoursElapsed <= 0) return;
     const gained = hoursElapsed * bkmpDragonResourceRatePerHour(kind, bkmpIdleState[levelKey]);
     /* Bug-Report 17.07. (ChronoKora): "Speichern schlaegt IMMER fehl" -
@@ -2039,10 +2419,87 @@ function bkmpIdleBuildingPrestigeBonusPct() {
 }
 function bkmpIdleProductionBuildingRatePerHour(def, level) {
   const prestigeBonusPct = bkmpIdleBuildingPrestigeBonusPct();
-  return def.baseRate * (1 + Number(level || 0) * def.rateCoef) * (1 + prestigeBonusPct / 100);
+  const boostMult = bkmpIdleProductionBoostActiveMultiplier();
+  return def.baseRate * (1 + Number(level || 0) * def.rateCoef) * (1 + prestigeBonusPct / 100) * boostMult;
+}
+
+/* ============================================================
+   Progression-Rebalance Phase 10 (26.07.2026): Gold-/Ressourcen-Senke
+   "Gebaeude-Ueberladung" (Auftrags-Vorschlag: "temporaerer Boost, 1/4/12/24
+   Std., steigende Kosten bei Mehrfachnutzung"). Rein CLIENT-SEITIG
+   (localStorage, pro Spieler-Name_key) - bewusst KEINE neue SQL-Spalte auf
+   idle_player_state (waere eine reine Komfort-/Zeitfenster-Mechanik, kein
+   dauerhafter Spielstand-Wert, der einen Geraetewechsel ueberleben muesste;
+   verliert man den Boost durch einen Geraetewechsel mitten in der Laufzeit,
+   ist das ein akzeptabler, sehr kleiner Nachteil fuer ein reines Zeit-
+   limitiertes Extra). Zwei bereits vorhandene Senken erfuellen den Rest von
+   Phase 10 bereits: Runen-Neuwuerfeln existiert seit dem Lategame-Content-
+   Update (bkmpRuneRerollSubstat, js/systems/bkmp-runes.js) unveraendert;
+   Dungeon-Schluessel-Kauf/Stadtprojekte/Gildenprojekte/Kosmetik-Endgame-Shop
+   wurden in dieser Phase bewusst NICHT umgesetzt (siehe Abschlussbericht -
+   groesserer, eigenstaendiger Umfang, den diese bereits sehr umfangreiche
+   Phase nicht mehr sicher htte serioes mit abdecken koennen). */
+const BKMP_IDLE_BUILDING_OVERLOAD_TIERS = [
+  { hours: 1, baseCost: 20000, mult: 2 },
+  { hours: 4, baseCost: 60000, mult: 2 },
+  { hours: 12, baseCost: 150000, mult: 2.5 },
+  { hours: 24, baseCost: 250000, mult: 3 }
+];
+function bkmpIdleBuildingOverloadStorageKey() {
+  return `bkmp-idle-building-overload-${bkmpIdleState ? bkmpIdleState.name_key : 'guest'}`;
+}
+function bkmpIdleBuildingOverloadState() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(bkmpIdleBuildingOverloadStorageKey()) || 'null');
+    if (!raw || typeof raw !== 'object') return { until: 0, mult: 1, usesLast24h: [] };
+    return raw;
+  } catch (e) { return { until: 0, mult: 1, usesLast24h: [] }; }
+}
+function bkmpIdleBuildingOverloadSave(state) {
+  try { localStorage.setItem(bkmpIdleBuildingOverloadStorageKey(), JSON.stringify(state)); } catch (e) {}
+}
+function bkmpIdleProductionBoostActiveMultiplier() {
+  const state = bkmpIdleBuildingOverloadState();
+  return Date.now() < Number(state.until || 0) ? Number(state.mult || 1) : 1;
+}
+/* Steigende Kosten bei Mehrfachnutzung: jede Nutzung innerhalb der letzten
+   24h zaehlt, Kosten verdoppeln sich pro bereits erfolgter Nutzung im
+   Fenster (rollierendes 24h-Fenster, keine feste Tagesgrenze). */
+function bkmpIdleBuildingOverloadCost(tier) {
+  const state = bkmpIdleBuildingOverloadState();
+  const now = Date.now();
+  const recentUses = (state.usesLast24h || []).filter(ts => now - ts < 24 * 3600 * 1000).length;
+  return Math.round(tier.baseCost * Math.pow(2, recentUses));
+}
+function bkmpIdleBuyBuildingOverload(hours) {
+  if (!bkmpIdleState) return;
+  const tier = BKMP_IDLE_BUILDING_OVERLOAD_TIERS.find(t => t.hours === hours);
+  if (!tier) return;
+  const cost = bkmpIdleBuildingOverloadCost(tier);
+  if ((bkmpIdleState.gold || 0) < cost) {
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Nicht genug Gold für die Gebäude-Überladung.', 2800);
+    return;
+  }
+  bkmpIdleState.gold -= cost;
+  const now = Date.now();
+  const state = bkmpIdleBuildingOverloadState();
+  const stillActive = now < Number(state.until || 0);
+  state.until = (stillActive ? Number(state.until) : now) + tier.hours * 3600000; // verlaengert einen noch laufenden Boost, statt ihn zu ueberschreiben
+  state.mult = tier.mult;
+  state.usesLast24h = (state.usesLast24h || []).filter(ts => now - ts < 24 * 3600 * 1000);
+  state.usesLast24h.push(now);
+  bkmpIdleBuildingOverloadSave(state);
+  bkmpIdleRenderHud();
+  bkmpIdleQueueSync();
+  if (typeof bkmpIdleRenderUpgradesPanel === 'function') bkmpIdleRenderUpgradesPanel();
+  if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`⚡ Gebäude-Überladung aktiv: ${tier.mult}x Produktion für ${tier.hours} Std.`, 3200);
 }
 function bkmpIdleProductionBuildingCost(def, level) {
-  return Math.round(def.baseCost * bkmpIdleGrowthMult(def.costRate, def.costExponent, level));
+  const raw = def.baseCost * bkmpIdleGrowthMult(def.costRate, def.costExponent, level);
+  /* Prestige-Knoten "Effiziente Baukunst" (Zweig Wirtschaft, 26.07.2026) -
+     gleiches Prinzip wie "Haendlergeschick" bei den normalen Upgrades. */
+  const discountPct = typeof bkmpPrestigeBonus === 'function' ? Math.min(40, bkmpPrestigeBonus('building_cost_reduction_pct')) : 0;
+  return Math.max(1, Math.round(raw * (1 - discountPct / 100)));
 }
 function bkmpIdleAccrueProductionBuildings() {
   if (!bkmpIdleState) return;
@@ -2051,8 +2508,9 @@ function bkmpIdleAccrueProductionBuildings() {
     const level = Number(bkmpIdleState[def.levelKey] || 0);
     const last = Date.parse(bkmpIdleState[def.tsKey] || now) || now;
     const rawHoursElapsed = Math.max(0, (now - last) / 3600000);
-    const wasCapped = rawHoursElapsed > BKMP_IDLE_PRODUCTION_MAX_OFFLINE_HOURS;
-    const hoursElapsed = Math.min(BKMP_IDLE_PRODUCTION_MAX_OFFLINE_HOURS, rawHoursElapsed);
+    const effectiveCapHours = bkmpIdleEffectiveProductionOfflineCapHours();
+    const wasCapped = rawHoursElapsed > effectiveCapHours;
+    const hoursElapsed = Math.min(effectiveCapHours, rawHoursElapsed);
     if (hoursElapsed <= 0) return;
     const ratePerHour = bkmpIdleProductionBuildingRatePerHour(def, level);
     const gained = hoursElapsed * ratePerHour;
@@ -2318,7 +2776,33 @@ function bkmpIdleRefreshLiveTabs() {
     }
   }, 300);
 }
+/* Bugfix 26.07.2026 (Spieler-Meldung, Video-Beweis: "verzoegert in Kategorien
+   wie Upgrades, Kampf laeuft komplett fluessig") - bkmpIdleRefreshLiveTabsRender()
+   ersetzt panel.innerHTML KOMPLETT bei JEDEM Drachen-Kill, solange einer der
+   5 "lebenden" Tabs offen ist (siehe bkmpIdleRefreshLiveTabs()-Aufrufstelle
+   in bkmpIdleHandleDragonDefeated). Waehrend aktivem Kampf (ein Kill alle
+   ~0,9-2,5s) reisst das dem Spieler mitten in einem Hover/Klick auf z.B.
+   einen "Kaufen"-Knopf den DOM-Knoten unter dem Cursor weg - der neue Knoten
+   an derselben Stelle startet wieder bei :hover=false, das fuehlt sich exakt
+   wie "reagiert verzoegert" an, obwohl die CSS-Transition selbst (siehe
+   hover-performance.spec.js) nachweislich sofort feuert. Fix: steht die Maus
+   GERADE ueber dem betroffenen Panel (:hover deckt per CSS-Spec auch alle
+   Nachkommen ab, exakt dasselbe Prinzip wie beim bestehenden
+   .streamer-marquee:hover-Pausieren), wird das Neu-Rendern verschoben statt
+   sofort ausgefuehrt - bkmpIdleRefreshLiveTabsPending bleibt/wird true, der
+   naechste ohnehin schon laufende 300ms-Timer (siehe bkmpIdleRefreshLiveTabs)
+   probiert es danach erneut. Keine Daten/Werte werden dadurch veraendert,
+   nur der Render-Zeitpunkt - holt beim naechsten Kill oder sobald die Maus
+   das Panel verlaesst zuverlaessig auf. */
+function bkmpIdleRefreshLiveTabsPanelId(tab) {
+  return { upgrades: 'idlePanelUpgrades', runen: 'idlePanelRunen', prestige: 'idlePanelPrestige', skins: 'idlePanelSkins', drachen: 'idlePanelDrachen' }[tab] || null;
+}
 function bkmpIdleRefreshLiveTabsRender() {
+  const panelId = bkmpIdleRefreshLiveTabsPanelId(bkmpIdleActiveTab);
+  if (panelId) {
+    const panelEl = document.getElementById(panelId);
+    if (panelEl && panelEl.matches(':hover')) { bkmpIdleRefreshLiveTabsPending = true; return; }
+  }
   if (bkmpIdleActiveTab === 'upgrades') bkmpIdleRenderUpgradesPanel();
   else if (bkmpIdleActiveTab === 'runen') bkmpIdleRenderRunenPanel();
   else if (bkmpIdleActiveTab === 'prestige') bkmpIdleRenderPrestigePanel();
@@ -2684,8 +3168,10 @@ function bkmpIdleInit() {
          welcher Reihenfolge der Browser die ueberfaellige Aufgabe beim
          Aufwachen abarbeitet. */
       bkmpIdleLastSeenSyncBlockedUntil = Date.now() + 15000;
+      bkmpIdleStartBackgroundStreamCatchup();
       return;
     }
+    bkmpIdleStopBackgroundStreamCatchup();
     bkmpIdleCatchUpAfterHidden();
   });
   window.setTimeout(bkmpIdlePreloadStateIfNamed, 0);

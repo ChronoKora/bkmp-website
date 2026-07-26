@@ -405,6 +405,7 @@ function bkmpIdleRenderHud() {
   /* PROTOTYP 2 (18.07., entfernbar): siehe Kommentar im App-Modus-Zweig
      oben - gleiches Prinzip fuer die Desktop-Vorlage. */
   if (typeof bkmpProtoChudRenderHud === 'function') bkmpProtoChudRenderHud();
+  if (typeof bkmpPrestigeUpdateTabBadge === 'function') bkmpPrestigeUpdateTabBadge();
 }
 
 /* ---------------- Live-Kampf-Broadcast fuers OBS-Mini-Overlay ----------------

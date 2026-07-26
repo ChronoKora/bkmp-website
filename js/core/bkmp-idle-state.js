@@ -57,6 +57,12 @@ let bkmpIdleLoopTimerMs = 900;
 let bkmpIdleModalOpen = false;
 let bkmpIdleSyncPending = false;
 let bkmpIdleSyncTimer = null;
+/* OBS-Stream-Bugfix (26.07.2026, Spieler-Meldung: "kein Fortschritt im
+   Overlay, wenn das Hauptfenster im Hintergrund ist") - siehe
+   bkmpIdleStartBackgroundStreamCatchup() in idledorf.js fuer die volle
+   Begruendung. Haelt die laufende Intervall-ID, solange der Tab
+   versteckt UND ein echter Overlay-Zuschauer verbunden ist. */
+let bkmpIdleBackgroundStreamCatchupTimer = null;
 /* Serialisiert ueberlappende bkmpIdleFlushSync()-Aufrufe (siehe dortiger
    Kommentar) - haelt die Promise des GERADE laufenden Speichervorgangs, damit
    ein zweiter, waehrenddessen gestarteter Aufruf zuerst darauf wartet statt

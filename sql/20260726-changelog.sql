@@ -112,3 +112,27 @@ select '2026-07-26', 'fix',
 where not exists (
   select 1 from public.changelog_entries where entry_date = '2026-07-26' and title = 'Speichern schlug über Level 2000 dauerhaft fehl'
 );
+
+-- ============================================================
+-- Direkte Nachbesserung am selben Tag: Buttons in Upgrades/Runen/Prestige/
+-- Dorf-Skins/Drachenzucht reagierten während aktivem Kampf träge.
+-- ============================================================
+insert into public.changelog_entries (entry_date, category, title, description)
+select '2026-07-26', 'fix',
+  'Buttons in Upgrades, Runen & Co. reagierten während des Kampfes träge',
+  'Während aktivem Kampf bauten sich die Bereiche Upgrades, Runen, Prestige, Dorf-Skins und Drachenzucht bei jedem besiegten Drachen komplett neu auf - stand die Maus dabei gerade über einem Knopf, fühlte sich das verzögert an. Diese Bereiche warten jetzt, bis ihr die Maus wegbewegt, bevor sie sich aktualisieren - Kampf lief davon unabhängig schon immer flüssig.'
+where not exists (
+  select 1 from public.changelog_entries where entry_date = '2026-07-26' and title = 'Buttons in Upgrades, Runen & Co. reagierten während des Kampfes träge'
+);
+
+-- ============================================================
+-- Ebenfalls am selben Tag: OBS-Stream-Overlay blieb bei längerem
+-- unfokussiertem Hauptfenster stehen.
+-- ============================================================
+insert into public.changelog_entries (entry_date, category, title, description)
+select '2026-07-26', 'fix',
+  'OBS-Stream-Overlay blieb bei unfokussiertem Hauptfenster stehen',
+  'Wenn das Hauptspiel-Fenster längere Zeit im Hintergrund lief (z.B. während des Streamens), zeigte das OBS-Overlay keinen neuen Fortschritt mehr - nur die Deko-Animationen liefen weiter. Der Kampf läuft jetzt auch in diesem Fall regelmäßig für Zuschauer sichtbar weiter.'
+where not exists (
+  select 1 from public.changelog_entries where entry_date = '2026-07-26' and title = 'OBS-Stream-Overlay blieb bei unfokussiertem Hauptfenster stehen'
+);

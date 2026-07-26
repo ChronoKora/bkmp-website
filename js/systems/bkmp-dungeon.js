@@ -132,6 +132,21 @@ const BKMP_DUNGEON_RUNE_RARITY_WEIGHTS = [
 ];
 const BKMP_DUNGEON_RUNE_COUNT = [1, 1, 2, 2];
 
+/* Progression-Rebalance Phase 5 (26.07.2026): Prestige-Knoten "Runenglück"/
+   "Seltene Brut" (Zweig Runen & Dungeons/Drachen) verschieben die Chance
+   auf hoehere Seltenheit, indem sie das Gewicht JEDER Stufe ausser der
+   niedrigsten proportional anheben (monoton: hoeherer Bonus -> hoehere
+   relative Chance auf Selten/Episch/Legendaer, niemals eine Chance ueber
+   100% oder negative Gewichte). Bewusst NUR fuer Dungeon-Wuerfe verdrahtet
+   (die einzige zentrale Stelle mit einer echten Gewichts-Tabelle) - der
+   normale Kampf-Runendrop nutzt eine andere, einfachere Wuerfellogik ohne
+   Rarity-Gewichtstabelle und ist bewusst nicht Teil dieser Erweiterung. */
+function bkmpDungeonApplyRarityBonus(weights, lowestKey, bonusPct) {
+  if (!bonusPct) return weights;
+  const boosted = {};
+  Object.entries(weights).forEach(([k, w]) => { boosted[k] = k === lowestKey ? w : w * (1 + bonusPct / 100); });
+  return boosted;
+}
 function bkmpDungeonWeightedPick(weights) {
   const entries = Object.entries(weights).filter(([, w]) => w > 0);
   const total = entries.reduce((sum, [, w]) => sum + w, 0);
@@ -214,7 +229,9 @@ function bkmpDungeonBoostMultiplier(kind) {
 }
 
 function bkmpDungeonRollEgg(difficultyIdx) {
-  const weights = BKMP_DUNGEON_EGG_RARITY_WEIGHTS[difficultyIdx] || BKMP_DUNGEON_EGG_RARITY_WEIGHTS[0];
+  const baseWeights = BKMP_DUNGEON_EGG_RARITY_WEIGHTS[difficultyIdx] || BKMP_DUNGEON_EGG_RARITY_WEIGHTS[0];
+  const rarityBonusPct = typeof bkmpPrestigeBonus === 'function' ? Math.min(150, bkmpPrestigeBonus('egg_rarity_bonus_pct')) : 0;
+  const weights = bkmpDungeonApplyRarityBonus(baseWeights, 'standard', rarityBonusPct);
   const rarity = bkmpDungeonWeightedPick(weights) || 'standard';
   const pool = bkmpDragonSpeciesCatalog.filter(sp => sp.active !== false && sp.rarity === rarity);
   const species = pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
@@ -265,11 +282,23 @@ function bkmpDungeonPersistEgg(egg) {
   });
 }
 function bkmpDungeonRollRune(difficultyIdx, forceRarityId) {
-  const weights = BKMP_DUNGEON_RUNE_RARITY_WEIGHTS[difficultyIdx] || BKMP_DUNGEON_RUNE_RARITY_WEIGHTS[0];
+  const baseWeights = BKMP_DUNGEON_RUNE_RARITY_WEIGHTS[difficultyIdx] || BKMP_DUNGEON_RUNE_RARITY_WEIGHTS[0];
+  const rarityBonusPct = typeof bkmpPrestigeBonus === 'function' ? Math.min(150, bkmpPrestigeBonus('rune_rarity_bonus_pct')) : 0;
+  const weights = bkmpDungeonApplyRarityBonus(baseWeights, 'blue', rarityBonusPct);
   const rarityId = forceRarityId || bkmpDungeonWeightedPick(weights) || 'blue';
   const slot = window.BKMP_RUNE_SLOTS[Math.floor(Math.random() * window.BKMP_RUNE_SLOTS.length)];
   const rolledValue = bkmpIdleRollRuneValue(slot.id, rarityId);
-  return { id: null, _cid: bkmpRuneNewLocalId(), rune_type: slot.id, rarity: rarityId, rolled_value: rolledValue, equipped: false, upgrade_level: 0, substats: bkmpIdleRollInitialSubstats(slot.stat, rarityId), created_at: new Date().toISOString() };
+  /* Prestige-Knoten "Runenmeister" (Zweig Runen & Dungeons): neu gefundene
+     Runen starten mit einer hoeheren Stufe statt bei 0 - gedeckelt auf den
+     NORMALEN Aufwertungs-Maximalwert (BKMP_RUNE_MAX_LEVEL, aktuell 15) statt
+     des hoeheren "Aufgestiegenen"-Maximalwerts (BKMP_RUNE_ASCEND_MAX_LEVEL,
+     30, nur ueber die eigene bkmpRuneAscend()-Aktion erreichbar) - ein
+     frisch gedroppter Rune-Startbonus darf die separate Aufstiegs-Mechanik
+     nicht umgehen. */
+  const startLevelBonus = typeof bkmpPrestigeBonus === 'function' ? Math.round(bkmpPrestigeBonus('rune_start_level_bonus')) : 0;
+  const startLevelCap = typeof BKMP_RUNE_MAX_LEVEL !== 'undefined' ? BKMP_RUNE_MAX_LEVEL : 15;
+  const startLevel = Math.max(0, Math.min(startLevelCap, startLevelBonus));
+  return { id: null, _cid: bkmpRuneNewLocalId(), rune_type: slot.id, rarity: rarityId, rolled_value: rolledValue, equipped: false, upgrade_level: startLevel, substats: bkmpIdleRollInitialSubstats(slot.stat, rarityId), created_at: new Date().toISOString() };
 }
 function bkmpDungeonPersistRunes(runes) {
   runes.forEach(rune => {
@@ -377,6 +406,39 @@ function bkmpDungeonGrantReward(type, difficulty, wavesCleared, success, dailyBo
     if (summary.meat > 0) summary.meat = Math.round(summary.meat * BKMP_DUNGEON_SEASONAL_BONUS_MULT);
     if (summary.fruit > 0) summary.fruit = Math.round(summary.fruit * BKMP_DUNGEON_SEASONAL_BONUS_MULT);
     summary.seasonalBonusApplied = true;
+  }
+
+  /* Progression-Rebalance Phase 5 (26.07.2026): Prestige-Knoten
+     "Dungeonjaeger" (alle Belohnungen) + "Bosskammer" (zusaetzlich auf den
+     bereits bestehenden "vollstaendiger Erfolg"-Bonus oben) - beide wirken
+     nur auf die kontinuierlichen Belohnungen, gleiche Begruendung wie beim
+     Tages-/Saisonbonus (Ei-/Runen-Drop-Logik bleibt unangetastet, siehe
+     "seltene_funde" weiter unten fuer deren eigenen, separaten Bonus). */
+  const dungeonRewardBonusPct = typeof bkmpPrestigeBonus === 'function' ? bkmpPrestigeBonus('dungeon_reward_pct') : 0;
+  const successBonusPct = success && typeof bkmpPrestigeBonus === 'function' ? bkmpPrestigeBonus('dungeon_success_bonus_pct') : 0;
+  const totalRewardMultPct = dungeonRewardBonusPct + successBonusPct;
+  if (totalRewardMultPct > 0) {
+    if (summary.gold > 0) summary.gold = Math.round(summary.gold * (1 + totalRewardMultPct / 100));
+    if (summary.xp > 0) summary.xp = Math.round(summary.xp * (1 + totalRewardMultPct / 100));
+    if (summary.gems > 0) summary.gems = Math.round(summary.gems * (1 + totalRewardMultPct / 100));
+    if (summary.meat > 0) summary.meat = Math.round(summary.meat * (1 + totalRewardMultPct / 100));
+    if (summary.fruit > 0) summary.fruit = Math.round(summary.fruit * (1 + totalRewardMultPct / 100));
+  }
+
+  /* "Seltene Funde" (Zweig Runen & Dungeons): zusaetzliche Chance auf ein
+     weiteres episches/legendaeres Ei ODER eine weitere seltene (purple/gold)
+     Rune bei einem erfolgreichen Lauf - additiv zur bestehenden Drop-Logik,
+     ersetzt nichts. */
+  if (success) {
+    const rareFindBonusPct = typeof bkmpPrestigeBonus === 'function' ? Math.min(60, bkmpPrestigeBonus('dungeon_rare_find_bonus_pct')) : 0;
+    if (rareFindBonusPct > 0 && Math.random() * 100 < rareFindBonusPct) {
+      if (type === 'egg') {
+        const bonusEgg = bkmpDungeonRollEgg(idx);
+        if (bonusEgg) summary.eggs.push(bonusEgg);
+      } else if (type === 'rune') {
+        summary.runes.push(bkmpDungeonRollRune(idx));
+      }
+    }
   }
 
   if (summary.gold > 0) {
@@ -642,7 +704,17 @@ function bkmpDungeonWireCard(type) {
     bkmpIdleRenderDungeonPanel();
   }));
   const startBtn = card.querySelector('.idle-dungeon-start-btn');
-  if (startBtn) startBtn.addEventListener('click', () => bkmpDungeonStart(type.id));
+  /* Prestige-Knoten "Automatische Dungeon-Wiederholung" (Zweig Automation,
+     26.07.2026): der unbegrenzte Auto-Lauf ("Bis Schluessel leer") existiert
+     bereits fuer jeden Spieler (siehe .idle-dungeon-auto-btn data-auto-
+     count="-1" weiter oben) - dieser Knoten spart nur den Extra-Klick, indem
+     der normale "Starten"-Knopf direkt einen unbegrenzten Auto-Lauf beginnt,
+     sobald freigeschaltet. */
+  if (startBtn) startBtn.addEventListener('click', () => {
+    const unlocked = typeof bkmpPrestigeBonus === 'function' && bkmpPrestigeBonus('auto_dungeon_unlimited_unlock') > 0;
+    if (unlocked && !bkmpDungeonActive && !bkmpDungeonAutoActive()) bkmpDungeonStartAuto(type.id, Infinity);
+    else bkmpDungeonStart(type.id);
+  });
   card.querySelectorAll('.idle-dungeon-auto-btn').forEach(btn => btn.addEventListener('click', () => {
     const count = Number(btn.dataset.autoCount);
     bkmpDungeonStartAuto(type.id, count === -1 ? Infinity : count);
@@ -963,8 +1035,16 @@ async function bkmpDungeonStart(type) {
 
   bkmpDungeonStarting = true;
   let remainingKeys;
+  /* Prestige-Knoten "Sparsamer Eintritt" (Zweig Runen & Dungeons): Chance,
+     dass dieser Lauf GAR KEINEN Schluessel verbraucht - komplett client-
+     seitig entschieden, VOR dem serverseitigen Verbrauchs-Aufruf (kein
+     SQL-Aenderung noetig): trifft die Chance, wird bkmpDungeonConsumeKey()
+     schlicht nicht aufgerufen, der bestehende Schluesselstand bleibt
+     unveraendert. */
+  const keySaveChancePct = typeof bkmpPrestigeBonus === 'function' ? Math.min(75, bkmpPrestigeBonus('dungeon_key_save_chance_pct')) : 0;
+  const keySaved = keySaveChancePct > 0 && Math.random() * 100 < keySaveChancePct;
   try {
-    remainingKeys = typeof bkmpDungeonConsumeKey === 'function' ? await bkmpDungeonConsumeKey(type) : 0;
+    remainingKeys = keySaved ? Number(status ? status.keys : 0) : (typeof bkmpDungeonConsumeKey === 'function' ? await bkmpDungeonConsumeKey(type) : 0);
   } catch (e) {
     bkmpDungeonStarting = false;
     if (String(e && e.message) === 'no_keys_available') {
@@ -1103,10 +1183,17 @@ async function bkmpDungeonFinish(success) {
   const banner = document.getElementById('idleDungeonBanner');
   if (!willContinueAuto) {
     if (banner) banner.style.display = 'none';
-    /* Bug-Fix (siehe ausfuehrlicher Kommentar bei bkmpDungeonStopAuto oben
-       in dieser Datei): "stageBar.style.display=''" liess hier ebenfalls
-       die alte, vom kompakten HUD-Prototyp eigentlich dauerhaft
-       versteckte Stufenleiste wieder aufleben - ersatzlos entfernt. */
+    /* Bugfix 26.07.2026 (siehe ausfuehrlicher Kommentar bei
+       bkmpIdleStageBarWantedVisible() in idledorf.js): die 20.07.-
+       Entscheidung "niemals mehr einblenden" traf nur fuer den kompakten
+       HUD-Prototyp zu - auf normaler Desktop-Breite ist #idleStageBar die
+       einzige Stufenleiste und blieb nach jedem Dungeon-Lauf dauerhaft
+       unsichtbar. Jetzt dynamisch statt pauschal: nur einblenden, wenn
+       der kompakte Modus GERADE JETZT nicht aktiv ist. */
+    const stageBarEl = document.getElementById('idleStageBar');
+    if (stageBarEl && typeof bkmpIdleStageBarWantedVisible === 'function' && bkmpIdleStageBarWantedVisible()) {
+      stageBarEl.style.display = '';
+    }
   }
 
   bkmpIdleCurrentDragon = bkmpDungeonPrevDragon;

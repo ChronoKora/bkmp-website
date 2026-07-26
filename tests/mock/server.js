@@ -235,6 +235,17 @@ function createTestServer(store, opts) {
   server.on('connection', (socket) => {
     openSockets.add(socket);
     socket.on('close', () => openSockets.delete(socket));
+    /* Bugfix 26.07.2026 (echter Server-Absturz beim manuellen Testen im
+       Browser: "Emitted 'error' event on Socket instance", ECONNRESET,
+       Node.js-Prozess komplett beendet): ein rohes TCP-Socket ohne
+       registrierten 'error'-Listener wirft einen Node-internen Fehler als
+       unbehandelte Exception, sobald der Client die Verbindung abrupt
+       abbricht (z.B. Seiten-Reload/Tab schliessen mitten in einer noch
+       offenen Anfrage) - voellig normales Vorkommnis bei echtem, interaktivem
+       Browsen, das in den bisherigen Playwright-Tests (saubere, kontrollierte
+       Navigation) nie ausgeloest wurde. Reiner No-Op-Handler schluckt den
+       Fehler, statt den ganzen lokalen Dev-/QA-Server abstuerzen zu lassen. */
+    socket.on('error', () => {});
   });
   server.on('upgrade', (req, socket) => {
     if (!req.url.startsWith('/realtime/v1/')) { socket.destroy(); return; }

@@ -218,11 +218,18 @@ function bkmpTowerFinish(reachedWave) {
   if (bkmpTowerTimerInterval) { clearInterval(bkmpTowerTimerInterval); bkmpTowerTimerInterval = null; }
   const banner = document.getElementById('idleTurmBanner');
   if (banner) banner.style.display = 'none';
-  /* Bug-Fix (Spieler-Meldung ChronoKora, 20.07., analog beim Dungeon
-     gefunden - siehe Kommentar bei bkmpDungeonStopAuto in bkmp-dungeon.js):
-     "stageBar.style.display=''" liess die vom kompakten HUD-Prototyp
-     eigentlich dauerhaft versteckte alte Stufenleiste nach jedem Turm-
-     Lauf wieder aufleben - ersatzlos entfernt. */
+  /* Bugfix 26.07.2026 (Spieler-Report: Stufenleisten-Buttons nach einem
+     Kampf dauerhaft weg - siehe ausfuehrlicher Kommentar bei
+     bkmpIdleStageBarWantedVisible() in idledorf.js): die 20.07.-Entscheidung
+     "niemals mehr einblenden" traf nur fuer den kompakten HUD-Prototyp zu -
+     auf normaler Desktop-Breite ist #idleStageBar die einzige Stufenleiste
+     und blieb nach jedem Turm-Lauf dauerhaft unsichtbar. Jetzt dynamisch
+     statt pauschal: nur einblenden, wenn der kompakte Modus GERADE JETZT
+     nicht aktiv ist (identisches Muster wie beim Dungeon-Gegenstueck). */
+  const stageBarEl = document.getElementById('idleStageBar');
+  if (stageBarEl && typeof bkmpIdleStageBarWantedVisible === 'function' && bkmpIdleStageBarWantedVisible()) {
+    stageBarEl.style.display = '';
+  }
 
   bkmpIdleCurrentDragon = bkmpTowerPrevDragon;
   bkmpIdleVillageHp = bkmpTowerPrevVillageHp;
