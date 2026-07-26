@@ -11737,6 +11737,26 @@ html.bkmp-app-mode .idle-app-more-sheet-group-title:first-child {
 .fbb-scroll { flex: 1 1 auto; overflow-y: auto; padding: 1rem 1.5rem; display: flex; flex-direction: column; gap: 1.4rem; }
 .fbb-footnote { flex-shrink: 0; margin: 0; padding: 0.8rem 1.5rem; border-top: 1px solid var(--line); font-size: 0.74rem; color: var(--muted); text-align: center; }
 
+/* Oeffentliches Changelog (26.07.2026, js/ui/bkmp-changelog.js) - reuses
+   .fbb-panel/.fbb-header/.fbb-close/.fbb-controls/.fbb-filters/
+   .fbb-filter-chip/.fbb-scroll/.fbb-footnote/.fbb-status/.fbb-tone-* aus
+   dem Feedback-Board oben (identisches Grundgeruest) - hier nur die
+   Bausteine, die dort keine Entsprechung haben: die vertikale Zeitleiste
+   je Eintrag (Datum links, Inhalt rechts). */
+.chl-timeline { display: flex; flex-direction: column; gap: 1.1rem; }
+.chl-entry { display: grid; grid-template-columns: 84px 1fr; gap: 0.9rem; align-items: start; }
+.chl-entry-date { font-size: 0.74rem; font-weight: 700; color: var(--muted); padding-top: 0.2rem; white-space: nowrap; }
+.chl-entry-body { border-left: 2px solid var(--line); padding-left: 0.9rem; }
+.chl-entry-head { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.25rem; }
+.chl-entry-title { margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--ink); }
+.chl-entry-desc { margin: 0.15rem 0 0; font-size: 0.85rem; color: var(--muted); line-height: 1.45; }
+.chl-empty { text-align: center; color: var(--muted); font-size: 0.85rem; padding: 1.5rem 0; }
+@media (max-width: 640px) {
+  .chl-entry { grid-template-columns: 1fr; gap: 0.3rem; }
+  .chl-entry-date { padding-top: 0; }
+  .chl-entry-body { border-left: none; padding-left: 0; }
+}
+
 .fbb-section-title { margin: 0 0 0.7rem; font-size: 0.95rem; font-weight: 800; color: var(--ink); }
 .fbb-flat-list { display: flex; flex-direction: column; gap: 0.7rem; }
 .fbb-empty { color: var(--muted); font-size: 0.85rem; margin: 0; }
@@ -11837,7 +11857,7 @@ html.bkmp-app-mode .idle-app-more-sheet-group-title:first-child {
 .fbb-admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start; }
 .fbb-admin-form { display: flex; flex-direction: column; gap: 0.5rem; }
 .fbb-admin-form label { font-size: 0.8rem; font-weight: 700; color: var(--muted); margin-top: 0.5rem; }
-.fbb-admin-form input[type="text"], .fbb-admin-form select, .fbb-admin-form textarea {
+.fbb-admin-form input[type="text"], .fbb-admin-form input[type="date"], .fbb-admin-form select, .fbb-admin-form textarea {
   width: 100%; padding: 0.55rem 0.75rem;
   border-radius: 8px; border: 1px solid var(--line);
   background: var(--paper); color: var(--ink);

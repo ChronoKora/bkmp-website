@@ -201,6 +201,10 @@
           Feedback
           <span class="admin-nav-badge" id="feedbackNavBadge"></span>
         </button>
+        <button class="admin-nav-btn" data-page="changelog">
+          <svg viewBox="0 0 24 24"><path d="M6 3h9l5 5v13H6z"/><path d="M15 3v5h5"/><path d="M9 13h6"/><path d="M9 17h6"/></svg>
+          Changelog
+        </button>
         <button class="admin-nav-btn" data-page="playermgmt">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v2"/></svg>
           Spieler-Verwaltung
@@ -931,6 +935,22 @@
           </div>
         </section>
 
+        <!-- Changelog (26.07.2026, eigenstaendig - siehe js/ui/bkmp-changelog.js
+             fuer das oeffentliche Panel, Formular hier schreibt direkt in
+             public.changelog_entries, siehe sql/20260726-changelog.sql. -->
+        <section class="admin-page" id="page-changelog">
+          <div class="admin-section">
+            <h2>📜 Changelog</h2>
+            <p class="admin-help-text">Kurze, öffentlich sichtbare Einträge für jede Änderung/jeden Fix. Braucht vorher <code>sql/20260726-changelog.sql</code> in Supabase.</p>
+            <div id="changelogAdminForm"></div>
+          </div>
+          <div class="admin-section">
+            <h3>Bereits veröffentlichte Einträge</h3>
+            <button class="edit-btn" type="button" id="changelogAdminRefreshBtn" style="margin-bottom:1rem;">Aktualisieren</button>
+            <div class="fbb-admin-published-list" id="changelogAdminList"></div>
+          </div>
+        </section>
+
         <!-- Spieler-Verwaltung -->
         <section class="admin-page" id="page-playermgmt">
           <div class="admin-section">
@@ -1025,6 +1045,9 @@
   <!-- Feedback-/Status-Board Stufe 1 (20.07.2026) - speist hier nur die
        Admin-Workflow-Vorschau (#fbbAdminMock), reine Testdaten. -->
   <script src="js/ui/bkmp-feedback-board.js?v=20260721-stufe34"></script>
+  <!-- Oeffentliches Changelog (26.07.2026) - speist hier das Admin-Formular
+       (#changelogAdminForm), siehe js/ui/bkmp-changelog.js. -->
+  <script src="js/ui/bkmp-changelog.js?v=20260726-changelog1"></script>
   <script src="idledorf.js?v=20260725-runescale1"></script>
   <script src="js/core/bkmp-idle-bootstrap.js?v=20260717-p2afoundation"></script>
   <script src="mapart.js?v=20260717-kartenfirmen1"></script>

@@ -2511,6 +2511,70 @@ async function deleteFeedbackPublicEntry(id) {
   return true;
 }
 
+/* ---------------- Oeffentliches Changelog (26.07.2026) ----------------
+   Eigenstaendig, getrennt vom Feedback-Board oben (siehe sql/20260726-
+   changelog.sql fuer die volle Begruendung) - beantwortet "was wurde
+   zuletzt geaendert", nicht "wie ist der Stand einer Spieler-Meldung".
+   Gleiches RLS-/Client-Muster wie feedback_public: oeffentlich lesbar ueber
+   den normalen Client, Schreibzugriff nur fuer eingeloggte Admins (per
+   is_active_admin()-Policy serverseitig durchgesetzt, kein separater
+   Auth-Client noetig). */
+function bkmpMapChangelogEntryFromSupabase(row) {
+  return {
+    id: row.id,
+    entryDate: row.entry_date,
+    category: row.category,
+    title: row.title,
+    description: row.description,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+async function loadChangelogEntries() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('changelog_entries')
+    .select('id, entry_date, category, title, description, created_at, updated_at')
+    .order('entry_date', { ascending: false })
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(bkmpMapChangelogEntryFromSupabase);
+}
+
+/* entry.id gesetzt = Update, sonst Insert. */
+async function upsertChangelogEntry(entry) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const payload = {
+    entry_date: entry.entryDate || new Date().toISOString().slice(0, 10),
+    category: entry.category || 'fix',
+    title: entry.title,
+    description: entry.description || '',
+    updated_at: new Date().toISOString()
+  };
+  const select = 'id, entry_date, category, title, description, created_at, updated_at';
+  if (entry.id) {
+    const { data, error } = await client.from('changelog_entries').update(payload).eq('id', entry.id).select(select).limit(1);
+    if (error) throw error;
+    const row = Array.isArray(data) ? data[0] : null;
+    return row ? bkmpMapChangelogEntryFromSupabase(row) : null;
+  }
+  const { data, error } = await client.from('changelog_entries').insert(payload).select(select).limit(1);
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : null;
+  return row ? bkmpMapChangelogEntryFromSupabase(row) : null;
+}
+
+async function deleteChangelogEntry(id) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return false;
+  const { error } = await client.from('changelog_entries').delete().eq('id', id);
+  if (error) throw error;
+  return true;
+}
+
 async function loadFeedbackPublicProgress(feedbackPublicId) {
   const client = bkmpGetSupabaseClient();
   if (!client) return [];

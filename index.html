@@ -208,6 +208,11 @@
       <button class="pill-btn feedback-status-btn" id="feedbackStatusButton" type="button" aria-label="Bekannte Bugs und Feedback-Status ansehen">
         <span aria-hidden="true">📋</span><span class="feedback-btn-label">Status</span>
       </button>
+      <!-- Oeffentliches Changelog (26.07.2026, siehe js/ui/bkmp-changelog.js) -
+           eigenstaendig, getrennt vom Feedback-/Status-Board oben. -->
+      <button class="pill-btn feedback-status-btn" id="changelogButton" type="button" aria-label="Änderungsverlauf ansehen">
+        <span aria-hidden="true">📜</span><span class="feedback-btn-label">Changelog</span>
+      </button>
     </div>
     <img class="opsucht-logo" src="assets/opsucht-logo.webp" alt="OPSUCHT.net" width="130" height="41">
   </div>
@@ -1365,6 +1370,27 @@
     </div>
   </div>
 
+  <!-- ============================================================
+       Oeffentliches Changelog (26.07.2026) - siehe js/ui/bkmp-changelog.js.
+       Eigenstaendig, getrennt vom Feedback-/Status-Board oben (dort:
+       Spieler-Meldungen + Status-Workflow, hier: reine, bereits
+       abgeschlossene Aenderungs-Eintraege, chronologisch).
+       ============================================================ -->
+  <div class="joke-overlay changelog-overlay" id="changelogOverlay">
+    <div class="fbb-panel chl-panel" id="changelogPanel" role="dialog" aria-modal="true" aria-labelledby="changelogTitle">
+      <div class="fbb-panel-handle" aria-hidden="true"></div>
+      <div class="fbb-header">
+        <h3 id="changelogTitle">📜 Changelog</h3>
+        <button type="button" class="fbb-close" id="changelogClose" aria-label="Schließen">&times;</button>
+      </div>
+      <div class="fbb-controls">
+        <div class="fbb-filters" id="changelogFilters" role="tablist" aria-label="Nach Kategorie filtern"></div>
+      </div>
+      <div class="fbb-scroll" id="changelogBody"></div>
+      <p class="fbb-footnote">Alle Änderungen am Spiel und an der Seite, kurz zusammengefasst.</p>
+    </div>
+  </div>
+
   <div class="joke-overlay investor-request-overlay" id="investorRequestOverlay">
     <div class="joke-card" id="investorRequestCard">
       <div id="investorRequestFormView">
@@ -1530,6 +1556,9 @@
   <!-- Feedback-/Status-Board Stufe 1 (20.07.2026) - eigenstaendig, reine
        lokale Testdaten, siehe Datei-Kopf-Kommentar. -->
   <script src="js/ui/bkmp-feedback-board.js?v=20260721-stufe34" defer></script>
+  <!-- Oeffentliches Changelog (26.07.2026) - eigenstaendig, siehe Datei-Kopf-
+       Kommentar in js/ui/bkmp-changelog.js. -->
+  <script src="js/ui/bkmp-changelog.js?v=20260726-changelog1" defer></script>
   <script src="js/core/bkmp-app-mode-bootstrap.js?v=20260723-visibilityresync1" defer></script>
   <!-- PROTOTYP 2 (18.07., isoliert & jederzeit entfernbar) - siehe Kommentar
        in js/prototype/bkmp-proto-compact-hud.js. Laedt bewusst zuletzt. -->
