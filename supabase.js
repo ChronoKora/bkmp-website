@@ -4310,7 +4310,15 @@ async function bkmpArenaAttack(targetAuthUserId) {
   if (error) {
     const msg = String(error.message || '');
     if (msg.includes('cooldown_active')) throw new Error('Du hast dieses Ziel schon vor Kurzem angegriffen. Bitte warte ein paar Minuten.');
-    if (msg.includes('daily_limit_reached')) throw new Error('Du hast dein Tageslimit von 10 Arena-Angriffen erreicht. Morgen um 0 Uhr geht es weiter.');
+    if (msg.includes('daily_limit_reached')) {
+      // Gilden-Technologie v2 (26.07.), "Kriegsrat": das tatsaechliche
+      // Tageslimit kann ueber 10 liegen - Fehlermeldung zeigt den echten,
+      // wirksamen Wert statt einer hartcodierten "10" (echter, beim
+      // Verdrahten selbst gefundener Anzeige/Realitaet-Mismatch, gleiches
+      // Muster wie beim Arena-Panel-Fund).
+      const dailyLimit = 10 + (typeof bkmpGuildTechBonus === 'function' ? Math.max(0, Math.round(bkmpGuildTechBonus('arenaExtraAttempts'))) : 0);
+      throw new Error(`Du hast dein Tageslimit von ${dailyLimit} Arena-Angriffen erreicht. Morgen um 0 Uhr geht es weiter.`);
+    }
     if (msg.includes('no_attacker_state')) throw new Error('Spiele zuerst im Kampf-Tab, bevor du in die Arena gehst.');
     if (msg.includes('no_defender_state')) throw new Error('Dieser Gegner hat noch keinen Kampf-Fortschritt.');
     if (msg.includes('invalid_target') || msg.includes('not_authenticated')) throw new Error('Angriff nicht möglich.');
@@ -4524,6 +4532,10 @@ async function bkmpGuildGetMine() {
     guild: bkmpGuildMapRow(guildRow),
     myRole: membership.role,
     myContributedGold: Number(membership.contributed_gold || 0),
+    // Gilden-Technologie v2 (26.07.): "Willkommenspaket" braucht den
+    // eigenen Beitrittszeitpunkt, um ein zeitlich befristetes Neumitglieder-
+    // Fenster zu pruefen - additiv, keine bestehenden Aufrufer betroffen.
+    myJoinedAt: membership.joined_at,
     members: (memberList || []).map(m => ({
       authUserId: m.auth_user_id,
       displayName: m.display_name,
@@ -4532,6 +4544,24 @@ async function bkmpGuildGetMine() {
       joinedAt: m.joined_at
     }))
   };
+}
+
+/* Gilden-Technologie v2 (26.07.): "Turm-Vorreiter" braucht die hoechste
+   je von EINEM Mitglied erreichte Turmstufe - idle_player_state ist
+   bereits oeffentlich lesbar (siehe "Public read idle player state"-
+   Policy, gleiches Prinzip wie die Arena-Gewinnchance-Anzeige), eine
+   gezielte in()-Abfrage ueber die bereits geladene Mitgliederliste reicht,
+   keine neue RPC/Tabelle noetig. */
+async function loadGuildTowerChampionWave(authUserIds) {
+  const client = bkmpGetSupabaseClient();
+  const ids = Array.isArray(authUserIds) ? authUserIds.filter(Boolean) : [];
+  if (!client || !ids.length) return 0;
+  const { data, error } = await client
+    .from('idle_player_state')
+    .select('turm_highest_wave')
+    .in('auth_user_id', ids);
+  if (error) throw error;
+  return (data || []).reduce((max, row) => Math.max(max, Number(row.turm_highest_wave || 0)), 0);
 }
 
 /* Spieler-Wunsch (16.07., Feedback-Eintrag: "wäre es Möglich das man

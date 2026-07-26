@@ -968,12 +968,30 @@ function bkmpAscensionEffectTotals() {
   Object.entries(BKMP_ASCENSION_BONUS_PER_SOUL).forEach(([key, perSoul]) => { totals[key] = souls * perSoul; });
   return totals;
 }
+/* Gilden-Technologie v2 (26.07.), "Aufstiegsvorbereitung": senkt alle
+   drei Mindestanforderungen um denselben Prozentsatz (max. 10% bei
+   Stufe 5), gerundet auf ganze Zahlen. Eigene Funktion statt der
+   Rabatt direkt in bkmpAscensionEligible() versteckt, damit die
+   Hinweis-Anzeige (bkmpAscensionRenderSectionHtml) dieselben,
+   TATSAECHLICH geltenden Zahlen zeigen kann statt der undiscountierten
+   Basiswerte - sonst waere das exakt derselbe Anzeige/Realitaet-
+   Mismatch-Bug wie der beim Arena-Tageslimit gefundene. */
+function bkmpAscensionEffectiveThresholds() {
+  const discountPct = Math.min(10, typeof bkmpGuildTechBonus === 'function' ? bkmpGuildTechBonus('ascensionThresholdDiscountPct') : 0);
+  const mult = 1 - discountPct / 100;
+  return {
+    minPrestigeLevel: Math.max(1, Math.round(BKMP_ASCENSION_MIN_PRESTIGE_LEVEL * mult)),
+    minPointsSpent: Math.max(1, Math.round(BKMP_ASCENSION_MIN_POINTS_SPENT * mult)),
+    minLifetimeStage: Math.max(1, Math.round(BKMP_ASCENSION_MIN_LIFETIME_STAGE * mult))
+  };
+}
 function bkmpAscensionEligible() {
   if (!bkmpIdleState || !bkmpPrestigeState || bkmpPrestigeLoadFailed) return false;
   const level = Number(bkmpPrestigeState.prestige_level || 0);
   const spent = Number(bkmpPrestigeState.prestige_points_spent || 0);
   const lifetimeStage = typeof bkmpIdleLifetimeStageCount === 'function' ? bkmpIdleLifetimeStageCount() : 0;
-  return level >= BKMP_ASCENSION_MIN_PRESTIGE_LEVEL && spent >= BKMP_ASCENSION_MIN_POINTS_SPENT && lifetimeStage >= BKMP_ASCENSION_MIN_LIFETIME_STAGE;
+  const thresholds = bkmpAscensionEffectiveThresholds();
+  return level >= thresholds.minPrestigeLevel && spent >= thresholds.minPointsSpent && lifetimeStage >= thresholds.minLifetimeStage;
 }
 /* Seelen-Ertrag: bewusst DEUTLICH seltener/kleiner als normale Prestige-
    Punkte - Aufstieg ist eine seltene, sehr grosse Entscheidung, keine
@@ -995,7 +1013,8 @@ function bkmpAscensionGetPreview() {
     currentSouls, soulsGained, soulsAfter: currentSouls + soulsGained,
     lifetimeStage,
     prestigeLevel: Number(bkmpPrestigeState.prestige_level || 0),
-    pointsSpent: Number(bkmpPrestigeState.prestige_points_spent || 0)
+    pointsSpent: Number(bkmpPrestigeState.prestige_points_spent || 0),
+    thresholds: bkmpAscensionEffectiveThresholds()
   };
 }
 /* Fuehrt zuerst EXAKT denselben, bereits ausfuehrlich getesteten normalen
@@ -1040,7 +1059,7 @@ function bkmpAscensionRenderSectionHtml() {
       <p class="idle-prestige-hint">Aktuell: Aufstiegsstufe ${bkmpIdleFormatNumber(preview.currentLevel)} &middot; ${bkmpIdleFormatNumber(preview.currentSouls)} Drachenseelen (je +${BKMP_ASCENSION_BONUS_PER_SOUL.attack_pct}% Angriff/Leben/Gold/XP dauerhaft).</p>
       ${preview.eligible
         ? `<button type="button" class="btn-ja idle-ascension-btn" id="idleAscensionBtn">✨ Aufsteigen (+${bkmpIdleFormatNumber(preview.soulsGained)} Drachenseelen, setzt den GESAMTEN Prestige-Baum zurück)</button>`
-        : `<p class="idle-prestige-hint">Voraussetzungen: Prestige-Stufe ${BKMP_ASCENSION_MIN_PRESTIGE_LEVEL}+ (aktuell ${preview.prestigeLevel}), ${bkmpIdleFormatNumber(BKMP_ASCENSION_MIN_POINTS_SPENT)}+ investierte Punkte (aktuell ${bkmpIdleFormatNumber(preview.pointsSpent)}), ${bkmpIdleFormatNumber(BKMP_ASCENSION_MIN_LIFETIME_STAGE)}+ insgesamt erreichte Drachen-Stufen (aktuell ${bkmpIdleFormatNumber(preview.lifetimeStage)}).</p>`}
+        : `<p class="idle-prestige-hint">Voraussetzungen: Prestige-Stufe ${preview.thresholds.minPrestigeLevel}+ (aktuell ${preview.prestigeLevel}), ${bkmpIdleFormatNumber(preview.thresholds.minPointsSpent)}+ investierte Punkte (aktuell ${bkmpIdleFormatNumber(preview.pointsSpent)}), ${bkmpIdleFormatNumber(preview.thresholds.minLifetimeStage)}+ insgesamt erreichte Drachen-Stufen (aktuell ${bkmpIdleFormatNumber(preview.lifetimeStage)}).</p>`}
     </div>`;
 }
 

@@ -129,6 +129,19 @@ function rpcError(message) {
   return err;
 }
 
+/* Gilden-Technologie v2 (26.07.2026) - gemeinsamer Nachschlage-Helfer fuer
+   die drei serverseitigen Zweige (Kriegsrat/Stadtmauer/Nachtwache), die
+   NICHT nur einen client-seitig gecachten Stat-Pool speisen, sondern
+   echte RPC-Logik veraendern (arena_attack/raid_join) - originalgetreu
+   zu sql/20260726-guild-tech-branches-v2.sql. Liefert 0, wenn der Spieler
+   in keiner Gilde ist oder der Zweig nie gekauft wurde. */
+function guildTechLevelFor(store, uid, techId) {
+  const member = getTable(store, 'guild_members').find(m => m.auth_user_id === uid);
+  if (!member) return 0;
+  const row = getTable(store, 'guild_tech_levels').find(r => r.guild_id === member.guild_id && r.tech_id === techId);
+  return row ? Number(row.level || 0) : 0;
+}
+
 /* Phase 4 (24.07.2026, siehe CLAUDE.md) - raid_finish() (interner Helfer,
    nie direkt vom Client aufgerufen, nur ueber raid_deal_damage()/
    raid_boss_attack_tick()'s "perform"). Belohnungs-Anteil-Formel aus
@@ -413,7 +426,9 @@ const RPC_HANDLERS = {
 
     const todayStartMs = berlinMidnightMs(nowMs);
     const attacksToday = battleLog.filter(r => r.attacker_auth_user_id === uid && r.occurred_at_ms >= todayStartMs).length;
-    if (attacksToday >= 10) throw rpcError('daily_limit_reached');
+    // Gilden-Technologie v2 (26.07.), "Kriegsrat": +1 Versuch/Tag pro Stufe.
+    const dailyLimit = 10 + guildTechLevelFor(store, uid, 'guild_kriegsrat');
+    if (attacksToday >= dailyLimit) throw rpcError('daily_limit_reached');
 
     const stateRows = getTable(store, 'idle_player_state');
     const atk = stateRows.find(r => r.auth_user_id === uid);
@@ -872,8 +887,29 @@ const RPC_HANDLERS = {
      SQL - dem Client wird nie vertraut. */
   guild_tech_upgrade(store, uid, params) {
     const techId = params.p_tech_id;
-    const validTechIds = ['attack', 'defense', 'gold', 'crit_chance', 'crit_damage', 'boss_damage', 'rune_luck', 'xp', 'prestige'];
-    if (!validTechIds.includes(techId)) throw rpcError('invalid_tech');
+    /* Gilden-Technologie v2 (26.07.2026, siehe sql/20260726-guild-tech-
+       branches-v2.sql) - die 9 STANDARD-Zweige behalten EXAKT ihre
+       bisherigen Werte (20/200000/1,4), die 10 neuen Zweige bekommen
+       eigene Maximalstufen/Kostenkurven (analog BKMP_PRESTIGE_TIER). */
+    const TECH_TIERS = {
+      attack: { max: 20, base: 200000, growth: 1.4 }, defense: { max: 20, base: 200000, growth: 1.4 },
+      gold: { max: 20, base: 200000, growth: 1.4 }, crit_chance: { max: 20, base: 200000, growth: 1.4 },
+      crit_damage: { max: 20, base: 200000, growth: 1.4 }, boss_damage: { max: 20, base: 200000, growth: 1.4 },
+      rune_luck: { max: 20, base: 200000, growth: 1.4 }, xp: { max: 20, base: 200000, growth: 1.4 },
+      prestige: { max: 20, base: 200000, growth: 1.4 },
+      guild_kriegsrat: { max: 5, base: 350000, growth: 1.6 },
+      guild_turm_vorreiter: { max: 10, base: 300000, growth: 1.35 },
+      guild_brutbeschleuniger: { max: 20, base: 200000, growth: 1.4 },
+      guild_schmiede: { max: 20, base: 200000, growth: 1.4 },
+      guild_autokauf: { max: 10, base: 300000, growth: 1.35 },
+      guild_nachtwache: { max: 10, base: 300000, growth: 1.35 },
+      guild_streak_schutz: { max: 1, base: 1500000, growth: 1 },
+      guild_stadtmauer: { max: 10, base: 300000, growth: 1.35 },
+      guild_aufstiegsvorbereitung: { max: 5, base: 350000, growth: 1.6 },
+      guild_willkommenspaket: { max: 1, base: 1500000, growth: 1 }
+    };
+    const tier = TECH_TIERS[techId];
+    if (!tier) throw rpcError('invalid_tech');
     const members = getTable(store, 'guild_members');
     const me = members.find(m => m.auth_user_id === uid);
     if (!me || !['leader', 'officer'].includes(me.role)) throw rpcError('not_authorized');
@@ -882,9 +918,9 @@ const RPC_HANDLERS = {
     const levels = getTable(store, 'guild_tech_levels');
     let levelRow = levels.find(r => r.guild_id === me.guild_id && r.tech_id === techId);
     const currentLevel = levelRow ? Number(levelRow.level || 0) : 0;
-    if (currentLevel >= 20) throw rpcError('max_level');
+    if (currentLevel >= tier.max) throw rpcError('max_level');
 
-    const cost = Math.round(200000 * Math.pow(1.4, currentLevel));
+    const cost = Math.round(tier.base * Math.pow(tier.growth, currentLevel));
     const treasury = Number(guild.treasury_gold || 0);
     if (treasury < cost) throw rpcError('insufficient_treasury');
 
@@ -1067,6 +1103,11 @@ const RPC_HANDLERS = {
     const player = getTable(store, 'idle_player_state').find(r => r.auth_user_id === uid);
     if (!player) throw rpcError('no_idle_state');
 
+    // Gilden-Technologie v2 (26.07.), "Stadtmauer": +1% eigener HP-Beitrag
+    // zum Stadt-HP-Pool pro Stufe.
+    const stadtmauerLevel = guildTechLevelFor(store, uid, 'guild_stadtmauer');
+    const effectiveHp = Number(player.hp || 0) * (1 + stadtmauerLevel * 0.01);
+
     const instances = getTable(store, 'raid_instances');
     let inst = instances.find(r => r.id === raidId);
     if (!inst) {
@@ -1091,11 +1132,11 @@ const RPC_HANDLERS = {
     let p = participants.find(r => r.raid_id === raidId && r.auth_user_id === uid);
     if (p) {
       p.attack = Number(player.attack || 0); p.defense = Number(player.defense || 0);
-      p.hp = Number(player.hp || 0); p.display_name = player.display_name;
+      p.hp = effectiveHp; p.display_name = player.display_name;
     } else {
       p = {
         raid_id: raidId, auth_user_id: uid, display_name: player.display_name,
-        attack: Number(player.attack || 0), defense: Number(player.defense || 0), hp: Number(player.hp || 0),
+        attack: Number(player.attack || 0), defense: Number(player.defense || 0), hp: effectiveHp,
         damage_dealt: 0, crits_landed: 0, clicks_landed: 0, joined_at: store.clock.nowIso()
       };
       participants.push(p);

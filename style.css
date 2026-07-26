@@ -6989,6 +6989,14 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 .idle-guild-tech-maxed { font-size: 0.78rem; color: var(--muted); font-weight: 700; }
 .idle-guild-tech-upgrade-btn { font-size: 0.78rem; padding: 0.4rem 0.7rem; }
 .idle-guild-tech-upgrade-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+/* Gilden-Technologie v2 (26.07.): 10 neue Zweige mit eigener Beschreibung
+   (kein reiner Prozent-Stat wie die 9 STANDARD-Zweige oben) - eigene,
+   etwas breitere Grid-Spalte fuer den Beschreibungstext, sonst identische
+   Kartenoptik (nutzt dieselben .idle-guild-tech-card/-icon/-name/-level/
+   -bonus/-maxed/-upgrade-btn-Klassen). */
+.idle-guild-tech-ext-intro { margin-top: 1.4rem; }
+.idle-guild-tech-ext-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+.idle-guild-tech-desc { font-size: 0.68rem; color: var(--muted); line-height: 1.3; margin: 0.15rem 0 0.3rem; }
 
 /* Tägliche Gildenquests - gruene Fortschrittsfarbe (bewusst eine dritte
    Akzentfarbe neben Orange=Kasse und Lila=Level/Technologie, damit alle

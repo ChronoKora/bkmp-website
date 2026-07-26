@@ -1717,7 +1717,11 @@ function bkmpIdleRuneUpgradeFailChance(rune) {
 function bkmpIdleRuneUpgradeCost(rune) {
   const rarity = window.BKMP_RUNE_RARITIES.find(r => r.id === rune.rarity);
   const mult = rarity ? rarity.mult : 1;
-  return Math.round(16 * mult * Math.pow(1.42, Number(rune.upgrade_level || 0)));
+  const base = Math.round(16 * mult * Math.pow(1.42, Number(rune.upgrade_level || 0)));
+  // Gilden-Technologie v2 (26.07.), "Gildenschmiede": guenstigere Runen-
+  // Aufwertungen fuer alle Mitglieder, gedeckelt bei 20% (max. Stufe 20 x 1%).
+  const discountPct = Math.min(20, typeof bkmpGuildTechBonus === 'function' ? bkmpGuildTechBonus('runeUpgradeDiscountPct') : 0);
+  return Math.max(1, Math.round(base * (1 - discountPct / 100)));
 }
 /* +8% des Grundwerts pro Stufe -> bei +15 rund das 2,2-fache des rohen
    rolled_value (2 * 5 fuer Legendaer waere z.B. 2 -> 4,4). */

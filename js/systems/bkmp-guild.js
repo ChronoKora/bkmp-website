@@ -41,6 +41,51 @@ const BKMP_GUILD_TECH_MAX_LEVEL = 20;
 function bkmpGuildTechCostForLevel(currentLevel) {
   return Math.round(200000 * Math.pow(1.4, currentLevel));
 }
+
+/* ---------------- Gilden-Technologie v2: 10 neue Zweige (26.07.2026)
+   ----------------
+   Nutzerwunsch: alle 9 obigen Zweige waren Stufe 20/20, die Kasse hatte
+   nichts mehr zu tun. Statt die bestehenden 9 (uniform 20 Stufen, immer
+   +X%) blind zu erweitern, bekommen die neuen Zweige eigene Mechaniken
+   UND eigene Kosten-/Maximalstufen-Tiers - identisches Konzept wie
+   BKMP_PRESTIGE_TIER in bkmp-prestige.js (nicht jede Idee passt in
+   "20 Stufen a X%": +1 Arena-Versuch/Tag waere bei 20 Stufen absurd
+   stark, Streak-Schutz ist ein reiner Ein/Aus-Schalter).
+
+   Kostenkurve/Maximalstufe MUSS exakt mit guild_tech_upgrade() in
+   sql/20260726-guild-tech-branches-v2.sql uebereinstimmen - der Client
+   rechnet nur zur Anzeige, bezahlt/geprueft wird ausschliesslich
+   serverseitig (gleiches Prinzip wie bei den bestehenden 9 Zweigen). */
+const BKMP_GUILD_TECH_TIER = {
+  STANDARD: { maxLevel: 20, baseCost: 200000, growth: 1.4 },
+  LOW5: { maxLevel: 5, baseCost: 350000, growth: 1.6 },
+  MED10: { maxLevel: 10, baseCost: 300000, growth: 1.35 },
+  TOGGLE: { maxLevel: 1, baseCost: 1500000, growth: 1 }
+};
+function bkmpGuildTechTierDef(tier) {
+  return { ...(BKMP_GUILD_TECH_TIER[tier] || BKMP_GUILD_TECH_TIER.STANDARD) };
+}
+function bkmpGuildTechExtCostForLevel(def, currentLevel) {
+  return Math.round(def.baseCost * Math.pow(def.growth, currentLevel));
+}
+/* effectType/effectPerRank statt statKey/perLevel (Namenskonvention
+   angeglichen an BKMP_PRESTIGE_UPGRADES) - die 9 STANDARD-Zweige oben
+   bleiben bewusst unangetastet (eigenes, bereits laenger etabliertes
+   Schema), keine Notwendigkeit, funktionierenden Code umzubauen. */
+const BKMP_GUILD_TECH_CATALOG_EXT = [
+  { id: 'guild_kriegsrat', label: 'Kriegsrat', icon: '🗡️', desc: '+1 zusätzlicher Arena-Angriff pro Tag (über das normale 10x-Tageslimit hinaus) pro Stufe.', effectType: 'arenaExtraAttempts', effectPerRank: 1, ...bkmpGuildTechTierDef('LOW5') },
+  { id: 'guild_turm_vorreiter', label: 'Turm-Vorreiter', icon: '🗼', desc: 'Die höchste je von einem Mitglied erreichte Turmstufe gibt der GESAMTEN Gilde einen kleinen Dauerbonus auf Angriff/Verteidigung/Gold (+0,05% pro 10 Turmstufen des Vorreiters, pro Stufe dieser Technologie).', effectType: 'towerChampionPctPer10', effectPerRank: 0.05, ...bkmpGuildTechTierDef('MED10') },
+  { id: 'guild_brutbeschleuniger', label: 'Brutbeschleuniger', icon: '🥚', desc: 'Verkürzt die Brutzeit neuer Drachen und senkt die Opfergabe-Kosten seltener Eier für alle Mitglieder um 1% pro Stufe.', effectType: 'broodSpeedPct', effectPerRank: 1, ...bkmpGuildTechTierDef('STANDARD') },
+  { id: 'guild_schmiede', label: 'Gildenschmiede', icon: '⚒️', desc: 'Günstigere Runen-Aufwertungskosten für alle Mitglieder (1% pro Stufe).', effectType: 'runeUpgradeDiscountPct', effectPerRank: 1, ...bkmpGuildTechTierDef('STANDARD') },
+  { id: 'guild_autokauf', label: 'Gilden-Autokauf', icon: '🤖', desc: '+2 automatische Käufe pro Tick für alle Mitglieder, pro Stufe.', effectType: 'autobuyExtraPurchases', effectPerRank: 2, ...bkmpGuildTechTierDef('MED10') },
+  { id: 'guild_nachtwache', label: 'Nachtwache', icon: '🌙', desc: '+0,5 Std. Offline-Fortschritts-Deckel für alle Mitglieder, pro Stufe (max. +5 Std.).', effectType: 'offlineCapExtraHours', effectPerRank: 0.5, ...bkmpGuildTechTierDef('MED10') },
+  { id: 'guild_streak_schutz', label: 'Streak-Schutz', icon: '🛡️', desc: 'Ein ausgelassener Tag setzt die Login-Serie nur um eine Stufe zurück statt komplett auf 1.', effectType: 'streakProtectUnlock', effectPerRank: 1, ...bkmpGuildTechTierDef('TOGGLE') },
+  { id: 'guild_stadtmauer', label: 'Stadtmauer', icon: '🏯', desc: 'Erhöht den eigenen HP-Beitrag zur gemeinsamen Stadt-HP beim Beitritt zu einem Weltboss-Raid um 1% pro Stufe.', effectType: 'raidCityHpPct', effectPerRank: 1, ...bkmpGuildTechTierDef('MED10') },
+  { id: 'guild_aufstiegsvorbereitung', label: 'Aufstiegsvorbereitung', icon: '🌌', desc: 'Senkt die Mindestanforderungen für die zweite Prestige-Ebene ("Aufstieg") für alle Mitglieder um 2% pro Stufe.', effectType: 'ascensionThresholdDiscountPct', effectPerRank: 2, ...bkmpGuildTechTierDef('LOW5') },
+  { id: 'guild_willkommenspaket', label: 'Willkommenspaket', icon: '🎁', desc: 'Neue Mitglieder erhalten in den ersten 3 Tagen nach dem Beitritt +10% auf Angriff/Verteidigung/Gold.', effectType: 'newMemberBonusUnlock', effectPerRank: 1, ...bkmpGuildTechTierDef('TOGGLE') }
+];
+const BKMP_GUILD_NEW_MEMBER_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
+const BKMP_GUILD_NEW_MEMBER_BONUS_PCT = 10;
 const BKMP_GUILD_TECH_CACHE_KEY = 'bkmp-guild-tech-cache';
 
 /* ---------------- Gildenplätze dazukaufen (siehe supabase-guild-extra-
@@ -97,6 +142,45 @@ async function bkmpGuildRefreshTreasuryBonusCache() {
     BKMP_GUILD_TECH_CATALOG.forEach(tech => {
       techTotals[tech.statKey] = (levels[tech.id] || 0) * tech.perLevel;
     });
+    /* Gilden-Technologie v2 (26.07.): die 8 "einfachen" neuen Zweige folgen
+       demselben Rang*Effekt-Muster wie oben, nur unter effectType statt
+       statKey - Turm-Vorreiter/Willkommenspaket brauchen eine eigene
+       Berechnung (siehe unten), werden hier bewusst uebersprungen. */
+    BKMP_GUILD_TECH_CATALOG_EXT.forEach(tech => {
+      if (tech.effectType === 'towerChampionPctPer10' || tech.effectType === 'newMemberBonusUnlock') return;
+      techTotals[tech.effectType] = (levels[tech.id] || 0) * tech.effectPerRank;
+    });
+
+    /* Turm-Vorreiter: haengt zusaetzlich von der hoechsten je erreichten
+       Turmstufe UNTER ALLEN Mitgliedern ab, nicht nur vom Rang selbst -
+       braucht eine gezielte idle_player_state-Abfrage ueber die bereits
+       geladene Mitgliederliste (siehe loadGuildTowerChampionWave,
+       supabase.js). Deckel bei 25% haelt den Bonus im selben moderaten
+       Rahmen wie die uebrigen Gilden-Boni, trotz des theoretisch
+       unbegrenzten Turms. */
+    const turmVorreiterLevel = levels['guild_turm_vorreiter'] || 0;
+    let towerChampionPct = 0;
+    if (mine && turmVorreiterLevel > 0 && typeof loadGuildTowerChampionWave === 'function') {
+      try {
+        const championWave = await loadGuildTowerChampionWave(mine.members.map(m => m.authUserId));
+        towerChampionPct = Math.min(25, Math.floor(championWave / 10) * turmVorreiterLevel * 0.05);
+      } catch (e) { /* Netzwerkfehler - Bonus bleibt 0 statt eines veralteten Werts */ }
+    }
+    techTotals.towerChampionPct = towerChampionPct;
+
+    /* Willkommenspaket: reiner Ein/Aus-Schalter (TOGGLE, max. 1 Stufe) UND
+       zeitlich befristet - beides muss hier zusammenlaufen, damit der
+       Rest des Codes (idledorf.js liest nur noch den fertigen Pool-Wert)
+       einfach bleibt. */
+    let newMemberBonusPct = 0;
+    if (mine && (levels['guild_willkommenspaket'] || 0) > 0 && mine.myJoinedAt) {
+      const joinedMs = Date.parse(mine.myJoinedAt);
+      if (Number.isFinite(joinedMs) && (Date.now() - joinedMs) < BKMP_GUILD_NEW_MEMBER_WINDOW_MS) {
+        newMemberBonusPct = BKMP_GUILD_NEW_MEMBER_BONUS_PCT;
+      }
+    }
+    techTotals.newMemberBonusPct = newMemberBonusPct;
+
     localStorage.setItem(BKMP_GUILD_TECH_CACHE_KEY, JSON.stringify(techTotals));
 
     if (mine && !bkmpGuildLevelThresholds.length) {
@@ -776,6 +860,14 @@ function bkmpIdleGetGuildTreasuryBonusCache() {
 }
 function bkmpIdleGetGuildTechCache() {
   try { return JSON.parse(localStorage.getItem(BKMP_GUILD_TECH_CACHE_KEY) || '{}'); } catch (e) { return {}; }
+}
+/* Generischer Zugriff fuer die 10 neuen Zweige (analog zu bkmpPrestigeBonus()
+   in bkmp-prestige.js) - genutzt von Dateien ausserhalb von bkmp-guild.js
+   (bkmp-runes.js/bkmp-breeding.js/bkmp-events.js/bkmp-prestige.js/idledorf.js),
+   die nicht wissen muessen, dass der Wert technisch aus einem localStorage-
+   Cache kommt. */
+function bkmpGuildTechBonus(key) {
+  return bkmpIdleGetGuildTechCache()[key] || 0;
 }
 function bkmpRenderGuildBanner(banner, size) {
   const colorId = (banner && banner.color) || BKMP_GUILD_BANNER_COLORS[0].id;
@@ -1488,6 +1580,30 @@ async function bkmpIdleRenderGildeTechPanel() {
         `;
       }).join('')}
     </div>
+    <div class="idle-dungeon-intro idle-guild-tech-ext-intro">
+      <h4>🧪 Erweiterte Technologien</h4>
+      <p>Zehn weitere, eigenständige Zweige (kein reiner Prozent-Stat) - jeweils eigene Maximalstufe.</p>
+    </div>
+    <div class="idle-guild-tech-grid idle-guild-tech-ext-grid">
+      ${BKMP_GUILD_TECH_CATALOG_EXT.map(tech => {
+        const level = bkmpGuildTechLevels[tech.id] || 0;
+        const maxed = level >= tech.maxLevel;
+        const cost = bkmpGuildTechExtCostForLevel(tech, level);
+        const canAfford = g.treasuryGold >= cost;
+        return `
+          <div class="idle-guild-tech-card">
+            <div class="idle-guild-tech-icon">${tech.icon}</div>
+            <div class="idle-guild-tech-name">${escapeHtml(tech.label)}</div>
+            <div class="idle-guild-tech-level">Stufe ${level}/${tech.maxLevel}</div>
+            <div class="idle-guild-tech-bonus">${bkmpGuildTechExtBonusDisplay(tech, level)}</div>
+            <div class="idle-guild-tech-desc">${escapeHtml(tech.desc)}</div>
+            ${maxed
+              ? '<span class="idle-guild-tech-maxed">✅ Maximalstufe</span>'
+              : `<button type="button" class="btn-ja idle-guild-tech-upgrade-btn" data-tech-id="${tech.id}" ${!canUpgrade || !canAfford || bkmpGuildBusy ? 'disabled' : ''}>${bkmpIdleFormatNumber(cost)} 💰</button>`}
+          </div>
+        `;
+      }).join('')}
+    </div>
   `;
 
   panel.querySelectorAll('.idle-guild-tech-upgrade-btn').forEach(btn => {
@@ -1501,7 +1617,7 @@ async function bkmpIdleRenderGildeTechPanel() {
           bkmpGuildTechLevels[techId] = result.newLevel;
           bkmpGuildState.guild.treasuryGold = result.treasuryGold;
           bkmpGuildRefreshTreasuryBonusCache();
-          const techDef = BKMP_GUILD_TECH_CATALOG.find(t => t.id === techId);
+          const techDef = BKMP_GUILD_TECH_CATALOG.find(t => t.id === techId) || BKMP_GUILD_TECH_CATALOG_EXT.find(t => t.id === techId);
           if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`🌳 ${techDef ? techDef.label : techId} auf Stufe ${result.newLevel}!`, 3000);
         }
       } catch (e) {
@@ -1511,6 +1627,24 @@ async function bkmpIdleRenderGildeTechPanel() {
       await bkmpIdleRenderGildeTechPanel();
     });
   });
+}
+/* Jeder der 10 neuen Zweige braucht eine eigene Anzeigeform - anders als
+   die 9 STANDARD-Zweige (immer "+X%") sind hier Zaehlwerte (Versuche/
+   Kaeufe/Stunden), ein reiner Ein/Aus-Schalter (TOGGLE) und ein von
+   externen Live-Daten abhaengiger Wert (Turm-Vorreiter) gemischt. */
+function bkmpGuildTechExtBonusDisplay(tech, level) {
+  if (tech.id === 'guild_turm_vorreiter') {
+    const active = bkmpGuildTechBonus('towerChampionPct');
+    return level > 0 ? `+${active.toFixed(2).replace(/\.?0+$/, '')}% (aktuell)` : '—';
+  }
+  if (tech.id === 'guild_streak_schutz' || tech.id === 'guild_willkommenspaket') {
+    return level > 0 ? '✅ Aktiv' : '❌ Inaktiv';
+  }
+  if (tech.id === 'guild_kriegsrat') return `+${level} Versuch(e)/Tag`;
+  if (tech.id === 'guild_autokauf') return `+${level * tech.effectPerRank} Käufe/Tick`;
+  if (tech.id === 'guild_nachtwache') return `+${(level * tech.effectPerRank).toFixed(1).replace(/\.0$/, '')} Std.`;
+  const pct = (level * tech.effectPerRank).toFixed(1).replace(/\.0$/, '');
+  return `+${pct}%`;
 }
 async function bkmpIdleRenderGildeBossPanel() {
   const panel = document.getElementById('idlePanelGildeBoss');

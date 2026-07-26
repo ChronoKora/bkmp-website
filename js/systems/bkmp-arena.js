@@ -189,14 +189,21 @@ async function bkmpIdleRenderArenaPanel() {
      innerhalb der geladenen 15 juengsten Kaempfe liegt. */
   const todayStr = new Date().toDateString();
   const attacksToday = bkmpArenaRecentBattles.filter(b => b.wasAttacker && new Date(b.occurredAt).toDateString() === todayStr).length;
-  const attacksLeft = Math.max(0, 10 - attacksToday);
+  /* Gilden-Technologie v2 (26.07.), Zweig "Kriegsrat": erhoeht das
+     serverseitige Tageslimit (arena_attack(), sql/20260726-guild-tech-
+     branches-v2.sql) um +1 pro Stufe - ohne diese Anpassung haette der
+     Angriffs-Knopf hier faelschlich bei genau 10 gesperrt, obwohl der
+     Server bereits mehr Angriffe zugelassen haette (echter, beim
+     Verdrahten selbst gefundener Bug, nicht nur eine Anzeigefeinheit). */
+  const dailyLimit = 10 + (typeof bkmpGuildTechBonus === 'function' ? Math.max(0, Math.round(bkmpGuildTechBonus('arenaExtraAttempts'))) : 0);
+  const attacksLeft = Math.max(0, dailyLimit - attacksToday);
 
   panel.innerHTML = `
     <div class="idle-dungeon-intro">
       <h4>⚔️ PvP-Arena</h4>
       <p>Asynchroner Kampf gegen die aktuellen Kampfwerte anderer Spieler - kein Echtzeit-Duell, dein Gegner muss nicht online sein. Sieg bringt Rating + Gold, Niederlage kostet nur Rating (nie Gold).</p>
       <p class="idle-dungeon-best">🏅 Dein Rating: <strong>${rating}</strong> &middot; ${wins}S / ${losses}N ${total > 0 ? `(${winRate}% Siegquote)` : ''}</p>
-      <p>⚔️ Angriffe heute: <strong>${attacksLeft}/10</strong> übrig &middot; Reset um 0 Uhr</p>
+      <p>⚔️ Angriffe heute: <strong>${attacksLeft}/${dailyLimit}</strong> übrig &middot; Reset um 0 Uhr</p>
     </div>
     <div class="idle-arena-opponents">
       <h4 style="margin-top:1rem;">Gegner in deiner Nähe</h4>

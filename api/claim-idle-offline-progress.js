@@ -153,10 +153,30 @@ module.exports = async function handler(req, res) {
     const rareCfg = config.rare_spawn || { chancePct: 8 };
     const rareChance = Math.max(0, Math.min(100, Number(rareCfg.chancePct != null ? rareCfg.chancePct : 8))) / 100;
 
+    /* Gilden-Technologie v2 (26.07.), "Nachtwache": erhoeht den Offline-
+       Deckel um +0,5 Std./Stufe (max. 10 Stufen -> +5 Std.) fuer
+       Mitglieder einer Gilde mit diesem Zweig. Rein additive Abfrage
+       (guild_members/guild_tech_levels sind beide oeffentlich lesbar,
+       hier per Service-Role ohnehin RLS-unabhaengig) - liefert 0, wenn
+       der Spieler in keiner Gilde ist oder der Zweig nicht gekauft
+       wurde, aendert dann nichts am bestehenden Verhalten. */
+    let guildOfflineBonusHours = 0;
+    try {
+      const memberRes = await sbFetch(serviceKey, `guild_members?auth_user_id=eq.${encodeURIComponent(user.id)}&select=guild_id&limit=1`);
+      const memberRows = memberRes.ok ? await memberRes.json() : [];
+      const guildId = Array.isArray(memberRows) && memberRows[0] ? memberRows[0].guild_id : null;
+      if (guildId) {
+        const techRes = await sbFetch(serviceKey, `guild_tech_levels?guild_id=eq.${encodeURIComponent(guildId)}&tech_id=eq.guild_nachtwache&select=level&limit=1`);
+        const techRows = techRes.ok ? await techRes.json() : [];
+        const level = Array.isArray(techRows) && techRows[0] ? Number(techRows[0].level || 0) : 0;
+        guildOfflineBonusHours = Math.max(0, level) * 0.5;
+      }
+    } catch (e) { /* Gilden-Lookup fehlgeschlagen - Deckel bleibt beim Standardwert */ }
+
     const lastSeenIso = state.last_seen_at;
     const lastSeenMs = Date.parse(lastSeenIso);
     const nowMs = Date.now();
-    const maxSeconds = (offlineCfg.maxHours || 12) * 3600;
+    const maxSeconds = ((offlineCfg.maxHours || 12) + guildOfflineBonusHours) * 3600;
     const elapsedSeconds = Math.max(0, Math.min(maxSeconds, Math.round((nowMs - lastSeenMs) / 1000)));
 
     if (elapsedSeconds < 60) {

@@ -557,7 +557,15 @@ function bkmpIdleRecomputeEffectiveStats() {
      4-5-fache angehoben (proportional zur Groessenordnung der neuen
      Upgrade-/Prestige-Caps), NICHT entfernt - bleibt weiterhin eine echte
      Obergrenze gegen Zahlenexplosion, nur auf einem zeitgemaessen Niveau. */
-  const attackPctTotal = Math.min(2000, t('attack_pct') + t('extra_archer') * 6 + prestigeLevelBonusPct + guildBonusPct + gt('attackPct') + guildPrestigeBonusPct);
+  /* Gilden-Technologie v2 (26.07.): "Turm-Vorreiter" (Turmstufen-Rekord
+     eines Mitglieds) und "Willkommenspaket" (befristeter Neumitglieder-
+     Bonus) sind beide bereits als fertige Prozentwerte in derselben
+     techTotals-Cache abgelegt (siehe bkmpGuildRefreshTreasuryBonusCache()
+     in bkmp-guild.js) - hier nur noch in denselben drei Pools (Angriff/
+     Verteidigung/Gold) mitaddiert, exakt wie der bestehende guildBonusPct
+     (Kassenstand-Bonus). */
+  const guildExtraPct = gt('towerChampionPct') + gt('newMemberBonusPct');
+  const attackPctTotal = Math.min(2000, t('attack_pct') + t('extra_archer') * 6 + prestigeLevelBonusPct + guildBonusPct + gt('attackPct') + guildPrestigeBonusPct + guildExtraPct);
   const attackFlatTotal = t('attack_flat') + t('ballista_unlock') * 8;
   bkmpIdleEffectiveStats = {
     attack: (base.attack + attackFlatTotal) * (1 + attackPctTotal / 100),
@@ -569,11 +577,11 @@ function bkmpIdleRecomputeEffectiveStats() {
        haette unbegrenztes defense_pct jeden Kampf (inkl. Dungeon) trivial
        machen koennen. 2000 spiegelt den (Phase 2, 26.07.) angehobenen
        Deckel von goldBonus/xpBonus weiter unten. */
-    defense: (base.defense + t('defense_flat')) * (1 + Math.min(2000, t('defense_pct') + guildBonusPct + gt('defensePct')) / 100),
+    defense: (base.defense + t('defense_flat')) * (1 + Math.min(2000, t('defense_pct') + guildBonusPct + gt('defensePct') + guildExtraPct) / 100),
     hp: Math.round((base.hp + t('hp_flat')) * (1 + (t('hp_pct') + prestigeLevelBonusPct + guildPrestigeBonusPct) / 100)),
     critChance: Math.min(75, base.critChance + t('crit_chance_flat') + t('crit_chance_pct') + gt('critChancePct')),
     critDamage: base.critDamage + Math.min(900, t('crit_damage_flat') + t('crit_damage_pct') + gt('critDamagePct')),
-    goldBonus: Math.min(2000, base.goldBonus + t('gold_prod_pct') + t('gold_find_pct') + prestigeLevelBonusPct + guildBonusPct + gt('goldPct') + guildPrestigeBonusPct),
+    goldBonus: Math.min(2000, base.goldBonus + t('gold_prod_pct') + t('gold_find_pct') + prestigeLevelBonusPct + guildBonusPct + gt('goldPct') + guildPrestigeBonusPct + guildExtraPct),
     xpBonus: Math.min(2000, base.xpBonus + t('xp_pct') + prestigeLevelBonusPct + gt('xpPct') + guildPrestigeBonusPct),
     lootBonus: Math.min(1500, base.lootBonus + t('loot_chance_pct')),
     /* Gilden-Technologie "Bossschaden" - siehe bkmpIdleApplyBossDamageBonus,
@@ -1458,7 +1466,10 @@ function bkmpIdleRunAutomationToggles() {
 
 function bkmpIdleAutoBuyMaxPurchasesPerTick() {
   const bonus = typeof bkmpPrestigeBonus === 'function' ? Math.max(0, Math.round(bkmpPrestigeBonus('autobuy_extra_purchases'))) : 0;
-  return 50 + bonus;
+  // Gilden-Technologie v2 (26.07.): "Gilden-Autokauf" wirkt auf denselben
+  // Hebel wie die Prestige-Automatisierungs-Knoten, additiv.
+  const guildBonus = typeof bkmpGuildTechBonus === 'function' ? Math.max(0, Math.round(bkmpGuildTechBonus('autobuyExtraPurchases'))) : 0;
+  return 50 + bonus + guildBonus;
 }
 function bkmpIdleUpgradeInSoftcapZone(def, level) {
   const cfg = bkmpIdleUpgradeSoftcapCfg(def);

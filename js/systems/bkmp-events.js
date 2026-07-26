@@ -111,7 +111,18 @@ function bkmpIdleCheckDailyStreak() {
   const today = bkmpIdleDateStr(new Date(gameNow));
   if (data.lastDate === today) return;
   const yesterday = bkmpIdleDateStr(new Date(gameNow - 86400000));
-  const newCount = data.lastDate === yesterday ? Number(data.count || 0) + 1 : 1;
+  /* Gilden-Technologie v2 (26.07.), "Streak-Schutz": ein ausgelassener
+     Tag setzt die Serie nur um EINE Stufe zurueck statt komplett auf 1,
+     solange der Zweig aktiv ist (TOGGLE, Stufe 0/1). */
+  const streakProtectActive = typeof bkmpGuildTechBonus === 'function' && bkmpGuildTechBonus('streakProtectUnlock') > 0;
+  let newCount;
+  if (data.lastDate === yesterday) {
+    newCount = Number(data.count || 0) + 1;
+  } else if (streakProtectActive && Number(data.count || 0) > 1) {
+    newCount = Number(data.count || 0) - 1;
+  } else {
+    newCount = 1;
+  }
   bkmpIdleSaveStreakData({ count: newCount, lastDate: today });
   const goldBonus = Math.min(10000, 500 * newCount);
   const gemBonus = newCount % 5 === 0 ? 10 : 0;

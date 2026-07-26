@@ -175,7 +175,11 @@ async function bkmpDragonPurchaseNest() {
    VOR dem Ausbrueten - reduziert um den "zucht_opfergabe"-Skillknoten
    (sacrifice_cost_pct), gedeckelt bei 50% Ersparnis. */
 function bkmpDragonSacrificeCost(species) {
-  const reductionPct = Math.min(50, bkmpIdleSkillEffectTotals(bkmpIdleState ? bkmpIdleState.skill_allocations : null, bkmpIdleSkillDefs).sacrifice_cost_pct || 0);
+  // Gilden-Technologie v2 (26.07.), "Brutbeschleuniger": senkt die
+  // Opfergabe-Kosten zusaetzlich zum bestehenden Skilltree-Rabatt.
+  const guildPct = typeof bkmpGuildTechBonus === 'function' ? bkmpGuildTechBonus('broodSpeedPct') : 0;
+  const skillPct = bkmpIdleSkillEffectTotals(bkmpIdleState ? bkmpIdleState.skill_allocations : null, bkmpIdleSkillDefs).sacrifice_cost_pct || 0;
+  const reductionPct = Math.min(50, skillPct + guildPct);
   const mult = 1 - reductionPct / 100;
   return {
     gold: Math.round((species.sacrifice_gold || 0) * mult),
@@ -225,7 +229,10 @@ async function bkmpDragonAssignEggToNest(nestId, eggId) {
 /* Brut-Pfad: Reduktion gedeckelt bei 40% (Vorgabe: "Brutzeit darf niemals
    auf null reduziert werden... zentrale maximale Reduzierung"). */
 function bkmpDragonEffectiveBroodSeconds(species) {
-  const reductionPct = Math.min(40, bkmpDragonSkillBonus('brood_time_pct') + bkmpDragonPrestigeBonus('brood_time_pct'));
+  // Gilden-Technologie v2 (26.07.), "Brutbeschleuniger": zusaetzlich zu
+  // Skilltree/Prestige, gleicher gedeckelter Pool.
+  const guildPct = typeof bkmpGuildTechBonus === 'function' ? bkmpGuildTechBonus('broodSpeedPct') : 0;
+  const reductionPct = Math.min(40, bkmpDragonSkillBonus('brood_time_pct') + bkmpDragonPrestigeBonus('brood_time_pct') + guildPct);
   return species.brood_seconds * (1 - reductionPct / 100);
 }
 function bkmpDragonNestReady(nest) {
