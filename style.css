@@ -2069,7 +2069,10 @@ label { display: block; font-size: 0.76rem; color: var(--muted); margin-bottom: 
 .btn {
   font-family: 'Inter', sans-serif; font-weight: 500; font-size: 0.88rem;
   padding: 0.65rem 1.3rem; border-radius: 999px; border: 1px solid var(--line);
-  background: var(--paper); color: var(--ink); cursor: pointer; transition: all 0.2s ease;
+  background: var(--paper); color: var(--ink); cursor: pointer;
+  /* Hover-Audit-Fix (26.07.2026): "transition: all" auf die tatsaechlich von
+     .btn/.btn-primary/.btn-danger :hover genutzten Eigenschaften verengt. */
+  transition: border-color 0.2s ease, filter 0.2s ease;
 }
 .btn:hover { border-color: var(--gold); }
 .btn-primary { background: var(--gold); border-color: var(--gold); color: var(--accent-ink); font-weight: 600; }
@@ -4514,7 +4517,10 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s ease;
+  /* Hover-Audit-Fix (26.07.2026): "transition: all" auf gezielte Eigenschaften
+     verengt - .active toggelt nur background/color/border-color, kein
+     Layout-relevantes "all" noetig. */
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 .achievements-subtab.active {
   background: linear-gradient(135deg, #f5d58a, var(--gold));
@@ -7686,17 +7692,22 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
   background: color-mix(in srgb, var(--paper-2) 70%, transparent);
   border: 1px solid var(--line);
   position: relative;
-  top: 0;
   min-height: 44px;
   flex-shrink: 0;
-  transition: top var(--duration-base) var(--ease-out), border-color var(--duration-base) var(--ease-out), background var(--duration-base) var(--ease-out), color var(--duration-base) var(--ease-out);
+  /* Hover-Performance-Fix (26.07.2026, Spieler-Video-Beweis "Hover ruckelt/
+     reagiert verzoegert"): animierte bisher "top" (siehe Kommentar unten) -
+     eine LAYOUT-Eigenschaft, die bei jedem Animationsframe einen echten
+     Reflow erzwingt, statt nur zu compositen. Auf "transform" umgestellt
+     (GPU-komponiert, kein Layout-Neuaufbau) - identisches visuelles
+     Ergebnis (-2px nach oben), siehe .active/:hover unten. */
+  transition: transform var(--duration-base) var(--ease-out), border-color var(--duration-base) var(--ease-out), background var(--duration-base) var(--ease-out), color var(--duration-base) var(--ease-out);
 }
-.idle-dorf-tab:not(:disabled):hover { top: -2px; color: var(--ink); border-color: color-mix(in srgb, var(--gold) 55%, var(--line)); }
+.idle-dorf-tab:not(:disabled):hover { transform: translateY(-2px); color: var(--ink); border-color: color-mix(in srgb, var(--gold) 55%, var(--line)); }
 .idle-dorf-tab.active {
   background: linear-gradient(180deg, color-mix(in srgb, var(--gold) 28%, var(--paper-2)), var(--paper-2));
   color: var(--gold);
   border-color: var(--gold);
-  top: -2px;
+  transform: translateY(-2px);
   box-shadow: 0 4px 14px color-mix(in srgb, var(--gold) 30%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 .idle-dorf-tab.active::after {

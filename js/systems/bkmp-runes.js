@@ -641,6 +641,35 @@ function bkmpRuneQuickSelectFuseAll() {
   bkmpRuneFuseSelection.cids = candidates.slice(0, usableCount).map(r => r._cid);
   bkmpIdleRenderRunenPanel();
 }
+/* Gemeinsame Auswahlfunktion fuer "im Lager gespeicherte, verwertbare
+   Runen" (26.07.2026 Bugfix, siehe CLAUDE.md fuer den vollen Bericht) -
+   genutzt von SOWOHL Auto-Schmelzen ALS AUCH Lager-aufraeumen, damit beide
+   niemals wieder unterschiedliche Bestaende sehen koennen. Fetcht bewusst
+   IMMER frisch vom Server (loadStoredRunes(), supabase.js) statt aus dem
+   LOKALEN bkmpIdlePlayerRunes - der ist seit dem 25.07.-Ladefix auf die 300
+   wertvollsten (nach upgrade_level/rolled_value sortierten) Zeilen gekappt,
+   was GENAU die frischen +0-Runen ausschliessen kann, die Auto-Schmelzen
+   braucht, wenn der Spieler anderswo schon viel hochgestuft hat. filters:
+   { runeType, rarity, upgradeLevelZeroOnly } - alle optional, unabhaengig
+   kombinierbar. equipped=false ist bereits serverseitig fest verdrahtet
+   (loadStoredRunes), kein zusaetzlicher Filter noetig. Ein "Sperr"/
+   "Favoriten"-Konzept existiert im Runensystem aktuell nicht (gezielt
+   geprueft, siehe Bugfix-Bericht) - equipped=false ist der einzige
+   tatsaechlich vorhandene Schutzstatus. */
+async function bkmpGetStoredMeltableRunes(filters) {
+  if (!bkmpIdleState || typeof loadStoredRunes !== 'function') return [];
+  const rows = await loadStoredRunes(bkmpIdleState.name_key, {
+    runeType: filters && filters.runeType,
+    rarity: filters && filters.rarity
+  });
+  const normalized = rows.map(r => ({
+    ...r,
+    upgrade_level: Number(r.upgrade_level || 0),
+    substats: Array.isArray(r.substats) ? r.substats : []
+  }));
+  return (filters && filters.upgradeLevelZeroOnly) ? normalized.filter(r => r.upgrade_level === 0) : normalized;
+}
+
 /* Auto-Schmelzen ueber ALLE Seltenheiten (Spieler-Wunsch 17.07.: "6 und 9
    weg, dann autoschmelzen aller ... Runen mit einem Klick aller Farben") -
    ersetzt das rarity-weise Durchklicken (Seltenheit waehlen -> "Alle" ->
@@ -653,11 +682,35 @@ function bkmpRuneQuickSelectFuseAll() {
    so nicht"): der fruehere Rueckfall auf aufgewertete Runen (falls nicht
    genug +0-Kopien vorhanden waren) ist entfernt - eine Seltenheit wird nur
    noch aus komplett unangetasteten +0-Runen gruppiert, sonst ganz
-   uebersprungen. */
+   uebersprungen.
+   BUGFIX (26.07.2026, Spieler-Meldung "erkennt Schildrunen im Lager nicht,
+   zeigt 0 an"): las bisher direkt aus dem gekappten bkmpIdlePlayerRunes
+   (siehe bkmpGetStoredMeltableRunes()-Kommentar oben) - holt die
+   Kandidaten jetzt IMMER frisch vom Server. bkmpRuneFuse() sucht die zu
+   verschmelzenden Runen anschliessend weiterhin ueber _cid in
+   bkmpIdlePlayerRunes (unveraendert) - frisch gefundene, dort noch nicht
+   vorhandene Zeilen werden deshalb zuerst in den lokalen Bestand
+   eingemischt (gleiche Normalisierung wie beim normalen Laden), sonst
+   wuerde bkmpRuneFuse() sie nicht finden und die Gruppe faelschlich als
+   "zerstoert" zaehlen. */
 async function bkmpRuneAutoFuseAll() {
   const activeSlot = window.BKMP_RUNE_SLOTS.find(s => s.id === bkmpRuneActiveSlotTab);
   if (!activeSlot || !bkmpIdleState) return;
   const fusableRarities = window.BKMP_RUNE_RARITIES.filter(r => r.id !== 'gold');
+
+  let freshCandidates;
+  try {
+    freshCandidates = await bkmpGetStoredMeltableRunes({ runeType: activeSlot.id, upgradeLevelZeroOnly: true });
+  } catch (e) {
+    console.warn('Auto-Schmelzen: Laden fehlgeschlagen.', e);
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Auto-Schmelzen fehlgeschlagen - bitte erneut versuchen.', 3200);
+    return;
+  }
+  const localIds = new Set(bkmpIdlePlayerRunes.filter(r => r.id).map(r => r.id));
+  freshCandidates.forEach(r => {
+    if (!localIds.has(r.id)) bkmpIdlePlayerRunes.push({ ...r, _cid: r.id });
+  });
+
   const groups = [];
   fusableRarities.forEach(rarity => {
     const candidates = bkmpIdlePlayerRunes
@@ -1168,14 +1221,17 @@ async function bkmpRuneSellAllDuplicates() {
    der normalen Lager-Ansicht) rarity-gefilterte Liste, um den Gold-Wert
    EXAKT (dieselbe bkmpRuneSellValue()-Formel wie beim Einzelverkauf) statt
    nur geschaetzt zu berechnen - Loeschung selbst laeuft danach serverseitig
-   per Filter (deleteRunesByRarity), nicht per id-Liste. */
+   per Filter (deleteRunesByRarity), nicht per id-Liste. Nutzt seit 26.07.
+   dieselbe gemeinsame bkmpGetStoredMeltableRunes()-Quelle wie Auto-
+   Schmelzen (siehe dortigen Kommentar) - garantiert denselben Bestand fuer
+   beide Funktionen. */
 async function bkmpRuneSellAllByRarity(rarity) {
   if (!bkmpIdleState || !rarity) return;
   const rarityDef = window.BKMP_RUNE_RARITIES.find(r => r.id === rarity);
   if (!rarityDef) return;
   let rows;
   try {
-    rows = typeof loadRunesForBulkSellByRarity === 'function' ? await loadRunesForBulkSellByRarity(bkmpIdleState.name_key, rarity) : [];
+    rows = await bkmpGetStoredMeltableRunes({ rarity });
   } catch (e) {
     console.warn('Sammelverkauf nach Seltenheit: Laden fehlgeschlagen.', e);
     if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Verkauf fehlgeschlagen - bitte erneut versuchen.', 3600);
@@ -1832,8 +1888,16 @@ function bkmpIdleRenderRunenPanel() {
   const savedInventoryScrollTop = oldInventoryScroll ? oldInventoryScroll.scrollTop : 0;
 
   const unequippedSlotCount = slotOwned.filter(r => !r.equipped).length;
+  /* Bugfix 26.07.2026: zaehlte bisher ALLE unausgeruesteten Runen der
+     Seltenheit, unabhaengig vom Aufwertungsstand - bkmpRuneAutoFuseAll()
+     selbst verwendet aber nur echte +0-Runen (siehe dortiger Kommentar),
+     wodurch die Anzeige oft mehr zeigte, als der Klick tatsaechlich fand.
+     Jetzt exakt dieselbe Bedingung wie im echten Klick-Handler - bleibt ein
+     lokaler, synchroner Schaetzwert (basiert auf dem evtl. gekappten
+     bkmpIdlePlayerRunes, siehe dortigen Ladeblock-Kommentar), der eigentliche
+     Klick holt trotzdem zusaetzlich frisch vom Server nach. */
   const autoFuseGroupCount = window.BKMP_RUNE_RARITIES.filter(r => r.id !== 'gold').reduce((sum, rarity) => {
-    const c = slotOwned.filter(r => r.rarity === rarity.id && !r.equipped).length;
+    const c = slotOwned.filter(r => r.rarity === rarity.id && !r.equipped && Number(r.upgrade_level || 0) === 0).length;
     return sum + Math.floor(c / 3);
   }, 0);
   const autoAscendPairCount = bkmpRuneAutoAscendPairs(slotOwned).length;

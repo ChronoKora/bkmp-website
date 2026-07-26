@@ -3418,23 +3418,38 @@ async function loadUnequippedPlayerRunesCapped(name, limit) {
   return Array.isArray(data) ? data : [];
 }
 
-/* Fuer den neuen "Alle <Seltenheit> verkaufen"-Sammelverkauf (slot-
-   uebergreifend, siehe bkmpRuneSellAllByRarity in bkmp-runes.js) - holt
-   bewusst NUR die drei fuer bkmpRuneSellValue() noetigen Felder (kein
-   rune_type/created_at/name_key/auth_user_id), um die Antwortgroesse bei
-   einem sehr grossen Lager so klein wie moeglich zu halten. Kein
-   Zeilenlimit hier - dieser Aufruf laeuft nur bei einer bewussten,
-   einmaligen Spieler-Aktion (nicht bei jedem Laden), ein groesserer,
-   einmaliger Abruf ist dafuer vertretbar. */
-async function loadRunesForBulkSellByRarity(name, rarity) {
+/* Bugfix 26.07.2026 (Spieler-Meldung "Auto-Schmelzen erkennt Schildrunen im
+   Lager nicht, zeigt 0 an"): Auto-Schmelzen (bkmpRuneAutoFuseAll(), bkmp-
+   runes.js) las bisher ausschliesslich aus dem LOKALEN, seit dem 25.07.-
+   Bugfix auf die 300 wertvollsten (nach upgrade_level/rolled_value
+   absteigend sortierten) Zeilen GEKAPPTEN bkmpIdlePlayerRunes - bei einem
+   Spieler, der in ANDEREN Slots bereits viel hochgestuft hat, wurden dadurch
+   GENAU die frischen +0-Runen (die einzigen, die Auto-Schmelzen je
+   automatisch verwenden darf) aus der gekappten lokalen Liste verdraengt,
+   obwohl sie im vollen Server-Lager laengst vorhanden waren. "Lager
+   aufraeumen" (bkmpRuneSellAllByRarity(), 26.07.) hatte dieses Problem nie,
+   weil es von Anfang an eine EIGENE, frische Serverabfrage nutzte statt der
+   gekappten lokalen Liste - fand deshalb dieselben Runen weiterhin korrekt.
+   loadStoredRunes() ersetzt die vorherige, funktional identische aber enger
+   benannte loadRunesForBulkSellByRarity() als EINE gemeinsame, immer frische
+   Quelle fuer beide Aufrufer (siehe bkmpGetStoredMeltableRunes() in
+   bkmp-runes.js) - garantiert denselben Bestand fuer beide, unabhaengig von
+   der lokalen Ladeobergrenze. Beide Filter (runeType/rarity) sind optional
+   und unabhaengig kombinierbar: Auto-Schmelzen braucht nur runeType (alle
+   Seltenheiten des aktiven Slots in einem Abruf), Lager-aufraeumen nur
+   rarity (alle Slots einer Seltenheit). Kein Zeilenlimit - laeuft nur bei
+   einer bewussten, einmaligen Spieler-Aktion, nicht bei jedem Laden. */
+async function loadStoredRunes(name, filters) {
   const client = bkmpGetSupabaseClient();
-  if (!client || !name || !rarity) return [];
-  const { data, error } = await client
+  if (!client || !name) return [];
+  let query = client
     .from('idle_player_runes')
-    .select('rolled_value, upgrade_level, substats')
+    .select('id, rune_type, rarity, rolled_value, equipped, upgrade_level, substats, created_at')
     .eq('name_key', String(name).trim().toLowerCase())
-    .eq('equipped', false)
-    .eq('rarity', rarity);
+    .eq('equipped', false);
+  if (filters && filters.runeType) query = query.eq('rune_type', filters.runeType);
+  if (filters && filters.rarity) query = query.eq('rarity', filters.rarity);
+  const { data, error } = await query;
   if (error) throw error;
   return Array.isArray(data) ? data : [];
 }

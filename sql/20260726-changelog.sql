@@ -79,3 +79,24 @@ select '2026-07-26', 'change',
 where not exists (
   select 1 from public.changelog_entries where entry_date = '2026-07-26' and title = 'Minimieren-Knopf am Raidboss-Hinweis entfernt'
 );
+
+-- ============================================================
+-- Zwei weitere, spaeter am selben Tag fertiggestellte Eintraege
+-- (Hover-Ruckeln-Fix + Auto-Schmelzen-Fix) - ebenfalls bereits fertig
+-- ausgefuellt, gleiches idempotentes Muster.
+-- ============================================================
+insert into public.changelog_entries (entry_date, category, title, description)
+select '2026-07-26', 'fix',
+  'Hover-Effekte reagierten verzögert und ruckelig',
+  'Buttons, Karten und Tabs im gesamten Idle-Dorf reagierten beim Überfahren mit der Maus spürbar verzögert statt sofort hochzuploppen. Die Ursache war eine ineffiziente Animation in der Hauptnavigation - jetzt reagiert der Hover-Effekt direkt, ohne spürbare Wartezeit.'
+where not exists (
+  select 1 from public.changelog_entries where entry_date = '2026-07-26' and title = 'Hover-Effekte reagierten verzögert und ruckelig'
+);
+
+insert into public.changelog_entries (entry_date, category, title, description)
+select '2026-07-26', 'fix',
+  '"Auto-Schmelzen" erkannte Runen im Lager nicht',
+  'Der "Auto-Schmelzen"-Knopf im Runen-Lager zeigte fälschlich "0" an, obwohl passende Runen vorhanden waren - "Lager aufräumen" fand dieselben Runen dabei problemlos. Beide Funktionen nutzen jetzt dieselbe, zuverlässige Quelle und finden garantiert denselben Bestand.'
+where not exists (
+  select 1 from public.changelog_entries where entry_date = '2026-07-26' and title = '"Auto-Schmelzen" erkannte Runen im Lager nicht'
+);

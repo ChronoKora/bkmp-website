@@ -30,6 +30,15 @@ const { test, expect, openAndLogin, waitForDragonReady } = require('../helpers/q
    Frage ist bereits in tests/e2e/rune-persistence-hardening.spec.js
    abgedeckt. */
 
+// Alle Tests dieser Datei navigieren ueber echte Desktop-Tab-Buttons (#idleTabBtnRunen) -
+// auf mobile-small/mobile-large sind diese per kompakter Navigation versteckt/verschoben
+// (siehe Phase 7.0-7.3). Erst beim ersten vollstaendigen 3-Projekte-qa:full-Lauf sichtbar
+// geworden (26.07.2026) - dieselbe, bereits mehrfach etablierte Luecke wie in
+// buttons-inventory/dungeon-time/navigation/prestige/save-load/rune-autofuse-datasource.spec.js.
+test.beforeEach(async ({}, testInfo) => {
+  test.skip(testInfo.project.name.startsWith('mobile'), 'Desktop-only Navigation (#idleTabBtnRunen) - siehe Kommentar am Dateianfang.');
+});
+
 function runeSummary(page) {
   return page.evaluate(() => bkmpIdlePlayerRunes.map(r => ({
     cid: r._cid, rune_type: r.rune_type, rarity: r.rarity, equipped: r.equipped, upgrade_level: r.upgrade_level
