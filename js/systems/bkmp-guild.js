@@ -19,27 +19,37 @@ const BKMP_GUILD_TREASURY_TIERS = [
 ];
 /* ---------------- Gilden-Technologie (siehe supabase-guild-tech-tree.sql)
    ----------------
-   9 Zweige, jeweils ein fester Prozentsatz pro Stufe (max. 20 Stufen) -
-   permanent, einmal gekauft, unabhaengig vom aktuellen Kassenstand
-   (im Gegensatz zum bestehenden Kassenstand-Meilenstein-Bonus, der bei
-   sinkendem Kassenstand wieder sinken wuerde). Kostenkurve MUSS exakt
-   mit der serverseitigen Formel in guild_tech_upgrade() uebereinstimmen
-   (200.000 * 1,4^Stufe) - hier nur fuer die Anzeige, bezahlt/geprueft
-   wird ausschliesslich serverseitig. */
+   9 Zweige, jeweils ein fester Prozentsatz pro Stufe - permanent, einmal
+   gekauft, unabhaengig vom aktuellen Kassenstand (im Gegensatz zum
+   bestehenden Kassenstand-Meilenstein-Bonus, der bei sinkendem
+   Kassenstand wieder sinken wuerde). Kostenkurve MUSS exakt mit der
+   serverseitigen Formel in guild_tech_upgrade() uebereinstimmen - hier
+   nur fuer die Anzeige, bezahlt/geprueft wird ausschliesslich serverseitig.
+
+   Rebalance (26.07., direkter Nutzerwunsch "Auch die dürfen erhöht
+   werden etc." - nachdem bereits die 10 neuen Zweige denselben Rebalance
+   bekommen hatten): Maximalstufe 20->35, Kostenkurve 200.000*1,4^Stufe ->
+   250.000*1,18^Stufe (IDENTISCH zur STANDARD_V2-Kurve der neuen Zweige
+   Brutbeschleuniger/Gildenschmiede, siehe unten) + Paragon-Fortfuehrung
+   danach. `effectPerRank`/`maxLevel`/`baseCost`/`growth`/`paragonEligible`
+   sind rein ADDITIV zu den bereits bestehenden `perLevel`/`statKey`-Feldern
+   ergaenzt (nicht ersetzt) - lassen sich dadurch mit denselben generischen
+   Tier-/Paragon-Helfern (bkmpGuildTechExtCostForLevel/bkmpGuildTechParagon*)
+   wie die neuen Zweige weiterverwenden, ohne den bestehenden `perLevel`-
+   Lesepfad in bkmpGuildRefreshTreasuryBonusCache() anzufassen. */
 const BKMP_GUILD_TECH_CATALOG = [
-  { id: 'attack', label: 'Angriff', icon: '⚔️', perLevel: 1, statKey: 'attackPct' },
-  { id: 'defense', label: 'Verteidigung', icon: '🛡️', perLevel: 1, statKey: 'defensePct' },
-  { id: 'gold', label: 'Gold', icon: '💰', perLevel: 1.5, statKey: 'goldPct' },
-  { id: 'crit_chance', label: 'Kritchance', icon: '🎯', perLevel: 0.3, statKey: 'critChancePct' },
-  { id: 'crit_damage', label: 'Kritischer Schaden', icon: '💥', perLevel: 2, statKey: 'critDamagePct' },
-  { id: 'boss_damage', label: 'Bossschaden', icon: '🐉', perLevel: 2.5, statKey: 'bossDamagePct' },
-  { id: 'rune_luck', label: 'Runenglück', icon: '🍀', perLevel: 1.5, statKey: 'runeLuckPct' },
-  { id: 'xp', label: 'Erfahrungsbonus', icon: '📖', perLevel: 1, statKey: 'xpPct' },
-  { id: 'prestige', label: 'Prestigebonus', icon: '🌌', perLevel: 0.5, statKey: 'prestigePct' }
+  { id: 'attack', label: 'Angriff', icon: '⚔️', perLevel: 1, effectPerRank: 1, statKey: 'attackPct', paragonEligible: true, maxLevel: 35, baseCost: 250000, growth: 1.18 },
+  { id: 'defense', label: 'Verteidigung', icon: '🛡️', perLevel: 1, effectPerRank: 1, statKey: 'defensePct', paragonEligible: true, maxLevel: 35, baseCost: 250000, growth: 1.18 },
+  { id: 'gold', label: 'Gold', icon: '💰', perLevel: 1.5, effectPerRank: 1.5, statKey: 'goldPct', paragonEligible: true, maxLevel: 35, baseCost: 250000, growth: 1.18 },
+  { id: 'crit_chance', label: 'Kritchance', icon: '🎯', perLevel: 0.3, effectPerRank: 0.3, statKey: 'critChancePct', paragonEligible: true, maxLevel: 35, baseCost: 250000, growth: 1.18 },
+  { id: 'crit_damage', label: 'Kritischer Schaden', icon: '💥', perLevel: 2, effectPerRank: 2, statKey: 'critDamagePct', paragonEligible: true, maxLevel: 35, baseCost: 250000, growth: 1.18 },
+  { id: 'boss_damage', label: 'Bossschaden', icon: '🐉', perLevel: 2.5, effectPerRank: 2.5, statKey: 'bossDamagePct', paragonEligible: true, maxLevel: 35, baseCost: 250000, growth: 1.18 },
+  { id: 'rune_luck', label: 'Runenglück', icon: '🍀', perLevel: 1.5, effectPerRank: 1.5, statKey: 'runeLuckPct', paragonEligible: true, maxLevel: 35, baseCost: 250000, growth: 1.18 },
+  { id: 'xp', label: 'Erfahrungsbonus', icon: '📖', perLevel: 1, effectPerRank: 1, statKey: 'xpPct', paragonEligible: true, maxLevel: 35, baseCost: 250000, growth: 1.18 },
+  { id: 'prestige', label: 'Prestigebonus', icon: '🌌', perLevel: 0.5, effectPerRank: 0.5, statKey: 'prestigePct', paragonEligible: true, maxLevel: 35, baseCost: 250000, growth: 1.18 }
 ];
-const BKMP_GUILD_TECH_MAX_LEVEL = 20;
 function bkmpGuildTechCostForLevel(currentLevel) {
-  return Math.round(200000 * Math.pow(1.4, currentLevel));
+  return Math.round(250000 * Math.pow(1.18, currentLevel));
 }
 
 /* ---------------- Gilden-Technologie v2: 10 neue Zweige (26.07.2026)
@@ -105,6 +115,26 @@ function bkmpGuildTechParagonCost(tech, currentParagonRank) {
   const growth = tech.growth + BKMP_GUILD_TECH_PARAGON_GROWTH_BONUS;
   const raw = lastNormalLevelCost * Math.pow(growth, currentParagonRank + 1);
   return Number.isFinite(raw) && raw < Number.MAX_SAFE_INTEGER ? Math.round(raw) : Number.MAX_SAFE_INTEGER;
+}
+/* Gemeinsamer "Maximalstufe erreicht"-Kartenbereich, von BEIDEN Katalogen
+   genutzt (den urspruenglichen 9 UND den 10 neuen Zweigen, seit dem
+   Rebalance vom 26.07. teilen sich beide dieselbe Paragon-Mechanik) -
+   vermeidet doppelten Code fuer identische Logik. */
+function bkmpGuildTechMaxedExtraHtml(tech, canUpgrade, treasuryGold) {
+  if (!tech.paragonEligible) return '<span class="idle-guild-tech-maxed">✅ Maximalstufe</span>';
+  const paragonKey = bkmpGuildTechParagonKey(tech.id);
+  const paragonRank = bkmpGuildTechLevels[paragonKey] || 0;
+  const paragonMaxed = paragonRank >= BKMP_GUILD_TECH_PARAGON_MAX_RANK;
+  const paragonCost = bkmpGuildTechParagonCost(tech, paragonRank);
+  const paragonCanAfford = treasuryGold >= paragonCost;
+  return `
+    <span class="idle-guild-tech-maxed">✅ Maximalstufe</span>
+    <div class="idle-guild-tech-paragon">
+      <div class="idle-guild-tech-paragon-rank">🌟 Paragon-Rang ${bkmpIdleFormatNumber(paragonRank)}</div>
+      ${paragonMaxed
+        ? '<span class="idle-guild-tech-maxed">Paragon-Maximalrang</span>'
+        : `<button type="button" class="btn-ja idle-guild-tech-paragon-btn" data-tech-id="${paragonKey}" ${!canUpgrade || !paragonCanAfford || bkmpGuildBusy ? 'disabled' : ''}>+Paragon: ${bkmpIdleFormatNumber(paragonCost)} 💰</button>`}
+    </div>`;
 }
 /* effectType/effectPerRank statt statKey/perLevel (Namenskonvention
    angeglichen an BKMP_PRESTIGE_UPGRADES) - die 9 STANDARD-Zweige oben
@@ -178,7 +208,14 @@ async function bkmpGuildRefreshTreasuryBonusCache() {
     const levels = mine ? await bkmpGuildGetTechLevels(mine.guild.id) : {};
     const techTotals = {};
     BKMP_GUILD_TECH_CATALOG.forEach(tech => {
-      techTotals[tech.statKey] = (levels[tech.id] || 0) * tech.perLevel;
+      let total = (levels[tech.id] || 0) * tech.perLevel;
+      // Rebalance (26.07.): Paragon-Fortfuehrung, identisches Prinzip wie
+      // bei den 10 neuen Zweigen unten.
+      if (tech.paragonEligible) {
+        const paragonLevel = levels[bkmpGuildTechParagonKey(tech.id)] || 0;
+        total += paragonLevel * bkmpGuildTechParagonEffectPerRank(tech);
+      }
+      techTotals[tech.statKey] = total;
     });
     /* Gilden-Technologie v2 (26.07.): die 8 "einfachen" neuen Zweige folgen
        demselben Rang*Effekt-Muster wie oben, nur unter effectType statt
@@ -1616,7 +1653,7 @@ async function bkmpIdleRenderGildeTechPanel() {
     <div class="idle-guild-tech-grid">
       ${BKMP_GUILD_TECH_CATALOG.map(tech => {
         const level = bkmpGuildTechLevels[tech.id] || 0;
-        const maxed = level >= BKMP_GUILD_TECH_MAX_LEVEL;
+        const maxed = level >= tech.maxLevel;
         const cost = bkmpGuildTechCostForLevel(level);
         const canAfford = g.treasuryGold >= cost;
         const bonusDisplay = (level * tech.perLevel).toFixed(1).replace(/\.0$/, '');
@@ -1624,10 +1661,10 @@ async function bkmpIdleRenderGildeTechPanel() {
           <div class="idle-guild-tech-card">
             <div class="idle-guild-tech-icon">${tech.icon}</div>
             <div class="idle-guild-tech-name">${escapeHtml(tech.label)}</div>
-            <div class="idle-guild-tech-level">Stufe ${level}/${BKMP_GUILD_TECH_MAX_LEVEL}</div>
+            <div class="idle-guild-tech-level">Stufe ${level}/${tech.maxLevel}</div>
             <div class="idle-guild-tech-bonus">+${bonusDisplay}%</div>
             ${maxed
-              ? '<span class="idle-guild-tech-maxed">✅ Maximalstufe</span>'
+              ? bkmpGuildTechMaxedExtraHtml(tech, canUpgrade, g.treasuryGold)
               : `<button type="button" class="btn-ja idle-guild-tech-upgrade-btn" data-tech-id="${tech.id}" ${!canUpgrade || !canAfford || bkmpGuildBusy ? 'disabled' : ''}>${bkmpIdleFormatNumber(cost)} 💰</button>`}
           </div>
         `;
@@ -1643,25 +1680,6 @@ async function bkmpIdleRenderGildeTechPanel() {
         const maxed = level >= tech.maxLevel;
         const cost = bkmpGuildTechExtCostForLevel(tech, level);
         const canAfford = g.treasuryGold >= cost;
-        /* Rebalance (26.07.): Paragon-Fortfuehrung, sobald die (jetzt
-           deutlich hoehere) Maximalstufe erreicht ist - nur fuer die 8
-           dafuer geeigneten Zweige (nicht Streak-Schutz/Willkommenspaket). */
-        let maxedExtraHtml = '<span class="idle-guild-tech-maxed">✅ Maximalstufe</span>';
-        if (maxed && tech.paragonEligible) {
-          const paragonKey = bkmpGuildTechParagonKey(tech.id);
-          const paragonRank = bkmpGuildTechLevels[paragonKey] || 0;
-          const paragonMaxed = paragonRank >= BKMP_GUILD_TECH_PARAGON_MAX_RANK;
-          const paragonCost = bkmpGuildTechParagonCost(tech, paragonRank);
-          const paragonCanAfford = g.treasuryGold >= paragonCost;
-          maxedExtraHtml = `
-            <span class="idle-guild-tech-maxed">✅ Maximalstufe</span>
-            <div class="idle-guild-tech-paragon">
-              <div class="idle-guild-tech-paragon-rank">🌟 Paragon-Rang ${bkmpIdleFormatNumber(paragonRank)}</div>
-              ${paragonMaxed
-                ? '<span class="idle-guild-tech-maxed">Paragon-Maximalrang</span>'
-                : `<button type="button" class="btn-ja idle-guild-tech-paragon-btn" data-tech-id="${paragonKey}" ${!canUpgrade || !paragonCanAfford || bkmpGuildBusy ? 'disabled' : ''}>+Paragon: ${bkmpIdleFormatNumber(paragonCost)} 💰</button>`}
-            </div>`;
-        }
         return `
           <div class="idle-guild-tech-card">
             <div class="idle-guild-tech-icon">${tech.icon}</div>
@@ -1670,7 +1688,7 @@ async function bkmpIdleRenderGildeTechPanel() {
             <div class="idle-guild-tech-bonus">${bkmpGuildTechExtBonusDisplay(tech, level)}</div>
             <div class="idle-guild-tech-desc">${escapeHtml(tech.desc)}</div>
             ${maxed
-              ? maxedExtraHtml
+              ? bkmpGuildTechMaxedExtraHtml(tech, canUpgrade, g.treasuryGold)
               : `<button type="button" class="btn-ja idle-guild-tech-upgrade-btn" data-tech-id="${tech.id}" ${!canUpgrade || !canAfford || bkmpGuildBusy ? 'disabled' : ''}>${bkmpIdleFormatNumber(cost)} 💰</button>`}
           </div>
         `;

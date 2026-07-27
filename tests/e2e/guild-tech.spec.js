@@ -131,7 +131,8 @@ test.describe('Gilden-Technologie', () => {
     const before = await page.evaluate((name) => window.loadIdlePlayerState(name), LEADER_NAME);
     const result = await page.evaluate(() => window.bkmpGuildTechUpgrade('attack'));
     expect(result.newLevel).toBe(1);
-    expect(result.treasuryGold).toBe(1000000 - 200000);
+    // Rebalance (26.07.): Basiskosten 200000 -> 250000 (dieselbe Kurve wie STANDARD_V2).
+    expect(result.treasuryGold).toBe(1000000 - 250000);
     const after = await page.evaluate((name) => window.loadIdlePlayerState(name), LEADER_NAME);
     expect(after.gold).toBe(before.gold); // persoenliches Gold unangetastet
   });
@@ -159,10 +160,10 @@ test.describe('Gilden-Technologie', () => {
     expect(qaServer.store.tables.guild_tech_levels.some(l => l.tech_id === 'gold')).toBe(false);
   });
 
-  test('Kostenkurve steigt exakt mit 200000*1,4^Stufe ueber mehrere Kaeufe', async ({ page, qaServer }) => {
+  test('Kostenkurve steigt exakt mit 250000*1,18^Stufe ueber mehrere Kaeufe (Rebalance 26.07., vorher 200000*1,4^Stufe)', async ({ page, qaServer }) => {
     await login(page, qaServer, LEADER_NAME);
     let treasury = 1000000;
-    const expectedCosts = [200000, 280000, 392000]; // 200000*1.4^0, *1.4^1, *1.4^2 (gerundet)
+    const expectedCosts = [250000, 295000, 348100]; // 250000*1.18^0, *1.18^1, *1.18^2 (gerundet)
     for (let i = 0; i < 3; i++) {
       const result = await page.evaluate(() => window.bkmpGuildTechUpgrade('crit_chance'));
       expect(result.newLevel).toBe(i + 1);
@@ -171,15 +172,25 @@ test.describe('Gilden-Technologie', () => {
     }
   });
 
-  test('Maximalstufe 20 wird durchgesetzt, kein Kauf darueber hinaus', async ({ page, qaServer }) => {
+  test('Maximalstufe 35 (Rebalance 26.07., vorher 20) wird durchgesetzt, kein Kauf darueber hinaus', async ({ page, qaServer }) => {
     await login(page, qaServer, LEADER_NAME);
     qaServer.store.tables.guilds.find(g => g.id === 'g1').treasury_gold = 999999999999;
-    qaServer.store.tables.guild_tech_levels.push({ guild_id: 'g1', tech_id: 'xp', level: 20 });
+    qaServer.store.tables.guild_tech_levels.push({ guild_id: 'g1', tech_id: 'xp', level: 35 });
     let threw = null;
     try { await page.evaluate(() => window.bkmpGuildTechUpgrade('xp')); }
     catch (e) { threw = String(e.message || e); }
     expect(threw).toMatch(/Maximalstufe/);
-    expect(qaServer.store.tables.guild_tech_levels.find(l => l.tech_id === 'xp').level).toBe(20);
+    expect(qaServer.store.tables.guild_tech_levels.find(l => l.tech_id === 'xp').level).toBe(35);
+  });
+
+  test('Paragon-Fortfuehrung (Rebalance 26.07.) fuer einen urspruenglichen Zweig: erst ab Maximalstufe kaufbar, teilt sich dieselben Basiswerte wie STANDARD_V2', async ({ page, qaServer }) => {
+    await login(page, qaServer, LEADER_NAME);
+    qaServer.store.tables.guilds.find(g => g.id === 'g1').treasury_gold = 999999999999;
+    qaServer.store.tables.guild_tech_levels.push({ guild_id: 'g1', tech_id: 'attack', level: 35 });
+    const paragon1 = await page.evaluate(() => window.bkmpGuildTechUpgrade('attack__paragon'));
+    expect(paragon1.newLevel).toBe(1);
+    // Teilt sich denselben Paragon-Basiswert wie Brutbeschleuniger/Gildenschmiede (STANDARD_V2).
+    expect(999999999999 - paragon1.treasuryGold).toBe(92422965);
   });
 
   test('ungueltige Technologie-ID wird abgelehnt', async ({ page, qaServer }) => {

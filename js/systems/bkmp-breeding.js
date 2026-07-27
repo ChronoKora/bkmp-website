@@ -187,42 +187,72 @@ function bkmpDragonSacrificeCost(species) {
   };
 }
 
+/* Bugfix 27.07.2026 (Spieler-Meldung "Kaiser [Dustin]", Discord): die
+   Automations-Ei-Ausbruetung (Prestige-Knoten auto_egg_nest_unlock,
+   idledorf.js bkmpIdleRunAutomationToggles) waehlte das "beste" Ei direkt
+   aus dem rohen bkmpPlayerDragonEggs - anders als bkmpIdleRenderDragonsPanel
+   (siehe unassignedEggs weiter unten), das Eier ausschliesst, die bereits
+   in einem Nest brueten. Ein legendaeres Ei loest eine AWAIT-blockierende
+   Opfergabe-Bestaetigung aus; solange die offen steht, bleibt das Ei in
+   bkmpPlayerDragonEggs unveraendert "verfuegbar" - der naechste Automations-
+   Durchlauf (oder ein zweites freies Nest kurz danach) griff dasselbe Ei
+   erneut, liess es EIN ZWEITES MAL bestaetigen und in ein ZWEITES Nest
+   legen (assignEggToDragonNest prueft nur, ob das NEST leer ist, nicht ob
+   das EI schon woanders liegt) - aus einem Ei wurden zwei Drachen. Guard
+   hier statt nur an den beiden Aufrufstellen, schuetzt automatisch jeden
+   aktuellen UND kuenftigen Aufrufer. Zusaetzlich Busy-Sperre pro Nest-ID
+   (identisches, bereits bewaehrtes Muster wie bkmpDragonHatchBusyNestIds
+   weiter unten) UEBER die gesamte Funktionsdauer inkl. der AWAIT-blockierenden
+   Opfergabe-Bestaetigung - ohne sie koennte ein zweiter Automations-Durchlauf
+   (10s-Takt) waehrend eine erste Bestaetigung noch offen ist, fuer DASSELBE
+   Nest+Ei ein ZWEITES, redundantes Bestaetigungsfenster aufreissen (exakt das
+   vom Spieler beschriebene "es wird wieder angezeigt"), auch wenn der Server-
+   Guard in assignEggToDragonNest() eine echte Doppel-Zuweisung ins selbe Nest
+   bereits verhindert hatte. */
+const bkmpDragonAssignBusyNestIds = new Set();
 async function bkmpDragonAssignEggToNest(nestId, eggId) {
+  if (bkmpDragonAssignBusyNestIds.has(nestId)) return;
+  if (bkmpPlayerDragonNests.some(n => n.egg_id === eggId)) return;
   const egg = bkmpPlayerDragonEggs.find(e => e.id === eggId);
   const species = egg ? bkmpDragonSpeciesById(egg.species_id) : null;
   if (!species || !bkmpIdleState) return;
-  const sacrifice = bkmpDragonSacrificeCost(species);
-  if (sacrifice.gold > 0 || sacrifice.crystals > 0) {
-    const parts = [];
-    if (sacrifice.gold > 0) parts.push(`💰 ${bkmpIdleFormatNumber(sacrifice.gold)} Gold`);
-    if (sacrifice.crystals > 0) parts.push(`💎 ${bkmpIdleFormatNumber(sacrifice.crystals)} Diamanten`);
-    const body = `${species.name} ist ein legendäres Ei und verlangt eine Opfergabe, bevor die Brut beginnen kann:\n${parts.join(' + ')}`;
-    const confirmed = typeof bkmpConfirmDialog === 'function'
-      ? await bkmpConfirmDialog('🐲 Opfergabe erforderlich', body, 'Opfern und ausbrüten', 'Abbrechen')
-      : window.confirm(body);
-    if (!confirmed) return;
-    if ((bkmpIdleState.gold || 0) < sacrifice.gold || (bkmpIdleState.crystals || 0) < sacrifice.crystals) {
-      if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Nicht genug Gold/Diamanten für die Opfergabe.', 3000);
-      return;
-    }
-  }
+  bkmpDragonAssignBusyNestIds.add(nestId);
   try {
-    const ok = await assignEggToDragonNest(nestId, eggId);
-    if (!ok) {
-      if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Dieses Nest ist gerade nicht mehr frei.', 2600);
-      return;
-    }
+    const sacrifice = bkmpDragonSacrificeCost(species);
     if (sacrifice.gold > 0 || sacrifice.crystals > 0) {
-      bkmpIdleState.gold -= sacrifice.gold;
-      bkmpIdleState.crystals -= sacrifice.crystals;
-      bkmpIdleRenderHud();
-      bkmpIdleQueueSync();
+      const parts = [];
+      if (sacrifice.gold > 0) parts.push(`💰 ${bkmpIdleFormatNumber(sacrifice.gold)} Gold`);
+      if (sacrifice.crystals > 0) parts.push(`💎 ${bkmpIdleFormatNumber(sacrifice.crystals)} Diamanten`);
+      const body = `${species.name} ist ein legendäres Ei und verlangt eine Opfergabe, bevor die Brut beginnen kann:\n${parts.join(' + ')}`;
+      const confirmed = typeof bkmpConfirmDialog === 'function'
+        ? await bkmpConfirmDialog('🐲 Opfergabe erforderlich', body, 'Opfern und ausbrüten', 'Abbrechen')
+        : window.confirm(body);
+      if (!confirmed) return;
+      if ((bkmpIdleState.gold || 0) < sacrifice.gold || (bkmpIdleState.crystals || 0) < sacrifice.crystals) {
+        if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Nicht genug Gold/Diamanten für die Opfergabe.', 3000);
+        return;
+      }
     }
-    const nest = bkmpPlayerDragonNests.find(n => n.id === nestId);
-    if (nest) { nest.egg_id = eggId; nest.started_at = new Date().toISOString(); }
-    bkmpIdleRenderDragonsPanel();
-  } catch (e) {
-    console.warn('Idle Dorf: Ei konnte nicht ins Nest gelegt werden.', e);
+    try {
+      const ok = await assignEggToDragonNest(nestId, eggId);
+      if (!ok) {
+        if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Dieses Nest ist gerade nicht mehr frei.', 2600);
+        return;
+      }
+      if (sacrifice.gold > 0 || sacrifice.crystals > 0) {
+        bkmpIdleState.gold -= sacrifice.gold;
+        bkmpIdleState.crystals -= sacrifice.crystals;
+        bkmpIdleRenderHud();
+        bkmpIdleQueueSync();
+      }
+      const nest = bkmpPlayerDragonNests.find(n => n.id === nestId);
+      if (nest) { nest.egg_id = eggId; nest.started_at = new Date().toISOString(); }
+      bkmpIdleRenderDragonsPanel();
+    } catch (e) {
+      console.warn('Idle Dorf: Ei konnte nicht ins Nest gelegt werden.', e);
+    }
+  } finally {
+    bkmpDragonAssignBusyNestIds.delete(nestId);
   }
 }
 

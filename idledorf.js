@@ -1451,9 +1451,17 @@ function bkmpIdleRunAutomationToggles() {
 
   if (bkmpPrestigeBonus('auto_egg_nest_unlock') > 0 && typeof bkmpPlayerDragonNests !== 'undefined' && typeof bkmpPlayerDragonEggs !== 'undefined' && typeof bkmpDragonAssignEggToNest === 'function') {
     const freeNest = bkmpPlayerDragonNests.find(n => !n.egg_id);
-    if (freeNest && bkmpPlayerDragonEggs.length > 0) {
+    // Bugfix 27.07.2026: dieselbe "bereits in einem Nest"-Ausschlussliste wie
+    // bkmpIdleRenderDragonsPanel()s unassignedEggs (bkmp-breeding.js) - sonst
+    // waehlt Auto-Ausbruetung immer wieder dasselbe (noch nicht geschluepfte)
+    // Top-Raritaets-Ei, obwohl es laengst in einem anderen Nest brütet, und
+    // ignoriert dabei andere tatsaechlich freie/unbenutzte Eier. Der eigentliche
+    // Doppel-Zuweisungs-Schutz liegt zusaetzlich als Guard in
+    // bkmpDragonAssignEggToNest() selbst (bkmp-breeding.js).
+    const availableEggs = bkmpPlayerDragonEggs.filter(e => !bkmpPlayerDragonNests.some(n => n.egg_id === e.id));
+    if (freeNest && availableEggs.length > 0) {
       const rarityOrder = { legendaer: 3, episch: 2, selten: 1, standard: 0 };
-      const bestEgg = [...bkmpPlayerDragonEggs].sort((a, b) => (rarityOrder[b.rarity] || 0) - (rarityOrder[a.rarity] || 0))[0];
+      const bestEgg = [...availableEggs].sort((a, b) => (rarityOrder[b.rarity] || 0) - (rarityOrder[a.rarity] || 0))[0];
       if (bestEgg) bkmpDragonAssignEggToNest(freeNest.id, bestEgg.id);
     }
   }

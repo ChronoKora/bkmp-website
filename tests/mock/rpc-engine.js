@@ -894,11 +894,14 @@ const RPC_HANDLERS = {
        neuen Zweige bekamen deutlich hoehere Maximalstufen/Kosten + eine
        Paragon-Fortfuehrung ("<id>__paragon", max. Rang 1000) danach. */
     const TECH_TIERS = {
-      attack: { max: 20, base: 200000, growth: 1.4 }, defense: { max: 20, base: 200000, growth: 1.4 },
-      gold: { max: 20, base: 200000, growth: 1.4 }, crit_chance: { max: 20, base: 200000, growth: 1.4 },
-      crit_damage: { max: 20, base: 200000, growth: 1.4 }, boss_damage: { max: 20, base: 200000, growth: 1.4 },
-      rune_luck: { max: 20, base: 200000, growth: 1.4 }, xp: { max: 20, base: 200000, growth: 1.4 },
-      prestige: { max: 20, base: 200000, growth: 1.4 },
+      // Rebalance-Nachtrag (26.07., Nutzerwunsch "Auch die dürfen erhöht
+      // werden etc."): die 9 urspruenglichen Zweige teilen sich jetzt
+      // dieselbe Kurve wie STANDARD_V2 (20->35 Stufen, 200k/1,4 -> 250k/1,18).
+      attack: { max: 35, base: 250000, growth: 1.18 }, defense: { max: 35, base: 250000, growth: 1.18 },
+      gold: { max: 35, base: 250000, growth: 1.18 }, crit_chance: { max: 35, base: 250000, growth: 1.18 },
+      crit_damage: { max: 35, base: 250000, growth: 1.18 }, boss_damage: { max: 35, base: 250000, growth: 1.18 },
+      rune_luck: { max: 35, base: 250000, growth: 1.18 }, xp: { max: 35, base: 250000, growth: 1.18 },
+      prestige: { max: 35, base: 250000, growth: 1.18 },
       guild_kriegsrat: { max: 15, base: 600000, growth: 1.5 },
       guild_aufstiegsvorbereitung: { max: 15, base: 600000, growth: 1.5 },
       guild_turm_vorreiter: { max: 25, base: 350000, growth: 1.28 },
@@ -916,7 +919,16 @@ const RPC_HANDLERS = {
       'guild_nachtwache__paragon': { max: 1000, base: 187259282, growth: 1.43, baseTechId: 'guild_nachtwache' },
       'guild_stadtmauer__paragon': { max: 1000, base: 187259282, growth: 1.43, baseTechId: 'guild_stadtmauer' },
       'guild_brutbeschleuniger__paragon': { max: 1000, base: 92422965, growth: 1.33, baseTechId: 'guild_brutbeschleuniger' },
-      'guild_schmiede__paragon': { max: 1000, base: 92422965, growth: 1.33, baseTechId: 'guild_schmiede' }
+      'guild_schmiede__paragon': { max: 1000, base: 92422965, growth: 1.33, baseTechId: 'guild_schmiede' },
+      'attack__paragon': { max: 1000, base: 92422965, growth: 1.33, baseTechId: 'attack' },
+      'defense__paragon': { max: 1000, base: 92422965, growth: 1.33, baseTechId: 'defense' },
+      'gold__paragon': { max: 1000, base: 92422965, growth: 1.33, baseTechId: 'gold' },
+      'crit_chance__paragon': { max: 1000, base: 92422965, growth: 1.33, baseTechId: 'crit_chance' },
+      'crit_damage__paragon': { max: 1000, base: 92422965, growth: 1.33, baseTechId: 'crit_damage' },
+      'boss_damage__paragon': { max: 1000, base: 92422965, growth: 1.33, baseTechId: 'boss_damage' },
+      'rune_luck__paragon': { max: 1000, base: 92422965, growth: 1.33, baseTechId: 'rune_luck' },
+      'xp__paragon': { max: 1000, base: 92422965, growth: 1.33, baseTechId: 'xp' },
+      'prestige__paragon': { max: 1000, base: 92422965, growth: 1.33, baseTechId: 'prestige' }
     };
     const tier = TECH_TIERS[techId];
     if (!tier) throw rpcError('invalid_tech');
