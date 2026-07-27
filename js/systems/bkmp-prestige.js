@@ -134,16 +134,17 @@ const BKMP_PRESTIGE_UPGRADES = [
   { id: 'effiziente_aufwertung', branch: 'runen_dungeon', name: 'Effiziente Aufwertung', desc: '-1% Runen-Aufwertungskosten pro Rang (max. 20%).', icon: '🔧', effectType: 'rune_upgrade_cost_reduction_pct', effectPerRank: 1, ...bkmpPrestigeTierDef('STRONG') },
   { id: 'schmelzmeister', branch: 'runen_dungeon', name: 'Schmelzmeister', desc: '+3% Runen-Schmelzbelohnung pro Rang.', icon: '🔥', effectType: 'rune_fuse_reward_bonus_pct', effectPerRank: 3, ...bkmpPrestigeTierDef('MEDIUM') },
   { id: 'dungeonjaeger', branch: 'runen_dungeon', name: 'Dungeonjäger', desc: '+3% Dungeon-Belohnungen pro Rang.', icon: '🗡️', effectType: 'dungeon_reward_pct', effectPerRank: 3, ...bkmpPrestigeTierDef('MEDIUM') },
-  /* Schluesselmeister/Schluesselbund: die Schluessel-Regeneration selbst
-     laeuft server-seitig (dungeon_regen_calc() in supabase-dungeon-system-
-     v2.sql) - eine echte Anbindung braucht eine eigene SQL-Migration (siehe
-     sql/20260726-dungeon-key-prestige-bonus.sql, NEU, NOCH NICHT AUSGEFUEHRT).
-     Knoten sind bereits vollstaendig kaufbar/anzeigbar, effectType wird
-     bereits berechnet - wirkt aber erst, sobald die Migration laeuft
-     (client wertet die Felder defensiv aus, kein Fehler falls noch nicht
-     vorhanden). */
-  { id: 'schluesselmeister', branch: 'runen_dungeon', name: 'Schlüsselmeister', desc: '+3% schnellere Schlüssel-Regeneration pro Rang. (SQL-Migration erforderlich, siehe Kommentar im Code)', icon: '🗝️', effectType: 'dungeon_key_regen_speed_pct', effectPerRank: 3, serverSyncRequired: true, ...bkmpPrestigeTierDef('MEDIUM') },
-  { id: 'schluesselbund', branch: 'runen_dungeon', name: 'Schlüsselbund', desc: '+1 maximale Dungeon-Schlüssel pro Rang. (SQL-Migration erforderlich, siehe Kommentar im Code)', icon: '🎒', effectType: 'dungeon_key_cap_bonus', effectPerRank: 1, serverSyncRequired: true, ...bkmpPrestigeTierDef('WEAK') },
+  /* Schluesselmeister/Schluesselbund: die Schluessel-Regeneration laeuft
+     vollstaendig serverseitig (dungeon_regen_calc(), dungeon_get_all_status()/
+     dungeon_consume_key() lesen prestige_allocations direkt und rechnen Rang+
+     Paragon-Rang in echte Werte um - siehe sql/20260727-fix-dungeon-regen-
+     fixed-slots-and-wire-prestige.sql, NEU, NOCH NICHT AUSGEFUEHRT). Bis
+     dahin bereits kaufbar/anzeigbar, aber wirkungslos (kein Client-Fehler,
+     Server ignoriert die Zusatz-Parameter einfach, solange die Migration
+     nicht gelaufen ist). Schluesselmeister-Deckel bei 95% (nie 0/negatives
+     Intervall) - siehe Kommentar in der SQL-Datei. */
+  { id: 'schluesselmeister', branch: 'runen_dungeon', name: 'Schlüsselmeister', desc: '+3% schnellere Schlüssel-Regeneration pro Rang (max. 95%).', icon: '🗝️', effectType: 'dungeon_key_regen_speed_pct', effectPerRank: 3, ...bkmpPrestigeTierDef('MEDIUM') },
+  { id: 'schluesselbund', branch: 'runen_dungeon', name: 'Schlüsselbund', desc: '+1 maximale Dungeon-Schlüssel pro Rang.', icon: '🎒', effectType: 'dungeon_key_cap_bonus', effectPerRank: 1, ...bkmpPrestigeTierDef('WEAK') },
   { id: 'sparsamer_eintritt', branch: 'runen_dungeon', name: 'Sparsamer Eintritt', desc: '+1% Chance, dass ein Dungeon-Lauf keinen Schlüssel verbraucht, pro Rang.', icon: '🚪', effectType: 'dungeon_key_save_chance_pct', effectPerRank: 1, ...bkmpPrestigeTierDef('SPECIAL') },
   { id: 'bosskammer', branch: 'runen_dungeon', name: 'Bosskammer', desc: '+2% zusätzlicher Bonus auf den bestehenden "vollständiger Erfolg"-Multiplikator pro Rang.', icon: '👹', effectType: 'dungeon_success_bonus_pct', effectPerRank: 2, ...bkmpPrestigeTierDef('MEDIUM') },
   { id: 'seltene_funde', branch: 'runen_dungeon', name: 'Seltene Funde', desc: '+1% zusätzliche Chance auf ein episches/legendäres Ei oder eine seltene Rune im Dungeon pro Rang.', icon: '✨', effectType: 'dungeon_rare_find_bonus_pct', effectPerRank: 1, ...bkmpPrestigeTierDef('MEDIUM') },
