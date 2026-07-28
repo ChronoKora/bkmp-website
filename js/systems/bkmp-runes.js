@@ -510,6 +510,33 @@ function bkmpRuneAutoAscendPairs(candidateRunes) {
   });
   return pairs;
 }
+/* Gemeinsamer Kern (27.07.2026, siehe bkmpRuneFindFuseGroupsForSlot fuer
+   dasselbe Prinzip beim Verschmelzen) - verarbeitet eine bereits gefundene
+   Paar-Liste (bkmpRuneAutoAscendPairs) wirklich, ohne selbst zu fragen ob
+   ueberhaupt welche vorhanden sind oder wie bezahlt wird. Genutzt vom
+   manuellen Button (bkmpRuneAutoAscendAll, MIT Bestaetigung) UND der neuen
+   Hintergrund-Automatik (bkmpRuneRunBackgroundAscend, OHNE Bestaetigung pro
+   Lauf). */
+function bkmpRuneExecuteAscendPairs(pairs) {
+  let succeeded = 0;
+  let skippedForGold = 0;
+  pairs.forEach(({ survivor, fodder }) => {
+    if (!bkmpIdleState || survivor.upgrade_level !== fodder.upgrade_level) return; // gleiche Rune kann nicht doppelt in zwei Paaren stecken
+    if (!bkmpIdlePlayerRunes.includes(survivor) || !bkmpIdlePlayerRunes.includes(fodder)) return;
+    const cost = bkmpIdleRuneUpgradeCost(survivor);
+    if (bkmpIdleState.gold < cost) { skippedForGold += 1; return; }
+    bkmpIdleState.gold -= cost;
+    bkmpIdlePlayerRunes = bkmpIdlePlayerRunes.filter(r => r._cid !== fodder._cid);
+    if (fodder.id) bkmpRuneDeleteRemote([fodder.id], 'Auto-Aufstieg-Fodder');
+    survivor.upgrade_level = Number(survivor.upgrade_level || 0) + 1;
+    if (survivor.id) updatePlayerRuneUpgrade(survivor.id, survivor.upgrade_level, survivor.substats).catch(err => {
+      console.error('bkmpRuneExecuteAscendPairs: Speichern fehlgeschlagen', err);
+    });
+    bkmpIdleState.rune_upgrade_successes = Number(bkmpIdleState.rune_upgrade_successes || 0) + 1;
+    succeeded += 1;
+  });
+  return { succeeded, skippedForGold };
+}
 async function bkmpRuneAutoAscendAll() {
   const activeSlot = window.BKMP_RUNE_SLOTS.find(s => s.id === bkmpRuneActiveSlotTab);
   if (!activeSlot || !bkmpIdleState) return;
@@ -527,24 +554,7 @@ async function bkmpRuneAutoAscendAll() {
     'Abbrechen'
   );
   if (!confirmed) return;
-  let succeeded = 0;
-  let skippedForGold = 0;
-  pairs.forEach(({ survivor, fodder }) => {
-    if (!bkmpIdleState || survivor.upgrade_level !== fodder.upgrade_level) return; // gleiche Rune kann nicht doppelt in zwei Paaren stecken
-    if (!bkmpIdlePlayerRunes.includes(survivor) || !bkmpIdlePlayerRunes.includes(fodder)) return;
-    const cost = bkmpIdleRuneUpgradeCost(survivor);
-    if (bkmpIdleState.gold < cost) { skippedForGold += 1; return; }
-    const slot = window.BKMP_RUNE_SLOTS.find(s => s.id === survivor.rune_type);
-    bkmpIdleState.gold -= cost;
-    bkmpIdlePlayerRunes = bkmpIdlePlayerRunes.filter(r => r._cid !== fodder._cid);
-    if (fodder.id) bkmpRuneDeleteRemote([fodder.id], 'Auto-Aufstieg-Fodder');
-    survivor.upgrade_level = Number(survivor.upgrade_level || 0) + 1;
-    if (survivor.id) updatePlayerRuneUpgrade(survivor.id, survivor.upgrade_level, survivor.substats).catch(err => {
-      console.error('bkmpRuneAutoAscendAll: Speichern fehlgeschlagen', err);
-    });
-    bkmpIdleState.rune_upgrade_successes = Number(bkmpIdleState.rune_upgrade_successes || 0) + 1;
-    succeeded += 1;
-  });
+  const { succeeded, skippedForGold } = bkmpRuneExecuteAscendPairs(pairs);
   const summary = skippedForGold
     ? `🌟 ${succeeded}× Legendäre aufgestiegen, ${skippedForGold}× mangels Gold übersprungen.`
     : `🌟 Alle ${succeeded} Legendäre-Paare aufgestiegen!`;
@@ -554,6 +564,123 @@ async function bkmpRuneAutoAscendAll() {
   bkmpIdleRenderRunenPanel();
   bkmpIdleRenderHud();
   bkmpIdleQueueSync();
+}
+
+/* ---------------- Hintergrund-Automatik: Legi-Aufwertung/Aufstieg/Schmelzen (27.07.2026) ----------------
+   Nutzerwunsch, nachdem "Automatische Runenaufwertung" (Prestige-Knoten)
+   bei komplett auf +15 ausgeruesteten Runen erwartungsgemaess nichts mehr
+   zu tun hatte: "eine andere Variante automatische +15 upgrade Funktion
+   von Legis und die Automatischer Aufstieg der legis dann mit einen On/Off
+   Button im Runen System Seite. + Auto verschmelzung". Alle drei nutzen
+   AUSSCHLIESSLICH bereits bestehende, manuell laengst getestete Aktionen
+   (bkmpRuneUpgrade/bkmpRuneExecuteAscendPairs/bkmpRuneExecuteFuseGroups) -
+   keine neue Spiellogik, nur ein wiederkehrender Trigger ohne Klick.
+   Bewusst an den Prestige-Knoten "Automatische Runenaufwertung" gekoppelt
+   (Nutzerentscheidung) statt komplett kostenlos - erscheinen erst, wenn
+   der Knoten gekauft ist. Rein lokale Ein/Aus-Schalter (localStorage,
+   identisches Prinzip wie BKMP_RUNE_FUSE_AUTOCONFIRM_KEY) - kein Kauf,
+   keine SQL-Aenderung. Da ein Hintergrund-Prozess nicht alle 10s einen
+   Bestaetigungsdialog aufreissen kann (Verschmelzen kann Runen zerstoeren,
+   Aufstieg verbraucht immer eine zweite Legendaere unwiderruflich),
+   bestaetigt der Spieler stattdessen EINMALIG beim Einschalten des
+   jeweiligen Schalters (bkmpRuneToggleBackgroundAutomation) - danach
+   laeuft es lautlos weiter, bis er wieder ausschaltet. */
+const BKMP_RUNE_AUTO_LEGI_UPGRADE_KEY = 'bkmp-rune-auto-legiupgrade-enabled';
+const BKMP_RUNE_AUTO_ASCEND_KEY = 'bkmp-rune-auto-ascend-enabled';
+const BKMP_RUNE_AUTO_FUSE_BG_KEY = 'bkmp-rune-auto-fuse-enabled';
+function bkmpRuneBackgroundAutoGet(key) {
+  try { return localStorage.getItem(key) === '1'; } catch (e) { return false; }
+}
+function bkmpRuneBackgroundAutoSet(key, on) {
+  try { localStorage.setItem(key, on ? '1' : '0'); } catch (e) {}
+}
+/* Zentrale Freischaltbedingung fuer alle drei Schalter - siehe Kommentar
+   oben zur Nutzerentscheidung. */
+function bkmpRuneBackgroundAutomationUnlocked() {
+  return typeof bkmpPrestigeBonus === 'function' && bkmpPrestigeBonus('auto_rune_upgrade_unlock') > 0;
+}
+const BKMP_RUNE_BACKGROUND_TOGGLE_META = {
+  legiUpgrade: {
+    key: BKMP_RUNE_AUTO_LEGI_UPGRADE_KEY,
+    label: '🥇 Auto-Legi-Aufwertung',
+    warnTitle: '🥇 Automatische Legendäre-Aufwertung einschalten?',
+    warnBody: 'Wertet ab jetzt automatisch (alle paar Sekunden) deine günstigste bezahlbare legendäre Rune auf +15 auf - egal ob ausgerüstet oder im Lager. Kostet dabei laufend Gold, es gibt eine Fehlschlagchance (Gold ist bei Fehlschlag trotzdem weg).\n\nEinschalten?'
+  },
+  ascend: {
+    key: BKMP_RUNE_AUTO_ASCEND_KEY,
+    label: '🌟 Auto-Aufstieg',
+    warnTitle: '🌟 Automatischen Legendäre-Aufstieg einschalten?',
+    warnBody: 'Lässt ab jetzt automatisch alle passenden +15-Legendäre-Paare (gleicher Slot, gleiche Stufe) aufsteigen - verbraucht dabei UNWIDERRUFLICH jeweils eine zweite Legendäre als Material und kostet Gold. Läuft danach lautlos im Hintergrund weiter.\n\nEinschalten?'
+  },
+  fuse: {
+    key: BKMP_RUNE_AUTO_FUSE_BG_KEY,
+    label: '🔥 Auto-Verschmelzung',
+    warnTitle: '🔥 Automatisches Verschmelzen einschalten?',
+    warnBody: 'Verschmilzt ab jetzt automatisch jede vollständige +0-Dreiergruppe (über alle Seltenheiten außer Legendär) - jede Gruppe hat je nach Seltenheit eine eigene Chance, komplett zerstört zu werden statt zu gelingen. Läuft danach lautlos im Hintergrund weiter.\n\nEinschalten?'
+  }
+};
+/* Wird von der Checkbox im Runen-Panel aufgerufen - zeigt die Warnung nur
+   beim EINSCHALTEN (Ausschalten braucht keine Bestaetigung, ist immer
+   sicher). Setzt die Checkbox zurueck, falls der Spieler abbricht. */
+async function bkmpRuneToggleBackgroundAutomation(name, checkboxEl) {
+  const meta = BKMP_RUNE_BACKGROUND_TOGGLE_META[name];
+  if (!meta) return;
+  const turningOn = !!(checkboxEl && checkboxEl.checked);
+  if (turningOn) {
+    const confirmed = await bkmpConfirmDialog(meta.warnTitle, meta.warnBody, 'Ja, einschalten', 'Abbrechen');
+    if (!confirmed) { if (checkboxEl) checkboxEl.checked = false; return; }
+  }
+  bkmpRuneBackgroundAutoSet(meta.key, turningOn);
+  if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`${meta.label}: ${turningOn ? 'eingeschaltet' : 'ausgeschaltet'}.`, 2400);
+}
+
+/* Wertet die guenstigste bezahlbare LEGENDAERE Rune unter +15 auf - anders
+   als der Prestige-Knoten selbst (nur ausgeruestete Runen aller
+   Seltenheiten) bewusst OHNE Ausruestungs-Einschraenkung, dafuer NUR
+   Legendaer (ergaenzt den Knoten, ersetzt ihn nicht). Ein Versuch pro
+   Automations-Durchlauf, identisches Tempo wie die bestehende
+   Prestige-Automatik. */
+function bkmpRuneRunBackgroundLegiUpgrade() {
+  if (!bkmpIdleState || !Array.isArray(bkmpIdlePlayerRunes)) return;
+  const candidates = bkmpIdlePlayerRunes.filter(r => r.rarity === 'gold' && Number(r.upgrade_level || 0) < BKMP_RUNE_MAX_LEVEL);
+  const affordable = candidates
+    .map(r => ({ r, cost: bkmpIdleRuneUpgradeCost(r) }))
+    .filter(({ cost }) => Number(bkmpIdleState.gold || 0) >= cost)
+    .sort((a, b) => a.cost - b.cost);
+  if (affordable.length > 0) bkmpRuneUpgrade(affordable[0].r._cid);
+}
+/* Aufstieg ueber ALLE 6 Slot-Typen gleichzeitig - bkmpRuneAutoAscendPairs()
+   gruppiert intern bereits nach rune_type+Stufe, ein einziger Aufruf mit
+   dem kompletten Bestand reicht (kein Durchlauf pro Slot noetig). */
+function bkmpRuneRunBackgroundAscend() {
+  if (!bkmpIdleState || !Array.isArray(bkmpIdlePlayerRunes)) return;
+  const pairs = bkmpRuneAutoAscendPairs(bkmpIdlePlayerRunes);
+  if (!pairs.length) return;
+  const { succeeded } = bkmpRuneExecuteAscendPairs(pairs);
+  if (succeeded > 0) {
+    bkmpIdleRecomputeEffectiveStats();
+    bkmpIdleRenderRunenPanel();
+    bkmpIdleRenderHud();
+    bkmpIdleQueueSync();
+  }
+}
+/* Verschmelzen laeuft (anders als Aufstieg) pro Slot-Typ einzeln, weil die
+   zugrundeliegende Kandidatensuche einen echten Serveraufruf pro Slot
+   braucht (bkmpGetStoredMeltableRunes, siehe dortiger Kommentar) - EIN
+   Slot pro Automations-Durchlauf reicht (naechster Durchlauf in ~10s nimmt
+   den naechsten), vermeidet 6 gleichzeitige Serveraufrufe pro Tick. */
+let bkmpRuneBackgroundFuseSlotCursor = 0;
+async function bkmpRuneRunBackgroundFuse() {
+  if (!bkmpIdleState) return;
+  const slot = window.BKMP_RUNE_SLOTS[bkmpRuneBackgroundFuseSlotCursor % window.BKMP_RUNE_SLOTS.length];
+  bkmpRuneBackgroundFuseSlotCursor += 1;
+  const groups = await bkmpRuneFindFuseGroupsForSlot(slot.id);
+  if (!groups || !groups.length) return;
+  const { succeeded, destroyed } = bkmpRuneExecuteFuseGroups(slot.id, groups);
+  if (succeeded || destroyed) {
+    bkmpIdleLog(`🔥 Auto-Verschmelzung (${slot.name}): ${succeeded}/${groups.length} erfolgreich${destroyed ? `, ${destroyed} zerstört` : ''}.`);
+    bkmpIdleRenderRunenPanel();
+  }
 }
 
 /* ---------------- Runen-UI: eigenes Inventarfenster je Slot ---------------- */
@@ -693,31 +820,56 @@ async function bkmpGetStoredMeltableRunes(filters) {
    eingemischt (gleiche Normalisierung wie beim normalen Laden), sonst
    wuerde bkmpRuneFuse() sie nicht finden und die Gruppe faelschlich als
    "zerstoert" zaehlen. */
-async function bkmpRuneAutoFuseAll() {
-  const activeSlot = window.BKMP_RUNE_SLOTS.find(s => s.id === bkmpRuneActiveSlotTab);
-  if (!activeSlot || !bkmpIdleState) return;
+/* Auto-Ausbau (27.07.2026): der gemeinsame Kern - "vollstaendige +0-
+   Dreiergruppen fuer EINEN Slot finden" - getrennt von "Gruppen tatsaechlich
+   verschmelzen", damit sowohl der bestehende manuelle Button (mit
+   Bestaetigung, siehe bkmpRuneAutoFuseAll) als auch die neue Hintergrund-
+   Automatik (bkmpRuneRunBackgroundFuse, ohne Bestaetigung pro Lauf - der
+   Spieler bestaetigt einmalig beim Einschalten des Schalters) exakt
+   dieselbe Logik nutzen, keine zweite Kopie. Liefert null bei einem
+   Ladefehler (unterscheidbar von "leere Liste"). */
+async function bkmpRuneFindFuseGroupsForSlot(slotId) {
   const fusableRarities = window.BKMP_RUNE_RARITIES.filter(r => r.id !== 'gold');
-
   let freshCandidates;
   try {
-    freshCandidates = await bkmpGetStoredMeltableRunes({ runeType: activeSlot.id, upgradeLevelZeroOnly: true });
+    freshCandidates = await bkmpGetStoredMeltableRunes({ runeType: slotId, upgradeLevelZeroOnly: true });
   } catch (e) {
     console.warn('Auto-Schmelzen: Laden fehlgeschlagen.', e);
-    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Auto-Schmelzen fehlgeschlagen - bitte erneut versuchen.', 3200);
-    return;
+    return null;
   }
   const localIds = new Set(bkmpIdlePlayerRunes.filter(r => r.id).map(r => r.id));
   freshCandidates.forEach(r => {
     if (!localIds.has(r.id)) bkmpIdlePlayerRunes.push({ ...r, _cid: r.id });
   });
-
   const groups = [];
   fusableRarities.forEach(rarity => {
     const candidates = bkmpIdlePlayerRunes
-      .filter(r => r.rune_type === activeSlot.id && r.rarity === rarity.id && !r.equipped && Number(r.upgrade_level || 0) === 0);
+      .filter(r => r.rune_type === slotId && r.rarity === rarity.id && !r.equipped && Number(r.upgrade_level || 0) === 0);
     const usableCount = Math.floor(candidates.length / 3) * 3;
     for (let i = 0; i < usableCount; i += 3) groups.push({ rarityId: rarity.id, cids: candidates.slice(i, i + 3).map(r => r._cid) });
   });
+  return groups;
+}
+function bkmpRuneExecuteFuseGroups(slotId, groups) {
+  let succeeded = 0;
+  let destroyed = 0;
+  groups.forEach(g => {
+    const result = bkmpRuneFuse(slotId, g.rarityId, g.cids);
+    if (result && result.success) succeeded += 1;
+    else destroyed += 1;
+  });
+  return { succeeded, destroyed };
+}
+async function bkmpRuneAutoFuseAll() {
+  const activeSlot = window.BKMP_RUNE_SLOTS.find(s => s.id === bkmpRuneActiveSlotTab);
+  if (!activeSlot || !bkmpIdleState) return;
+  const fusableRarities = window.BKMP_RUNE_RARITIES.filter(r => r.id !== 'gold');
+
+  const groups = await bkmpRuneFindFuseGroupsForSlot(activeSlot.id);
+  if (groups === null) {
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Auto-Schmelzen fehlgeschlagen - bitte erneut versuchen.', 3200);
+    return;
+  }
   if (!groups.length) {
     if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`Keine vollständigen +0-Dreiergruppen zum Verschmelzen bei ${activeSlot.name}.`, 2800);
     return;
@@ -733,13 +885,7 @@ async function bkmpRuneAutoFuseAll() {
   );
   if (!confirmed) return;
   bkmpRuneFuseSelection = null;
-  let succeeded = 0;
-  let destroyed = 0;
-  groups.forEach(g => {
-    const result = bkmpRuneFuse(activeSlot.id, g.rarityId, g.cids);
-    if (result && result.success) succeeded += 1;
-    else destroyed += 1;
-  });
+  const { succeeded, destroyed } = bkmpRuneExecuteFuseGroups(activeSlot.id, groups);
   const summary = destroyed
     ? `🔥 ${succeeded}/${groups.length} Verschmelzungen erfolgreich, 💥 ${destroyed} zerstört.`
     : `🔥 Alle ${groups.length} Verschmelzungen erfolgreich!`;
@@ -1883,6 +2029,21 @@ function bkmpIdleRenderRunenPanel() {
   const viewingRune = slotOwned.find(r => r._cid === bkmpRuneCurrentlyViewing) || null;
 
   const loadoutUnlocked = typeof bkmpPrestigeBonus === 'function' && bkmpPrestigeBonus('rune_loadout_unlock') > 0;
+  /* Hintergrund-Automatik-Schalter (27.07.2026) - siehe Kommentar bei
+     BKMP_RUNE_BACKGROUND_TOGGLE_META fuer den vollen Hintergrund. Global
+     (nicht slot-abhaengig), deshalb hier im Panel-Kopf statt im per-Slot-
+     Lager weiter unten. */
+  const bgAutoUnlocked = bkmpRuneBackgroundAutomationUnlocked();
+  const bgAutoRowHtml = bgAutoUnlocked ? `
+    <div class="idle-runen-bgauto-row">
+      ${Object.entries(BKMP_RUNE_BACKGROUND_TOGGLE_META).map(([name, meta]) => `
+        <label class="idle-autobuy-toggle idle-runen-bgauto-toggle">
+          <input type="checkbox" class="idle-runen-bgauto-checkbox" data-auto-name="${name}" ${bkmpRuneBackgroundAutoGet(meta.key) ? 'checked' : ''}>
+          <span>${meta.label}</span>
+        </label>
+      `).join('')}
+    </div>
+  ` : '';
   panel.innerHTML = `
     <div class="idle-runen-header-row">
       <button type="button" class="btn-nein idle-runen-help-btn" id="idleRunenHelpBtn">❓ Hilfe</button>
@@ -1891,6 +2052,7 @@ function bkmpIdleRenderRunenPanel() {
         <button type="button" class="btn-nein idle-runen-loadout-btn" id="idleRuneRestoreLoadoutBtn" title="Gespeicherte Ausrüstung wiederherstellen" ${bkmpRuneHasSavedLoadout() ? '' : 'disabled'}>♻️ Set laden</button>
       ` : ''}
     </div>
+    ${bgAutoRowHtml}
     <div class="idle-runen-slot-tabs" id="idleRunenSlotTabs">
       ${window.BKMP_RUNE_SLOTS.map(slot => {
         const count = bkmpIdlePlayerRunes.filter(r => r.rune_type === slot.id).length;
@@ -2069,4 +2231,5 @@ function bkmpIdleRenderRunenPanel() {
   const retryLoadBtn = document.getElementById('idleRuneRetryLoadBtn');
   if (retryLoadBtn) retryLoadBtn.addEventListener('click', bkmpRuneRetryLoad);
   drawerContent.querySelectorAll('.idle-runen-rarity-sell-btn').forEach(btn => btn.addEventListener('click', () => bkmpRuneSellAllByRarity(btn.dataset.rarity)));
+  panel.querySelectorAll('.idle-runen-bgauto-checkbox').forEach(cb => cb.addEventListener('change', () => bkmpRuneToggleBackgroundAutomation(cb.dataset.autoName, cb)));
 }

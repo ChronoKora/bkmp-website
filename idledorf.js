@@ -1449,6 +1449,20 @@ function bkmpIdleRunAutomationToggles() {
     if (affordable.length > 0) bkmpRuneUpgrade(affordable[0].r._cid);
   }
 
+  /* 27.07.2026 (Nutzerwunsch, siehe Kommentar bei BKMP_RUNE_BACKGROUND_TOGGLE_META
+     in bkmp-runes.js): drei zusaetzliche, rein lokal (localStorage) ein-/
+     ausschaltbare Automatiken speziell fuer Legendaere Runen - ergaenzen den
+     obigen Knoten (der bei komplett ausgeruesteten +15-Runen erwartungsgemaess
+     nichts mehr zu tun hat), decken aber Lager-Legendaere + Aufstieg + normales
+     Verschmelzen ab. Alle drei bewusst an denselben Prestige-Knoten (auto_rune_
+     upgrade_unlock) gekoppelt wie oben, zusaetzlich per eigenem Schalter im
+     Runen-Tab an/aus. */
+  if (bkmpRuneBackgroundAutomationUnlocked()) {
+    if (bkmpRuneBackgroundAutoGet(BKMP_RUNE_AUTO_LEGI_UPGRADE_KEY) && typeof bkmpRuneRunBackgroundLegiUpgrade === 'function') bkmpRuneRunBackgroundLegiUpgrade();
+    if (bkmpRuneBackgroundAutoGet(BKMP_RUNE_AUTO_ASCEND_KEY) && typeof bkmpRuneRunBackgroundAscend === 'function') bkmpRuneRunBackgroundAscend();
+    if (bkmpRuneBackgroundAutoGet(BKMP_RUNE_AUTO_FUSE_BG_KEY) && typeof bkmpRuneRunBackgroundFuse === 'function') bkmpRuneRunBackgroundFuse();
+  }
+
   if (bkmpPrestigeBonus('auto_egg_nest_unlock') > 0 && typeof bkmpPlayerDragonNests !== 'undefined' && typeof bkmpPlayerDragonEggs !== 'undefined' && typeof bkmpDragonAssignEggToNest === 'function') {
     const freeNest = bkmpPlayerDragonNests.find(n => !n.egg_id);
     // Bugfix 27.07.2026: dieselbe "bereits in einem Nest"-Ausschlussliste wie

@@ -11,6 +11,12 @@ Automatisch von Claude Code gepflegt: **nach jeder Code-/SQL-Änderung kommt hie
 
 ---
 
+## 2026-07-28
+
+- **[Neu]** Drei neue Runen-Hintergrund-Automatiken (Nutzerwunsch nach Klärung eines vermeintlichen Bugs bei "Automatische Runenaufwertung" — die lief korrekt, hatte bei komplett auf +15 ausgerüsteten Runen nur nichts mehr zu tun): Auto-Legi-Aufwertung (wertet auch unausgerüstete legendäre Runen automatisch auf +15 auf), Auto-Aufstieg (lässt passende +15-Legendäre-Paare automatisch auf +16+ aufsteigen, verbraucht dabei eine zweite Legendäre) und Auto-Verschmelzung (verschmilzt automatisch vollständige +0-Dreiergruppen). Alle drei als eigene Ein/Aus-Schalter direkt im Runen-Tab, gekoppelt an den bestehenden Prestige-Knoten "Automatische Runenaufwertung", mit einer einmaligen Bestätigung beim Einschalten (nicht bei jedem Lauf). Nutzen ausschließlich bereits bestehende, manuell getestete Aktionen — keine neue Spiellogik. 6 neue Tests, bestehende Runen-Tests unverändert grün. — `js/systems/bkmp-runes.js`, `idledorf.js`, `style.css` — 🟡 lokal
+
+---
+
 ## 2026-07-27
 
 - **[Fix]** Beim systematischen Testen aller Prestige-Automations-Skills (Nutzerwunsch) gefunden: die Knoten "Schlüsselmeister"/"Schlüsselbund" (Zweig Runen & Dungeons) zeigten einen rohen internen Entwickler-Hinweis als Spieler-Text und waren trotz echter Kosten wirkungslos. Beim Fertig-Verdrahten zusätzlich gefunden: eine bereits live gelaufene SQL-Migration hatte versehentlich die feste, für alle Spieler gleiche Schlüssel-Regenerationszeit (Spielerwunsch vom 16.07.) stillschweigend wieder auf "rollend seit dem individuellen letzten Zeitpunkt" zurückgestellt — seit dem 26.07. unbemerkt live. Zusätzlich eine harte Datenbank-Obergrenze (max. 5 Schlüssel) gefunden, die Schlüsselbunds höheren Deckel sonst beim Speichern abgelehnt hätte. Alle drei in einer Migration behoben, 5 neue Tests. — `js/systems/bkmp-prestige.js`, `sql/20260727-fix-dungeon-regen-fixed-slots-and-wire-prestige.sql` (neu, **noch nicht ausgeführt**), `tests/mock/rpc-engine.js` — 🟡 lokal

@@ -4065,6 +4065,12 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 
 /* ---------------- Runen-Tab (siehe idledorf.js) ---------------- */
 .idle-runen-header-row { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: flex-end; margin-bottom: 0.7rem; }
+/* Hintergrund-Automatik-Schalter (27.07.2026, siehe bkmp-runes.js
+   BKMP_RUNE_BACKGROUND_TOGGLE_META) - drei kompakte Checkboxen nebeneinander,
+   wiederverwendet .idle-autobuy-toggle als Basis (siehe dort), hier nur
+   dichter gepackt fuer eine Zeile statt volle Breite. */
+.idle-runen-bgauto-row { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.7rem; }
+.idle-runen-bgauto-toggle { margin-bottom: 0; padding: 0.4rem 0.7rem; font-size: 0.74rem; flex: 0 0 auto; }
 .idle-runen-help-btn { padding: 0.4rem 0.8rem; font-size: 0.76rem; white-space: nowrap; }
 .idle-runen-loadout-btn { padding: 0.4rem 0.7rem; font-size: 0.72rem; white-space: nowrap; }
 .idle-runen-loadout-btn:disabled { opacity: 0.5; cursor: not-allowed; }
