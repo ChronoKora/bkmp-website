@@ -1463,6 +1463,7 @@
                 <div class="investor-name">${escapeHtml(invName)}</div>
                 ${mcName ? `<div class="investor-mc">${escapeHtml(mcName)}</div>` : ''}
               </div>
+              ${inv.payoutProofUrl ? `<img class="investor-payout-thumb" src="${escapeHtml(inv.payoutProofUrl)}" data-full="${escapeHtml(inv.payoutProofUrl)}" data-investor-name="${escapeHtml(invName)}" alt="Auszahlungsbeweis von ${escapeHtml(invName)} - zum Vergrößern anklicken" title="Auszahlungsbeweis anzeigen" loading="lazy" decoding="async">` : ''}
             </div>
             <div class="investor-period">${formatInvestorPeriod(inv)}</div>
             <div class="investor-highlight">
@@ -1507,6 +1508,28 @@
     }
     }
     renderFinancialSections();
+
+    /* Auszahlungsbeweis-Foto vergroessern (28.07.2026) - identisches Prinzip
+       wie beim Donut-Chart-Easter-Egg direkt darunter: #investorGrid selbst
+       wird bei jedem Re-Render nur per innerHTML neu befuellt, nie ersetzt -
+       ein Delegations-Listener EINMAL hier (ausserhalb von
+       renderFinancialSections()) statt bei jedem Render neu anzuhaengen,
+       sonst sammeln sich bei jedem Live-Update weitere Listener an. */
+    const investorGridEl = document.getElementById('investorGrid');
+    const investorPayoutViewerOverlay = document.getElementById('investorPayoutViewerOverlay');
+    if (investorGridEl && investorPayoutViewerOverlay) {
+      investorGridEl.addEventListener('click', e => {
+        const thumb = e.target.closest('.investor-payout-thumb');
+        if (!thumb) return;
+        document.getElementById('investorPayoutViewerImg').src = thumb.dataset.full || thumb.src;
+        document.getElementById('investorPayoutViewerTitle').textContent = `📷 Auszahlungsbeweis: ${thumb.dataset.investorName || ''}`;
+        investorPayoutViewerOverlay.classList.add('visible');
+      });
+      const closeInvestorPayoutViewer = () => investorPayoutViewerOverlay.classList.remove('visible');
+      const investorPayoutViewerCloseBtn = document.getElementById('investorPayoutViewerCloseBtn');
+      if (investorPayoutViewerCloseBtn) investorPayoutViewerCloseBtn.addEventListener('click', closeInvestorPayoutViewer);
+      investorPayoutViewerOverlay.addEventListener('click', e => { if (e.target === investorPayoutViewerOverlay) closeInvestorPayoutViewer(); });
+    }
 
     /* Easter Egg: Donut-Chart oft klicken -> dreht sich immer schneller, Farben
        mischen sich zu Regenbogen, am Ende Feuerwerk + Erfolg.

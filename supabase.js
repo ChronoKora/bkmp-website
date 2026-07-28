@@ -850,6 +850,10 @@ async function importLocalIncomesToSupabase() {
   };
 }
 
+/* Auszahlungsnachweis (28.07.2026): paid_out/payout_proof_url sind additive
+   Spalten (sql/20260728-investor-payout-proof.sql, noch nicht ausgefuehrt) -
+   defensiv ausgewertet (Number/Boolean/||''), damit ein noch nicht
+   migriertes Schema keinen Fehler wirft, nur die neuen Felder leer bleiben. */
 function bkmpMapInvestorFromSupabase(row) {
   return {
     id: row.id,
@@ -860,6 +864,8 @@ function bkmpMapInvestorFromSupabase(row) {
     startDate: row.start_date || '',
     endDate: row.end_date || '',
     anonymous: Boolean(row.anonymous),
+    paidOut: Boolean(row.paid_out),
+    payoutProofUrl: row.payout_proof_url || '',
     createdAt: row.created_at ? Date.parse(row.created_at) : 0,
     source: 'supabase'
   };
@@ -873,7 +879,9 @@ function bkmpMapInvestorToSupabase(investor) {
     start_date: investor.startDate || investor.start_date || null,
     end_date: investor.endDate || investor.end_date || null,
     note: investor.minecraftName || investor.note || null,
-    anonymous: Boolean(investor.anonymous)
+    anonymous: Boolean(investor.anonymous),
+    paid_out: Boolean(investor.paidOut),
+    payout_proof_url: investor.payoutProofUrl || null
   };
 }
 
@@ -883,7 +891,7 @@ async function loadInvestors() {
 
   const { data, error } = await client
     .from('investors')
-    .select('id, name, investment, profit_percent, start_date, end_date, note, anonymous, created_at')
+    .select('id, name, investment, profit_percent, start_date, end_date, note, anonymous, paid_out, payout_proof_url, created_at')
     .order('created_at', { ascending: true });
 
   if (error) throw error;
@@ -901,13 +909,13 @@ async function saveInvestor(investor) {
       .from('investors')
       .update(payload)
       .eq('id', investor.id)
-      .select('id, name, investment, profit_percent, start_date, end_date, note, anonymous, created_at')
+      .select('id, name, investment, profit_percent, start_date, end_date, note, anonymous, paid_out, payout_proof_url, created_at')
       .single();
   } else {
     query = client
       .from('investors')
       .insert(payload)
-      .select('id, name, investment, profit_percent, start_date, end_date, note, anonymous, created_at')
+      .select('id, name, investment, profit_percent, start_date, end_date, note, anonymous, paid_out, payout_proof_url, created_at')
       .single();
   }
 

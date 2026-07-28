@@ -20,7 +20,7 @@
 <title>BKMP — Admin</title>
 
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
-<link rel="stylesheet" href="style.css?v=20260728-runeautofix1">
+<link rel="stylesheet" href="style.css?v=20260728-investorpayout1">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 </head>
 <body>
@@ -351,6 +351,17 @@
               <input type="checkbox" id="invAnonymous">
               Anonym auf der Website anzeigen (Name/Minecraft-Kopf nur im Admin-Panel sichtbar)
             </label>
+            <label class="investor-request-visibility">
+              <input type="checkbox" id="invPaidOut">
+              ✅ Ausgezahlt (rein interner Status, unabhängig vom Beweisfoto unten)
+            </label>
+            <div class="form-grid">
+              <div>
+                <label for="invPayoutProofFile">Auszahlungsbeweis-Foto (optional)</label>
+                <input type="file" id="invPayoutProofFile" accept="image/*">
+                <p class="admin-help-text" id="invPayoutProofCurrent" style="display:none;">Aktuelles Foto ist gesetzt - neue Datei wählen, um es zu ersetzen.</p>
+              </div>
+            </div>
             <div class="investor-form-actions">
               <button class="btn btn-primary" id="addInvestor">+ Investor hinzufügen</button>
               <button class="btn" id="cancelInvestorEdit" type="button" style="display:none;">Abbrechen</button>
@@ -1019,7 +1030,7 @@
        da admin.html kein window.BKMP_QA_MODE-Gate setzt; macht nur
        bkmpGetGameNow() fuer bkmp-events.js verfuegbar (identisch Date.now()). -->
   <script src="js/core/bkmp-game-clock.js?v=20260724-qafoundation1"></script>
-  <script src="supabase.js?v=20260726-guildtechext1"></script>
+  <script src="supabase.js?v=20260728-investorpayout1"></script>
   <script src="app.js?v=20260718-selbstverdient1"></script>
   <!-- Redesign Phase 2a (17.07.): siehe index.html fuer die Begruendung der
        festen Ladereihenfolge (bkmp-idle-state.js zuerst, bkmp-idle-
@@ -1305,6 +1316,12 @@
     /* ---------------- Daten-Handling ---------------- */
     let data = bkmpLoadData();
     let editingInvestorId = null;
+    // Auszahlungsbeweis-Foto (28.07.2026): das Formular hat keinen echten
+    // "aktueller Wert"-Input dafuer, nur ein <input type="file"> (das kann
+    // man nicht vorbelegen) - die bereits gespeicherte URL wird hier separat
+    // gemerkt, damit "Speichern ohne neue Datei ausgewaehlt" das bestehende
+    // Foto NICHT loescht.
+    let editingInvestorPayoutProofUrl = '';
     let editingNewsId = null;
     let editingStreamerId = null;
     let editingAboutId = null;
@@ -3253,7 +3270,7 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
         row.className = 'entry-row';
         row.innerHTML = `
           <div class="desc">
-            <span class="name">${escapeHtml(item.name)}${item.anonymous ? ' <span class="investor-anonymous-badge">Anonym auf Website</span>' : ''}</span>
+            <span class="name">${escapeHtml(item.name)}${item.anonymous ? ' <span class="investor-anonymous-badge">Anonym auf Website</span>' : ''}${item.paidOut ? ' <span class="investor-anonymous-badge investor-paidout-badge">✅ Ausgezahlt</span>' : ''}${item.payoutProofUrl ? ' <span class="investor-anonymous-badge">📷 Foto</span>' : ''}</span>
             <span class="meta">${item.minecraftName ? escapeHtml(item.minecraftName) + ' · ' : ''}${bkmpFormatCurrency(item.invested)} · ${item.sharePercent}% · ${item.startDate ? escapeHtml(formatDate(item.startDate)) : 'ohne Start'}</span>
           </div>
           <div class="entry-actions">
@@ -3378,6 +3395,7 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
 
     function clearInvestorForm() {
       editingInvestorId = null;
+      editingInvestorPayoutProofUrl = '';
       document.getElementById('invName').value = '';
       document.getElementById('invMinecraft').value = '';
       document.getElementById('invAmount').value = '';
@@ -3385,6 +3403,9 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       document.getElementById('invStartDate').value = '';
       document.getElementById('invEndDate').value = '';
       document.getElementById('invAnonymous').checked = false;
+      document.getElementById('invPaidOut').checked = false;
+      document.getElementById('invPayoutProofFile').value = '';
+      document.getElementById('invPayoutProofCurrent').style.display = 'none';
       setInvestorEditMode(false);
     }
 
@@ -3392,6 +3413,7 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       const investor = data.investors.find(item => item.id === id);
       if (!investor) return;
       editingInvestorId = id;
+      editingInvestorPayoutProofUrl = investor.payoutProofUrl || '';
       document.getElementById('invName').value = investor.name || '';
       document.getElementById('invMinecraft').value = investor.minecraftName || '';
       document.getElementById('invAmount').value = investor.invested || '';
@@ -3399,13 +3421,16 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       document.getElementById('invStartDate').value = investor.startDate || '';
       document.getElementById('invEndDate').value = investor.endDate || '';
       document.getElementById('invAnonymous').checked = Boolean(investor.anonymous);
+      document.getElementById('invPaidOut').checked = Boolean(investor.paidOut);
+      document.getElementById('invPayoutProofFile').value = '';
+      document.getElementById('invPayoutProofCurrent').style.display = editingInvestorPayoutProofUrl ? '' : 'none';
       setInvestorEditMode(true);
       document.getElementById('invName').focus();
     }
 
     cancelInvestorEditBtn.addEventListener('click', clearInvestorForm);
 
-    addInvestorBtn.addEventListener('click', () => {
+    addInvestorBtn.addEventListener('click', async () => {
       if (addInvestorBtn.disabled) return;
       const name = document.getElementById('invName').value.trim();
       const minecraftName = document.getElementById('invMinecraft').value.trim();
@@ -3414,18 +3439,35 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       const startDate = document.getElementById('invStartDate').value;
       const endDate = document.getElementById('invEndDate').value;
       const anonymous = document.getElementById('invAnonymous').checked;
+      const paidOut = document.getElementById('invPaidOut').checked;
       if (!name) { document.getElementById('invName').reportValidity(); return; }
       if (!invested) { document.getElementById('invAmount').reportValidity(); return; }
       if (startDate && endDate && endDate < startDate) {
         showAdminToast('Das Enddatum darf nicht vor dem Startdatum liegen.', 'error');
         return;
       }
-      const payload = { name, minecraftName, invested, sharePercent, startDate, endDate, anonymous };
-      if (editingInvestorId) payload.id = editingInvestorId;
       addInvestorBtn.disabled = true;
-      persistInvestor(payload).then(saved => {
+      try {
+        // Neue Datei ausgewaehlt -> hochladen, sonst bestehendes Foto (falls
+        // vorhanden) unveraendert beibehalten - kein leeres Feld loescht ein
+        // bereits gespeichertes Beweisfoto versehentlich.
+        let payoutProofUrl = editingInvestorPayoutProofUrl;
+        const proofFileInput = document.getElementById('invPayoutProofFile');
+        const proofFile = proofFileInput.files && proofFileInput.files[0];
+        if (proofFile) {
+          const dataUrl = await readFileAsDataUrl(proofFile);
+          payoutProofUrl = await bkmpStoreImageIfNeeded(dataUrl, 'investor-payouts');
+        }
+        const payload = { name, minecraftName, invested, sharePercent, startDate, endDate, anonymous, paidOut, payoutProofUrl };
+        if (editingInvestorId) payload.id = editingInvestorId;
+        const saved = await persistInvestor(payload);
         if (saved) clearInvestorForm();
-      }).finally(() => { addInvestorBtn.disabled = false; });
+      } catch (e) {
+        console.error('Auszahlungsbeweis-Foto konnte nicht hochgeladen werden.', e);
+        showAdminToast('Foto konnte nicht hochgeladen werden: ' + supabaseErrorText(e), 'error');
+      } finally {
+        addInvestorBtn.disabled = false;
+      }
     });
 
     /* Twitch-Leiste */

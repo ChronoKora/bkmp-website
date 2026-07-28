@@ -13,6 +13,7 @@ Automatisch von Claude Code gepflegt: **nach jeder Code-/SQL-Änderung kommt hie
 
 ## 2026-07-28
 
+- **[Neu]** Investor-Auszahlungen jetzt dokumentierbar: neue "Ausgezahlt"-Checkbox im Admin-Panel + Upload eines Auszahlungsbeweis-Fotos. Auf der Website erscheint das Foto als kleines anklickbares Vorschaubild direkt neben dem Investorennamen, vergrößerbar per Klick. Anlass: erste reale Investor-Auszahlung (CrazyMcNugget). — `admin.html`, `js/core/bkmp-site.js`, `supabase.js`, `index.html`, `style.css`, `sql/20260728-investor-payout-proof.sql` (neu, **noch nicht ausgeführt**) — 🟡 lokal
 - **[Neu]** Drei neue Runen-Hintergrund-Automatiken (Nutzerwunsch nach Klärung eines vermeintlichen Bugs bei "Automatische Runenaufwertung" — die lief korrekt, hatte bei komplett auf +15 ausgerüsteten Runen nur nichts mehr zu tun): Auto-Legi-Aufwertung (wertet auch unausgerüstete legendäre Runen automatisch auf +15 auf), Auto-Aufstieg (lässt passende +15-Legendäre-Paare automatisch auf +16+ aufsteigen, verbraucht dabei eine zweite Legendäre) und Auto-Verschmelzung (verschmilzt automatisch vollständige +0-Dreiergruppen). Alle drei als eigene Ein/Aus-Schalter direkt im Runen-Tab, gekoppelt an den bestehenden Prestige-Knoten "Automatische Runenaufwertung", mit einer einmaligen Bestätigung beim Einschalten (nicht bei jedem Lauf). Nutzen ausschließlich bereits bestehende, manuell getestete Aktionen — keine neue Spiellogik. 6 neue Tests, bestehende Runen-Tests unverändert grün. — `js/systems/bkmp-runes.js`, `idledorf.js`, `style.css` — 🟡 lokal
 
 ---

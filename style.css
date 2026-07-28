@@ -3052,6 +3052,23 @@ input.cardcatalog-search:focus {
   border: 1px solid var(--line);
   vertical-align: middle;
 }
+/* Admin-Panel: "Ausgezahlt"-Status (28.07.2026) - gruener Akzent statt der
+   neutralen Standardfarbe von .investor-anonymous-badge, sonst identisch. */
+.investor-paidout-badge { color: #22c55e; background: color-mix(in srgb, #22c55e 16%, transparent); border-color: color-mix(in srgb, #22c55e 40%, var(--line)); }
+
+/* Auszahlungsbeweis-Foto (28.07.2026): kleines, anklickbares Vorschau-
+   Quadrat rechts in der Investor-Kopfzeile (siehe .investor-head oben,
+   margin-left:auto schiebt es an den rechten Kartenrand), vergroesserbar
+   ueber #investorPayoutViewerOverlay (js/core/bkmp-site.js). */
+.investor-payout-thumb {
+  width: 44px; height: 44px; margin-left: auto; flex-shrink: 0;
+  border-radius: 8px; object-fit: cover; cursor: zoom-in;
+  border: 1px solid var(--line); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.investor-payout-thumb:hover { transform: scale(1.08); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3); }
+.investor-payout-viewer-card { max-width: min(720px, 92vw); text-align: center; }
+.investor-payout-viewer-img { max-width: 100%; max-height: 70vh; border-radius: 10px; border: 1px solid var(--line); margin: 0.6rem 0; }
 
 .feedback-list { display: flex; flex-direction: column; gap: 0.75rem; }
 .feedback-card {
