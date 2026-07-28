@@ -3089,7 +3089,7 @@ input.cardcatalog-search:focus {
    margin-left:auto schiebt es an den rechten Kartenrand), vergroesserbar
    ueber #investorPayoutViewerOverlay (js/core/bkmp-site.js). */
 .investor-payout-thumb {
-  width: 78px; height: 40px; margin-left: auto; flex-shrink: 0;
+  flex: 1 1 140px; min-width: 90px; max-width: 260px; height: 46px; margin-left: 0.75rem;
   border-radius: 8px; object-fit: cover; cursor: zoom-in;
   border: 1px solid var(--line); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
