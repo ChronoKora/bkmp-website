@@ -1455,16 +1455,17 @@
         const mcName = isAnonymous ? '' : (inv.minecraftName || '').trim();
         const avatar = mcName ? `https://minotar.net/helm/${encodeURIComponent(mcName)}/96.png` : '';
         const invName = isAnonymous ? 'Anonym' : (inv.name || '');
-        return `
-          <div class="investor-card investor-card-rich">
-            <div class="investor-head">
-              ${avatar ? `<img class="investor-avatar" src="${avatar}" alt="Minecraft-Kopf von ${escapeHtml(mcName)}" loading="lazy" decoding="async">` : `<div class="investor-avatar investor-avatar-fallback">${isAnonymous ? '?' : escapeHtml(invName.slice(0, 1).toUpperCase())}</div>`}
-              <div class="investor-title-block">
-                <div class="investor-name">${escapeHtml(invName)}</div>
-                ${mcName ? `<div class="investor-mc">${escapeHtml(mcName)}</div>` : ''}
-              </div>
-              ${inv.payoutProofUrl ? `<img class="investor-payout-thumb" src="${escapeHtml(inv.payoutProofUrl)}" data-full="${escapeHtml(inv.payoutProofUrl)}" data-investor-name="${escapeHtml(invName)}" alt="Auszahlungsbeweis von ${escapeHtml(invName)} - zum Vergrößern anklicken" title="Auszahlungsbeweis anzeigen" loading="lazy" decoding="async">` : ''}
-            </div>
+        /* Abgeschlossene Investition (28.07.2026, Nutzerwunsch nach dem
+           ersten echten Investor-Zeitraumende): sobald als "Ausgezahlt"
+           markiert, zeigt die Karte statt der auf laufenden Zahlen basierten
+           "Aktueller Anteil"-Kachel einen kurzen, in der Vergangenheit
+           formulierten Zusammenfassungssatz - derselbe payout-Wert (nur
+           anders praesentiert), keine neue Berechnung. */
+        const isConcluded = Boolean(inv.paidOut);
+        const bodyHtml = isConcluded ? `
+            <div class="investor-concluded-summary">
+              War Investor von <strong>${escapeHtml(formatDate(inv.startDate))}</strong> bis <strong>${inv.endDate ? escapeHtml(formatDate(inv.endDate)) : 'heute'}</strong> und hat in diesem Zeitraum <strong>${bkmpFormatCurrency(payout)}</strong> Anteil verdient, mit einer Investitionssumme von <strong>${bkmpFormatCurrency(inv.invested)}</strong> und einer Gewinnbeteiligung von <strong>${Number(inv.sharePercent || 0)}%</strong>.
+            </div>` : `
             <div class="investor-period">${formatInvestorPeriod(inv)}</div>
             <div class="investor-highlight">
               <span>Aktueller Anteil</span>
@@ -1474,7 +1475,18 @@
               <div><span>Investiert</span><strong>${bkmpFormatCurrency(inv.invested)}</strong></div>
               <div><span>Beteiligung</span><strong>${Number(inv.sharePercent || 0)}%</strong></div>
               <div><span>Zeitraum-Gewinn</span><strong class="${periodNet >= 0 ? 'pos' : 'neg'}">${bkmpFormatCurrency(periodNet)}</strong></div>
+            </div>`;
+        return `
+          <div class="investor-card investor-card-rich${isConcluded ? ' investor-card-concluded' : ''}">
+            <div class="investor-head">
+              ${avatar ? `<img class="investor-avatar" src="${avatar}" alt="Minecraft-Kopf von ${escapeHtml(mcName)}" loading="lazy" decoding="async">` : `<div class="investor-avatar investor-avatar-fallback">${isAnonymous ? '?' : escapeHtml(invName.slice(0, 1).toUpperCase())}</div>`}
+              <div class="investor-title-block">
+                <div class="investor-name">${escapeHtml(invName)}</div>
+                ${mcName ? `<div class="investor-mc">${escapeHtml(mcName)}</div>` : ''}
+              </div>
+              ${inv.payoutProofUrl ? `<img class="investor-payout-thumb" src="${escapeHtml(inv.payoutProofUrl)}" data-full="${escapeHtml(inv.payoutProofUrl)}" data-investor-name="${escapeHtml(invName)}" alt="Auszahlungsbeweis von ${escapeHtml(invName)} - zum Vergrößern anklicken" title="Auszahlungsbeweis anzeigen" loading="lazy" decoding="async">` : ''}
             </div>
+            ${bodyHtml}
           </div>`;
       }).join('');
     }
