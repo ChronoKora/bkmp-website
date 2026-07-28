@@ -1465,7 +1465,8 @@
         const bodyHtml = isConcluded ? `
             <div class="investor-concluded-summary">
               War Investor von <strong>${escapeHtml(formatDate(inv.startDate))}</strong> bis <strong>${inv.endDate ? escapeHtml(formatDate(inv.endDate)) : 'heute'}</strong> und hat in diesem Zeitraum <strong>${bkmpFormatCurrency(payout)}</strong> Anteil verdient, mit einer Investitionssumme von <strong>${bkmpFormatCurrency(inv.invested)}</strong> und einer Gewinnbeteiligung von <strong>${Number(inv.sharePercent || 0)}%</strong>.
-            </div>` : `
+            </div>
+            <div class="investor-thankyou-note">🙏 Vielen Dank für dein Vertrauen und deine Unterstützung – ohne Investoren wie dich wäre BKMP nicht das, was es heute ist.</div>` : `
             <div class="investor-period">${formatInvestorPeriod(inv)}</div>
             <div class="investor-highlight">
               <span>Aktueller Anteil</span>

@@ -1970,6 +1970,17 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
   color: var(--muted);
 }
 .investor-concluded-summary strong { color: var(--pos); font-weight: 700; }
+.investor-thankyou-note {
+  margin-top: 0.6rem;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--gold) 8%, var(--paper-2));
+  border: 1px dashed color-mix(in srgb, var(--gold) 35%, var(--line));
+  font-size: 0.84rem;
+  line-height: 1.5;
+  font-style: italic;
+  color: var(--ink);
+}
 @media (max-width: 560px) { .investor-grid { grid-template-columns: 1fr; } }
 @media (max-width: 900px) { .investor-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .investor-metrics div:last-child { grid-column: 1 / -1; } }
 @media (max-width: 520px) { .investor-metrics { grid-template-columns: 1fr; } .investor-metrics div:last-child { grid-column: auto; } }
@@ -3078,14 +3089,14 @@ input.cardcatalog-search:focus {
    margin-left:auto schiebt es an den rechten Kartenrand), vergroesserbar
    ueber #investorPayoutViewerOverlay (js/core/bkmp-site.js). */
 .investor-payout-thumb {
-  width: 44px; height: 44px; margin-left: auto; flex-shrink: 0;
+  width: 78px; height: 40px; margin-left: auto; flex-shrink: 0;
   border-radius: 8px; object-fit: cover; cursor: zoom-in;
   border: 1px solid var(--line); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 .investor-payout-thumb:hover { transform: scale(1.08); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3); }
-.investor-payout-viewer-card { max-width: min(720px, 92vw); text-align: center; }
-.investor-payout-viewer-img { max-width: 100%; max-height: 70vh; border-radius: 10px; border: 1px solid var(--line); margin: 0.6rem 0; }
+.investor-payout-viewer-card { max-width: min(1100px, 96vw); text-align: center; }
+.investor-payout-viewer-img { max-width: 100%; max-height: 80vh; width: 100%; object-fit: contain; border-radius: 10px; border: 1px solid var(--line); margin: 0.6rem 0; }
 
 .feedback-list { display: flex; flex-direction: column; gap: 0.75rem; }
 .feedback-card {
