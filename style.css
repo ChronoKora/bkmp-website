@@ -6662,9 +6662,22 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 .idle-prestige-branch-tab.active { border-color: var(--gold); color: var(--gold); font-weight: 600; }
 .idle-prestige-branch-tab.is-locked { opacity: 0.55; cursor: not-allowed; }
 .idle-upgrade-card.idle-prestige-needs-sql { border-color: color-mix(in srgb, #f59e0b 35%, var(--line)); }
-.idle-prestige-paragon-row { font-size: 0.74rem; color: #c4b5fd; margin: -0.2rem 0 0.1rem; }
+.idle-prestige-paragon-row { display: flex; align-items: center; gap: 0.35rem; position: relative; font-size: 0.74rem; color: #c4b5fd; margin: -0.2rem 0 0.1rem; }
 .idle-prestige-buy-paragon { width: 100%; padding: 0.35rem 0.6rem; font-size: 0.74rem; }
 .idle-prestige-buy-paragon:disabled { opacity: 0.5; cursor: not-allowed; }
+/* Paragon-Info-Tooltip (28.07.2026, Spieler-Verwirrung "was ist Paragon,
+   wo bekomme ich das her") - kleiner "?"-Ausloeser neben der Paragon-Zeile,
+   nutzt bkmpUiTooltipHtml()/-WireTooltipTrigger() (Phase 3, bisher
+   ungenutzt). position:relative auf der Zeile oben verankert die
+   Tooltip-Bubble (position:absolute, siehe .bkmp-ui-tooltip) korrekt. */
+.idle-prestige-paragon-info {
+  width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0;
+  border: 1px solid color-mix(in srgb, #c4b5fd 55%, var(--line));
+  background: color-mix(in srgb, #c4b5fd 14%, transparent);
+  color: #c4b5fd; font-size: 0.62rem; font-weight: 700; line-height: 1;
+  cursor: help; padding: 0;
+}
+.idle-prestige-paragon-info:hover, .idle-prestige-paragon-info:focus-visible { background: color-mix(in srgb, #c4b5fd 28%, transparent); }
 .idle-prestige-tab-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 14px; height: 14px; padding: 0 3px; margin-left: 0.3rem; border-radius: 999px; background: #f87171; color: #1a0a0a; font-size: 0.62rem; font-weight: 800; vertical-align: middle; }
 .idle-prestige-allocate-btn { margin: 0.4rem 0 0.8rem; }
 .idle-prestige-section-ascension { border-color: color-mix(in srgb, #facc15 35%, var(--line)); }

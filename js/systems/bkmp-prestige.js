@@ -315,7 +315,7 @@ const BKMP_PRESTIGE_MILESTONES = [
   { points: 50, name: 'Schlüsselbewahrer', desc: '+1 maximale Dungeon-Schlüssel (alle Typen).', effectType: 'dungeon_key_cap_bonus', effectValue: 1 },
   { points: 100, name: 'Erweiterter Baum', desc: 'Schaltet die Zweige "Runen & Dungeons" und "Automation" frei.', effectType: null, effectValue: 0, unlocksBranches: ['runen_dungeon', 'automation'] },
   { points: 200, name: 'Drachenbund', desc: '+3% Schaden deines aktiven Begleitdrachens dauerhaft.', effectType: 'companion_dmg_pct', effectValue: 3 },
-  { points: 350, name: 'Jenseits der Grenze', desc: 'Schaltet das Paragon-System frei.', effectType: null, effectValue: 0, unlocksParagon: true },
+  { points: 350, name: 'Jenseits der Grenze', desc: 'Schaltet das Paragon-System frei: voll ausgebaute Skills lassen sich damit weiter aufwerten - mit denselben Prestige-Punkten, nur schwächer pro Rang (4%) und ohne Maximum.', effectType: null, effectValue: 0, unlocksParagon: true },
   { points: 500, name: 'Aufstieg', desc: 'Schaltet die zweite Prestige-Ebene ("Aufstieg", neue Währung Drachenseelen) frei, sofern die Voraussetzungen erfüllt sind.', effectType: null, effectValue: 0, unlocksAscension: true },
   { points: 750, name: 'Wirtschaftswunder', desc: '+5% Gold- und XP-Ausbeute dauerhaft.', effectType: null, effectValue: 0, custom: 'wirtschaftswunder' },
   { points: 1000, name: 'Punkte-Legende', desc: '+5% Bossschaden dauerhaft.', effectType: 'boss_dmg_pct', effectValue: 5 }
@@ -368,6 +368,26 @@ function bkmpPrestigeBranchUnlocked(branchId) {
 function bkmpPrestigeParagonSystemUnlocked() {
   const spent = bkmpPrestigeState ? Number(bkmpPrestigeState.prestige_points_spent || 0) : 0;
   return bkmpPrestigeMilestonesReached(spent).some(m => m.unlocksParagon === true);
+}
+/* Spieler-Verwirrung (28.07.2026, mehrere Nachfragen): "Paragon" tauchte
+   bisher kommentarlos an einem Skill auf, sobald der Meilenstein "Jenseits
+   der Grenze" (350 investierte Punkte) im Hintergrund erreicht wurde -
+   niemand hat je erklaert bekommen, WAS das ist oder WOHER die Raenge
+   kommen (dieselben Prestige-Punkte wie der normale Baum, keine eigene
+   Waehrung). Einmaliger Toast beim tatsaechlichen Ueberschreiten der
+   Schwelle statt eines stillen Erscheinens - bkmpUiShowToast() (Phase 3,
+   bisher ungenutzt) ist genau fuer solche bedeutungsvollen Momente gebaut.
+   localStorage-Flag verhindert Wiederholung bei jedem Panel-Render. */
+const BKMP_PRESTIGE_PARAGON_ANNOUNCED_KEY = 'bkmp-idle-paragon-announced';
+function bkmpPrestigeMaybeAnnounceParagonUnlock() {
+  if (!bkmpPrestigeParagonSystemUnlocked()) return;
+  try {
+    if (localStorage.getItem(BKMP_PRESTIGE_PARAGON_ANNOUNCED_KEY) === '1') return;
+    localStorage.setItem(BKMP_PRESTIGE_PARAGON_ANNOUNCED_KEY, '1');
+  } catch (e) { return; }
+  if (typeof bkmpUiShowToast === 'function') {
+    bkmpUiShowToast({ text: '🌠 Paragon freigeschaltet! Voll ausgebaute Skills lassen sich jetzt mit denselben Prestige-Punkten weiter aufwerten (schwächer pro Rang, aber ohne Maximum).', kind: 'success', ms: 6000 });
+  }
 }
 function bkmpAscensionMilestoneUnlocked() {
   const spent = bkmpPrestigeState ? Number(bkmpPrestigeState.prestige_points_spent || 0) : 0;
@@ -1098,6 +1118,7 @@ function bkmpIdleRenderPrestigePanel() {
   const previewGain = bkmpPrestigePointsForStage(stage);
   const alloc = bkmpPrestigeState ? bkmpPrestigeState.prestige_allocations || {} : {};
   const preview = bkmpPrestigeGetPreview();
+  bkmpPrestigeMaybeAnnounceParagonUnlock();
 
   panel.innerHTML = `
     <div class="idle-prestige-summary">
@@ -1153,6 +1174,12 @@ function bkmpIdleRenderPrestigePanel() {
   if (prestigeBtn) prestigeBtn.addEventListener('click', bkmpIdlePerformPrestige);
   panel.querySelectorAll('.idle-prestige-buy').forEach(btn => btn.addEventListener('click', () => bkmpPrestigeBuyUpgrade(btn.dataset.prestigeId)));
   panel.querySelectorAll('.idle-prestige-buy-paragon').forEach(btn => btn.addEventListener('click', () => bkmpPrestigeBuyParagon(btn.dataset.prestigeId)));
+  if (typeof bkmpUiWireTooltipTrigger === 'function') {
+    panel.querySelectorAll('.idle-prestige-paragon-info').forEach(btn => {
+      const tip = document.getElementById(btn.dataset.tooltipId);
+      bkmpUiWireTooltipTrigger(btn, tip);
+    });
+  }
   const autoAllocateBtn = document.getElementById('idlePrestigeAutoAllocateBtn');
   if (autoAllocateBtn) autoAllocateBtn.addEventListener('click', bkmpPrestigeAutoAllocate);
   const ascensionBtn = document.getElementById('idleAscensionBtn');
@@ -1205,12 +1232,22 @@ function bkmpPrestigeRenderBranchGridHtml(alloc, available) {
     const paragonMaxed = showParagon && paragonRank >= BKMP_PRESTIGE_PARAGON_MAX_RANK;
     const paragonCost = showParagon && !paragonMaxed ? bkmpPrestigeParagonCost(def, paragonRank + 1) : 0;
     const paragonAffordable = showParagon && !paragonMaxed && available >= paragonCost;
+    /* Spieler-Verwirrung (28.07.2026): "Paragon" tauchte bisher ohne jede
+       Erklaerung auf - kleiner "?"-Hinweis direkt an der Zeile erklaert
+       Kosten (dieselben Prestige-Punkte) und Effekt (4% Rang, kein Max),
+       siehe bkmpPrestigeMaybeAnnounceParagonUnlock() fuer den einmaligen
+       Freischalt-Toast. bkmpUiTooltipHtml/-WireTooltipTrigger (Phase 3,
+       bisher ungenutzt) sind exakt fuer diesen Fall gebaut. */
+    const paragonTipId = 'prestigeParagonTip-' + def.id;
+    const paragonTipHtml = showParagon && typeof bkmpUiTooltipHtml === 'function'
+      ? bkmpUiTooltipHtml('Kostet dieselben Prestige-Punkte wie der Baum oben - keine eigene Währung. Jeder Paragon-Rang gibt nur 4% des normalen Bonus, dafür ohne Maximum (bis Rang 1.000).', paragonTipId)
+      : '';
     return `
       <div class="idle-upgrade-card${def.serverSyncRequired ? ' idle-prestige-needs-sql' : ''}">
         <div class="idle-upgrade-icon">${def.icon}</div>
         <div class="idle-upgrade-name">${escapeHtml(def.name)} <span class="idle-upgrade-level">Rang ${rank}${maxed ? ' (Max)' : '/' + def.maxRank}</span></div>
         <div class="idle-upgrade-desc">${escapeHtml(def.desc)}</div>
-        ${showParagon ? `<div class="idle-prestige-paragon-row"><span class="idle-prestige-paragon-label">🌠 Paragon-Rang ${bkmpIdleFormatNumber(paragonRank)}${paragonMaxed ? ' (Max)' : '/' + bkmpIdleFormatNumber(BKMP_PRESTIGE_PARAGON_MAX_RANK)}</span></div>` : ''}
+        ${showParagon ? `<div class="idle-prestige-paragon-row"><span class="idle-prestige-paragon-label">🌠 Paragon-Rang ${bkmpIdleFormatNumber(paragonRank)}${paragonMaxed ? ' (Max)' : '/' + bkmpIdleFormatNumber(BKMP_PRESTIGE_PARAGON_MAX_RANK)}</span><button type="button" class="idle-prestige-paragon-info" data-tooltip-id="${paragonTipId}" aria-label="Was ist Paragon?">?</button>${paragonTipHtml}</div>` : ''}
         <button type="button" class="btn-ja idle-prestige-buy" data-prestige-id="${def.id}" ${maxed || !affordable ? 'disabled' : ''}>
           ${maxed ? 'Maximal' : `🌌 ${bkmpIdleFormatNumber(cost)}`}
         </button>
