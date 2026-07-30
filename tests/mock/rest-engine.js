@@ -23,14 +23,33 @@ function valuesEqual(a, b) {
   return a == b || String(a) === String(b);
 }
 
+/* gt/gte/lt/lte muessen sowohl echte Zahlenspalten (level, gold, ...) als
+   auch Zeitstempel-Spalten (occurred_at, created_at, ...) vergleichen
+   koennen - reine Number()-Umwandlung ergibt bei ISO-Datums-Strings immer
+   NaN (NaN >= NaN ist immer false), wodurch jeder .gte()/.lt()-Filter auf
+   eine Zeitstempel-Spalte bisher stillschweigend NICHTS traf, egal welcher
+   Wert. Gefunden beim Bauen eines neuen, echten Zeitraum-Filters
+   (bkmpArenaGetAttacksTodayCount, 29.07.2026) - betraf latent auch die
+   bereits bestehende Update-Dedup-Abfrage in supabase.js (Zeile ~1163),
+   dort bisher offenbar nie von einem Test durchlaufen. Erst Zahlen
+   versuchen, dann Datums-Parsing, sonst String-Vergleich als letzter
+   Rueckfall. */
+function compareForRange(rowValue, raw) {
+  const numA = Number(rowValue), numB = Number(raw);
+  if (!Number.isNaN(numA) && !Number.isNaN(numB)) return numA - numB;
+  const dateA = Date.parse(rowValue), dateB = Date.parse(raw);
+  if (!Number.isNaN(dateA) && !Number.isNaN(dateB)) return dateA - dateB;
+  return rowValue > raw ? 1 : rowValue < raw ? -1 : 0;
+}
+
 function matchFilter(rowValue, op, raw) {
   switch (op) {
     case 'eq': return valuesEqual(rowValue, coerce(raw));
     case 'neq': return !valuesEqual(rowValue, coerce(raw));
-    case 'gt': return Number(rowValue) > Number(raw);
-    case 'gte': return Number(rowValue) >= Number(raw);
-    case 'lt': return Number(rowValue) < Number(raw);
-    case 'lte': return Number(rowValue) <= Number(raw);
+    case 'gt': return compareForRange(rowValue, raw) > 0;
+    case 'gte': return compareForRange(rowValue, raw) >= 0;
+    case 'lt': return compareForRange(rowValue, raw) < 0;
+    case 'lte': return compareForRange(rowValue, raw) <= 0;
     case 'is': return raw === 'null' ? (rowValue === null || rowValue === undefined) : valuesEqual(rowValue, coerce(raw));
     case 'in': {
       const list = raw.replace(/^\(|\)$/g, '').split(',').map(coerce);
@@ -42,17 +61,48 @@ function matchFilter(rowValue, op, raw) {
 
 const RESERVED_PARAMS = new Set(['select', 'order', 'limit', 'offset', 'on_conflict', 'columns']);
 
+/* .or('a.eq.1,b.eq.2') (PostgREST: or=(a.eq.1,b.eq.2)) wurde bisher WIE EIN
+   NORMALER SPALTENFILTER behandelt ("or" existiert auf keiner Zeile als
+   Spalte, matchFilter() faellt fuer den daraus falsch geparsten
+   "op" immer auf den default-Zweig "return true" zurueck) - jeder .or()-
+   Aufruf war dadurch faktisch wirkungslos (liess ausnahmslos ALLE Zeilen
+   durch), nicht nur bei einzelnen Faellen. Gefunden beim Bau der Clan-Arena
+   (30.07.2026, bkmpGuildArenaGetRecentBattles nutzt exakt dasselbe
+   .or()-Muster wie das schon laenger bestehende bkmpArenaGetRecentBattles) -
+   dort waere der Fehler durch mehrere gleichzeitig kaempfende Gilden im
+   selben Test sofort sichtbar geworden, beim Spieler-Pendant bisher nie,
+   weil die bestehenden Tests zufaellig nie fremde, nicht zum Spieler
+   gehoerende Kaempfe im selben Store hatten. */
+function parseOrConditions(raw) {
+  const inner = raw.replace(/^\(|\)$/g, '');
+  return inner.split(',').map(part => {
+    const firstDot = part.indexOf('.');
+    const key = part.slice(0, firstDot);
+    const rest = part.slice(firstDot + 1);
+    const secondDot = rest.indexOf('.');
+    const op = secondDot >= 0 ? rest.slice(0, secondDot) : 'eq';
+    const val = secondDot >= 0 ? rest.slice(secondDot + 1) : rest;
+    return { key, op, val };
+  }).filter(c => c.key);
+}
+
 function applyFilters(rows, searchParams) {
   const filters = [];
+  let orConditions = null;
   for (const [key, value] of searchParams.entries()) {
     if (RESERVED_PARAMS.has(key)) continue;
+    if (key === 'or') { orConditions = parseOrConditions(value); continue; }
     const dot = value.indexOf('.');
     const op = dot >= 0 ? value.slice(0, dot) : 'eq';
     const raw = dot >= 0 ? value.slice(dot + 1) : value;
     filters.push({ key, op, raw });
   }
-  if (!filters.length) return rows;
-  return rows.filter(row => filters.every(f => matchFilter(row[f.key], f.op, f.raw)));
+  if (!filters.length && !orConditions) return rows;
+  return rows.filter(row => {
+    if (!filters.every(f => matchFilter(row[f.key], f.op, f.raw))) return false;
+    if (orConditions && !orConditions.some(c => matchFilter(row[c.key], c.op, c.val))) return false;
+    return true;
+  });
 }
 
 function applyOrder(rows, searchParams) {

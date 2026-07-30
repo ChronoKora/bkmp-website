@@ -536,6 +536,98 @@ const RPC_HANDLERS = {
     };
   },
 
+  /* Originalgetreuer Port von guild_arena_attack() - siehe
+     sql/20260730-guild-arena.sql (Spieler-Idee Kaledoss, 28.07.2026). Direkter
+     Guild-Level-Port des obigen arena_attack(): identische Macht-/ELO-Formel,
+     nur "Macht" = SUMME der Kampfwerte aller aktuellen Gildenmitglieder statt
+     eines einzelnen Spielers. */
+  guild_arena_attack(store, uid, params) {
+    const targetGuildId = params.p_target_guild_id;
+    const members = getTable(store, 'guild_members');
+    const myMembership = members.find(m => m.auth_user_id === uid);
+    if (!myMembership) throw rpcError('no_guild');
+    const myGuildId = myMembership.guild_id;
+    if (!['leader', 'officer'].includes(myMembership.role)) throw rpcError('insufficient_role');
+    if (!targetGuildId || targetGuildId === myGuildId) throw rpcError('invalid_target');
+
+    const guilds = getTable(store, 'guilds');
+    const myGuild = guilds.find(g => g.id === myGuildId);
+    const defGuild = guilds.find(g => g.id === targetGuildId);
+    if (!defGuild) throw rpcError('no_defender_guild');
+
+    const nowMs = store.clock.nowMs();
+    const battleLog = getTable(store, 'guild_battle_log');
+    const todayStartMs = berlinMidnightMs(nowMs);
+    const attacksToday = battleLog.filter(r => r.attacker_guild_id === myGuildId && r.occurred_at_ms >= todayStartMs).length;
+    if (attacksToday >= 3) throw rpcError('daily_limit_reached');
+
+    const lastAttack = battleLog
+      .filter(r => r.attacker_guild_id === myGuildId && r.defender_guild_id === targetGuildId)
+      .sort((a, b) => b.occurred_at_ms - a.occurred_at_ms)[0];
+    if (lastAttack && lastAttack.occurred_at_ms > nowMs - 30 * 60 * 1000) throw rpcError('cooldown_active');
+
+    const stateRows = getTable(store, 'idle_player_state');
+    function guildPower(guildId) {
+      const memberIds = members.filter(m => m.guild_id === guildId).map(m => m.auth_user_id);
+      return memberIds.reduce((sum, id) => {
+        const s = stateRows.find(r => r.auth_user_id === id);
+        if (!s) return sum;
+        return sum + Math.max(1, Number(s.attack || 0) * 2 + Number(s.defense || 0) + Number(s.hp || 0) * 0.3);
+      }, 0);
+    }
+    const atkPower = guildPower(myGuildId);
+    const defPower = guildPower(targetGuildId);
+    if (atkPower <= 0 || defPower <= 0) throw rpcError('no_combat_stats');
+
+    const ratings = getTable(store, 'guild_ratings');
+    let atkRatingRow = ratings.find(r => r.guild_id === myGuildId);
+    if (!atkRatingRow) { atkRatingRow = { guild_id: myGuildId, rating: 1000, wins: 0, losses: 0 }; ratings.push(atkRatingRow); }
+    let defRatingRow = ratings.find(r => r.guild_id === targetGuildId);
+    if (!defRatingRow) { defRatingRow = { guild_id: targetGuildId, rating: 1000, wins: 0, losses: 0 }; ratings.push(defRatingRow); }
+
+    const winChance = atkPower / (atkPower + defPower);
+    const won = store.rng() < winChance;
+
+    const K = 32;
+    const expected = 1.0 / (1.0 + Math.pow(10, (defRatingRow.rating - atkRatingRow.rating) / 400));
+    let change;
+    let gold = 0;
+    if (won) {
+      change = Math.round(K * (1 - expected));
+      gold = Math.round(Math.max(50, defPower * 8));
+    } else {
+      change = -Math.round(K * expected);
+    }
+
+    atkRatingRow.rating += change;
+    atkRatingRow.wins += won ? 1 : 0;
+    atkRatingRow.losses += won ? 0 : 1;
+    defRatingRow.rating -= change;
+    defRatingRow.wins += won ? 0 : 1;
+    defRatingRow.losses += won ? 1 : 0;
+
+    if (won && gold > 0) {
+      myGuild.treasury_gold = Number(myGuild.treasury_gold || 0) + gold;
+      getTable(store, 'guild_activity_log').push({
+        id: store.nextId(), guild_id: myGuildId, kind: 'clan_arena_win',
+        actor_name: myGuild.name, value: gold, extra: null, created_at: new Date(nowMs).toISOString()
+      });
+    }
+
+    battleLog.push({
+      id: store.nextId(),
+      attacker_guild_id: myGuildId, attacker_guild_name: myGuild.name,
+      defender_guild_id: targetGuildId, defender_guild_name: defGuild.name,
+      attacker_won: won, rating_change: change, gold_reward: gold,
+      occurred_at_ms: nowMs, occurred_at: new Date(nowMs).toISOString()
+    });
+
+    return {
+      attacker_won: won, rating_change: change, new_rating: atkRatingRow.rating,
+      gold_reward: gold, defender_guild_name: defGuild.name
+    };
+  },
+
   /* Gilde-Kernmechanik (24.07.2026, siehe CLAUDE.md Phase 3) -
      originalgetreuer Port der JEWEILS aktuellsten Fassung:
        - create_guild: sql/supabase-idle-guilds-founding-cost.sql (500k-Gold-

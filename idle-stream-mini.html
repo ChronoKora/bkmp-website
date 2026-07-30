@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="favicon.ico" sizes="any">
 <title>BKMP – Idle Drachen Dorf (Mini-Stream-Overlay)</title>
-<link rel="stylesheet" href="style.css?v=20260728-paragonclarity1">
+<link rel="stylesheet" href="style.css?v=20260730-clanarena1">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 <style>
   /* ============================================================
@@ -37,7 +37,7 @@
   #idleDorfLog,
   #idlePanelUpgrades, #idlePanelSkilltree, #idlePanelSammlung,
   #idlePanelErfolge, #idlePanelBestenliste, #idlePanelPrestige, #idlePanelRunen,
-  #idlePanelSkins, #idlePanelDungeon, #idleDungeonBanner, #idlePanelGildeTech, #idlePanelGildeBoss, #idlePanelDrachen,
+  #idlePanelSkins, #idlePanelDungeon, #idleDungeonBanner, #idlePanelGildeTech, #idlePanelGildeBoss, #idlePanelClan, #idlePanelDrachen,
   #idleRuneDrawer,
   .idle-hud-stats, .idle-hud-resources,
   #idleDragonName {
@@ -284,6 +284,7 @@
         <button type="button" class="idle-dorf-tab" id="idleTabBtnGilde">🛡️ Gilde</button>
         <button type="button" class="idle-dorf-tab" id="idleTabBtnGildeTech">🌳 Gilden-Tech</button>
         <button type="button" class="idle-dorf-tab" id="idleTabBtnGildeBoss">🐲 Gildenboss</button>
+        <button type="button" class="idle-dorf-tab" id="idleTabBtnClan">🏆 Clan</button>
         <button type="button" class="idle-dorf-tab" id="idleTabBtnBestenliste">&#128202; Bestenliste</button>
         <button type="button" class="idle-dorf-tab" id="idleTabBtnDrachen">🐉 Drachenzucht</button>
       </div>
@@ -327,6 +328,7 @@
       <div class="idle-dorf-panel" id="idlePanelGilde" style="display:none;"></div>
       <div class="idle-dorf-panel" id="idlePanelGildeTech" style="display:none;"></div>
       <div class="idle-dorf-panel" id="idlePanelGildeBoss" style="display:none;"></div>
+      <div class="idle-dorf-panel" id="idlePanelClan" style="display:none;"></div>
       <div class="idle-dorf-panel" id="idlePanelDrachen" style="display:none;"></div>
 
       <div class="joke-buttons">
@@ -351,7 +353,7 @@
        da idle-stream-mini.html kein window.BKMP_QA_MODE-Gate setzt; macht nur
        bkmpGetGameNow() fuer bkmp-events.js verfuegbar (identisch Date.now()). -->
   <script src="js/core/bkmp-game-clock.js?v=20260724-qafoundation1"></script>
-  <script src="supabase.js?v=20260728-investorpayout1"></script>
+  <script src="supabase.js?v=20260730-clanarena1"></script>
   <script>
     /* ---------------- Minimal-Set der Helfer, die idledorf.js braucht
        (siehe idle-stream.html fuer die ausfuehrlichere Variante mit allen
@@ -413,12 +415,12 @@
   <script src="js/core/bkmp-combat-math.js?v=20260726-progrebalance1"></script>
   <script src="js/systems/bkmp-dungeon.js?v=20260726-progrebalance1"></script>
   <script src="js/systems/bkmp-breeding.js?v=20260727-eggdupefix1"></script>
-  <script src="js/systems/bkmp-guild.js?v=20260726-guildtechrebalance2"></script>
-  <script src="js/systems/bkmp-runes.js?v=20260728-runeautofix1"></script>
+  <script src="js/systems/bkmp-guild.js?v=20260730-clanarena1"></script>
+  <script src="js/systems/bkmp-runes.js?v=20260730-runeequipfix1"></script>
   <script src="js/systems/bkmp-raid.js?v=20260724-raidsyncfix1"></script>
   <script src="js/systems/bkmp-tower.js?v=20260726-stagebarvisfix1"></script>
-  <script src="js/systems/bkmp-prestige.js?v=20260728-paragonclarity1"></script>
-  <script src="js/systems/bkmp-arena.js?v=20260726-guildtechext1"></script>
+  <script src="js/systems/bkmp-prestige.js?v=20260730-autokaufideas1"></script>
+  <script src="js/systems/bkmp-arena.js?v=20260730-arenalimitfix1"></script>
   <script src="js/systems/bkmp-meister.js?v=20260717-p2bfoundation"></script>
   <script src="js/systems/bkmp-skilltree.js?v=20260717-p2bfoundation"></script>
   <script src="js/systems/bkmp-cosmetics.js?v=20260724-eslintcleanup1"></script>
@@ -426,7 +428,7 @@
   <script src="js/ui/bkmp-hud.js?v=20260726-progrebalance1"></script>
   <script src="js/systems/bkmp-leaderboard.js?v=20260717-p2cfoundation"></script>
   <script src="js/ui/bkmp-ui-components.js?v=20260719-p55b"></script>
-  <script src="idledorf.js?v=20260728-runeautofix1"></script>
+  <script src="idledorf.js?v=20260730-clanarena1"></script>
   <script src="js/core/bkmp-idle-bootstrap.js?v=20260717-p2afoundation"></script>
   <script>
     /* Gold/XP-Hochschweb-Anzeige laeuft jetzt zentral in idledorf.js

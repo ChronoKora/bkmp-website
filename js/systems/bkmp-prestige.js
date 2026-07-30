@@ -257,16 +257,69 @@ function bkmpPrestigeEffectTotals(allocations) {
   return totals;
 }
 
+/* Spieler-Idee Kaledoss (28.07.2026, Feedback-Board): "Den Skill Tree in
+   Prioritäten/Reihenfolgen Sortieren für einen 'Auto Kauf', da nun mit den
+   neuen Abläufen es möglicherweise zu repetitiv werden könnte" - bezieht
+   sich auf den seit der Progression-Rebalance auf 52 Knoten gewachsenen
+   Baum (5 Zweige + Vermächtnis, vorher 6 Knoten). Statt einer Priorität
+   pro einzelnem Knoten (52 Eintraege waeren unhandlich) laesst sich die
+   REIHENFOLGE DER ZWEIGE festlegen - "Automatische Verteilung" leert dann
+   den hoechst-priorisierten Zweig zuerst (nach Kosten sortiert innerhalb
+   des Zweigs) und geht erst danach zum naechsten Zweig ueber, statt Punkte
+   nach reinem Preis quer ueber alle 6 Zweige zu verstreuen. Rein lokal
+   (localStorage) - Standardreihenfolge = die bereits bestehende, deklarierte
+   BKMP_PRESTIGE_BRANCHES-Reihenfolge (identisches Verhalten wie vorher, bis
+   der Spieler aktiv umsortiert). */
+const BKMP_PRESTIGE_AUTOALLOCATE_PRIORITY_KEY = 'bkmp-idle-prestige-autoallocate-priority';
+function bkmpPrestigeGetAutoAllocatePriority() {
+  const allIds = BKMP_PRESTIGE_BRANCHES.map(b => b.id);
+  let saved = [];
+  try { saved = JSON.parse(localStorage.getItem(BKMP_PRESTIGE_AUTOALLOCATE_PRIORITY_KEY) || '[]'); } catch (e) { saved = []; }
+  if (!Array.isArray(saved)) saved = [];
+  // Nur bekannte Zweig-IDs uebernehmen (schuetzt gegen veraltete/erfundene
+  // Werte), fehlende (z.B. ein spaeter neu hinzugekommener Zweig) hinten anhaengen.
+  const known = saved.filter(id => allIds.includes(id));
+  const missing = allIds.filter(id => !known.includes(id));
+  return [...known, ...missing];
+}
+function bkmpPrestigeSetAutoAllocatePriority(order) {
+  try { localStorage.setItem(BKMP_PRESTIGE_AUTOALLOCATE_PRIORITY_KEY, JSON.stringify(order)); } catch (e) {}
+}
+function bkmpPrestigeMoveBranchPriority(branchId, direction) {
+  const order = bkmpPrestigeGetAutoAllocatePriority();
+  const idx = order.indexOf(branchId);
+  const target = idx + direction;
+  if (idx < 0 || target < 0 || target >= order.length) return;
+  [order[idx], order[target]] = [order[target], order[idx]];
+  bkmpPrestigeSetAutoAllocatePriority(order);
+}
+function bkmpPrestigeRenderAutoAllocatePriorityHtml() {
+  const order = bkmpPrestigeGetAutoAllocatePriority();
+  return `<div class="idle-prestige-priority-list">
+    <div class="idle-prestige-priority-label">🧭 Auto-Kauf-Priorität (oben = zuerst leergekauft):</div>
+    ${order.map((branchId, i) => {
+      const b = BKMP_PRESTIGE_BRANCHES.find(x => x.id === branchId);
+      if (!b) return '';
+      return `<div class="idle-prestige-priority-row">
+        <span class="idle-prestige-priority-rank">${i + 1}.</span>
+        <span class="idle-prestige-priority-name">${b.icon} ${escapeHtml(b.name)}</span>
+        <button type="button" class="idle-prestige-priority-btn idle-prestige-priority-up" data-branch="${branchId}" data-dir="-1" ${i === 0 ? 'disabled' : ''} aria-label="${escapeHtml(b.name)} nach oben">▲</button>
+        <button type="button" class="idle-prestige-priority-btn idle-prestige-priority-down" data-branch="${branchId}" data-dir="1" ${i === order.length - 1 ? 'disabled' : ''} aria-label="${escapeHtml(b.name)} nach unten">▼</button>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
 /* Prestige-Knoten "Automatische Verteilung" (Zweig Automation, 26.07.2026):
-   verteilt alle GERADE VERFUEGBAREN Punkte automatisch nach Kosten (immer
-   die guenstigste noch kaufbare Option zuerst, ueber alle freigeschalteten
-   Zweige hinweg) - einfache, aber echte Automation (kein Vorab-gespeichertes
-   Template noetig, ausdruecklich "nach Kosten sinnvoll" statt einer
-   erfundenen komplexeren Prioritaeten-Logik). Nutzt exakt dieselbe
-   bkmpPrestigeBuyUpgrade()-Funktion wie ein manueller Klick - kein
-   zweiter Kaufpfad. */
+   verteilt alle GERADE VERFUEGBAREN Punkte automatisch nach der oben
+   konfigurierbaren Zweig-Prioritaet, INNERHALB eines Zweigs weiterhin nach
+   Kosten (immer die guenstigste noch kaufbare Option zuerst) - einfache,
+   aber echte Automation (kein Vorab-gespeichertes Node-Template noetig).
+   Nutzt exakt dieselbe bkmpPrestigeBuyUpgrade()-Funktion wie ein manueller
+   Klick - kein zweiter Kaufpfad. */
 function bkmpPrestigeAutoAllocate() {
   if (!bkmpPrestigeState) return;
+  const priorityOrder = bkmpPrestigeGetAutoAllocatePriority();
   let guard = 0;
   while (guard < 500) {
     guard++;
@@ -278,7 +331,11 @@ function bkmpPrestigeAutoAllocate() {
       .filter(({ def, rank }) => rank < def.maxRank)
       .map(({ def, rank }) => ({ def, cost: bkmpPrestigeUpgradeCost(def, rank + 1) }))
       .filter(({ cost }) => available >= cost)
-      .sort((a, b) => a.cost - b.cost);
+      .sort((a, b) => {
+        const branchDiff = priorityOrder.indexOf(a.def.branch) - priorityOrder.indexOf(b.def.branch);
+        if (branchDiff !== 0) return branchDiff;
+        return a.cost - b.cost;
+      });
     if (options.length === 0) break;
     bkmpPrestigeBuyUpgrade(options[0].def.id);
   }
@@ -1159,7 +1216,7 @@ function bkmpIdleRenderPrestigePanel() {
     ${bkmpPrestigeRenderMilestonesSectionHtml(spentPoints)}
     ${bkmpAscensionMilestoneUnlocked() ? bkmpAscensionRenderSectionHtml() : ''}
     ${typeof bkmpPrestigeBonus === 'function' && bkmpPrestigeBonus('auto_prestige_allocate_unlock') > 0
-      ? `<button type="button" class="btn-nein idle-prestige-allocate-btn" id="idlePrestigeAutoAllocateBtn">🧭 Empfohlene Verteilung (verfügbare Punkte automatisch ausgeben)</button>`
+      ? `${bkmpPrestigeRenderAutoAllocatePriorityHtml()}<button type="button" class="btn-nein idle-prestige-allocate-btn" id="idlePrestigeAutoAllocateBtn">🧭 Empfohlene Verteilung (verfügbare Punkte automatisch ausgeben)</button>`
       : ''}
 
     <div class="idle-upgrade-section-title">Permanenter Bonusbaum</div>
@@ -1182,6 +1239,10 @@ function bkmpIdleRenderPrestigePanel() {
   }
   const autoAllocateBtn = document.getElementById('idlePrestigeAutoAllocateBtn');
   if (autoAllocateBtn) autoAllocateBtn.addEventListener('click', bkmpPrestigeAutoAllocate);
+  panel.querySelectorAll('.idle-prestige-priority-btn').forEach(btn => btn.addEventListener('click', () => {
+    bkmpPrestigeMoveBranchPriority(btn.dataset.branch, Number(btn.dataset.dir));
+    bkmpIdleRenderPrestigePanel();
+  }));
   const ascensionBtn = document.getElementById('idleAscensionBtn');
   if (ascensionBtn) ascensionBtn.addEventListener('click', bkmpAscensionConfirmAndExecute);
   panel.querySelectorAll('.idle-prestige-branch-tab').forEach(btn => btn.addEventListener('click', () => {

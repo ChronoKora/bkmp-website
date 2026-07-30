@@ -119,6 +119,41 @@ test.describe('Runensystem - Teststand C (fortgeschritten)', () => {
     expect(Object.keys(equippedByType).sort()).toEqual(['slot1', 'slot2', 'slot3', 'slot4', 'slot5', 'slot6']);
     Object.values(equippedByType).forEach(count => expect(count).toBe(1));
   });
+
+  /* Spieler-Idee OPShadowWolf (30.07.2026, Feedback-Board): "Einsetzen"-Button
+     (#idleRuneEquipBtn) wird vom geoeffneten Kraftrune-Lager verdeckt, muss
+     bisher jedes Mal erst geschlossen werden - bereits als bekannter, nicht
+     behobener horizontaler Overlap in save-load.spec.js dokumentiert gewesen
+     (siehe dortiger frueherer Workaround-Kommentar, jetzt entfernt). Fix:
+     bkmpRuneSyncDrawerPosition() reserviert live per CSS-Variable exakt so
+     viel Rand-Abstand, wie der Balken tatsaechlich ueberlappen wuerde. */
+  test('Einsetzen-Button bleibt sichtbar/erreichbar, wenn das geoeffnete Runen-Lager ihn sonst ueberlappen wuerde', async ({ page, qaBaseURL, fixtureData }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await page.locator('#idleTabBtnRunen').click();
+    await page.locator('.idle-runen-slot-tab[data-slot="slot1"]').click();
+    await expect(page.locator('#idleRuneDrawer')).toHaveClass(/open/);
+
+    const geometry = await page.evaluate(() => {
+      const drawer = document.getElementById('idleRuneDrawer');
+      const btn = document.getElementById('idleRuneEquipBtn');
+      const dRect = drawer.getBoundingClientRect();
+      const bRect = btn.getBoundingClientRect();
+      return {
+        overlapVar: getComputedStyle(document.getElementById('idlePanelRunen')).getPropertyValue('--rune-drawer-overlap').trim(),
+        drawerLeft: dRect.left, btnRight: bRect.right,
+        covered: !(bRect.right <= dRect.left || bRect.left >= dRect.right)
+      };
+    });
+    expect(geometry.covered).toBe(false);
+    expect(geometry.btnRight).toBeLessThanOrEqual(geometry.drawerLeft);
+
+    // Nicht nur Geometrie - der Button muss bei geoeffnetem Balken auch
+    // wirklich per echtem Playwright-Klick erreichbar sein (kein anderes
+    // Element liegt trotz korrekter Geometrie im Klickpfad).
+    const equipBtn = page.locator('#idleRuneEquipBtn');
+    await expect(equipBtn).toBeVisible();
+    await equipBtn.click({ trial: true }); // wirft, falls etwas anderes den Klickpunkt abfaengt
+  });
 });
 
 test.describe('Runensystem - Teststand E (Maximalbelastung)', () => {

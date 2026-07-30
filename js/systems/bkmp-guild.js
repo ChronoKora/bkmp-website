@@ -1894,3 +1894,159 @@ async function bkmpIdleRenderGildeBossPanel() {
 
   bkmpGuildBossUpdateCombatUI();
 }
+
+/* ---------------- Clan-Bestenliste + Clan-Arena (Spieler-Idee Kaledoss,
+   28.07.2026, Feedback-Board: "Einen Reiter für Clanbestenliste und ne Art
+   Clanarena kämpfe") ----------------
+   Ein Tab, zwei Bereiche: oben die Clan-Arena (nur sichtbar/nutzbar mit
+   eigener Gilde), unten die Bestenliste (immer sichtbar, auch ohne Gilde -
+   zeigt jedem Spieler, wonach es sich lohnen wuerde, eine Gilde zu suchen).
+   Nutzt exakt dieselben Bausteine wie die Spieler-Arena (bkmp-arena.js) -
+   nur die Macht-Berechnung liegt serverseitig (SUMME aller Mitglieder statt
+   eines einzelnen Spielers), deshalb hier keine Client-seitige
+   Gewinnchance-Schaetzung (haette pro angezeigter Gilde einen zusaetzlichen
+   Abruf aller Mitglieder-Kampfwerte gebraucht - bewusst nicht umgesetzt,
+   siehe Kommentar unten bei den Gegner-Karten). */
+let bkmpClanLoaded = false;
+let bkmpClanLoading = false;
+let bkmpClanLeaderboard = [];
+let bkmpClanArenaMyRating = null;
+let bkmpClanArenaOpponents = [];
+let bkmpClanArenaRecentBattles = [];
+let bkmpClanArenaAttacksToday = 0;
+let bkmpClanArenaAttacking = null;
+
+async function bkmpClanLoadAll() {
+  bkmpClanLoading = true;
+  try {
+    // Gilden-Mitgliedschaft (bkmpGuildState/bkmpGuildMyAuthUserId) wird
+    // sonst nur beim Oeffnen des "Gilde"-Tabs geladen - ein Spieler koennte
+    // aber direkt in den neuen Clan-Tab wechseln, ohne je den Gilde-Tab
+    // geoeffnet zu haben. Teilt sich denselben Lade-Zustand/Cache, laedt
+    // also nie doppelt.
+    if (!bkmpGuildLoaded && !bkmpGuildLoading) await bkmpGuildLoadAll();
+    bkmpClanLeaderboard = await bkmpGuildGetLeaderboard(50);
+    const myGuildId = bkmpGuildState ? bkmpGuildState.guild.id : null;
+    if (myGuildId) {
+      bkmpClanArenaMyRating = await bkmpGuildArenaGetMyRating(myGuildId);
+      bkmpClanArenaOpponents = await bkmpGuildArenaGetOpponents(myGuildId, 8);
+      bkmpClanArenaRecentBattles = await bkmpGuildArenaGetRecentBattles(myGuildId, 15);
+      bkmpClanArenaAttacksToday = await bkmpGuildArenaGetAttacksTodayCount(myGuildId);
+    } else {
+      bkmpClanArenaMyRating = null;
+      bkmpClanArenaOpponents = [];
+      bkmpClanArenaRecentBattles = [];
+      bkmpClanArenaAttacksToday = 0;
+    }
+  } catch (e) {
+    console.warn('Clan-Daten konnten nicht geladen werden.', e);
+  }
+  bkmpClanLoaded = true;
+  bkmpClanLoading = false;
+}
+
+function bkmpClanRenderLeaderboardHtml(myGuildId) {
+  return `
+    <div class="idle-arena-history">
+      <h4 style="margin-top:1rem;">🏆 Clan-Bestenliste</h4>
+      ${bkmpClanLeaderboard.length === 0 ? '<p class="empty-hint">Noch keine Gilden vorhanden.</p>' : bkmpClanLeaderboard.map((g, i) => {
+        const level = bkmpGuildLevelInfo(g.guildXp).level;
+        const medal = BKMP_GUILD_MEDALS[i] || `${i + 1}.`;
+        const isMine = myGuildId && g.id === myGuildId;
+        return `
+        <div class="idle-arena-opponent-card${isMine ? ' idle-clan-leaderboard-mine' : ''}">
+          <span class="idle-arena-opponent-name">${medal} ${escapeHtml(g.name)} [${escapeHtml(g.tag)}]${isMine ? ' (deine Gilde)' : ''}</span>
+          <span class="idle-arena-opponent-rating">🎖️ Level ${level}</span>
+          <span class="idle-arena-opponent-record">${g.memberCount} Mitglieder</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+async function bkmpIdleRenderClanPanel() {
+  const panel = document.getElementById('idlePanelClan');
+  if (!panel) return;
+
+  if (!bkmpClanLoaded && !bkmpClanLoading) {
+    panel.innerHTML = '<p class="idle-dungeon-best">⏳ Lade Clan-Daten...</p>';
+    await bkmpClanLoadAll();
+  }
+
+  const myGuildId = bkmpGuildState ? bkmpGuildState.guild.id : null;
+  if (!myGuildId) {
+    panel.innerHTML = `
+      <div class="idle-dungeon-intro">
+        <h4>🏆 Clan</h4>
+        <p>Tritt einer Gilde bei (Tab "Gilde"), um in der Clan-Arena zu kämpfen - dort tritt die GESAMTE Kampfkraft deiner Gilde gegen eine andere an, Sieg füllt die gemeinsame Kasse. Die Bestenliste unten zeigt schon jetzt, wie stark die vorhandenen Gilden sind.</p>
+      </div>
+      ${bkmpClanRenderLeaderboardHtml(myGuildId)}`;
+    return;
+  }
+
+  const canAttack = bkmpGuildState.myRole === 'leader' || bkmpGuildState.myRole === 'officer';
+  const dailyLimit = 3;
+  const attacksLeft = Math.max(0, dailyLimit - bkmpClanArenaAttacksToday);
+  const rating = bkmpClanArenaMyRating ? bkmpClanArenaMyRating.rating : 1000;
+  const wins = bkmpClanArenaMyRating ? bkmpClanArenaMyRating.wins : 0;
+  const losses = bkmpClanArenaMyRating ? bkmpClanArenaMyRating.losses : 0;
+  const total = wins + losses;
+  const winRate = total > 0 ? Math.round((wins / total) * 100) : 0;
+
+  panel.innerHTML = `
+    <div class="idle-dungeon-intro">
+      <h4>⚔️ Clan-Arena</h4>
+      <p>Asynchroner Kampf gegen die AKTUELLE Gesamtkampfkraft einer anderen Gilde (Summe der Kampfwerte aller ihrer Mitglieder) - kein Echtzeit-Duell. Sieg füllt eure gemeinsame Kasse, Niederlage kostet nur Rating (nie Kassen-Gold).</p>
+      <p class="idle-dungeon-best">🏅 Gilden-Rating: <strong>${rating}</strong> &middot; ${wins}S / ${losses}N ${total > 0 ? `(${winRate}% Siegquote)` : ''}</p>
+      <p>⚔️ Angriffe heute: <strong>${attacksLeft}/${dailyLimit}</strong> übrig &middot; Reset um 0 Uhr${canAttack ? '' : ' &middot; nur Anführer/Stellvertreter können angreifen'}</p>
+    </div>
+    <div class="idle-arena-opponents">
+      <h4 style="margin-top:1rem;">Gilden in deiner Nähe</h4>
+      ${canAttack && attacksLeft === 0 ? '<p class="empty-hint">Tageslimit erreicht - morgen um 0 Uhr geht es weiter.</p>' : ''}
+      ${bkmpClanArenaOpponents.length === 0 ? '<p class="empty-hint">Noch keine anderen Gilden mit Mitgliedern gefunden.</p>' : bkmpClanArenaOpponents.map(g => `
+        <div class="idle-arena-opponent-card" data-target-guild-id="${escapeHtml(g.id)}">
+          <span class="idle-arena-opponent-name">${escapeHtml(g.name)} [${escapeHtml(g.tag)}]</span>
+          <span class="idle-arena-opponent-rating">🏅 ${g.rating}</span>
+          <span class="idle-arena-opponent-record">${g.wins}S/${g.losses}N &middot; ${g.memberCount} Mitgl.</span>
+          <button type="button" class="btn-ja idle-clan-arena-attack-btn" ${!canAttack || bkmpClanArenaAttacking || attacksLeft === 0 ? 'disabled' : ''}>${bkmpClanArenaAttacking === g.id ? '⏳...' : '⚔️ Angreifen'}</button>
+        </div>
+      `).join('')}
+    </div>
+    <div class="idle-arena-history">
+      <h4 style="margin-top:1rem;">Letzte Clan-Kämpfe</h4>
+      ${bkmpClanArenaRecentBattles.length === 0 ? '<p class="empty-hint">Noch keine Clan-Kämpfe.</p>' : bkmpClanArenaRecentBattles.map(b => {
+        const won = b.wasAttacker ? b.attackerWon : !b.attackerWon;
+        const opponentName = escapeHtml(b.wasAttacker ? b.defenderName : b.attackerName);
+        const phrase = b.wasAttacker
+          ? (won ? `Eure Gilde hat ${opponentName} besiegt` : `Eure Gilde hat gegen ${opponentName} verloren`)
+          : (won ? `Eure Gilde hat ${opponentName} abgewehrt` : `${opponentName} hat eure Gilde überrumpelt`);
+        return `<p class="idle-dungeon-best">${won ? '✅' : '❌'} ${phrase} &middot; ${b.wasAttacker ? (won ? '+' : '') + b.ratingChange : (won ? '+' : '') + (-b.ratingChange)} Rating${b.goldReward ? ` &middot; +${bkmpIdleFormatNumber(b.goldReward)} 💰 Kasse` : ''} &middot; ${bkmpArenaFormatTime(b.occurredAt)}</p>`;
+      }).join('')}
+    </div>
+    ${bkmpClanRenderLeaderboardHtml(myGuildId)}
+  `;
+
+  panel.querySelectorAll('.idle-clan-arena-attack-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const card = btn.closest('[data-target-guild-id]');
+      const targetGuildId = card ? card.dataset.targetGuildId : null;
+      if (!targetGuildId || bkmpClanArenaAttacking) return;
+      bkmpClanArenaAttacking = targetGuildId;
+      bkmpIdleRenderClanPanel();
+      try {
+        const result = await bkmpGuildArenaAttack(targetGuildId);
+        if (result) {
+          const msg = result.won
+            ? `⚔️ Clan-Sieg gegen ${result.defenderGuildName}! +${result.ratingChange} Rating, +${bkmpIdleFormatNumber(result.goldReward)} 💰 in die Kasse (jetzt ${result.newRating})`
+            : `⚔️ Clan-Niederlage gegen ${result.defenderGuildName}. ${result.ratingChange} Rating (jetzt ${result.newRating})`;
+          if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(msg, 4200);
+          bkmpIdleLog(msg);
+        }
+      } catch (e) {
+        if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(e.message || 'Clan-Arena-Angriff fehlgeschlagen.', 3200);
+      }
+      bkmpClanArenaAttacking = null;
+      bkmpClanLoaded = false; // naechstes Rendern laedt frisches Rating/frische Kasse/frischen Tageszaehler
+      await bkmpIdleRenderClanPanel();
+    });
+  });
+}

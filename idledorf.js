@@ -1410,6 +1410,27 @@ function bkmpIdleGetAutoBuy() {
 function bkmpIdleSetAutoBuy(on) {
   try { localStorage.setItem(BKMP_IDLE_AUTOBUY_KEY, on ? '1' : '0'); } catch (e) {}
 }
+/* Spieler-Idee (Fightmaria, 28.07.2026, Feedback-Board): "Auto-Käufer
+   spezialisieren... z.B. alles automatisch kauft außer die Sachen mit Gold
+   weil man gerade auf etwas spart. Das man das manuell anklicken könnte" -
+   Auto-Kauf laesst sich jetzt pro Ressourcentyp (gold/wood/stone/crystals/
+   essence, siehe BKMP_IDLE_UPGRADES/bkmpIdleResourceEmoji) gezielt
+   ausschliessen, waehrend die uebrigen weiter automatisch gekauft werden.
+   Rein lokal (localStorage), kein Server-Feld noetig - identisches Muster
+   wie BKMP_IDLE_AUTOBUY_KEY selbst. */
+const BKMP_IDLE_AUTOBUY_EXCLUDED_RESOURCES_KEY = 'bkmp-idle-autobuy-excluded-resources';
+const BKMP_IDLE_AUTOBUY_RESOURCE_NAMES = { gold: 'Gold', wood: 'Holz', stone: 'Stein', crystals: 'Kristalle', essence: 'Essenz' };
+function bkmpIdleGetAutoBuyExcludedResources() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(BKMP_IDLE_AUTOBUY_EXCLUDED_RESOURCES_KEY) || '[]');
+    return Array.isArray(raw) ? raw.filter(r => typeof r === 'string') : [];
+  } catch (e) { return []; }
+}
+function bkmpIdleSetAutoBuyResourceExcluded(resource, excluded) {
+  const current = new Set(bkmpIdleGetAutoBuyExcludedResources());
+  if (excluded) current.add(resource); else current.delete(resource);
+  try { localStorage.setItem(BKMP_IDLE_AUTOBUY_EXCLUDED_RESOURCES_KEY, JSON.stringify([...current])); } catch (e) {}
+}
 /* Progression-Rebalance Phase 11 (26.07.2026): Auto-Kauf an die neuen,
    deutlich hoeheren Caps/Softcaps angepasst.
    1) Der bisherige feste Deckel (50 Kaeufe/Tick) skaliert jetzt mit dem
@@ -1500,11 +1521,13 @@ function bkmpIdleUpgradeInSoftcapZone(def, level) {
 function bkmpIdleAutoBuyUpgrades() {
   if (!bkmpIdleState) return;
   const maxPerTick = bkmpIdleAutoBuyMaxPurchasesPerTick();
+  const excludedResources = bkmpIdleGetAutoBuyExcludedResources();
   let guard = 0;
   while (guard < maxPerTick) {
     guard++;
     const purchases = bkmpIdleState.upgrade_purchases || {};
     const affordable = BKMP_IDLE_UPGRADES
+      .filter(def => !excludedResources.includes(def.resource))
       .map(def => ({ def, level: Number(purchases[def.id] || 0) }))
       .filter(({ def, level }) => level < def.maxLevel)
       .map(({ def, level }) => ({ def, level, cost: bkmpIdleUpgradeCost(def, level) }))
@@ -1583,11 +1606,22 @@ function bkmpIdleRenderUpgradesPanel() {
   bkmpIdleAccrueProductionBuildings();
   const purchases = bkmpIdleState.upgrade_purchases || {};
   const autoBuyOn = bkmpIdleGetAutoBuy();
+  const excludedResources = bkmpIdleGetAutoBuyExcludedResources();
+  const usedResources = [...new Set(BKMP_IDLE_UPGRADES.map(def => def.resource))];
   panel.innerHTML = `
     <label class="idle-autobuy-toggle">
       <input type="checkbox" id="idleAutoBuyToggle" ${autoBuyOn ? 'checked' : ''}>
       <span>Auto-Kauf: kauft automatisch das günstigste bezahlbare Upgrade</span>
     </label>
+    <div class="idle-autobuy-resource-filter" title="Auto-Kauf überspringt angehakte Ressourcen komplett - praktisch, wenn du gerade gezielt darauf sparst.">
+      <span class="idle-autobuy-resource-filter-label">Von Auto-Kauf ausschließen:</span>
+      ${usedResources.map(res => `
+        <label class="idle-autobuy-resource-chip">
+          <input type="checkbox" class="idle-autobuy-resource-checkbox" data-resource="${res}" ${excludedResources.includes(res) ? 'checked' : ''}>
+          <span>${bkmpIdleResourceEmoji(res)} ${escapeHtml(BKMP_IDLE_AUTOBUY_RESOURCE_NAMES[res] || res)}</span>
+        </label>
+      `).join('')}
+    </div>
     <div class="idle-upgrade-grid">${BKMP_IDLE_UPGRADES.map(def => {
     const level = Number(purchases[def.id] || 0);
     const maxed = level >= def.maxLevel;
@@ -1678,6 +1712,9 @@ function bkmpIdleRenderUpgradesPanel() {
       if (autoBuyToggle.checked) bkmpIdleAutoBuyUpgrades();
     });
   }
+  panel.querySelectorAll('.idle-autobuy-resource-checkbox').forEach(cb => {
+    cb.addEventListener('change', () => bkmpIdleSetAutoBuyResourceExcluded(cb.dataset.resource, cb.checked));
+  });
 }
 
 /* ---------------- Rendering: Sammlung- / Erfolge-Tab (Shortcuts ins bestehende System) ---------------- */
@@ -2773,6 +2810,7 @@ const bkmpIdleTabs = [
   { id: 'gilde', btn: 'idleTabBtnGilde', panel: 'idlePanelGilde', render: bkmpIdleRenderGildePanel },
   { id: 'gildetech', btn: 'idleTabBtnGildeTech', panel: 'idlePanelGildeTech', render: bkmpIdleRenderGildeTechPanel },
   { id: 'gildeboss', btn: 'idleTabBtnGildeBoss', panel: 'idlePanelGildeBoss', render: bkmpIdleRenderGildeBossPanel },
+  { id: 'clan', btn: 'idleTabBtnClan', panel: 'idlePanelClan', render: bkmpIdleRenderClanPanel },
   { id: 'bestenliste', btn: 'idleTabBtnBestenliste', panel: 'idlePanelBestenliste', render: bkmpIdleRenderBestenlistePanel },
   { id: 'drachen', btn: 'idleTabBtnDrachen', panel: 'idlePanelDrachen', render: bkmpIdleRenderDragonsPanel }
 ];

@@ -10,6 +10,69 @@ const { test, expect, openAndLogin, waitForDragonReady } = require('../helpers/q
    dragon-breeding-automation.spec.js). Testet den echten Produktionscode,
    keine Kopien. */
 
+/* Spieler-Idee Fightmaria (28.07.2026, Feedback-Board): "Auto käufer
+   spezialisieren... alles ausser die Sachen mit Gold, weil man gerade auf
+   etwas spart" - bkmpIdleAutoBuyUpgrades() ueberspringt jetzt jede Ressource
+   in bkmpIdleGetAutoBuyExcludedResources() komplett. Rein lokal
+   (localStorage), kein Server-Feld. */
+test.describe('Auto-Kauf: Ressourcen-Ausschluss (Spieler-Idee Fightmaria) - Teststand A', () => {
+  test.use({ teststand: 'A' });
+
+  test('ausgeschlossene Ressource wird von Auto-Kauf komplett uebersprungen, andere kaufen weiter', async ({ page, qaBaseURL, fixtureData }) => {
+    // Dieser erste Test ruft bkmpIdleAutoBuyUpgrades() nur direkt per
+    // page.evaluate() auf, keine Desktop-Tab-Klicks - laeuft bewusst auch
+    // auf mobile-*-Projekten mit.
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+
+    const result = await page.evaluate(() => {
+      bkmpIdleState.gold = 1e18; bkmpIdleState.wood = 1e18; bkmpIdleState.stone = 1e18;
+      bkmpIdleState.crystals = 1e18; bkmpIdleState.essence = 1e18;
+      bkmpIdleState.upgrade_purchases = {};
+      bkmpIdleSetAutoBuyResourceExcluded('gold', true);
+      bkmpIdleAutoBuyUpgrades();
+      const purchases = bkmpIdleState.upgrade_purchases;
+      const goldUpgradeIds = BKMP_IDLE_UPGRADES.filter(d => d.resource === 'gold').map(d => d.id);
+      const nonGoldUpgradeIds = BKMP_IDLE_UPGRADES.filter(d => d.resource !== 'gold').map(d => d.id);
+      return {
+        goldPurchased: goldUpgradeIds.reduce((sum, id) => sum + Number(purchases[id] || 0), 0),
+        nonGoldPurchased: nonGoldUpgradeIds.reduce((sum, id) => sum + Number(purchases[id] || 0), 0)
+      };
+    });
+    expect(result.goldPurchased).toBe(0); // ausgeschlossen - trotz unbegrenztem Gold kein einziger Kauf
+    expect(result.nonGoldPurchased).toBeGreaterThan(0); // andere Ressourcen kaufen unveraendert weiter
+
+    // Ausschluss wieder aufheben - Gold-Upgrades kaufen danach wieder normal.
+    const afterReenable = await page.evaluate(() => {
+      bkmpIdleSetAutoBuyResourceExcluded('gold', false);
+      bkmpIdleAutoBuyUpgrades();
+      const purchases = bkmpIdleState.upgrade_purchases;
+      return BKMP_IDLE_UPGRADES.filter(d => d.resource === 'gold').reduce((sum, d) => sum + Number(purchases[d.id] || 0), 0);
+    });
+    expect(afterReenable).toBeGreaterThan(0);
+  });
+
+  test('Checkbox im Upgrades-Tab spiegelt und setzt den Ausschluss korrekt', async ({ page, qaBaseURL, fixtureData }, testInfo) => {
+    test.skip(/^mobile-/.test(testInfo.project.name), 'Nutzt einen echten Desktop-Tab-Klick - mobile-smoke.spec.js deckt die kompakte Navigation ab');
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    await page.locator('#idleTabBtnUpgrades').click();
+
+    const goldChip = page.locator('.idle-autobuy-resource-checkbox[data-resource="gold"]');
+    await expect(goldChip).not.toBeChecked();
+    await goldChip.check();
+    expect(await page.evaluate(() => bkmpIdleGetAutoBuyExcludedResources())).toContain('gold');
+
+    // Ueberlebt ein Neu-Rendern des Panels (liest den gespeicherten Zustand
+    // beim Aufbau, nicht nur den einmaligen Klick-Zustand).
+    await page.evaluate(() => bkmpIdleRenderUpgradesPanel());
+    await expect(page.locator('.idle-autobuy-resource-checkbox[data-resource="gold"]')).toBeChecked();
+
+    await page.locator('.idle-autobuy-resource-checkbox[data-resource="gold"]').uncheck();
+    expect(await page.evaluate(() => bkmpIdleGetAutoBuyExcludedResources())).not.toContain('gold');
+  });
+});
+
 test.describe('Automatisierungs-Schalter Teil 2 (Erweiterter Auto-Kauf/Auto-Kauf mehrerer Stufen) - Teststand A', () => {
   test.use({ teststand: 'A' });
 
@@ -212,6 +275,77 @@ test.describe('Automatisierungs-Schalter Teil 2 (Automatische Verteilung) - Test
     const spentAfter = await page.evaluate(() => bkmpPrestigeState.prestige_points_spent);
     expect(spentAfter).toBeGreaterThan(spentBefore);
     expect(spentAfter).toBeLessThanOrEqual(5000);
+  });
+
+  /* Spieler-Idee Kaledoss (28.07.2026, Feedback-Board): "Den Skill Tree in
+     Prioritäten/Reihenfolgen Sortieren für einen 'Auto Kauf'" - mit einem
+     bewusst KLEINEN Punktebudget (garantiert nicht genug, um einen ganzen
+     Zweig leerzukaufen) muss bkmpPrestigeAutoAllocate() ausschliesslich in
+     den hoechst-priorisierten Zweig investieren, unabhaengig davon, ob ein
+     anderer Zweig global guenstigere Einzelknoten haette - das beweist,
+     dass die Prioritaet die reine Kosten-Sortierung tatsaechlich uebersteuert. */
+  test('Zweig-Prioritaet steuert, welcher Zweig bei "Automatische Verteilung" bevorzugt bedient wird', async ({ page, qaBaseURL, fixtureData }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+
+    // Absichtlich ein kleines Budget (20 Punkte, statt der 5000 im
+    // Nachbartest oben) - reicht fuer mehrere, aber nicht ALLE Raenge eines
+    // Zweigs. bkmpPrestigeAutoAllocate() kauft den hoechst-priorisierten
+    // Zweig leer, bis darin nichts mehr bezahlbar ist, BEVOR es zum
+    // naechsten wechselt - ein kleiner Rest kann dabei noch in den
+    // zweiten Zweig "ueberschwappen" (der hoechst-priorisierte Zweig hat
+    // ja nicht unbegrenzt viele guenstige Optionen). Die robuste, vom
+    // exakten Kosten-Feintuning unabhaengige Behauptung ist deshalb nicht
+    // "0 im anderen Zweig", sondern "deutlich mehr im priorisierten Zweig
+    // als im anderen" - und dass sich das Verhaeltnis beim Umdrehen der
+    // Prioritaet tatsaechlich umkehrt.
+    async function ranksByBranch(branchId) {
+      return page.evaluate((bid) => {
+        const alloc = bkmpPrestigeState.prestige_allocations || {};
+        return BKMP_PRESTIGE_UPGRADES.filter(d => d.branch === bid).reduce((sum, d) => sum + Number(alloc[d.id] || 0), 0);
+      }, branchId);
+    }
+    async function runRound(priorityOrder) {
+      await page.evaluate((order) => {
+        if (!bkmpPrestigeState) bkmpPrestigeState = { prestige_level: 1, prestige_points: 0, prestige_points_spent: 0, prestige_allocations: {} };
+        bkmpPrestigeState.prestige_allocations = { automatische_verteilung: 1 };
+        bkmpPrestigeState.prestige_points = 20;
+        bkmpPrestigeState.prestige_points_spent = 0;
+        bkmpPrestigeSetAutoAllocatePriority(order);
+        bkmpPrestigeAutoAllocate();
+      }, priorityOrder);
+      return { kampf: await ranksByBranch('kampf'), wirtschaft: await ranksByBranch('wirtschaft') };
+    }
+
+    const round1 = await runRound(['wirtschaft', 'kampf', 'drachen', 'runen_dungeon', 'automation', 'legacy']);
+    expect(round1.wirtschaft).toBeGreaterThan(round1.kampf);
+    expect(round1.wirtschaft).toBeGreaterThan(0);
+
+    const round2 = await runRound(['kampf', 'wirtschaft', 'drachen', 'runen_dungeon', 'automation', 'legacy']);
+    expect(round2.kampf).toBeGreaterThan(round2.wirtschaft);
+    expect(round2.kampf).toBeGreaterThan(0);
+  });
+
+  test('Priorität-Auf/Ab-Knöpfe im Prestige-Panel sortieren die Zweigliste tatsächlich um', async ({ page, qaBaseURL, fixtureData }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    await page.evaluate(() => {
+      if (!bkmpPrestigeState) bkmpPrestigeState = { prestige_level: 1, prestige_points: 0, prestige_points_spent: 0, prestige_allocations: {} };
+      bkmpPrestigeState.prestige_allocations.automatische_verteilung = 1;
+      bkmpPrestigeSetAutoAllocatePriority(['kampf', 'wirtschaft', 'drachen', 'runen_dungeon', 'automation', 'legacy']);
+    });
+    await page.locator('#idleTabBtnPrestige').click();
+    await page.evaluate(() => bkmpIdleRenderPrestigePanel());
+
+    const namesBefore = await page.locator('.idle-prestige-priority-name').allTextContents();
+    expect(namesBefore[0]).toContain('Kampf');
+
+    // "Wirtschaft" (Rang 2) einmal nach oben schieben.
+    await page.locator('.idle-prestige-priority-up[data-branch="wirtschaft"]').click();
+    const namesAfter = await page.locator('.idle-prestige-priority-name').allTextContents();
+    expect(namesAfter[0]).toContain('Wirtschaft');
+    expect(namesAfter[1]).toContain('Kampf');
+    expect(await page.evaluate(() => bkmpPrestigeGetAutoAllocatePriority())).toEqual(['wirtschaft', 'kampf', 'drachen', 'runen_dungeon', 'automation', 'legacy']);
   });
 
   test('ohne den Knoten ist der Knopf nicht sichtbar', async ({ page, qaBaseURL, fixtureData }) => {

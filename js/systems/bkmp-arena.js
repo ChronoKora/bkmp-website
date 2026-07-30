@@ -12,6 +12,7 @@ let bkmpArenaMyAuthUserId = null;
 let bkmpArenaMyRating = null;
 let bkmpArenaOpponents = [];
 let bkmpArenaRecentBattles = [];
+let bkmpArenaAttacksToday = 0;
 let bkmpArenaLoaded = false;
 let bkmpArenaLoading = false;
 let bkmpArenaAttacking = null;
@@ -51,6 +52,7 @@ async function bkmpArenaLoadAll() {
     bkmpArenaMyRating = uid ? await bkmpArenaGetMyRating() : null;
     bkmpArenaOpponents = uid ? await bkmpArenaGetOpponents(uid, bkmpArenaMyRating ? bkmpArenaMyRating.rating : 1000, 8) : [];
     bkmpArenaRecentBattles = uid ? await bkmpArenaGetRecentBattles(uid, 15) : [];
+    bkmpArenaAttacksToday = uid && typeof bkmpArenaGetAttacksTodayCount === 'function' ? await bkmpArenaGetAttacksTodayCount(uid) : 0;
   } catch (e) {
     console.warn('Arena-Daten konnten nicht geladen werden.', e);
   }
@@ -182,13 +184,16 @@ async function bkmpIdleRenderArenaPanel() {
   const total = wins + losses;
   const winRate = total > 0 ? Math.round((wins / total) * 100) : 0;
   /* Tageslimit-Anzeige (Spieler-Wunsch 14.07.: "Arena nur 10x Täglich
-     Angreifen reset um 0:00") - reine Client-Schaetzung aus den ohnehin
-     schon geladenen letzten Kaempfen (server-seitig ist arena_attack() die
-     eigentliche, verbindliche Grenze - siehe supabase-idle-arena-daily-
-     limit.sql). Reicht fuer die Anzeige, weil ein Tageslimit von 10 locker
-     innerhalb der geladenen 15 juengsten Kaempfe liegt. */
-  const todayStr = new Date().toDateString();
-  const attacksToday = bkmpArenaRecentBattles.filter(b => b.wasAttacker && new Date(b.occurredAt).toDateString() === todayStr).length;
+     Angreifen reset um 0:00") - echte, ungedeckelte COUNT-Abfrage
+     (bkmpArenaGetAttacksTodayCount, supabase.js), server-seitig ist
+     arena_attack() weiterhin die eigentliche, verbindliche Grenze (siehe
+     supabase-idle-arena-daily-limit.sql). Vorher wurde aus den ohnehin
+     schon geladenen letzten 15 Kaempfen geschaetzt - seit Kriegsrat
+     (Gilden-Technologie v2, 26.07.) kann das echte Tageslimit aber ueber
+     15 liegen, wodurch die Schaetzung faelschlich bei 15 haengen blieb
+     (Spieler-Report BagonTr01 29.07., "10 Angriffe uebrig, bekomme aber
+     die Meldung dass ich keine mehr habe"). */
+  const attacksToday = bkmpArenaAttacksToday;
   /* Gilden-Technologie v2 (26.07.), Zweig "Kriegsrat": erhoeht das
      serverseitige Tageslimit (arena_attack(), sql/20260726-guild-tech-
      branches-v2.sql) um +1 pro Stufe - ohne diese Anpassung haette der

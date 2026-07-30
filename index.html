@@ -146,7 +146,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260728-paragonclarity1">
+<link rel="stylesheet" href="style.css?v=20260730-clanarena1">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 </head>
 <body>
@@ -782,6 +782,7 @@
             <button type="button" class="idle-dorf-tab" id="idleTabBtnGilde" data-testid="idle-tab-gilde">🛡️ Gilde</button>
             <button type="button" class="idle-dorf-tab" id="idleTabBtnGildeTech" data-testid="idle-tab-gildetech">🌳 Gilden-Tech</button>
             <button type="button" class="idle-dorf-tab" id="idleTabBtnGildeBoss" data-testid="idle-tab-gildeboss">🐲 Gildenboss</button>
+            <button type="button" class="idle-dorf-tab" id="idleTabBtnClan" data-testid="idle-tab-clan">🏆 Clan</button>
           </div>
         </div>
       </div>
@@ -867,6 +868,7 @@
       <div class="idle-dorf-panel" id="idlePanelGilde" style="display:none;"></div>
       <div class="idle-dorf-panel" id="idlePanelGildeTech" style="display:none;"></div>
       <div class="idle-dorf-panel" id="idlePanelGildeBoss" style="display:none;"></div>
+      <div class="idle-dorf-panel" id="idlePanelClan" style="display:none;"></div>
       <div class="idle-dorf-panel" id="idlePanelDrachen" style="display:none;"></div>
 
       <!-- Nutzerwunsch (15.07.): "Baust du das dann unten ein und im
@@ -1532,7 +1534,7 @@
        liest. window.BKMP_QA_MODE selbst wird noch frueher gesetzt (Kopf-Skript
        oben, vor jedem <script src>). Reiner No-Op ausserhalb des QA-Modus. -->
   <script src="js/core/bkmp-game-clock.js?v=20260724-qafoundation1" defer></script>
-  <script src="supabase.js?v=20260728-investorpayout1" defer></script>
+  <script src="supabase.js?v=20260730-clanarena1" defer></script>
   <script src="app.js?v=20260718-selbstverdient1" defer></script>
   <!-- Redesign Phase 2a (17.07.): idledorf.js in geteilten Zustand + Subsysteme
        zerlegt. Ladereihenfolge ist bewusst fest: bkmp-idle-state.js zuerst
@@ -1546,12 +1548,12 @@
   <script src="js/core/bkmp-combat-math.js?v=20260726-progrebalance1" defer></script>
   <script src="js/systems/bkmp-dungeon.js?v=20260726-progrebalance1" defer></script>
   <script src="js/systems/bkmp-breeding.js?v=20260727-eggdupefix1" defer></script>
-  <script src="js/systems/bkmp-guild.js?v=20260726-guildtechrebalance2" defer></script>
-  <script src="js/systems/bkmp-runes.js?v=20260728-runeautofix1" defer></script>
+  <script src="js/systems/bkmp-guild.js?v=20260730-clanarena1" defer></script>
+  <script src="js/systems/bkmp-runes.js?v=20260730-runeequipfix1" defer></script>
   <script src="js/systems/bkmp-raid.js?v=20260724-raidsyncfix1" defer></script>
   <script src="js/systems/bkmp-tower.js?v=20260726-stagebarvisfix1" defer></script>
-  <script src="js/systems/bkmp-prestige.js?v=20260728-paragonclarity1" defer></script>
-  <script src="js/systems/bkmp-arena.js?v=20260726-guildtechext1" defer></script>
+  <script src="js/systems/bkmp-prestige.js?v=20260730-autokaufideas1" defer></script>
+  <script src="js/systems/bkmp-arena.js?v=20260730-arenalimitfix1" defer></script>
   <script src="js/systems/bkmp-meister.js?v=20260717-p2bfoundation" defer></script>
   <script src="js/systems/bkmp-skilltree.js?v=20260717-p2bfoundation" defer></script>
   <script src="js/systems/bkmp-cosmetics.js?v=20260724-eslintcleanup1" defer></script>
@@ -1560,7 +1562,7 @@
   <script src="js/systems/bkmp-leaderboard.js?v=20260717-p2cfoundation" defer></script>
   <script src="js/ui/bkmp-ui-components.js?v=20260719-p55b" defer></script>
   <script src="js/ui/bkmp-reward-presenter.js?v=20260719-p55e" defer></script>
-  <script src="idledorf.js?v=20260728-runeautofix1" defer></script>
+  <script src="idledorf.js?v=20260730-clanarena1" defer></script>
   <script src="mapart.js?v=20260717-kartenfirmen1" defer></script>
   <script src="js/core/bkmp-idle-bootstrap.js?v=20260717-p2afoundation" defer></script>
   <script src="js/core/bkmp-site.js?v=20260728-investorpayout3" defer></script>

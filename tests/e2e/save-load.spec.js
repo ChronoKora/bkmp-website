@@ -110,23 +110,14 @@ test.describe('Speichern/Laden', () => {
     await expect(equippedCard).toBeVisible();
     await equippedCard.click();
 
-    // Der offene Balken ueberlappt bei dieser Kartenbreite echte Buttons der
-    // Detailbox (idleRuneEquipBtn) - dieselbe Grundursache wie der bereits
-    // gefixte Tab-Leisten-Overlap (siehe CLAUDE.md Phase 7.2), hier aber
-    // HORIZONTAL statt vertikal und (noch) nicht behoben, da eine echte
-    // Abhilfe die Karten-/Balken-Breitenaufteilung neu gestalten muesste statt
-    // nur die Ankerposition zu verschieben - siehe "Runentest" (eigene Suite)
-    // fuer die volle Untersuchung. Fuer DIESEN Test (Save/Load, nicht Layout)
-    // einfach zuklappen, wie es ein echter Spieler mit dem sichtbaren
-    // "‹"-Pfeil auch koennte, NACHDEM die Rune ausgewaehlt wurde.
-    await page.locator('#idleRuneDrawerToggle').click();
-    // Give the drawer's width/position change a moment to actually settle
-    // before interacting with what's now uncovered - a click dispatched
-    // mid-transition landed on the drawer's own toggle arrow instead of the
-    // real button underneath (found via a screenshot showing Playwright's
-    // click marker several hundred px off from the visible "Entfernen" button).
-    await page.waitForTimeout(300);
-
+    // FIX (30.07.2026, Spieler-Idee OPShadowWolf): der offene Balken ueberlappte
+    // bei dieser Kartenbreite frueher echte Buttons der Detailbox
+    // (idleRuneEquipBtn) - dieselbe Grundursache wie der bereits gefixte
+    // Tab-Leisten-Overlap (Phase 7.2), hier HORIZONTAL statt vertikal.
+    // bkmpRuneSyncDrawerPosition() reserviert jetzt live per CSS-Variable
+    // (--rune-drawer-overlap) exakt so viel Rand-Abstand in der Hauptzeile,
+    // wie tatsaechlich ueberlappt wuerde - der Balken muss dafuer NICHT mehr
+    // extra geschlossen werden, siehe eigener Regressionstest in runes.spec.js.
     const equipBtn = page.locator('#idleRuneEquipBtn');
     await expect(equipBtn).toHaveText('Entfernen', { timeout: 5000 });
     await equipBtn.click();

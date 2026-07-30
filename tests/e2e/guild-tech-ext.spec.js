@@ -218,6 +218,48 @@ test.describe('Gilden-Technologie v2 - Kriegsrat (Arena-Tageslimit)', () => {
     expect(overLimit.ok).toBe(false);
     expect(overLimit.error).toMatch(/Tageslimit/);
   });
+
+  test('Arena-Panel zeigt korrekt uebrige Angriffe auch bei mehr als 15 Angriffen am selben Tag (Spieler-Report BagonTr01 29.07.: "10 Angriffe uebrig" trotz Serverblock)', async ({ page, qaServer }) => {
+    await login(page, qaServer, LEADER_NAME);
+    qaServer.store.tables.guilds.find(g => g.id === 'g1').treasury_gold = 200000000; // 10 Kriegsrat-Raenge kosten insgesamt ~68M
+    await buyTech(page, 'guild_kriegsrat', 10); // +10 -> Limit 20
+    await page.evaluate(() => bkmpGuildRefreshTreasuryBonusCache());
+
+    // 18 erfolgreiche Angriffe - bewusst > 15 (die alte, auf die letzten
+    // 15 geladenen Kaempfe gedeckelte Client-Schaetzung), aber < 20 (das
+    // echte, erweiterte Tageslimit).
+    for (let i = 0; i < 18; i++) {
+      if (i > 0) qaServer.store.clock.advance(3 * 60 * 1000 + 1000);
+      const ok = await page.evaluate(async () => {
+        try { await window.bkmpArenaAttack('qa-ext-member-0000'); return true; }
+        catch (e) { return false; }
+      });
+      expect(ok).toBe(true);
+    }
+
+    // Panel ueber den echten Codepfad neu laden (kein direkter Store-Zugriff).
+    await page.evaluate(() => { bkmpArenaLoaded = false; });
+    await page.evaluate(() => bkmpIdleRenderArenaPanel());
+
+    const state = await page.evaluate(() => ({
+      attacksToday: bkmpArenaAttacksToday,
+      recentBattlesLength: bkmpArenaRecentBattles.length,
+      panelText: document.getElementById('idlePanelArena').textContent
+    }));
+    // Beweis, dass die alte Liste tatsaechlich zu kurz gewesen waere -
+    // ohne diesen Beweis waere der Test kein echter Regressionsnachweis.
+    expect(state.recentBattlesLength).toBe(15);
+    expect(state.attacksToday).toBe(18);
+    expect(state.panelText).toContain('2/20 übrig'); // 20 Limit - 18 verbraucht = 2 uebrig
+
+    // Angriff 19 (noch innerhalb des Limits) muss weiterhin klappen.
+    qaServer.store.clock.advance(3 * 60 * 1000 + 1000);
+    const attack19 = await page.evaluate(async () => {
+      try { await window.bkmpArenaAttack('qa-ext-member-0000'); return true; }
+      catch (e) { return false; }
+    });
+    expect(attack19).toBe(true);
+  });
 });
 
 test.describe('Gilden-Technologie v2 - Stadtmauer (Raid-Stadt-HP-Beitrag)', () => {

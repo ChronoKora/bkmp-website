@@ -4125,7 +4125,15 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
    ausklappbaren Balken am Bildschirmrand (.idle-runen-drawer weiter
    unten) - dadurch bleibt diese Zeile kurz und erfordert praktisch nie
    eigenes Scrollen. */
-.idle-runen-main-row { display: flex; gap: 1.6rem; align-items: flex-start; }
+/* Spieler-Idee (OPShadowWolf, 30.07.2026): --rune-drawer-overlap wird live
+   von bkmpRuneSyncDrawerPosition() (js/systems/bkmp-runes.js) gesetzt, sobald
+   der geoeffnete Lager-Balken auf schmalen Fenstern in die Karte hinein
+   geklemmt werden muss - schiebt die Hauptzeile (inkl. .idle-runen-equip-btn,
+   das per margin-left:auto ganz rechts sitzt) exakt so weit nach links, wie
+   ueberlappt wuerde, damit der Button immer erreichbar bleibt. 0px per
+   Default (Var. noch nie gesetzt bzw. Balken geschlossen), transition synchron
+   zur 0.25s-Breiten-Animation des Balkens selbst. */
+.idle-runen-main-row { display: flex; gap: 1.6rem; align-items: flex-start; padding-right: var(--rune-drawer-overlap, 0px); transition: padding-right 0.25s ease; }
 .idle-runen-main-row .idle-runen-circle-wrap { flex-shrink: 0; margin-bottom: 0; }
 .idle-runen-main-row .idle-runen-stat-box { flex: 1; min-width: 0; margin-bottom: 0; }
 @media (max-width: 720px) {
@@ -6405,6 +6413,17 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
   cursor: pointer;
 }
 .idle-autobuy-toggle input { width: 1.05rem; height: 1.05rem; cursor: pointer; accent-color: var(--gold, #c9a24b); }
+/* Spieler-Idee Fightmaria (28.07.2026): Auto-Kauf laesst sich pro
+   Ressourcentyp ausschliessen (z.B. "alles ausser Gold", waehrend man
+   gezielt darauf spart) - gleiches Chip-Muster wie .idle-runen-bgauto-row. */
+.idle-autobuy-resource-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
+.idle-autobuy-resource-filter-label { font-size: 0.78rem; color: var(--muted); }
+.idle-autobuy-resource-chip {
+  display: flex; align-items: center; gap: 0.35rem;
+  padding: 0.35rem 0.65rem; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--paper); font-size: 0.76rem; cursor: pointer; flex: 0 0 auto;
+}
+.idle-autobuy-resource-chip input { width: 0.9rem; height: 0.9rem; cursor: pointer; accent-color: var(--gold, #c9a24b); }
 /* Nutzer-Screenshot 19.07.: unterste Kartenreihe wirkte zu dicht an der
    Button-Leiste (Als App installieren/Für Streamer/Schließen), die IMMER
    unterhalb des scrollenden .idle-dorf-panel sitzt (siehe dort) - etwas
@@ -6680,6 +6699,17 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 .idle-prestige-paragon-info:hover, .idle-prestige-paragon-info:focus-visible { background: color-mix(in srgb, #c4b5fd 28%, transparent); }
 .idle-prestige-tab-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 14px; height: 14px; padding: 0 3px; margin-left: 0.3rem; border-radius: 999px; background: #f87171; color: #1a0a0a; font-size: 0.62rem; font-weight: 800; vertical-align: middle; }
 .idle-prestige-allocate-btn { margin: 0.4rem 0 0.8rem; }
+/* Spieler-Idee Kaledoss (28.07.2026): Zweig-Reihenfolge fuer "Automatische
+   Verteilung" - kompakte Liste mit Auf/Ab-Knoepfen statt Drag&Drop (robuster,
+   keine zusaetzliche Bibliothek/Accessibility-Sonderbehandlung noetig). */
+.idle-prestige-priority-list { margin: 0.6rem 0; padding: 0.7rem 0.85rem; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+.idle-prestige-priority-label { font-size: 0.78rem; font-weight: 600; color: var(--muted); margin-bottom: 0.5rem; }
+.idle-prestige-priority-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0; font-size: 0.85rem; }
+.idle-prestige-priority-rank { color: var(--muted); width: 1.3rem; flex-shrink: 0; }
+.idle-prestige-priority-name { flex: 1; }
+.idle-prestige-priority-btn { width: 1.8rem; height: 1.8rem; padding: 0; border-radius: 8px; border: 1px solid var(--line); background: var(--paper-2); color: var(--ink); cursor: pointer; font-size: 0.7rem; flex-shrink: 0; }
+.idle-prestige-priority-btn:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
+.idle-prestige-priority-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .idle-prestige-section-ascension { border-color: color-mix(in srgb, #facc15 35%, var(--line)); }
 .idle-ascension-btn { width: 100%; margin-top: 0.4rem; }
 
@@ -6901,6 +6931,10 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
   flex-wrap: wrap;
 }
 .idle-arena-opponent-name { font-weight: 700; color: var(--ink); flex: 1 1 auto; min-width: 100px; }
+/* Clan-Bestenliste (Spieler-Idee Kaledoss, 28.07.2026): hebt die eigene
+   Gilde in der Liste optisch hervor, wiederverwendet .idle-arena-opponent-*
+   fuer Zeilen-Layout/Typografie. */
+.idle-clan-leaderboard-mine { border-color: var(--gold); background: color-mix(in srgb, var(--gold) 10%, var(--paper-2)); }
 .idle-arena-opponent-rating { font-weight: 700; color: #fb923c; }
 .idle-arena-opponent-record { font-size: 0.8rem; color: var(--muted); }
 /* Geschaetzte Gewinnchance (Spieler-Wunsch 21.07., Lilith57 im Minecraft-

@@ -4361,6 +4361,48 @@ async function bkmpArenaGetLeaderboard(limit) {
   }));
 }
 
+/* Echte Tagesangriffs-Zaehlung (29.07.2026, Spieler-Report BagonTr01:
+   "Ich habe noch 10 Angriffe uebrig und bekomme die Meldung dass ich
+   keine mehr habe") - vorher wurde `attacksToday` rein aus den geladenen
+   `bkmpArenaRecentBattles` (fest auf 15 Eintraege gedeckelt) geschaetzt,
+   mit dem Kommentar "reicht, weil ein Tageslimit von 10 locker in 15
+   Kaempfen passt". Seit Kriegsrat (Gilden-Technologie v2, 26.07.) kann
+   das echte Tageslimit aber ueber 15 liegen - sobald ein Spieler an
+   einem Tag mehr als 15x angreift, fallen die AELTESTEN Angriffe des
+   Tages aus dem 15er-Fenster, `attacksToday` blieb dadurch dauerhaft bei
+   15 haengen und `attacksLeft` zeigte faelschlich noch Angriffe uebrig,
+   obwohl der Server (der die ECHTE Anzahl zaehlt, siehe arena_attack())
+   laengst korrekt blockierte. Fix: eigene, ungedeckelte Abfrage seit
+   Tagesbeginn statt einer Schaetzung aus der Anzeige-Liste - bewusst
+   `.select('id')` + `.length` statt `count:'exact', head:true` (letzteres
+   braucht PostgREST's Content-Range-Mechanismus + einen echten HEAD-
+   Request, ein im gesamten restlichen Projekt bisher NIE genutztes,
+   gegen den lokalen Mock ungetestetes Muster - die Zeilenanzahl bleibt
+   pro Spieler/Tag ohnehin klein genug, dass die paar geladenen Spalten
+   nicht ins Gewicht fallen, identisches Abfrage-Muster wie
+   bkmpArenaGetRecentBattles direkt darunter). */
+async function bkmpArenaGetAttacksTodayCount(authUserId) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !authUserId) return 0;
+  const parts = {};
+  new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Berlin', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit' })
+    .formatToParts(new Date()).forEach(p => { if (p.type !== 'literal') parts[p.type] = p.value; });
+  const utcGuess = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), 0, 0, 0);
+  const berlinStr = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Berlin', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(utcGuess));
+  const [datePart, timePart] = berlinStr.replace(',', '').split(' ');
+  const [bm, bd, by] = datePart.split('/').map(Number);
+  const [bh, bmin] = timePart.split(':').map(Number);
+  const berlinAsUtc = Date.UTC(by, bm - 1, bd, bh, bmin, 0);
+  const todayStartMs = utcGuess - (berlinAsUtc - utcGuess);
+  const { data, error } = await client
+    .from('arena_battle_log')
+    .select('id')
+    .eq('attacker_auth_user_id', authUserId)
+    .gte('occurred_at', new Date(todayStartMs).toISOString());
+  if (error) throw error;
+  return (data || []).length;
+}
+
 async function bkmpArenaGetRecentBattles(authUserId, limit) {
   const client = bkmpGetSupabaseClient();
   if (!client || !authUserId) return [];
@@ -4552,6 +4594,163 @@ async function bkmpGuildGetMine() {
       joinedAt: m.joined_at
     }))
   };
+}
+
+/* ---------------- Clan-Bestenliste + Clan-Arena (Spieler-Idee Kaledoss,
+   28.07.2026, Feedback-Board: "Einen Reiter für Clanbestenliste und ne Art
+   Clanarena kämpfe") ----------------
+   Clan-BESTENLISTE braucht keine neue Tabelle/RPC - guilds.guild_xp ist
+   bereits die etablierte, oeffentlich lesbare, indizierte Metrik fuer
+   "wie stark/etabliert ist diese Gilde" (treibt bereits das Gildenlevel).
+   Clan-ARENA (sql/20260730-guild-arena.sql, noch nicht ausgefuehrt) ist ein
+   direkter Guild-Level-Port des laengst bewaehrten Spieler-Arena-Musters -
+   siehe bkmpArenaGetMyRating/-GetOpponents/-Attack/-GetRecentBattles weiter
+   oben fuer die identischen Vorlagen, hier nur auf Gilden-Ebene (Macht =
+   SUMME der Kampfwerte aller aktuellen Mitglieder statt eines einzelnen
+   Spielers). */
+async function bkmpGuildGetLeaderboard(limit) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from('guilds')
+    .select('id, name, tag, guild_xp, member_count')
+    .order('guild_xp', { ascending: false })
+    .limit(limit || 50);
+  if (error) throw error;
+  return (data || []).map(row => ({
+    id: row.id,
+    name: row.name,
+    tag: row.tag,
+    guildXp: Number(row.guild_xp || 0),
+    memberCount: Number(row.member_count || 0)
+  }));
+}
+
+async function bkmpGuildArenaGetMyRating(guildId) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !guildId) return null;
+  const { data, error } = await client
+    .from('guild_ratings')
+    .select('guild_id, rating, wins, losses')
+    .eq('guild_id', guildId)
+    .limit(1);
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : null;
+  return {
+    rating: Number(row ? row.rating : 1000),
+    wins: Number(row ? row.wins : 0),
+    losses: Number(row ? row.losses : 0)
+  };
+}
+
+/* Gegnerauswahl fuer die Clan-Arena: identisches Bootstrap-Prinzip wie beim
+   Spieler-Arena (guild_ratings bekommt eine Zeile erst nach dem ersten
+   Kampf) - deshalb primaer aus guilds selbst lesen (jede Gilde mit
+   mindestens 1 Mitglied ist ein gueltiges Ziel), guild_ratings nur zum
+   Anreichern um echtes Rating/Sieg-Niederlage-Verhaeltnis danebenlegen. */
+async function bkmpGuildArenaGetOpponents(myGuildId, limit) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return [];
+  const selfId = myGuildId || '00000000-0000-0000-0000-000000000000';
+  const { data: guildRows, error: guildError } = await client
+    .from('guilds')
+    .select('id, name, tag, member_count')
+    .neq('id', selfId)
+    .limit(200);
+  if (guildError) throw guildError;
+  const { data: ratingRows, error: ratingError } = await client
+    .from('guild_ratings')
+    .select('guild_id, rating, wins, losses')
+    .neq('guild_id', selfId)
+    .limit(200);
+  if (ratingError) throw ratingError;
+  const ratingById = new Map((ratingRows || []).map(r => [r.guild_id, r]));
+  const pool = (guildRows || []).filter(g => Number(g.member_count || 0) > 0).map(g => {
+    const r = ratingById.get(g.id);
+    return {
+      id: g.id, name: g.name, tag: g.tag, memberCount: Number(g.member_count || 0),
+      rating: Number(r ? r.rating : 1000), wins: Number(r ? r.wins : 0), losses: Number(r ? r.losses : 0)
+    };
+  });
+  // Zufallsauswahl statt strikter Rating-Sortierung - identisches Prinzip
+  // wie bkmpArenaGetOpponents (verhindert, dass immer dieselbe Handvoll
+  // Gilden angezeigt wird).
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, limit || 8);
+}
+
+async function bkmpGuildArenaAttack(targetGuildId) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { data, error } = await client.rpc('guild_arena_attack', { p_target_guild_id: targetGuildId });
+  if (error) {
+    const msg = String(error.message || '');
+    if (msg.includes('insufficient_role')) throw new Error('Nur Anführer/Stellvertreter dürfen die Gilde in die Clan-Arena führen.');
+    if (msg.includes('no_guild')) throw new Error('Du bist in keiner Gilde.');
+    if (msg.includes('cooldown_active')) throw new Error('Diese Gilde wurde schon vor Kurzem angegriffen. Bitte warte etwas.');
+    if (msg.includes('daily_limit_reached')) throw new Error('Deine Gilde hat ihr Tageslimit von 3 Clan-Arena-Angriffen erreicht. Morgen um 0 Uhr geht es weiter.');
+    if (msg.includes('no_combat_stats') || msg.includes('no_defender_guild')) throw new Error('Dieses Ziel hat noch keine Kampf-Daten.');
+    if (msg.includes('invalid_target') || msg.includes('not_authenticated')) throw new Error('Angriff nicht möglich.');
+    throw new Error('Der Clan-Arena-Angriff ist fehlgeschlagen. Bitte versuche es erneut.');
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return null;
+  return {
+    won: !!row.attacker_won,
+    ratingChange: Number(row.rating_change || 0),
+    newRating: Number(row.new_rating || 1000),
+    goldReward: Number(row.gold_reward || 0),
+    defenderGuildName: row.defender_guild_name || ''
+  };
+}
+
+async function bkmpGuildArenaGetRecentBattles(myGuildId, limit) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !myGuildId) return [];
+  const { data, error } = await client
+    .from('guild_battle_log')
+    .select('attacker_guild_id, attacker_guild_name, defender_guild_id, defender_guild_name, attacker_won, rating_change, gold_reward, occurred_at')
+    .or(`attacker_guild_id.eq.${myGuildId},defender_guild_id.eq.${myGuildId}`)
+    .order('occurred_at', { ascending: false })
+    .limit(limit || 15);
+  if (error) throw error;
+  return (data || []).map(row => ({
+    attackerName: row.attacker_guild_name,
+    defenderName: row.defender_guild_name,
+    attackerWon: !!row.attacker_won,
+    ratingChange: Number(row.rating_change || 0),
+    goldReward: Number(row.gold_reward || 0),
+    occurredAt: row.occurred_at,
+    wasAttacker: row.attacker_guild_id === myGuildId
+  }));
+}
+
+/* Echte Tageszaehlung statt einer aus der (auf 15 gedeckelten) Kampf-Liste
+   geschaetzten - lernt direkt aus dem am 30.07. gefundenen Spieler-Arena-Bug
+   (BagonTr01-Report), identisches Vorgehen wie bkmpArenaGetAttacksTodayCount. */
+async function bkmpGuildArenaGetAttacksTodayCount(myGuildId) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !myGuildId) return 0;
+  const parts = {};
+  new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Berlin', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit' })
+    .formatToParts(new Date()).forEach(p => { if (p.type !== 'literal') parts[p.type] = p.value; });
+  const utcGuess = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), 0, 0, 0);
+  const berlinStr = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Berlin', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(utcGuess));
+  const [datePart, timePart] = berlinStr.replace(',', '').split(' ');
+  const [bm, bd, by] = datePart.split('/').map(Number);
+  const [bh, bmin] = timePart.split(':').map(Number);
+  const berlinAsUtc = Date.UTC(by, bm - 1, bd, bh, bmin, 0);
+  const todayStartMs = utcGuess - (berlinAsUtc - utcGuess);
+  const { data, error } = await client
+    .from('guild_battle_log')
+    .select('id')
+    .eq('attacker_guild_id', myGuildId)
+    .gte('occurred_at', new Date(todayStartMs).toISOString());
+  if (error) throw error;
+  return (data || []).length;
 }
 
 /* Gilden-Technologie v2 (26.07.): "Turm-Vorreiter" braucht die hoechste

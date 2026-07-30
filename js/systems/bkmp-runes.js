@@ -1529,9 +1529,32 @@ function bkmpRuneSyncDrawerPosition() {
   const card = document.querySelector('.idle-dorf-overlay .idle-dorf-card');
   if (!drawer || !card || !drawer.classList.contains('visible')) return;
   const rect = card.getBoundingClientRect();
-  const drawerWidth = drawer.offsetWidth || 360;
+  /* Breite bewusst aus der CSS-Formel selbst berechnet (min(320px,84vw)
+     bzw. 78vw unter 640px, siehe style.css .idle-runen-drawer-panel),
+     NICHT ueber drawer.offsetWidth gemessen: eine Messung UNMITTELBAR nach
+     dem classList.toggle('open', ...) faengt die 250ms-Breiten-Transition
+     noch am Startwert ab (0px/nur der Pfeil-Tab), nicht am Zielwert - siehe
+     unten fuer den Grund, warum das ueberhaupt wichtig ist. */
+  const isOpen = drawer.classList.contains('open');
+  const panelWidth = isOpen ? (window.innerWidth <= 640 ? window.innerWidth * 0.78 : Math.min(320, window.innerWidth * 0.84)) : 0;
+  const drawerWidth = 30 + panelWidth; // 30px = .idle-runen-drawer-toggle
   const maxLeft = window.innerWidth - drawerWidth - 8;
-  drawer.style.left = Math.max(0, Math.min(Math.round(rect.right), maxLeft)) + 'px';
+  const left = Math.max(0, Math.min(Math.round(rect.right), maxLeft));
+  drawer.style.left = left + 'px';
+  /* Spieler-Idee (OPShadowWolf, 30.07.2026, Feedback-Board): "Einsetzen"-
+     Button (.idle-runen-equip-btn, sitzt per margin-left:auto ganz rechts
+     in der Detailbox) wird auf schmalen Desktop-Fenstern vom geoeffneten
+     Lager-Balken ueberdeckt, sobald oben "left" auf maxLeft geklemmt werden
+     musste - der Spieler muss den Balken bisher jedes Mal erst schliessen,
+     um den Button zu erreichen. Statt den Button nur um ein paar feste
+     Pixel zu verschieben (haette bei unterschiedlichen Ueberlappungsgroessen
+     nicht zuverlaessig gereicht), bekommt die Hauptzeile per CSS-Variable
+     GENAU so viel rechten Rand-Abstand wie tatsaechlich ueberlappt wird -
+     der Button bleibt dadurch bei JEDER Fensterbreite sichtbar/klickbar,
+     ohne dass der Balken selbst kleiner werden muss. */
+  const overlapPx = isOpen ? Math.max(0, Math.round(rect.right) - left) : 0;
+  const runenPanel = document.getElementById('idlePanelRunen');
+  if (runenPanel) runenPanel.style.setProperty('--rune-drawer-overlap', overlapPx + 'px');
 
   /* Bug-Fix (Playwright-Testbericht 21.07., Phase 7.2): der Balken sass
      bisher fix bei "top:50%" (style.css), also mittig auf der GANZEN
