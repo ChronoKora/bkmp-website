@@ -249,3 +249,47 @@ test.describe('Gilden-Technologie', () => {
     expect(levels.gold).toBe(1);
   });
 });
+
+/* Spieler-Meldung 30.07.2026 (Screenshot: "Kritischer Schaden", Stufe 35/35,
+   Paragon-Rang 5, "+70%") - "Level Paragon hoch aber am Wert ändert sich
+   nichts". Root Cause: bkmpIdleRenderGildeTechPanel()'s "+X%"-Kartenanzeige
+   rechnete bisher direkt "level * tech.perLevel" aus, unabhaengig vom
+   Paragon-Rang - der reale Spieleffekt (bkmpGuildTechBonus(), siehe Test
+   oben "Bonusberechnung...") war nie betroffen, nur diese eine Anzeige.
+   Anders als der Rest dieser Datei (reine RPC-Aufrufe) braucht dieser
+   Beweis eine echte UI-Pruefung - der Bug lebte ausschliesslich in der
+   Render-Funktion, kein bestehender RPC-Test haette ihn je auffangen
+   koennen. */
+test.describe('Gilden-Technologie: Anzeige-Bugfix (Paragon-Bonus in der Karte)', () => {
+  test.beforeEach(async ({}, testInfo) => {
+    test.skip(/^mobile-/.test(testInfo.project.name), 'Nutzt einen echten Desktop-Tab-Klick (#idleTabBtnGildeTech).');
+  });
+
+  test('Kartenanzeige "+X%" aendert sich sichtbar nach einem Paragon-Kauf', async ({ page, qaServer }) => {
+    await login(page, qaServer, LEADER_NAME);
+    qaServer.store.tables.guilds.find(g => g.id === 'g1').treasury_gold = 999999999999;
+    qaServer.store.tables.guild_tech_levels.push({ guild_id: 'g1', tech_id: 'crit_damage', level: 35 });
+
+    await page.locator('#idleTabBtnGildeTech').click();
+    // Die Stufe wurde direkt in den Store injiziert (nicht ueber einen echten
+    // Kauf-RPC) - bkmpGuildTechLevels (Client-Cache) und der localStorage-
+    // Bonus-Cache muessen deshalb hier explizit aufgefrischt werden, sonst
+    // rendert die erste Zeile noch mit dem alten "Stufe 0"-Stand.
+    await page.evaluate(async () => {
+      bkmpGuildTechLevels = await window.bkmpGuildGetTechLevels('g1');
+      await bkmpGuildRefreshTreasuryBonusCache();
+      bkmpIdleRenderGildeTechPanel();
+    });
+
+    const card = page.locator('.idle-guild-tech-card', { hasText: 'Kritischer Schaden' });
+    // Vor dem Fix: bliebe hier fuer immer bei "+70%" stehen, egal wie viele
+    // Paragon-Raenge gekauft werden (35 * 2 = 70, Paragon nie eingerechnet).
+    await expect(card.locator('.idle-guild-tech-bonus')).toHaveText('+70%');
+
+    await card.locator('.idle-guild-tech-paragon-btn').click();
+    await expect.poll(() => page.evaluate(() => bkmpGuildBusy)).toBe(false);
+
+    // 1 Paragon-Rang * (2% Basis-Effekt * 4% Paragon-Anteil) = +0,08% -> 70,08 rundet auf 70,1.
+    await expect(card.locator('.idle-guild-tech-bonus')).toHaveText('+70.1%');
+  });
+});

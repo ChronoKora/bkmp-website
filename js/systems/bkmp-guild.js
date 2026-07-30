@@ -1656,7 +1656,16 @@ async function bkmpIdleRenderGildeTechPanel() {
         const maxed = level >= tech.maxLevel;
         const cost = bkmpGuildTechCostForLevel(level);
         const canAfford = g.treasuryGold >= cost;
-        const bonusDisplay = (level * tech.perLevel).toFixed(1).replace(/\.0$/, '');
+        /* Bugfix (Spieler-Meldung 30.07.2026: "Level Paragon hoch aber am
+           Wert ändert sich nichts") - vorher stand hier direkt "(level *
+           tech.perLevel).toFixed(1)", was den Paragon-Rang komplett
+           ignorierte, obwohl bkmpGuildRefreshTreasuryBonusCache() dessen
+           Beitrag laengst korrekt in den Cache einrechnet (siehe dortige
+           Zeile "total += paragonLevel * bkmpGuildTechParagonEffectPerRank").
+           Der reale Spieleffekt war also nie betroffen, nur diese eine
+           Anzeige - jetzt dieselbe bereits berechnete, Paragon-inklusive
+           Quelle lesen wie jeder andere Aufrufer von bkmpGuildTechBonus(). */
+        const bonusDisplay = bkmpGuildTechBonus(tech.statKey).toFixed(1).replace(/\.0$/, '');
         return `
           <div class="idle-guild-tech-card">
             <div class="idle-guild-tech-icon">${tech.icon}</div>
@@ -1706,7 +1715,12 @@ async function bkmpIdleRenderGildeTechPanel() {
         if (result) {
           bkmpGuildTechLevels[techId] = result.newLevel;
           bkmpGuildState.guild.treasuryGold = result.treasuryGold;
-          bkmpGuildRefreshTreasuryBonusCache();
+          /* War bisher ein "fire-and-forget"-Aufruf (kein await) - die
+             Karte konnte dadurch mit dem noch alten (Paragon-)Bonuswert
+             neu rendern, falls das Netzwerk-Refresh minimal langsamer war
+             als der synchrone Rest dieses Handlers. Jetzt abgewartet, damit
+             die "+X%"-Anzeige direkt nach dem Kauf garantiert aktuell ist. */
+          await bkmpGuildRefreshTreasuryBonusCache();
           const isParagon = techId.endsWith('__paragon');
           const baseTechId = isParagon ? techId.slice(0, -'__paragon'.length) : techId;
           const techDef = BKMP_GUILD_TECH_CATALOG.find(t => t.id === baseTechId) || BKMP_GUILD_TECH_CATALOG_EXT.find(t => t.id === baseTechId);
@@ -1725,6 +1739,15 @@ async function bkmpIdleRenderGildeTechPanel() {
    die 9 STANDARD-Zweige (immer "+X%") sind hier Zaehlwerte (Versuche/
    Kaeufe/Stunden), ein reiner Ein/Aus-Schalter (TOGGLE) und ein von
    externen Live-Daten abhaengiger Wert (Turm-Vorreiter) gemischt. */
+/* Bugfix (Spieler-Meldung 30.07.2026: "Level Paragon hoch aber am Wert
+   ändert sich nichts") - dieselbe Ursache wie beim Bugfix-Kommentar oben bei
+   BKMP_GUILD_TECH_CATALOG: guild_kriegsrat/guild_autokauf/guild_nachtwache
+   sowie der generische Prozent-Fall rechneten bisher direkt "level *
+   effectPerRank" aus, ohne je den Paragon-Rang zu beruecksichtigen - der
+   reale Spieleffekt (bkmpGuildTechBonus()) war davon nie betroffen, nur die
+   Anzeige. guild_turm_vorreiter nutzte bereits korrekt bkmpGuildTechBonus()
+   (einziger Zweig ohne diesen Bug) - jetzt alle Paragon-faehigen Zweige
+   einheitlich ueber dieselbe, bereits Paragon-inklusive Cache-Quelle. */
 function bkmpGuildTechExtBonusDisplay(tech, level) {
   if (tech.id === 'guild_turm_vorreiter') {
     const active = bkmpGuildTechBonus('towerChampionPct');
@@ -1733,10 +1756,10 @@ function bkmpGuildTechExtBonusDisplay(tech, level) {
   if (tech.id === 'guild_streak_schutz' || tech.id === 'guild_willkommenspaket') {
     return level > 0 ? '✅ Aktiv' : '❌ Inaktiv';
   }
-  if (tech.id === 'guild_kriegsrat') return `+${level} Versuch(e)/Tag`;
-  if (tech.id === 'guild_autokauf') return `+${level * tech.effectPerRank} Käufe/Tick`;
-  if (tech.id === 'guild_nachtwache') return `+${(level * tech.effectPerRank).toFixed(1).replace(/\.0$/, '')} Std.`;
-  const pct = (level * tech.effectPerRank).toFixed(1).replace(/\.0$/, '');
+  if (tech.id === 'guild_kriegsrat') return `+${bkmpGuildTechBonus('arenaExtraAttempts').toFixed(2).replace(/\.?0+$/, '')} Versuch(e)/Tag`;
+  if (tech.id === 'guild_autokauf') return `+${bkmpGuildTechBonus('autobuyExtraPurchases').toFixed(2).replace(/\.?0+$/, '')} Käufe/Tick`;
+  if (tech.id === 'guild_nachtwache') return `+${bkmpGuildTechBonus('offlineCapExtraHours').toFixed(1).replace(/\.0$/, '')} Std.`;
+  const pct = bkmpGuildTechBonus(tech.effectType).toFixed(1).replace(/\.0$/, '');
   return `+${pct}%`;
 }
 async function bkmpIdleRenderGildeBossPanel() {

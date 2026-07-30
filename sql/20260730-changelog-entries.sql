@@ -89,3 +89,23 @@ select '2026-07-30', 'feature',
 where not exists (
   select 1 from public.changelog_entries where entry_date = '2026-07-30' and title = 'Gilden-Arena zeigt jetzt eine echte Kampfanimation'
 );
+
+-- ============================================================
+-- Zwei weitere Eintraege desselben Tages (Anti-Cheat-Tempo-Grenze +
+-- Gilden-Technologie-Paragon-Anzeigefix) - gleiches idempotentes Muster.
+-- ============================================================
+insert into public.changelog_entries (entry_date, category, title, description)
+select '2026-07-30', 'fix',
+  'Schutz gegen Tempo-Manipulation (Speedhacks) eingebaut',
+  'Der Server prüft jetzt beim Speichern, ob euer gemeldeter Fortschritt (Kills, Level, Ressourcen) überhaupt zur tatsächlich vergangenen Zeit passt - wer mit manipulierten Browser-Tools künstlich schneller spielt, bekommt davon nichts mehr gutgeschrieben. Normales Spielen, auch nach längerer Abwesenheit, ist davon nicht betroffen.'
+where not exists (
+  select 1 from public.changelog_entries where entry_date = '2026-07-30' and title = 'Schutz gegen Tempo-Manipulation (Speedhacks) eingebaut'
+);
+
+insert into public.changelog_entries (entry_date, category, title, description)
+select '2026-07-30', 'fix',
+  'Gilden-Technologie: Paragon-Bonus wurde in der Kartenanzeige nicht angezeigt',
+  'Paragon-Ränge haben euren Bonus schon immer korrekt erhöht - die Prozentzahl auf der Karte hat das aber nie gezeigt und blieb optisch stehen. Die Anzeige zeigt jetzt bei jedem Paragon-Kauf sofort den echten, aktuellen Wert.'
+where not exists (
+  select 1 from public.changelog_entries where entry_date = '2026-07-30' and title = 'Gilden-Technologie: Paragon-Bonus wurde in der Kartenanzeige nicht angezeigt'
+);
