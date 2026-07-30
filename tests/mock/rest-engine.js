@@ -8,6 +8,7 @@
    reproduced; only the shapes this app's own supabase-js calls rely on. */
 
 const { table: getTable } = require('./store');
+const { applyIdlePlayerStateAntiCheatGuard } = require('./anticheat-guard');
 
 function coerce(raw) {
   if (raw === 'null') return null;
@@ -234,7 +235,29 @@ function handleRestRequest(store, { method, tableName, searchParams, body, heade
 
   if (method === 'PATCH') {
     const matches = applyFilters(rows, searchParams);
-    matches.forEach(row => Object.assign(row, body));
+    matches.forEach(row => {
+      let patchBody = body;
+      /* Anti-Cheat-Tempo-Guard (30.07.2026) - Nachbau des Postgres-Triggers
+         idle_player_state_anticheat_guard(), siehe anticheat-guard.js fuer
+         die volle Begruendung. Nur fuer diese eine Tabelle gescoped, alle
+         anderen PATCH-Ziele bleiben unveraendert. */
+      if (tableName === 'idle_player_state') {
+        const guard = applyIdlePlayerStateAntiCheatGuard(row, body, store.clock.nowMs());
+        patchBody = guard.body;
+        if (guard.flagged) {
+          getTable(store, 'idle_anticheat_flags').push({
+            id: store.nextId(),
+            name_key: row.name_key,
+            flagged_at: store.clock.nowIso(),
+            claimed_dragon_kills_delta: guard.claimedKillsDelta,
+            allowed_dragon_kills_delta: guard.maxKillsDelta,
+            elapsed_seconds: guard.elapsedSeconds,
+            ratio_applied: guard.ratio
+          });
+        }
+      }
+      Object.assign(row, patchBody);
+    });
     return { status: 200, json: applySelect(matches, searchParams, tableName, store) };
   }
 
