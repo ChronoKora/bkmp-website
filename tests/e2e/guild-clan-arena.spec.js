@@ -258,4 +258,53 @@ test.describe('Clan-Tab (UI)', () => {
     const logText = await page.evaluate(() => document.getElementById('idleDorfLog') ? document.getElementById('idleDorfLog').textContent : '');
     expect(logText).toMatch(/Clan-(Sieg|Niederlage)/);
   });
+
+  /* Spieler-Nachfrage 30.07.2026 ("Hatte kein Angriffs Animation?") - neue
+     Kampfanimation (bkmpClanArenaPlayBattleAnimation, js/systems/bkmp-guild.js),
+     Port von bkmpArenaPlayBattleAnimation (Spieler-Arena) mit Gilden-Tag-
+     Abzeichen statt Dorf-Skin-Sprite. Guild A (LEADER_A) besiegt die
+     schwachen Zielgilden zuverlaessig (siehe Machtwerte oben) - garantierter
+     Sieg fuer einen deterministischen Test, ohne den echten arena_attack()-
+     Zufallswurf zu mocken. */
+  test('Kampfanimation zeigt beide Gilden-Tags/-Namen an und endet mit korrektem Sieg-Ergebnis', async ({ page, qaServer }) => {
+    await login(page, qaServer, LEADER_A_NAME);
+    await page.locator('#idleTabBtnClan').click();
+    await page.evaluate(() => bkmpIdleRenderClanPanel());
+    const card = page.locator(`.idle-arena-opponent-card[data-target-guild-id="${WEAK_GUILD_IDS[0]}"]`);
+    await expect(card).toBeVisible();
+    await card.locator('.idle-clan-arena-attack-btn').click();
+
+    const overlay = page.locator('#clanArenaBattleOverlay');
+    await expect(overlay).toHaveClass(/visible/, { timeout: 10000 });
+    await expect(page.locator('#clanArenaBattleMeName')).toContainText('Clan A');
+    await expect(page.locator('#clanArenaBattleMeTag')).toContainText('[CLNA]');
+    await expect(page.locator('#clanArenaBattleOpponentName')).toContainText('Clan Weak 0');
+    await expect(page.locator('#clanArenaBattleOpponentTag')).toContainText('[CW0]');
+
+    // Die Animation selbst dauert ~350ms + 5x420ms + 1100ms Ergebnis-Anzeige (~3.5s) -
+    // grosszuegiger Timeout, danach schliesst sich das Overlay automatisch wieder.
+    await expect(overlay).not.toHaveClass(/visible/, { timeout: 10000 });
+    await expect.poll(() => page.evaluate(() => bkmpClanArenaAttacking)).toBe(null);
+    const logText = await page.evaluate(() => document.getElementById('idleDorfLog') ? document.getElementById('idleDorfLog').textContent : '');
+    expect(logText).toMatch(/Clan-Sieg/); // Guild A ist deutlich staerker als jede WEAK_GUILD - garantierter Sieg.
+  });
+
+  test('Kampfanimation zeigt korrektes Niederlage-Ergebnis, wenn die schwache Gilde die starke angreift', async ({ page, qaServer }) => {
+    // Umgekehrter Fall: ein schwacher Gilden-Anfuehrer greift die deutlich staerkere Guild A an - garantierte Niederlage.
+    await login(page, qaServer, weakLeaderName(1));
+    await page.locator('#idleTabBtnClan').click();
+    await page.evaluate(() => bkmpIdleRenderClanPanel());
+    const card = page.locator(`.idle-arena-opponent-card[data-target-guild-id="${GUILD_A_ID}"]`);
+    await expect(card).toBeVisible();
+    await card.locator('.idle-clan-arena-attack-btn').click();
+
+    const overlay = page.locator('#clanArenaBattleOverlay');
+    await expect(overlay).toHaveClass(/visible/, { timeout: 10000 });
+    await expect(page.locator('#clanArenaBattleMeTag')).toContainText('[CW1]');
+    await expect(page.locator('#clanArenaBattleOpponentTag')).toContainText('[CLNA]');
+    await expect(overlay).not.toHaveClass(/visible/, { timeout: 10000 });
+
+    const logText = await page.evaluate(() => document.getElementById('idleDorfLog') ? document.getElementById('idleDorfLog').textContent : '');
+    expect(logText).toMatch(/Clan-Niederlage/);
+  });
 });

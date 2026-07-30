@@ -146,7 +146,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260730-legimaximize1">
+<link rel="stylesheet" href="style.css?v=20260730-clanbattleanim1">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 </head>
 <body>
@@ -574,6 +574,37 @@
         </div>
       </div>
       <p class="arena-battle-result" id="arenaBattleResult">&nbsp;</p>
+    </div>
+  </div>
+
+  <!-- Clan-Arena-Kampfanimation (Spieler-Wunsch 30.07.2026, Nachbesserung nach
+       Nutzer-Frage "Hatte kein Angriffs Animation?" - die Spieler-Arena hat
+       schon laenger eine, siehe #arenaBattleOverlay oben). Identisches Muster
+       (idle-battlefield/idle-village/idle-hp-bar wiederverwendet), aber KEIN
+       Dorf-Skin-Sprite - eine Gilde hat viele Mitglieder, kein einzelnes
+       "eigenes" Dorf. Stattdessen ein rundes Gilden-Abzeichen mit Tag/Name. -->
+  <div class="joke-overlay zone-game" id="clanArenaBattleOverlay">
+    <div class="joke-card arena-battle-card">
+      <h3>⚔️ Clan-Arena-Kampf</h3>
+      <div class="idle-battlefield arena-battle-field">
+        <div class="idle-village" id="clanArenaBattleMe">
+          <div class="clan-arena-battle-badge" id="clanArenaBattleMeBadge">
+            <span class="clan-arena-battle-badge-icon">🏰</span>
+            <span class="clan-arena-battle-badge-tag" id="clanArenaBattleMeTag"></span>
+          </div>
+          <div class="idle-hp-bar"><div class="idle-hp-fill idle-hp-fill-village" id="clanArenaBattleMeHpFill" style="width:100%"></div></div>
+          <div class="arena-battle-name" id="clanArenaBattleMeName"></div>
+        </div>
+        <div class="idle-village" id="clanArenaBattleOpponent">
+          <div class="clan-arena-battle-badge" id="clanArenaBattleOpponentBadge">
+            <span class="clan-arena-battle-badge-icon">🏰</span>
+            <span class="clan-arena-battle-badge-tag" id="clanArenaBattleOpponentTag"></span>
+          </div>
+          <div class="idle-hp-bar"><div class="idle-hp-fill idle-hp-fill-dragon" id="clanArenaBattleOpponentHpFill" style="width:100%"></div></div>
+          <div class="arena-battle-name" id="clanArenaBattleOpponentName"></div>
+        </div>
+      </div>
+      <p class="arena-battle-result" id="clanArenaBattleResult">&nbsp;</p>
     </div>
   </div>
 
@@ -1548,7 +1579,7 @@
   <script src="js/core/bkmp-combat-math.js?v=20260726-progrebalance1" defer></script>
   <script src="js/systems/bkmp-dungeon.js?v=20260726-progrebalance1" defer></script>
   <script src="js/systems/bkmp-breeding.js?v=20260727-eggdupefix1" defer></script>
-  <script src="js/systems/bkmp-guild.js?v=20260730-clanarena1" defer></script>
+  <script src="js/systems/bkmp-guild.js?v=20260730-clanbattleanim1" defer></script>
   <script src="js/systems/bkmp-runes.js?v=20260730-legimaximize1" defer></script>
   <script src="js/systems/bkmp-raid.js?v=20260724-raidsyncfix1" defer></script>
   <script src="js/systems/bkmp-tower.js?v=20260726-stagebarvisfix1" defer></script>

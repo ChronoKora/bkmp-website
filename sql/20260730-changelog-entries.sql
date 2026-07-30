@@ -77,3 +77,15 @@ select '2026-07-30', 'feature',
 where not exists (
   select 1 from public.changelog_entries where entry_date = '2026-07-30' and title = 'Neuer Button: Legendäre Runen in einem Rutsch auf +15 maximieren'
 );
+
+-- ============================================================
+-- Letzter Eintrag desselben Tages (Clan-Arena-Kampfanimation) - gleiches
+-- idempotentes Muster.
+-- ============================================================
+insert into public.changelog_entries (entry_date, category, title, description)
+select '2026-07-30', 'feature',
+  'Clan-Arena zeigt jetzt eine echte Kampfanimation',
+  'Ein Angriff in der Clan-Arena zeigt jetzt - wie schon von der normalen Arena gewohnt - eine kleine Kampfanimation mit HP-Balken und Schadenszahlen für beide Gilden, bevor das Ergebnis erscheint, statt sofort stumm zum Toast zu springen.'
+where not exists (
+  select 1 from public.changelog_entries where entry_date = '2026-07-30' and title = 'Clan-Arena zeigt jetzt eine echte Kampfanimation'
+);

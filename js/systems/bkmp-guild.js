@@ -1963,6 +1963,72 @@ function bkmpClanRenderLeaderboardHtml(myGuildId) {
     </div>`;
 }
 
+/* Clan-Arena-Kampfanimation (Spieler-Nachfrage 30.07.2026: "Hatte kein
+   Angriffs Animation?" - die Spieler-Arena hat schon seit 14.07. eine, siehe
+   bkmpArenaPlayBattleAnimation in bkmp-arena.js). Identischer Aufbau/Timing
+   (HP-Balken/Hit-Flash/Schadenszahlen, gleiche 5 Ticks à 420ms), aber kein
+   Dorf-Skin-Sprite - eine Gilde hat viele Mitglieder, kein einzelnes
+   "eigenes" Dorf, deshalb ein rundes Tag-Abzeichen statt eines Sprites (siehe
+   #clanArenaBattleOverlay in index.html + .clan-arena-battle-badge in
+   style.css). Das Ergebnis steht serverseitig schon fest (guild_arena_attack()
+   ist eine einzelne, bereits entschiedene RPC) - die Animation spielt nur
+   eine plausible Annaeherung daran ab. */
+function bkmpClanArenaPlayBattleAnimation(myName, myTag, opponentName, opponentTag, won) {
+  return new Promise(resolve => {
+    const overlay = document.getElementById('clanArenaBattleOverlay');
+    if (!overlay) { resolve(); return; }
+    const meFill = document.getElementById('clanArenaBattleMeHpFill');
+    const oppFill = document.getElementById('clanArenaBattleOpponentHpFill');
+    const resultEl = document.getElementById('clanArenaBattleResult');
+    document.getElementById('clanArenaBattleMeName').textContent = myName || 'Eure Gilde';
+    document.getElementById('clanArenaBattleOpponentName').textContent = opponentName || 'Gegner-Gilde';
+    document.getElementById('clanArenaBattleMeTag').textContent = myTag ? `[${myTag}]` : '';
+    document.getElementById('clanArenaBattleOpponentTag').textContent = opponentTag ? `[${opponentTag}]` : '';
+    meFill.style.width = '100%';
+    oppFill.style.width = '100%';
+    resultEl.textContent = ' ';
+    overlay.classList.add('visible');
+
+    const loserFill = won ? oppFill : meFill;
+    const loserId = won ? 'clanArenaBattleOpponent' : 'clanArenaBattleMe';
+    const winnerFill = won ? meFill : oppFill;
+    const winnerId = won ? 'clanArenaBattleMe' : 'clanArenaBattleOpponent';
+    const winnerFinalPct = 30 + Math.round(Math.random() * 40);
+    const ticks = 5;
+    let tick = 0;
+    const spawnDmg = (targetId, isCrit) => {
+      const target = document.getElementById(targetId);
+      if (!target) return;
+      const dmg = document.createElement('span');
+      dmg.className = 'idle-dmg-float' + (isCrit ? ' idle-dmg-crit' : '');
+      dmg.textContent = '-' + Math.round(8 + Math.random() * 30) + (isCrit ? '!' : '');
+      target.appendChild(dmg);
+      window.setTimeout(() => dmg.remove(), 800);
+    };
+    const step = () => {
+      tick++;
+      const loserPct = Math.max(0, Math.round(100 - (100 / ticks) * tick));
+      const winnerPct = tick >= ticks ? winnerFinalPct : Math.max(winnerFinalPct, Math.round(100 - ((100 - winnerFinalPct) / ticks) * tick));
+      loserFill.style.width = loserPct + '%';
+      winnerFill.style.width = winnerPct + '%';
+      if (typeof bkmpIdleSpawnHitFlash === 'function') {
+        bkmpIdleSpawnHitFlash(loserId);
+        if (Math.random() < 0.4) bkmpIdleSpawnHitFlash(winnerId);
+      }
+      spawnDmg(loserId, tick === ticks);
+      if (Math.random() < 0.5) spawnDmg(winnerId, false);
+      if (tick < ticks) {
+        window.setTimeout(step, 420);
+      } else {
+        resultEl.textContent = won ? '🏆 Sieg!' : '💥 Niederlage';
+        resultEl.style.color = won ? '#4ade80' : '#f87171';
+        window.setTimeout(() => { overlay.classList.remove('visible'); resolve(); }, 1100);
+      }
+    };
+    window.setTimeout(step, 350);
+  });
+}
+
 async function bkmpIdleRenderClanPanel() {
   const panel = document.getElementById('idlePanelClan');
   if (!panel) return;
@@ -2029,12 +2095,19 @@ async function bkmpIdleRenderClanPanel() {
     btn.addEventListener('click', async () => {
       const card = btn.closest('[data-target-guild-id]');
       const targetGuildId = card ? card.dataset.targetGuildId : null;
+      const opponent = bkmpClanArenaOpponents.find(g => g.id === targetGuildId);
       if (!targetGuildId || bkmpClanArenaAttacking) return;
       bkmpClanArenaAttacking = targetGuildId;
       bkmpIdleRenderClanPanel();
       try {
         const result = await bkmpGuildArenaAttack(targetGuildId);
         if (result) {
+          const myGuild = bkmpGuildState ? bkmpGuildState.guild : null;
+          await bkmpClanArenaPlayBattleAnimation(
+            myGuild ? myGuild.name : 'Eure Gilde', myGuild ? myGuild.tag : '',
+            result.defenderGuildName, opponent ? opponent.tag : '',
+            result.won
+          );
           const msg = result.won
             ? `⚔️ Clan-Sieg gegen ${result.defenderGuildName}! +${result.ratingChange} Rating, +${bkmpIdleFormatNumber(result.goldReward)} 💰 in die Kasse (jetzt ${result.newRating})`
             : `⚔️ Clan-Niederlage gegen ${result.defenderGuildName}. ${result.ratingChange} Rating (jetzt ${result.newRating})`;

@@ -7370,6 +7370,23 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 .arena-battle-field { margin: 1.2rem 0; min-height: 340px; }
 .arena-battle-name { font-weight: 700; font-size: 1.15rem; margin-top: 0.6rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .arena-battle-result { font-weight: 700; font-size: 1.4rem; min-height: 1.4em; margin-top: 0.6rem; }
+
+/* Clan-Arena-Kampfabzeichen (30.07.2026) - Ersatz fuer .idle-village-sprite
+   (Dorf-Skin-Bild) in #clanArenaBattleOverlay: eine Gilde hat kein einzelnes
+   Dorf, daher ein rundes Abzeichen mit Tag statt eines Sprites. Sitzt wie
+   .idle-village-sprite direkt in .idle-village, teilt sich dieselbe
+   Hit-Flash/Schadenszahlen-Logik (bkmpIdleSpawnHitFlash zielt auf den
+   .idle-village-Wrapper, nicht auf den Sprite/das Abzeichen selbst). */
+.clan-arena-battle-badge {
+  width: 100%; max-width: 240px; aspect-ratio: 1 / 1; margin: 0 auto;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.3rem;
+  border-radius: 50%; border: 3px solid var(--gold);
+  background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--gold) 20%, var(--paper)), var(--paper-2));
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.3));
+  padding: 0.8rem;
+}
+.clan-arena-battle-badge-icon { font-size: clamp(2rem, 6vw, 3.2rem); line-height: 1; }
+.clan-arena-battle-badge-tag { font-family: 'Fraunces', serif; font-weight: 700; font-size: clamp(0.95rem, 2.6vw, 1.3rem); color: var(--gold); text-align: center; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .skillhelp-list {
   display: flex;
   flex-direction: column;
