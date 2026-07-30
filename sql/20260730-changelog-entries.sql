@@ -45,3 +45,35 @@ select '2026-07-30', 'feature',
 where not exists (
   select 1 from public.changelog_entries where entry_date = '2026-07-30' and title = 'Neuer Tab: Clan-Bestenliste & Clan-Arena'
 );
+
+-- ============================================================
+-- Zwei weitere, spaeter am selben Tag fertiggestellte Eintraege
+-- (sw.js-Robustheit + Prestige-Panel-Umbau) - gleiches idempotentes Muster.
+-- ============================================================
+insert into public.changelog_entries (entry_date, category, title, description)
+select '2026-07-30', 'fix',
+  'Seltener Ladefehler bei installierter App-Version behoben',
+  'In seltenen Fällen konnte ein kurzer Netzwerk-Aussetzer (z.B. bei einem Neuladen mitten im Laden) bei der "Als App installieren"-Version zu einer unschönen Fehlermeldung führen, statt einfach normal weiterzumachen. Das ist jetzt behoben.'
+where not exists (
+  select 1 from public.changelog_entries where entry_date = '2026-07-30' and title = 'Seltener Ladefehler bei installierter App-Version behoben'
+);
+
+insert into public.changelog_entries (entry_date, category, title, description)
+select '2026-07-30', 'change',
+  'Prestige-Baum direkt sichtbar statt weit unten versteckt',
+  'Der Baum zum Verteilen eurer Prestige-Punkte stand bisher ganz unten im Prestige-Bereich, hinter viel Erklärtext - ihr musstet erst weit scrollen. Jetzt seht ihr den Baum sofort; die Erklärungen (was beim Aufstieg zurückgesetzt wird / erhalten bleibt, nächster Durchlauf, Meilensteine) findet ihr eingeklappt direkt darunter zum Aufklappen.'
+where not exists (
+  select 1 from public.changelog_entries where entry_date = '2026-07-30' and title = 'Prestige-Baum direkt sichtbar statt weit unten versteckt'
+);
+
+-- ============================================================
+-- Ein weiterer, spaeter am selben Tag fertiggestellter Eintrag (neuer
+-- Runen-Sammel-Button "Auf +15 maximieren") - gleiches idempotentes Muster.
+-- ============================================================
+insert into public.changelog_entries (entry_date, category, title, description)
+select '2026-07-30', 'feature',
+  'Neuer Button: Legendäre Runen in einem Rutsch auf +15 maximieren',
+  'Im Runen-Lager gibt es jetzt einen "⚡ Auf +15 maximieren"-Knopf, der alle unausgerüsteten Legendären des aktuellen Rüstungsplatzes automatisch bis +15 aufwertet - gleiche Gold-Kosten und Fehlschlagchance wie beim manuellen Aufwerten, nur ohne dutzendfaches Klicken nach einer längeren AFK-Pause.'
+where not exists (
+  select 1 from public.changelog_entries where entry_date = '2026-07-30' and title = 'Neuer Button: Legendäre Runen in einem Rutsch auf +15 maximieren'
+);

@@ -366,6 +366,50 @@ function bkmpRuneInstantUpgrade(cid) {
   bkmpIdleQueueSync();
 }
 
+/* Spieler-Idee BagonTr01 (30.07.2026, Feedback-Board): "mehrere Legendäre
+   Runen gleichzeitig auf +15 maximieren" statt jede einzeln durchzuklicken -
+   nach einer AFK-Phase kann das laut Spieler "teilweise ne Stunde" dauern.
+   Ergaenzt (ersetzt NICHT) die bereits bestehende Prestige-gated Hintergrund-
+   Automatik "Auto-Legi-Aufwertung" (bkmpRuneRunBackgroundLegiUpgrade,
+   verarbeitet nur eine Rune pro 10s-Tick - bei einem grossen Rueckstau
+   entsprechend langsam): dieser Button macht dieselbe Aktion (identische
+   Kosten/Fehlschlagchance wie manuelles Klicken, ueber die bereits
+   bestehende bkmpRuneInstantUpgrade() pro Rune - keine zweite Kopie der
+   Kosten-/Fehlschlag-/Substat-Formeln) sofort in einem Rutsch fuer ALLE
+   unausgeruesteten Legendaeren des aktuell offenen Ruestungsplatzes,
+   unabhaengig vom Prestige-Knoten. Fetcht bewusst frisch vom Server
+   (bkmpGetStoredMeltableRunes, gleiches Prinzip wie Auto-Schmelzen/Lager-
+   aufraeumen) statt aus dem potenziell auf 300 Zeilen gekappten lokalen
+   Bestand - sonst koennte der Button bei einem grossen Lager genau die
+   Runen uebersehen, die der Spieler eigentlich meint (siehe Runenverlust-
+   Fund vom 25.07. fuer die gleiche Bugklasse). */
+async function bkmpRuneMaximizeLegendarySlot() {
+  if (!bkmpIdleState) return;
+  const slot = window.BKMP_RUNE_SLOTS.find(s => s.id === bkmpRuneActiveSlotTab);
+  if (!slot) return;
+  let freshCandidates;
+  try {
+    freshCandidates = await bkmpGetStoredMeltableRunes({ runeType: slot.id, rarity: 'gold' });
+  } catch (e) {
+    console.warn('Auf +15 maximieren: Laden fehlgeschlagen.', e);
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('⚠️ Legendäre konnten nicht geladen werden - versuch es gleich nochmal.', 3000);
+    return;
+  }
+  const localIds = new Set(bkmpIdlePlayerRunes.filter(r => r.id).map(r => r.id));
+  freshCandidates.forEach(r => {
+    if (!localIds.has(r.id)) bkmpIdlePlayerRunes.push({ ...r, _cid: r.id });
+  });
+  const cids = freshCandidates.filter(r => Number(r.upgrade_level || 0) < BKMP_RUNE_MAX_LEVEL).map(r => r.id);
+  if (!cids.length) {
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`Keine unausgerüsteten ${slot.name} (Legendär) unter +15 im Lager.`, 2600);
+    return;
+  }
+  /* bkmpRuneInstantUpgrade() rendert/loggt/toastet pro Rune bereits vollstaendig
+     selbst (siehe dortiger Kommentar) - kein zusaetzlicher Sammel-Toast noetig,
+     die Reihe an Einzel-Rueckmeldungen macht bereits klar sichtbar, was passiert ist. */
+  cids.forEach(cid => bkmpRuneInstantUpgrade(cid));
+}
+
 /* Substat-Reroll (Lategame-Content, Spieler-Vorgabe 16.07.): bisher gab es
    KEINERLEI Moeglichkeit, einen bereits vorhandenen Sub-Stat neu zu wuerfeln
    - einmal (bei Drop/Verschmelzung/Meilenstein) gewuerfelt, fuer immer so.
@@ -2133,6 +2177,11 @@ function bkmpIdleRenderRunenPanel() {
     return sum + Math.floor(c / 3);
   }, 0);
   const autoAscendPairCount = bkmpRuneAutoAscendPairs(slotOwned).length;
+  /* Spieler-Idee BagonTr01 (30.07.2026): siehe bkmpRuneMaximizeLegendarySlot()-
+     Kommentar. Gleicher lokaler-Schaetzwert-Vorbehalt wie autoFuseGroupCount/
+     autoAscendPairCount oben - der echte Klick holt trotzdem frisch vom
+     Server nach. */
+  const legendaryUnmaxedCount = slotOwned.filter(r => r.rarity === 'gold' && !r.equipped && Number(r.upgrade_level || 0) < BKMP_RUNE_MAX_LEVEL).length;
   /* Bugfix 25.07.2026 (siehe idledorf.js's Ladeblock-Kommentar): Hinweis-
      Banner, sobald das ungenutzte Lager an der Ladeobergrenze haengt (also
      sicher noch mehr Runen in der Datenbank liegen als hier angezeigt) oder
@@ -2171,6 +2220,9 @@ function bkmpIdleRenderRunenPanel() {
         </button>
         <button type="button" class="btn-nein idle-runen-autoascend-btn" id="idleRuneAutoAscendBtn" ${autoAscendPairCount ? '' : 'disabled'} title="Aufstieg für alle passenden Legendäre-Paare gleicher Stufe (ab +${BKMP_RUNE_MAX_LEVEL}) auf einmal.">
           🌟 Auto-Aufstieg (${autoAscendPairCount})
+        </button>
+        <button type="button" class="btn-nein idle-runen-maximize-legi-btn" id="idleRuneMaximizeLegiBtn" ${legendaryUnmaxedCount ? '' : 'disabled'} title="Wertet alle unausgerüsteten Legendären dieses Rüstungsplatzes automatisch bis +15 auf - gleiche Kosten/Fehlschlagchance wie beim manuellen Aufwerten, nur ohne wiederholtes Klicken.">
+          ⚡ Auf +15 maximieren (${legendaryUnmaxedCount})
         </button>
         <button type="button" class="btn-nein idle-runen-sell-all-btn" id="idleRuneSellAllBtn" ${unequippedSlotCount ? '' : 'disabled'}>
           💰 Alle verkaufen (${unequippedSlotCount})
@@ -2245,6 +2297,8 @@ function bkmpIdleRenderRunenPanel() {
   if (autoFuseBtn) autoFuseBtn.addEventListener('click', bkmpRuneAutoFuseAll);
   const autoAscendBtn = document.getElementById('idleRuneAutoAscendBtn');
   if (autoAscendBtn) autoAscendBtn.addEventListener('click', bkmpRuneAutoAscendAll);
+  const maximizeLegiBtn = document.getElementById('idleRuneMaximizeLegiBtn');
+  if (maximizeLegiBtn) maximizeLegiBtn.addEventListener('click', bkmpRuneMaximizeLegendarySlot);
   const runenHelpBtn = document.getElementById('idleRunenHelpBtn');
   if (runenHelpBtn) runenHelpBtn.addEventListener('click', bkmpIdleOpenRunenHelp);
   const saveLoadoutBtn = document.getElementById('idleRuneSaveLoadoutBtn');
