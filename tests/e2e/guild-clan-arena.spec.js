@@ -233,8 +233,8 @@ test.describe('Clan-Tab (UI)', () => {
   test('zeigt Bestenliste + Beitritts-Hinweis fuer Spieler ohne Gilde, Arena fuer Mitglieder', async ({ page, qaServer }) => {
     await login(page, qaServer, weakLeaderName(1)); // hat bereits eine eigene Gilde - Gegenbeweis siehe naechster Test
     await page.locator('#idleTabBtnClan').click();
-    await expect(page.locator('#idlePanelClan')).toContainText('Clan-Bestenliste');
-    await expect(page.locator('#idlePanelClan')).toContainText('Clan-Arena');
+    await expect(page.locator('#idlePanelClan')).toContainText('Gilden-Bestenliste');
+    await expect(page.locator('#idlePanelClan')).toContainText('Gilden-Arena');
   });
 
   test('Angreifen-Button ist fuer ein normales Mitglied deaktiviert', async ({ page, qaServer }) => {
@@ -256,7 +256,7 @@ test.describe('Clan-Tab (UI)', () => {
     await card.locator('.idle-clan-arena-attack-btn').click();
     await expect.poll(() => page.evaluate(() => bkmpClanArenaAttacking)).toBe(null);
     const logText = await page.evaluate(() => document.getElementById('idleDorfLog') ? document.getElementById('idleDorfLog').textContent : '');
-    expect(logText).toMatch(/Clan-(Sieg|Niederlage)/);
+    expect(logText).toMatch(/Gilden-(Sieg|Niederlage)/);
   });
 
   /* Spieler-Nachfrage 30.07.2026 ("Hatte kein Angriffs Animation?") - neue
@@ -286,7 +286,7 @@ test.describe('Clan-Tab (UI)', () => {
     await expect(overlay).not.toHaveClass(/visible/, { timeout: 10000 });
     await expect.poll(() => page.evaluate(() => bkmpClanArenaAttacking)).toBe(null);
     const logText = await page.evaluate(() => document.getElementById('idleDorfLog') ? document.getElementById('idleDorfLog').textContent : '');
-    expect(logText).toMatch(/Clan-Sieg/); // Guild A ist deutlich staerker als jede WEAK_GUILD - garantierter Sieg.
+    expect(logText).toMatch(/Gilden-Sieg/); // Guild A ist deutlich staerker als jede WEAK_GUILD - garantierter Sieg.
   });
 
   test('Kampfanimation zeigt korrektes Niederlage-Ergebnis, wenn die schwache Gilde die starke angreift', async ({ page, qaServer }) => {
@@ -305,6 +305,6 @@ test.describe('Clan-Tab (UI)', () => {
     await expect(overlay).not.toHaveClass(/visible/, { timeout: 10000 });
 
     const logText = await page.evaluate(() => document.getElementById('idleDorfLog') ? document.getElementById('idleDorfLog').textContent : '');
-    expect(logText).toMatch(/Clan-Niederlage/);
+    expect(logText).toMatch(/Gilden-Niederlage/);
   });
 });

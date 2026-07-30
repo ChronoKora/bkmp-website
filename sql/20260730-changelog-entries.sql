@@ -40,10 +40,10 @@ where not exists (
 
 insert into public.changelog_entries (entry_date, category, title, description)
 select '2026-07-30', 'feature',
-  'Neuer Tab: Clan-Bestenliste & Clan-Arena',
-  'Ein neuer Bereich "Clan" zeigt eine Bestenliste aller Gilden nach Erfahrung sowie die neue Clan-Arena: Anführer und Stellvertreter können damit die eigene Gilde gegen andere Gilden ins Rennen schicken (bis zu 3x pro Tag) - ein Sieg füllt die gemeinsame Gildenkasse.'
+  'Neuer Tab: Gilden-Arena (Bestenliste & Gilde-gegen-Gilde-Kämpfe)',
+  'Ein neuer Bereich "Gilden-Arena" zeigt eine Bestenliste aller Gilden nach Erfahrung sowie Gilde-gegen-Gilde-Kämpfe: Anführer und Stellvertreter können damit die eigene Gilde gegen andere Gilden ins Rennen schicken (bis zu 3x pro Tag) - ein Sieg füllt die gemeinsame Gildenkasse.'
 where not exists (
-  select 1 from public.changelog_entries where entry_date = '2026-07-30' and title = 'Neuer Tab: Clan-Bestenliste & Clan-Arena'
+  select 1 from public.changelog_entries where entry_date = '2026-07-30' and title = 'Neuer Tab: Gilden-Arena (Bestenliste & Gilde-gegen-Gilde-Kämpfe)'
 );
 
 -- ============================================================
@@ -84,8 +84,8 @@ where not exists (
 -- ============================================================
 insert into public.changelog_entries (entry_date, category, title, description)
 select '2026-07-30', 'feature',
-  'Clan-Arena zeigt jetzt eine echte Kampfanimation',
-  'Ein Angriff in der Clan-Arena zeigt jetzt - wie schon von der normalen Arena gewohnt - eine kleine Kampfanimation mit HP-Balken und Schadenszahlen für beide Gilden, bevor das Ergebnis erscheint, statt sofort stumm zum Toast zu springen.'
+  'Gilden-Arena zeigt jetzt eine echte Kampfanimation',
+  'Ein Angriff in der Gilden-Arena zeigt jetzt - wie schon von der normalen Arena gewohnt - eine kleine Kampfanimation mit HP-Balken und Schadenszahlen für beide Gilden, bevor das Ergebnis erscheint, statt sofort stumm zum Toast zu springen.'
 where not exists (
-  select 1 from public.changelog_entries where entry_date = '2026-07-30' and title = 'Clan-Arena zeigt jetzt eine echte Kampfanimation'
+  select 1 from public.changelog_entries where entry_date = '2026-07-30' and title = 'Gilden-Arena zeigt jetzt eine echte Kampfanimation'
 );

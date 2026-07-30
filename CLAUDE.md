@@ -951,6 +951,16 @@ Direkte Nachbesserung nach Spieler-Nachfrage (Screenshot des ersten echten Clan-
 
 Cache-Busting `?v=20260730-clanbattleanim1` für `js/systems/bkmp-guild.js` (index.html/admin.html/idle-stream-mini.html) und `style.css` (alle 5 HTML-Dateien).
 
+## Umbenennung "Clan" → "Gilden-Arena" (30.07.2026)
+
+Direkter Nutzerwunsch nach der Kampfanimations-Nachbesserung: "kannst du es dann 'Gilden Arena' nennen bitte?" - das gesamte Spiel nutzt sonst durchgehend "Gilde" (Gilde-Tab, Gilden-Tech, Gildenboss, Gildenkasse), nur dieses neue Feature hieß bisher "Clan" - Terminologie-Inkonsistenz behoben.
+
+**Umsetzung:** ausschließlich sichtbare Spieler-Texte umbenannt - Tab-Button "🏆 Clan" → "🏆 Gilden-Arena" (index.html + idle-stream-mini.html), Panel-Überschriften "🏆 Clan"/"⚔️ Clan-Arena"/"🏆 Clan-Bestenliste" → "🏆 Gilden-Arena"/"⚔️ Gilden-Arena"/"🏆 Gilden-Bestenliste", Kampfanimations-Overlay-Titel "⚔️ Clan-Arena-Kampf" → "⚔️ Gilden-Arena-Kampf", Sieg/Niederlage-Toast+Log-Texte, Ladehinweis, Fehlermeldung. **Bewusst NICHT umbenannt:** interne Funktions-/Variablen-/CSS-Klassen-/ID-Namen (`bkmpClan*`, `.idle-clan-arena-*`, `#idlePanelClan`, `#clanArenaBattleOverlay` usw.) - reine interne Bezeichner, die kein Spieler je sieht, eine vollständige mechanische Umbenennung über HTML/CSS/JS/Tests hinweg hätte nur Risiko ohne sichtbaren Nutzen gebracht. Die noch nicht ausgeführten öffentlichen Changelog-SQL-Einträge (`sql/20260730-changelog-entries.sql`) wurden entsprechend mit angepasst, bevor sie ausgeführt werden.
+
+**Verifiziert:** ein Test hing an der alten sichtbaren Textzeichenkette (`toContainText('Clan-Bestenliste')`/`toMatch(/Clan-Sieg/)` usw.) - alle 4 betroffenen Assertions in `tests/e2e/guild-clan-arena.spec.js` auf die neuen Texte umgestellt. Voller Regressionslauf danach: 35 bestanden, 10 korrekt übersprungen, alle 3 Projekte. `node --check` sauber.
+
+Cache-Busting `?v=20260730-guildarenarename1` für `js/systems/bkmp-guild.js` (index.html/admin.html/idle-stream-mini.html) und `style.css` (alle 5 HTML-Dateien).
+
 ## Architektur-Entscheidungen (siehe Plan-Datei für vollständige Begründung)
 
 - **Kein Bundler, keine ES-Module.** idledorf.js wird in mehrere klassische globale `<script>`-Dateien mit fester Ladereihenfolge zerlegt (`/js/systems/*.js`), nicht in ES-Module — 418 globale Funktionen + 156 geteilte veränderliche Variablen + Live-Geld-Fluss (Stripe) ohne Tests machen einen Bundler/ESM-Umbau zu riskant. Neue globale Funktionen folgen der bestehenden `bkmpXxx`-Namenskonvention.
