@@ -1157,6 +1157,57 @@ async function bkmpAscensionConfirmAndExecute() {
   await bkmpAscensionExecute();
 }
 
+/* Spieler-Beschwerde (30.07.2026, Screenshot): der eigentliche Baum zum
+   Punkte-Ausgeben stand bisher ganz am Ende des Panels, hinter acht reinen
+   Info-Bloecken ("Du erhaeltst"/Reset-Keep-Spalten/Naechster Durchlauf/
+   Meilensteine/ggf. Aufstieg/ggf. Auto-Kauf-Prioritaet) - "30 Meter scrollen
+   fuer die Punktevergabe". Fix: der Baum steht jetzt direkt unter dem
+   Fortschrittsbalken, die vier reinen Erklaer-Bloecke wandern in ein
+   einziges, standardmaessig EINGEKLAPPTES Akkordeon darunter (Zustand pro
+   Browser gemerkt). Kein Sicherheitsverlust vor dem eigentlichen Aufstieg -
+   der bereits bestehende zweistufige Bestaetigungsdialog
+   (bkmpPrestigeOpenConfirmFlow) zeigt dieselbe Reset/Bleibt-erhalten-Liste
+   ohnehin ein zweites Mal, bevor der Aufstieg tatsaechlich ausgefuehrt wird. */
+const BKMP_PRESTIGE_INFO_EXPANDED_KEY = 'bkmp-idle-prestige-info-expanded';
+function bkmpPrestigeInfoExpanded() {
+  try { return localStorage.getItem(BKMP_PRESTIGE_INFO_EXPANDED_KEY) === '1'; } catch (e) { return false; }
+}
+function bkmpPrestigeSetInfoExpanded(expanded) {
+  try { localStorage.setItem(BKMP_PRESTIGE_INFO_EXPANDED_KEY, expanded ? '1' : '0'); } catch (e) {}
+}
+function bkmpPrestigeRenderInfoAccordionHtml(preview, spentPoints) {
+  const expanded = bkmpPrestigeInfoExpanded();
+  return `
+    <div class="idle-prestige-section idle-prestige-info-accordion">
+      <button type="button" class="idle-prestige-info-toggle" id="idlePrestigeInfoToggleBtn" aria-expanded="${expanded ? 'true' : 'false'}" aria-controls="idlePrestigeInfoBody">
+        <span>ℹ️ Was passiert beim Aufstieg?</span>
+        <span class="idle-prestige-info-toggle-chevron" aria-hidden="true">${expanded ? '▲' : '▼'}</span>
+      </button>
+      <div class="idle-prestige-info-body" id="idlePrestigeInfoBody"${expanded ? '' : ' hidden'}>
+        <div class="idle-prestige-section idle-prestige-section-gain">
+          <div class="idle-upgrade-section-title">Du erhältst</div>
+          <div class="idle-prestige-gain-highlight">+${bkmpIdleFormatNumber(preview.pointsGained)} Prestige-Punkte <span class="idle-prestige-gain-arrow">&rarr; neuer dauerhafter Bonus +${preview.nextBonusPct}%</span></div>
+          ${!preview.eligible ? `<p class="idle-prestige-hint">Verfügbar, sobald du Drachen-Stufe ${bkmpIdleFormatStage(preview.requiredStage)} erreichst.</p>` : ''}
+        </div>
+        <div class="idle-prestige-columns">
+          <div class="idle-prestige-section idle-prestige-section-reset">
+            <div class="idle-upgrade-section-title idle-upgrade-section-title-reset">Wird zurückgesetzt</div>
+            ${bkmpPrestigeRenderInfoList(bkmpPrestigeResetItems(preview))}
+          </div>
+          <div class="idle-prestige-section idle-prestige-section-keep">
+            <div class="idle-upgrade-section-title idle-upgrade-section-title-keep">Bleibt erhalten</div>
+            ${bkmpPrestigeRenderInfoList(bkmpPrestigeKeepItems(preview))}
+          </div>
+        </div>
+        <div class="idle-prestige-section idle-prestige-section-next">
+          <div class="idle-upgrade-section-title">Nächster Durchlauf</div>
+          <p class="idle-prestige-next-note">Der übernächste Aufstieg benötigt Drachen-Stufe ${bkmpIdleFormatStage(preview.nextRequiredStage)} (+50 gegenüber jetzt) - dein dann bereits höherer dauerhafter Bonus macht diesen kommenden Lauf spürbar schneller als den aktuellen.</p>
+        </div>
+        ${bkmpPrestigeRenderMilestonesSectionHtml(spentPoints)}
+      </div>
+    </div>`;
+}
+
 function bkmpIdleRenderPrestigePanel() {
   const panel = document.getElementById('idlePanelPrestige');
   if (!panel || !bkmpIdleState) return;
@@ -1191,41 +1242,19 @@ function bkmpIdleRenderPrestigePanel() {
         : `<p class="idle-prestige-hint">Erreiche Drachen-Stufe ${bkmpIdleFormatStage(requiredStage)}, um dauerhaft aufsteigen zu können.</p>`}
     </div>
 
-    <div class="idle-prestige-section idle-prestige-section-gain">
-      <div class="idle-upgrade-section-title">Du erhältst</div>
-      <div class="idle-prestige-gain-highlight">+${bkmpIdleFormatNumber(preview.pointsGained)} Prestige-Punkte <span class="idle-prestige-gain-arrow">&rarr; neuer dauerhafter Bonus +${preview.nextBonusPct}%</span></div>
-      ${!eligible ? `<p class="idle-prestige-hint">Verfügbar, sobald du Drachen-Stufe ${bkmpIdleFormatStage(requiredStage)} erreichst.</p>` : ''}
-    </div>
-
-    <div class="idle-prestige-columns">
-      <div class="idle-prestige-section idle-prestige-section-reset">
-        <div class="idle-upgrade-section-title idle-upgrade-section-title-reset">Wird zurückgesetzt</div>
-        ${bkmpPrestigeRenderInfoList(bkmpPrestigeResetItems(preview))}
-      </div>
-      <div class="idle-prestige-section idle-prestige-section-keep">
-        <div class="idle-upgrade-section-title idle-upgrade-section-title-keep">Bleibt erhalten</div>
-        ${bkmpPrestigeRenderInfoList(bkmpPrestigeKeepItems(preview))}
-      </div>
-    </div>
-
-    <div class="idle-prestige-section idle-prestige-section-next">
-      <div class="idle-upgrade-section-title">Nächster Durchlauf</div>
-      <p class="idle-prestige-next-note">Der übernächste Aufstieg benötigt Drachen-Stufe ${bkmpIdleFormatStage(preview.nextRequiredStage)} (+50 gegenüber jetzt) - dein dann bereits höherer dauerhafter Bonus macht diesen kommenden Lauf spürbar schneller als den aktuellen.</p>
-    </div>
-
-    ${bkmpPrestigeRenderMilestonesSectionHtml(spentPoints)}
-    ${bkmpAscensionMilestoneUnlocked() ? bkmpAscensionRenderSectionHtml() : ''}
-    ${typeof bkmpPrestigeBonus === 'function' && bkmpPrestigeBonus('auto_prestige_allocate_unlock') > 0
-      ? `${bkmpPrestigeRenderAutoAllocatePriorityHtml()}<button type="button" class="btn-nein idle-prestige-allocate-btn" id="idlePrestigeAutoAllocateBtn">🧭 Empfohlene Verteilung (verfügbare Punkte automatisch ausgeben)</button>`
-      : ''}
-
     <div class="idle-upgrade-section-title">Permanenter Bonusbaum</div>
     <div class="idle-prestige-branch-tabs">${BKMP_PRESTIGE_BRANCHES.map(b => {
       const unlocked = bkmpPrestigeBranchUnlocked(b.id);
       const active = bkmpPrestigeActiveBranch() === b.id;
-      return `<button type="button" class="idle-prestige-branch-tab${active ? ' active' : ''}${unlocked ? '' : ' is-locked'}" data-prestige-branch="${b.id}" ${unlocked ? '' : 'title="Noch gesperrt - siehe Meilensteine oben"'}>${b.icon} ${escapeHtml(b.name)}${unlocked ? '' : ' 🔒'}</button>`;
+      return `<button type="button" class="idle-prestige-branch-tab${active ? ' active' : ''}${unlocked ? '' : ' is-locked'}" data-prestige-branch="${b.id}" ${unlocked ? '' : 'title="Noch gesperrt - siehe Meilensteine unten bei \\"Was passiert beim Aufstieg?\\""'}>${b.icon} ${escapeHtml(b.name)}${unlocked ? '' : ' 🔒'}</button>`;
     }).join('')}</div>
     ${bkmpPrestigeRenderBranchGridHtml(alloc, available)}
+
+    ${bkmpPrestigeRenderInfoAccordionHtml(preview, spentPoints)}
+    ${bkmpAscensionMilestoneUnlocked() ? bkmpAscensionRenderSectionHtml() : ''}
+    ${typeof bkmpPrestigeBonus === 'function' && bkmpPrestigeBonus('auto_prestige_allocate_unlock') > 0
+      ? `${bkmpPrestigeRenderAutoAllocatePriorityHtml()}<button type="button" class="btn-nein idle-prestige-allocate-btn" id="idlePrestigeAutoAllocateBtn">🧭 Empfohlene Verteilung (verfügbare Punkte automatisch ausgeben)</button>`
+      : ''}
   `;
   const prestigeBtn = document.getElementById('idlePrestigeBtn');
   if (prestigeBtn) prestigeBtn.addEventListener('click', bkmpIdlePerformPrestige);
@@ -1237,6 +1266,11 @@ function bkmpIdleRenderPrestigePanel() {
       bkmpUiWireTooltipTrigger(btn, tip);
     });
   }
+  const infoToggleBtn = document.getElementById('idlePrestigeInfoToggleBtn');
+  if (infoToggleBtn) infoToggleBtn.addEventListener('click', () => {
+    bkmpPrestigeSetInfoExpanded(!bkmpPrestigeInfoExpanded());
+    bkmpIdleRenderPrestigePanel();
+  });
   const autoAllocateBtn = document.getElementById('idlePrestigeAutoAllocateBtn');
   if (autoAllocateBtn) autoAllocateBtn.addEventListener('click', bkmpPrestigeAutoAllocate);
   panel.querySelectorAll('.idle-prestige-priority-btn').forEach(btn => btn.addEventListener('click', () => {

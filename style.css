@@ -6713,6 +6713,18 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 .idle-prestige-section-ascension { border-color: color-mix(in srgb, #facc15 35%, var(--line)); }
 .idle-ascension-btn { width: 100%; margin-top: 0.4rem; }
 
+/* Spieler-Beschwerde (30.07.2026): der Punkte-Baum stand hinter acht reinen
+   Info-Bloecken versteckt ("30 Meter scrollen"). Die vier Erklaer-Bloecke
+   (Du erhaeltst/Reset-Keep/Naechster Durchlauf/Meilensteine) leben jetzt
+   standardmaessig eingeklappt in diesem Akkordeon UNTER dem Baum, statt
+   permanent davor zu stehen - siehe bkmpPrestigeRenderInfoAccordionHtml(). */
+.idle-prestige-info-accordion { padding: 0; overflow: hidden; }
+.idle-prestige-info-toggle { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; width: 100%; padding: 0.9rem 1rem; border: none; background: transparent; color: var(--ink); font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
+.idle-prestige-info-toggle:hover, .idle-prestige-info-toggle:focus-visible { color: var(--gold); }
+.idle-prestige-info-toggle-chevron { flex-shrink: 0; opacity: 0.65; font-size: 0.75em; }
+.idle-prestige-info-body { padding: 0 1rem 1rem; }
+.idle-prestige-info-body .idle-prestige-section:last-child { margin-bottom: 0; }
+
 /* ---- Section C (18.07.): Prestige-Bestaetigungsdialog (2-stufig, siehe
    #idlePrestigeConfirmOverlay in index.html - ein Overlay, zwei per
    [data-step] umgeschaltete .idle-prestige-confirm-step-Bloecke). ---- */
