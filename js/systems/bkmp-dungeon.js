@@ -85,6 +85,25 @@ function bkmpDungeonDifficultyIndex(difficultyId) {
   return idx >= 0 ? idx : 0;
 }
 const BKMP_DUNGEON_KEY_MAX = 5;
+/* Bugfix (Spieler-Meldung 30.07.2026: "Dungeon schlüssel funktioniert nicht
+   so gut", Screenshot zeigte "Schlüssel: 7/5" - mehr Schlüssel im Bestand
+   als das angezeigte Maximum). Root Cause: BKMP_DUNGEON_KEY_MAX war ueberall
+   im Client eine feste Konstante (5), obwohl der Prestige-Knoten
+   "Schlüsselbund" (dungeon_key_cap_bonus) das echte Maximum serverseitig
+   laengst korrekt erhoeht (dungeon_get_all_status()/dungeon_consume_key(),
+   siehe sql/20260727-fix-dungeon-regen-fixed-slots-and-wire-prestige.sql) -
+   die RPC gibt den berechneten v_max_keys aber nie als eigene Spalte zurueck,
+   der Client muss ihn deshalb selbst aus demselben Prestige-Bonus ableiten,
+   den bkmpPrestigeBonus() fuer JEDEN anderen Knoten ohnehin schon liefert.
+   Server-Formel (dort per floor(...)::int) 1:1 nachgebildet. Betraf nicht
+   nur die Anzeige: bkmpDungeonStartCountdownTicker() nutzte dieselbe feste
+   Konstante, um zu entscheiden, ob der Countdown ueberhaupt noch weiterlaeuft
+   - sobald der Bestand die alte Konstante (5) ueberschritt, blieb der
+   Countdown fuer diesen Dungeon-Typ komplett stehen. */
+function bkmpDungeonEffectiveKeyMax() {
+  const bonus = typeof bkmpPrestigeBonus === 'function' ? bkmpPrestigeBonus('dungeon_key_cap_bonus') : 0;
+  return BKMP_DUNGEON_KEY_MAX + Math.floor(Number(bonus) || 0);
+}
 
 /* Serverseitiger Status (Schluessel/Tagesbonus/Freischaltung/Statistik, siehe
    dungeon_get_all_status() in supabase-dungeon-system-v2.sql) pro Typ - wird
@@ -612,10 +631,11 @@ async function bkmpDungeonRefreshStatus() {
 }
 
 function bkmpDungeonKeyLineHtml(status) {
-  const keysFull = status.keys >= BKMP_DUNGEON_KEY_MAX;
+  const effectiveMax = bkmpDungeonEffectiveKeyMax();
+  const keysFull = status.keys >= effectiveMax;
   return keysFull
-    ? `🔑 Schlüssel: ${status.keys}/${BKMP_DUNGEON_KEY_MAX}<br>✓ Schlüssel vollständig aufgeladen`
-    : `🔑 Schlüssel: ${status.keys}/${BKMP_DUNGEON_KEY_MAX}<br>Nächster Schlüssel in: ${bkmpDungeonFormatCountdown(status.secondsToNext)}`;
+    ? `🔑 Schlüssel: ${status.keys}/${effectiveMax}<br>✓ Schlüssel vollständig aufgeladen`
+    : `🔑 Schlüssel: ${status.keys}/${effectiveMax}<br>Nächster Schlüssel in: ${bkmpDungeonFormatCountdown(status.secondsToNext)}`;
 }
 
 /* Bug-Fix (Spieler-Meldung 18.07., Screenshot "Nächster Schlüssel in:
@@ -642,7 +662,7 @@ function bkmpDungeonStartCountdownTicker() {
     let anyReachedZero = false;
     BKMP_DUNGEON_TYPES.forEach(type => {
       const status = bkmpDungeonStatusByType[type.id];
-      if (!status || status.keys >= BKMP_DUNGEON_KEY_MAX) return;
+      if (!status || status.keys >= bkmpDungeonEffectiveKeyMax()) return;
       status.secondsToNext = Math.max(0, Number(status.secondsToNext || 0) - 1);
       if (status.secondsToNext <= 0) { anyReachedZero = true; return; }
       const el = document.getElementById('idle-dungeon-keys-' + type.id);
@@ -653,7 +673,7 @@ function bkmpDungeonStartCountdownTicker() {
 }
 
 function bkmpDungeonRenderCard(type, busy) {
-  const status = bkmpDungeonStatusByType[type.id] || { keys: BKMP_DUNGEON_KEY_MAX, secondsToNext: 0, dailyBonusAvailable: true, highestDifficulty: 'leicht', totalCompletions: 0, totalDefeats: 0 };
+  const status = bkmpDungeonStatusByType[type.id] || { keys: bkmpDungeonEffectiveKeyMax(), secondsToNext: 0, dailyBonusAvailable: true, highestDifficulty: 'leicht', totalCompletions: 0, totalDefeats: 0 };
   const selectedId = bkmpDungeonSelectedDifficultyByType[type.id] || 'leicht';
   const unlockedIdx = bkmpDungeonDifficultyIndex(status.highestDifficulty);
   const selected = BKMP_DUNGEON_DIFFICULTIES.find(d => d.id === selectedId) || BKMP_DUNGEON_DIFFICULTIES[0];
@@ -1338,7 +1358,7 @@ function bkmpIdleRenderDungeonPanel() {
   panel.innerHTML = `
     <div class="idle-dungeon-intro">
       <h4>🏛️ Dungeon-System</h4>
-      <p>7 spezialisierte Dungeons, jeder mit eigenem Schlüssel-Vorrat (max. ${BKMP_DUNGEON_KEY_MAX}, +1 zu festen Uhrzeiten: 0, 4, 8, 12, 16 und 20 Uhr - läuft auch offline korrekt weiter) und eigenem Tagesbonus (+50% auf die erste erfolgreiche Runde pro Tag). Wähle einen Dungeon und eine Schwierigkeit - jede Schwierigkeit schaltet sich erst nach dem Meistern der vorherigen frei.</p>
+      <p>7 spezialisierte Dungeons, jeder mit eigenem Schlüssel-Vorrat (max. ${bkmpDungeonEffectiveKeyMax()}, +1 zu festen Uhrzeiten: 0, 4, 8, 12, 16 und 20 Uhr - läuft auch offline korrekt weiter) und eigenem Tagesbonus (+50% auf die erste erfolgreiche Runde pro Tag). Wähle einen Dungeon und eine Schwierigkeit - jede Schwierigkeit schaltet sich erst nach dem Meistern der vorherigen frei.</p>
       <p class="idle-dungeon-seasonal-hint">⭐ Diese Woche im Rampenlicht: <b>${seasonalType.icon} ${seasonalType.name}</b> - +${Math.round((BKMP_DUNGEON_SEASONAL_BONUS_MULT - 1) * 100)}% auf Gold/EXP/Fleisch/Frucht/Edelsteine bei Erfolg.</p>
     </div>
     <div class="idle-dungeon-type-grid">

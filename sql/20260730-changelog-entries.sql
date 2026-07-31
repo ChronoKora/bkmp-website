@@ -109,3 +109,31 @@ select '2026-07-30', 'fix',
 where not exists (
   select 1 from public.changelog_entries where entry_date = '2026-07-30' and title = 'Gilden-Technologie: Paragon-Bonus wurde in der Kartenanzeige nicht angezeigt'
 );
+
+-- ============================================================
+-- Zwei weitere Eintraege vom 31.07.2026 (Tooltip-Form + Dungeon-
+-- Schluessel-Anzeige) - gleiches idempotentes Muster.
+-- ============================================================
+insert into public.changelog_entries (entry_date, category, title, description)
+select '2026-07-31', 'fix',
+  'Info-Tooltips hatten eine unschöne, sehr schmale Form',
+  'Die kleinen Erklär-Tooltips (z.B. beim Paragon-Hinweis im Prestige-Baum) zeigten sich bisher als schmale Spalte mit einem Wort pro Zeile statt eines normalen Kastens. Sie erscheinen jetzt als sauberes Rechteck.'
+where not exists (
+  select 1 from public.changelog_entries where entry_date = '2026-07-31' and title = 'Info-Tooltips hatten eine unschöne, sehr schmale Form'
+);
+
+insert into public.changelog_entries (entry_date, category, title, description)
+select '2026-07-31', 'fix',
+  'Dungeon-Schlüsselanzeige zeigte trotz Schlüsselbund-Bonus noch die alte Obergrenze',
+  'Mit dem Prestige-Knoten "Schlüsselbund" konntet ihr mehr als 5 Schlüssel pro Dungeon-Typ sammeln - die Anzeige zeigte aber weiterhin "X/5" statt eurer echten, höheren Grenze, und der Countdown bis zum nächsten Schlüssel blieb dabei sogar stehen. Beides ist jetzt korrekt.'
+where not exists (
+  select 1 from public.changelog_entries where entry_date = '2026-07-31' and title = 'Dungeon-Schlüsselanzeige zeigte trotz Schlüsselbund-Bonus noch die alte Obergrenze'
+);
+
+insert into public.changelog_entries (entry_date, category, title, description)
+select '2026-07-31', 'change',
+  'Prestige-Knoten "Schlüsselbund": Maximalrang von 50 auf 3 gesenkt',
+  'Der Knoten war mit 50 einzelnen Rängen für seinen eher kleinen Effekt unnötig grindig. Er lässt sich jetzt nur noch bis Rang 3 normal ausbauen (Bonus pro Rang unverändert) - danach greift wie bei anderen vollen Knoten der Paragon-Ausbau. Bereits investierte höhere Ränge bleiben unangetastet voll wirksam.'
+where not exists (
+  select 1 from public.changelog_entries where entry_date = '2026-07-31' and title = 'Prestige-Knoten "Schlüsselbund": Maximalrang von 50 auf 3 gesenkt'
+);

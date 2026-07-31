@@ -11327,6 +11327,13 @@ html.bkmp-app-mode .idle-app-more-sheet-group-title:first-child {
   border-radius: var(--radius-sm);
   padding: 0.4rem 0.6rem;
   font-size: var(--font-size-xs);
+  /* Bugfix (Spieler-Meldung 30.07.2026, Screenshot: "sieht dumm aus") - ohne
+     eine echte width schrumpft ein position:absolute-Element per "shrink-
+     to-fit" auf die Breite seines laengsten WORTES statt vernuenftig
+     umzubrechen (jedes Wort landete in einer eigenen Zeile). width:max-
+     content + max-width sorgt fuer eine natuerliche Breite bis zur Grenze,
+     erst danach wird normal umgebrochen. */
+  width: max-content;
   max-width: 240px;
   white-space: normal;
   text-align: center;

@@ -144,7 +144,15 @@ const BKMP_PRESTIGE_UPGRADES = [
      nicht gelaufen ist). Schluesselmeister-Deckel bei 95% (nie 0/negatives
      Intervall) - siehe Kommentar in der SQL-Datei. */
   { id: 'schluesselmeister', branch: 'runen_dungeon', name: 'Schlüsselmeister', desc: '+3% schnellere Schlüssel-Regeneration pro Rang (max. 95%).', icon: '🗝️', effectType: 'dungeon_key_regen_speed_pct', effectPerRank: 3, ...bkmpPrestigeTierDef('MEDIUM') },
-  { id: 'schluesselbund', branch: 'runen_dungeon', name: 'Schlüsselbund', desc: '+1 maximale Dungeon-Schlüssel pro Rang.', icon: '🎒', effectType: 'dungeon_key_cap_bonus', effectPerRank: 1, ...bkmpPrestigeTierDef('WEAK') },
+  /* Nutzerwunsch 31.07.2026 ("maximal 3 lvl"): reiner Grind-Fix, nur
+     maxRank gesenkt (50->3), effectPerRank/Kosten-Basis unveraendert -
+     identisches Override-Muster wie bereits bei 'runenmeister' unten
+     (maxRank:15). Bereits vor der Aenderung investierte hoehere Raenge
+     (z.B. Rang 10) bleiben unangetastet voll wirksam (rank*effectPerRank
+     in bkmpPrestigeEffectTotals() kennt keine maxRank-Kappung) - nur
+     weitere NORMALE Kaeufe ueber Rang 3 hinaus sind nicht mehr moeglich,
+     danach greift automatisch der bestehende Paragon-Pfad. */
+  { id: 'schluesselbund', branch: 'runen_dungeon', name: 'Schlüsselbund', desc: '+1 maximale Dungeon-Schlüssel pro Rang.', icon: '🎒', effectType: 'dungeon_key_cap_bonus', effectPerRank: 1, ...bkmpPrestigeTierDef('WEAK', { maxRank: 3 }) },
   { id: 'sparsamer_eintritt', branch: 'runen_dungeon', name: 'Sparsamer Eintritt', desc: '+1% Chance, dass ein Dungeon-Lauf keinen Schlüssel verbraucht, pro Rang.', icon: '🚪', effectType: 'dungeon_key_save_chance_pct', effectPerRank: 1, ...bkmpPrestigeTierDef('SPECIAL') },
   { id: 'bosskammer', branch: 'runen_dungeon', name: 'Bosskammer', desc: '+2% zusätzlicher Bonus auf den bestehenden "vollständiger Erfolg"-Multiplikator pro Rang.', icon: '👹', effectType: 'dungeon_success_bonus_pct', effectPerRank: 2, ...bkmpPrestigeTierDef('MEDIUM') },
   { id: 'seltene_funde', branch: 'runen_dungeon', name: 'Seltene Funde', desc: '+1% zusätzliche Chance auf ein episches/legendäres Ei oder eine seltene Rune im Dungeon pro Rang.', icon: '✨', effectType: 'dungeon_rare_find_bonus_pct', effectPerRank: 1, ...bkmpPrestigeTierDef('MEDIUM') },

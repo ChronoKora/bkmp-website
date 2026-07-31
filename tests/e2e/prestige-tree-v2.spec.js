@@ -159,4 +159,45 @@ test.describe('Prestige-Baum v2: Struktur/Kosten/Paragon/Meilensteine (Teststand
     expect(result.attackAt30).toBe(result.attackAt30Again); // deterministisch, kein Drift bei wiederholtem Aufruf
     expect(result.milestoneTotals25.attack_pct).toBe(2); // Meilenstein 25 gibt +2% Angriff
   });
+
+  /* Nutzerwunsch 31.07.2026 ("maximal 3 lvl" beim Schluesselbund-Skill,
+     siehe Dungeon-Schluessel-Anzeigefix in CLAUDE.md) - reiner Grind-Fix,
+     maxRank 50->3, effectPerRank/Kosten-Basis unveraendert. */
+  test('Schluesselbund: Maximalrang auf 3 gesenkt, weitere normale Kaeufe darueber hinaus blockiert, bereits hoehere Bestandsraenge bleiben voll wirksam', async ({ page, qaBaseURL, fixtureData }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+
+    const maxRank = await page.evaluate(() => bkmpPrestigeNodeById('schluesselbund').maxRank);
+    expect(maxRank).toBe(3);
+
+    // Genug Punkte fuer weit mehr als 3 Raenge - der Kauf muss trotzdem bei Rang 3 stoppen.
+    const buyResult = await page.evaluate(() => {
+      bkmpPrestigeState.prestige_allocations.schluesselbund = 0;
+      bkmpPrestigeState.prestige_points = 100000;
+      bkmpPrestigeState.prestige_points_spent = 0;
+      for (let i = 0; i < 6; i++) bkmpPrestigeBuyUpgrade('schluesselbund');
+      return {
+        rank: bkmpPrestigeState.prestige_allocations.schluesselbund,
+        spent: bkmpPrestigeState.prestige_points_spent
+      };
+    });
+    expect(buyResult.rank).toBe(3);
+    const spentAfterThreeRanks = buyResult.spent;
+
+    // Ein siebter Kaufversuch (bereits am Cap) darf weder den Rang noch die ausgegebenen Punkte veraendern.
+    const afterExtraAttempt = await page.evaluate(() => {
+      bkmpPrestigeBuyUpgrade('schluesselbund');
+      return { rank: bkmpPrestigeState.prestige_allocations.schluesselbund, spent: bkmpPrestigeState.prestige_points_spent };
+    });
+    expect(afterExtraAttempt.rank).toBe(3);
+    expect(afterExtraAttempt.spent).toBe(spentAfterThreeRanks);
+
+    // Migrationsbeweis: ein VOR der Aenderung bereits hoeherer Rang (z.B. 10, siehe Nutzer-Screenshot
+    // "Rang 10/50") bleibt unveraendert voll wirksam - keine Kappung des bereits erspielten Bonus.
+    const legacyRank = await page.evaluate(() => {
+      bkmpPrestigeState.prestige_allocations = { schluesselbund: 10 };
+      return bkmpPrestigeEffectTotals(bkmpPrestigeState.prestige_allocations).dungeon_key_cap_bonus;
+    });
+    expect(legacyRank).toBe(10);
+  });
 });

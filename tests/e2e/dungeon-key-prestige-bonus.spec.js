@@ -84,6 +84,57 @@ test.describe('Dungeon-Schluessel: Schluesselmeister/Schluesselbund-Verdrahtung 
     expect(await page.evaluate(() => bkmpDungeonStatusByType.gold.keys)).toBe(25);
   });
 
+  /* 30.07.2026 - Spieler-Meldung ("Dungeon schluessel funktioniert nicht so
+     gut", Screenshot zeigte "Ei-Dungeon Schluessel: 7/5") - der obige Test
+     bewies bereits, dass der SERVER korrekt bis 25 akkumuliert. Der Bug lag
+     ausschliesslich auf der CLIENT-Anzeige-Seite: bkmpDungeonKeyLineHtml()/
+     bkmpDungeonStartCountdownTicker() nutzten bisher die alte feste
+     BKMP_DUNGEON_KEY_MAX=5-Konstante statt bkmpDungeonEffectiveKeyMax() -
+     zeigte "7/5" statt "7/25" UND liess den Sekunden-Countdown fuer diesen
+     Dungeon-Typ dauerhaft einfrieren, sobald der Bestand ueber 5 stieg
+     (siehe Kommentar an bkmpDungeonStartCountdownTicker() in
+     js/systems/bkmp-dungeon.js). Dieser Test prueft explizit die ANZEIGE
+     und den TICKER, nicht nur den bereits bewiesenen Server-Wert. */
+  test('REGRESSION: Anzeige + Countdown-Ticker nutzen den echten (Schluesselbund-inklusiven) Maximalwert statt der alten festen "5"', async ({ page, qaBaseURL, fixtureData, store }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    setPrestigeAllocations(store, fixtureData.nameKey, { schluesselbund: 10 }); // 5 Basis + 10*1 = 15
+    // bkmpPrestigeState ist ein beim Login einmalig geladener Client-Cache
+    // (anders als der Server-RPC oben, der bei jedem Aufruf frisch aus der
+    // DB liest) - muss nach dem direkten Store-Eingriff explizit
+    // nachgezogen werden, sonst saehe bkmpDungeonEffectiveKeyMax() weiterhin
+    // die alte, beim Login geladene Zuteilung.
+    await page.evaluate(async (nameKey) => { bkmpPrestigeState = await loadIdlePrestigeState(nameKey); }, fixtureData.nameKey);
+    await page.locator('#idleTabBtnDungeon').click();
+    await refreshDungeonStatus(page);
+
+    const effectiveMax = await page.evaluate(() => bkmpDungeonEffectiveKeyMax());
+    expect(effectiveMax).toBe(15);
+
+    // Kartentext zeigt den echten, hoeheren Maximalwert statt der alten "5" -
+    // Bestand absichtlich auf 7 gesetzt (exakt das im Bugreport gezeigte
+    // Muster "7/5") und neu gerendert.
+    await page.evaluate(() => { bkmpDungeonStatusByType.gold.keys = 7; bkmpIdleRenderDungeonPanel(); });
+    const keyLineText = await page.locator('#idle-dungeon-keys-gold').innerText();
+    expect(keyLineText).toContain('7/15');
+    expect(keyLineText).not.toContain('7/5');
+
+    // Der Einleitungstext im Panel-Kopf nennt ebenfalls den echten Maximalwert.
+    const introText = await page.locator('.idle-dungeon-intro').innerText();
+    expect(introText).toContain('max. 15');
+
+    // REGRESSION: der Countdown-Ticker darf bei 7 Schluesseln (> alte feste
+    // Konstante 5, aber < neuer Maximalwert 15) NICHT mehr einfrieren -
+    // vorher stoppte die Sekunden-Anzeige fuer diesen Typ dauerhaft, sobald
+    // der Bestand ueber 5 lag.
+    await page.evaluate(() => {
+      bkmpDungeonStatusByType.gold.secondsToNext = 6;
+      bkmpDungeonStartCountdownTicker();
+    });
+    await page.waitForTimeout(1300); // echter 1s-Tick des Ticker-Intervalls
+    const secondsAfterTick = await page.evaluate(() => bkmpDungeonStatusByType.gold.secondsToNext);
+    expect(secondsAfterTick).toBeLessThan(6);
+  });
+
   test('Paragon-Raenge zaehlen anteilig mit (Schluesselmeister Maximalrang + 10 Paragon-Raenge = 91,2%)', async ({ page, qaBaseURL, fixtureData, store }) => {
     await openAndLogin(page, qaBaseURL, fixtureData);
     setPrestigeAllocations(store, fixtureData.nameKey, { schluesselmeister: 30, schluesselmeister__paragon: 10 });
