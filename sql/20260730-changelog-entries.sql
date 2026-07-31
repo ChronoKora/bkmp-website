@@ -132,8 +132,8 @@ where not exists (
 
 insert into public.changelog_entries (entry_date, category, title, description)
 select '2026-07-31', 'change',
-  'Prestige-Knoten "Schlüsselbund": Maximalrang von 50 auf 3 gesenkt',
-  'Der Knoten war mit 50 einzelnen Rängen für seinen eher kleinen Effekt unnötig grindig. Er lässt sich jetzt nur noch bis Rang 3 normal ausbauen (Bonus pro Rang unverändert) - danach greift wie bei anderen vollen Knoten der Paragon-Ausbau. Bereits investierte höhere Ränge bleiben unangetastet voll wirksam.'
+  'Prestige-Knoten "Schlüsselbund": Maximalrang auf 3 vereinheitlicht, Paragon entfernt',
+  'Der Knoten war mit 50 einzelnen Rängen für seinen eher kleinen Effekt unnötig grindig - er lässt sich jetzt für ALLE Spieler einheitlich nur noch bis Rang 3 ausbauen (Bonus pro Rang unverändert, kein Paragon-Ausbau mehr für diesen Knoten). Wer vorher schon mehr investiert hatte, bekommt die überschüssig ausgegebenen Prestige-Punkte automatisch beim nächsten Login zurückerstattet - fair für alle, egal wie viel vorher schon investiert war.'
 where not exists (
-  select 1 from public.changelog_entries where entry_date = '2026-07-31' and title = 'Prestige-Knoten "Schlüsselbund": Maximalrang von 50 auf 3 gesenkt'
+  select 1 from public.changelog_entries where entry_date = '2026-07-31' and title = 'Prestige-Knoten "Schlüsselbund": Maximalrang auf 3 vereinheitlicht, Paragon entfernt'
 );

@@ -161,9 +161,15 @@ test.describe('Prestige-Baum v2: Struktur/Kosten/Paragon/Meilensteine (Teststand
   });
 
   /* Nutzerwunsch 31.07.2026 ("maximal 3 lvl" beim Schluesselbund-Skill,
-     siehe Dungeon-Schluessel-Anzeigefix in CLAUDE.md) - reiner Grind-Fix,
-     maxRank 50->3, effectPerRank/Kosten-Basis unveraendert. */
-  test('Schluesselbund: Maximalrang auf 3 gesenkt, weitere normale Kaeufe darueber hinaus blockiert, bereits hoehere Bestandsraenge bleiben voll wirksam', async ({ page, qaBaseURL, fixtureData }) => {
+     siehe Dungeon-Schluessel-Anzeigefix in CLAUDE.md) - maxRank 50->3,
+     effectPerRank/Kosten-Basis unveraendert. Das "bereits hoehere Bestands-
+     raenge bleiben unangetastet"-Verhalten aus der ersten Fassung wurde
+     NOCH AM SELBEN TAG per Fairness-Nachbesserung durch eine echte
+     Rueckerstattungs-Migration ersetzt (siehe die beiden Tests direkt
+     darunter) - dieser Test prueft nur noch den reinen Kauf-Stopp bei
+     Rang 3 fuer NEUE Kaeufe, nicht mehr das (inzwischen ueberholte)
+     Bestandsschutz-Verhalten. */
+  test('Schluesselbund: Maximalrang auf 3 gesenkt, weitere normale Kaeufe darueber hinaus blockiert', async ({ page, qaBaseURL, fixtureData }) => {
     await openAndLogin(page, qaBaseURL, fixtureData);
     await waitForDragonReady(page);
 
@@ -192,12 +198,99 @@ test.describe('Prestige-Baum v2: Struktur/Kosten/Paragon/Meilensteine (Teststand
     expect(afterExtraAttempt.rank).toBe(3);
     expect(afterExtraAttempt.spent).toBe(spentAfterThreeRanks);
 
-    // Migrationsbeweis: ein VOR der Aenderung bereits hoeherer Rang (z.B. 10, siehe Nutzer-Screenshot
-    // "Rang 10/50") bleibt unveraendert voll wirksam - keine Kappung des bereits erspielten Bonus.
-    const legacyRank = await page.evaluate(() => {
-      bkmpPrestigeState.prestige_allocations = { schluesselbund: 10 };
-      return bkmpPrestigeEffectTotals(bkmpPrestigeState.prestige_allocations).dungeon_key_cap_bonus;
+    // Paragon wurde fuer diesen Knoten bewusst komplett entfernt (Fairness-Nachbesserung).
+    const paragonEligible = await page.evaluate(() => bkmpPrestigeParagonEligible(bkmpPrestigeNodeById('schluesselbund')));
+    expect(paragonEligible).toBe(false);
+  });
+
+  /* Nachtrag 31.07.2026 (Fairness-Nachbesserung auf Nutzerwunsch, siehe
+     Kommentar am Knoten): anders als der urspruengliche Plan (Bestandsraenge
+     bleiben grandfathered) sollen ALLE Spieler einheitlich bei Rang 3 landen,
+     ueberschuessige Punkte (normale Raenge UND die zwischenzeitlich per
+     Paragon investierten) werden zurueckerstattet statt behalten. */
+  test('Schluesselbund-Downgrade-Migration: bereits hoeherer Rang + Paragon-Raenge werden auf 3 gekappt, exakte Rueckerstattung, idempotent bei erneutem Aufruf', async ({ page, qaBaseURL, fixtureData }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+
+    const result = await page.evaluate(() => {
+      const def = bkmpPrestigeNodeById('schluesselbund');
+      // Simuliert einen Spieler mit Rang 10 (vor der Grind-Reduktion investiert)
+      // UND 3 Paragon-Raengen (kurzzeitig nach dem ersten maxRank-Fix erreichbar,
+      // bevor Paragon fuer diesen Knoten wieder entfernt wurde - exakt der im
+      // Nutzer-Screenshot gezeigte Fall).
+      let refundExpected = 0;
+      for (let r = def.maxRank + 1; r <= 10; r++) refundExpected += bkmpPrestigeUpgradeCost(def, r);
+      for (let p = 1; p <= 3; p++) refundExpected += bkmpPrestigeParagonCost(def, p);
+
+      bkmpPrestigeState.prestige_allocations = { schluesselbund: 10, schluesselbund__paragon: 3 };
+      bkmpPrestigeState.prestige_points_spent = 100000; // deutlich ueber dem erwarteten Refund, damit max(0,...) nie greift
+      const spentBefore = bkmpPrestigeState.prestige_points_spent;
+
+      bkmpPrestigeMigrateSchluesselbundDowngrade();
+      const afterFirst = {
+        rank: bkmpPrestigeState.prestige_allocations.schluesselbund,
+        paragon: bkmpPrestigeState.prestige_allocations.schluesselbund__paragon,
+        spent: bkmpPrestigeState.prestige_points_spent,
+        bonus: bkmpPrestigeEffectTotals(bkmpPrestigeState.prestige_allocations).dungeon_key_cap_bonus
+      };
+
+      // Zweiter Aufruf (z.B. beim naechsten Laden) darf nichts mehr veraendern - idempotent.
+      bkmpPrestigeMigrateSchluesselbundDowngrade();
+      const afterSecond = {
+        rank: bkmpPrestigeState.prestige_allocations.schluesselbund,
+        spent: bkmpPrestigeState.prestige_points_spent
+      };
+
+      return { refundExpected, spentBefore, afterFirst, afterSecond };
     });
-    expect(legacyRank).toBe(10);
+
+    expect(result.afterFirst.rank).toBe(3);
+    expect(result.afterFirst.paragon).toBeUndefined();
+    expect(result.afterFirst.bonus).toBe(3); // nur noch der gekappte Rang zaehlt, kein Paragon-Anteil mehr
+    expect(result.spentBefore - result.afterFirst.spent).toBe(result.refundExpected);
+    expect(result.refundExpected).toBeGreaterThan(0); // echter, spuerbarer Refund, kein Nullbetrag
+
+    // Idempotenz: zweiter Aufruf aendert weder Rang noch ausgegebene Punkte.
+    expect(result.afterSecond.rank).toBe(3);
+    expect(result.afterSecond.spent).toBe(result.afterFirst.spent);
+  });
+
+  test('Schluesselbund-Downgrade-Migration: ein Spieler bei Rang<=3 ohne Paragon bleibt komplett unangetastet', async ({ page, qaBaseURL, fixtureData }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    const result = await page.evaluate(() => {
+      bkmpPrestigeState.prestige_allocations = { schluesselbund: 2 };
+      bkmpPrestigeState.prestige_points_spent = 500;
+      bkmpPrestigeMigrateSchluesselbundDowngrade();
+      return { rank: bkmpPrestigeState.prestige_allocations.schluesselbund, spent: bkmpPrestigeState.prestige_points_spent };
+    });
+    expect(result.rank).toBe(2);
+    expect(result.spent).toBe(500);
+  });
+
+  test('Schluesselbund-Downgrade-Migration laeuft automatisch beim echten Login (kein manueller Funktionsaufruf noetig) - exakt der gemeldete Produktionsfall', async ({ page, qaBaseURL, fixtureData, store }) => {
+    // Simuliert genau das, was in der DB fuer einen betroffenen Spieler stand,
+    // BEVOR er sich das erste Mal nach dem Fix wieder einloggt - identisches
+    // Muster wie setPrestigeAllocations() in dungeon-key-prestige-bonus.spec.js.
+    const rows = store.tables.idle_prestige_state || (store.tables.idle_prestige_state = []);
+    let row = rows.find(r => r.name_key === fixtureData.nameKey);
+    if (!row) {
+      row = { name_key: fixtureData.nameKey, display_name: fixtureData.nameKey, prestige_level: 5, prestige_points: 500, prestige_points_spent: 300, prestige_allocations: {}, updated_at: new Date().toISOString() };
+      rows.push(row);
+    }
+    row.prestige_allocations = { ...row.prestige_allocations, schluesselbund: 10, schluesselbund__paragon: 3 };
+    row.prestige_points_spent = 100000;
+
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+
+    const result = await page.evaluate(() => ({
+      rank: bkmpPrestigeState.prestige_allocations.schluesselbund,
+      paragon: bkmpPrestigeState.prestige_allocations.schluesselbund__paragon,
+      spentLessThanBefore: bkmpPrestigeState.prestige_points_spent < 100000
+    }));
+    expect(result.rank).toBe(3);
+    expect(result.paragon).toBeUndefined();
+    expect(result.spentLessThanBefore).toBe(true);
   });
 });

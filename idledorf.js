@@ -374,6 +374,7 @@ async function bkmpIdleLoadOrInitState(name) {
     const remotePrestige = typeof loadIdlePrestigeState === 'function' ? await loadIdlePrestigeState(name) : null;
     bkmpPrestigeState = remotePrestige || { name_key: key, display_name: name, prestige_level: 0, prestige_points: 0, prestige_points_spent: 0, prestige_allocations: {} };
     bkmpPrestigeSnapshotMergeBaseline();
+    if (typeof bkmpPrestigeMigrateSchluesselbundDowngrade === 'function') bkmpPrestigeMigrateSchluesselbundDowngrade();
   } catch (e) {
     console.warn('Idle Dorf: Prestige-Fortschritt konnte nicht geladen werden (Netzwerkfehler oder Migration noch nicht ausgefuehrt).', e);
     bkmpPrestigeState = null;
@@ -2218,7 +2219,11 @@ async function bkmpIdleMergeRemoteSpendableFields() {
     bkmpIdleState.auto_advance = remote.auto_advance !== false;
     /* remotePrestigeCheck wurde oben bereits geladen (Bestaetigungs-
        Abfrage) - kein zweiter Request noetig. */
-    if (remotePrestigeCheck) { bkmpPrestigeState = remotePrestigeCheck; bkmpPrestigeSnapshotMergeBaseline(); }
+    if (remotePrestigeCheck) {
+      bkmpPrestigeState = remotePrestigeCheck;
+      bkmpPrestigeSnapshotMergeBaseline();
+      if (typeof bkmpPrestigeMigrateSchluesselbundDowngrade === 'function') bkmpPrestigeMigrateSchluesselbundDowngrade();
+    }
     /* Bug-Fix 18.07. (Section B, "Runen ueberleben Prestige"): Runen
        gehen seit der Aenderung an bkmpPrestigeExecuteReset NICHT mehr
        verloren - der bisherige Code hier ging noch von der alten Annahme

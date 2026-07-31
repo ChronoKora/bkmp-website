@@ -147,12 +147,18 @@ const BKMP_PRESTIGE_UPGRADES = [
   /* Nutzerwunsch 31.07.2026 ("maximal 3 lvl"): reiner Grind-Fix, nur
      maxRank gesenkt (50->3), effectPerRank/Kosten-Basis unveraendert -
      identisches Override-Muster wie bereits bei 'runenmeister' unten
-     (maxRank:15). Bereits vor der Aenderung investierte hoehere Raenge
-     (z.B. Rang 10) bleiben unangetastet voll wirksam (rank*effectPerRank
-     in bkmpPrestigeEffectTotals() kennt keine maxRank-Kappung) - nur
-     weitere NORMALE Kaeufe ueber Rang 3 hinaus sind nicht mehr moeglich,
-     danach greift automatisch der bestehende Paragon-Pfad. */
-  { id: 'schluesselbund', branch: 'runen_dungeon', name: 'Schlüsselbund', desc: '+1 maximale Dungeon-Schlüssel pro Rang.', icon: '🎒', effectType: 'dungeon_key_cap_bonus', effectPerRank: 1, ...bkmpPrestigeTierDef('WEAK', { maxRank: 3 }) },
+     (maxRank:15). NACHTRAG (gleicher Tag, Fairness-Nachbesserung auf
+     Nutzerwunsch): "Paragon dort entfernen" + "fuer alle die dort bereits
+     investiert haben zuruckgeben" - anders als der urspruengliche Plan
+     (bereits hoehere Bestandsraenge bleiben grandfathered) wollte der
+     Nutzer NACH dem ersten Deploy eine echte Gleichbehandlung: jeder
+     Spieler (auch wer vorher schon Rang 10-50 hatte) landet einheitlich
+     bei maximal Rang 3, ueberschuessige Punkte werden zurueckerstattet.
+     paragonEligible:false verhindert zusaetzlich, dass ueber den (durch
+     den neuen niedrigen maxRank ploetzlich erreichbaren) Paragon-Pfad
+     weiterinvestiert werden kann - siehe bkmpPrestigeMigrateSchluessel-
+     bundDowngrade() fuer die eigentliche Rueckerstattungs-Logik. */
+  { id: 'schluesselbund', branch: 'runen_dungeon', name: 'Schlüsselbund', desc: '+1 maximale Dungeon-Schlüssel pro Rang.', icon: '🎒', effectType: 'dungeon_key_cap_bonus', effectPerRank: 1, ...bkmpPrestigeTierDef('WEAK', { maxRank: 3, paragonEligible: false }) },
   { id: 'sparsamer_eintritt', branch: 'runen_dungeon', name: 'Sparsamer Eintritt', desc: '+1% Chance, dass ein Dungeon-Lauf keinen Schlüssel verbraucht, pro Rang.', icon: '🚪', effectType: 'dungeon_key_save_chance_pct', effectPerRank: 1, ...bkmpPrestigeTierDef('SPECIAL') },
   { id: 'bosskammer', branch: 'runen_dungeon', name: 'Bosskammer', desc: '+2% zusätzlicher Bonus auf den bestehenden "vollständiger Erfolg"-Multiplikator pro Rang.', icon: '👹', effectType: 'dungeon_success_bonus_pct', effectPerRank: 2, ...bkmpPrestigeTierDef('MEDIUM') },
   { id: 'seltene_funde', branch: 'runen_dungeon', name: 'Seltene Funde', desc: '+1% zusätzliche Chance auf ein episches/legendäres Ei oder eine seltene Rune im Dungeon pro Rang.', icon: '✨', effectType: 'dungeon_rare_find_bonus_pct', effectPerRank: 1, ...bkmpPrestigeTierDef('MEDIUM') },
@@ -503,6 +509,38 @@ let bkmpPrestigeSkipNextMerge = false;
 
 function bkmpPrestigeSnapshotMergeBaseline() {
   bkmpPrestigeMergeBaseline = bkmpPrestigeState ? { prestige_points_spent: Number(bkmpPrestigeState.prestige_points_spent || 0) } : null;
+}
+
+/* Nutzerwunsch 31.07.2026 (Fairness-Nachbesserung, siehe Kommentar am
+   'schluesselbund'-Knoten oben): jeder Spieler landet einheitlich bei
+   maximal Rang 3 - wer vorher schon mehr investiert hatte (normale Raenge
+   ueber 3 ODER die zwischenzeitlich durch den frueheren maxRank-Fix kurz
+   erreichbaren Paragon-Raenge), bekommt die dafuer ausgegebenen Prestige-
+   Punkte zurueck, statt sie grandfathered zu behalten. bkmpPrestigeUpgrade-
+   Cost() haengt NICHT von maxRank ab (nur baseCost/costGrowth, die
+   unveraendert blieben) - die Rueckerstattung fuer bereits vor der
+   Aenderung gekaufte hoehere Raenge ist dadurch exakt, kein Schaetzwert.
+   Idempotent: ein Spieler, der schon bei Rang<=3 ohne Paragon steht (der
+   allergroesste Teil), verlaesst die Funktion sofort ohne jede Mutation -
+   sicher bei jedem Laden erneut aufrufbar. */
+function bkmpPrestigeMigrateSchluesselbundDowngrade() {
+  if (!bkmpPrestigeState) return;
+  const def = bkmpPrestigeNodeById('schluesselbund');
+  if (!def) return;
+  const alloc = bkmpPrestigeState.prestige_allocations || (bkmpPrestigeState.prestige_allocations = {});
+  const rank = Number(alloc.schluesselbund || 0);
+  const paragonRank = Number(alloc.schluesselbund__paragon || 0);
+  if (rank <= def.maxRank && paragonRank <= 0) return; // haeufigster Fall: nichts zu tun
+
+  let refund = 0;
+  for (let r = def.maxRank + 1; r <= rank; r++) refund += bkmpPrestigeUpgradeCost(def, r);
+  for (let p = 1; p <= paragonRank; p++) refund += bkmpPrestigeParagonCost(def, p);
+
+  alloc.schluesselbund = Math.min(rank, def.maxRank);
+  if (paragonRank > 0) delete alloc.schluesselbund__paragon;
+  bkmpPrestigeState.prestige_points_spent = Math.max(0, Number(bkmpPrestigeState.prestige_points_spent || 0) - refund);
+  bkmpPrestigeSnapshotMergeBaseline(); // Baseline auf den bereits korrigierten Stand ziehen, sonst wuerde der naechste Remote-Merge die Rueckerstattung wieder verwerfen
+  bkmpPrestigeQueueSave();
 }
 
 /* Gleicher Race-Fix wie bkmpIdleMergeInFlight bei
