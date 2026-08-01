@@ -969,12 +969,24 @@ function bkmpIdleDragonCompanionEffectTotals() {
   const dragon = bkmpPlayerDragons.find(d => d.is_companion && d.stage === 'adult');
   if (!dragon) return totals;
   const prestigeTotals = typeof bkmpPrestigeEffectTotals === 'function' ? bkmpPrestigeEffectTotals(bkmpPrestigeState ? bkmpPrestigeState.prestige_allocations : null) : {};
+  /* Gilden-Technologie-Zweig "Drachenzucht" (01.08.2026, Nutzerwunsch nach
+     eigenem Angriff/Verteidigung/Leben-Zweig fuer Begleitdrachen) - drei
+     unabhaengige Wurzelknoten (guildCompanionAttackPct/-DefensePct/-HpPct)
+     + eine Zusammenfuehrung (guildCompanionAllStatPct, wirkt auf alle drei
+     gleichzeitig, identisches Prinzip wie companion_all_stat_pct im
+     Prestige-Baum). Gilt wie die Prestige-Gegenstuecke NUR, solange ein
+     erwachsener Begleitdrache aktiv ist - ergibt sich automatisch aus dem
+     bereits bestehenden fruehen Ausstieg oben, keine eigene Pruefung noetig. */
+  const guildBonus = key => Math.min(200, typeof bkmpGuildTechBonus === 'function' ? bkmpGuildTechBonus(key) : 0);
+  const guildAllStatPct = guildBonus('guildCompanionAllStatPct');
   const mainStatBoostPct = Math.min(200, (prestigeTotals.companion_stat_pct || 0) + (prestigeTotals.companion_all_stat_pct || 0));
-  const attackBoostPct = mainStatBoostPct + Math.min(200, prestigeTotals.companion_dmg_pct || 0);
+  const attackBoostPct = mainStatBoostPct + Math.min(200, prestigeTotals.companion_dmg_pct || 0) + guildBonus('guildCompanionAttackPct') + guildAllStatPct;
+  const defenseBoostPct = mainStatBoostPct + guildBonus('guildCompanionDefensePct') + guildAllStatPct;
+  const hpBoostPct = mainStatBoostPct + guildBonus('guildCompanionHpPct') + guildAllStatPct;
   const substatBoostPct = Math.min(200, prestigeTotals.companion_all_stat_pct || 0);
   if (dragon.stat_attack) totals.attack_flat = (totals.attack_flat || 0) + bkmpDragonAscendedMainStat(dragon, dragon.stat_attack) * (1 + attackBoostPct / 100);
-  if (dragon.stat_defense) totals.defense_flat = (totals.defense_flat || 0) + bkmpDragonAscendedMainStat(dragon, dragon.stat_defense) * (1 + mainStatBoostPct / 100);
-  if (dragon.stat_hp) totals.hp_flat = (totals.hp_flat || 0) + bkmpDragonAscendedMainStat(dragon, dragon.stat_hp) * (1 + mainStatBoostPct / 100);
+  if (dragon.stat_defense) totals.defense_flat = (totals.defense_flat || 0) + bkmpDragonAscendedMainStat(dragon, dragon.stat_defense) * (1 + defenseBoostPct / 100);
+  if (dragon.stat_hp) totals.hp_flat = (totals.hp_flat || 0) + bkmpDragonAscendedMainStat(dragon, dragon.stat_hp) * (1 + hpBoostPct / 100);
   (dragon.substats || []).forEach(s => {
     if (['fruit_bonus_pct', 'meat_bonus_pct', 'dragon_xp_bonus_pct'].includes(s.stat)) return;
     totals[s.stat] = (totals[s.stat] || 0) + Number(s.value || 0) * (1 + substatBoostPct / 100);

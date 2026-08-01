@@ -137,8 +137,30 @@ async function bkmpIdleRenderGildeTechPanel() {
 
   await bkmpGuildTechEnsureNodesLoaded();
   await bkmpGuildTechEnsureProgressLoaded(bkmpGuildState.guild.id);
+  let attemptsFetchFailed = false;
   if (!bkmpGuildTechAttemptStatus) {
     try { bkmpGuildTechAttemptStatus = await bkmpGuildTechGetAttemptStatus(); } catch (e) { bkmpGuildTechAttemptStatus = null; }
+    attemptsFetchFailed = !bkmpGuildTechAttemptStatus;
+  }
+
+  /* Bug gefunden 01.08.2026 (Live-Report: "0/5 - Naechster in 00:00:00"
+     blieb auf einer frischen Panel-Ansicht dauerhaft haengen, nicht nur
+     kurz nach einem Beitrag - der bereits gefixte Fall unten). Ursache:
+     schlaegt DIESER allererste bkmpGuildTechGetAttemptStatus()-Aufruf fehl
+     (z.B. kurzer Netzwerk-Haenger), bleibt bkmpGuildTechAttemptStatus NULL
+     - der Fallback-Platzhalter unten wird dann zwar einmalig angezeigt,
+     aber bkmpGuildTechStartCountdownTicker() bricht bei einem NULL-Status
+     sofort wieder ab (siehe deren eigener Kommentar), OHNE je einen erneuten
+     Versuch zu starten - die irrefuehrende "0/5, 00:00:00"-Anzeige blieb
+     dadurch fuer immer stehen, bis der Spieler den Tab verlaesst und neu
+     oeffnet. Fix: bei einem fehlgeschlagenen ALLERERSTEN Ladeversuch zeigt
+     die Zeile jetzt ehrlich "wird geladen..." statt einer erfundenen 0/5-
+     Zahl, UND ein einmaliger automatischer Nachlade-Versuch nach 3s wird
+     geplant (identisches Wiederholungs-Prinzip wie der bereits bestehende
+     Ticker-Selbstheilungs-Mechanismus, nur fuer den Fall, dass dieser gar
+     nicht erst starten konnte). */
+  if (attemptsFetchFailed) {
+    setTimeout(() => { if (bkmpIdleActiveTab === 'gildetech') bkmpIdleRenderGildeTechPanel(); }, 3000);
   }
 
   const attempts = bkmpGuildTechAttemptStatus || { attempts: 0, maxAttempts: 5, secondsToNext: 0 };
@@ -150,7 +172,7 @@ async function bkmpIdleRenderGildeTechPanel() {
     <div class="idle-dungeon-intro">
       <h4>🌳 Gilden-Technologie</h4>
       <p>Trage mit eigenem Gold zum gemeinsamen Fortschritt deiner Gilde bei - jede Stufe schaltet dauerhafte Boni für ALLE Mitglieder frei. Jedes Mitglied darf beitragen, unabhängig von der Rolle.</p>
-      <p class="idle-guild-tech-attempts">🎲 Beitragsversuche heute: <strong>${attempts.attempts}/${attempts.maxAttempts}</strong>${attempts.attempts < attempts.maxAttempts ? ` &middot; Nächster in <span id="idleGuildTechCountdown">${bkmpGuildTechFormatCountdown(attempts.secondsToNext)}</span>` : ''}</p>
+      <p class="idle-guild-tech-attempts">${attemptsFetchFailed ? '🎲 Beitragsversuche heute: <em>wird geladen…</em>' : `🎲 Beitragsversuche heute: <strong>${attempts.attempts}/${attempts.maxAttempts}</strong>${attempts.attempts < attempts.maxAttempts ? ` &middot; Nächster in <span id="idleGuildTechCountdown">${bkmpGuildTechFormatCountdown(attempts.secondsToNext)}</span>` : ''}`}</p>
     </div>
     <div class="idle-guild-tech-category-tabs">
       <button type="button" class="idle-guild-tech-category-tab ${bkmpGuildTechActiveCategory === 'wachstum' ? 'active' : ''}" data-category="wachstum">${BKMP_GUILD_TECH_CATEGORY_LABEL.wachstum}</button>

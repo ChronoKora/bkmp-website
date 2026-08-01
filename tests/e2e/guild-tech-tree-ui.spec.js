@@ -184,4 +184,39 @@ test.describe('Gilden-Technologie v3: Baum-Panel (UI-Ebene)', () => {
     expect(countdownText).not.toBe('00:00:00');
     expect(countdownText).toMatch(/^0[34]:\d{2}:\d{2}$/); // ~4h (bewusst grosszuegig: 03:xx oder 04:00:00 je nach Timing)
   });
+
+  /* Regression (01.08.2026, Live-Report: "0/5 - Naechster in 00:00:00"
+     blieb auf einer FRISCHEN Panel-Ansicht dauerhaft haengen, nicht nur
+     kurz nach einem Beitrag wie im Test oben). Root Cause: schlaegt der
+     ALLERERSTE guild_tech_attempt_status()-Aufruf fehl (z.B. kurzer
+     Netzwerk-Haenger), blieb bkmpGuildTechAttemptStatus dauerhaft NULL -
+     der Countdown-Ticker bricht bei einem NULL-Status sofort wieder ab,
+     OHNE je einen erneuten Versuch zu starten. Simuliert hier per
+     context.route() genau EINEN fehlgeschlagenen RPC-Aufruf (identisches
+     Muster wie rune-persistence-hardening.spec.js), danach klappt der
+     Aufruf wieder normal. */
+  test('REGRESSION: schlaegt der allererste Beitragsversuche-Ladevorgang fehl, zeigt das Panel "wird geladen" statt einer erfundenen 0/5-Anzeige und erholt sich automatisch', async ({ page, qaServer, context }) => {
+    // login() oeffnet den Gilden-Tech-Tab bereits selbst als letzten Schritt (siehe login()
+    // oben) - die Route muss deshalb VOR login() registriert sein, damit sie genau DIESEN
+    // ersten, versteckten Ladevorgang abfaengt. Ein zusaetzlicher expliziter Klick danach
+    // waere ein ZWEITER Aufruf und wuerde die simulierte Poison-Pill bereits verbraucht vorfinden.
+    let firstAttemptStatusCallBlocked = true;
+    await context.route('**/rpc/guild_tech_attempt_status', async (route) => {
+      if (firstAttemptStatusCallBlocked) {
+        firstAttemptStatusCallBlocked = false;
+        return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'simulated transient failure' }) });
+      }
+      return route.fallback();
+    });
+
+    await login(page, qaServer);
+
+    const attemptsLine = page.locator('#idlePanelGildeTech .idle-guild-tech-attempts');
+    await expect(attemptsLine).toContainText('wird geladen');
+    await expect(attemptsLine).not.toContainText('0/5');
+    await expect(attemptsLine).not.toContainText('00:00:00');
+
+    // Automatischer Nachlade-Versuch (3s Timer) - danach echter, korrekter Stand.
+    await expect(attemptsLine).toContainText('5/5', { timeout: 5000 });
+  });
 });
