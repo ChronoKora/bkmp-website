@@ -1120,6 +1120,22 @@ Cache-Busting `js/systems/bkmp-breeding.js?v=20260801-drachenzucht1` (index.html
 
 **Nicht geprüft/offen:** `sql/20260801-guild-tech-drachenzucht-branch.sql` muss im Supabase-Dashboard ausgeführt werden, bevor der neue Zweig live sichtbar wird (bis dahin bleibt der bestehende 19-Knoten-Baum unverändert nutzbar, die 4 neuen Knoten existieren nur lokal).
 
+## Gilden-Technologie: neuer Zweig "Drachenzucht" (01.08.2026)
+
+Auslöser: Live-Screenshot des Gilden-Tech-Baums, in dem Zuchtkraft/Zuchtpanzer direkt neben Turm-Vorreiter (5/5) unter derselben "Schlacht"-Kategorie hingen. Nutzerwunsch: "Können wir das mit Drachenzucht in einen Neuen Zweig gepackt?"
+
+Beide Rendering-Bausteine waren bereits vollständig generisch gebaut (kein hartcodiertes 2-Kategorien-Limit): `bkmpUiGuildTechTreeHtml()` filtert Knoten rein über `n.category === category`, egal welcher String das ist. Nur zwei Stellen kannten wirklich nur zwei Kategorien: der `BKMP_GUILD_TECH_CATEGORY_LABEL`-Objekt (fehlender dritter Eintrag) und die Tab-Leiste selbst (zwei fest verdrahtete `<button>`-Zeilen statt einer Schleife über die Label-Tabelle) - letzteres beim Umbauen gleich mit aufgeräumt, ein künftiger vierter Zweig braucht jetzt nur noch einen neuen Eintrag in der Label-Tabelle.
+
+**Umsetzung:** dritte Kategorie `drachenzucht` (Label "🐲 Drachenzucht") + Tab-Leiste datengetrieben aus `Object.keys(BKMP_GUILD_TECH_CATEGORY_LABEL)` gebaut. Da alle vier Vorbedingungen der Drachenzucht-Knoten ausschließlich untereinander liegen (Zuchtmeisterschaft braucht nur die drei anderen Zucht-Knoten, keine Verbindung zu Schlacht-Knoten), bleibt der Baum beim Umzug in die eigene Kategorie strukturell in sich geschlossen - keine über-Kategorien-Grenzen laufenden Vorbedingungs-Linien möglich.
+
+**Live-DB-Migration nötig** (die 4 Knoten existieren bereits live unter `category='schlacht'`, siehe vorheriger Abschnitt): `sql/20260801-guild-tech-drachenzucht-own-category.sql` (neu, **noch nicht ausgeführt**) - erweitert die `guild_tech_nodes.category`-CHECK-Bedingung um `'drachenzucht'` (`drop constraint if exists guild_tech_nodes_category_check` + neu anlegen, Standard-Postgres-Name für eine inline-Column-Check-Bedingung) und setzt die 4 bereits existierenden Zeilen per `update ... where id in (...)` um. Die ursprüngliche `sql/20260801-guild-tech-drachenzucht-branch.sql` bleibt bewusst UNVERÄNDERT (historisches Abbild des ersten Ausführungsstands, nur ein erklärender Kommentar ergänzt) - ein hypothetischer künftiger Frischlauf auf einem neuen Projekt würde die Knoten wieder unter "schlacht" anlegen, die Nachtrag-Datei danach korrigiert das in beiden Fällen (bereits laufendes UND frisches System) gleichermaßen.
+
+**Verifiziert:** 21/21 Tests grün über alle 3 Projekte (`guild-tech-drachenzucht.spec.js`, Testfixture-Kategorie mit umgestellt), `guild-tech-tree-ui.spec.js`/`guild-tech-tree.spec.js`/`guild-tech-tree-migration.spec.js` unverändert grün (85 Tests, korrekte Mobile-Skips). `scripts/static-checks.js` unverändert (0 CRITICAL/HIGH/MEDIUM). `node --check`/`eslint` sauber.
+
+Cache-Busting `js/systems/bkmp-guild-tech.js?v=20260801-zuchtcategory1` (index.html/idle-stream-mini.html - admin.html bindet diese Datei nicht ein).
+
+**Nicht geprüft/offen:** `sql/20260801-guild-tech-drachenzucht-own-category.sql` muss im Supabase-Dashboard ausgeführt werden - bis dahin bleiben die 4 Knoten live weiterhin sichtbar unter "Schlacht" (kein Fehlerzustand, nur noch nicht die gewünschte eigene Kategorie).
+
 ## Raid/Weltboss: Tap-Schaden-Zähler zeigte nie einen Wert (01.08.2026)
 
 Spieler-Nachfrage anhand eines Screenshots der Raid-Kampfleiste: "Was ist das eigentlich beim stündlichen Raid boss? Auto kampf? Rote Symbol.. Die Klickzähler? der nicht funktioniert?" — Anlass für eine Bestandsaufnahme der drei Elemente (🟢 Auto-Kampf-Hinweistext, ⚔️ echter Angreifen-Knopf, 👆 Tap-Schaden-Zähler), dabei einen echten, bestätigten Bug im dritten Element gefunden.

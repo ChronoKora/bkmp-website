@@ -29,7 +29,7 @@ let bkmpGuildTechBusy = false;
 let bkmpGuildTechCountdownInterval = null;
 let bkmpGuildTechModalNodeId = null;
 
-const BKMP_GUILD_TECH_CATEGORY_LABEL = { wachstum: '🌱 Wachstum', schlacht: '⚔️ Schlacht' };
+const BKMP_GUILD_TECH_CATEGORY_LABEL = { wachstum: '🌱 Wachstum', schlacht: '⚔️ Schlacht', drachenzucht: '🐲 Drachenzucht' };
 
 /* "Willkommenspaket" (guild_willkommenspaket, effect_type 'newMemberBonusUnlock')
    ist ein TOGGLE-Knoten - sein effect_per_tier (1) ist nur ein Freischalt-
@@ -175,8 +175,7 @@ async function bkmpIdleRenderGildeTechPanel() {
       <p class="idle-guild-tech-attempts">${attemptsFetchFailed ? '🎲 Beitragsversuche heute: <em>wird geladen…</em>' : `🎲 Beitragsversuche heute: <strong>${attempts.attempts}/${attempts.maxAttempts}</strong>${attempts.attempts < attempts.maxAttempts ? ` &middot; Nächster in <span id="idleGuildTechCountdown">${bkmpGuildTechFormatCountdown(attempts.secondsToNext)}</span>` : ''}`}</p>
     </div>
     <div class="idle-guild-tech-category-tabs">
-      <button type="button" class="idle-guild-tech-category-tab ${bkmpGuildTechActiveCategory === 'wachstum' ? 'active' : ''}" data-category="wachstum">${BKMP_GUILD_TECH_CATEGORY_LABEL.wachstum}</button>
-      <button type="button" class="idle-guild-tech-category-tab ${bkmpGuildTechActiveCategory === 'schlacht' ? 'active' : ''}" data-category="schlacht">${BKMP_GUILD_TECH_CATEGORY_LABEL.schlacht}</button>
+      ${Object.keys(BKMP_GUILD_TECH_CATEGORY_LABEL).map(cat => `<button type="button" class="idle-guild-tech-category-tab ${bkmpGuildTechActiveCategory === cat ? 'active' : ''}" data-category="${cat}">${BKMP_GUILD_TECH_CATEGORY_LABEL[cat]}</button>`).join('')}
     </div>
     <div class="idle-guild-tech-tree-wrap" id="idleGuildTechTreeWrap">
       ${bkmpUiGuildTechTreeHtml(bkmpGuildTechNodes, bkmpGuildTechProgress, bkmpGuildTechActiveCategory)}

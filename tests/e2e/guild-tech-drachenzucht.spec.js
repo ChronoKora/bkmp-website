@@ -27,10 +27,10 @@ const LEADER_UID = 'qa-zucht-leader-0000';
 
 // 1:1 aus sql/20260801-guild-tech-drachenzucht-branch.sql.
 const ZUCHT_NODES = [
-  { id: 'guild_zucht_kraft', category: 'schlacht', label: 'Zuchtkraft', description: '', icon: '🔥', effect_type: 'guildCompanionAttackPct', effect_per_tier: 8, max_tier: 5, base_gold_cost: 2000000, cost_growth: 1.5, attempts_per_tier: 25, prereq_node_ids: [], pos_x: 800, pos_y: 50 },
-  { id: 'guild_zucht_panzer', category: 'schlacht', label: 'Zuchtpanzer', description: '', icon: '🛡️', effect_type: 'guildCompanionDefensePct', effect_per_tier: 8, max_tier: 5, base_gold_cost: 2000000, cost_growth: 1.5, attempts_per_tier: 25, prereq_node_ids: [], pos_x: 1000, pos_y: 50 },
-  { id: 'guild_zucht_vitalitaet', category: 'schlacht', label: 'Zuchtvitalität', description: '', icon: '❤️', effect_type: 'guildCompanionHpPct', effect_per_tier: 8, max_tier: 5, base_gold_cost: 2000000, cost_growth: 1.5, attempts_per_tier: 25, prereq_node_ids: [], pos_x: 1200, pos_y: 50 },
-  { id: 'guild_zucht_meisterschaft', category: 'schlacht', label: 'Zuchtmeisterschaft', description: '', icon: '🐲', effect_type: 'guildCompanionAllStatPct', effect_per_tier: 5, max_tier: 5, base_gold_cost: 3000000, cost_growth: 1.6, attempts_per_tier: 25, prereq_node_ids: ['guild_zucht_kraft', 'guild_zucht_panzer', 'guild_zucht_vitalitaet'], pos_x: 1000, pos_y: 200 }
+  { id: 'guild_zucht_kraft', category: 'drachenzucht', label: 'Zuchtkraft', description: '', icon: '🔥', effect_type: 'guildCompanionAttackPct', effect_per_tier: 8, max_tier: 5, base_gold_cost: 2000000, cost_growth: 1.5, attempts_per_tier: 25, prereq_node_ids: [], pos_x: 800, pos_y: 50 },
+  { id: 'guild_zucht_panzer', category: 'drachenzucht', label: 'Zuchtpanzer', description: '', icon: '🛡️', effect_type: 'guildCompanionDefensePct', effect_per_tier: 8, max_tier: 5, base_gold_cost: 2000000, cost_growth: 1.5, attempts_per_tier: 25, prereq_node_ids: [], pos_x: 1000, pos_y: 50 },
+  { id: 'guild_zucht_vitalitaet', category: 'drachenzucht', label: 'Zuchtvitalität', description: '', icon: '❤️', effect_type: 'guildCompanionHpPct', effect_per_tier: 8, max_tier: 5, base_gold_cost: 2000000, cost_growth: 1.5, attempts_per_tier: 25, prereq_node_ids: [], pos_x: 1200, pos_y: 50 },
+  { id: 'guild_zucht_meisterschaft', category: 'drachenzucht', label: 'Zuchtmeisterschaft', description: '', icon: '🐲', effect_type: 'guildCompanionAllStatPct', effect_per_tier: 5, max_tier: 5, base_gold_cost: 3000000, cost_growth: 1.6, attempts_per_tier: 25, prereq_node_ids: ['guild_zucht_kraft', 'guild_zucht_panzer', 'guild_zucht_vitalitaet'], pos_x: 1000, pos_y: 200 }
 ];
 
 function zuchtFixture(startTimeMs) {

@@ -4,6 +4,19 @@
 -- (Angriff/Verteidigung/Leben des Begleitdrachens) + eine Zusammenfuehrung
 -- ("Zuchtmeisterschaft", wirkt auf alle drei gleichzeitig).
 --
+-- NACHTRAG (01.08.2026, direkt danach): die vier Knoten unten liefen zuerst
+-- unter category='schlacht' (bewusst so gewaehlt, siehe unveraendert
+-- gebliebene Begruendung weiter unten). Auf Nutzerwunsch nach Live-
+-- Screenshot ("Können wir das mit Drachenzucht in einen Neuen Zweig
+-- gepackt?") in eine eigene dritte Kategorie umgezogen - siehe
+-- sql/20260801-guild-tech-drachenzucht-own-category.sql fuer die
+-- CHECK-Constraint-Erweiterung + das UPDATE der bereits live existierenden
+-- Zeilen. Diese Datei bleibt bewusst UNVERAENDERT (historisches Abbild des
+-- ersten Ausfuehrungsstands) - ein hypothetischer erneuter Lauf auf einem
+-- FRISCHEN Projekt ohne die Nachtrag-Datei wuerde die Knoten wieder unter
+-- 'schlacht' anlegen; die Nachtrag-Datei danach ausfuehren korrigiert das
+-- in beiden Faellen gleichermassen (bereits laufendes ODER frisches System).
+--
 -- Kein neues Datenmodell noetig - guild_tech_nodes/guild_tech_progress
 -- (siehe sql/20260731-guild-tech-tree-v2-foundation.sql) sind bereits
 -- generisch fuer beliebig viele Knoten gebaut. Reine Katalog-Erweiterung,
