@@ -7071,48 +7071,59 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 .idle-guild-chat-role-veteran { color: #38bdf8; }
 .idle-guild-chat-role-member { color: var(--ink); }
 
-/* Gilden-Technologie (9 Karten-Raster) - gleiche Lila-Akzentfarbe wie die
-   Level-Anzeige (var(--purple)), damit "Gilden-Fortschritt" (Level +
-   Technologie) optisch als eine zusammengehoerige Familie erkennbar
-   bleibt, getrennt vom orangenen Kassenstand-Bonus. */
-.idle-guild-tech-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 0.7rem;
-  margin-top: 0.8rem;
+/* Gilden-Technologie v3 (31.07.2026): Baum-System mit Mitglieder-Beitraegen
+   (siehe js/systems/bkmp-guild-tech.js), ersetzt das fruehere 9+10-Karten-
+   Raster komplett. Gleiche Lila-Akzentfarbe wie vorher (var(--purple)),
+   damit "Gilden-Fortschritt" (Level + Technologie) optisch weiterhin als
+   zusammengehoerige Familie erkennbar bleibt, getrennt vom orangenen
+   Kassenstand-Bonus. */
+.idle-guild-tech-attempts { font-size: 0.8rem; color: var(--muted); margin-top: 0.4rem; }
+.idle-guild-tech-category-tabs { display: flex; gap: 0.5rem; margin: 0.8rem 0; flex-wrap: wrap; }
+.idle-guild-tech-category-tab {
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
-.idle-guild-tech-card {
+.idle-guild-tech-category-tab.active { background: color-mix(in srgb, var(--purple) 22%, var(--paper-2)); border-color: var(--purple); color: var(--ink); }
+.idle-guild-tech-category-tab:hover { color: var(--ink); }
+.idle-guild-tech-tree-wrap { overflow: auto; border-radius: 14px; border: 1px solid var(--line); background: var(--paper); padding: 0.6rem; max-height: 420px; }
+.bkmp-guild-tech-tree { position: relative; margin: 0 auto; }
+.bkmp-guild-tech-svg { position: absolute; top: 0; left: 0; pointer-events: none; }
+.bkmp-guild-tech-line { stroke: var(--line); stroke-width: 2.5; }
+.bkmp-guild-tech-line.met { stroke: var(--purple); }
+.bkmp-guild-tech-node {
+  position: absolute;
+  width: 128px;
+  transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.2rem;
-  padding: 0.8rem 0.6rem;
+  gap: 0.15rem;
+  padding: 0.6rem 0.5rem;
   border-radius: 14px;
-  border: 1px solid var(--line);
+  border: 1.5px solid var(--line);
   background: var(--paper-2);
   text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
-.idle-guild-tech-icon { font-size: 1.4rem; }
-.idle-guild-tech-name { font-weight: 700; font-size: 0.85rem; color: var(--ink); }
-.idle-guild-tech-level { font-size: 0.72rem; color: var(--muted); }
-.idle-guild-tech-bonus { font-weight: 700; font-size: 0.95rem; color: var(--purple); margin-bottom: 0.2rem; }
-.idle-guild-tech-maxed { font-size: 0.78rem; color: var(--muted); font-weight: 700; }
-.idle-guild-tech-upgrade-btn { font-size: 0.78rem; padding: 0.4rem 0.7rem; }
-.idle-guild-tech-upgrade-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-/* Gilden-Technologie v2 (26.07.): 10 neue Zweige mit eigener Beschreibung
-   (kein reiner Prozent-Stat wie die 9 STANDARD-Zweige oben) - eigene,
-   etwas breitere Grid-Spalte fuer den Beschreibungstext, sonst identische
-   Kartenoptik (nutzt dieselben .idle-guild-tech-card/-icon/-name/-level/
-   -bonus/-maxed/-upgrade-btn-Klassen). */
-.idle-guild-tech-ext-intro { margin-top: 1.4rem; }
-.idle-guild-tech-ext-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
-.idle-guild-tech-desc { font-size: 0.68rem; color: var(--muted); line-height: 1.3; margin: 0.15rem 0 0.3rem; }
-/* Rebalance (26.07.): Paragon-Fortfuehrung nach der Maximalstufe - dezent
-   abgesetzt (dünne obere Trennlinie) unter dem bereits bestehenden
-   "Maximalstufe"-Hinweis derselben Karte. */
-.idle-guild-tech-paragon { margin-top: 0.4rem; padding-top: 0.4rem; border-top: 1px dashed var(--line); width: 100%; display: flex; flex-direction: column; align-items: center; gap: 0.2rem; }
-.idle-guild-tech-paragon-rank { font-size: 0.75rem; font-weight: 700; color: var(--gold); }
-.idle-guild-tech-paragon-btn { font-size: 0.72rem; padding: 0.35rem 0.6rem; }
+.bkmp-guild-tech-node:hover:not(:disabled) { transform: translate(-50%, -50%) translateY(-2px); box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25); }
+.bkmp-guild-tech-node.state-locked { opacity: 0.5; cursor: not-allowed; }
+.bkmp-guild-tech-node.state-available { border-color: var(--purple); }
+.bkmp-guild-tech-node.state-maxed { border-color: var(--gold); background: color-mix(in srgb, var(--gold) 12%, var(--paper-2)); }
+.bkmp-guild-tech-node-icon { font-size: 1.5rem; line-height: 1; }
+.bkmp-guild-tech-node-label { font-weight: 700; font-size: 0.78rem; color: var(--ink); }
+.bkmp-guild-tech-node-tier { font-size: 0.72rem; color: var(--muted); }
+.bkmp-guild-tech-node-bar { display: block; width: 100%; height: 6px; border-radius: 999px; background: var(--paper); overflow: hidden; border: 1px solid var(--line); margin-top: 0.15rem; }
+.bkmp-guild-tech-node-bar-fill { display: block; height: 100%; background: linear-gradient(90deg, var(--purple), var(--gold)); transition: width 0.4s ease; }
+.idle-guild-tech-modal-progress { font-size: 0.85rem; margin: 0.4rem 0; }
+.idle-guild-tech-modal-meta { font-size: 0.75rem; color: var(--muted); margin-top: 0.4rem; }
 
 /* Tägliche Gildenquests - gruene Fortschrittsfarbe (bewusst eine dritte
    Akzentfarbe neben Orange=Kasse und Lila=Level/Technologie, damit alle
@@ -10466,12 +10477,22 @@ html.bkmp-app-mode .idle-dorf-panel #idleGuildSettingsToggleBtn,
 html.bkmp-app-mode .idle-dorf-panel #idleGuildLeaveBtn,
 html.bkmp-app-mode .idle-dorf-panel #idleGuildRegenCodeBtn,
 html.bkmp-app-mode .idle-dorf-panel #idleGuildSaveSettingsBtn,
-html.bkmp-app-mode .idle-dorf-panel #idleGuildChatSendBtn,
-html.bkmp-app-mode .idle-dorf-panel .idle-guild-tech-upgrade-btn {
+html.bkmp-app-mode .idle-dorf-panel #idleGuildChatSendBtn {
   padding: .8rem 1.1rem !important;
   font-size: .9rem !important;
   min-height: 46px !important;
 }
+html.bkmp-app-mode .idle-dorf-panel .idle-guild-tech-category-tab {
+  min-height: 44px !important;
+  font-size: .92rem !important;
+}
+html.bkmp-app-mode .idle-dorf-panel .bkmp-guild-tech-node {
+  width: 148px !important;
+  padding: .9rem .7rem !important;
+}
+html.bkmp-app-mode .idle-dorf-panel .bkmp-guild-tech-node-icon { font-size: 1.7rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .bkmp-guild-tech-node-label { font-size: .86rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .bkmp-guild-tech-node-tier { font-size: .8rem !important; }
 html.bkmp-app-mode .idle-dorf-panel .idle-guild-banner-color-btn {
   width: 40px !important;
   height: 40px !important;
@@ -10494,12 +10515,6 @@ html.bkmp-app-mode .idle-dorf-panel .idle-guild-quest-title { font-size: .96rem 
 html.bkmp-app-mode .idle-dorf-panel .idle-guild-quest-progress,
 html.bkmp-app-mode .idle-dorf-panel .idle-guild-quest-reward { font-size: .82rem !important; }
 html.bkmp-app-mode .idle-dorf-panel .idle-guild-chat-time { font-size: .74rem !important; }
-html.bkmp-app-mode .idle-dorf-panel .idle-guild-tech-card { padding: .95rem .8rem !important; }
-html.bkmp-app-mode .idle-dorf-panel .idle-guild-tech-icon { font-size: 1.6rem !important; }
-html.bkmp-app-mode .idle-dorf-panel .idle-guild-tech-name { font-size: .92rem !important; }
-html.bkmp-app-mode .idle-dorf-panel .idle-guild-tech-level { font-size: .8rem !important; }
-html.bkmp-app-mode .idle-dorf-panel .idle-guild-tech-bonus { font-size: 1.05rem !important; }
-html.bkmp-app-mode .idle-dorf-panel .idle-guild-tech-maxed { font-size: .86rem !important; }
 /* Gildenboss/Weltboss-Kampfergebnis - bewusst auf beide Kontexte
    angewendet (dieselben raid-*-Klassen), damit auch der Weltboss-Kampf
    von der groesseren Optik profitiert statt nur die Gildenboss-Ansicht.
@@ -11117,7 +11132,7 @@ html.bkmp-app-mode .idle-dorf-panel .idle-skill-branch-header {
 }
 html.bkmp-app-mode .idle-dorf-panel .idle-arena-opponent-card,
 html.bkmp-app-mode .idle-dorf-panel .idle-guild-quest-card,
-html.bkmp-app-mode .idle-dorf-panel .idle-guild-tech-card,
+html.bkmp-app-mode .idle-dorf-panel .bkmp-guild-tech-node,
 html.bkmp-app-mode .idle-dorf-panel .leaderboard-row {
   background: linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(0, 0, 0, .25)) !important;
   border: 1px solid rgba(255, 255, 255, .1) !important;

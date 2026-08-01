@@ -3473,6 +3473,14 @@ window.BKMP_IDLE_TITLES = [
   { id: 'idletitle_guild_leader', name: 'Gildenanführer', desc: 'Anführer einer Gilde.', unlockCustom: ctx => ctx.guildRole === 'leader', effectType: 'attack_pct', effectValue: 3 },
   { id: 'idletitle_guild_level10', name: 'Etablierte Gilde', desc: 'Gildenlevel 10 erreicht.', unlockCustom: ctx => ctx.guildLevel >= 10, effectType: 'gold_prod_pct', effectValue: 3 },
   { id: 'idletitle_guild_level20', name: 'Gildenlegende', desc: 'Gildenlevel 20 erreicht.', unlockCustom: ctx => ctx.guildLevel >= 20, effectType: 'gold_prod_pct', effectValue: 6 },
+  /* Level-Ausbau auf Deckel 100 (01.08.2026) - Name IDENTISCH zum jeweiligen
+     guild_level_XX-Erfolgstitel (js/systems/bkmp-guild.js) gewaehlt, damit
+     bkmpAchievementLinkedTitleBonus() den Bonus automatisch auf der
+     Erfolgs-Karte anzeigt. */
+  { id: 'idletitle_guild_level40', name: 'Legendäre Gilde', desc: 'Gildenlevel 40 erreicht.', unlockCustom: ctx => ctx.guildLevel >= 40, effectType: 'gold_prod_pct', effectValue: 9 },
+  { id: 'idletitle_guild_level60', name: 'Imperiale Gilde', desc: 'Gildenlevel 60 erreicht.', unlockCustom: ctx => ctx.guildLevel >= 60, effectType: 'gold_prod_pct', effectValue: 12 },
+  { id: 'idletitle_guild_level80', name: 'Unaufhaltsame Gilde', desc: 'Gildenlevel 80 erreicht.', unlockCustom: ctx => ctx.guildLevel >= 80, effectType: 'gold_prod_pct', effectValue: 15 },
+  { id: 'idletitle_guild_level100', name: 'Gilde der Ewigkeit', desc: 'Gildenlevel 100 (Maximalstufe) erreicht.', unlockCustom: ctx => ctx.guildLevel >= 100, effectType: 'gold_prod_pct', effectValue: 20 },
   { id: 'idletitle_guild_boss10', name: 'Gildenboss-Bezwinger', desc: '10 Gildenbosse besiegt.', unlockCustom: ctx => ctx.guildBossesDefeated >= 10, effectType: 'boss_dmg_pct', effectValue: 4 },
   { id: 'idletitle_arena_win10', name: 'Arena-Kämpfer', desc: '10 Arena-Kämpfe gewonnen.', unlockCustom: ctx => ctx.arenaWins >= 10, effectType: 'crit_chance_flat', effectValue: 1 },
   { id: 'idletitle_arena_win50', name: 'Arena-Veteran', desc: '50 Arena-Kämpfe gewonnen.', unlockCustom: ctx => ctx.arenaWins >= 50, effectType: 'crit_chance_flat', effectValue: 2 },

@@ -1,5 +1,19 @@
-/* Phase 5 (24.07.2026, siehe CLAUDE.md) - Gilden-Technologie-Tests.
+/* UEBERHOLT seit 31.07.2026 (Gilden-Technologie v3, Baum-System mit
+   Mitglieder-Beitraegen, siehe Plan zazzy-crunching-plum.md/CLAUDE.md) - die
+   gesamte Datei ist uebersprungen. window.bkmpGuildTechUpgrade()/
+   bkmpGuildGetTechLevels() (supabase.js), auf denen jeder Test dieser Datei
+   aufbaut, wurden beim v3-Umbau vollstaendig entfernt (das alte SQL-RPC/die
+   alte Tabelle guild_tech_levels existieren serverseitig bewusst weiter,
+   werden aber von keinem Client-Code mehr aufgerufen) - jeder Aufruf von
+   window.bkmpGuildTechUpgrade() wuerde jetzt mit "not defined" fehlschlagen.
+   Ersetzt durch tests/e2e/guild-tech-tree.spec.js (Kern-RPC, inkl. des
+   generalisierten Paragon-Nachfolgers "Vorbedingungs-Sperre") +
+   tests/e2e/guild-tech-tree-migration.spec.js (Alt-Daten-Migration). Datei
+   bewusst nicht geloescht (dokumentiert die Herleitung des jetzt abgeloesten
+   Systems), nur komplett uebersprungen.
 
+   Urspruenglicher Dateikopf-Kommentar (Phase 5, 24.07.2026) zur Referenz
+   erhalten:
    Architektur (aus echtem Code + SQL rekonstruiert, siehe ausfuehrlicher
    Herleitungskommentar in tests/mock/rpc-engine.js direkt vor den neuen
    Phase-5-Handlern): guild_tech_upgrade() (sql/supabase-guild-tech-tree.sql,
@@ -96,7 +110,7 @@ async function rpcAs(server, name, fnName, params) {
   return json;
 }
 
-test.describe('Gilden-Technologie', () => {
+test.describe.skip('Gilden-Technologie (UEBERHOLT, siehe Dateikopf-Kommentar)', () => {
   test('Tech-Liste laden zeigt alle 9 Zweige bei Stufe 0', async ({ page, qaServer }) => {
     await login(page, qaServer, LEADER_NAME);
     const levels = await page.evaluate(() => window.bkmpGuildGetTechLevels('g1'));
@@ -260,7 +274,7 @@ test.describe('Gilden-Technologie', () => {
    Beweis eine echte UI-Pruefung - der Bug lebte ausschliesslich in der
    Render-Funktion, kein bestehender RPC-Test haette ihn je auffangen
    koennen. */
-test.describe('Gilden-Technologie: Anzeige-Bugfix (Paragon-Bonus in der Karte)', () => {
+test.describe.skip('Gilden-Technologie: Anzeige-Bugfix (Paragon-Bonus in der Karte) (UEBERHOLT, siehe Dateikopf-Kommentar)', () => {
   test.beforeEach(async ({}, testInfo) => {
     test.skip(/^mobile-/.test(testInfo.project.name), 'Nutzt einen echten Desktop-Tab-Klick (#idleTabBtnGildeTech).');
   });

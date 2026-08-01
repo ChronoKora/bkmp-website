@@ -153,23 +153,35 @@ module.exports = async function handler(req, res) {
     const rareCfg = config.rare_spawn || { chancePct: 8 };
     const rareChance = Math.max(0, Math.min(100, Number(rareCfg.chancePct != null ? rareCfg.chancePct : 8))) / 100;
 
-    /* Gilden-Technologie v2 (26.07.), "Nachtwache": erhoeht den Offline-
-       Deckel um +0,5 Std./Stufe (max. 10 Stufen -> +5 Std.) fuer
-       Mitglieder einer Gilde mit diesem Zweig. Rein additive Abfrage
-       (guild_members/guild_tech_levels sind beide oeffentlich lesbar,
-       hier per Service-Role ohnehin RLS-unabhaengig) - liefert 0, wenn
-       der Spieler in keiner Gilde ist oder der Zweig nicht gekauft
-       wurde, aendert dann nichts am bestehenden Verhalten. */
+    /* Gilden-Technologie v3 (31.07.2026), "Nachtwache" (guild_nachtwache):
+       erhoeht den Offline-Deckel um effect_per_tier Std./Stufe fuer
+       Mitglieder einer Gilde mit diesem Knoten. Bis 31.07. hier direkt aus
+       guild_tech_levels (altes System) gelesen - das Baum-System v3 ersetzt
+       das VOLLSTAENDIG (siehe sql/20260731-guild-tech-tree-v2-foundation.sql,
+       js/systems/bkmp-guild-tech.js), guild_tech_levels wird ab jetzt
+       nirgends mehr befuellt und bliebe sonst stumm auf 0 haengen. Tier UND
+       effect_per_tier werden bewusst dynamisch aus guild_tech_progress/
+       guild_tech_nodes gelesen (keine zweite hartcodierte Kopie des
+       Stufenwerts, gleiches Prinzip wie bei arena_attack()/raid_join() in
+       derselben SQL-Datei). Rein additive Abfrage (beide Tabellen oeffentlich
+       lesbar, hier per Service-Role ohnehin RLS-unabhaengig) - liefert 0,
+       wenn der Spieler in keiner Gilde ist oder der Knoten noch nicht
+       freigeschaltet wurde, aendert dann nichts am bestehenden Verhalten. */
     let guildOfflineBonusHours = 0;
     try {
       const memberRes = await sbFetch(serviceKey, `guild_members?auth_user_id=eq.${encodeURIComponent(user.id)}&select=guild_id&limit=1`);
       const memberRows = memberRes.ok ? await memberRes.json() : [];
       const guildId = Array.isArray(memberRows) && memberRows[0] ? memberRows[0].guild_id : null;
       if (guildId) {
-        const techRes = await sbFetch(serviceKey, `guild_tech_levels?guild_id=eq.${encodeURIComponent(guildId)}&tech_id=eq.guild_nachtwache&select=level&limit=1`);
-        const techRows = techRes.ok ? await techRes.json() : [];
-        const level = Array.isArray(techRows) && techRows[0] ? Number(techRows[0].level || 0) : 0;
-        guildOfflineBonusHours = Math.max(0, level) * 0.5;
+        const [progressRes, nodeRes] = await Promise.all([
+          sbFetch(serviceKey, `guild_tech_progress?guild_id=eq.${encodeURIComponent(guildId)}&node_id=eq.guild_nachtwache&select=tier&limit=1`),
+          sbFetch(serviceKey, `guild_tech_nodes?id=eq.guild_nachtwache&select=effect_per_tier&limit=1`)
+        ]);
+        const progressRows = progressRes.ok ? await progressRes.json() : [];
+        const nodeRows = nodeRes.ok ? await nodeRes.json() : [];
+        const tier = Array.isArray(progressRows) && progressRows[0] ? Number(progressRows[0].tier || 0) : 0;
+        const perTier = Array.isArray(nodeRows) && nodeRows[0] ? Number(nodeRows[0].effect_per_tier || 0) : 0;
+        guildOfflineBonusHours = Math.max(0, tier) * perTier;
       }
     } catch (e) { /* Gilden-Lookup fehlgeschlagen - Deckel bleibt beim Standardwert */ }
 

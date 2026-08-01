@@ -159,17 +159,28 @@ function rpcError(message) {
   return err;
 }
 
-/* Gilden-Technologie v2 (26.07.2026) - gemeinsamer Nachschlage-Helfer fuer
-   die drei serverseitigen Zweige (Kriegsrat/Stadtmauer/Nachtwache), die
-   NICHT nur einen client-seitig gecachten Stat-Pool speisen, sondern
-   echte RPC-Logik veraendern (arena_attack/raid_join) - originalgetreu
-   zu sql/20260726-guild-tech-branches-v2.sql. Liefert 0, wenn der Spieler
-   in keiner Gilde ist oder der Zweig nie gekauft wurde. */
-function guildTechLevelFor(store, uid, techId) {
+/* Gilden-Technologie v3 (31.07.2026, ersetzt guildTechLevelFor()/das alte
+   guild_tech_levels - siehe sql/20260731-guild-tech-tree-v2-foundation.sql):
+   gemeinsamer Nachschlage-Helfer fuer die serverseitigen Zweige (Kriegsrat/
+   Stadtmauer), die NICHT nur einen client-seitig gecachten Stat-Pool
+   speisen, sondern echte RPC-Logik veraendern (arena_attack/raid_join).
+   Liefert 0, wenn der Spieler in keiner Gilde ist oder der Knoten noch bei
+   Stufe 0 steht. */
+function guildTechTierFor(store, uid, nodeId) {
   const member = getTable(store, 'guild_members').find(m => m.auth_user_id === uid);
   if (!member) return 0;
-  const row = getTable(store, 'guild_tech_levels').find(r => r.guild_id === member.guild_id && r.tech_id === techId);
-  return row ? Number(row.level || 0) : 0;
+  const row = getTable(store, 'guild_tech_progress').find(r => r.guild_id === member.guild_id && r.node_id === nodeId);
+  return row ? Number(row.tier || 0) : 0;
+}
+
+/* effect_per_tier wird bewusst DYNAMISCH aus guild_tech_nodes gelesen statt
+   ein zweites Mal hardcodiert - genau dieses "zwei Kopien muessen synchron
+   bleiben"-Muster hat in diesem Projekt bereits mehrfach echte Bugs
+   verursacht (z.B. dungeon_regen_calc()-Mehrdeutigkeit vom 26.07.), gleiches
+   Prinzip wie in der echten SQL-Fassung von arena_attack()/raid_join(). */
+function guildTechNodeEffectPerTier(store, nodeId) {
+  const node = getTable(store, 'guild_tech_nodes').find(n => n.id === nodeId);
+  return node ? Number(node.effect_per_tier || 0) : 0;
 }
 
 /* Phase 4 (24.07.2026, siehe CLAUDE.md) - raid_finish() (interner Helfer,
@@ -458,8 +469,8 @@ const RPC_HANDLERS = {
 
     const todayStartMs = berlinMidnightMs(nowMs);
     const attacksToday = battleLog.filter(r => r.attacker_auth_user_id === uid && r.occurred_at_ms >= todayStartMs).length;
-    // Gilden-Technologie v2 (26.07.), "Kriegsrat": +1 Versuch/Tag pro Stufe.
-    const dailyLimit = 10 + guildTechLevelFor(store, uid, 'guild_kriegsrat');
+    // Gilden-Technologie v3 (31.07.), "Kriegsrat": +effect_per_tier Versuche/Tag pro Stufe.
+    const dailyLimit = 10 + Math.round(guildTechTierFor(store, uid, 'guild_kriegsrat') * guildTechNodeEffectPerTier(store, 'guild_kriegsrat'));
     if (attacksToday >= dailyLimit) throw rpcError('daily_limit_reached');
 
     const stateRows = getTable(store, 'idle_player_state');
@@ -1087,6 +1098,128 @@ const RPC_HANDLERS = {
     return { new_level: levelRow.level, treasury_gold: guild.treasury_gold };
   },
 
+  /* Gilden-Technologie v3 (31.07.2026, siehe sql/20260731-guild-tech-tree-v2-
+     foundation.sql) - der Kern der neuen Baum-Mechanik. Originalgetreuer
+     Port der RPC-Pruefreihenfolge dort: Mitgliedschaft (KEINE Rollenpruefung -
+     anders als guild_tech_upgrade oben, das ist der ganze Sinn des neuen
+     Systems) -> Knoten gueltig -> nicht bereits maximal -> alle Vorbedingungen
+     erfuellt -> Beitragsversuch-Regen (dungeonRegenCalc() wiederverwendet,
+     Ergebnis wird SOFORT persistiert - auch bei spaeterem insufficient_gold,
+     identisches Prinzip wie dungeon_consume_key) -> Gold-Pruefung (Versuch
+     bleibt dabei verbraucht) -> Commit. */
+  guild_tech_contribute(store, uid, params) {
+    const nodeId = params.p_node_id;
+    const members = getTable(store, 'guild_members');
+    const me = members.find(m => m.auth_user_id === uid);
+    if (!me) throw rpcError('not_in_guild');
+
+    const nameKey = findNameKeyForUid(store, uid);
+    if (!nameKey) throw rpcError('no_player_state');
+
+    const node = getTable(store, 'guild_tech_nodes').find(n => n.id === nodeId);
+    if (!node) throw rpcError('invalid_node');
+
+    const progressRows = getTable(store, 'guild_tech_progress');
+    let progress = progressRows.find(r => r.guild_id === me.guild_id && r.node_id === nodeId);
+    if (!progress) {
+      progress = { guild_id: me.guild_id, node_id: nodeId, tier: 0, progress_gold: 0 };
+      progressRows.push(progress);
+    }
+    if (progress.tier >= node.max_tier) throw rpcError('node_maxed');
+
+    const prereqIds = node.prereq_node_ids || [];
+    for (const prereqId of prereqIds) {
+      const prereqNode = getTable(store, 'guild_tech_nodes').find(n => n.id === prereqId);
+      const prereqProgress = progressRows.find(r => r.guild_id === me.guild_id && r.node_id === prereqId);
+      const haveTier = prereqProgress ? Number(prereqProgress.tier || 0) : 0;
+      if (!prereqNode || haveTier < prereqNode.max_tier) throw rpcError('prereq_not_met');
+    }
+
+    const nowMs = store.clock.nowMs();
+    const attemptRows = getTable(store, 'guild_tech_contributor_attempts');
+    let attemptRow = attemptRows.find(r => r.auth_user_id === uid);
+    if (!attemptRow) {
+      attemptRow = { auth_user_id: uid, name_key: nameKey, attempts: 5, last_attempt_at_ms: nowMs };
+      attemptRows.push(attemptRow);
+    }
+    const calc = dungeonRegenCalc(attemptRow.attempts, attemptRow.last_attempt_at_ms, nowMs, 14400, 5);
+    attemptRow.attempts = calc.newKeys;
+    attemptRow.last_attempt_at_ms = calc.newLastKeyAtMs;
+    attemptRow.name_key = nameKey;
+
+    if (calc.newKeys < 1) throw rpcError('no_attempts_available');
+
+    const tierGoldCost = Math.round(Number(node.base_gold_cost) * Math.pow(Number(node.cost_growth), progress.tier));
+    const remainingNeeded = tierGoldCost - Number(progress.progress_gold || 0);
+    const contributionStep = Math.round(tierGoldCost / Math.max(1, Number(node.attempts_per_tier) || 1));
+    const actualAmount = Math.max(1, Math.min(contributionStep, remainingNeeded));
+
+    const playerRow = getTable(store, 'idle_player_state').find(r => r.auth_user_id === uid);
+    const gold = Number((playerRow && playerRow.gold) || 0);
+    if (gold < actualAmount) {
+      // Versuch bleibt verbraucht (bereits oben persistiert) - identisch zu
+      // einem gescheiterten Dungeon-Lauf, der auch einen Schluessel kostet.
+      attemptRow.attempts -= 1;
+      throw rpcError('insufficient_gold');
+    }
+
+    playerRow.gold = gold - actualAmount;
+    attemptRow.attempts -= 1;
+    me.tech_contributed_gold = Number(me.tech_contributed_gold || 0) + actualAmount;
+
+    const previousTier = progress.tier;
+    let newProgress = Number(progress.progress_gold || 0) + actualAmount;
+    let newTier = progress.tier;
+    if (newProgress >= tierGoldCost) {
+      newTier = progress.tier + 1;
+      newProgress = 0;
+    }
+    progress.tier = newTier;
+    progress.progress_gold = newProgress;
+
+    const activityLog = getTable(store, 'guild_activity_log');
+    activityLog.push({
+      id: store.nextId(), guild_id: me.guild_id, kind: 'tech_contribute',
+      actor_name: me.display_name, value: actualAmount, extra: nodeId, created_at: store.clock.nowIso()
+    });
+    if (newTier > previousTier) {
+      activityLog.push({
+        id: store.nextId(), guild_id: me.guild_id, kind: 'tech_tier_complete',
+        actor_name: me.display_name, value: newTier, extra: nodeId, created_at: store.clock.nowIso()
+      });
+    }
+
+    return {
+      new_tier: newTier,
+      new_progress_gold: newProgress,
+      tier_gold_cost: tierGoldCost,
+      gold_spent: actualAmount,
+      remaining_gold: playerRow.gold,
+      attempts_left: calc.newKeys - 1,
+      seconds_to_next_attempt: 0
+    };
+  },
+
+  /* Einzeilen-Aequivalent zu dungeon_get_all_status() (EIN gemeinsamer
+     Beitragsversuch-Pool statt mehrerer Dungeon-Typen). */
+  guild_tech_attempt_status(store, uid) {
+    const nameKey = findNameKeyForUid(store, uid);
+    if (!nameKey) throw rpcError('no_player_state');
+    const nowMs = store.clock.nowMs();
+    const attemptRows = getTable(store, 'guild_tech_contributor_attempts');
+    let attemptRow = attemptRows.find(r => r.auth_user_id === uid);
+    if (!attemptRow) {
+      attemptRow = { auth_user_id: uid, name_key: nameKey, attempts: 5, last_attempt_at_ms: nowMs };
+      attemptRows.push(attemptRow);
+    }
+    const calc = dungeonRegenCalc(attemptRow.attempts, attemptRow.last_attempt_at_ms, nowMs, 14400, 5);
+    attemptRow.attempts = calc.newKeys;
+    attemptRow.last_attempt_at_ms = calc.newLastKeyAtMs;
+    attemptRow.name_key = nameKey;
+    const secondsToNext = calc.newKeys >= 5 ? 0 : Math.max(0, Math.floor((14400 * 1000 - (nowMs - calc.newLastKeyAtMs)) / 1000));
+    return { attempts: calc.newKeys, max_attempts: 5, seconds_to_next: secondsToNext };
+  },
+
   /* Phase 5 (24.07.2026) - Gildenplaetze dazukaufen (sql/supabase-guild-
      extra-slots.sql, einzige Fassung). Gleiches Rechte-/Kosten-Prinzip wie
      guild_tech_upgrade oben. */
@@ -1255,10 +1388,11 @@ const RPC_HANDLERS = {
     const player = getTable(store, 'idle_player_state').find(r => r.auth_user_id === uid);
     if (!player) throw rpcError('no_idle_state');
 
-    // Gilden-Technologie v2 (26.07.), "Stadtmauer": +1% eigener HP-Beitrag
-    // zum Stadt-HP-Pool pro Stufe.
-    const stadtmauerLevel = guildTechLevelFor(store, uid, 'guild_stadtmauer');
-    const effectiveHp = Number(player.hp || 0) * (1 + stadtmauerLevel * 0.01);
+    // Gilden-Technologie v3 (31.07.), "Stadtmauer": +effect_per_tier% eigener
+    // HP-Beitrag zum Stadt-HP-Pool pro Stufe.
+    const stadtmauerTier = guildTechTierFor(store, uid, 'guild_stadtmauer');
+    const stadtmauerPerTier = guildTechNodeEffectPerTier(store, 'guild_stadtmauer');
+    const effectiveHp = Number(player.hp || 0) * (1 + stadtmauerTier * stadtmauerPerTier / 100);
 
     const instances = getTable(store, 'raid_instances');
     let inst = instances.find(r => r.id === raidId);

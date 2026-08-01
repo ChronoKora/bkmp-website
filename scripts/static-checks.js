@@ -26,7 +26,7 @@ const CLIENT_JS_FILES = [
   'js/systems/bkmp-achievements.js', 'js/systems/bkmp-arena.js',
   'js/systems/bkmp-breeding.js', 'js/systems/bkmp-cosmetics.js',
   'js/systems/bkmp-dungeon.js', 'js/systems/bkmp-events.js',
-  'js/systems/bkmp-guild.js', 'js/systems/bkmp-leaderboard.js',
+  'js/systems/bkmp-guild.js', 'js/systems/bkmp-guild-tech.js', 'js/systems/bkmp-leaderboard.js',
   'js/systems/bkmp-meister.js', 'js/systems/bkmp-prestige.js',
   'js/systems/bkmp-raid.js', 'js/systems/bkmp-runes.js',
   'js/systems/bkmp-skilltree.js', 'js/systems/bkmp-tower.js',

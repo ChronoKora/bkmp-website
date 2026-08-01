@@ -1,9 +1,21 @@
-/* Gilden-Technologie v2 (26.07.2026) - 10 neue Zweige (Nutzerwunsch: die 9
-   bestehenden STANDARD-Zweige waren alle Stufe 20/20, die Kasse hatte nichts
-   mehr zu tun). Siehe sql/20260726-guild-tech-branches-v2.sql fuer die
-   serverseitige Herleitung/Kommentare, js/systems/bkmp-guild.js fuer
-   BKMP_GUILD_TECH_CATALOG_EXT/BKMP_GUILD_TECH_TIER.
+/* UEBERHOLT seit 31.07.2026 (Gilden-Technologie v3, Baum-System mit
+   Mitglieder-Beitraegen, siehe Plan zazzy-crunching-plum.md/CLAUDE.md) -
+   die gesamte Datei ist auskommentiert/uebersprungen. window.bkmpGuildTechUpgrade()/
+   bkmpGuildGetTechLevels() (supabase.js) und BKMP_GUILD_TECH_CATALOG_EXT/
+   BKMP_GUILD_TECH_TIER (js/systems/bkmp-guild.js), auf denen JEDER Test
+   dieser Datei ueber buyTech() aufbaut, wurden beim v3-Umbau vollstaendig
+   entfernt (das alte SQL-RPC/die alte Tabelle guild_tech_levels existieren
+   serverseitig bewusst weiter, werden aber von keinem Client-Code mehr
+   aufgerufen) - jeder Aufruf von window.bkmpGuildTechUpgrade() wuerde jetzt
+   mit "not defined" fehlschlagen. Ersetzt durch tests/e2e/guild-tech-tree.spec.js
+   (Kern-RPC) + tests/e2e/guild-tech-tree-migration.spec.js (Alt-Daten-
+   Migration) - deckt dieselbe Kriegsrat-/Stadtmauer-/Turm-Vorreiter-/
+   Willkommenspaket-Mechanik gegen die neuen guild_tech_nodes/
+   guild_tech_progress-Tabellen ab. Datei bewusst nicht geloescht (dokumentiert
+   die Herleitung des jetzt abgeloesten v2-Systems), nur komplett uebersprungen.
 
+   Urspruenglicher Dateikopf-Kommentar (Gilden-Technologie v2, 26.07.2026,
+   10 neue Zweige) zur Referenz erhalten:
    Zwei Test-Strategien, je nachdem wo der Effekt tatsaechlich lebt:
    - Kriegsrat/Stadtmauer/Nachtwache aendern echte SERVERSEITIGE RPC-/API-
      Logik (arena_attack/raid_join/api/claim-idle-offline-progress.js) -
@@ -98,7 +110,7 @@ async function buyTech(page, techId, times) {
   return result;
 }
 
-test.describe('Gilden-Technologie v2 - generische Zweig-Infrastruktur', () => {
+test.describe.skip('Gilden-Technologie v2 - generische Zweig-Infrastruktur (UEBERHOLT, siehe Dateikopf-Kommentar)', () => {
   test('Kostenkurve/Maximalstufe je Tier korrekt durchgesetzt (LOW vs. MED vs. TOGGLE, Rebalance 26.07.)', async ({ page, qaServer }) => {
     await login(page, qaServer, LEADER_NAME);
     // LOW (Kriegsrat): max. 15 Stufen (Rebalance, vorher 5), Basis 600000, Wachstum 1.5.
@@ -182,7 +194,23 @@ test.describe('Gilden-Technologie v2 - generische Zweig-Infrastruktur', () => {
   });
 });
 
-test.describe('Gilden-Technologie v2 - Kriegsrat (Arena-Tageslimit)', () => {
+/* 31.07.2026 - Gilden-Technologie v3 (Baum-System mit Mitglieder-Beitraegen,
+   siehe Plan zazzy-crunching-plum.md/CLAUDE.md) hat arena_attack()/
+   raid_join() bewusst auf die NEUE guild_tech_progress-Tabelle umgestellt
+   (statt guild_tech_levels) - genau die Ambiguitaet, die dieser Umbau
+   beheben soll (Effekt-Werte sollen nur noch EINE Quelle haben). buyTech()
+   in den beiden folgenden describe-Bloecken kauft weiterhin ueber das ALTE
+   guild_tech_upgrade()/guild_tech_levels (bewusst noch nicht entfernt,
+   bleibt bis Stufe 3 des Umbaus als Altsystem bestehen) - eine ueber diesen
+   alten Pfad gekaufte Kriegsrat-/Stadtmauer-Stufe hat dadurch ab jetzt
+   korrekt KEINEN Effekt mehr auf arena_attack()/raid_join(), das ist die
+   beabsichtigte Trennung, kein neuer Bug. Diese 3 Tests pruefen exakt die
+   jetzt bewusst abgeschnittene alte Verbindung - werden in Stufe 4 des
+   Umbaus durch die neue tests/e2e/guild-tech-tree.spec.js ersetzt (die
+   dieselbe Mechanik bereits gegen guild_tech_progress beweist), bis dahin
+   bewusst uebersprungen statt fälschlich rot zu stehen oder den alten
+   Anspruch stillschweigend zu veraendern. */
+test.describe.skip('Gilden-Technologie v2 - Kriegsrat (Arena-Tageslimit)', () => {
   test('erhoeht das serverseitige Tageslimit um +1 pro Stufe - RPC selbst, nicht nur Anzeige', async ({ page, qaServer }) => {
     await login(page, qaServer, LEADER_NAME);
     await buyTech(page, 'guild_kriegsrat', 2); // +2 -> Limit 12
@@ -262,7 +290,8 @@ test.describe('Gilden-Technologie v2 - Kriegsrat (Arena-Tageslimit)', () => {
   });
 });
 
-test.describe('Gilden-Technologie v2 - Stadtmauer (Raid-Stadt-HP-Beitrag)', () => {
+// 31.07.2026 - siehe Erklaerkommentar am Kriegsrat-describe-Block oben (identischer Grund, raid_join() betroffen statt arena_attack()).
+test.describe.skip('Gilden-Technologie v2 - Stadtmauer (Raid-Stadt-HP-Beitrag)', () => {
   test('erhoeht den eigenen HP-Beitrag zum Stadt-HP-Pool eines Weltboss-Raids um 1%/Stufe', async ({ page, qaServer }) => {
     await login(page, qaServer, LEADER_NAME);
     await buyTech(page, 'guild_stadtmauer', 5); // +5% HP-Beitrag
@@ -293,7 +322,7 @@ test.describe('Gilden-Technologie v2 - Stadtmauer (Raid-Stadt-HP-Beitrag)', () =
   });
 });
 
-test.describe('Gilden-Technologie v2 - Turm-Vorreiter (client-berechneter Champion-Bonus)', () => {
+test.describe.skip('Gilden-Technologie v2 - Turm-Vorreiter (client-berechneter Champion-Bonus) (UEBERHOLT, siehe Dateikopf-Kommentar)', () => {
   test('nutzt die hoechste Turmstufe UNTER ALLEN Mitgliedern, nicht nur die eigene', async ({ page, qaServer }) => {
     await login(page, qaServer, LEADER_NAME);
     // Leader selbst hat turm_highest_wave=0 (Default) - das MITGLIED hat 340.
@@ -326,7 +355,7 @@ test.describe('Gilden-Technologie v2 - Turm-Vorreiter (client-berechneter Champi
   });
 });
 
-test.describe('Gilden-Technologie v2 - Willkommenspaket (befristeter Neumitglieder-Bonus)', () => {
+test.describe.skip('Gilden-Technologie v2 - Willkommenspaket (befristeter Neumitglieder-Bonus) (UEBERHOLT, siehe Dateikopf-Kommentar)', () => {
   test('aktiv innerhalb der ersten 3 Tage nach Beitritt, nicht mehr danach', async ({ page, qaServer }) => {
     await login(page, qaServer, LEADER_NAME);
     await buyTech(page, 'guild_willkommenspaket');

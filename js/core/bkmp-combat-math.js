@@ -281,8 +281,17 @@ function bkmpIdleResourceEmoji(resource) {
 
 /* ---------------- Rendering: Kampf-Tab ---------------- */
 
+/* Gilden-Level-Ausbau auf Stufe 100 (01.08.2026, siehe CLAUDE.md) treibt
+   guild_xp-Werte erstmals routinemaessig in den Billionen-/Billiarden-
+   Bereich - bisher endete die Abkuerzung bei 'M' (Millionen), ein Wert wie
+   14.300.000.000 (Level 30, bereits VOR diesem Ausbau erreichbar) erschien
+   dadurch faelschlich als "14300M" statt "14,3B". Kein Verhalten fuer
+   Werte < 1 Milliarde geaendert (identische Ausgabe wie zuvor). */
 function bkmpIdleFormatNumber(n) {
   n = Math.floor(Number(n) || 0);
+  if (n >= 1000000000000000) return (n / 1000000000000000).toFixed(2).replace(/\.?0+$/, '') + 'Qa';
+  if (n >= 1000000000000) return (n / 1000000000000).toFixed(2).replace(/\.?0+$/, '') + 'T';
+  if (n >= 1000000000) return (n / 1000000000).toFixed(2).replace(/\.?0+$/, '') + 'B';
   if (n >= 1000000) return (n / 1000000).toFixed(2).replace(/\.?0+$/, '') + 'M';
   if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
   return String(n);

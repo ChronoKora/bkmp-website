@@ -1,19 +1,23 @@
-/* Gilden-Technologie v2 (26.07.2026) - READ-Seite der 10 neuen Zweige, die
-   am Ende alle im selben client-seitigen Cache landen (bkmp-guild-tech-cache,
-   bkmpGuildTechBonus() in js/systems/bkmp-guild.js). Statt jedes Mal eine
-   echte Gilde+Kauf-Roundtrip aufzusetzen (das WRITE-Ende ist bereits separat
-   in tests/e2e/guild-tech-ext.spec.js abgedeckt - dort auch Turm-Vorreiter/
-   Willkommenspaket, die den Cache mit einer SPEZIELLEN Formel statt nur
-   Rang*Effekt befuellen), wird der Cache hier direkt injiziert - das prueft
-   exakt denselben Code-Pfad wie ein echter Spieler sehen wuerde (jede
-   Verbrauchsstelle liest ausschliesslich ueber bkmpGuildTechBonus()/
-   bkmpIdleGetGuildTechCache(), nie ueber Kenntnis "woher" der Wert kommt).
+/* Gilden-Technologie (26.07.2026, urspruenglich v2) - READ-Seite mehrerer
+   Zweige, die am Ende alle im selben client-seitigen Cache landen
+   (bkmp-guild-tech-cache, bkmpGuildTechBonus() in js/systems/bkmp-guild.js).
+   Statt jedes Mal eine echte Gilde+Beitrags-Roundtrip aufzusetzen, wird der
+   Cache hier direkt injiziert - das prueft exakt denselben Code-Pfad wie ein
+   echter Spieler sehen wuerde (jede Verbrauchsstelle liest ausschliesslich
+   ueber bkmpGuildTechBonus()/bkmpIdleGetGuildTechCache(), nie ueber Kenntnis
+   "woher" der Wert kommt) - DIESER Teil der Datei ist vom v2->v3-Umbau
+   (Baum-System mit Mitglieder-Beitraegen, 31.07.2026, siehe Plan
+   zazzy-crunching-plum.md/CLAUDE.md) UNBERUEHRT, weiterhin gueltig und aktiv
+   (bewusst nicht uebersprungen, anders als guild-tech.spec.js/
+   guild-tech-ext.spec.js, die direkt window.bkmpGuildTechUpgrade() aufrufen).
 
    Nachtwache ist die einzige Ausnahme (serverseitiger Offline-Deckel,
    api/claim-idle-offline-progress.js) - dort lebt der Effekt NICHT im
-   Client-Cache, sondern wird bei jedem Claim frisch aus guild_members/
-   guild_tech_levels nachgeschlagen. Braucht deshalb echte Gilden-Tabellen
-   im Mock-Store (per direkter store.tables-Injektion in einen bestehenden
+   Client-Cache, sondern wird bei jedem Claim frisch nachgeschlagen. Seit dem
+   v3-Umbau aus guild_tech_progress/guild_tech_nodes (vorher guild_members/
+   guild_tech_levels) - der zugehoerige describe-Block unten wurde auf die
+   neuen Tabellen umgestellt. Braucht deshalb echte Gilden-Tabellen im
+   Mock-Store (per direkter store.tables-Injektion in einen bestehenden
    Einzelspieler-Teststand, gleicher Trick wie in
    tests/e2e/prestige-automation-toggles.spec.js). */
 
@@ -147,24 +151,32 @@ test.describe('Gilden-Technologie v2 - Streak-Schutz', () => {
   });
 });
 
-test.describe('Gilden-Technologie v2 - Nachtwache (serverseitiger Offline-Deckel)', () => {
+test.describe('Gilden-Technologie v3 - Nachtwache (serverseitiger Offline-Deckel, umgestellt von guild_tech_levels auf guild_tech_progress)', () => {
   test.use({ teststand: 'B' });
 
-  test('erhoeht den Offline-Fortschritts-Deckel um 0,5 Std./Stufe fuer Mitglieder einer Gilde mit diesem Zweig', async ({ page, qaBaseURL, fixtureData, store }) => {
+  /* 31.07.2026: api/claim-idle-offline-progress.js liest den Nachtwache-Bonus
+     seit dem Baum-System-Umbau (v3) dynamisch aus guild_tech_progress/
+     guild_tech_nodes statt aus dem abgeloesten guild_tech_levels - dieser
+     Test wurde entsprechend umgestellt (Tabellen/Spaltennamen), die Assertion
+     selbst (13h nicht gekappt) blieb unveraendert gueltig, da tier=4 *
+     effect_per_tier=2,5 = 10h Bonus -> 22h Deckel, exakt aequivalent zum
+     alten level=4 * 0,5 = 2h Bonus -> 14h Deckel fuer diesen Testfall. */
+  test('erhoeht den Offline-Fortschritts-Deckel um effect_per_tier Std./Stufe fuer Mitglieder einer Gilde mit diesem Zweig', async ({ page, qaBaseURL, fixtureData, store }) => {
     // Guild-Tabellen nachtraeglich in den (auf Teststand B basierenden)
     // Store injizieren - derselbe Trick wie beim Raid-Automations-Test
     // (tests/e2e/prestige-automation-toggles.spec.js): store.tables ist ein
     // gewoehnliches, veraenderbares Objekt, unabhaengig davon, welche
     // Fixture es urspruenglich befuellt hat.
     const myAuthId = fixtureData.authUserId;
-    store.tables.guild_members = [{ auth_user_id: myAuthId, guild_id: 'g-nachtwache', name_key: fixtureData.nameKey, display_name: fixtureData.displayName, role: 'leader', contributed_gold: 0, joined_at: fixtureData.nowIso }];
-    store.tables.guild_tech_levels = [{ guild_id: 'g-nachtwache', tech_id: 'guild_nachtwache', level: 4 }]; // +2 Std.
+    store.tables.guild_members = [{ auth_user_id: myAuthId, guild_id: 'g-nachtwache', name_key: fixtureData.nameKey, display_name: fixtureData.displayName, role: 'leader', contributed_gold: 0, tech_contributed_gold: 0, joined_at: fixtureData.nowIso }];
+    store.tables.guild_tech_nodes = [{ id: 'guild_nachtwache', category: 'wachstum', label: 'Nachtwache', description: '', icon: '🌙', effect_type: 'offlineCapExtraHours', effect_per_tier: 2.5, max_tier: 5, base_gold_cost: 3000000, cost_growth: 1.6, attempts_per_tier: 25, prereq_node_ids: [], pos_x: 100, pos_y: 350 }];
+    store.tables.guild_tech_progress = [{ guild_id: 'g-nachtwache', node_id: 'guild_nachtwache', tier: 4, progress_gold: 0 }]; // 4 * 2,5 = +10 Std.
 
     await openAndLogin(page, qaBaseURL, fixtureData);
     await waitForDragonReady(page);
     await page.evaluate(() => bkmpIdleStopLoop());
 
-    store.clock.advance(13 * 3600 * 1000); // 13h - ueber dem Standard-12h-Deckel, unter dem erweiterten 14h-Deckel
+    store.clock.advance(13 * 3600 * 1000); // 13h - ueber dem Standard-12h-Deckel, unter dem erweiterten 22h-Deckel
     const result = await page.evaluate(() => bkmpIdleClaimOfflineProgress(bkmpGetMcName()));
     expect(result.elapsedSeconds).toBe(13 * 3600); // NICHT bei 12h gekappt
   });

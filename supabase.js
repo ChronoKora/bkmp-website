@@ -4558,7 +4558,7 @@ async function bkmpGuildGetMine() {
   if (!userId) return null;
   const { data: memberRows, error: memberError } = await client
     .from('guild_members')
-    .select('auth_user_id, guild_id, name_key, display_name, role, contributed_gold, joined_at')
+    .select('auth_user_id, guild_id, name_key, display_name, role, contributed_gold, tech_contributed_gold, joined_at')
     .eq('auth_user_id', userId)
     .limit(1);
   if (memberError) throw memberError;
@@ -4574,7 +4574,7 @@ async function bkmpGuildGetMine() {
   if (!guildRow) return null;
   const { data: memberList, error: listError } = await client
     .from('guild_members')
-    .select('auth_user_id, display_name, role, contributed_gold, joined_at')
+    .select('auth_user_id, display_name, role, contributed_gold, tech_contributed_gold, joined_at')
     .eq('guild_id', membership.guild_id)
     .order('contributed_gold', { ascending: false });
   if (listError) throw listError;
@@ -4582,6 +4582,11 @@ async function bkmpGuildGetMine() {
     guild: bkmpGuildMapRow(guildRow),
     myRole: membership.role,
     myContributedGold: Number(membership.contributed_gold || 0),
+    // Gilden-Technologie v3 (31.07.2026): Lifetime-Beitrag zum Baum-System
+    // (guild_tech_contribute()) - eigene Spalte, ueberlaedt NICHT
+    // contributed_gold (das ist die andere, bereits bestehende
+    // "Spendenrangliste"-Metrik von contribute_gold()).
+    myTechContributedGold: Number(membership.tech_contributed_gold || 0),
     // Gilden-Technologie v2 (26.07.): "Willkommenspaket" braucht den
     // eigenen Beitrittszeitpunkt, um ein zeitlich befristetes Neumitglieder-
     // Fenster zu pruefen - additiv, keine bestehenden Aufrufer betroffen.
@@ -4591,6 +4596,7 @@ async function bkmpGuildGetMine() {
       displayName: m.display_name,
       role: m.role,
       contributedGold: Number(m.contributed_gold || 0),
+      techContributedGold: Number(m.tech_contributed_gold || 0),
       joinedAt: m.joined_at
     }))
   };
@@ -5074,41 +5080,77 @@ async function bkmpGuildBuySlot() {
   return row ? { newBonusSlots: Number(row.new_bonus_slots), treasuryGold: Number(row.treasury_gold) } : null;
 }
 
-/* ---------------- Gilden-Technologie (siehe guild_tech_levels in
-   supabase-guild-tech-tree.sql) ---------------- */
-async function bkmpGuildGetTechLevels(guildId) {
+/* ---------------- Gilden-Technologie v3: Baum-System mit Mitglieder-
+   Beitraegen (31.07.2026, siehe sql/20260731-guild-tech-tree-v2-
+   foundation.sql) - ersetzt das fruehere "Anfuehrer/Stellvertreter kauft
+   Raenge aus der Gildenkasse"-System VOLLSTAENDIG. bkmpGuildGetTechLevels()/
+   bkmpGuildTechUpgrade() gab es an dieser Stelle bis 31.07.2026 - das alte
+   SQL-RPC (guild_tech_upgrade())/die alte Tabelle (guild_tech_levels)
+   existieren serverseitig weiter (bewusst nicht gedroppt), werden aber von
+   hier aus nicht mehr aufgerufen; die alte Playwright-Suite, die sie
+   testete, wurde entsprechend als ueberholt markiert (siehe tests/e2e/
+   guild-tech*.spec.js). */
+async function bkmpGuildTechGetNodes() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from('guild_tech_nodes')
+    .select('id, category, label, description, icon, effect_type, effect_per_tier, max_tier, base_gold_cost, cost_growth, attempts_per_tier, prereq_node_ids, pos_x, pos_y')
+    .order('category', { ascending: true })
+    .order('pos_y', { ascending: true })
+    .order('pos_x', { ascending: true });
+  if (error) return [];
+  return data || [];
+}
+
+async function bkmpGuildTechGetProgress(guildId) {
   const client = bkmpGetSupabaseClient();
   if (!client || !guildId) return {};
   const { data, error } = await client
-    .from('guild_tech_levels')
-    .select('tech_id, level')
+    .from('guild_tech_progress')
+    .select('node_id, tier, progress_gold')
     .eq('guild_id', guildId);
   if (error) return {};
   const map = {};
-  (data || []).forEach(row => { map[row.tech_id] = Number(row.level || 0); });
+  (data || []).forEach(row => { map[row.node_id] = { tier: Number(row.tier || 0), progressGold: Number(row.progress_gold || 0) }; });
   return map;
 }
 
-async function bkmpGuildTechUpgrade(techId) {
+async function bkmpGuildTechContribute(nodeId) {
   const client = bkmpGetPlayerAuthClient();
   if (!client) throw new Error('Supabase ist nicht verbunden.');
-  const { data, error } = await client.rpc('guild_tech_upgrade', { p_tech_id: techId });
+  const { data, error } = await client.rpc('guild_tech_contribute', { p_node_id: nodeId });
   if (error) {
     const msg = String(error.message || '');
-    if (msg.includes('insufficient_treasury')) throw new Error('Nicht genug Gold in der Gildenkasse.');
-    if (msg.includes('max_level')) throw new Error('Diese Technologie ist bereits auf Maximalstufe.');
-    if (msg.includes('not_authorized')) throw new Error('Nur Anführer oder Stellvertreter dürfen Technologie verbessern.');
+    if (msg.includes('insufficient_gold')) throw new Error('Nicht genug eigenes Gold.');
+    if (msg.includes('no_attempts_available')) throw new Error('Keine Beitragsversuche mehr übrig - schau später wieder vorbei.');
+    if (msg.includes('node_maxed')) throw new Error('Diese Technologie ist bereits auf Maximalstufe.');
+    if (msg.includes('prereq_not_met')) throw new Error('Die Vorbedingungen für diese Technologie sind noch nicht erfüllt.');
+    if (msg.includes('not_in_guild')) throw new Error('Du bist in keiner Gilde.');
     if (msg.includes('not_authenticated')) throw new Error('Du bist nicht eingeloggt (Sitzung abgelaufen?). Bitte neu einloggen.');
-    if (msg.includes('invalid_tech')) throw new Error('Unbekannte Technologie-ID.');
-    /* Nachbesserung: die generische Meldung ("Verbesserung fehlgeschlagen")
-       verschleierte bisher die echte Postgres-Fehlermeldung komplett - jetzt
-       wird sie zumindest mit angehaengt, damit ein Spieler-Report wie
-       "geht nicht" den tatsaechlichen Fehlercode enthaelt statt nur die
-       Wrapper-Nachricht. */
-    throw new Error('Verbesserung fehlgeschlagen: ' + (msg || 'unbekannter Fehler') + '. Bitte versuche es erneut.');
+    if (msg.includes('invalid_node')) throw new Error('Unbekannte Technologie-ID.');
+    throw new Error('Beitrag fehlgeschlagen: ' + (msg || 'unbekannter Fehler') + '. Bitte versuche es erneut.');
   }
   const row = Array.isArray(data) ? data[0] : data;
-  return row ? { newLevel: Number(row.new_level), treasuryGold: Number(row.treasury_gold) } : null;
+  if (!row) return null;
+  return {
+    newTier: Number(row.new_tier),
+    newProgressGold: Number(row.new_progress_gold),
+    tierGoldCost: Number(row.tier_gold_cost),
+    goldSpent: Number(row.gold_spent),
+    remainingGold: Number(row.remaining_gold),
+    attemptsLeft: Number(row.attempts_left)
+  };
+}
+
+async function bkmpGuildTechGetAttemptStatus() {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return null;
+  const { data, error } = await client.rpc('guild_tech_attempt_status', {});
+  if (error) return null;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return null;
+  return { attempts: Number(row.attempts), maxAttempts: Number(row.max_attempts), secondsToNext: Number(row.seconds_to_next) };
 }
 
 /* ---------------- Gildenquests (siehe supabase-guild-quests.sql) ---------------- */

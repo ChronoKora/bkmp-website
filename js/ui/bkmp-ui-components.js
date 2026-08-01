@@ -163,3 +163,76 @@ function bkmpUiShowToast({ text, kind = 'info', ms = 3200 } = {}) {
     setTimeout(() => toast.remove(), 300);
   }, ms);
 }
+
+/* ---------------- Gilden-Technologie-Baum (31.07.2026) ----------------
+   SVG-Verbindungslinien (eine <line> pro Vorbedingungs-Paar) + darueber-
+   liegende, absolut positionierte klickbare Knoten - bewusst KEIN
+   <foreignObject> (browseruebergreifende Eigenheiten bei Text/Interaktion
+   darin), stattdessen ein einfacher DOM-Overlay auf einem reinen Deko-SVG,
+   Positionen kommen 1:1 aus guild_tech_nodes.pos_x/pos_y (Datenbank ist die
+   einzige Quelle fuer das Baum-Layout, kein zweiter Positionierungscode).
+   nodes = kompletter Katalog (alle 19, ungefiltert - fuer die Vorbedingungs-
+   Aufloesung ueber Kategorie-Grenzen hinweg unnoetig, aber unschaedlich),
+   progressByNodeId = { [nodeId]: {tier, progressGold} } aus
+   bkmpGuildTechGetProgress(), category = 'wachstum'|'schlacht' filtert die
+   ANGEZEIGTEN Knoten. */
+function bkmpUiGuildTechNodeCost(node, tier) {
+  return Math.round(Number(node.base_gold_cost) * Math.pow(Number(node.cost_growth), tier));
+}
+function bkmpUiGuildTechPrereqsMet(node, nodesById, progressByNodeId) {
+  return (node.prereq_node_ids || []).every(prereqId => {
+    const prereqNode = nodesById[prereqId];
+    const haveTier = (progressByNodeId[prereqId] || {}).tier || 0;
+    return prereqNode && haveTier >= prereqNode.max_tier;
+  });
+}
+function bkmpUiGuildTechTreeHtml(nodes, progressByNodeId, category) {
+  const nodesById = {};
+  nodes.forEach(n => { nodesById[n.id] = n; });
+  const visible = nodes.filter(n => n.category === category);
+  if (!visible.length) return '<p class="empty-hint">Noch keine Technologien in dieser Kategorie.</p>';
+
+  const xs = visible.map(n => Number(n.pos_x));
+  const ys = visible.map(n => Number(n.pos_y));
+  const pad = 90;
+  const minX = Math.min(...xs) - pad, maxX = Math.max(...xs) + pad;
+  const minY = Math.min(...ys) - pad, maxY = Math.max(...ys) + pad;
+  const width = maxX - minX, height = maxY - minY;
+
+  const lines = [];
+  visible.forEach(n => {
+    (n.prereq_node_ids || []).forEach(prereqId => {
+      const from = nodesById[prereqId];
+      if (!from) return; // sollte durch die Katalog-Vollstaendigkeits-Tests nie vorkommen
+      const met = bkmpUiGuildTechPrereqsMet(n, nodesById, progressByNodeId);
+      lines.push(`<line x1="${Number(from.pos_x) - minX}" y1="${Number(from.pos_y) - minY}" x2="${Number(n.pos_x) - minX}" y2="${Number(n.pos_y) - minY}" class="bkmp-guild-tech-line${met ? ' met' : ''}" />`);
+    });
+  });
+
+  const nodesHtml = visible.map(n => {
+    const progress = progressByNodeId[n.id] || { tier: 0, progressGold: 0 };
+    const maxed = progress.tier >= n.max_tier;
+    const prereqsMet = bkmpUiGuildTechPrereqsMet(n, nodesById, progressByNodeId);
+    const state = maxed ? 'maxed' : (prereqsMet ? 'available' : 'locked');
+    const tierCost = maxed ? 0 : bkmpUiGuildTechNodeCost(n, progress.tier);
+    const barPct = maxed || !tierCost ? (maxed ? 100 : 0) : Math.min(100, Math.round((progress.progressGold / tierCost) * 100));
+    /* Bewusst KEIN disabled-Attribut auf gesperrten Knoten (echte HTML-
+       disabled-Buttons feuern keine Klick-Events, ein Spieler koennte dann
+       nie erfahren, WELCHE Vorbedingung noch fehlt) - der Klick-Handler
+       (bkmpGuildTechOpenContributeModal, js/systems/bkmp-guild-tech.js)
+       prueft die Vorbedingung selbst und zeigt stattdessen einen Hinweis-
+       Toast. .state-locked traegt die visuelle Sperr-Optik (opacity/cursor)
+       rein per CSS. */
+    return `<button type="button" class="bkmp-guild-tech-node state-${state}" data-node-id="${escapeHtml(n.id)}" style="left:${Number(n.pos_x) - minX}px; top:${Number(n.pos_y) - minY}px" title="${escapeHtml(n.label)}">
+      <span class="bkmp-guild-tech-node-icon">${n.icon || '🌳'}</span>
+      <span class="bkmp-guild-tech-node-label">${escapeHtml(n.label)}</span>
+      <span class="bkmp-guild-tech-node-tier">${state === 'locked' ? '🔒' : `${progress.tier}/${n.max_tier}`}</span>
+      ${!maxed && state !== 'locked' ? `<span class="bkmp-guild-tech-node-bar"><span class="bkmp-guild-tech-node-bar-fill" style="width:${barPct}%"></span></span>` : ''}
+    </button>`;
+  }).join('');
+
+  return `<div class="bkmp-guild-tech-tree" style="width:${width}px; height:${height}px;">
+    <svg class="bkmp-guild-tech-svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">${lines.join('')}</svg>
+    ${nodesHtml}
+  </div>`;
+}

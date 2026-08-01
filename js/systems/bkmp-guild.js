@@ -17,143 +17,17 @@ const BKMP_GUILD_TREASURY_TIERS = [
   { threshold: 50000, pct: 12 },
   { threshold: 150000, pct: 18 }
 ];
-/* ---------------- Gilden-Technologie (siehe supabase-guild-tech-tree.sql)
+/* ---------------- Gilden-Technologie (siehe js/systems/bkmp-guild-tech.js)
    ----------------
-   9 Zweige, jeweils ein fester Prozentsatz pro Stufe - permanent, einmal
-   gekauft, unabhaengig vom aktuellen Kassenstand (im Gegensatz zum
-   bestehenden Kassenstand-Meilenstein-Bonus, der bei sinkendem
-   Kassenstand wieder sinken wuerde). Kostenkurve MUSS exakt mit der
-   serverseitigen Formel in guild_tech_upgrade() uebereinstimmen - hier
-   nur fuer die Anzeige, bezahlt/geprueft wird ausschliesslich serverseitig.
-
-   Rebalance (26.07., direkter Nutzerwunsch "Auch die dürfen erhöht
-   werden etc." - nachdem bereits die 10 neuen Zweige denselben Rebalance
-   bekommen hatten): Maximalstufe 20->35, Kostenkurve 200.000*1,4^Stufe ->
-   250.000*1,18^Stufe (IDENTISCH zur STANDARD_V2-Kurve der neuen Zweige
-   Brutbeschleuniger/Gildenschmiede, siehe unten) + Paragon-Fortfuehrung
-   danach. `effectPerRank`/`maxLevel`/`baseCost`/`growth`/`paragonEligible`
-   sind rein ADDITIV zu den bereits bestehenden `perLevel`/`statKey`-Feldern
-   ergaenzt (nicht ersetzt) - lassen sich dadurch mit denselben generischen
-   Tier-/Paragon-Helfern (bkmpGuildTechExtCostForLevel/bkmpGuildTechParagon*)
-   wie die neuen Zweige weiterverwenden, ohne den bestehenden `perLevel`-
-   Lesepfad in bkmpGuildRefreshTreasuryBonusCache() anzufassen. */
-const BKMP_GUILD_TECH_CATALOG = [
-  { id: 'attack', label: 'Angriff', icon: '⚔️', perLevel: 1, effectPerRank: 1, statKey: 'attackPct', paragonEligible: true, maxLevel: 35, baseCost: 250000, growth: 1.18 },
-  { id: 'defense', label: 'Verteidigung', icon: '🛡️', perLevel: 1, effectPerRank: 1, statKey: 'defensePct', paragonEligible: true, maxLevel: 35, baseCost: 250000, growth: 1.18 },
-  { id: 'gold', label: 'Gold', icon: '💰', perLevel: 1.5, effectPerRank: 1.5, statKey: 'goldPct', paragonEligible: true, maxLevel: 35, baseCost: 250000, growth: 1.18 },
-  { id: 'crit_chance', label: 'Kritchance', icon: '🎯', perLevel: 0.3, effectPerRank: 0.3, statKey: 'critChancePct', paragonEligible: true, maxLevel: 35, baseCost: 250000, growth: 1.18 },
-  { id: 'crit_damage', label: 'Kritischer Schaden', icon: '💥', perLevel: 2, effectPerRank: 2, statKey: 'critDamagePct', paragonEligible: true, maxLevel: 35, baseCost: 250000, growth: 1.18 },
-  { id: 'boss_damage', label: 'Bossschaden', icon: '🐉', perLevel: 2.5, effectPerRank: 2.5, statKey: 'bossDamagePct', paragonEligible: true, maxLevel: 35, baseCost: 250000, growth: 1.18 },
-  { id: 'rune_luck', label: 'Runenglück', icon: '🍀', perLevel: 1.5, effectPerRank: 1.5, statKey: 'runeLuckPct', paragonEligible: true, maxLevel: 35, baseCost: 250000, growth: 1.18 },
-  { id: 'xp', label: 'Erfahrungsbonus', icon: '📖', perLevel: 1, effectPerRank: 1, statKey: 'xpPct', paragonEligible: true, maxLevel: 35, baseCost: 250000, growth: 1.18 },
-  { id: 'prestige', label: 'Prestigebonus', icon: '🌌', perLevel: 0.5, effectPerRank: 0.5, statKey: 'prestigePct', paragonEligible: true, maxLevel: 35, baseCost: 250000, growth: 1.18 }
-];
-function bkmpGuildTechCostForLevel(currentLevel) {
-  return Math.round(250000 * Math.pow(1.18, currentLevel));
-}
-
-/* ---------------- Gilden-Technologie v2: 10 neue Zweige (26.07.2026)
-   ----------------
-   Nutzerwunsch: alle 9 obigen Zweige waren Stufe 20/20, die Kasse hatte
-   nichts mehr zu tun. Statt die bestehenden 9 (uniform 20 Stufen, immer
-   +X%) blind zu erweitern, bekommen die neuen Zweige eigene Mechaniken
-   UND eigene Kosten-/Maximalstufen-Tiers - identisches Konzept wie
-   BKMP_PRESTIGE_TIER in bkmp-prestige.js (nicht jede Idee passt in
-   "20 Stufen a X%": +1 Arena-Versuch/Tag waere bei 20 Stufen absurd
-   stark, Streak-Schutz ist ein reiner Ein/Aus-Schalter).
-
-   Kostenkurve/Maximalstufe MUSS exakt mit guild_tech_upgrade() in
-   sql/20260726-guild-tech-branches-v2.sql uebereinstimmen - der Client
-   rechnet nur zur Anzeige, bezahlt/geprueft wird ausschliesslich
-   serverseitig (gleiches Prinzip wie bei den bestehenden 9 Zweigen). */
-const BKMP_GUILD_TECH_TIER = {
-  STANDARD: { maxLevel: 20, baseCost: 200000, growth: 1.4 },
-  /* Nachbesserung (26.07., Spieler-Feedback: bei einer Multi-Milliarden-
-     Kasse waren alle 10 neuen Zweige mit ~40M Gold komplett durchgekauft -
-     spuerbar zu billig). Maximalstufen deutlich angehoben + Kostenkurven
-     neu kalibriert: Maxen ALLER 10 neuen Zweige kostet jetzt zusammen
-     ca. 4,36 Mrd. Gold (vorher ca. 40M) - ein echtes, langfristiges Ziel
-     statt Wechselgeld. LOW5/MED10 in LOW/MED umbenannt (Maximalstufe ist
-     nicht mehr 5/10), STANDARD_V2 ist eine EIGENE, von der bestehenden
-     STANDARD-Kurve der urspruenglichen 9 Zweige getrennte Kopie (die
-     alten 9 Zweige bleiben unangetastet). */
-  LOW: { maxLevel: 15, baseCost: 600000, growth: 1.5 },
-  MED: { maxLevel: 25, baseCost: 350000, growth: 1.28 },
-  STANDARD_V2: { maxLevel: 35, baseCost: 250000, growth: 1.18 },
-  TOGGLE: { maxLevel: 1, baseCost: 8000000, growth: 1 }
-};
-function bkmpGuildTechTierDef(tier) {
-  return { ...(BKMP_GUILD_TECH_TIER[tier] || BKMP_GUILD_TECH_TIER.STANDARD) };
-}
-function bkmpGuildTechExtCostForLevel(def, currentLevel) {
-  return Math.round(def.baseCost * Math.pow(def.growth, currentLevel));
-}
-/* ---------------- Paragon-Fortfuehrung nach der Maximalstufe (26.07.) ----------------
-   Identisches Prinzip wie BKMP_PRESTIGE_PARAGON_* in bkmp-prestige.js:
-   nach der (jetzt deutlich hoeheren) Maximalstufe geht es mit einem
-   schwaecheren Bonus (4% des normalen Rang-Effekts) und einer steileren,
-   aber am Ende der normalen Kurve ANSETZENDEN Kostenkurve weiter (+0,15
-   auf das Wachstum) - haelt die Kasse auch nach dem vollen Ausbau
-   dauerhaft relevant, statt sie wieder komplett brachliegen zu lassen.
-   Gespeichert als eigene, synthetische tech_id "<id>__paragon" im
-   bereits bestehenden flachen guild_tech_levels-Schema (identischer
-   Trick wie __dragon_souls/__ascension_level im Spieler-Prestige-JSONB)
-   - keine neue Tabelle/Spalte noetig. BEWUSST NICHT fuer die 2 TOGGLE-
-   Zweige (Streak-Schutz/Willkommenspaket) - ein reiner Ein/Aus-Schalter
-   hat keine sinnvolle "noch mehr davon"-Fortsetzung. */
-const BKMP_GUILD_TECH_PARAGON_MAX_RANK = 1000;
-const BKMP_GUILD_TECH_PARAGON_EFFECT_RATIO = 0.04;
-const BKMP_GUILD_TECH_PARAGON_GROWTH_BONUS = 0.15;
-function bkmpGuildTechParagonKey(techId) { return `${techId}__paragon`; }
-function bkmpGuildTechParagonEffectPerRank(tech) { return tech.effectPerRank * BKMP_GUILD_TECH_PARAGON_EFFECT_RATIO; }
-/* Kosten setzen nahtlos an der letzten NORMALEN Stufe an (baseCost*growth^(maxLevel-1)),
-   danach mit dem gebumpten Wachstum weiter - siehe sql/20260726-guild-tech-
-   rebalance-paragon.sql fuer die serverseitig hart hinterlegten, hier
-   identisch nachgerechneten Basiswerte pro Zweig. */
-function bkmpGuildTechParagonCost(tech, currentParagonRank) {
-  const lastNormalLevelCost = tech.baseCost * Math.pow(tech.growth, tech.maxLevel - 1);
-  const growth = tech.growth + BKMP_GUILD_TECH_PARAGON_GROWTH_BONUS;
-  const raw = lastNormalLevelCost * Math.pow(growth, currentParagonRank + 1);
-  return Number.isFinite(raw) && raw < Number.MAX_SAFE_INTEGER ? Math.round(raw) : Number.MAX_SAFE_INTEGER;
-}
-/* Gemeinsamer "Maximalstufe erreicht"-Kartenbereich, von BEIDEN Katalogen
-   genutzt (den urspruenglichen 9 UND den 10 neuen Zweigen, seit dem
-   Rebalance vom 26.07. teilen sich beide dieselbe Paragon-Mechanik) -
-   vermeidet doppelten Code fuer identische Logik. */
-function bkmpGuildTechMaxedExtraHtml(tech, canUpgrade, treasuryGold) {
-  if (!tech.paragonEligible) return '<span class="idle-guild-tech-maxed">✅ Maximalstufe</span>';
-  const paragonKey = bkmpGuildTechParagonKey(tech.id);
-  const paragonRank = bkmpGuildTechLevels[paragonKey] || 0;
-  const paragonMaxed = paragonRank >= BKMP_GUILD_TECH_PARAGON_MAX_RANK;
-  const paragonCost = bkmpGuildTechParagonCost(tech, paragonRank);
-  const paragonCanAfford = treasuryGold >= paragonCost;
-  return `
-    <span class="idle-guild-tech-maxed">✅ Maximalstufe</span>
-    <div class="idle-guild-tech-paragon">
-      <div class="idle-guild-tech-paragon-rank">🌟 Paragon-Rang ${bkmpIdleFormatNumber(paragonRank)}</div>
-      ${paragonMaxed
-        ? '<span class="idle-guild-tech-maxed">Paragon-Maximalrang</span>'
-        : `<button type="button" class="btn-ja idle-guild-tech-paragon-btn" data-tech-id="${paragonKey}" ${!canUpgrade || !paragonCanAfford || bkmpGuildBusy ? 'disabled' : ''}>+Paragon: ${bkmpIdleFormatNumber(paragonCost)} 💰</button>`}
-    </div>`;
-}
-/* effectType/effectPerRank statt statKey/perLevel (Namenskonvention
-   angeglichen an BKMP_PRESTIGE_UPGRADES) - die 9 STANDARD-Zweige oben
-   bleiben bewusst unangetastet (eigenes, bereits laenger etabliertes
-   Schema), keine Notwendigkeit, funktionierenden Code umzubauen. */
-const BKMP_GUILD_TECH_CATALOG_EXT = [
-  { id: 'guild_kriegsrat', label: 'Kriegsrat', icon: '🗡️', desc: '+1 zusätzlicher Arena-Angriff pro Tag (über das normale 10x-Tageslimit hinaus) pro Stufe.', effectType: 'arenaExtraAttempts', effectPerRank: 1, paragonEligible: true, ...bkmpGuildTechTierDef('LOW') },
-  { id: 'guild_turm_vorreiter', label: 'Turm-Vorreiter', icon: '🗼', desc: 'Die höchste je von einem Mitglied erreichte Turmstufe gibt der GESAMTEN Gilde einen kleinen Dauerbonus auf Angriff/Verteidigung/Gold (+0,05% pro 10 Turmstufen des Vorreiters, pro Stufe dieser Technologie).', effectType: 'towerChampionPctPer10', effectPerRank: 0.05, paragonEligible: true, ...bkmpGuildTechTierDef('MED') },
-  { id: 'guild_brutbeschleuniger', label: 'Brutbeschleuniger', icon: '🥚', desc: 'Verkürzt die Brutzeit neuer Drachen und senkt die Opfergabe-Kosten seltener Eier für alle Mitglieder um 1% pro Stufe.', effectType: 'broodSpeedPct', effectPerRank: 1, paragonEligible: true, ...bkmpGuildTechTierDef('STANDARD_V2') },
-  { id: 'guild_schmiede', label: 'Gildenschmiede', icon: '⚒️', desc: 'Günstigere Runen-Aufwertungskosten für alle Mitglieder (1% pro Stufe).', effectType: 'runeUpgradeDiscountPct', effectPerRank: 1, paragonEligible: true, ...bkmpGuildTechTierDef('STANDARD_V2') },
-  { id: 'guild_autokauf', label: 'Gilden-Autokauf', icon: '🤖', desc: '+2 automatische Käufe pro Tick für alle Mitglieder, pro Stufe.', effectType: 'autobuyExtraPurchases', effectPerRank: 2, paragonEligible: true, ...bkmpGuildTechTierDef('MED') },
-  { id: 'guild_nachtwache', label: 'Nachtwache', icon: '🌙', desc: '+0,5 Std. Offline-Fortschritts-Deckel für alle Mitglieder, pro Stufe.', effectType: 'offlineCapExtraHours', effectPerRank: 0.5, paragonEligible: true, ...bkmpGuildTechTierDef('MED') },
-  { id: 'guild_streak_schutz', label: 'Streak-Schutz', icon: '🛡️', desc: 'Ein ausgelassener Tag setzt die Login-Serie nur um eine Stufe zurück statt komplett auf 1.', effectType: 'streakProtectUnlock', effectPerRank: 1, paragonEligible: false, ...bkmpGuildTechTierDef('TOGGLE') },
-  { id: 'guild_stadtmauer', label: 'Stadtmauer', icon: '🏯', desc: 'Erhöht den eigenen HP-Beitrag zur gemeinsamen Stadt-HP beim Beitritt zu einem Weltboss-Raid um 1% pro Stufe.', effectType: 'raidCityHpPct', effectPerRank: 1, paragonEligible: true, ...bkmpGuildTechTierDef('MED') },
-  { id: 'guild_aufstiegsvorbereitung', label: 'Aufstiegsvorbereitung', icon: '🌌', desc: 'Senkt die Mindestanforderungen für die zweite Prestige-Ebene ("Aufstieg") für alle Mitglieder um 2% pro Stufe.', effectType: 'ascensionThresholdDiscountPct', effectPerRank: 2, paragonEligible: true, ...bkmpGuildTechTierDef('LOW') },
-  { id: 'guild_willkommenspaket', label: 'Willkommenspaket', icon: '🎁', desc: 'Neue Mitglieder erhalten in den ersten 3 Tagen nach dem Beitritt +10% auf Angriff/Verteidigung/Gold.', effectType: 'newMemberBonusUnlock', effectPerRank: 1, paragonEligible: false, ...bkmpGuildTechTierDef('TOGGLE') }
-];
-const BKMP_GUILD_NEW_MEMBER_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
-const BKMP_GUILD_NEW_MEMBER_BONUS_PCT = 10;
+   31.07.2026: das komplette Katalog-/Kosten-/Paragon-/Panel-Geruest fuer
+   das alte "Anfuehrer/Stellvertreter kauft Raenge aus der Gildenkasse"-
+   System (BKMP_GUILD_TECH_CATALOG/_EXT, Tier-/Paragon-Helfer,
+   bkmpIdleRenderGildeTechPanel) wurde HIERHIN verschoben und durch das
+   neue Baum-System mit Mitglieder-Beitraegen ersetzt (siehe Plan
+   zazzy-crunching-plum.md) - js/systems/bkmp-guild-tech.js ist die neue,
+   alleinige Quelle. BKMP_GUILD_TECH_CACHE_KEY/bkmpIdleGetGuildTechCache()/
+   bkmpGuildTechBonus() bleiben bewusst HIER (generischer Cache-Leser,
+   unveraendert von 7+ anderen Dateien genutzt - siehe unten). */
 const BKMP_GUILD_TECH_CACHE_KEY = 'bkmp-guild-tech-cache';
 
 /* ---------------- Gildenplätze dazukaufen (siehe supabase-guild-extra-
@@ -205,73 +79,15 @@ async function bkmpGuildRefreshTreasuryBonusCache() {
     const bonusPct = bkmpIdleGuildTreasuryBonusPct(treasury);
     localStorage.setItem(BKMP_GUILD_TREASURY_BONUS_CACHE_KEY, String(bonusPct));
 
-    const levels = mine ? await bkmpGuildGetTechLevels(mine.guild.id) : {};
-    const techTotals = {};
-    BKMP_GUILD_TECH_CATALOG.forEach(tech => {
-      let total = (levels[tech.id] || 0) * tech.perLevel;
-      // Rebalance (26.07.): Paragon-Fortfuehrung, identisches Prinzip wie
-      // bei den 10 neuen Zweigen unten.
-      if (tech.paragonEligible) {
-        const paragonLevel = levels[bkmpGuildTechParagonKey(tech.id)] || 0;
-        total += paragonLevel * bkmpGuildTechParagonEffectPerRank(tech);
-      }
-      techTotals[tech.statKey] = total;
-    });
-    /* Gilden-Technologie v2 (26.07.): die 8 "einfachen" neuen Zweige folgen
-       demselben Rang*Effekt-Muster wie oben, nur unter effectType statt
-       statKey - Turm-Vorreiter/Willkommenspaket brauchen eine eigene
-       Berechnung (siehe unten), werden hier bewusst uebersprungen. */
-    BKMP_GUILD_TECH_CATALOG_EXT.forEach(tech => {
-      if (tech.effectType === 'towerChampionPctPer10' || tech.effectType === 'newMemberBonusUnlock') return;
-      let total = (levels[tech.id] || 0) * tech.effectPerRank;
-      /* Rebalance (26.07.): Paragon-Fortfuehrung nach der Maximalstufe -
-         zaehlt nur, wenn der Zweig ueberhaupt Paragon-faehig ist (nicht
-         Streak-Schutz/Willkommenspaket) UND die Maximalstufe bereits
-         erreicht ist (Paragon-Raenge koennen serverseitig ohnehin nur
-         gekauft werden, sobald die Basis-Stufe voll ist, siehe
-         guild_tech_upgrade()-Aequivalent fuer "<id>__paragon"). */
-      if (tech.paragonEligible) {
-        const paragonLevel = levels[bkmpGuildTechParagonKey(tech.id)] || 0;
-        total += paragonLevel * bkmpGuildTechParagonEffectPerRank(tech);
-      }
-      techTotals[tech.effectType] = total;
-    });
-
-    /* Turm-Vorreiter: haengt zusaetzlich von der hoechsten je erreichten
-       Turmstufe UNTER ALLEN Mitgliedern ab, nicht nur vom Rang selbst -
-       braucht eine gezielte idle_player_state-Abfrage ueber die bereits
-       geladene Mitgliederliste (siehe loadGuildTowerChampionWave,
-       supabase.js). Rebalance (26.07.): Deckel von 25% auf 50% anghoben,
-       proportional zur von 10 auf 25 angehobenen Maximalstufe (sonst
-       waeren die zusaetzlichen 15 Stufen bei einer normalen Turmstufe
-       wirkungslos gewesen) - Paragon-Raenge zaehlen als Bruchteil einer
-       normalen Stufe (4% pro Rang) in dieselbe Formel hinein. */
-    const turmVorreiterLevel = levels['guild_turm_vorreiter'] || 0;
-    const turmVorreiterParagon = levels[bkmpGuildTechParagonKey('guild_turm_vorreiter')] || 0;
-    const turmVorreiterEffectiveLevel = turmVorreiterLevel + turmVorreiterParagon * BKMP_GUILD_TECH_PARAGON_EFFECT_RATIO;
-    let towerChampionPct = 0;
-    if (mine && turmVorreiterEffectiveLevel > 0 && typeof loadGuildTowerChampionWave === 'function') {
-      try {
-        const championWave = await loadGuildTowerChampionWave(mine.members.map(m => m.authUserId));
-        towerChampionPct = Math.min(50, Math.floor(championWave / 10) * turmVorreiterEffectiveLevel * 0.05);
-      } catch (e) { /* Netzwerkfehler - Bonus bleibt 0 statt eines veralteten Werts */ }
+    /* Gilden-Technologie v3 (31.07.2026): die komplette Tech-Aggregation
+       (frueher direkt hier, siehe Git-Historie) lebt jetzt in
+       js/systems/bkmp-guild-tech.js - schreibt in denselben
+       BKMP_GUILD_TECH_CACHE_KEY, bkmpGuildTechBonus() bleibt fuer alle
+       Aufrufer unveraendert. typeof-Guard, falls die neue Datei aus
+       irgendeinem Grund (noch) nicht geladen ist. */
+    if (typeof bkmpGuildTechRecomputeBonusCache === 'function') {
+      await bkmpGuildTechRecomputeBonusCache(mine);
     }
-    techTotals.towerChampionPct = towerChampionPct;
-
-    /* Willkommenspaket: reiner Ein/Aus-Schalter (TOGGLE, max. 1 Stufe) UND
-       zeitlich befristet - beides muss hier zusammenlaufen, damit der
-       Rest des Codes (idledorf.js liest nur noch den fertigen Pool-Wert)
-       einfach bleibt. */
-    let newMemberBonusPct = 0;
-    if (mine && (levels['guild_willkommenspaket'] || 0) > 0 && mine.myJoinedAt) {
-      const joinedMs = Date.parse(mine.myJoinedAt);
-      if (Number.isFinite(joinedMs) && (Date.now() - joinedMs) < BKMP_GUILD_NEW_MEMBER_WINDOW_MS) {
-        newMemberBonusPct = BKMP_GUILD_NEW_MEMBER_BONUS_PCT;
-      }
-    }
-    techTotals.newMemberBonusPct = newMemberBonusPct;
-
-    localStorage.setItem(BKMP_GUILD_TECH_CACHE_KEY, JSON.stringify(techTotals));
 
     if (mine && !bkmpGuildLevelThresholds.length) {
       bkmpGuildLevelThresholds = await bkmpGuildGetLevelThresholds();
@@ -318,8 +134,6 @@ let bkmpGuildJoinRequests = [];
 let bkmpGuildJoinRequestsLoadedForGuildId = null;
 let bkmpGuildExpandedBrowseGuildId = null;
 let bkmpGuildBrowseMembersCache = {};
-let bkmpGuildTechLevels = {};
-let bkmpGuildTechLoadedForGuildId = null;
 let bkmpGuildQuests = [];
 let bkmpGuildQuestsLoadedForGuildId = null;
 const BKMP_GUILD_QUEST_CATALOG = {
@@ -926,6 +740,17 @@ window.BKMP_GUILD_ACHIEVEMENTS_EXTRA = [
   { id: 'guild_level_5', category: 'Gilde', title: 'Aufstrebende Gilde', desc: 'Erreiche Gildenlevel 5.', progress: ctx => [ctx.guildLevel, 5], check: ctx => ctx.guildLevel >= 5 },
   { id: 'guild_level_10', category: 'Gilde', title: 'Etablierte Gilde', desc: 'Erreiche Gildenlevel 10.', progress: ctx => [ctx.guildLevel, 10], check: ctx => ctx.guildLevel >= 10 },
   { id: 'guild_level_20', category: 'Gilde', title: 'Mächtige Gilde', desc: 'Erreiche Gildenlevel 20.', progress: ctx => [ctx.guildLevel, 20], check: ctx => ctx.guildLevel >= 20 },
+  /* Level-Ausbau auf Deckel 100 (01.08.2026, siehe CLAUDE.md/sql/20260801-
+     guild-level-cap-100.sql) - vier neue Meilensteine fuer bereits auf dem
+     alten Deckel (30) ausgereizte Gilden. Titel-Text ist bewusst IDENTISCH
+     zum zugehoerigen idletitle_guild_levelXX-Namen (idledorf.js) - das ist
+     die einzige Verknuepfung, ueber die bkmpAchievementLinkedTitleBonus()
+     (js/core/bkmp-site.js) den echten Bonus automatisch auf der Erfolgs-
+     Karte anzeigt (siehe Bug-3-Fix vom 25.07.2026). */
+  { id: 'guild_level_40', category: 'Gilde', title: 'Legendäre Gilde', desc: 'Erreiche Gildenlevel 40.', progress: ctx => [ctx.guildLevel, 40], check: ctx => ctx.guildLevel >= 40 },
+  { id: 'guild_level_60', category: 'Gilde', title: 'Imperiale Gilde', desc: 'Erreiche Gildenlevel 60.', progress: ctx => [ctx.guildLevel, 60], check: ctx => ctx.guildLevel >= 60 },
+  { id: 'guild_level_80', category: 'Gilde', title: 'Unaufhaltsame Gilde', desc: 'Erreiche Gildenlevel 80.', progress: ctx => [ctx.guildLevel, 80], check: ctx => ctx.guildLevel >= 80 },
+  { id: 'guild_level_100', category: 'Gilde', title: 'Gilde der Ewigkeit', desc: 'Erreiche Gildenlevel 100 (Maximalstufe).', progress: ctx => [ctx.guildLevel, 100], check: ctx => ctx.guildLevel >= 100 },
   { id: 'guild_xp_1m', category: 'Gilde', title: 'Großzügige Gilde', desc: 'Deine Gilde hat insgesamt 1.000.000 Gold in die Kasse eingezahlt.', progress: ctx => [ctx.guildXp, 1000000], check: ctx => ctx.guildXp >= 1000000 },
   { id: 'guild_boss_first', category: 'Gilde', title: 'Erster Gildenboss', desc: 'Besiege deinen ersten Gildenboss.', check: ctx => ctx.guildBossesDefeated >= 1 },
   { id: 'guild_boss_10', category: 'Gilde', title: 'Gildenboss-Bezwinger', desc: 'Besiege 10 Gildenbosse.', progress: ctx => [ctx.guildBossesDefeated, 10], check: ctx => ctx.guildBossesDefeated >= 10 },
@@ -1621,147 +1446,12 @@ async function bkmpIdleRenderGildePanel() {
 }
 
 /* ---------------- Rendering: Gilden-Technologie-Tab ----------------
-   Eigener Tab statt Teil des Gilde-Tabs - 9 Karten brauchen sichtbaren
-   Platz, gleiche Trennung wie Skilltree vs. Kampf-Tab. */
-async function bkmpIdleRenderGildeTechPanel() {
-  const panel = document.getElementById('idlePanelGildeTech');
-  if (!panel) return;
-  if (!bkmpGuildLoaded && !bkmpGuildLoading) await bkmpGuildLoadAll();
-
-  if (!bkmpGuildState) {
-    panel.innerHTML = `
-      <div class="idle-dungeon-intro">
-        <h4>🌳 Gilden-Technologie</h4>
-        <p>Du musst Mitglied einer Gilde sein, um an der gemeinsamen Technologie mitzuwirken.</p>
-      </div>`;
-    return;
-  }
-
-  const g = bkmpGuildState.guild;
-  const canUpgrade = bkmpGuildState.myRole === 'leader' || bkmpGuildState.myRole === 'officer';
-
-  if (bkmpGuildTechLoadedForGuildId !== g.id) {
-    bkmpGuildTechLoadedForGuildId = g.id;
-    bkmpGuildGetTechLevels(g.id).then(levels => { bkmpGuildTechLevels = levels; bkmpIdleRenderGildeTechPanel(); }).catch(() => {});
-  }
-
-  panel.innerHTML = `
-    <div class="idle-dungeon-intro">
-      <h4>🌳 Gilden-Technologie</h4>
-      <p>Permanente Boni für ALLE Mitglieder, bezahlt aus der Gildenkasse (💰 ${bkmpIdleFormatNumber(g.treasuryGold)}).${canUpgrade ? '' : ' Nur Anführer oder Stellvertreter dürfen verbessern.'}</p>
-    </div>
-    <div class="idle-guild-tech-grid">
-      ${BKMP_GUILD_TECH_CATALOG.map(tech => {
-        const level = bkmpGuildTechLevels[tech.id] || 0;
-        const maxed = level >= tech.maxLevel;
-        const cost = bkmpGuildTechCostForLevel(level);
-        const canAfford = g.treasuryGold >= cost;
-        /* Bugfix (Spieler-Meldung 30.07.2026: "Level Paragon hoch aber am
-           Wert ändert sich nichts") - vorher stand hier direkt "(level *
-           tech.perLevel).toFixed(1)", was den Paragon-Rang komplett
-           ignorierte, obwohl bkmpGuildRefreshTreasuryBonusCache() dessen
-           Beitrag laengst korrekt in den Cache einrechnet (siehe dortige
-           Zeile "total += paragonLevel * bkmpGuildTechParagonEffectPerRank").
-           Der reale Spieleffekt war also nie betroffen, nur diese eine
-           Anzeige - jetzt dieselbe bereits berechnete, Paragon-inklusive
-           Quelle lesen wie jeder andere Aufrufer von bkmpGuildTechBonus(). */
-        const bonusDisplay = bkmpGuildTechBonus(tech.statKey).toFixed(1).replace(/\.0$/, '');
-        return `
-          <div class="idle-guild-tech-card">
-            <div class="idle-guild-tech-icon">${tech.icon}</div>
-            <div class="idle-guild-tech-name">${escapeHtml(tech.label)}</div>
-            <div class="idle-guild-tech-level">Stufe ${level}/${tech.maxLevel}</div>
-            <div class="idle-guild-tech-bonus">+${bonusDisplay}%</div>
-            ${maxed
-              ? bkmpGuildTechMaxedExtraHtml(tech, canUpgrade, g.treasuryGold)
-              : `<button type="button" class="btn-ja idle-guild-tech-upgrade-btn" data-tech-id="${tech.id}" ${!canUpgrade || !canAfford || bkmpGuildBusy ? 'disabled' : ''}>${bkmpIdleFormatNumber(cost)} 💰</button>`}
-          </div>
-        `;
-      }).join('')}
-    </div>
-    <div class="idle-dungeon-intro idle-guild-tech-ext-intro">
-      <h4>🧪 Erweiterte Technologien</h4>
-      <p>Zehn weitere, eigenständige Zweige (kein reiner Prozent-Stat) - jeweils eigene Maximalstufe.</p>
-    </div>
-    <div class="idle-guild-tech-grid idle-guild-tech-ext-grid">
-      ${BKMP_GUILD_TECH_CATALOG_EXT.map(tech => {
-        const level = bkmpGuildTechLevels[tech.id] || 0;
-        const maxed = level >= tech.maxLevel;
-        const cost = bkmpGuildTechExtCostForLevel(tech, level);
-        const canAfford = g.treasuryGold >= cost;
-        return `
-          <div class="idle-guild-tech-card">
-            <div class="idle-guild-tech-icon">${tech.icon}</div>
-            <div class="idle-guild-tech-name">${escapeHtml(tech.label)}</div>
-            <div class="idle-guild-tech-level">Stufe ${level}/${tech.maxLevel}</div>
-            <div class="idle-guild-tech-bonus">${bkmpGuildTechExtBonusDisplay(tech, level)}</div>
-            <div class="idle-guild-tech-desc">${escapeHtml(tech.desc)}</div>
-            ${maxed
-              ? bkmpGuildTechMaxedExtraHtml(tech, canUpgrade, g.treasuryGold)
-              : `<button type="button" class="btn-ja idle-guild-tech-upgrade-btn" data-tech-id="${tech.id}" ${!canUpgrade || !canAfford || bkmpGuildBusy ? 'disabled' : ''}>${bkmpIdleFormatNumber(cost)} 💰</button>`}
-          </div>
-        `;
-      }).join('')}
-    </div>
-  `;
-
-  panel.querySelectorAll('.idle-guild-tech-upgrade-btn, .idle-guild-tech-paragon-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const techId = btn.dataset.techId;
-      if (!techId || bkmpGuildBusy) return;
-      bkmpGuildBusy = true;
-      try {
-        const result = await bkmpGuildTechUpgrade(techId);
-        if (result) {
-          bkmpGuildTechLevels[techId] = result.newLevel;
-          bkmpGuildState.guild.treasuryGold = result.treasuryGold;
-          /* War bisher ein "fire-and-forget"-Aufruf (kein await) - die
-             Karte konnte dadurch mit dem noch alten (Paragon-)Bonuswert
-             neu rendern, falls das Netzwerk-Refresh minimal langsamer war
-             als der synchrone Rest dieses Handlers. Jetzt abgewartet, damit
-             die "+X%"-Anzeige direkt nach dem Kauf garantiert aktuell ist. */
-          await bkmpGuildRefreshTreasuryBonusCache();
-          const isParagon = techId.endsWith('__paragon');
-          const baseTechId = isParagon ? techId.slice(0, -'__paragon'.length) : techId;
-          const techDef = BKMP_GUILD_TECH_CATALOG.find(t => t.id === baseTechId) || BKMP_GUILD_TECH_CATALOG_EXT.find(t => t.id === baseTechId);
-          const label = techDef ? techDef.label : baseTechId;
-          if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(isParagon ? `🌟 ${label}: Paragon-Rang ${result.newLevel}!` : `🌳 ${label} auf Stufe ${result.newLevel}!`, 3000);
-        }
-      } catch (e) {
-        if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(e.message, 3400);
-      }
-      bkmpGuildBusy = false;
-      await bkmpIdleRenderGildeTechPanel();
-    });
-  });
-}
-/* Jeder der 10 neuen Zweige braucht eine eigene Anzeigeform - anders als
-   die 9 STANDARD-Zweige (immer "+X%") sind hier Zaehlwerte (Versuche/
-   Kaeufe/Stunden), ein reiner Ein/Aus-Schalter (TOGGLE) und ein von
-   externen Live-Daten abhaengiger Wert (Turm-Vorreiter) gemischt. */
-/* Bugfix (Spieler-Meldung 30.07.2026: "Level Paragon hoch aber am Wert
-   ändert sich nichts") - dieselbe Ursache wie beim Bugfix-Kommentar oben bei
-   BKMP_GUILD_TECH_CATALOG: guild_kriegsrat/guild_autokauf/guild_nachtwache
-   sowie der generische Prozent-Fall rechneten bisher direkt "level *
-   effectPerRank" aus, ohne je den Paragon-Rang zu beruecksichtigen - der
-   reale Spieleffekt (bkmpGuildTechBonus()) war davon nie betroffen, nur die
-   Anzeige. guild_turm_vorreiter nutzte bereits korrekt bkmpGuildTechBonus()
-   (einziger Zweig ohne diesen Bug) - jetzt alle Paragon-faehigen Zweige
-   einheitlich ueber dieselbe, bereits Paragon-inklusive Cache-Quelle. */
-function bkmpGuildTechExtBonusDisplay(tech, level) {
-  if (tech.id === 'guild_turm_vorreiter') {
-    const active = bkmpGuildTechBonus('towerChampionPct');
-    return level > 0 ? `+${active.toFixed(2).replace(/\.?0+$/, '')}% (aktuell)` : '—';
-  }
-  if (tech.id === 'guild_streak_schutz' || tech.id === 'guild_willkommenspaket') {
-    return level > 0 ? '✅ Aktiv' : '❌ Inaktiv';
-  }
-  if (tech.id === 'guild_kriegsrat') return `+${bkmpGuildTechBonus('arenaExtraAttempts').toFixed(2).replace(/\.?0+$/, '')} Versuch(e)/Tag`;
-  if (tech.id === 'guild_autokauf') return `+${bkmpGuildTechBonus('autobuyExtraPurchases').toFixed(2).replace(/\.?0+$/, '')} Käufe/Tick`;
-  if (tech.id === 'guild_nachtwache') return `+${bkmpGuildTechBonus('offlineCapExtraHours').toFixed(1).replace(/\.0$/, '')} Std.`;
-  const pct = bkmpGuildTechBonus(tech.effectType).toFixed(1).replace(/\.0$/, '');
-  return `+${pct}%`;
-}
+   31.07.2026: bkmpIdleRenderGildeTechPanel() (das alte "Anfuehrer kauft
+   Raenge aus der Gildenkasse"-Panel) und bkmpGuildTechExtBonusDisplay()
+   wurden HIERHIN entfernt - die Funktion mit demselben Namen wird jetzt
+   in js/systems/bkmp-guild-tech.js definiert (neues Baum-Panel mit
+   Mitglieder-Beitraegen). Die Tab-Registry in idledorf.js verweist
+   weiterhin auf denselben Funktionsnamen, keine Aenderung dort noetig. */
 async function bkmpIdleRenderGildeBossPanel() {
   const panel = document.getElementById('idlePanelGildeBoss');
   if (!panel) return;
