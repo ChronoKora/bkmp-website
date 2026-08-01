@@ -524,27 +524,34 @@ function bkmpRaidRenderCombat() {
     const info = bkmpRaidGetPhaseInfo();
     timerEl.textContent = info.phase === 'fight' ? '⏳ ' + bkmpRaidFormatCountdown(info.msUntilFightEnd) : '';
   }
-  /* App-Modus (Phase 16): Tap-Schaden-Zaehler pro Raid zuruecksetzen
-     (neue Raid-Id seit letztem Render = neuer Kampf) und zusammen mit
-     der Ressourcen-Leiste rendern - beides rein lesend aus bereits
-     vorhandenem State, auf der Website ohne Wirkung (Elemente existieren
-     dort nicht). */
-  if (window.BKMP_APP_MODE) {
-    if (bkmpRaidState.id !== bkmpRaidTapDamageSessionId) {
-      bkmpRaidTapDamageSessionId = bkmpRaidState.id;
-      bkmpRaidTapDamageSession = 0;
-    }
-    const tapVal = document.querySelector('#raidTapDamagePill .idle-res-val');
-    if (tapVal) tapVal.textContent = bkmpIdleFormatNumber(bkmpRaidTapDamageSession);
-    const strip = document.getElementById('raidRewardsStrip');
-    if (strip && bkmpIdleState) {
-      strip.innerHTML = `
-        <span class="idle-res-chip idle-res-gold"><i class="idle-res-icon">💰</i><b class="idle-res-val">${bkmpIdleFormatNumber(bkmpIdleState.gold)}</b></span>
-        <span class="idle-res-chip idle-res-wood"><i class="idle-res-icon">🌳</i><b class="idle-res-val">${bkmpIdleFormatNumber(bkmpIdleState.wood)}</b></span>
-        <span class="idle-res-chip idle-res-stone"><i class="idle-res-icon">🗿</i><b class="idle-res-val">${bkmpIdleFormatNumber(bkmpIdleState.stone)}</b></span>
-        <span class="idle-res-chip idle-res-crystal"><i class="idle-res-icon">💎</i><b class="idle-res-val">${bkmpIdleFormatNumber(bkmpIdleState.crystals)}</b></span>
-        <span class="idle-res-chip idle-res-essence"><i class="idle-res-icon">🧪</i><b class="idle-res-val">${bkmpIdleFormatNumber(bkmpIdleState.essence)}</b></span>`;
-    }
+  /* Tap-Schaden-Zaehler pro Raid zuruecksetzen (neue Raid-Id seit letztem
+     Render = neuer Kampf) und zusammen mit der Ressourcen-Leiste rendern -
+     beides rein lesend aus bereits vorhandenem State.
+     Bug gefunden 01.08.2026 (Spieler-Nachfrage "Klickzaehler funktioniert
+     nicht"): dieser Block stand bisher hinter "if (window.BKMP_APP_MODE)"
+     - der urspruengliche Kommentar behauptete, die Elemente existierten
+     auf der normalen Website nicht, das stimmt aber nicht (#raidTapDamagePill/
+     #raidRewardsStrip stehen unconditional in index.html, .raid-action-bar
+     ist seit Redesign Phase 5 IMMER sichtbar, siehe Kommentar dort). Jeder
+     Klick zaehlte serverseitig+intern (bkmpRaidTapDamageSession) also
+     schon immer korrekt mit, nur die Anzeige aktualisierte sich auf der
+     normalen Website nie - exakt dasselbe Bugmuster wie der bereits am
+     19.07. gefixte #raidAttackBtn (siehe Kommentar in idledorf.js). Fix:
+     unconditional, Elementpruefung statt App-Modus-Abhaengigkeit. */
+  if (bkmpRaidState.id !== bkmpRaidTapDamageSessionId) {
+    bkmpRaidTapDamageSessionId = bkmpRaidState.id;
+    bkmpRaidTapDamageSession = 0;
+  }
+  const tapVal = document.querySelector('#raidTapDamagePill .idle-res-val');
+  if (tapVal) tapVal.textContent = bkmpIdleFormatNumber(bkmpRaidTapDamageSession);
+  const strip = document.getElementById('raidRewardsStrip');
+  if (strip && bkmpIdleState) {
+    strip.innerHTML = `
+      <span class="idle-res-chip idle-res-gold"><i class="idle-res-icon">💰</i><b class="idle-res-val">${bkmpIdleFormatNumber(bkmpIdleState.gold)}</b></span>
+      <span class="idle-res-chip idle-res-wood"><i class="idle-res-icon">🌳</i><b class="idle-res-val">${bkmpIdleFormatNumber(bkmpIdleState.wood)}</b></span>
+      <span class="idle-res-chip idle-res-stone"><i class="idle-res-icon">🗿</i><b class="idle-res-val">${bkmpIdleFormatNumber(bkmpIdleState.stone)}</b></span>
+      <span class="idle-res-chip idle-res-crystal"><i class="idle-res-icon">💎</i><b class="idle-res-val">${bkmpIdleFormatNumber(bkmpIdleState.crystals)}</b></span>
+      <span class="idle-res-chip idle-res-essence"><i class="idle-res-icon">🧪</i><b class="idle-res-val">${bkmpIdleFormatNumber(bkmpIdleState.essence)}</b></span>`;
   }
   /* Ueber den Throttle statt direkt - bkmpRaidRenderCombat wird bei jedem
      eigenen Tick (2.5s), jedem Boss-Poll (1.5s) UND jedem Realtime-Update

@@ -1120,6 +1120,18 @@ Cache-Busting `js/systems/bkmp-breeding.js?v=20260801-drachenzucht1` (index.html
 
 **Nicht geprüft/offen:** `sql/20260801-guild-tech-drachenzucht-branch.sql` muss im Supabase-Dashboard ausgeführt werden, bevor der neue Zweig live sichtbar wird (bis dahin bleibt der bestehende 19-Knoten-Baum unverändert nutzbar, die 4 neuen Knoten existieren nur lokal).
 
+## Raid/Weltboss: Tap-Schaden-Zähler zeigte nie einen Wert (01.08.2026)
+
+Spieler-Nachfrage anhand eines Screenshots der Raid-Kampfleiste: "Was ist das eigentlich beim stündlichen Raid boss? Auto kampf? Rote Symbol.. Die Klickzähler? der nicht funktioniert?" — Anlass für eine Bestandsaufnahme der drei Elemente (🟢 Auto-Kampf-Hinweistext, ⚔️ echter Angreifen-Knopf, 👆 Tap-Schaden-Zähler), dabei einen echten, bestätigten Bug im dritten Element gefunden.
+
+**Root Cause:** `bkmpRaidRenderCombat()` (`js/systems/bkmp-raid.js`) aktualisierte `#raidTapDamagePill`/`#raidRewardsStrip` bisher hinter `if (window.BKMP_APP_MODE)` — der dortige Kommentar behauptete, die Elemente existierten auf der normalen Website nicht ("auf der Website ohne Wirkung"). Das stimmt seit Redesign Phase 5 (17.07.) nicht mehr: `html.bkmp-app-mode` ist die CSS-Klasse für OPTIK und seitdem auf JEDER Seite aktiv, `window.BKMP_APP_MODE` blieb aber das engere, nur unter `/app`/`?app=idledorf` wahre VERHALTENS-Flag (bewusste Trennung, siehe Kommentar in `index.html`) — die beiden sind seitdem NICHT mehr dasselbe. `.raid-action-bar` samt aller drei Elemente ist dadurch auf der normalen Website längst sichtbar und stilistisch komplett fertig, nur diese eine Anzeige-Aktualisierung lief nie. Jeder Klick zählte serverseitig+intern (`bkmpRaidTapDamageSession`) korrekt mit (unconditional, kein Gate) — nur die "0" auf dem Bildschirm aktualisierte sich nie. **Exakt dasselbe Bugmuster wie der bereits am 19.07. gefixte `#raidAttackBtn`** (siehe Kommentar in `idledorf.js:3161-3180`) - beim damaligen Fix wurde nur der Knopf selbst unconditional verdrahtet, die Zähler-Anzeige direkt daneben blieb übersehen.
+
+**Fix:** dieselbe `if (window.BKMP_APP_MODE)`-Klammer entfernt, durch reine Elementprüfung ersetzt (identisches Prinzip wie beim Knopf-Fix). Beim eigenen Verifizieren zusätzlich ein reines Mess-Artefakt gefunden (kein zweiter Bug): eine alte, bereits offene Browser-Tab-Kopie hatte die alte `bkmp-raid.js` gecacht - ein eigenes, vergessenes Cache-Busting-Versäumnis (die Datei hatte noch `?v=20260724-raidsyncfix1`), nicht Teil des eigentlichen Fehlers. Nach dem Cache-Bust + echtem Reload bestätigt: Zähler zeigt korrekt `54.3K` statt stehenbleibendem `0`, auch mit `window.BKMP_APP_MODE===false`.
+
+**Verifiziert:** neuer Regressionstest (`tests/e2e/raid-tap-counter-appmode.spec.js`, 2 Tests - Zähler aktualisiert sich trotz `BKMP_APP_MODE===false`, neue Raid-ID setzt korrekt auf 0 zurück), 20/20 stabil bei 10x Wiederholung, 6/6 über alle 3 Projekte. Voller `raid.spec.js`-Regressionslauf (54 Tests, 3 Projekte) unverändert grün. `eslint`/`node --check` sauber.
+
+Cache-Busting `js/systems/bkmp-raid.js?v=20260801-tapcounterfix1` (index.html/admin.html/idle-stream-mini.html).
+
 ## Architektur-Entscheidungen (siehe Plan-Datei für vollständige Begründung)
 
 - **Kein Bundler, keine ES-Module.** idledorf.js wird in mehrere klassische globale `<script>`-Dateien mit fester Ladereihenfolge zerlegt (`/js/systems/*.js`), nicht in ES-Module — 418 globale Funktionen + 156 geteilte veränderliche Variablen + Live-Geld-Fluss (Stripe) ohne Tests machen einen Bundler/ESM-Umbau zu riskant. Neue globale Funktionen folgen der bestehenden `bkmpXxx`-Namenskonvention.
