@@ -3625,6 +3625,14 @@ async function insertPlayerDragonEgg(nameKey, speciesId) {
   return Array.isArray(data) ? data[0] : null;
 }
 
+async function deletePlayerDragonEgg(eggId) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client || !eggId) return false;
+  const { error } = await client.from('player_dragon_eggs').delete().eq('id', eggId);
+  if (error) throw error;
+  return true;
+}
+
 async function loadPlayerDragonNests(name) {
   const client = bkmpGetSupabaseClient();
   if (!client || !name) return [];

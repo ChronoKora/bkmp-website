@@ -6545,7 +6545,7 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 @keyframes bkmpDragonNestReadyPulse { 0%, 100% { box-shadow: 0 0 0 1px var(--gold) inset; } 50% { box-shadow: 0 0 0 3px var(--gold) inset; } }
 .idle-dragon-nest-empty { opacity: 0.6; }
 .idle-dragon-nest-buy { border-style: dashed; opacity: 0.85; }
-.idle-dragon-baby-card { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 14px; padding: 0.9rem; background: var(--paper); text-align: center; }
+.idle-dragon-baby-card { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 14px; padding: 0.9rem; background: var(--paper); text-align: center; position: relative; }
 /* Bug-Fix 18.07. (Spieler-Screenshot: "Füttern"-Knöpfe außerhalb der
    Karte): dieselbe Ursache wie bei .idle-dragon-actions-row oben - das
    globale 44px-Touch-Target-Mindestmaß (html.bkmp-app-mode .idle-dragon-
@@ -6555,6 +6555,36 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 .idle-dragon-feed-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.4rem; }
 .idle-dragon-feed-row .idle-skin-action { margin-top: 0; flex: 1 1 auto; min-width: 100px; }
 .idle-dragon-fav-badge { position: absolute; top: 0.5rem; right: 0.6rem; color: var(--gold); font-size: 1.1rem; }
+/* Ei/Baby freilassen (Spieler-Wunsch 02.08.2026, "kleiner suesser
+   Muelleimer oben rechts") - bewusst NICHT dieselbe Klasse wie
+   .idle-dragon-release-btn (dessen html.bkmp-app-mode-Regel erzwingt dort
+   44x44px fuer die Zeilen-Optik, siehe weiter unten) - eigene, kleinere
+   runde Ecken-Badge-Optik, per eigenem Klick-Handler verdrahtet
+   (bkmpDragonReleaseEgg / bkmpDragonConfirmAndRelease). */
+/* !important auf Radius/Padding/Mindesthoehe: das generische
+   "html.bkmp-app-mode .idle-dorf-panel button"-Reset (14px Radius, grosses
+   Innenpolster, 46px Mindesthoehe - fuer normale Text-Buttons gedacht, siehe
+   Kommentar dort) hat sonst hoehere Spezifitaet und macht aus der runden
+   Ecken-Badge sonst wieder ein eckiges Vollformat-Rechteck. */
+.idle-dragon-mini-delete-btn {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.5rem;
+  width: 24px;
+  height: 24px;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: none;
+  border-radius: 50% !important;
+  background: color-mix(in srgb, var(--paper-2) 90%, transparent);
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.65;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.idle-dragon-mini-delete-btn:hover { opacity: 1; background: color-mix(in srgb, var(--paper-2) 55%, #ef4444); color: #ef4444; }
 .idle-dragon-stats { font-size: 0.75rem; margin-bottom: 0.5rem; }
 .idle-dragon-substats { color: var(--muted); font-size: 0.68rem; margin-top: 0.3rem; display: flex; flex-direction: column; gap: 0.15rem; }
 /* Bug-Fix 18.07. (Spieler-Screenshot: Favoriten-/Löschen-Knopf liegt
@@ -6566,7 +6596,17 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
    in eine Zeile und liefen ueber den Kartenrand hinaus. flex-wrap laesst
    die Icon-Knoepfe bei Bedarf in eine zweite Zeile umbrechen, statt das
    44px-Minimum (wichtig fuer Touch-Bedienung) wieder zu verkleinern. */
-.idle-dragon-actions-row { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; align-items: center; }
+/* Bug-Fix 01.08.2026 (Spieler-Screenshot: "Als Begleiter"/Stern/Papierkorb
+   sitzen "kreuz und quer" statt auf einer Linie): .idle-skin-card ist
+   bereits eine Flex-Spalte, .idle-skin-grid streckt alle Karten einer Reihe
+   bereits auf gleiche Hoehe (align-items:stretch) - nur die Aktionszeile
+   selbst wanderte bisher NICHT ans untere Kartenende, sondern blieb direkt
+   unter dem letzten Inhalt (Substats/Aufsteigen-Knopf), dessen Hoehe von
+   Karte zu Karte unterschiedlich ist (mehr/weniger Substats, Aufsteigen-
+   Knopf nur bei manchen Drachen). margin-top:auto schluckt in einer
+   Flex-Spalte den gesamten uebrigen Platz VOR diesem Element - die Zeile
+   landet dadurch bei jeder Karte exakt auf derselben Hoehe am unteren Rand. */
+.idle-dragon-actions-row { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: auto; padding-top: 0.5rem; align-items: center; }
 .idle-dragon-actions-row .idle-skin-action { margin-top: 0; flex: 1 1 auto; min-width: 88px; }
 .idle-dragon-fav-btn, .idle-dragon-release-btn { border: 1px solid var(--line); background: var(--paper-2); border-radius: 8px; padding: 0.3rem 0.5rem; cursor: pointer; font-size: 0.9rem; }
 .idle-dragon-fav-btn:hover, .idle-dragon-release-btn:hover { border-color: var(--gold); }
@@ -10584,6 +10624,7 @@ html.bkmp-app-mode .idle-dorf-panel .idle-dragon-release-btn {
   padding: .4rem !important;
 }
 html.bkmp-app-mode .idle-dorf-panel .idle-dragon-fav-badge { font-size: 1.3rem !important; }
+html.bkmp-app-mode .idle-dorf-panel .idle-dragon-mini-delete-btn { width: 30px !important; height: 30px !important; font-size: 0.92rem !important; }
 html.bkmp-app-mode .idle-dorf-panel .idle-dragon-filter-fav,
 html.bkmp-app-mode .idle-dorf-panel .idle-dragon-filter-bar select {
   font-size: .86rem !important;
@@ -11843,6 +11884,28 @@ html.bkmp-app-mode .idle-app-more-sheet-group-title:first-child {
   .feedback-btn-group { gap: 0.35rem; }
   .feedback-status-btn { padding: 0.42rem; border-radius: 50%; }
 }
+
+/* Ungelesen-Punkt am Changelog-Knopf (01.08.2026, Nutzerwunsch: "kleiner
+   roter Punkt wenn was Neues gibt") - #changelogButton braucht dafuer
+   position:relative als Bezugsrahmen (kein bestehender .pill-btn/
+   .feedback-status-btn-Wert gesetzt). Erster echter Einsatz von
+   --color-danger (design-tokens.css, Phase 3 vorbereitet, bis jetzt an
+   keinem Button angeschlossen). js/ui/bkmp-changelog.js schaltet die
+   Klasse "has-unread" am Knopf selbst um, hier nur reine Optik. */
+#changelogButton { position: relative; }
+.chl-unread-dot {
+  display: none;
+  position: absolute;
+  top: 0.1rem;
+  right: 0.1rem;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--color-danger);
+  border: 2px solid var(--paper);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-danger) 55%, transparent);
+}
+#changelogButton.has-unread .chl-unread-dot { display: block; }
 
 /* ---- Duplikat-Vermeidung im bestehenden #feedbackOverlay-Formular
    (Auftrag Abschnitt 12) ---- */

@@ -146,7 +146,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260801-guildtechtreecss1">
+<link rel="stylesheet" href="style.css?v=20260802-eggreleasefix2">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 </head>
 <body>
@@ -211,7 +211,7 @@
       <!-- Oeffentliches Changelog (26.07.2026, siehe js/ui/bkmp-changelog.js) -
            eigenstaendig, getrennt vom Feedback-/Status-Board oben. -->
       <button class="pill-btn feedback-status-btn" id="changelogButton" type="button" aria-label="Änderungsverlauf ansehen">
-        <span aria-hidden="true">📜</span><span class="feedback-btn-label">Changelog</span>
+        <span aria-hidden="true">📜</span><span class="feedback-btn-label">Changelog</span><span class="chl-unread-dot" id="changelogUnreadDot" aria-hidden="true"></span>
       </button>
     </div>
     <img class="opsucht-logo" src="assets/opsucht-logo.webp" alt="OPSUCHT.net" width="130" height="41">
@@ -1565,7 +1565,7 @@
        liest. window.BKMP_QA_MODE selbst wird noch frueher gesetzt (Kopf-Skript
        oben, vor jedem <script src>). Reiner No-Op ausserhalb des QA-Modus. -->
   <script src="js/core/bkmp-game-clock.js?v=20260724-qafoundation1" defer></script>
-  <script src="supabase.js?v=20260731-guildtechtreev3" defer></script>
+  <script src="supabase.js?v=20260802-eggreleasefix1" defer></script>
   <script src="app.js?v=20260718-selbstverdient1" defer></script>
   <!-- Redesign Phase 2a (17.07.): idledorf.js in geteilten Zustand + Subsysteme
        zerlegt. Ladereihenfolge ist bewusst fest: bkmp-idle-state.js zuerst
@@ -1578,7 +1578,7 @@
   <script src="js/systems/bkmp-achievements.js?v=20260717-p2cfoundation" defer></script>
   <script src="js/core/bkmp-combat-math.js?v=20260801-guildlvlcap1" defer></script>
   <script src="js/systems/bkmp-dungeon.js?v=20260731-dungeonkeyfix1" defer></script>
-  <script src="js/systems/bkmp-breeding.js?v=20260801-drachenzucht1" defer></script>
+  <script src="js/systems/bkmp-breeding.js?v=20260802-eggreleasefix1" defer></script>
   <script src="js/systems/bkmp-guild.js?v=20260801-guildlvlcap1" defer></script>
   <script src="js/systems/bkmp-guild-tech.js?v=20260801-zuchtcategory1" defer></script>
   <script src="js/systems/bkmp-runes.js?v=20260730-legimaximize1" defer></script>
@@ -1603,7 +1603,7 @@
   <script src="js/ui/bkmp-feedback-board.js?v=20260721-stufe34" defer></script>
   <!-- Oeffentliches Changelog (26.07.2026) - eigenstaendig, siehe Datei-Kopf-
        Kommentar in js/ui/bkmp-changelog.js. -->
-  <script src="js/ui/bkmp-changelog.js?v=20260726-changelog1" defer></script>
+  <script src="js/ui/bkmp-changelog.js?v=20260801-unreaddot1" defer></script>
   <script src="js/core/bkmp-app-mode-bootstrap.js?v=20260723-visibilityresync1" defer></script>
   <!-- PROTOTYP 2 (18.07., isoliert & jederzeit entfernbar) - siehe Kommentar
        in js/prototype/bkmp-proto-compact-hud.js. Laedt bewusst zuletzt. -->

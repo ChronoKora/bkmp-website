@@ -42,6 +42,33 @@ let bkmpChangelogLoadError = false;
 let bkmpChangelogLoading = false;
 let bkmpChangelogLastTrigger = null;
 
+/* Ungelesen-Punkt (01.08.2026, Nutzerwunsch: "kleiner roter Punkt wenn was
+   Neues gibt"). Nur clientseitig (localStorage) - kein Server-Zustand
+   noetig, jeder Browser merkt sich unabhaengig, welchen Eintrag er zuletzt
+   gesehen hat. loadChangelogEntries() sortiert bereits DESC (entry_date
+   dann created_at), Index 0 ist also immer der neueste Eintrag - reicht als
+   einziger Vergleichswert (dessen id gegen den gemerkten Stand pruefen),
+   keine Liste "seit wann alles gesehen" noetig. */
+const BKMP_CHANGELOG_LAST_SEEN_KEY = 'bkmp-changelog-last-seen-id';
+
+function bkmpChangelogGetLastSeenId() {
+  try { return localStorage.getItem(BKMP_CHANGELOG_LAST_SEEN_KEY) || null; } catch (e) { return null; }
+}
+function bkmpChangelogSetLastSeenId(id) {
+  try { if (id) localStorage.setItem(BKMP_CHANGELOG_LAST_SEEN_KEY, id); } catch (e) {}
+}
+function bkmpChangelogUpdateUnreadBadge() {
+  const btn = document.getElementById('changelogButton');
+  if (!btn) return;
+  const newest = (bkmpChangelogActiveData || [])[0];
+  btn.classList.toggle('has-unread', !!newest && newest.id !== bkmpChangelogGetLastSeenId());
+}
+function bkmpChangelogMarkAllSeen() {
+  const newest = (bkmpChangelogActiveData || [])[0];
+  if (newest) bkmpChangelogSetLastSeenId(newest.id);
+  bkmpChangelogUpdateUnreadBadge();
+}
+
 function bkmpChangelogEscapeHtml(str) {
   return String(str == null ? '' : str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
@@ -135,6 +162,7 @@ async function bkmpChangelogOpen(triggerEl) {
   bkmpChangelogRenderList();
   await bkmpChangelogEnsureDataLoaded();
   if (overlay.classList.contains('visible')) bkmpChangelogRenderList();
+  bkmpChangelogMarkAllSeen();
 }
 function bkmpChangelogClose() {
   const overlay = document.getElementById('changelogOverlay');
@@ -154,6 +182,13 @@ function bkmpChangelogClose() {
   if (closeButton) closeButton.addEventListener('click', bkmpChangelogClose);
   if (overlay) overlay.addEventListener('click', e => { if (e.target === overlay) bkmpChangelogClose(); });
   if (overlay && typeof bkmpUiTrapFocus === 'function') bkmpUiTrapFocus(overlay);
+  /* Proaktiv im Hintergrund laden (nicht erst beim Oeffnen) - nur so kann
+     der Ungelesen-Punkt schon VOR dem ersten Klick angezeigt werden.
+     bkmpChangelogEnsureDataLoaded() ist bereits gegen Doppel-Laden
+     abgesichert (bkmpChangelogActiveData !== null-Check) - der spaetere
+     Aufruf beim echten Oeffnen (bkmpChangelogOpen) findet die Daten dann
+     meist schon vor, kein doppelter Netzwerk-Request. */
+  if (openButton) bkmpChangelogEnsureDataLoaded().then(bkmpChangelogUpdateUnreadBadge);
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && overlay && overlay.classList.contains('visible')) bkmpChangelogClose();
   });

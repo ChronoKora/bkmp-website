@@ -543,6 +543,60 @@ async function bkmpDragonRelease(dragonId) {
   }
 }
 
+/* Gemeinsame Bestaetigen-dann-Freilassen-Logik fuer jugendliche/erwachsene
+   UND Baby-Drachen (Spieler-Wunsch 02.08., kleiner Muelleimer-Knopf auch auf
+   Baby-Karten) - vorher nur inline im Klick-Handler der Aktionszeile
+   fuer erwachsene/jugendliche Drachen, jetzt eine Funktion, damit beide
+   Aufrufstellen exakt dieselbe Sicherheitsabfrage nutzen (dragon.stage
+   liefert bereits korrekt "Baby" fuer den Beschreibungstext). */
+async function bkmpDragonConfirmAndRelease(dragonId) {
+  const dragon = bkmpPlayerDragons.find(d => d.id === dragonId);
+  const species = dragon ? bkmpDragonSpeciesById(dragon.species_id) : null;
+  if (!dragon || !species) return;
+  const rarity = bkmpDragonRarityMeta(species.rarity);
+  const stats = bkmpDragonMainStatLine(dragon) || '';
+  const stageLabel = dragon.stage === 'adult' ? 'Erwachsen' : dragon.stage === 'teen' ? 'Jugendlich' : 'Baby';
+  const body = `${species.name} (${rarity.name}, ${stageLabel}) ${stats}\n\nDiese Aktion kann nicht rückgängig gemacht werden.`;
+  const confirmed = typeof bkmpConfirmDialog === 'function'
+    ? await bkmpConfirmDialog('🏞️ Drachen freilassen?', body, 'Ja, freilassen', 'Abbrechen')
+    : window.confirm(body);
+  if (!confirmed) return;
+  const extraConfirm = species.rarity === 'episch' || species.rarity === 'legendaer';
+  if (extraConfirm) {
+    const doubleConfirmed = typeof bkmpConfirmDialog === 'function'
+      ? await bkmpConfirmDialog('⚠️ Wirklich sicher?', `${species.name} ist ${rarity.name.toLowerCase()} und geht dauerhaft verloren.`, 'Ja, endgültig freilassen', 'Abbrechen')
+      : window.confirm('Wirklich endgültig freilassen?');
+    if (!doubleConfirmed) return;
+  }
+  bkmpDragonRelease(dragon.id);
+}
+
+/* Ei freilassen (Spieler-Wunsch 02.08.2026): loescht genau EIN Ei der
+   angeklickten Art - dieselbe representative eggId, die auch der "In
+   freies Nest legen"-Knopf nutzt (bewusst kein Massenloeschen der ganzen
+   Gruppe, verhindert ein versehentliches Leeren des kompletten Stapels
+   bei mehreren Eiern derselben Art). */
+async function bkmpDragonReleaseEgg(eggId) {
+  const egg = bkmpPlayerDragonEggs.find(e => e.id === eggId);
+  if (!egg) return;
+  const species = bkmpDragonSpeciesById(egg.species_id);
+  const remaining = bkmpPlayerDragonEggs.filter(e => e.species_id === egg.species_id && !bkmpPlayerDragonNests.some(n => n.egg_id === e.id)).length;
+  const label = species ? species.name : `${egg.species_id}-Ei`;
+  const rarity = species ? bkmpDragonRarityMeta(species.rarity).name : '';
+  const body = `${label}${rarity ? ` (${rarity})` : ''}${remaining > 1 ? ` — noch ${remaining - 1} weitere${remaining - 1 === 1 ? 's' : ''} Ei dieser Art bleibt im Lager` : ''}\n\nDiese Aktion kann nicht rückgängig gemacht werden.`;
+  const confirmed = typeof bkmpConfirmDialog === 'function'
+    ? await bkmpConfirmDialog('🥚 Ei freilassen?', body, 'Ja, freilassen', 'Abbrechen')
+    : window.confirm(body);
+  if (!confirmed) return;
+  try {
+    await deletePlayerDragonEgg(eggId);
+    bkmpPlayerDragonEggs = bkmpPlayerDragonEggs.filter(e => e.id !== eggId);
+    bkmpIdleRenderDragonsPanel();
+  } catch (e) {
+    console.warn('Idle Dorf: Ei konnte nicht freigelassen werden.', e);
+  }
+}
+
 async function bkmpDragonToggleFavorite(dragonId) {
   const dragon = bkmpPlayerDragons.find(d => d.id === dragonId);
   if (!dragon) return;
@@ -551,17 +605,18 @@ async function bkmpDragonToggleFavorite(dragonId) {
   bkmpIdleRenderDragonsPanel();
 }
 
-/* Legendaeren-Aufstieg (Lategame-Content, Spieler-Vorgabe 16.07.):
-   Zerathor/Yakshadrache droppen ohne Besitz-Limit (siehe raid_finish, 1%
-   Chance pro Weltboss-Sieg, unabhaengig davon wie viele man schon hat) -
-   Dubletten waren bisher reiner Ballast, nur zum Freilassen fuer eine
-   kleine Trostbelohnung gut. Exakt dasselbe Prinzip wie der bestehende
-   Runen-Aufstieg (BKMP_RUNE_ASCEND_MAX_LEVEL, siehe bkmpRuneAscend): eine
-   zweite Legendaere DERSELBEN Art wird komplett verbraucht (Fodder), die
-   behaltene steigt eine Stufe. Bewusst OHNE Fehlschlagchance (der Preis ist
-   bereits eine ganze zweite Legendaere plus Gold) und mit niedrigem Deckel
-   (5 Stufen) - das soll ein spuerbarer Bonus fuer Vielspieler sein, kein
-   neuer unbegrenzter Powercreep-Weg. */
+/* Drachen-Aufstieg (Lategame-Content, urspruenglich 16.07. nur fuer
+   Legendaere - Spieler-Wunsch 02.08.2026: fuer ALLE Seltenheiten
+   freigeschaltet, exakt dieselbe Mechanik). Dubletten waren bisher reiner
+   Ballast, nur zum Freilassen fuer eine kleine Trostbelohnung gut. Exakt
+   dasselbe Prinzip wie der bestehende Runen-Aufstieg
+   (BKMP_RUNE_ASCEND_MAX_LEVEL, siehe bkmpRuneAscend): eine zweite
+   erwachsene Kopie DERSELBEN Art wird komplett verbraucht (Fodder), die
+   behaltene steigt eine Stufe - bis zu BKMP_DRAGON_ASCEND_MAX_LEVEL Stufen,
+   also bis zu 5 verbrauchte Kopien insgesamt fuer den vollen Ausbau. Bewusst
+   OHNE Fehlschlagchance (der Preis ist bereits eine ganze zweite Kopie plus
+   Gold) und mit niedrigem Deckel (5 Stufen) - das soll ein spuerbarer Bonus
+   fuer Vielspieler sein, kein neuer unbegrenzter Powercreep-Weg. */
 const BKMP_DRAGON_ASCEND_MAX_LEVEL = 5;
 const BKMP_DRAGON_ASCEND_BONUS_PCT = 10;
 const BKMP_DRAGON_ASCEND_COST_GOLD = 150000;
@@ -571,7 +626,7 @@ function bkmpDragonAscendedMainStat(dragon, rawValue) {
 }
 function bkmpDragonCanAscend(dragon) {
   const species = bkmpDragonSpeciesById(dragon.species_id);
-  return Boolean(species) && species.rarity === 'legendaer' && dragon.stage === 'adult' && Number(dragon.ascension_level || 0) < BKMP_DRAGON_ASCEND_MAX_LEVEL;
+  return Boolean(species) && dragon.stage === 'adult' && Number(dragon.ascension_level || 0) < BKMP_DRAGON_ASCEND_MAX_LEVEL;
 }
 function bkmpDragonFindAscendFodder(dragon) {
   return bkmpPlayerDragons.find(d => d.id !== dragon.id && d.species_id === dragon.species_id && d.stage === 'adult' && !d.is_favorite && !d.is_companion);
@@ -1029,6 +1084,7 @@ function bkmpIdleRenderDragonsPanel() {
         if (!species) {
           return `
             <div class="idle-skin-card">
+              <button type="button" class="idle-dragon-mini-delete-btn idle-dragon-egg-delete-btn" data-egg-id="${eggId}" title="Ei freilassen">🗑️</button>
               <div class="idle-dragon-thumb idle-dragon-thumb-unknown">🥚</div>
               <div class="idle-skin-name">${escapeHtml(speciesId)}-Ei</div>
               <div class="idle-skin-desc">x${eggGroups[speciesId]} &middot; Art wird geladen - bitte Seite neu laden, falls das bestehen bleibt.</div>
@@ -1038,6 +1094,7 @@ function bkmpIdleRenderDragonsPanel() {
         const rarity = bkmpDragonRarityMeta(species.rarity);
         return `
           <div class="idle-skin-card" style="--dragon-rarity-color:${rarity.color}">
+            <button type="button" class="idle-dragon-mini-delete-btn idle-dragon-egg-delete-btn" data-egg-id="${eggId}" title="Ei freilassen">🗑️</button>
             ${bkmpDragonThumbHtml(species.egg_image, escapeHtml(species.name))}
             <div class="idle-skin-name">${escapeHtml(species.name)}-Ei</div>
             <div class="idle-skin-desc">${rarity.name} &middot; x${eggGroups[speciesId]} &middot; ${bkmpDragonFormatDuration(bkmpDragonEffectiveBroodSeconds(species) * 1000)} Brutzeit</div>
@@ -1087,6 +1144,7 @@ function bkmpIdleRenderDragonsPanel() {
         const canEvolve = d.growth_points >= species.growth_points_required;
         return `
           <div class="idle-dragon-baby-card">
+            <button type="button" class="idle-dragon-mini-delete-btn idle-dragon-baby-delete-btn" data-dragon-id="${d.id}" title="Freilassen">🗑️</button>
             ${bkmpDragonThumbHtml(species.baby_image, escapeHtml(species.name))}
             <div class="idle-skin-name">${escapeHtml(species.name)} <small>(Baby)</small></div>
             <div class="idle-skin-desc">Frisst am liebsten: ${foodLabel} · Vorrat: ${bkmpIdleFormatNumber(Math.floor(bkmpIdleState[d.food_preference] || 0))}</div>
@@ -1225,26 +1283,9 @@ function bkmpIdleRenderDragonsPanel() {
   panel.querySelectorAll('.idle-dragon-companion-btn').forEach(btn => btn.addEventListener('click', () => bkmpDragonSetCompanion(btn.dataset.dragonId)));
   panel.querySelectorAll('.idle-dragon-uncompanion-btn').forEach(btn => btn.addEventListener('click', bkmpDragonUnsetCompanion));
   panel.querySelectorAll('.idle-dragon-fav-btn').forEach(btn => btn.addEventListener('click', () => bkmpDragonToggleFavorite(btn.dataset.dragonId)));
-  panel.querySelectorAll('.idle-dragon-release-btn').forEach(btn => btn.addEventListener('click', async () => {
-    const dragon = bkmpPlayerDragons.find(d => d.id === btn.dataset.dragonId);
-    const species = dragon ? bkmpDragonSpeciesById(dragon.species_id) : null;
-    if (!dragon || !species) return;
-    const rarity = bkmpDragonRarityMeta(species.rarity);
-    const stats = bkmpDragonMainStatLine(dragon) || '';
-    const body = `${species.name} (${rarity.name}, ${dragon.stage === 'adult' ? 'Erwachsen' : dragon.stage === 'teen' ? 'Jugendlich' : 'Baby'}) ${stats}\n\nDiese Aktion kann nicht rückgängig gemacht werden.`;
-    const confirmed = typeof bkmpConfirmDialog === 'function'
-      ? await bkmpConfirmDialog('🏞️ Drachen freilassen?', body, 'Ja, freilassen', 'Abbrechen')
-      : window.confirm(body);
-    if (!confirmed) return;
-    const extraConfirm = species.rarity === 'episch' || species.rarity === 'legendaer';
-    if (extraConfirm) {
-      const doubleConfirmed = typeof bkmpConfirmDialog === 'function'
-        ? await bkmpConfirmDialog('⚠️ Wirklich sicher?', `${species.name} ist ${rarity.name.toLowerCase()} und geht dauerhaft verloren.`, 'Ja, endgültig freilassen', 'Abbrechen')
-        : window.confirm('Wirklich endgültig freilassen?');
-      if (!doubleConfirmed) return;
-    }
-    bkmpDragonRelease(dragon.id);
-  }));
+  panel.querySelectorAll('.idle-dragon-release-btn').forEach(btn => btn.addEventListener('click', () => bkmpDragonConfirmAndRelease(btn.dataset.dragonId)));
+  panel.querySelectorAll('.idle-dragon-baby-delete-btn').forEach(btn => btn.addEventListener('click', () => bkmpDragonConfirmAndRelease(btn.dataset.dragonId)));
+  panel.querySelectorAll('.idle-dragon-egg-delete-btn').forEach(btn => btn.addEventListener('click', () => bkmpDragonReleaseEgg(btn.dataset.eggId)));
   const expandBtn = document.getElementById('idleDragonExpandStorageBtn');
   if (expandBtn) expandBtn.addEventListener('click', bkmpDragonExpandStorage);
 
