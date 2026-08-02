@@ -19,6 +19,12 @@ Automatisch von Claude Code gepflegt: **nach jeder Code-/SQL-Änderung kommt hie
 
 ---
 
+## 2026-08-02 (2)
+
+- **[Neu]** 6 neue Zucht-Drachenarten: **Fynnow, Vulkarion, Bloodterion, Gravoryx** (Episch) + **Lohendrache, Darknisdrache** (Legendär) - Nutzer lieferte alle 24 Bilder (Ei/Baby/Jugendlich/Erwachsen je Art) als ZIP mit eindeutigen Dateinamen ("BloodterionEi.png", "Baby Fynnow.png", ...), dadurch keine Ratearbeit bei der Bild-Zuordnung nötig (eine vorherige Rückfrage zur Bild-Zuordnung war damit hinfällig). Werte 1:1 von der bereits etablierten Episch-/Legendär-Stufe übernommen (identisches Muster wie Byte/Enderdrachen/Kaledoss/Nytherion/Phil vom 18.07.) - reine Katalog-Erweiterung, keine Code-Änderung nötig (`dragon_species` ist bereits vollständig datengetrieben, `bkmpDungeonRollEgg()` nimmt neue aktive Arten automatisch in den seltenheits-gewichteten Ei-Pool auf). Bilder auf max. 480px verkleinert + WebP-Variante erzeugt (62,1MB → 1,5MB WebP), gleiches Verfahren wie bei allen bisherigen Zucht-Sprites. Alle 24 WebP-Dateien per direktem Abruf gegen den lokalen Server verifiziert (laden korrekt, plausible Dateigrößen). — neu: `sql/20260802-dragon-species-neue-neue-drachen.sql` (**noch nicht ausgeführt**), 72 neue Bild-Dateien unter `assets/dragons/breeding/{egg,baby,teen,adult}/` — 🟡 lokal
+
+---
+
 ## 2026-08-01
 
 - **[Fix]** Drachenlager: "Als Begleiter"/Stern/Papierkorb saßen je nach Anzahl der angezeigten Substats einer Karte auf unterschiedlicher Höhe ("kreuz und quer" statt einer geraden Linie, Spieler-Screenshot). Die Aktionszeile wandert jetzt bei jeder Karte konsequent an den unteren Kartenrand, unabhängig davon, wie viel Text darüber steht. — `style.css` (`.idle-dragon-actions-row`) — 🟡 lokal
