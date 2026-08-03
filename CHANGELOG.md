@@ -19,6 +19,12 @@ Automatisch von Claude Code gepflegt: **nach jeder Code-/SQL-Änderung kommt hie
 
 ---
 
+## 2026-08-03
+
+- **[Fix]** Phils Jugendlich-Sprite hatte einen weißen statt transparenten Hintergrund (Admin-Feedback: "Bei ihm muss der weisse Hintergrund noch entfernt werden"). Bestätigt per Pixel-Check: alle anderen 95 Kombinationen (24 Arten × egg/baby/teen/adult) hatten 26-66% transparente Pixel, nur `teen/phil.png` lag bei 0,0% - ein isolierter Einzelfall, keine systemische Lücke (auch die 6 gerade erst hinzugefügten NeueNeueDrachen-Bilder waren alle sauber). Behoben mit demselben Flood-Fill-Verfahren, das schon für Kaledoss verwendet wurde (`scripts/fix-kaledoss-background.ps1`) - startet an allen vier Bildrändern, färbt nur mit dem Rand verbundene naheweiße Pixel transparent, lässt einen hellen Fleck mitten im Drachen unangetastet. WebP/PNG-Web-Varianten neu erzeugt (waren sonst weiter mit dem alten, kaputten Bild gecacht). Nach dem Fix erneut alle 96 Kombinationen geprüft - keine unter 5% Transparenz mehr. — `assets/dragons/breeding/teen/phil.png` + `-web.png`/`-web.webp` — 🟡 lokal
+
+---
+
 ## 2026-08-02 (2)
 
 - **[Neu]** 6 neue Zucht-Drachenarten: **Fynnow, Vulkarion, Bloodterion, Gravoryx** (Episch) + **Lohendrache, Darknisdrache** (Legendär) - Nutzer lieferte alle 24 Bilder (Ei/Baby/Jugendlich/Erwachsen je Art) als ZIP mit eindeutigen Dateinamen ("BloodterionEi.png", "Baby Fynnow.png", ...), dadurch keine Ratearbeit bei der Bild-Zuordnung nötig (eine vorherige Rückfrage zur Bild-Zuordnung war damit hinfällig). Werte 1:1 von der bereits etablierten Episch-/Legendär-Stufe übernommen (identisches Muster wie Byte/Enderdrachen/Kaledoss/Nytherion/Phil vom 18.07.) - reine Katalog-Erweiterung, keine Code-Änderung nötig (`dragon_species` ist bereits vollständig datengetrieben, `bkmpDungeonRollEgg()` nimmt neue aktive Arten automatisch in den seltenheits-gewichteten Ei-Pool auf). Bilder auf max. 480px verkleinert + WebP-Variante erzeugt (62,1MB → 1,5MB WebP), gleiches Verfahren wie bei allen bisherigen Zucht-Sprites. Alle 24 WebP-Dateien per direktem Abruf gegen den lokalen Server verifiziert (laden korrekt, plausible Dateigrößen). — neu: `sql/20260802-dragon-species-neue-neue-drachen.sql` (**noch nicht ausgeführt**), 72 neue Bild-Dateien unter `assets/dragons/breeding/{egg,baby,teen,adult}/` — 🟡 lokal
