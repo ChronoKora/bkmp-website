@@ -64,47 +64,37 @@ function berlinOffsetMs(epochMs) {
   return asIfUtc - epochMs;
 }
 
-/* Mirrors dungeon_regen_calc() (sql/20260727-fix-dungeon-regen-fixed-slots-
-   and-wire-prestige.sql, current/authoritative): Standardfall (kein
-   Schluesselmeister-Bonus, intervalSeconds===14400) -> +1 key per fixed 4h
-   Berlin slot crossed since last_key_at, capped at maxKeys, anchor snaps to
-   the current slot (no "keep leftover progress"). Individuelles (kuerzeres)
-   Intervall (Schluesselmeister-Bonus aktiv) -> rollierend seit dem eigenen
-   letzten Zeitstempel, KEIN gemeinsames Raster mehr (ein personalisiertes
-   Intervall kann nicht auf demselben festen Raster wie alle anderen Spieler
-   liegen). 27.07.2026: ersetzt eine Fassung, die versehentlich das aeltere,
-   VOR dem 16.07.-Fixed-Slots-Spielerwunsch geltende rollierende Verhalten
-   fuer ALLE Spieler wiederhergestellt hatte (echter, live bestaetigter
-   Regressions-Fund beim Verdrahten von Schluesselmeister/Schluesselbund). */
+/* Mirrors dungeon_regen_calc() (sql/20260803-remove-schluesselmeister-fixed-
+   slots-only.sql, current/authoritative): IMMER +1 key per fixed 4h Berlin
+   slot crossed since last_key_at, capped at maxKeys, anchor snaps to the
+   current slot (no "keep leftover progress"). Der Prestige-Knoten
+   "Schluesselmeister" (individuelles, vom gemeinsamen Raster abweichendes
+   Intervall) wurde am 03.08.2026 komplett entfernt (Nutzerwunsch: "wir
+   haben Feste Schluessel Zeiten. da bringt so ein skill nichts") -
+   intervalSeconds bleibt nur noch als Parameter fuer Aufrufer-Kompatibilitaet
+   bestehen (guild_tech_contribute()/-attempt_status() rufen weiterhin mit
+   14400 auf), wird aber fuer das Verhalten selbst nicht mehr ausgewertet. */
 function dungeonRegenCalc(keys, lastKeyAtMs, nowMs, intervalSeconds = 14400, maxKeys = 5) {
-  if (intervalSeconds === 14400) {
-    const nowSlot = slotNaiveMs(nowMs);
-    const lastSlot = slotNaiveMs(lastKeyAtMs);
-    const intervals = Math.round((nowSlot - lastSlot) / (4 * 3600 * 1000));
-    if (intervals <= 0) return { newKeys: keys, newLastKeyAtMs: lastKeyAtMs };
-    const newKeys = Math.min(maxKeys, keys + intervals);
-    const newLastKeyAtMs = nowSlot - berlinOffsetMs(nowMs);
-    return { newKeys, newLastKeyAtMs };
-  }
-  const intervals = Math.floor((nowMs - lastKeyAtMs) / (Math.max(1, intervalSeconds) * 1000));
+  const nowSlot = slotNaiveMs(nowMs);
+  const lastSlot = slotNaiveMs(lastKeyAtMs);
+  const intervals = Math.round((nowSlot - lastSlot) / (4 * 3600 * 1000));
   if (intervals <= 0) return { newKeys: keys, newLastKeyAtMs: lastKeyAtMs };
-  if (keys + intervals >= maxKeys) return { newKeys: maxKeys, newLastKeyAtMs: nowMs };
-  return { newKeys: keys + intervals, newLastKeyAtMs: lastKeyAtMs + intervals * intervalSeconds * 1000 };
+  const newKeys = Math.min(maxKeys, keys + intervals);
+  const newLastKeyAtMs = nowSlot - berlinOffsetMs(nowMs);
+  return { newKeys, newLastKeyAtMs };
 }
 
-/* Mirrors die neue prestige_allocations-Auswertung in dungeon_get_all_status()/
-   dungeon_consume_key() - identische Formel wie js/systems/bkmp-prestige.js'
-   bkmpPrestigeEffectTotals() fuer dungeon_key_regen_speed_pct/
-   dungeon_key_cap_bonus (Rang*effectPerRank + Paragon-Rang*effectPerRank*0.04),
-   95%-Deckel gegen ein Null-/Negativ-Intervall bei extremem Paragon-Ausbau. */
+/* Mirrors die prestige_allocations-Auswertung in dungeon_get_all_status()/
+   dungeon_consume_key() - nur noch Schluesselbund (Deckel-Anhebung), nach
+   der Schluesselmeister-Entfernung vom 03.08.2026. Identische Formel wie
+   js/systems/bkmp-prestige.js's bkmpPrestigeEffectTotals() fuer
+   dungeon_key_cap_bonus (Rang*effectPerRank + Paragon-Rang*effectPerRank*0.04). */
 function dungeonKeyBonusForName(store, nameKey) {
   const prestigeRow = getTable(store, 'idle_prestige_state').find(r => r.name_key === nameKey);
   const alloc = (prestigeRow && prestigeRow.prestige_allocations) || {};
-  const regenSpeedPct = Math.min(95, (Number(alloc.schluesselmeister) || 0) * 3 + (Number(alloc.schluesselmeister__paragon) || 0) * 0.12);
   const keyCapBonus = Math.floor((Number(alloc.schluesselbund) || 0) * 1 + (Number(alloc.schluesselbund__paragon) || 0) * 0.04);
-  const intervalSeconds = Math.max(1, Math.round(14400 * (1 - regenSpeedPct / 100)));
   const maxKeys = 5 + keyCapBonus;
-  return { intervalSeconds, maxKeys };
+  return { intervalSeconds: 14400, maxKeys };
 }
 
 function berlinDateStrCompact(epochMs) {

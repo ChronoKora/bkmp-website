@@ -375,6 +375,7 @@ async function bkmpIdleLoadOrInitState(name) {
     bkmpPrestigeState = remotePrestige || { name_key: key, display_name: name, prestige_level: 0, prestige_points: 0, prestige_points_spent: 0, prestige_allocations: {} };
     bkmpPrestigeSnapshotMergeBaseline();
     if (typeof bkmpPrestigeMigrateSchluesselbundDowngrade === 'function') bkmpPrestigeMigrateSchluesselbundDowngrade();
+    if (typeof bkmpPrestigeMigrateSchluesselmeisterRemoval === 'function') bkmpPrestigeMigrateSchluesselmeisterRemoval();
   } catch (e) {
     console.warn('Idle Dorf: Prestige-Fortschritt konnte nicht geladen werden (Netzwerkfehler oder Migration noch nicht ausgefuehrt).', e);
     bkmpPrestigeState = null;
@@ -767,6 +768,11 @@ function bkmpIdleAddXp(amount) {
 function bkmpIdleHandleDragonDefeated() {
   if (bkmpDungeonActive) { bkmpDungeonHandleWaveCleared(); return; }
   if (bkmpTowerActive) { bkmpTowerHandleWaveCleared(); return; }
+  /* Kampf-Feinschliff (03.08.2026): vor jeder weiteren Zustandsaenderung
+     festgehalten, damit spaeter (nach bkmpIdleSpawnDragon() weiter unten,
+     das bkmpIdleCurrentDragon bereits auf den NAECHSTEN Drachen umbiegt)
+     noch bekannt ist, ob der GERADE besiegte Drache ein Boss war. */
+  const wasBoss = Boolean(bkmpIdleCurrentDragon && bkmpIdleCurrentDragon.isBoss);
   const defeatedEventDragon = bkmpIdleCurrentDragon && bkmpIdleCurrentDragon.isEventDragon ? bkmpIdleCurrentDragon : null;
   const rewards = bkmpIdleRewardsAt(bkmpIdleCurrentDragon, bkmpIdleEffectiveStats, bkmpIdleGetMergedRewardScalingCfg());
   /* Goldrausch/Wissensschub (siehe bkmpDungeonGrantBoost) wirkt auf JEDE
@@ -813,10 +819,43 @@ function bkmpIdleHandleDragonDefeated() {
   bkmpDragonGrantCompanionBattleXp(bkmpIdleCurrentDragon.isBoss ? 25 : 4);
   const autoAdvance = bkmpIdleState.auto_advance !== false;
   const prevHighestIndex = Number(bkmpIdleState.highest_dragon_index || 0);
+  const prevCurrentIndex = Number(bkmpIdleState.current_dragon_index || 0);
   if (autoAdvance) bkmpIdleState.current_dragon_index += 1;
   bkmpIdleState.highest_dragon_index = Math.max(prevHighestIndex, bkmpIdleState.current_dragon_index);
   bkmpIdleAddXp(boostedXp);
   bkmpIdleVillageHp = bkmpIdleEffectiveStats.hp;
+  /* Kampf-Feinschliff (03.08.2026, Nutzer-Auftrag "Status-Einblendungen"):
+     "Sieg!" nur bei Boss-Siegen (bei jedem normalen Kill waere das bei der
+     hiesigen Kampfgeschwindigkeit reine Dauerspam, siehe die bereits
+     bestehenden Belohnungs-Chips fuer den Routinefall). "Naechste Stufe"
+     nur beim Ueberschreiten einer Akt-Grenze (bkmpIdleFormatStage gruppiert
+     je 10 Stufen zu einem Akt, "0-3"/"1-0"/...) statt bei jedem einzelnen
+     Kill - reine Anzeige, KEIN erneutes "Akt X erreicht!"-Popup (das wurde
+     am 20.07. auf ausdruecklichen Nutzerwunsch entfernt, siehe CLAUDE.md -
+     dieses Banner hier ist bewusst viel leichter: kein eigener Belohnungs-
+     block, kein Klick zum Schliessen, blendet von selbst weich aus). Beide
+     Aufrufe laufen VOR bkmpIdleSpawnDragon() weiter unten - spawnt dieses
+     fuer den naechsten Drachen sofort "Bosskampf!" (hoehere Prioritaet,
+     siehe BKMP_COMBAT_STATUS_PRIORITY), ersetzt es diese Meldung hier
+     automatisch, kein doppelter/ueberlappender Text. */
+  if (typeof bkmpIdleShowCombatStatus === 'function') {
+    if (wasBoss) {
+      bkmpIdleShowCombatStatus('sieg', '👑 Boss besiegt!', { durationMs: 1300 });
+    } else if (autoAdvance && Math.floor(prevCurrentIndex / 10) !== Math.floor(bkmpIdleState.current_dragon_index / 10)) {
+      bkmpIdleShowCombatStatus('naechsteStufe', `⬆️ Nächste Stufe (${bkmpIdleFormatStage(bkmpIdleState.current_dragon_index)})`, { durationMs: 1000 });
+    }
+  }
+  /* Kurzer Ausblend-Puls auf dem GERADE besiegten Drachen, unmittelbar
+     bevor bkmpIdleSpawnDragon() denselben Sprite-Container mit dem
+     naechsten Drachen ueberschreibt - macht den Wechsel weniger hart,
+     ohne die eigentliche (bereits synchron abgeschlossene) Zustands-
+     aenderung je zu verzoegern. */
+  const defeatedSprite = document.getElementById('idleDragonSprite');
+  if (defeatedSprite) {
+    defeatedSprite.classList.remove('idle-dragon-defeat-out');
+    void defeatedSprite.offsetWidth;
+    defeatedSprite.classList.add('idle-dragon-defeat-out');
+  }
   /* Nutzerwunsch (15.07.): "wo dieses Geld und XP hochploppt gerne auch so
      Standard mäßig machen, anstatt dadrunter so ein Scroll Fenster" - die
      Gold/XP-Zeile lief bisher bei JEDEM Kill in den Kampf-Log (mehrmals pro
@@ -892,6 +931,7 @@ function bkmpIdleCheckYakshasHeimatUnlock() {
 function bkmpIdleHandleDefeat() {
   if (bkmpDungeonActive) { bkmpDungeonHandleFailure(); return; }
   if (bkmpTowerActive) { bkmpTowerHandleDefeat(); return; }
+  if (typeof bkmpIdleShowCombatStatus === 'function') bkmpIdleShowCombatStatus('niederlage', '💀 Niederlage', { variant: 'defeat', durationMs: 1300 });
   bkmpIdleLog(`💀 Niederlage gegen ${bkmpIdleCurrentDragon.emoji} ${bkmpIdleCurrentDragon.name}! Du fällst eine Stufe zurück.`);
   bkmpIdleState.current_dragon_index = Math.max(0, Number(bkmpIdleState.current_dragon_index || 0) - 1);
   bkmpIdleState.village_defeats = Number(bkmpIdleState.village_defeats || 0) + 1;
@@ -2223,6 +2263,7 @@ async function bkmpIdleMergeRemoteSpendableFields() {
       bkmpPrestigeState = remotePrestigeCheck;
       bkmpPrestigeSnapshotMergeBaseline();
       if (typeof bkmpPrestigeMigrateSchluesselbundDowngrade === 'function') bkmpPrestigeMigrateSchluesselbundDowngrade();
+      if (typeof bkmpPrestigeMigrateSchluesselmeisterRemoval === 'function') bkmpPrestigeMigrateSchluesselmeisterRemoval();
     }
     /* Bug-Fix 18.07. (Section B, "Runen ueberleben Prestige"): Runen
        gehen seit der Aenderung an bkmpPrestigeExecuteReset NICHT mehr
@@ -3259,14 +3300,36 @@ function bkmpIdleInit() {
    Seite mit einem #idleBattlefield-Element (Hauptseite/admin.html/
    idle-stream.html/idle-stream-mini.html gleichermassen), reagiert auf das
    in bkmpIdleHandleDragonDefeated gefeuerte bkmpIdleRewardGained-Event. */
+/* Kampf-Feinschliff (03.08.2026, Nutzer-Auftrag "Belohnungsanzeigen
+   verbessern"): begrenzt+versetzt mehrere schnell aufeinanderfolgende
+   Belohnungs-Chip-Reihen, statt sie exakt uebereinander erscheinen zu
+   lassen. Jede noch aktive Anzeige verschiebt die naechste per CSS-
+   Variable ein Stueck nach oben (kaskadierender Versatz); wird das Limit
+   ueberschritten, blendet die AELTESTE sofort schneller aus statt ihre
+   volle Laufzeit abzuwarten - kein unbegrenztes Anwachsen. */
+const BKMP_REWARD_FLOAT_MAX = 3;
+let bkmpRewardFloats = [];
 document.addEventListener('bkmpIdleRewardGained', e => {
   const field = document.getElementById('idleBattlefield');
   if (!field || !e.detail) return;
   const el = document.createElement('div');
   el.className = 'idle-reward-float';
+  el.style.setProperty('--rf-stack-offset', (bkmpRewardFloats.length * -22) + 'px');
   el.innerHTML = `<span class="rf-chip rf-gold"><span class="rf-icon">💰</span>+${Math.round(e.detail.gold)}</span><span class="rf-chip rf-xp"><span class="rf-icon">✨</span>+${Math.round(e.detail.xp)}</span>`;
   field.appendChild(el);
-  window.setTimeout(() => el.remove(), 1500);
+  bkmpRewardFloats.push(el);
+  if (bkmpRewardFloats.length > BKMP_REWARD_FLOAT_MAX) {
+    const oldest = bkmpRewardFloats.shift();
+    if (oldest && oldest.isConnected && oldest !== el) {
+      oldest.classList.add('idle-reward-float-fastout');
+      window.setTimeout(() => oldest.remove(), 150);
+    }
+  }
+  window.setTimeout(() => {
+    const idx = bkmpRewardFloats.indexOf(el);
+    if (idx !== -1) bkmpRewardFloats.splice(idx, 1);
+    el.remove();
+  }, 1500);
 });
 
 /* ============================================================

@@ -128,10 +128,28 @@ function bkmpIdleSpawnDragon() {
     dragonEl.classList.toggle('idle-dragon-miniboss', bkmpIdleCurrentDragon.bossTier === 'miniboss');
     dragonEl.classList.toggle('idle-dragon-event', Boolean(bkmpIdleCurrentDragon.isEventDragon));
   }
+  /* Kampf-Feinschliff (03.08.2026, Nutzer-Auftrag "Gegnerwechsel weniger
+     abrupt"): rein visueller Ein-Puls auf dem bereits mit dem NEUEN Drachen
+     befuellten Sprite-Container - die eigentliche Zustandsaenderung (HP/
+     Name/Sprite/Stufe, alles oben) ist zu diesem Zeitpunkt bereits
+     vollstaendig und synchron abgeschlossen, die Animation verzoegert
+     nichts davon und blockiert auch bei sehr hoher Kampfgeschwindigkeit
+     nichts (naechster Tick laeuft unabhaengig weiter). Gleicher Neustart-
+     Trick wie bkmpIdlePlaySpriteAttack, deshalb sicher mehrfach schnell
+     hintereinander aufrufbar, ohne sich zu stapeln. */
+  const dragonSprite = document.getElementById('idleDragonSprite');
+  if (dragonSprite) {
+    dragonSprite.classList.remove('idle-dragon-spawn-in');
+    void dragonSprite.offsetWidth;
+    dragonSprite.classList.add('idle-dragon-spawn-in');
+  }
   bkmpIdleUpdateDragonHpBar();
   bkmpIdleRenderStageBar();
   bkmpIdleMaybeShowEventDragonPopup();
   bkmpIdleBroadcastCombatState(true);
+  if (bkmpIdleCurrentDragon.isBoss && typeof bkmpIdleShowCombatStatus === 'function') {
+    bkmpIdleShowCombatStatus('bosskampf', '👑 Bosskampf!', { strong: true, durationMs: 1400 });
+  }
 }
 
 /* Gegenschlag des Drachen - eigene Funktion, damit Tick UND Klick
@@ -183,14 +201,97 @@ function bkmpIdleDragonCounterAttack(stats, showVisuals) {
   }
 }
 
+/* Kampf-Feinschliff (03.08.2026, Nutzer-Auftrag): kleine, gemeinsam
+   genutzte Helfer fuer alle Schadenszahlen-Spawn-Funktionen unten -
+   verhindert dauerhaftes Uebereinanderliegen (leichter Zufalls-Versatz
+   per Inline-margin, faengt sich NICHT mit den bestehenden .idle-dmg-*-
+   Typklassen, die weiterhin ihre eigene feste left-Basis ueber CSS
+   vorgeben - der Versatz kommt zusaetzlich obendrauf) und begrenzt, wie
+   viele Zahlen gleichzeitig pro Ziel sichtbar sein duerfen (Auftrag:
+   "maximal 4 bis 6 aktive Zahlen pro Seite" - die AELTESTE wird bei
+   Ueberschreitung beschleunigt ausgeblendet statt ihre volle Laufzeit
+   abzuwarten, damit sich bei sehr hoher Kampfgeschwindigkeit nichts
+   unbegrenzt anhaeuft). Erzeugte Elemente werden nach Ablauf immer
+   vollstaendig entfernt (kein dauerhaft wachsendes DOM). */
+const BKMP_DMG_FLOAT_MAX_PER_TARGET = 5;
+const bkmpDmgFloatsByTarget = { idleDragon: [], idleVillage: [] };
+function bkmpIdleDmgJitter() {
+  return { x: Math.round((Math.random() - 0.5) * 26), y: Math.round((Math.random() - 0.5) * 10) };
+}
+function bkmpIdleTrackDmgFloat(targetId, el, ttlMs) {
+  const list = bkmpDmgFloatsByTarget[targetId] || (bkmpDmgFloatsByTarget[targetId] = []);
+  list.push(el);
+  if (list.length > BKMP_DMG_FLOAT_MAX_PER_TARGET) {
+    const oldest = list.shift();
+    if (oldest && oldest.isConnected && oldest !== el) {
+      oldest.classList.add('idle-dmg-float-fastout');
+      window.setTimeout(() => oldest.remove(), 130);
+    }
+  }
+  window.setTimeout(() => {
+    const idx = list.indexOf(el);
+    if (idx !== -1) list.splice(idx, 1);
+    el.remove();
+  }, ttlMs);
+}
+
+/* Kampf-Status-Banner (03.08.2026, Nutzer-Auftrag "Status-Einblendungen"):
+   kurze, nicht-blockierende Textmeldungen fest INNERHALB von
+   #idleBattlefield (Sieg/Bosskampf/Naechste Stufe/Niederlage). Bewusst
+   NICHT ueber das bestehende bkmpRewardPresent() (Phase 5.5, js/ui/bkmp-
+   reward-presenter.js) - das ist ein globales, seitenweites Toast-/Karten-
+   /Zeremonie-System mit eigener Warteschlange fuer BELOHNUNGEN (Level-
+   Aufstieg, Erfolge, Funde), an vielen Stellen ausserhalb des Kampfbereichs
+   genutzt. Ein Umbau dieses geteilten Systems fuer die hier verlangte enge
+   Positionierung ("in Kampfmitte, nicht ueber dem Lebensbalken") haette ein
+   erhebliches Regressionsrisiko fuer alle anderen Aufrufer gehabt - dieses
+   Banner ist bewusst klein/eigenstaendig, mit einer einfachen "neuere/
+   wichtigere Meldung ersetzt sofort"-Regel statt einer Warteschlange
+   (Auftrag: "immer nur eine grosse Statusmeldung gleichzeitig", "alte
+   Meldung kontrolliert ersetzen"). */
+const BKMP_COMBAT_STATUS_PRIORITY = { niederlage: 4, bosskampf: 3, sieg: 2, naechsteStufe: 1 };
+let bkmpCombatStatusActive = null;
+function bkmpIdleShowCombatStatus(type, text, opts) {
+  opts = opts || {};
+  const field = document.getElementById('idleBattlefield');
+  if (!field) return;
+  const priority = BKMP_COMBAT_STATUS_PRIORITY[type] || 1;
+  /* Sinnvolle Priorisierung (Auftrag: "Bosskampf hat hoehere Prioritaet
+     als Naechste Stufe") - eine gerade noch laufende, wichtigere Meldung
+     wird von einer neuen, NIEDRIGEREN Prioritaet nicht unterbrochen; die
+     niedrigere Meldung wird dann einfach verworfen statt sich anzustellen
+     (kein Warteschlangen-Aufbau, keine ueberlappenden Texte). */
+  if (bkmpCombatStatusActive && priority < bkmpCombatStatusActive.priority) return;
+  if (bkmpCombatStatusActive) {
+    window.clearTimeout(bkmpCombatStatusActive.hideTimer);
+    if (bkmpCombatStatusActive.el && bkmpCombatStatusActive.el.isConnected) bkmpCombatStatusActive.el.remove();
+    bkmpCombatStatusActive = null;
+  }
+  const el = document.createElement('div');
+  el.className = 'idle-combat-status' + (opts.strong ? ' idle-combat-status-strong' : '') + (opts.variant === 'defeat' ? ' idle-combat-status-defeat' : '');
+  el.textContent = text;
+  field.appendChild(el);
+  const durationMs = opts.durationMs || 1200;
+  const state = { type, priority, el };
+  state.hideTimer = window.setTimeout(() => {
+    el.classList.add('idle-combat-status-out');
+    window.setTimeout(() => el.remove(), 300);
+    if (bkmpCombatStatusActive === state) bkmpCombatStatusActive = null;
+  }, durationMs);
+  bkmpCombatStatusActive = state;
+}
+
 function bkmpIdleSpawnBurnTick(amount) {
   const target = document.getElementById('idleDragon');
   if (!target) return;
   const dmg = document.createElement('span');
   dmg.className = 'idle-dmg-float idle-dmg-burn';
   dmg.textContent = '🔥-' + Math.round(amount);
+  const jitter = bkmpIdleDmgJitter();
+  dmg.style.marginLeft = jitter.x + 'px';
+  dmg.style.marginTop = jitter.y + 'px';
   target.appendChild(dmg);
-  window.setTimeout(() => dmg.remove(), 800);
+  bkmpIdleTrackDmgFloat('idleDragon', dmg, 800);
 }
 
 function bkmpIdleSpawnLightningBolt(amount) {
@@ -206,8 +307,11 @@ function bkmpIdleSpawnLightningBolt(amount) {
     const dmg = document.createElement('span');
     dmg.className = 'idle-dmg-float idle-dmg-lightning';
     dmg.textContent = '⚡-' + Math.round(amount);
+    const jitter = bkmpIdleDmgJitter();
+    dmg.style.marginLeft = jitter.x + 'px';
+    dmg.style.marginTop = jitter.y + 'px';
     target.appendChild(dmg);
-    window.setTimeout(() => dmg.remove(), 800);
+    bkmpIdleTrackDmgFloat('idleDragon', dmg, 800);
   }
 }
 
@@ -254,8 +358,11 @@ function bkmpIdleSpawnProjectile(kind, amount, isCrit) {
     const dmg = document.createElement('span');
     dmg.className = 'idle-dmg-float' + (isCrit ? ' idle-dmg-crit' : '');
     dmg.textContent = '-' + Math.round(amount) + (isCrit ? '!' : '');
+    const jitter = bkmpIdleDmgJitter();
+    dmg.style.marginLeft = jitter.x + 'px';
+    dmg.style.marginTop = jitter.y + 'px';
     target.appendChild(dmg);
-    window.setTimeout(() => dmg.remove(), 800);
+    bkmpIdleTrackDmgFloat(targetId, dmg, 800);
   }
 }
 
@@ -270,12 +377,56 @@ function bkmpIdlePlaySpriteAttack() {
   sprite.classList.add('idle-sprite-attacking');
 }
 
+/* Kampf-Feinschliff (03.08.2026, Nutzer-Auftrag "Trefferfeedback fuer die
+   Spielerseite"): der bestehende Bildschirm-Wackler
+   (.idle-battlefield:has(.idle-hit-flash), style.css) bleibt UNVERAENDERT
+   fuer beide Seiten aktiv (er reagiert allein auf .idle-hit-flash, das
+   unten weiterhin fuer JEDES Ziel gesetzt wird - keine Regression). Nur
+   fuer 'idleVillage' kommen zwei zusaetzliche, rein dorf-spezifische
+   Effekte dazu: eine rote Innen-Vignette auf dem Dorf-Container selbst und
+   ein kurzes Aufleuchten des HP-Balkens (dessen umschliessendes .idle-hp-
+   bar hat overflow:hidden - der Glow muss deshalb auf den WRAPPER selbst,
+   nicht auf das darin liegende .idle-hp-fill, sonst wuerde er sofort
+   abgeschnitten). Alle drei Klassen nutzen denselben bewaehrten "remove +
+   offsetWidth + add"-Neustart-Trick wie schon bkmpIdlePlaySpriteAttack -
+   ein erneuter Treffer waehrend die Animation noch laeuft startet sie
+   sauber neu, statt sich zu stapeln oder haengen zu bleiben.
+
+   Echter Bug beim eigenen Testen gefunden (per getComputedStyle bestaetigt,
+   nicht nur vermutet): #idleVillageSprite bekommt von
+   bkmpApplyVillageSkinToElement() (bkmp-cosmetics.js) IMMER ein Inline-
+   "style.animation" gesetzt (entweder "none" fuer statische Skins oder ein
+   echter Endlos-steps()-Loop fuer animierte Mehrfach-Frame-Skins wie
+   Pilzdorf) - Inline-Styles schlagen jede Klassenregel ohne !important, die
+   .idle-village-damage-pulse-Animation waere dadurch fuer JEDEN Dorf-Skin
+   IMMER unsichtbar geblieben. !important gewinnt zwar gegen Inline-Styles,
+   darf hier aber NICHT dauerhaft gesetzt bleiben (die Klasse selbst wird
+   nie entfernt, siehe obiger Kommentar) - sonst wuerde ein einziger Treffer
+   die echte Endlos-Ambiente-Animation eines animierten Skins fuer den Rest
+   der Sitzung ersetzen. Fix: eigener kurzer Timer entfernt die Klasse exakt
+   nach Ablauf der 0.4s-Animation wieder, damit .idle-village-sprite direkt
+   danach wieder normal auf sein Inline-Skin-Style zurueckfaellt. */
+let bkmpVillagePulseRemoveTimer = null;
 function bkmpIdleSpawnHitFlash(targetId) {
   const el = document.getElementById(targetId);
   if (!el) return;
   el.classList.remove('idle-hit-flash');
   void el.offsetWidth;
   el.classList.add('idle-hit-flash');
+  if (targetId === 'idleVillage') {
+    el.classList.remove('idle-village-damage-pulse');
+    void el.offsetWidth;
+    el.classList.add('idle-village-damage-pulse');
+    window.clearTimeout(bkmpVillagePulseRemoveTimer);
+    bkmpVillagePulseRemoveTimer = window.setTimeout(() => el.classList.remove('idle-village-damage-pulse'), 420);
+    const hpFill = document.getElementById('idleVillageHpFill');
+    const hpBar = hpFill ? hpFill.parentElement : null;
+    if (hpBar) {
+      hpBar.classList.remove('idle-hp-bar-flash');
+      void hpBar.offsetWidth;
+      hpBar.classList.add('idle-hp-bar-flash');
+    }
+  }
 }
 
 function bkmpIdleRenderHud() {
@@ -470,6 +621,14 @@ function bkmpIdleSpawnClickDamage(amount, clientX, clientY) {
   const dmg = document.createElement('span');
   dmg.className = 'idle-dmg-float idle-dmg-click';
   dmg.textContent = '-' + Math.round(amount);
+  /* Kampf-Feinschliff (03.08.2026): kleiner Zufalls-Versatz wie bei den
+     anderen Schadenszahlen-Typen (bkmpIdleDmgJitter), damit schnell
+     hintereinander getippte Klicks nicht alle exakt auf demselben Punkt
+     landen - reine margin-Verschiebung, faengt sich nicht mit der
+     Klickpositions-Logik direkt darunter. */
+  const jitter = bkmpIdleDmgJitter();
+  dmg.style.marginLeft = jitter.x + 'px';
+  dmg.style.marginTop = jitter.y + 'px';
   if (typeof clientX === 'number' && typeof clientY === 'number') {
     /* Nur left/top ueberschreiben, NICHT transform - die bestehende
        idleDmgFloat-Animation (@keyframes) steuert transform selbst
@@ -479,11 +638,18 @@ function bkmpIdleSpawnClickDamage(amount, clientX, clientY) {
        mit dem Klickpunkt, kein zusaetzlicher Transform noetig/sinnvoll
        (wuerde vom Animations-Keyframe ohnehin sofort ueberschrieben). */
     const rect = target.getBoundingClientRect();
-    dmg.style.left = Math.round(clientX - rect.left) + 'px';
-    dmg.style.top = Math.round(clientY - rect.top) + 'px';
+    /* Rand-Sicherung (Auftrag: "Zahlen duerfen nicht am oberen oder
+       seitlichen Rand abgeschnitten werden") - klemmt den Klickpunkt auf
+       einen Bereich, der auch mit dem obigen Jitter (max. ±13/±5px) noch
+       sicher innerhalb des Zielcontainers bleibt, statt exakt am Rand
+       selbst (0px/100%) zu erscheinen. */
+    const clampedX = Math.min(Math.max(clientX - rect.left, 18), Math.max(18, rect.width - 18));
+    const clampedY = Math.min(Math.max(clientY - rect.top, 14), Math.max(14, rect.height - 14));
+    dmg.style.left = Math.round(clampedX) + 'px';
+    dmg.style.top = Math.round(clampedY) + 'px';
   }
   target.appendChild(dmg);
-  window.setTimeout(() => dmg.remove(), 800);
+  bkmpIdleTrackDmgFloat('idleDragon', dmg, 800);
 }
 
 function bkmpIdleHandleDragonClick(e) {

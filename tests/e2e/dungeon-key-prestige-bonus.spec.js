@@ -58,18 +58,26 @@ test.describe('Dungeon-Schluessel: Schluesselmeister/Schluesselbund-Verdrahtung 
     expect(await page.evaluate(() => bkmpDungeonStatusByType.exp.keys)).toBe(5);
   });
 
-  test('Schluesselmeister Rang 10 (30% schneller): naechster Schluessel bereits nach 2h48min statt nach 4h, nicht mehr auf dem gemeinsamen Raster', async ({ page, qaBaseURL, fixtureData, store }) => {
+  /* 03.08.2026 - Nutzerwunsch ("wir haben Feste Schluessel Zeiten. da
+     bringt so ein skill nichts"): der Knoten "Schluesselmeister" wurde
+     komplett entfernt (siehe sql/20260803-remove-schluesselmeister-fixed-
+     slots-only.sql + bkmpPrestigeMigrateSchluesselmeisterRemoval() in
+     js/systems/bkmp-prestige.js). Dieser Test war urspruenglich der
+     Wirksamkeitsbeweis fuer den Knoten - jetzt beweist er das Gegenteil:
+     selbst mit einer noch in der DB stehenden (z.B. nicht migrierten)
+     Bestands-Zuteilung bleibt das feste gemeinsame Raster unbeeinflusst. */
+  test('REGRESSION: eine (noch nicht migrierte) Schluesselmeister-Zuteilung hat keinen Effekt mehr - festes Raster bleibt unveraendert', async ({ page, qaBaseURL, fixtureData, store }) => {
     await openAndLogin(page, qaBaseURL, fixtureData);
-    setPrestigeAllocations(store, fixtureData.nameKey, { schluesselmeister: 10 }); // 10*3%=30% -> Intervall 14400*0,7=10080s
+    setPrestigeAllocations(store, fixtureData.nameKey, { schluesselmeister: 30, schluesselmeister__paragon: 10 }); // ehemals 91,2% schneller - jetzt wirkungslos
     await page.locator('#idleTabBtnDungeon').click();
     await refreshDungeonStatus(page);
-    await page.evaluate(() => bkmpDungeonConsumeKey('gold'));
+    await page.evaluate(() => bkmpDungeonConsumeKey('gold')); // verankert auf dem aktuellen 4h-Slot
 
-    store.clock.advance(10080 * 1000 - 60 * 1000); // 1 Min. vor der persoenlichen Grenze
+    store.clock.advance(3 * 3600 * 1000 + 59 * 60 * 1000); // knapp vor dem naechsten festen Slot - waere mit dem alten Bonus laengst voll gewesen
     await refreshDungeonStatus(page);
     expect(await page.evaluate(() => bkmpDungeonStatusByType.gold.keys)).toBe(4);
 
-    store.clock.advance(2 * 60 * 1000); // ueber die persoenliche Grenze
+    store.clock.advance(2 * 60 * 1000); // ueber den naechsten festen Slot
     await refreshDungeonStatus(page);
     expect(await page.evaluate(() => bkmpDungeonStatusByType.gold.keys)).toBe(5);
   });
@@ -135,36 +143,45 @@ test.describe('Dungeon-Schluessel: Schluesselmeister/Schluesselbund-Verdrahtung 
     expect(secondsAfterTick).toBeLessThan(6);
   });
 
-  test('Paragon-Raenge zaehlen anteilig mit (Schluesselmeister Maximalrang + 10 Paragon-Raenge = 91,2%)', async ({ page, qaBaseURL, fixtureData, store }) => {
+  test('REGRESSION: selbst ein extremer Schluesselmeister-Paragon-Ausbau (Rang 1000) bleibt wirkungslos - kein verkuerztes Intervall mehr moeglich', async ({ page, qaBaseURL, fixtureData, store }) => {
     await openAndLogin(page, qaBaseURL, fixtureData);
-    setPrestigeAllocations(store, fixtureData.nameKey, { schluesselmeister: 30, schluesselmeister__paragon: 10 });
-    await page.locator('#idleTabBtnDungeon').click();
-    await refreshDungeonStatus(page);
-    await page.evaluate(() => bkmpDungeonConsumeKey('rune'));
-
-    const expectedIntervalMs = Math.round(14400 * (1 - 91.2 / 100)) * 1000; // 1267000ms
-    store.clock.advance(expectedIntervalMs - 5000);
-    await refreshDungeonStatus(page);
-    expect(await page.evaluate(() => bkmpDungeonStatusByType.rune.keys)).toBe(4);
-
-    store.clock.advance(10000);
-    await refreshDungeonStatus(page);
-    expect(await page.evaluate(() => bkmpDungeonStatusByType.rune.keys)).toBe(5);
-  });
-
-  test('extremer Paragon-Ausbau bleibt bei 95% gedeckelt (nie 0/negatives Intervall)', async ({ page, qaBaseURL, fixtureData, store }) => {
-    await openAndLogin(page, qaBaseURL, fixtureData);
-    setPrestigeAllocations(store, fixtureData.nameKey, { schluesselmeister: 30, schluesselmeister__paragon: 1000 });
+    setPrestigeAllocations(store, fixtureData.nameKey, { schluesselmeister: 30, schluesselmeister__paragon: 1000 }); // ehemals beim 95%-Deckel, kuerzestmoegliches Intervall
     await page.locator('#idleTabBtnDungeon').click();
     await refreshDungeonStatus(page);
     await page.evaluate(() => bkmpDungeonConsumeKey('meat'));
 
-    store.clock.advance(719 * 1000); // 95%-Deckel -> Intervall = 14400*0,05 = 720s
+    store.clock.advance(719 * 1000); // waere mit dem alten 95%-Deckel (720s Intervall) laengst wieder voll gewesen
     await refreshDungeonStatus(page);
-    expect(await page.evaluate(() => bkmpDungeonStatusByType.meat.keys)).toBe(4);
+    expect(await page.evaluate(() => bkmpDungeonStatusByType.meat.keys)).toBe(4); // unveraendert auf dem festen Raster, kein verkuerztes Intervall
 
-    store.clock.advance(2000);
+    // Erst der naechste ECHTE feste Slot (4h ab Verbrauch, nicht die alte 720s-Grenze) fuellt wieder auf.
+    store.clock.advance(4 * 3600 * 1000 - 719 * 1000);
     await refreshDungeonStatus(page);
     expect(await page.evaluate(() => bkmpDungeonStatusByType.meat.keys)).toBe(5);
+  });
+
+  test('Migration: bereits investierte Schluesselmeister-Punkte (Basis + Paragon) werden beim Laden vollstaendig zurueckerstattet', async ({ page, qaBaseURL, fixtureData, store }) => {
+    const rows = store.tables.idle_prestige_state || (store.tables.idle_prestige_state = []);
+    let row = rows.find(r => r.name_key === fixtureData.nameKey);
+    if (!row) {
+      row = { name_key: fixtureData.nameKey, display_name: fixtureData.nameKey, prestige_level: 10, prestige_points: 500, prestige_points_spent: 300, prestige_allocations: {}, updated_at: new Date().toISOString() };
+      rows.push(row);
+    }
+    // Exakt der reale Blacklaier1337-Bestand aus der Live-DB (Rang 30 + Paragon 2).
+    row.prestige_allocations = { ...row.prestige_allocations, schluesselmeister: 30, schluesselmeister__paragon: 2 };
+    row.prestige_points_spent = 5000000;
+
+    await openAndLogin(page, qaBaseURL, fixtureData);
+
+    const result = await page.evaluate(() => ({
+      rank: bkmpPrestigeState.prestige_allocations.schluesselmeister,
+      paragon: bkmpPrestigeState.prestige_allocations.schluesselmeister__paragon,
+      spentLessThanBefore: bkmpPrestigeState.prestige_points_spent < 5000000,
+      nodeStillInCatalog: !!bkmpPrestigeNodeById('schluesselmeister')
+    }));
+    expect(result.rank).toBeUndefined();
+    expect(result.paragon).toBeUndefined();
+    expect(result.spentLessThanBefore).toBe(true); // echte, spuerbare Rueckerstattung
+    expect(result.nodeStillInCatalog).toBe(false); // Knoten komplett aus dem Katalog entfernt, nicht nur gekappt
   });
 });

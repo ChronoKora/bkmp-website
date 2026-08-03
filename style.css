@@ -6014,6 +6014,36 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 .idle-dragon-boss .idle-dragon-sprite { max-width: 400px; }
 .idle-dragon-miniboss .idle-dragon-sprite { max-width: 360px; }
 
+/* Kampf-Feinschliff (03.08.2026, Nutzer-Auftrag "Gegnerwechsel weniger
+   abrupt"): #idleDragonSprite ist EIN wiederverwendetes Element (siehe
+   bkmpIdleApplyDragonSprite in bkmp-hud.js - Hintergrundbild/Video werden
+   ausgetauscht, das Element selbst bleibt bestehen). bkmpIdleSpawnDragon()
+   fuegt idle-dragon-spawn-in IMMER unmittelbar nach einem etwaigen
+   idle-dragon-defeat-out hinzu (gleicher synchroner Aufruf, kein Timeout -
+   siehe bkmpIdleHandleDragonDefeated) - beide Klassen koennen dadurch
+   gleichzeitig auf demselben Element stehen. Bei gleicher Spezifitaet
+   gewinnt in der CSS-Kaskade die SPAETER deklarierte "animation"-Eigenschaft
+   komplett (kein Vermischen zweier animation-Werte ueber zwei Klassen) -
+   .idle-dragon-spawn-in steht deshalb bewusst NACH .idle-dragon-defeat-out
+   in dieser Datei, damit im ueblichen Fall (Kill -> sofort naechster
+   Drache) die Einblend-Animation gewinnt, die der Spieler tatsaechlich
+   sieht (das neue Sprite-Bild ist zu diesem Zeitpunkt technisch schon
+   eingesetzt). idle-dragon-defeat-out bleibt trotzdem als eigene,
+   funktionierende Animation stehen - fuer den selteneren Fall, dass ein
+   Aufrufer sie ohne unmittelbar folgendes Spawn nutzt, animiert sie
+   eigenstaendig korrekt. */
+.idle-dragon-defeat-out { animation: idleDragonDefeatOut 0.22s ease; }
+@keyframes idleDragonDefeatOut {
+  0% { opacity: 1; transform: scale(1) translateY(0); filter: brightness(1); }
+  100% { opacity: 0.15; transform: scale(0.92) translateY(6px); filter: brightness(0.6) saturate(0.4); }
+}
+.idle-dragon-spawn-in { animation: idleDragonSpawnIn 0.34s cubic-bezier(0.22, 1, 0.36, 1); }
+@keyframes idleDragonSpawnIn {
+  0% { opacity: 0; transform: scale(0.9) translateY(8px); filter: brightness(0.7); }
+  55% { opacity: 1; transform: scale(1.035) translateY(-2px); filter: brightness(1.08); }
+  100% { opacity: 1; transform: scale(1) translateY(0); filter: brightness(1); }
+}
+
 @keyframes idleSpriteAttackFrames {
   from { background-position-y: 0%; }
   to { background-position-y: 100%; }
@@ -6144,6 +6174,41 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   100% { filter: brightness(1); transform: scale(1); }
 }
 
+/* Kampf-Feinschliff (03.08.2026, Nutzer-Auftrag "Trefferfeedback fuer die
+   Spielerseite"): ergaenzt (nicht ersetzt) das obige idle-hit-flash, das
+   weiterhin fuer BEIDE Ziele (Dorf+Drache) unveraendert laeuft, ebenso wie
+   der bereits bestehende globale Bildschirm-Wackler
+   (html.bkmp-app-mode .idle-battlefield:has(.idle-hit-flash), weiter unten
+   in dieser Datei) - der deckt "minimale Erschuetterung" fuer beide Seiten
+   bereits ab, hier kommt bewusst KEIN zweiter Wackler dazu (Auftrag: "keine
+   dauerhaften Animationen stapeln"). Nur zwei zusaetzliche, rein
+   dorf-spezifische Effekte: eine kurze rot/orange Innen-Vignette auf dem
+   Dorf-Sprite (dessen overflow:hidden+border-radius sorgt automatisch fuer
+   einen sauberen, abgerundeten Rahmen) und ein kurzes Aufleuchten des
+   HP-Balken-Wrappers (siehe bkmpIdleSpawnHitFlash in bkmp-hud.js fuer die
+   Begruendung, warum der Glow auf dem Wrapper statt dem Fuellstand sitzen
+   muss). */
+/* !important noetig, da #idleVillageSprite immer ein Inline-"style.animation"
+   traegt (bkmpApplyVillageSkinToElement, bkmp-cosmetics.js - "none" fuer
+   statische Skins, ein echter Endlos-Loop fuer animierte Mehrfach-Frame-
+   Skins) - Inline-Styles schlagen jede Klassenregel ohne !important. Bleibt
+   trotzdem sicher: die Klasse wird per eigenem Timer in bkmpIdleSpawnHitFlash
+   (bkmp-hud.js) exakt nach Ablauf der 0.4s wieder entfernt, ueberschreibt
+   eine echte Skin-Ambiente-Animation also nur fuer den kurzen Puls-Moment,
+   nie dauerhaft. */
+.idle-village-damage-pulse .idle-village-sprite { animation: idleVillageDamagePulse 0.4s ease !important; }
+@keyframes idleVillageDamagePulse {
+  0% { box-shadow: inset 0 0 0 rgba(248, 113, 113, 0); }
+  25% { box-shadow: inset 0 0 34px rgba(248, 113, 113, 0.55); }
+  100% { box-shadow: inset 0 0 0 rgba(248, 113, 113, 0); }
+}
+.idle-hp-bar-flash { animation: idleHpBarFlash 0.4s ease; }
+@keyframes idleHpBarFlash {
+  0% { box-shadow: inset 0 0 0 rgba(248, 113, 113, 0); }
+  30% { box-shadow: inset 0 0 10px 2px rgba(248, 113, 113, 0.7); }
+  100% { box-shadow: inset 0 0 0 rgba(248, 113, 113, 0); }
+}
+
 .idle-arrow {
   position: absolute;
   top: 45%;
@@ -6187,7 +6252,32 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   animation: idleDmgFloat 0.8s ease forwards;
   pointer-events: none;
 }
-.idle-dmg-crit { color: #facc15; font-size: 1.05rem; }
+/* Kampf-Feinschliff (03.08.2026, Nutzer-Auftrag "Schadenszahlen"): eigenes,
+   kraeftigeres Pop-In fuer Kritische Treffer statt des gleichen sanften
+   Hochschwebens wie normale Zahlen (Groesse/Farbe waren schon vorher
+   unterschiedlich, siehe .idle-dmg-crit oben - der bereits bestehende
+   Funken-Ausbruch bei ::after, weiter unten in dieser Datei bei
+   html.bkmp-app-mode .idle-dmg-crit::after, deckt den "kurzen Leucht-/
+   Wumms-Effekt" bereits ab, unveraendert). Gleiche Spezifitaet wie
+   .idle-dmg-float, spaeter in der Kaskade deklariert - ueberschreibt
+   dessen "animation" komplett, kein !important noetig. */
+.idle-dmg-crit { color: #facc15; font-size: 1.05rem; animation: idleDmgFloatCrit 0.85s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+@keyframes idleDmgFloatCrit {
+  0% { opacity: 0; transform: translate(-50%, 6px) scale(0.5); }
+  35% { opacity: 1; transform: translate(-50%, -6px) scale(1.35); }
+  55% { transform: translate(-50%, -14px) scale(1.05); }
+  100% { opacity: 0; transform: translate(-50%, -40px) scale(1); }
+}
+/* Ueberschreitet die Anzahl gleichzeitig aktiver Schadenszahlen pro Ziel
+   das Limit (BKMP_DMG_FLOAT_MAX_PER_TARGET, bkmp-hud.js), blendet die
+   AELTESTE zuegig aus statt ihre volle 800ms-Laufzeit abzuwarten - gilt
+   fuer normale UND kritische Zahlen gleichermassen (!important gewinnt
+   gegen beide .idle-dmg-float/.idle-dmg-crit-Animationen). */
+.idle-dmg-float-fastout { animation: idleDmgFloatFastOut 0.13s ease forwards !important; }
+@keyframes idleDmgFloatFastOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
 .idle-dmg-click { color: #7dd3fc; left: 65%; }
 .idle-dmg-burn { color: #fb923c; left: 35%; text-shadow: 0 0 8px rgba(251, 146, 60, 0.7); }
 .idle-dmg-lightning { color: #fef08a; left: 60%; text-shadow: 0 0 8px rgba(250, 204, 21, 0.8); }
@@ -6272,7 +6362,11 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
    Kampf-Log, das dadurch nur noch fuer seltenere Ereignisse genutzt wird. */
 .idle-reward-float {
   position: absolute;
-  top: 10%;
+  /* Kampf-Feinschliff (03.08.2026): --rf-stack-offset wird per JS gesetzt
+     (siehe bkmpIdleRewardGained-Listener, idledorf.js) - bei schnell
+     aufeinanderfolgenden Siegen verschiebt jede noch aktive Anzeige die
+     naechste ein Stueck nach oben, statt exakt uebereinander zu liegen. */
+  top: calc(10% + var(--rf-stack-offset, 0px));
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -6281,6 +6375,10 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   z-index: 6;
   animation: idleRewardFloat 1.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
+/* Ueberschreitet die Anzahl gleichzeitig aktiver Belohnungs-Reihen das
+   Limit (BKMP_REWARD_FLOAT_MAX, idledorf.js), blendet die AELTESTE zuegig
+   aus statt ihre volle 1.5s-Laufzeit abzuwarten. */
+.idle-reward-float-fastout { animation: idleDmgFloatFastOut 0.15s ease forwards !important; }
 /* Nutzerwunsch (19.07.): "optisch was einfallen lassen" - vorher reiner
    Text mit Farbe+Schatten, jetzt kleine "Belohnungs-Chips" mit Glas-
    Hintergrund + zur jeweiligen Ressource passendem Rand/Glow (--rf-color
@@ -6375,6 +6473,82 @@ html[data-fx="aus"] .idle-reward-float .rf-gold::after { animation: none; displa
    hochzupoppen und wegzufaden. */
 html[data-fx="aus"] .idle-dmg-float { animation: none; opacity: 1; transform: translate(-50%, 0); }
 
+/* Kampf-Status-Banner (03.08.2026, Nutzer-Auftrag "Status-Einblendungen"):
+   siehe bkmpIdleShowCombatStatus in bkmp-hud.js fuer die JS-seitige
+   Prioritaets-/Ersetzungslogik. Positioniert oberhalb der Belohnungs-
+   Hochschweb-Anzeige (die sitzt bei top:10%, siehe .idle-reward-float
+   oben) - beide koennen bei einem Bosssieg gleichzeitig ausgeloest werden,
+   der kleine vertikale Abstand + der eigene, hoehere z-index verhindern,
+   dass sich die Texte gegenseitig unlesbar ueberdecken. clamp() statt
+   fester rem-Werte haelt die Schrift auch auf sehr schmalen mobilen
+   Kampffeldern lesbar, ohne eine eigene Media-Query zu brauchen. */
+.idle-combat-status {
+  position: absolute;
+  top: 3%;
+  left: 50%;
+  transform: translate(-50%, 0) scale(1);
+  z-index: 9;
+  max-width: 88%;
+  pointer-events: none;
+  font-family: 'Fraunces', serif;
+  font-weight: 800;
+  font-size: clamp(0.95rem, 3.6vw, 1.3rem);
+  color: var(--gold);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 3px 10px rgba(0, 0, 0, 0.6), 0 0 16px rgba(0, 0, 0, 0.4);
+  background: linear-gradient(155deg, rgba(10, 8, 16, 0.84), rgba(6, 5, 10, 0.7));
+  border: 1px solid color-mix(in srgb, var(--gold) 55%, transparent);
+  border-radius: 999px;
+  padding: 0.45rem 1.2rem;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  animation: idleCombatStatusIn 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+/* Bosskampf-Variante (Auftrag: "darf visuell staerker sein, muss aber KEIN
+   vollflaechiges Overlay sein und darf den Kampf nicht pausieren") - nur
+   groesser/kraeftigerer Glow, exakt derselbe leichte Banner-Mechanismus. */
+.idle-combat-status-strong {
+  font-size: clamp(1.15rem, 5.2vw, 1.75rem);
+  padding: 0.6rem 1.6rem;
+  color: #fde68a;
+  border-color: color-mix(in srgb, #ef4444 45%, var(--gold) 55%);
+  box-shadow: 0 0 26px rgba(239, 68, 68, 0.45), 0 0 16px rgba(250, 204, 21, 0.35), 0 8px 20px rgba(0, 0, 0, 0.45);
+}
+.idle-combat-status-defeat {
+  color: #fca5a5;
+  border-color: color-mix(in srgb, #ef4444 60%, transparent);
+}
+.idle-combat-status-out { animation: idleCombatStatusOut 0.3s ease forwards !important; }
+@keyframes idleCombatStatusIn {
+  0% { opacity: 0; transform: translate(-50%, -8px) scale(0.85); }
+  60% { opacity: 1; transform: translate(-50%, 2px) scale(1.04); }
+  100% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+@keyframes idleCombatStatusOut {
+  0% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -10px) scale(0.92); }
+}
+html[data-fx="aus"] .idle-combat-status { animation: none; opacity: 1; transform: translate(-50%, 0) scale(1); }
+html[data-fx="aus"] .idle-combat-status-out { animation: none !important; }
+/* Die globale reduced-motion-Kollektivregel weiter oben in dieser Datei
+   (*, *::before, *::after { animation-duration: 0.001ms !important; ... })
+   deckt jede normale, NICHT mit !important markierte "animation"-Angabe
+   bereits automatisch ab (Kaskade: gleiche Wichtigkeit, aber die spaeter
+   deklarierte, spezifischere Klassenregel gewinnt trotzdem gegen den
+   Universalselektor "*" NICHT, wenn beide !important sind UND die Klasse
+   eine hoehere Spezifitaet hat als "*" (0 Punkte) - genau das trifft auf
+   die drei "aeltestes Element schneller ausblenden"-Klassen hier zu, die
+   ihr eigenes "animation: ... !important" tragen. Ohne diese explizite
+   Ergaenzung wuerden GENAU diese drei Klassen die globale Kollektivregel
+   ueberstimmen und weiterhin mit voller Dauer laufen. */
+@media (prefers-reduced-motion: reduce) {
+  .idle-dmg-float-fastout,
+  .idle-reward-float-fastout,
+  .idle-combat-status-out { animation: none !important; opacity: 0 !important; }
+}
+
 /* ============================================================
    Granulare Effekt-Einzelschalter (Nutzerwunsch 19.07.: "wirklich alle
    Effekte selbst auswaehlbar", siehe BKMP_FX_TOGGLE_DEFS in idledorf.js) -
@@ -6387,12 +6561,17 @@ html[data-fx="aus"] .idle-dmg-float { animation: none; opacity: 1; transform: tr
    CSS-Regel hier.
    ============================================================ */
 html.fx-off-dmgNumbers .idle-dmg-float { animation: none; opacity: 1; transform: translate(-50%, 0); }
+html.fx-off-dmgNumbers .idle-dmg-float-fastout { animation: none !important; opacity: 1; }
 html.fx-off-hitShake .idle-battlefield:has(.idle-hit-flash) { animation: none; }
 html.fx-off-hitShake .idle-hit-flash { animation: none; }
+html.fx-off-hitShake .idle-village-damage-pulse .idle-village-sprite { animation: none !important; }
+html.fx-off-hitShake .idle-hp-bar-flash { animation: none; }
 html.fx-off-attackAnim .idle-arrow,
 html.fx-off-attackAnim .idle-fire-breath { animation: none; opacity: 0; }
 html.fx-off-attackAnim .idle-sprite-attacking { animation: none; }
 html.fx-off-attackAnim .idle-sprite-attacking > .idle-dragon-sprite-video { animation: none; }
+html.fx-off-attackAnim .idle-dragon-spawn-in,
+html.fx-off-attackAnim .idle-dragon-defeat-out { animation: none; opacity: 1; }
 html.fx-off-rewardPopups .idle-reward-float { animation: none; opacity: 1; }
 html.fx-off-rewardPopups .idle-reward-float .rf-chip { animation: none; }
 html.fx-off-rewardPopups .idle-reward-float .rf-gold::after { animation: none; display: none; }
@@ -8371,6 +8550,20 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 @media (prefers-reduced-motion: reduce) {
   .idle-dorf-overlay .idle-dorf-card { animation: none; }
   .idle-hit-flash, .idle-arrow, .idle-fire-breath, .idle-dmg-float, .idle-lightning-bolt { animation: none !important; }
+  /* Kampf-Feinschliff (03.08.2026): dieselbe explizite Abschalt-Liste wie
+     oben, erweitert um die neuen Uebergangs-/Feedback-/Status-Klassen -
+     die globale Kollektivregel (*, *::before, *::after{animation-duration:
+     .001ms!important}, siehe weiter oben in dieser Datei) deckt die
+     meisten davon bereits automatisch ab, hier trotzdem explizit gelistet
+     (gleiches Muster wie die bestehende Zeile direkt darueber), damit ein
+     spaeteres, unbedachtes !important auf einer dieser Klassen nicht
+     versehentlich die Kollektivregel aushebeln kann. */
+  .idle-dmg-crit,
+  .idle-dragon-spawn-in,
+  .idle-dragon-defeat-out,
+  .idle-village-damage-pulse .idle-village-sprite,
+  .idle-hp-bar-flash,
+  .idle-combat-status { animation: none !important; }
 }
 
 /* ---- 18 neue Kosmetiken (Idle Dorf) ---- */

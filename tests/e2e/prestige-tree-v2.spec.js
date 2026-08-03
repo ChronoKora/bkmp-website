@@ -45,7 +45,7 @@ test.describe('Prestige-Baum v2: Struktur/Kosten/Paragon/Meilensteine (Teststand
     expect(result.rankStillValid).toBe(true);
   });
 
-  test('5 Zweige + Vermaechtnis vorhanden, je 10 Knoten in den 5 Hauptzweigen', async ({ page, qaBaseURL, fixtureData }) => {
+  test('5 Zweige + Vermaechtnis vorhanden, je 10 Knoten in den 5 Hauptzweigen (runen_dungeon seit 03.08.2026 nur noch 9 - Schluesselmeister entfernt)', async ({ page, qaBaseURL, fixtureData }) => {
     await openAndLogin(page, qaBaseURL, fixtureData);
     await waitForDragonReady(page);
     const counts = await page.evaluate(() => {
@@ -56,7 +56,7 @@ test.describe('Prestige-Baum v2: Struktur/Kosten/Paragon/Meilensteine (Teststand
     expect(counts.kampf).toBe(10);
     expect(counts.wirtschaft).toBe(10);
     expect(counts.drachen).toBe(10);
-    expect(counts.runen_dungeon).toBe(10);
+    expect(counts.runen_dungeon).toBe(9); // Schluesselmeister komplett entfernt (Nutzerwunsch: feste Schluesselzeiten machen den Knoten wirkungslos)
     expect(counts.automation).toBe(10);
     expect(counts.legacy).toBe(2);
   });
@@ -292,5 +292,92 @@ test.describe('Prestige-Baum v2: Struktur/Kosten/Paragon/Meilensteine (Teststand
     expect(result.rank).toBe(3);
     expect(result.paragon).toBeUndefined();
     expect(result.spentLessThanBefore).toBe(true);
+  });
+
+  /* Nutzerwunsch 03.08.2026 ("wir haben Feste Schluessel Zeiten. da bringt
+     so ein skill nichts"): der Knoten "Schluesselmeister" (individuelles,
+     vom gemeinsamen Raster abweichendes Zeitverhalten) wurde komplett aus
+     dem Katalog entfernt - anders als die Schluesselbund-Downgrade-
+     Migration oben (Rang wird nur GEKAPPT, Knoten bleibt kaufbar) gibt es
+     hier gar keinen Zielrang mehr, jede Investition wird vollstaendig
+     zurueckerstattet. Gleiches Test-Trio wie beim Schluesselbund-Vorbild:
+     (1) Knoten wirklich weg + nicht mehr kaufbar, (2) Rueckerstattungs-
+     Migration exakt + idempotent, (3) ein Spieler ohne Investition bleibt
+     unangetastet. */
+  test('Schluesselmeister: Knoten komplett aus dem Katalog entfernt, nicht mehr kaufbar', async ({ page, qaBaseURL, fixtureData }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+
+    const result = await page.evaluate(() => {
+      const before = bkmpPrestigeState.prestige_allocations.schluesselmeister || 0;
+      const spentBefore = bkmpPrestigeState.prestige_points_spent;
+      bkmpPrestigeState.prestige_points = 100000;
+      bkmpPrestigeBuyUpgrade('schluesselmeister'); // darf ins Leere laufen - kein solcher Knoten mehr im Katalog
+      return {
+        nodeExists: !!bkmpPrestigeNodeById('schluesselmeister'),
+        rankAfter: bkmpPrestigeState.prestige_allocations.schluesselmeister || 0,
+        rankBefore: before,
+        spentUnchanged: bkmpPrestigeState.prestige_points_spent === spentBefore
+      };
+    });
+    expect(result.nodeExists).toBe(false);
+    expect(result.rankAfter).toBe(result.rankBefore); // kein Kauf moeglich, da kein Knoten mehr existiert
+    expect(result.spentUnchanged).toBe(true);
+  });
+
+  test('Schluesselmeister-Entfernungs-Migration: Rang + Paragon werden vollstaendig zurueckerstattet, exakt, idempotent bei erneutem Aufruf', async ({ page, qaBaseURL, fixtureData }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+
+    const result = await page.evaluate(() => {
+      // Simuliert einen Spieler mit Maximalrang (30) + 2 Paragon-Raengen -
+      // exakt der reale Blacklaier1337-Bestand aus der Live-Untersuchung.
+      const legacyDef = bkmpPrestigeTierDef('MEDIUM');
+      let refundExpected = 0;
+      for (let r = 1; r <= 30; r++) refundExpected += bkmpPrestigeUpgradeCost(legacyDef, r);
+      for (let p = 1; p <= 2; p++) refundExpected += bkmpPrestigeParagonCost(legacyDef, p);
+
+      bkmpPrestigeState.prestige_allocations = { schluesselmeister: 30, schluesselmeister__paragon: 2 };
+      bkmpPrestigeState.prestige_points_spent = 5000000; // deutlich ueber dem erwarteten Refund
+      const spentBefore = bkmpPrestigeState.prestige_points_spent;
+
+      bkmpPrestigeMigrateSchluesselmeisterRemoval();
+      const afterFirst = {
+        rank: bkmpPrestigeState.prestige_allocations.schluesselmeister,
+        paragon: bkmpPrestigeState.prestige_allocations.schluesselmeister__paragon,
+        spent: bkmpPrestigeState.prestige_points_spent
+      };
+
+      // Zweiter Aufruf (z.B. beim naechsten Laden) darf nichts mehr veraendern - idempotent.
+      bkmpPrestigeMigrateSchluesselmeisterRemoval();
+      const afterSecond = {
+        rank: bkmpPrestigeState.prestige_allocations.schluesselmeister,
+        spent: bkmpPrestigeState.prestige_points_spent
+      };
+
+      return { refundExpected, spentBefore, afterFirst, afterSecond };
+    });
+
+    expect(result.afterFirst.rank).toBeUndefined();
+    expect(result.afterFirst.paragon).toBeUndefined();
+    expect(result.spentBefore - result.afterFirst.spent).toBe(result.refundExpected);
+    expect(result.refundExpected).toBeGreaterThan(0); // echter, spuerbarer Refund, kein Nullbetrag
+
+    // Idempotenz: zweiter Aufruf aendert weder Zuteilung noch ausgegebene Punkte.
+    expect(result.afterSecond.rank).toBeUndefined();
+    expect(result.afterSecond.spent).toBe(result.afterFirst.spent);
+  });
+
+  test('Schluesselmeister-Entfernungs-Migration: ein Spieler ohne jede Investition bleibt komplett unangetastet', async ({ page, qaBaseURL, fixtureData }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    const result = await page.evaluate(() => {
+      bkmpPrestigeState.prestige_allocations = { ewiges_feuer: 5 };
+      bkmpPrestigeState.prestige_points_spent = 500;
+      bkmpPrestigeMigrateSchluesselmeisterRemoval();
+      return { spent: bkmpPrestigeState.prestige_points_spent, otherRankUntouched: bkmpPrestigeState.prestige_allocations.ewiges_feuer };
+    });
+    expect(result.spent).toBe(500);
+    expect(result.otherRankUntouched).toBe(5);
   });
 });

@@ -134,16 +134,29 @@ const BKMP_PRESTIGE_UPGRADES = [
   { id: 'effiziente_aufwertung', branch: 'runen_dungeon', name: 'Effiziente Aufwertung', desc: '-1% Runen-Aufwertungskosten pro Rang (max. 20%).', icon: '🔧', effectType: 'rune_upgrade_cost_reduction_pct', effectPerRank: 1, ...bkmpPrestigeTierDef('STRONG') },
   { id: 'schmelzmeister', branch: 'runen_dungeon', name: 'Schmelzmeister', desc: '+3% Runen-Schmelzbelohnung pro Rang.', icon: '🔥', effectType: 'rune_fuse_reward_bonus_pct', effectPerRank: 3, ...bkmpPrestigeTierDef('MEDIUM') },
   { id: 'dungeonjaeger', branch: 'runen_dungeon', name: 'Dungeonjäger', desc: '+3% Dungeon-Belohnungen pro Rang.', icon: '🗡️', effectType: 'dungeon_reward_pct', effectPerRank: 3, ...bkmpPrestigeTierDef('MEDIUM') },
-  /* Schluesselmeister/Schluesselbund: die Schluessel-Regeneration laeuft
-     vollstaendig serverseitig (dungeon_regen_calc(), dungeon_get_all_status()/
-     dungeon_consume_key() lesen prestige_allocations direkt und rechnen Rang+
-     Paragon-Rang in echte Werte um - siehe sql/20260727-fix-dungeon-regen-
-     fixed-slots-and-wire-prestige.sql, NEU, NOCH NICHT AUSGEFUEHRT). Bis
-     dahin bereits kaufbar/anzeigbar, aber wirkungslos (kein Client-Fehler,
-     Server ignoriert die Zusatz-Parameter einfach, solange die Migration
-     nicht gelaufen ist). Schluesselmeister-Deckel bei 95% (nie 0/negatives
-     Intervall) - siehe Kommentar in der SQL-Datei. */
-  { id: 'schluesselmeister', branch: 'runen_dungeon', name: 'Schlüsselmeister', desc: '+3% schnellere Schlüssel-Regeneration pro Rang (max. 95%).', icon: '🗝️', effectType: 'dungeon_key_regen_speed_pct', effectPerRank: 3, ...bkmpPrestigeTierDef('MEDIUM') },
+  /* Schluesselbund: die Schluessel-Regeneration laeuft vollstaendig
+     serverseitig (dungeon_regen_calc(), dungeon_get_all_status()/
+     dungeon_consume_key() lesen prestige_allocations.schluesselbund direkt
+     und rechnen Rang+Paragon-Rang in einen hoeheren Deckel um - siehe
+     sql/20260727-fix-dungeon-regen-fixed-slots-and-wire-prestige.sql).
+     Schluesselbund aendert NUR den Deckel (wie viele Schluessel maximal
+     gehortet werden koennen), NICHT das Zeitraster selbst - das feste
+     gemeinsame 0/4/8/12/16/20-Uhr-Raster (Europe/Berlin) gilt seit
+     sql/20260803-remove-schluesselmeister-fixed-slots-only.sql wieder
+     unbedingt fuer JEDEN Spieler, ohne Ausnahme.
+
+     Der frueher hier stehende Knoten "Schluesselmeister" (+3% schnellere
+     Regeneration/Rang, individuelles Zeitraster) wurde am 03.08.2026 auf
+     Nutzerwunsch komplett entfernt ("wir haben Feste Schluessel Zeiten. da
+     bringt so ein skill nichts") - ein personalisiertes, vom gemeinsamen
+     Raster abweichendes Tempo widerspricht direkt dem urspruenglichen
+     16.07.-Wunsch nach EINEM gemeinsamen Raster fuer alle Spieler, den die
+     Server-Verdrahtung vom 27.07. ungewollt wieder ausgehebelt hatte.
+     Bereits investierte Punkte (Basis-Raenge UND Paragon-Raenge) werden
+     beim naechsten Laden automatisch zurueckerstattet - siehe
+     bkmpPrestigeMigrateSchluesselmeisterRemoval() weiter unten, exakt
+     dasselbe Rueckerstattungs-Prinzip wie bei der Schluesselbund-
+     Downgrade-Migration direkt darunter. */
   /* Nutzerwunsch 31.07.2026 ("maximal 3 lvl"): reiner Grind-Fix, nur
      maxRank gesenkt (50->3), effectPerRank/Kosten-Basis unveraendert -
      identisches Override-Muster wie bereits bei 'runenmeister' unten
@@ -538,6 +551,40 @@ function bkmpPrestigeMigrateSchluesselbundDowngrade() {
 
   alloc.schluesselbund = Math.min(rank, def.maxRank);
   if (paragonRank > 0) delete alloc.schluesselbund__paragon;
+  bkmpPrestigeState.prestige_points_spent = Math.max(0, Number(bkmpPrestigeState.prestige_points_spent || 0) - refund);
+  bkmpPrestigeSnapshotMergeBaseline(); // Baseline auf den bereits korrigierten Stand ziehen, sonst wuerde der naechste Remote-Merge die Rueckerstattung wieder verwerfen
+  bkmpPrestigeQueueSave();
+}
+
+/* Nutzerwunsch 03.08.2026 ("wir haben Feste Schluessel Zeiten. da bringt
+   so ein skill nichts"): der Knoten "Schluesselmeister" wurde komplett aus
+   BKMP_PRESTIGE_UPGRADES entfernt (siehe Kommentar an der ehemaligen
+   Katalogstelle oben) - diese Funktion erstattet jedem Spieler, der schon
+   Punkte hineininvestiert hatte (Basis-Raenge UND Paragon-Raenge), diese
+   vollstaendig zurueck. Anders als bkmpPrestigeMigrateSchluesselbundDowngrade
+   (Rang wird nur GEKAPPT, der Knoten existiert weiter) verschwindet hier
+   die komplette Zuteilung - der Knoten ist ja nicht mehr im Katalog, ein
+   Rang>0 waere sonst dauerhaft "totes", nie mehr nutzbares Guthaben.
+   bkmpPrestigeTierDef('MEDIUM') liefert dieselbe Kostenformel (baseCost/
+   costGrowth), die der Knoten hatte, solange er noch im Katalog stand -
+   die Formel haengt nur vom Tier-Namen ab, nicht davon, ob der Knoten noch
+   existiert, die Rueckerstattung bleibt dadurch exakt, kein Schaetzwert.
+   Idempotent: ein Spieler ohne jede Schluesselmeister-Investition (der
+   ganz ueberwiegende Teil) verlaesst die Funktion sofort ohne Mutation. */
+function bkmpPrestigeMigrateSchluesselmeisterRemoval() {
+  if (!bkmpPrestigeState) return;
+  const alloc = bkmpPrestigeState.prestige_allocations || (bkmpPrestigeState.prestige_allocations = {});
+  const rank = Number(alloc.schluesselmeister || 0);
+  const paragonRank = Number(alloc.schluesselmeister__paragon || 0);
+  if (rank <= 0 && paragonRank <= 0) return; // haeufigster Fall: nichts zu tun
+
+  const legacyDef = bkmpPrestigeTierDef('MEDIUM'); // exakt die Tier-Werte, die der Knoten hatte, solange er noch im Katalog stand
+  let refund = 0;
+  for (let r = 1; r <= rank; r++) refund += bkmpPrestigeUpgradeCost(legacyDef, r);
+  for (let p = 1; p <= paragonRank; p++) refund += bkmpPrestigeParagonCost(legacyDef, p);
+
+  delete alloc.schluesselmeister;
+  delete alloc.schluesselmeister__paragon;
   bkmpPrestigeState.prestige_points_spent = Math.max(0, Number(bkmpPrestigeState.prestige_points_spent || 0) - refund);
   bkmpPrestigeSnapshotMergeBaseline(); // Baseline auf den bereits korrigierten Stand ziehen, sonst wuerde der naechste Remote-Merge die Rueckerstattung wieder verwerfen
   bkmpPrestigeQueueSave();
