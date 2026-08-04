@@ -386,6 +386,69 @@ test.describe('Dorf-Skins - Live-Vorschau (Grid-Kachel + Lightbox, 04.08.2026)',
     await expect(page.locator('#idleSkinPreviewOverlay')).toHaveClass(/visible/);
     await expect(page.locator('#idleSkinPreviewName')).toHaveText('❄️ Eis Dorf');
   });
+
+  /* REGRESSION (Spieler-Meldung 04.08.2026, Screenshot der Lightbox: "In der
+     Großansicht verschwinden alle Ansichten und fangen an zu flackern") -
+     bkmpIdleRefreshLiveTabsRender() ruft bkmpIdleRenderSkinsPanel() bei JEDEM
+     Drachen-Kill erneut auf, solange der Dorf-Skins-Tab offen ist (idledorf.js,
+     throttled auf max. alle 300ms) - ein voller innerHTML-Rebuild zerstoerte
+     dabei bisher JEDES <video>-Vorschauelement und erzwang einen kompletten
+     Neustart, alle ~0,9-2,5s waehrend im Hintergrund weitergekaempft wird -
+     sichtbar als Flackern/Verschwinden, auch waehrend die Lightbox offen war
+     (die Karten dahinter blitzten sichtbar durch). Direkter DOM-Knoten-
+     Identitaetsvergleich (nicht nur ein CSS-Selektor-Treffer) beweist, dass
+     dieselbe Kachel-Node (inkl. ihrem <video>-Kind) mehrere aufeinander-
+     folgende Renders unveraendert ueberlebt - identisches Beweismuster wie
+     bereits in panel-render-hover-guard.spec.js (26.07.) fuer ein verwandtes
+     Problem etabliert. */
+  test('REGRESSION: wiederholte Panel-Renders (simuliert den Live-Tick-Rebuild bei jedem Drachen-Kill) zerstören/erneuern die Vorschau-Kacheln NICHT', async ({ page, qaBaseURL, fixtureData }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    await openSkinsPanel(page);
+
+    const result = await page.evaluate(() => {
+      const panel = document.getElementById('idlePanelSkins');
+      const thumbsBefore = Array.from(panel.querySelectorAll('.idle-skin-preview-thumb'));
+      thumbsBefore.forEach((t, i) => { t.dataset.qaIdentity = 'marker-' + i; });
+
+      // Fünf aufeinanderfolgende Renders - exakt das, was bkmpIdleRefreshLiveTabsRender()
+      // bei fünf schnell aufeinanderfolgenden Drachen-Kills auslösen würde.
+      for (let i = 0; i < 5; i++) bkmpIdleRenderSkinsPanel();
+
+      const thumbsAfter = Array.from(panel.querySelectorAll('.idle-skin-preview-thumb'));
+      return {
+        countBefore: thumbsBefore.length,
+        countAfter: thumbsAfter.length,
+        allSameNode: thumbsBefore.every((t, i) => t === thumbsAfter[i]),
+        allMarkersSurvived: thumbsAfter.every((t, i) => t.dataset.qaIdentity === 'marker-' + i)
+      };
+    });
+    expect(result.countBefore).toBe(7);
+    expect(result.countAfter).toBe(7);
+    expect(result.allSameNode).toBe(true);
+    expect(result.allMarkersSurvived).toBe(true);
+  });
+
+  test('REGRESSION: ein waehrend der Sitzung neu zum Katalog hinzugekommener Skin bekommt trotzdem eine korrekt initialisierte Kachel', async ({ page, qaBaseURL, fixtureData }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    await openSkinsPanel(page);
+    // Erster Render bereits durch openSkinsPanel() geschehen - Katalog danach erweitern
+    // (simuliert z.B. einen frisch live nachgeladenen Skin) und erneut rendern.
+    const freshThumb = await page.evaluate(() => {
+      bkmpVillageSkinsCatalog.push({
+        id: 'qa-fresh-mid-session', name: 'Frischer Testskin', description: 'Neu.', icon: '🆕',
+        unlock_type: 'purchase', price_gold: 1, price_crystals: 0, image_file: '',
+        video_file: 'assets/village/pilzdorf.mp4', frame_count: 1, frame_aspect_w: 16, frame_aspect_h: 9, active: true
+      });
+      bkmpIdleRenderSkinsPanel();
+      const thumb = document.querySelector('.idle-skin-preview-thumb[data-skin-id="qa-fresh-mid-session"]');
+      const video = thumb ? thumb.querySelector('.idle-village-video') : null;
+      return { exists: !!thumb, videoSrc: video ? video.dataset.src : null };
+    });
+    expect(freshThumb.exists).toBe(true);
+    expect(freshThumb.videoSrc).toContain('pilzdorf.mp4');
+  });
 });
 
 test.describe('Idle-Dorf-Titel (BKMP_IDLE_TITLES, sticky ueber bkmpIdleState.titles_unlocked_at)', () => {

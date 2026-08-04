@@ -240,6 +240,22 @@ function bkmpIdleRenderSkinsPanel() {
     panel.innerHTML = `<p class="idle-skin-empty-hint">Noch keine Dorf-Skins verfuegbar - schau bald wieder vorbei.</p>`;
     return;
   }
+  /* Bugfix (Spieler-Meldung 04.08.2026, Screenshot: Vorschau-Kacheln
+     "verschwinden und fangen an zu flackern"): bkmpIdleRefreshLiveTabsRender()
+     ruft diese Funktion bei JEDEM Drachen-Kill erneut auf, solange der
+     Dorf-Skins-Tab offen ist (idledorf.js, throttled auf max. alle 300ms) -
+     vor der Vorschau-Kachel bedeutete das nur unsichtbares Neu-Rendern von
+     Text/Buttons, seitdem aber zerstoert JEDER Rebuild JEDES <video>-Element
+     und erzwingt einen kompletten Neustart (neu laden + neu dekodieren) -
+     alle ~0,9-2,5s, solange im Hintergrund weitergekaempft wird (auch bei
+     geoeffneter Vorschau-Lightbox sichtbar, siehe Screenshot: die Karten
+     dahinter blitzen durch). Fix: die bereits vorhandenen, laengst geladenen
+     .idle-skin-preview-thumb-Knoten werden VOR dem Rebuild gesichert und
+     danach per replaceWith() unveraendert (dieselbe DOM-Node, kein neues
+     <video>) in die neue Karte zurueckgehaengt - nur ein wirklich neuer Skin
+     (noch nie gerendert) bekommt eine frische Kachel. */
+  const bkmpSkinsExistingThumbs = {};
+  panel.querySelectorAll('.idle-skin-preview-thumb').forEach(el => { bkmpSkinsExistingThumbs[el.dataset.skinId] = el; });
   panel.innerHTML = `<div class="idle-skin-grid">${bkmpVillageSkinsCatalog.map(def => {
     const owned = bkmpVillageSkinOwned(def.id);
     const isEquipped = owned && activeVillageId === def.id;
@@ -304,8 +320,17 @@ function bkmpIdleRenderSkinsPanel() {
   /* Vorschau-Kacheln: statisches erstes Frame reicht hier (forceStatic:true,
      siehe bkmpApplyVillageSkinToElement) - checkOwnership:false, damit auch
      noch nicht freigeschaltete Skins ihre echte Vorschau zeigen (genau der
-     Zweck des Features: "man weiß sonst nicht, was man kauft"). */
-  panel.querySelectorAll('.idle-skin-preview-thumb').forEach(thumb => {
+     Zweck des Features: "man weiß sonst nicht, was man kauft"). Bereits
+     vorhandene Kacheln (siehe bkmpSkinsExistingThumbs oben) werden per
+     replaceWith() unveraendert wiederverwendet statt neu aufgebaut - der
+     visuelle Inhalt haengt einzig an der Skin-ID, checkOwnership:false macht
+     ihn unabhaengig vom Besitzstatus, ein erneutes Anwenden waere also
+     ohnehin nur verschwendete Arbeit (und der eigentliche Flacker-Grund). */
+  panel.querySelectorAll('.idle-skin-preview-thumb').forEach(freshThumb => {
+    const skinId = freshThumb.dataset.skinId;
+    const reused = bkmpSkinsExistingThumbs[skinId];
+    if (reused && reused !== freshThumb) { freshThumb.replaceWith(reused); return; }
+    const thumb = freshThumb;
     bkmpApplyVillageSkinToElement(thumb, thumb.dataset.skinId, { checkOwnership: false, forceStatic: true });
     thumb.addEventListener('click', () => bkmpIdleOpenSkinPreview(thumb.dataset.skinId));
     thumb.addEventListener('keydown', e => {
