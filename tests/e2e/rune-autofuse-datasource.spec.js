@@ -179,79 +179,12 @@ test.describe('Auto-Schmelzen - Ausgeruestete Rune (Teststand A, frischer Spiele
   });
 });
 
-test.describe('Auto-Schmelzen und Lager-aufraeumen teilen denselben Bestand (Regressionsbeweis, grosses Lager)', () => {
-  test.use({ teststand: 'E' });
-
-  test('Auto-Schmelzen findet +0-Schildrunen auch dann, wenn sie aus dem lokalen 300er-Cache verdraengt wuerden', async ({ page, qaBaseURL, fixtureData, store }) => {
-    await forceRuneFuseAlwaysSucceed(page);
-    // Teststand E hat schon 294 gray/+0 unequipped ueber alle 6 Slots verteilt (siehe teststands.js).
-    // Zusaetzlich 50 HOCH aufgewertete Runen in einem ANDEREN Slot (slot1), damit der wertabsteigende
-    // 300er-Cache (upgrade_level DESC) diese zuerst nimmt und die frischen Schildrunen (slot2) verdraengt.
-    for (let i = 0; i < 50; i++) {
-      store.tables.idle_player_runes.push({
-        id: `qa-rune-highvalue-${i}`, name_key: fixtureData.nameKey, auth_user_id: fixtureData.authUserId,
-        rune_type: 'slot1', rarity: 'purple', rolled_value: 20, equipped: false, upgrade_level: 12, substats: [], created_at: fixtureData.nowIso
-      });
-    }
-    // Exakt 9 frische +0-Schildrunen (slot2, gray) - genug fuer 3 Dreiergruppen, klar identifizierbar.
-    for (let i = 0; i < 9; i++) store.tables.idle_player_runes.push(makeGrayRune('shield-fresh', i, fixtureData, 'slot2'));
-
-    const totalUnequipped = store.tables.idle_player_runes.filter(r => !r.equipped).length;
-    expect(totalUnequipped).toBeGreaterThan(300); // 294 + 50 + 9 = 353 - der lokale Cache (Limit 300) MUSS etwas ausschliessen.
-
-    await openAndLogin(page, qaBaseURL, fixtureData);
-    await waitForDragonReady(page);
-
-    // Beweis, dass der lokale, gekappte Bestand MINDESTENS EINE der 9 namentlich bekannten frischen
-    // Schildrunen tatsaechlich NICHT enthaelt (sonst waere dieser Test kein echter Beweis fuer den
-    // Fix, nur Zufall - die exakte Anzahl haengt vom Sortier-Gleichstand mit Teststand E's eigenen
-    // 294 Runen ab und ist deshalb bewusst NICHT hart vorhergesagt, nur "mindestens eine fehlt").
-    const knownShieldFreshIds = Array.from({ length: 9 }, (_, i) => `qa-rune-shield-fresh-${i}`);
-    const localShieldFreshIds = await page.evaluate((ids) =>
-      bkmpIdlePlayerRunes.filter(r => ids.includes(r.id)).map(r => r.id), knownShieldFreshIds
-    );
-    expect(localShieldFreshIds.length).toBeLessThan(9);
-
-    await page.locator('#idleTabBtnRunen').click();
-    await page.locator('.idle-runen-slot-tab[data-slot="slot2"]').click();
-
-    // GENAU DAS ist der eigentliche Fix-Beweis: trotz gekapptem lokalem Bestand findet der echte
-    // Klick-Handler (frischer Serverabruf) alle 9 Schildrunen und verschmilzt sie vollstaendig.
-    // Teststand E hat selbst schon ~49 gray/+0-Runen in slot2 (294 gleichmaessig ueber 6 Slots verteilt) -
-    // die Gesamtzahl im Bestaetigungsdialog ist deshalb bewusst NICHT exakt vorhergesagt (haengt von der
-    // internen Verteilung ab), nur dass ueberhaupt eine "Gewöhnlich"-Gruppe angezeigt wird.
-    const evalPromise = page.evaluate(() => window.bkmpRuneAutoFuseAll());
-    await expect(page.locator('#bkmpConfirmOverlay')).toHaveClass(/visible/, { timeout: 10000 });
-    await expect(page.locator('#bkmpConfirmBody')).toContainText('Gewöhnlich');
-    await page.locator('#bkmpConfirmOkBtn').click();
-    await evalPromise;
-
-    // Praezise, ID-basierte Pruefung statt Gesamtzahl (die durch Teststand E's eigene 294 Runen
-    // kontaminiert waere): so gut wie ALLE 9 NAMENTLICH BEKANNTEN frischen Schildrunen sind weg.
-    // Rechnung: Teststand E saet exakt 49 gray/+0-Runen in slot2 (294 gleichmaessig ueber 6 Slots,
-    // siehe teststands.js), + unsere 9 = 58 - nicht durch 3 teilbar (58 = 19*3 + 1), es bleibt also
-    // IMMER genau 1 gray/+0-Rune irgendeines der 58 Kandidaten uebrig (unvermeidbarer Rest einer
-    // Dreiergruppierung, kein Bug) - welche der 58 das trifft, haengt von der Ladereihenfolge ab,
-    // "hoechstens 1 von unseren 9" ist deshalb die korrekte, deterministische Erwartung.
-    const shieldFreshStillThere = store.tables.idle_player_runes.filter(r => knownShieldFreshIds.includes(r.id));
-    expect(shieldFreshStillThere.length).toBeLessThanOrEqual(1);
-  });
-
-  test('Auto-Schmelzen und Lager-aufraeumen sehen denselben Bestand (identischer Serverabruf)', async ({ page, qaBaseURL, fixtureData, store }) => {
-    for (let i = 0; i < 12; i++) store.tables.idle_player_runes.push(makeGrayRune('shared-source', i, fixtureData, 'slot2'));
-    await openAndLogin(page, qaBaseURL, fixtureData);
-    await waitForDragonReady(page);
-
-    const viaAutoFuseSource = await page.evaluate(() => window.bkmpGetStoredMeltableRunes({ runeType: 'slot2', upgradeLevelZeroOnly: true }));
-    const viaCleanupSource = await page.evaluate(() => window.bkmpGetStoredMeltableRunes({ rarity: 'gray' }));
-    const shieldGrayFromCleanup = viaCleanupSource.filter(r => r.rune_type === 'slot2');
-
-    // Beide Aufrufer-Pfade muessen exakt dieselben 12 (+ die 294 aus Teststand E fuer andere Slots beim
-    // zweiten Aufruf, deshalb hier gezielt auf slot2 gefiltert) frisch gedroppten Schildrunen finden.
-    expect(viaAutoFuseSource.length).toBeGreaterThanOrEqual(12);
-    expect(shieldGrayFromCleanup.length).toBeGreaterThanOrEqual(12);
-    const autoFuseIds = new Set(viaAutoFuseSource.map(r => r.id));
-    const cleanupIds = new Set(shieldGrayFromCleanup.map(r => r.id));
-    for (const id of autoFuseIds) expect(cleanupIds.has(id)).toBe(true);
-  });
-});
+/* Nachtrag (04.08.2026): der vormals zweite Aufrufer von bkmpGetStoredMeltableRunes()
+   ("Lager aufräumen", bkmpRuneSellAllByRarity()) ist auf Nutzerwunsch komplett entfernt
+   (verwirrende Rarität-Verkaufsleiste, siehe supabase.js/bkmp-runes.js) - der vorherige,
+   auf einem 300-Zeilen-Ladelimit basierende Regressionsbeweis dieses Abschnitts (bkmpIdlePlayerRunes
+   schliesst bekannte Kandidaten garantiert aus) ist damit nicht mehr konstruierbar, seit auch das
+   Ladelimit selbst entfallen ist (siehe supabase.js loadUnequippedPlayerRunes()). Die eigentlich
+   getestete Eigenschaft (bkmpGetStoredMeltableRunes() liefert einen frischen, vom lokalen Zustand
+   unabhaengigen Bestand) bleibt aber gueltig und weiterhin durch die Tests oben (mit runeType-Filter,
+   dem einzigen von der App noch tatsaechlich genutzten Aufrufmuster) abgedeckt. */

@@ -4071,25 +4071,19 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 .idle-runen-sell-all-btn:disabled, .idle-runen-autofuse-btn:disabled, .idle-runen-maximize-legi-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 /* Bugfix 25.07.2026 (Spieler-Meldung "meine Runen sind komplett weg" -
    siehe idledorf.js/bkmp-runes.js Kommentare): Hinweis-Banner, wenn das
-   Lager an der Ladeobergrenze haengt oder das Laden (teilweise)
-   fehlgeschlagen ist, plus der neue slot-uebergreifende Sammelverkauf nach
-   Seltenheit. */
-.idle-runen-cap-banner {
+   Laden (teilweise) fehlgeschlagen ist.
+   Nachtrag (04.08.2026): umbenannt von .idle-runen-cap-banner - der frueher
+   zusaetzliche "Lager ist gekappt"-Zweig samt der slot-uebergreifenden
+   Rarität-Verkaufsleiste (.idle-runen-rarity-cleanup-row/-label/
+   -sell-btn) ist komplett entfallen, siehe supabase.js's
+   loadUnequippedPlayerRunes()-Kommentar. */
+.idle-runen-error-banner {
   display: flex; align-items: center; justify-content: space-between; gap: 0.6rem;
   flex-wrap: wrap; font-size: 0.78rem; color: var(--muted);
   background: rgba(249, 115, 22, 0.12); border: 1px solid rgba(249, 115, 22, 0.35);
   border-radius: 10px; padding: 0.5rem 0.7rem; margin: 0.4rem 0 0.6rem;
 }
-.idle-runen-cap-banner .idle-runen-retry-btn { font-size: 0.74rem; padding: 0.3rem 0.6rem; white-space: nowrap; }
-.idle-runen-rarity-cleanup-row {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem;
-  margin: 0.4rem 0 0.6rem; font-size: 0.76rem;
-}
-.idle-runen-rarity-cleanup-label { color: var(--muted); margin-right: 0.2rem; white-space: nowrap; }
-.idle-runen-rarity-sell-btn {
-  font-size: 0.72rem; padding: 0.3rem 0.6rem; white-space: nowrap;
-  border-left: 3px solid var(--rune-color, var(--muted));
-}
+.idle-runen-error-banner .idle-runen-retry-btn { font-size: 0.74rem; padding: 0.3rem 0.6rem; white-space: nowrap; }
 .idle-sammlung-count { font-size: 0.75rem; font-weight: 400; color: var(--muted); font-family: 'Inter', sans-serif; }
 .idle-title-bonus-list { display: grid; gap: 0.5rem; margin-top: 0.6rem; }
 .idle-title-bonus-list .achievement-row { align-items: center; }
@@ -6668,6 +6662,43 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
    Textlaenge unterschiedlich hoch). */
 .idle-skin-card { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 14px; padding: 0.9rem; background: var(--paper); text-align: center; }
 .idle-skin-card-equipped { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }
+/* Vorschau-Kachel (04.08.2026, Spieler-Idee NikschiOG: "Vorschau bei den
+   Dorf-Skins, da man sonst nicht weiß was man kauft") - zeigt ein statisches
+   erstes Frame direkt in der Karte (forceStatic:true, siehe
+   bkmpApplyVillageSkinToElement in bkmp-cosmetics.js - verhindert, dass alle
+   sichtbaren Karten gleichzeitig ihre Videos abspielen), Klick/Enter oeffnet
+   die vergroesserte, live animierte Ansicht in #idleSkinPreviewOverlay. */
+.idle-skin-preview-thumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1164 / 199;
+  border-radius: 8px;
+  overflow: hidden;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  border: 1px solid var(--line);
+  cursor: pointer;
+  margin-bottom: 0.55rem;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.idle-skin-preview-thumb:hover,
+.idle-skin-preview-thumb:focus-visible {
+  transform: scale(1.03);
+  box-shadow: 0 0 0 2px var(--gold);
+  outline: none;
+}
+.idle-skin-preview-card { max-width: min(640px, 92vw); }
+.idle-skin-preview-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1164 / 199;
+  border-radius: 10px;
+  overflow: hidden;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.3));
+  margin-bottom: 0.6rem;
+}
 .idle-skin-icon { font-size: 1.6rem; margin-bottom: 0.3rem; }
 .idle-skin-name { font-weight: 700; font-size: 0.85rem; margin-bottom: 0.2rem; }
 .idle-skin-desc { font-size: 0.72rem; color: var(--muted); margin-bottom: 0.6rem; }
@@ -7537,6 +7568,13 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
    sonst genau derselbe "Fenster oeffnet sich dahinter"-Bug (16.07.), da
    auch das Lexikon aus dem schon offenen idleDorfOverlay heraus oeffnet. */
 #idleDragonDexOverlay { z-index: 60; }
+/* Gleiches, bereits mehrfach dokumentiertes z-index-Muster (04.08.2026,
+   Dorf-Skin-Vorschau-Lightbox) - bkmpIdleOpenSkinPreview() oeffnet ebenfalls
+   aus dem schon offenen idleDorfOverlay heraus (Dorf-Skins-Tab), sonst
+   identischer "Fenster oeffnet sich dahinter"-Bug - beim eigenen Testen per
+   Playwright reproduziert ("idle-skin-card intercepts pointer events"),
+   nicht nur vermutet. */
+#idleSkinPreviewOverlay { z-index: 60; }
 /* NACHBESSERUNG (Nutzerwunsch 15.07.: "Baust du das dann unten ein und im
    gleichen Design overlay wie den Rest?") - vorher ein separater Text-Link
    direkt neben dem Titel oben, der optisch mit dem Live-Sync-Banner

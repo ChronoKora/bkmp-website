@@ -3395,10 +3395,19 @@ async function loadPlayerRunes(name) {
    Fix, zweigeteilt (ersetzt den Aufruf oben im normalen Ladepfad, siehe
    idledorf.js): ausgeruestete Runen sind IMMER hoechstens 6 Zeilen (ein
    eigener, garantiert kleiner Abruf, der praktisch nie an der Groesse
-   scheitern kann) - der grosse, potenziell riesige Rest wird nur noch
-   BEGRENZT und nach Wert sortiert geladen (die wertvollsten zuerst, damit
-   ein gekapptes Ergebnis trotzdem die fuers Verschmelzen/Aufsteigen
-   interessanten Runen zeigt, nicht zufaellige). */
+   scheitern kann) - der grosse Rest lief bis 03.08.2026 zusaetzlich noch
+   BEGRENZT und nach Wert sortiert (300 Zeilen).
+
+   Nachtrag (04.08.2026, Spieler-Feedback: die dafuer gebaute "Lager
+   aufraeumen"-Rarität-Verkaufsleiste verwirrte mehr Spieler, als sie half -
+   sah wie ein Filter aus, war aber ein sofortiger, unwiderruflicher
+   Sammelverkauf): auf ausdruecklichen Nutzerwunsch, TROTZ der bekannten
+   Risiken aus dem 25.07.-Vorfall (siehe oben), wieder auf unbegrenztes
+   Laden umgestellt - die Trennung in "ausgeruestet" (immer klein) und
+   "Rest" (jetzt wieder vollstaendig) bleibt bewusst bestehen, das ist die
+   eigentliche Fehler-Isolation (schlaegt der grosse Teil fehl, bleibt die
+   Kampfausruestung trotzdem korrekt geladen) und war nie die Ursache der
+   Verwirrung. */
 async function loadEquippedPlayerRunes(name) {
   const client = bkmpGetSupabaseClient();
   if (!client || !name) return [];
@@ -3411,7 +3420,7 @@ async function loadEquippedPlayerRunes(name) {
   return Array.isArray(data) ? data : [];
 }
 
-async function loadUnequippedPlayerRunesCapped(name, limit) {
+async function loadUnequippedPlayerRunes(name) {
   const client = bkmpGetSupabaseClient();
   if (!client || !name) return [];
   const { data, error } = await client
@@ -3420,33 +3429,25 @@ async function loadUnequippedPlayerRunesCapped(name, limit) {
     .eq('name_key', String(name).trim().toLowerCase())
     .eq('equipped', false)
     .order('upgrade_level', { ascending: false })
-    .order('rolled_value', { ascending: false })
-    .limit(limit || 300);
+    .order('rolled_value', { ascending: false });
   if (error) throw error;
   return Array.isArray(data) ? data : [];
 }
 
 /* Bugfix 26.07.2026 (Spieler-Meldung "Auto-Schmelzen erkennt Schildrunen im
    Lager nicht, zeigt 0 an"): Auto-Schmelzen (bkmpRuneAutoFuseAll(), bkmp-
-   runes.js) las bisher ausschliesslich aus dem LOKALEN, seit dem 25.07.-
-   Bugfix auf die 300 wertvollsten (nach upgrade_level/rolled_value
-   absteigend sortierten) Zeilen GEKAPPTEN bkmpIdlePlayerRunes - bei einem
-   Spieler, der in ANDEREN Slots bereits viel hochgestuft hat, wurden dadurch
-   GENAU die frischen +0-Runen (die einzigen, die Auto-Schmelzen je
-   automatisch verwenden darf) aus der gekappten lokalen Liste verdraengt,
-   obwohl sie im vollen Server-Lager laengst vorhanden waren. "Lager
-   aufraeumen" (bkmpRuneSellAllByRarity(), 26.07.) hatte dieses Problem nie,
-   weil es von Anfang an eine EIGENE, frische Serverabfrage nutzte statt der
-   gekappten lokalen Liste - fand deshalb dieselben Runen weiterhin korrekt.
-   loadStoredRunes() ersetzt die vorherige, funktional identische aber enger
-   benannte loadRunesForBulkSellByRarity() als EINE gemeinsame, immer frische
-   Quelle fuer beide Aufrufer (siehe bkmpGetStoredMeltableRunes() in
-   bkmp-runes.js) - garantiert denselben Bestand fuer beide, unabhaengig von
-   der lokalen Ladeobergrenze. Beide Filter (runeType/rarity) sind optional
-   und unabhaengig kombinierbar: Auto-Schmelzen braucht nur runeType (alle
-   Seltenheiten des aktiven Slots in einem Abruf), Lager-aufraeumen nur
-   rarity (alle Slots einer Seltenheit). Kein Zeilenlimit - laeuft nur bei
-   einer bewussten, einmaligen Spieler-Aktion, nicht bei jedem Laden. */
+   runes.js) las bisher ausschliesslich aus dem LOKALEN, damals auf die 300
+   wertvollsten (nach upgrade_level/rolled_value absteigend sortierten)
+   Zeilen GEKAPPTEN bkmpIdlePlayerRunes - bei einem Spieler, der in ANDEREN
+   Slots bereits viel hochgestuft hat, wurden dadurch GENAU die frischen
+   +0-Runen (die einzigen, die Auto-Schmelzen je automatisch verwenden darf)
+   aus der gekappten lokalen Liste verdraengt, obwohl sie im vollen
+   Server-Lager laengst vorhanden waren. loadStoredRunes() ist eine
+   gemeinsame, immer frische Quelle fuer alle Hintergrund-Automatiken
+   (siehe bkmpGetStoredMeltableRunes() in bkmp-runes.js) - garantiert
+   denselben, aktuellen Bestand unabhaengig vom (seit 04.08.2026 ohnehin
+   entfallenen) Ladelimit von bkmpIdlePlayerRunes. Beide Filter (runeType/
+   rarity) sind optional und unabhaengig kombinierbar. */
 async function loadStoredRunes(name, filters) {
   const client = bkmpGetSupabaseClient();
   if (!client || !name) return [];
@@ -3460,24 +3461,6 @@ async function loadStoredRunes(name, filters) {
   const { data, error } = await query;
   if (error) throw error;
   return Array.isArray(data) ? data : [];
-}
-
-/* Loescht per FILTER (rarity+equipped=false), nicht per id-Liste - ein
-   ".in('id', [...])" mit zehntausenden Eintraegen waere selbst wieder ein
-   sehr grosser Request/URL. Owner-Schreibzugriff (RLS: auth_user_id =
-   auth.uid()) reicht als Sicherheit, name_key+rarity+equipped grenzen den
-   Filter zusaetzlich clientseitig ein. */
-async function deleteRunesByRarity(name, rarity) {
-  const client = bkmpGetPlayerAuthClient();
-  if (!client || !name || !rarity) return false;
-  const { error } = await client
-    .from('idle_player_runes')
-    .delete()
-    .eq('name_key', String(name).trim().toLowerCase())
-    .eq('equipped', false)
-    .eq('rarity', rarity);
-  if (error) throw error;
-  return true;
 }
 
 async function insertPlayerRunes(nameKey, runes) {

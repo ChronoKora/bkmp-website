@@ -113,58 +113,9 @@ test.describe('Auf +15 maximieren - Basisverhalten (Teststand A, frischer Spiele
   });
 });
 
-test.describe('Auf +15 maximieren und grosses Lager (Regressionsbeweis, Teststand E)', () => {
-  test.use({ teststand: 'E' });
-
-  test('Findet und maximiert Legendäre auch dann, wenn der lokale 300er-Cache sie ausschließen würde', async ({ page, qaBaseURL, fixtureData, store }) => {
-    await forceRuneUpgradeAlwaysSucceed(page);
-    // Teststand E hat bereits 294 gray/+0 ueber alle 6 Slots verteilt. Zusaetzlich 305 HOCH
-    // aufgewertete Runen (mehr als der 300er-Cache selbst fasst) in einem ANDEREN Slot (slot1),
-    // damit der wertabsteigende Cache (upgrade_level DESC) den Cap allein schon fuellt und
-    // unsere frischen, nur niedrigstufigen Legendaeren (slot2, Stufe 1/5) GARANTIERT verdraengt -
-    // identisches Beweismuster wie rune-autofuse-datasource.spec.js, nur mit genug Konkurrenz,
-    // damit unsere zwei Kandidaten (anders als dort simple 9x +0-Runen) sicher rausfallen.
-    for (let i = 0; i < 305; i++) {
-      store.tables.idle_player_runes.push({
-        id: `qa-rune-highvalue2-${i}`, name_key: fixtureData.nameKey, auth_user_id: fixtureData.authUserId,
-        rune_type: 'slot1', rarity: 'purple', rolled_value: 20, equipped: false, upgrade_level: 13, substats: [], created_at: fixtureData.nowIso
-      });
-    }
-    store.tables.idle_player_runes.push(makeGoldRune('cap-bypass', 0, fixtureData, 'slot2', { level: 1 }));
-    store.tables.idle_player_runes.push(makeGoldRune('cap-bypass', 1, fixtureData, 'slot2', { level: 5 }));
-
-    const totalUnequipped = store.tables.idle_player_runes.filter(r => !r.equipped).length;
-    expect(totalUnequipped).toBeGreaterThan(300); // 294 + 305 + 2 = 601 - der lokale Cache (Limit 300) MUSS etwas ausschliessen.
-
-    await openAndLogin(page, qaBaseURL, fixtureData);
-    await waitForDragonReady(page);
-    await setHighGold(page);
-
-    // Beweis, dass unsere 2 namentlich bekannten (nur Stufe 1/5) Legendaeren GARANTIERT nicht im
-    // lokalen, gekappten Bestand landen - die 305 hoeherstufigen (Stufe 13) Konkurrenten fuellen den
-    // 300er-Cap bereits allein komplett (sonst waere dieser Test kein echter Beweis fuer den Fix).
-    const knownIds = ['qa-rune-cap-bypass-0', 'qa-rune-cap-bypass-1'];
-    const localFound = await page.evaluate((ids) => bkmpIdlePlayerRunes.filter(r => ids.includes(r.id)).length, knownIds);
-    expect(localFound).toBe(0);
-
-    await page.locator('#idleTabBtnRunen').click();
-    await page.locator('.idle-runen-slot-tab[data-slot="slot2"]').click();
-    // Die Anzeige "(N)" ist (wie bei Auto-Schmelzen/Auto-Aufstieg, siehe deren Kommentare) nur ein
-    // lokaler, synchroner Schaetzwert und zeigt hier erwartungsgemaess "(0)"/deaktiviert, da beide
-    // Kandidaten lokal nicht sichtbar sind - identisches, bereits akzeptiertes Verhalten wie beim
-    // Schwester-Feature. Die eigentliche Funktion selbst holt trotzdem frisch vom Server nach, direkt
-    // aufgerufen statt per (hier absichtlich deaktiviertem) Button-Klick - identisches Testmuster wie
-    // rune-autofuse-datasource.spec.js's Cap-Bypass-Beweis.
-    await expect(page.locator('#idleRuneMaximizeLegiBtn')).toContainText('Auf +15 maximieren (0)');
-    await expect(page.locator('#idleRuneMaximizeLegiBtn')).toBeDisabled();
-    await page.evaluate(() => window.bkmpRuneMaximizeLegendarySlot());
-    await page.waitForTimeout(500);
-
-    // GENAU DAS ist der eigentliche Fix-Beweis: trotz gekapptem lokalem Bestand findet die echte
-    // Funktion (frischer Serverabruf) beide Legendaeren und wertet sie vollstaendig auf +15 auf.
-    const levelA = store.tables.idle_player_runes.find(r => r.id === 'qa-rune-cap-bypass-0').upgrade_level;
-    const levelB = store.tables.idle_player_runes.find(r => r.id === 'qa-rune-cap-bypass-1').upgrade_level;
-    expect(levelA).toBe(15);
-    expect(levelB).toBe(15);
-  });
-});
+/* Nachtrag (04.08.2026): der vormals hier getestete "300er-Cache-Bypass" ist nicht mehr
+   konstruierbar, seit das Ladelimit fuer bkmpIdlePlayerRunes auf Nutzerwunsch komplett entfernt
+   wurde (siehe supabase.js loadUnequippedPlayerRunes()) - ein grosses Lager landet jetzt ohnehin
+   vollstaendig im lokalen Bestand. Der eigentliche Fix (bkmpRuneMaximizeLegendarySlot() holt ueber
+   bkmpGetStoredMeltableRunes() frisch vom Server statt sich auf den lokalen Bestand zu verlassen)
+   bleibt bestehen und ist weiterhin ueber die Tests oben (normale Faelle) abgedeckt. */

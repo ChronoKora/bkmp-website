@@ -111,7 +111,15 @@ function bkmpApplyVillageSkinToElement(el, skinId, options) {
      gleiches Prinzip wie schon beim Drachen-Kampfvideo
      (bkmpIdleSyncDragonVideoPlayback, js/ui/bkmp-hud.js). Reiner Anzeige-
      Unterschied, keine Kampfwerte betroffen. */
-  const fxOff = typeof bkmpFxVillageSkinAnimOff === 'function' && bkmpFxVillageSkinAnimOff();
+  /* Spieler-Idee NikschiOG (04.08.2026, Feedback-Board): "Vorschau bei den
+     Dorf-Skins, da man sonst nicht weiß was man kauft" - options.forceStatic
+     nutzt exakt denselben "keine Animation/kein Video-Play"-Zweig wie der
+     bestehende Effektmodus-Aus-Schalter, aber unabhaengig vom globalen
+     Nutzer-Setting: die kleinen Vorschau-Kacheln im Shop-Grid sollen NIE
+     gleichzeitig 15+ Videos abspielen (Performance), die vergroesserte
+     Lightbox-Ansicht dagegen soll weiterhin das echte Effektmodus-Setting
+     respektieren (kein Zwangs-Play bei aktivem "Effekte aus"). */
+  const fxOff = Boolean(options && options.forceStatic) || (typeof bkmpFxVillageSkinAnimOff === 'function' && bkmpFxVillageSkinAnimOff());
   if (def && def.video_file) {
     /* Video-Skin (z.B. Pinguindorf) statt Bild-Sprite-Streifen: aspect-
        ratio wird hier auf die ECHTEN Video-Massse gesetzt (frame_aspect_w/h
@@ -282,6 +290,7 @@ function bkmpIdleRenderSkinsPanel() {
     }
     return `
       <div class="idle-skin-card ${isEquipped ? 'idle-skin-card-equipped' : ''} ${def.unlock_type === 'real_money' ? 'idle-skin-card-premium' : ''}">
+        <div class="idle-skin-preview-thumb" data-skin-id="${def.id}" role="button" tabindex="0" title="Vorschau vergrößern" aria-label="Vorschau von ${escapeHtml(def.name)} vergrößern"></div>
         <div class="idle-skin-icon">${def.icon || '🏘️'}</div>
         <div class="idle-skin-name">${escapeHtml(def.name)}</div>
         <div class="idle-skin-desc">${escapeHtml(def.description || '')}</div>
@@ -292,6 +301,46 @@ function bkmpIdleRenderSkinsPanel() {
   panel.querySelectorAll('.idle-skin-buy').forEach(btn => btn.addEventListener('click', () => bkmpIdleBuyVillageSkin(btn.dataset.skinId)));
   panel.querySelectorAll('.idle-skin-equip').forEach(btn => btn.addEventListener('click', () => bkmpIdleEquipVillageSkin(btn.dataset.skinId)));
   panel.querySelectorAll('.idle-skin-buy-real-money').forEach(btn => btn.addEventListener('click', () => bkmpIdleOpenBuyFrameModal(btn.dataset.skinId)));
+  /* Vorschau-Kacheln: statisches erstes Frame reicht hier (forceStatic:true,
+     siehe bkmpApplyVillageSkinToElement) - checkOwnership:false, damit auch
+     noch nicht freigeschaltete Skins ihre echte Vorschau zeigen (genau der
+     Zweck des Features: "man weiß sonst nicht, was man kauft"). */
+  panel.querySelectorAll('.idle-skin-preview-thumb').forEach(thumb => {
+    bkmpApplyVillageSkinToElement(thumb, thumb.dataset.skinId, { checkOwnership: false, forceStatic: true });
+    thumb.addEventListener('click', () => bkmpIdleOpenSkinPreview(thumb.dataset.skinId));
+    thumb.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); bkmpIdleOpenSkinPreview(thumb.dataset.skinId); }
+    });
+  });
+}
+
+/* Vergroesserte, LIVE animierte Vorschau (echtes Video spielt/Sprite-Streifen
+   laeuft, respektiert dabei ganz normal den Effektmodus-Schalter - anders als
+   die statischen Grid-Kacheln oben) - identisches Lightbox-Muster wie
+   #investorPayoutViewerOverlay (28.07.2026, js/core/bkmp-site.js). */
+function bkmpIdleOpenSkinPreview(skinId) {
+  const overlay = document.getElementById('idleSkinPreviewOverlay');
+  const stage = document.getElementById('idleSkinPreviewStage');
+  const nameEl = document.getElementById('idleSkinPreviewName');
+  const descEl = document.getElementById('idleSkinPreviewDesc');
+  const closeBtn = document.getElementById('idleSkinPreviewCloseBtn');
+  if (!overlay || !stage || !closeBtn) return;
+  const def = bkmpVillageSkinsCatalog.find(s => s.id === skinId);
+  if (nameEl) nameEl.textContent = (def && `${def.icon || '🏘️'} ${def.name}`) || 'Dorf-Skin';
+  if (descEl) descEl.textContent = (def && def.description) || '';
+  bkmpApplyVillageSkinToElement(stage, skinId, { checkOwnership: false });
+  overlay.classList.add('visible');
+  document.body.classList.add('modal-open');
+  // Gleiches per-Oeffnen Add/Remove-Listener-Muster wie bkmpDragonOpenDetail (bkmp-breeding.js).
+  function close() {
+    overlay.classList.remove('visible');
+    document.body.classList.remove('modal-open');
+    closeBtn.removeEventListener('click', close);
+    overlay.removeEventListener('click', onOverlayClick);
+  }
+  function onOverlayClick(e) { if (e.target === overlay) close(); }
+  closeBtn.addEventListener('click', close);
+  overlay.addEventListener('click', onOverlayClick);
 }
 
 /* ---------------- Echtgeld-Kauf-Dialog (Steampunk Dorf etc.) ----------------

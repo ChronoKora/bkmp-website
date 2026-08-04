@@ -115,9 +115,12 @@ test.describe('Dorf-Skins - Katalog & Besitzstatus (Teststand A, frischer Spiele
     // eisdorf/pilzdorf: unlock_type purchase -> Kaufen-Button mit Preis
     expect(html).toContain('idle-skin-buy" data-skin-id="eisdorf"');
     expect(html).toContain('idle-skin-buy" data-skin-id="pilzdorf"');
-    // zerstoertesdorf/yakshasheimat: unlock_type achievement/boss_drop -> generischer Schloss-Hinweis, KEIN Kauf-Button
-    expect(html).not.toContain('data-skin-id="zerstoertesdorf"');
-    expect(html).not.toContain('data-skin-id="yakshasheimat"');
+    // zerstoertesdorf/yakshasheimat: unlock_type achievement/boss_drop -> generischer Schloss-Hinweis, KEIN Kauf-Button.
+    // Muss speziell auf "idle-skin-buy" pruefen (nicht nur die rohe data-skin-id) - seit der
+    // Vorschau-Kachel (04.08.2026) traegt JEDE Karte ein data-skin-id-Attribut, unabhaengig
+    // vom unlock_type (siehe Test-Block "Live-Vorschau" weiter unten).
+    expect(html).not.toContain('idle-skin-buy" data-skin-id="zerstoertesdorf"');
+    expect(html).not.toContain('idle-skin-buy" data-skin-id="yakshasheimat"');
     expect(html).toContain('15.000x gegen Drachen verloren');
     expect(html).toContain('50.000x den Boss Yaksha besiegen');
     // kallejuniordorf: unlock_type code -> ebenfalls generischer Schloss-Hinweis (bestaetigt CLAUDE.md:
@@ -257,6 +260,131 @@ test.describe('Dorf-Skins - Sicherheit (Teststand A)', () => {
     expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;');
     const xssFired = await page.evaluate(() => window.__xss === true);
     expect(xssFired).toBe(false);
+  });
+});
+
+/* Spieler-Idee NikschiOG (04.08.2026, Feedback-Board): "Vorschau bei den
+   Dorf Skins, da man sonst nicht weiß was man kauft" - kleine statische
+   Vorschau-Kachel in jeder Shop-Karte (forceStatic:true, kein gleichzeitiges
+   Abspielen aller sichtbaren Videos) + Klick/Enter oeffnet die vergroesserte,
+   LIVE animierte Ansicht in #idleSkinPreviewOverlay (identisches Lightbox-
+   Muster wie #investorPayoutViewerOverlay, 28.07.2026). Alle 7 Referenz-
+   Skins (reference-data.js) haben ein gesetztes video_file - bevorzugt von
+   bkmpApplyVillageSkinToElement IMMER vor image_file (siehe Sicherheits-
+   Test oben) - deshalb rendert praktisch jede echte Kachel als <video>,
+   nicht als Sprite-Hintergrundbild; ein eigener Test unten pusht deshalb
+   einen synthetischen reinen Bild-Skin, um auch den Sprite-Zweig
+   (frame_count>1, KEINE laufende steps()-Animation trotz forceStatic) zu
+   pruefen. */
+test.describe('Dorf-Skins - Live-Vorschau (Grid-Kachel + Lightbox, 04.08.2026)', () => {
+  test.use({ teststand: 'A' });
+
+  test('jede der 7 Karten zeigt eine Vorschau-Kachel mit korrektem Video/Hintergrund - auch fuer NICHT besessene Skins (checkOwnership:false, das ist der ganze Sinn des Features)', async ({ page, qaBaseURL, fixtureData }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    await openSkinsPanel(page);
+    const thumbs = await page.evaluate(() => Array.from(document.querySelectorAll('#idlePanelSkins .idle-skin-preview-thumb')).map(el => {
+      const v = el.querySelector('.idle-village-video');
+      return { skinId: el.dataset.skinId, hasVideo: !!v, videoSrc: v ? v.dataset.src : null };
+    }));
+    expect(thumbs.length).toBe(7);
+    const eisdorf = thumbs.find(t => t.skinId === 'eisdorf'); // Teststand A besitzt eisdorf NICHT
+    expect(eisdorf.hasVideo).toBe(true);
+    expect(eisdorf.videoSrc).toContain('eisdorf.mp4');
+  });
+
+  test('Vorschau-Kacheln spielen KEIN Video ab (forceStatic) - verhindert, dass alle sichtbaren Karten gleichzeitig 7 Videos abspielen', async ({ page, qaBaseURL, fixtureData }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    await openSkinsPanel(page);
+    const paused = await page.evaluate(() => Array.from(document.querySelectorAll('#idlePanelSkins .idle-skin-preview-thumb .idle-village-video')).map(v => v.paused));
+    expect(paused.length).toBe(7);
+    expect(paused.every(p => p === true)).toBe(true);
+  });
+
+  test('reiner Mehrfach-Frame-Sprite-Skin (kein Video): Kachel zeigt das Hintergrundbild ohne laufende Animation', async ({ page, qaBaseURL, fixtureData, store }) => {
+    store.tables.idle_village_skins.push({
+      id: 'qa-sprite-skin', name: 'Sprite-Testdorf', description: 'Nur fuer den Test.', icon: '🧪',
+      image_file: 'assets/village/qa-sprite.png', video_file: '', unlock_type: 'purchase', price_gold: 100,
+      price_crystals: 0, price_eur_cents: 0, unlock_hint: '', sort_order: 99, frame_count: 4,
+      frame_aspect_w: 1164, frame_aspect_h: 199, active: true
+    });
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    await openSkinsPanel(page);
+    const thumb = page.locator('.idle-skin-preview-thumb[data-skin-id="qa-sprite-skin"]');
+    // el.style.animationName statt el.style.animation - das Shorthand serialisiert beim
+    // Zurücklesen alle Longhand-Defaults mit ("auto ease 0s 1 normal none running none"),
+    // exakt dieselbe, bereits an anderer Stelle in diesem Projekt dokumentierte Browser-
+    // Eigenheit wie bei getComputedStyle().transitionDuration (siehe CLAUDE.md, Hover-
+    // Performance-Fix) - animationName ist das robuste Longhand-Feld, das genau das prueft,
+    // was gemeint ist: laeuft irgendein benanntes @keyframes, oder eben keins ('none').
+    const style = await thumb.evaluate(el => ({ backgroundImage: el.style.backgroundImage, animationName: el.style.animationName, hasVideo: !!el.querySelector('.idle-village-video') }));
+    expect(style.backgroundImage).toContain('qa-sprite.png');
+    expect(style.animationName).toBe('none'); // forceStatic: kein steps()-Loop trotz frame_count:4
+    expect(style.hasVideo).toBe(false);
+  });
+
+  test('Klick auf eine Kachel oeffnet die Lightbox mit korrektem Titel/Beschreibung + startet die echte (live) Wiedergabe', async ({ page, qaBaseURL, fixtureData }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    await openSkinsPanel(page);
+    await page.locator('.idle-skin-preview-thumb[data-skin-id="eisdorf"]').click();
+    await expect(page.locator('#idleSkinPreviewOverlay')).toHaveClass(/visible/);
+    await expect(page.locator('#idleSkinPreviewName')).toHaveText('❄️ Eis Dorf');
+    await expect(page.locator('#idleSkinPreviewDesc')).toHaveText('Ein vereistes Dorf inmitten glitzernder Schnee- und Eislandschaften.');
+    const stageVideo = await page.evaluate(() => {
+      const v = document.querySelector('#idleSkinPreviewStage .idle-village-video');
+      return v ? { src: v.dataset.src, paused: v.paused } : null;
+    });
+    expect(stageVideo).not.toBeNull();
+    expect(stageVideo.src).toContain('eisdorf.mp4');
+    expect(stageVideo.paused).toBe(false); // anders als die Grid-Kachel: hier KEIN forceStatic, echtes Abspielen wird versucht
+  });
+
+  test('nicht besessener Skin zeigt seine echte Vorschau in der Lightbox statt eines Standard-Fallbacks', async ({ page, qaBaseURL, fixtureData }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    await openSkinsPanel(page);
+    const owned = await page.evaluate(() => bkmpVillageSkinOwned('pilzdorf'));
+    expect(owned).toBe(false); // Teststand A besitzt nur 'standard'
+    await page.locator('.idle-skin-preview-thumb[data-skin-id="pilzdorf"]').click();
+    await expect(page.locator('#idleSkinPreviewName')).toHaveText('🍄 Pilzdorf');
+    const stageVideoSrc = await page.evaluate(() => {
+      const v = document.querySelector('#idleSkinPreviewStage .idle-village-video');
+      return v ? v.dataset.src : null;
+    });
+    expect(stageVideoSrc).toContain('pilzdorf.mp4'); // nicht der Standard-Fallback (startdorf.mp4)
+  });
+
+  test('Schließen-Button UND Klick auf den Hintergrund (nicht auf die Karte) schließen die Lightbox wieder', async ({ page, qaBaseURL, fixtureData }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    await openSkinsPanel(page);
+
+    await page.locator('.idle-skin-preview-thumb[data-skin-id="eisdorf"]').click();
+    await expect(page.locator('#idleSkinPreviewOverlay')).toHaveClass(/visible/);
+    await page.locator('#idleSkinPreviewCloseBtn').click();
+    await expect(page.locator('#idleSkinPreviewOverlay')).not.toHaveClass(/visible/);
+    await expect(page.locator('body')).not.toHaveClass(/modal-open/);
+
+    await page.locator('.idle-skin-preview-thumb[data-skin-id="eisdorf"]').click();
+    await expect(page.locator('#idleSkinPreviewOverlay')).toHaveClass(/visible/);
+    // Direkt auf das Overlay-Element selbst dispatcht (e.target === overlay, exakt die
+    // Bedingung, die bkmpIdleOpenSkinPreview() prueft) - robuster als Koordinaten-Klicks,
+    // die je nach Kartenbreite/Viewport zufaellig doch die Karte selbst treffen koennten.
+    await page.locator('#idleSkinPreviewOverlay').evaluate(el => el.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    await expect(page.locator('#idleSkinPreviewOverlay')).not.toHaveClass(/visible/);
+  });
+
+  test('Tastatur (Enter) auf einer fokussierten Kachel öffnet die Lightbox genau wie ein Klick', async ({ page, qaBaseURL, fixtureData }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    await openSkinsPanel(page);
+    await page.locator('.idle-skin-preview-thumb[data-skin-id="eisdorf"]').focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#idleSkinPreviewOverlay')).toHaveClass(/visible/);
+    await expect(page.locator('#idleSkinPreviewName')).toHaveText('❄️ Eis Dorf');
   });
 });
 

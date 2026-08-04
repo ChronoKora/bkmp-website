@@ -406,15 +406,21 @@ async function bkmpIdleLoadOrInitState(name) {
      nachweislich nichts fehlte.
      Fix: zwei UNABHAENGIGE Ladevorgaenge statt einem. Ausgeruestete Runen
      (garantiert hoechstens 6 Zeilen, praktisch nie zu gross zum Laden) und
-     das ungenutzte Lager (potenziell riesig, deshalb nach Wert gekappt -
-     siehe loadUnequippedPlayerRunesCapped) laufen in getrennten try/catch-
-     Bloecken. Schlaegt einer fehl, bleibt der jeweils ANDERE trotzdem
-     erhalten - der wichtigste Fall (Kampfausruestung) ist damit fast immer
-     sicher, selbst wenn das grosse Lager gerade nicht ladbar ist. KEIN
-     stilles Leeren mehr bei einem Fehler: bkmpIdleRuneLoadError signalisiert
-     dem Runen-Tab, einen sichtbaren Hinweis+Retry-Button statt eines leeren
-     Lagers zu zeigen. */
-  const BKMP_RUNE_INVENTORY_CAP = 300;
+     das ungenutzte Lager laufen in getrennten try/catch-Bloecken. Schlaegt
+     einer fehl, bleibt der jeweils ANDERE trotzdem erhalten - der wichtigste
+     Fall (Kampfausruestung) ist damit fast immer sicher, selbst wenn das
+     grosse Lager gerade nicht ladbar ist. KEIN stilles Leeren mehr bei einem
+     Fehler: bkmpIdleRuneLoadError signalisiert dem Runen-Tab, einen
+     sichtbaren Hinweis+Retry-Button statt eines leeren Lagers zu zeigen.
+
+     Nachtrag (04.08.2026): das ungenutzte Lager lief zwischen 25.07. und
+     03.08.2026 zusaetzlich noch auf die 300 wertvollsten Zeilen gekappt
+     (loadUnequippedPlayerRunesCapped) - auf ausdruecklichen Nutzerwunsch
+     (die dafuer gebaute "Lager aufraeumen"-Verkaufsleiste verwirrte mehr
+     Spieler als sie half) wieder entfernt, siehe loadUnequippedPlayerRunes()
+     in supabase.js fuer die volle Abwaegung. Die Trennung equipped/
+     unequipped selbst bleibt bestehen, das war nie die Ursache der
+     Verwirrung. */
   function bkmpIdleNormalizeRuneRow(r) {
     return {
       ...r,
@@ -433,12 +439,11 @@ async function bkmpIdleLoadOrInitState(name) {
     bkmpIdleRuneLoadError = true;
   }
   try {
-    bkmpIdleLoadedUnequippedRunes = typeof loadUnequippedPlayerRunesCapped === 'function' ? await loadUnequippedPlayerRunesCapped(name, BKMP_RUNE_INVENTORY_CAP) : [];
+    bkmpIdleLoadedUnequippedRunes = typeof loadUnequippedPlayerRunes === 'function' ? await loadUnequippedPlayerRunes(name) : [];
   } catch (e) {
     console.warn('Idle Dorf: Runen-Lager konnte nicht geladen werden (Netzwerkfehler oder Migration evtl. noch nicht ausgefuehrt).', e);
     bkmpIdleRuneLoadError = true;
   }
-  bkmpIdleRuneInventoryCapped = Array.isArray(bkmpIdleLoadedUnequippedRunes) && bkmpIdleLoadedUnequippedRunes.length >= BKMP_RUNE_INVENTORY_CAP;
   /* Nur ueberschreiben, was tatsaechlich (auch nur teilweise) geladen
      werden konnte - bei einem KOMPLETTEN Fehlschlag (beide null) bleibt ein
      bereits vorhandener bkmpIdlePlayerRunes-Bestand aus einer frueheren
