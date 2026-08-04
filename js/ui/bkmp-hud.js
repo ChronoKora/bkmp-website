@@ -90,6 +90,66 @@ function bkmpIdleSyncDragonVideoPlayback() {
   }
 }
 
+/* Kampf-Feinschliff (03.08.2026, Nutzer-Auftrag "Gegnerwechsel weniger
+   abrupt"): rein visueller Ein-Puls auf dem Drachen-Sprite-Container beim
+   Spawnen des naechsten Gegners (.idle-dragon-spawn-in, style.css). Aus
+   bkmpIdleSpawnDragon() herausgeloest (Bugfix 04.08.2026, siehe Kommentar
+   unten) - eigene, benannte Funktion statt einer Inline-Closure, damit sie
+   auch unabhaengig von der (im Test-Mock numerische, nie mit
+   BKMP_IDLE_VIDEO_DRAGON_SPRITES uebereinstimmende) Drachen-Rotation direkt
+   testbar ist. */
+function bkmpIdleTriggerDragonSpawnAnim(dragonSprite) {
+  if (!dragonSprite) return;
+  /* Bugfix (Spieler-Videobeweis 04.08.2026, 16:28 Uhr, zwei unabhaengige
+     Momente im selben Clip: "Das ganze Fenster flackert kurz und wird ein
+     stück kleiner"): die urspruengliche Annahme "der Sprite-Container ist
+     zu diesem Zeitpunkt bereits mit dem NEUEN Drachen befuellt" stimmt fuer
+     Video-Drachen (siehe BKMP_IDLE_VIDEO_DRAGON_SPRITES/
+     bkmpIdleApplyDragonSprite oben) NICHT - bkmpIdleApplyDragonSprite()
+     tauscht dort nur video.src aus (Perf-Fix 19.07., dasselbe <video>-
+     Element wird wiederverwendet), das erste darstellbare Bild braucht aber
+     noch einen echten Lade-/Dekodier-Schritt (Netzwerk+Decode, auch bei
+     bereits gecachten Dateien nicht 0ms). Wird .idle-dragon-spawn-in (Start
+     bei opacity:0, scale(0.9), siehe style.css) trotzdem SOFORT gestartet,
+     animiert sie eine buchstaeblich leere/schwarze Box - sichtbar als genau
+     das gemeldete kurze Schwarz-Flackern + sichtbares Schrumpfen (der
+     scale(0.9)-Startwert der Animation). Per Video-Standbild-Beweis
+     bestaetigt (zwei unabhaengige Drachenwechsel im selben Clip, je eine
+     komplett leere Sprite-Box direkt nach dem Wechsel, ffmpeg-Frame-
+     Extraktion, kein direktes Video-Tool verfuegbar - gleiche Notloesung
+     wie beim 27-Sek.-Bildschirmaufnahme-Fund vom 21.07.). Fix: bei einem
+     Video, dessen erstes Bild noch nicht bereitsteht (readyState <
+     HAVE_CURRENT_DATA) wird die Animation erst beim 'loadeddata'-Ereignis
+     gestartet (mit 600ms-Zeitfenster-Fallback, falls das Ereignis aus
+     irgendeinem Grund nie feuert, z.B. Netzwerkfehler) - bei PNG-Sprite-
+     Drachen (kein <video>, quasi verzoegerungsfrei) und bei einem bereits
+     geladenen Video (z.B. derselbe Drache erscheint erneut) bleibt das
+     Verhalten unveraendert sofort. Bekannter, bewusst akzeptierter
+     Randfall: bei mehreren sehr schnell aufeinanderfolgenden Kills waehrend
+     ein Video noch laedt kann der 600ms-Fallback-Timer eines AELTEREN
+     Aufrufs die Animation ein zweites Mal auf dem dann laengst naechsten
+     Drachen abspielen (rein kosmetische Wiederholung, keine Zustands-
+     aenderung) - selten genug (braucht gleichzeitig sehr schnelle Kills
+     UND ungewoehnlich langsames Laden), um keine eigene Abbruch-Logik zu
+     rechtfertigen. Gleicher Neustart-Trick wie bkmpIdlePlaySpriteAttack,
+     deshalb sicher mehrfach schnell hintereinander aufrufbar, ohne sich zu
+     stapeln. */
+  const startAnim = () => {
+    dragonSprite.classList.remove('idle-dragon-spawn-in');
+    void dragonSprite.offsetWidth;
+    dragonSprite.classList.add('idle-dragon-spawn-in');
+  };
+  const dragonVideo = dragonSprite.querySelector('video.idle-dragon-sprite-video');
+  if (dragonVideo && dragonVideo.readyState < 2 /* HAVE_CURRENT_DATA */) {
+    let triggered = false;
+    const trigger = () => { if (triggered) return; triggered = true; startAnim(); };
+    dragonVideo.addEventListener('loadeddata', trigger, { once: true });
+    window.setTimeout(trigger, 600);
+  } else {
+    startAnim();
+  }
+}
+
 function bkmpIdleSpawnDragon() {
   /* Bug-Fix 18.07. (Spieler-Meldung: Liber erscheint bei einem Spieler
      immer wieder auf derselben festen Stufe): bkmpIdleSelectDragonKindId()
@@ -128,21 +188,9 @@ function bkmpIdleSpawnDragon() {
     dragonEl.classList.toggle('idle-dragon-miniboss', bkmpIdleCurrentDragon.bossTier === 'miniboss');
     dragonEl.classList.toggle('idle-dragon-event', Boolean(bkmpIdleCurrentDragon.isEventDragon));
   }
-  /* Kampf-Feinschliff (03.08.2026, Nutzer-Auftrag "Gegnerwechsel weniger
-     abrupt"): rein visueller Ein-Puls auf dem bereits mit dem NEUEN Drachen
-     befuellten Sprite-Container - die eigentliche Zustandsaenderung (HP/
-     Name/Sprite/Stufe, alles oben) ist zu diesem Zeitpunkt bereits
-     vollstaendig und synchron abgeschlossen, die Animation verzoegert
-     nichts davon und blockiert auch bei sehr hoher Kampfgeschwindigkeit
-     nichts (naechster Tick laeuft unabhaengig weiter). Gleicher Neustart-
-     Trick wie bkmpIdlePlaySpriteAttack, deshalb sicher mehrfach schnell
-     hintereinander aufrufbar, ohne sich zu stapeln. */
-  const dragonSprite = document.getElementById('idleDragonSprite');
-  if (dragonSprite) {
-    dragonSprite.classList.remove('idle-dragon-spawn-in');
-    void dragonSprite.offsetWidth;
-    dragonSprite.classList.add('idle-dragon-spawn-in');
-  }
+  // Gegnerwechsel-Ein-Puls (.idle-dragon-spawn-in), video-lade-bewusst seit
+  // dem 04.08.2026-Bugfix - siehe Funktionskommentar bei bkmpIdleTriggerDragonSpawnAnim oben.
+  bkmpIdleTriggerDragonSpawnAnim(document.getElementById('idleDragonSprite'));
   bkmpIdleUpdateDragonHpBar();
   bkmpIdleRenderStageBar();
   bkmpIdleMaybeShowEventDragonPopup();

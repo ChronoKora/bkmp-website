@@ -115,6 +115,107 @@ test.describe('Kampf-Feinschliff (visuell)', () => {
     expect(dmgAfterClick.hpAfter === null || dmgAfterClick.hpAfter < dmgAfterClick.hpBefore).toBe(true);
   });
 
+  /* REGRESSION (Spieler-Videobeweis 04.08.2026, 16:28 Uhr: "Das ganze Fenster
+     flackert kurz und wird ein stück kleiner") - siehe Funktionskommentar bei
+     bkmpIdleTriggerDragonSpawnAnim() (js/ui/bkmp-hud.js) fuer die volle
+     Root-Cause-Erklaerung. Die Teststand-A-Mock-Drachen tragen numerische
+     spriteKeys (id-Fallback, siehe reference-data.js) und matchen NIE gegen
+     BKMP_IDLE_VIDEO_DRAGON_SPRITES - die reale Drachenrotation im Mock
+     durchlaeuft den Video-Zweig deshalb nie. Diese Tests rufen die (seit
+     diesem Bugfix eigenstaendige, benannte) Funktion deshalb direkt mit
+     einem echten <video>-Element auf, dessen Netzwerkanfrage gezielt
+     verzoegert wird - testet exakt denselben Produktionscode wie
+     bkmpIdleSpawnDragon(), unabhaengig von der Mock-Rotation. */
+  test.describe('REGRESSION: Gegnerwechsel-Animation wartet auf ein echtes Video-Bild statt eine leere Box zu animieren', () => {
+    test('Video noch nicht geladen: Animation startet NICHT sofort, sondern erst beim ersten darstellbaren Bild (loadeddata)', async ({ page, qaBaseURL, fixtureData }) => {
+      let releaseVideo;
+      const videoGate = new Promise(resolve => { releaseVideo = resolve; });
+      await page.route('**/assets/dragons/feuerdrache.mp4*', async route => {
+        await videoGate;
+        await route.continue();
+      });
+      await openAndLogin(page, qaBaseURL, fixtureData);
+      await waitForDragonReady(page);
+
+      const whileBlocked = await page.evaluate(() => {
+        const sprite = document.createElement('div');
+        const video = document.createElement('video');
+        video.className = 'idle-dragon-sprite-video';
+        video.muted = true;
+        video.src = 'assets/dragons/feuerdrache.mp4';
+        sprite.appendChild(video);
+        window.__qaTestSprite = sprite; // ausserhalb des DOM, aber am Leben halten
+        bkmpIdleTriggerDragonSpawnAnim(sprite);
+        return { spawnInClass: sprite.classList.contains('idle-dragon-spawn-in'), readyState: video.readyState };
+      });
+      expect(whileBlocked.readyState).toBeLessThan(2); // Beweis: die Blockade wirkt tatsaechlich (kein Bild verfuegbar)
+      expect(whileBlocked.spawnInClass).toBe(false); // Kernbeweis: keine Animation auf einer noch leeren Box
+
+      releaseVideo();
+      await expect.poll(() => page.evaluate(() => window.__qaTestSprite.classList.contains('idle-dragon-spawn-in'))).toBe(true);
+      const finalReadyState = await page.evaluate(() => window.__qaTestSprite.querySelector('video').readyState);
+      expect(finalReadyState).toBeGreaterThanOrEqual(2); // die Animation startete tatsaechlich erst NACHDEM ein Bild da war
+    });
+
+    test('Video bereits geladen (z.B. derselbe Drache erscheint erneut): Animation startet weiterhin sofort', async ({ page, qaBaseURL, fixtureData }) => {
+      await openAndLogin(page, qaBaseURL, fixtureData);
+      await waitForDragonReady(page);
+
+      const result = await page.evaluate(async () => {
+        const sprite = document.createElement('div');
+        const video = document.createElement('video');
+        video.className = 'idle-dragon-sprite-video';
+        video.muted = true;
+        video.src = 'assets/dragons/feuerdrache.mp4';
+        sprite.appendChild(video);
+        await new Promise(resolve => { video.addEventListener('loadeddata', resolve, { once: true }); });
+        bkmpIdleTriggerDragonSpawnAnim(sprite);
+        return { spawnInClass: sprite.classList.contains('idle-dragon-spawn-in'), readyState: video.readyState };
+      });
+      expect(result.readyState).toBeGreaterThanOrEqual(2);
+      expect(result.spawnInClass).toBe(true);
+    });
+
+    test('PNG-Sprite-Drache (kein <video>): Animation startet unveraendert sofort', async ({ page, qaBaseURL, fixtureData }) => {
+      await openAndLogin(page, qaBaseURL, fixtureData);
+      await waitForDragonReady(page);
+
+      const spawnInClass = await page.evaluate(() => {
+        const sprite = document.createElement('div');
+        sprite.classList.add('idle-sprite-erddrache'); // reine PNG-Klasse, kein <video>-Kind
+        bkmpIdleTriggerDragonSpawnAnim(sprite);
+        return sprite.classList.contains('idle-dragon-spawn-in');
+      });
+      expect(spawnInClass).toBe(true);
+    });
+
+    test('Fallback: feuert das loadeddata-Ereignis nie (z.B. Netzwerkfehler), startet die Animation trotzdem nach dem 600ms-Zeitfenster', async ({ page, qaBaseURL, fixtureData }) => {
+      // Blockiert die Anfrage DAUERHAFT (kein route.continue()) - simuliert einen
+      // haengenden/fehlgeschlagenen Ladevorgang, bei dem 'loadeddata' nie feuert.
+      await page.route('**/assets/dragons/feuerdrache.mp4*', () => {});
+      await openAndLogin(page, qaBaseURL, fixtureData);
+      await waitForDragonReady(page);
+
+      const immediatelyAfter = await page.evaluate(() => {
+        const sprite = document.createElement('div');
+        const video = document.createElement('video');
+        video.className = 'idle-dragon-sprite-video';
+        video.muted = true;
+        video.src = 'assets/dragons/feuerdrache.mp4';
+        sprite.appendChild(video);
+        window.__qaTestSpriteFallback = sprite;
+        bkmpIdleTriggerDragonSpawnAnim(sprite);
+        return sprite.classList.contains('idle-dragon-spawn-in');
+      });
+      expect(immediatelyAfter).toBe(false); // noch nicht - Video haengt weiterhin fest
+
+      await expect.poll(
+        () => page.evaluate(() => window.__qaTestSpriteFallback.classList.contains('idle-dragon-spawn-in')),
+        { timeout: 2000 }
+      ).toBe(true); // der 600ms-Fallback-Timer greift trotzdem
+    });
+  });
+
   test('Trefferfeedback Spielerseite: Dorf-Puls + HP-Balken-Aufleuchten erscheinen und raeumen sich selbst wieder auf', async ({ page, qaBaseURL, fixtureData }) => {
     await openAndLogin(page, qaBaseURL, fixtureData);
     await waitForDragonReady(page);
