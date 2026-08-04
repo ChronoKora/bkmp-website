@@ -1542,7 +1542,11 @@ function bkmpIdleRunAutomationToggles() {
     }
   }
 
-  if (bkmpPrestigeBonus('auto_raid_join_unlock') > 0 && typeof bkmpRaidGetPhaseInfo === 'function' && typeof bkmpRaidHasJoined === 'function' && typeof bkmpRaidJoin === 'function') {
+  /* Spieler-Wunsch (04.08.2026, siehe Kommentar bei BKMP_RAID_AUTO_JOIN_
+     ENABLED_KEY in bkmp-raid.js): zusaetzlich zum Prestige-Freischalter
+     jetzt auch der lokale Ein/Aus-Schalter noetig - Default TRUE, also ohne
+     jede Aenderung fuer alle, die den Schalter nie anfassen. */
+  if (bkmpPrestigeBonus('auto_raid_join_unlock') > 0 && (typeof bkmpRaidAutoJoinEnabledGet !== 'function' || bkmpRaidAutoJoinEnabledGet()) && typeof bkmpRaidGetPhaseInfo === 'function' && typeof bkmpRaidHasJoined === 'function' && typeof bkmpRaidJoin === 'function') {
     const info = bkmpRaidGetPhaseInfo();
     if (info.phase === 'prep' && info.raidId && !bkmpRaidHasJoined(info.raidId)) bkmpRaidJoin(info.raidId);
   }
@@ -3208,17 +3212,17 @@ function bkmpIdleInit() {
      Anhaengen hier - analog zu #idleDragon oben. */
   const raidBossEl = document.getElementById('raidBoss');
   if (raidBossEl) raidBossEl.addEventListener('click', bkmpRaidHandleBossClick);
-  /* Der "⚔️ Angreifen"-Button daneben (#raidAttackBtn) simulierte bisher nur
-     per bossEl.click() einen Klick auf #raidBoss - dieser Proxy-Listener
-     stand aber in bkmp-app-mode-bootstrap.js hinter "if (window.BKMP_APP_MODE)",
-     lief also NUR im echten /app-Modus. Auf der normalen Website (wo der
-     Button genauso sichtbar ist, siehe .raid-action-bar in index.html) tat
-     der Button dadurch buchstaeblich nichts - direkt hier verdrahtet, ohne
-     App-Modus-Abhaengigkeit, ruft direkt dieselbe Funktion wie der
-     Boss-Klick selbst auf statt noch einen Umweg ueber ein simuliertes
-     Klick-Event zu gehen. */
-  const raidAttackBtnEl = document.getElementById('raidAttackBtn');
-  if (raidAttackBtnEl) raidAttackBtnEl.addEventListener('click', bkmpRaidHandleBossClick);
+  /* Spieler-Feedback (04.08.2026, ChronoKora): der separate "⚔️ Angreifen"-
+     Button (#raidAttackBtn) rief ohnehin nur exakt denselben Handler auf wie
+     ein Klick auf #raidBoss selbst (siehe direkt oben) oder die Leertaste
+     (siehe keydown-Handler weiter unten) - reine Redundanz zu einem bereits
+     groesseren, ohnehin schon klickbaren Ziel (.raid-boss-sprite, bis zu
+     380px breit, deutlich groesser als der 4.6rem-Knopf). Button komplett
+     entfernt (index.html), diese Verdrahtungszeile faellt damit ersatzlos
+     weg - bewusst NICHT das "Auto-Kampf aktiv"-Anzeige-Element daneben
+     (siehe bkmpRaidOwnTick weiter oben in bkmp-raid.js: echte, alle 2,5s
+     wiederkehrende automatische Schadens-Zufuegung, unabhaengig von jedem
+     Klick - die Anzeige ist also keine leere Behauptung). */
   bkmpIdleWireStagePicker();
   const eventDragonReadyBtn = document.getElementById('idleEventDragonReadyBtn');
   if (eventDragonReadyBtn) eventDragonReadyBtn.addEventListener('click', bkmpIdleConfirmEventDragonReady);

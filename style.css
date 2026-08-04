@@ -11123,10 +11123,16 @@ html.bkmp-app-mode .idle-res-strip {
   border: 1px dashed color-mix(in srgb, var(--app-gold) 45%, transparent);
 }
 
-/* Action-Bar: Auto-Status (links, immer wahr solange sichtbar) +
-   grosser Angriff-Button (Mitte, echter Klick-Handler) + Tap-Schaden
-   (rechts, echte Summe) - wie im Referenzbild, aber alle drei Werte
-   echt. */
+/* Action-Bar: Auto-Status (links, echte automatische Tick-Schadenszufuegung,
+   siehe bkmpRaidOwnTick in bkmp-raid.js) + Klick-Zaehler (rechts, echte
+   Anzahl) - je Haelfte der Zeile.
+   Spieler-Feedback (04.08.2026, ChronoKora): der frueher mittig sitzende
+   grosse "⚔️ Angreifen"-Knopf (.raid-attack-btn) rief ohnehin nur denselben
+   Klick-Handler wie ein Tipp auf den (deutlich groesseren) Boss-Sprite
+   selbst oder die Leertaste auf - komplett entfernt (index.html/idledorf.js),
+   diese Regeln damit ersatzlos weg. Beide verbliebenen Kinder haben bereits
+   flex:1 1 0 - ohne den Knopf dazwischen teilen sie sich die Zeile jetzt
+   automatisch haelftig, keine Breiten-/Abstands-Anpassung noetig. */
 html.bkmp-app-mode .raid-action-bar {
   display: flex;
   align-items: center;
@@ -11150,22 +11156,6 @@ html.bkmp-app-mode .raid-auto-pill {
   flex: 1 1 0;
   min-width: 0;
 }
-html.bkmp-app-mode .raid-attack-btn {
-  flex: none;
-  width: 4.6rem;
-  height: 4.6rem;
-  border-radius: 50%;
-  font-size: 1.9rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: radial-gradient(circle at 35% 25%, var(--app-red), #7a0f22 75%);
-  border: 3px solid var(--app-gold);
-  color: var(--app-ink);
-  box-shadow: var(--app-glow-gold), 0 8px 20px rgba(0, 0, 0, .5);
-  transition: transform .12s ease;
-}
-html.bkmp-app-mode .raid-attack-btn:active { transform: scale(.9); }
 html.bkmp-app-mode .idle-res-tap {
   flex: 1 1 0;
   min-width: 0;

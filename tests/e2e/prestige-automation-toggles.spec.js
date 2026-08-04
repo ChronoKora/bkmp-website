@@ -90,6 +90,96 @@ test.describe('Automatisierungs-Schalter (Prestige-Zweig "Automation") - Teststa
     expect(after).toBe(false);
   });
 
+  /* Spieler-Wunsch (04.08.2026, BagonTr01 im Feedback-Discord): "ist
+     irgendwie ne Moeglichkeit das man das automatische Bossbeitreten [beim
+     stuendlichen Weltboss] an und ausschalten kann?" - siehe Kommentar bei
+     BKMP_RAID_AUTO_JOIN_ENABLED_KEY in bkmp-raid.js fuer die volle
+     Herleitung. Zwei neue Tests: der lokale Schalter selbst (Engine-Ebene,
+     identisches Fixture-Setup wie der erste Test oben, nur mit dem
+     Schalter explizit ausgeschaltet) + die Checkbox an der Knotenkarte im
+     Prestige-Baum (UI-Ebene). */
+  test('Automatischer Bosskampf mit lokal AUSGESCHALTETEM Schalter: kein Beitritt trotz Prestige-Freischaltung', async ({ page, qaBaseURL, fixtureData, store, qaClock }) => {
+    store.tables.raid_bosses = [{ ...RAID_BOSS }];
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+
+    const setup = await page.evaluate(() => {
+      if (!bkmpPrestigeState) bkmpPrestigeState = { prestige_level: 1, prestige_points: 0, prestige_points_spent: 0, prestige_allocations: {} };
+      bkmpPrestigeState.prestige_allocations.automatischer_bosskampf = 1;
+      bkmpRaidAutoJoinEnabledSet(false);
+      const info = bkmpRaidGetPhaseInfo();
+      return { bonus: bkmpPrestigeBonus('auto_raid_join_unlock'), enabled: bkmpRaidAutoJoinEnabledGet(), phase: info.phase, raidId: info.raidId };
+    });
+    expect(setup.bonus).toBeGreaterThan(0);
+    expect(setup.enabled).toBe(false);
+    expect(setup.phase).toBe('prep');
+
+    await qaClock.advance(store, 3000);
+    await page.waitForTimeout(1000); // Puffer fuer einen faelschlich ausgeloesten, asynchronen Join
+
+    const after = await page.evaluate((raidId) => bkmpRaidHasJoined(raidId), setup.raidId);
+    expect(after).toBe(false);
+
+    // Positivkontrolle im selben Test: erneut einschalten laesst den Beitritt
+    // sofort (naechster 10s-Automations-Durchlauf) wieder greifen - beweist,
+    // dass der Schalter tatsaechlich beide Richtungen steuert, nicht nur
+    // einmalig einen Zustand einfriert.
+    await page.evaluate(() => bkmpRaidAutoJoinEnabledSet(true));
+    await qaClock.advance(store, 11000);
+    await expect.poll(() => page.evaluate((raidId) => bkmpRaidHasJoined(raidId), setup.raidId), { timeout: 5000 }).toBe(true);
+  });
+
+  test('Checkbox "Automatisch beitreten" erscheint erst nach dem Kauf, spiegelt+setzt den lokalen Schalter korrekt', async ({ page, qaBaseURL, fixtureData }, testInfo) => {
+    // Einziger Test in dieser Datei mit einem echten Desktop-Tab-Klick
+    // (alle anderen rufen die Automations-/Bonus-Funktionen direkt auf) -
+    // gleiches, bereits etabliertes Muster wie prestige.spec.js: auf
+    // mobile-*-Projekten ist #idleTabBtnPrestige korrekt unsichtbar
+    // (kompakte Navigation), kein App-Bug.
+    test.skip(/^mobile-/.test(testInfo.project.name), 'Nutzt einen echten Desktop-Tab-Klick - siehe Kommentar oben, mobile-smoke.spec.js deckt die kompakte Navigation ab');
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    await page.locator('#idleTabBtnPrestige').click();
+
+    const beforePurchase = await page.evaluate(() => {
+      if (!bkmpPrestigeState) bkmpPrestigeState = { prestige_level: 1, prestige_points: 0, prestige_points_spent: 0, prestige_allocations: {} };
+      // "Automation"-Zweig ist erst ab 100 investierten Punkten ueberhaupt
+      // sichtbar (bkmpPrestigeBranchUnlocked, siehe Meilenstein "Erweiterter
+      // Baum") - ohne das wuerde die Karte gar nicht erst gerendert.
+      bkmpPrestigeState.prestige_points_spent = 100;
+      delete bkmpPrestigeState.prestige_allocations.automatischer_bosskampf;
+      bkmpPrestigeSetActiveBranch('automation');
+      bkmpIdleRenderPrestigePanel();
+      return document.querySelector('.idle-prestige-raidjoin-checkbox') !== null;
+    });
+    expect(beforePurchase).toBe(false);
+
+    const afterPurchase = await page.evaluate(() => {
+      bkmpPrestigeState.prestige_allocations.automatischer_bosskampf = 1;
+      bkmpIdleRenderPrestigePanel();
+      const cb = document.querySelector('.idle-prestige-raidjoin-checkbox');
+      return { present: !!cb, checkedByDefault: cb ? cb.checked : null };
+    });
+    expect(afterPurchase.present).toBe(true);
+    // Default TRUE (siehe Kommentar bei BKMP_RAID_AUTO_JOIN_ENABLED_KEY) -
+    // bestehendes Verhalten fuer alle, die den Schalter nie anfassen.
+    expect(afterPurchase.checkedByDefault).toBe(true);
+
+    await page.click('.idle-prestige-raidjoin-checkbox');
+    const afterUncheck = await page.evaluate(() => ({
+      checked: document.querySelector('.idle-prestige-raidjoin-checkbox').checked,
+      stored: bkmpRaidAutoJoinEnabledGet()
+    }));
+    expect(afterUncheck.checked).toBe(false);
+    expect(afterUncheck.stored).toBe(false);
+
+    // Ueberlebt einen erneuten Panel-Render (z.B. durch einen anderen Kauf
+    // ausgeloest) - liest den Zustand aus localStorage, nicht aus einer
+    // reinen DOM-Checkbox-Erinnerung.
+    await page.evaluate(() => bkmpIdleRenderPrestigePanel());
+    const stillUnchecked = await page.evaluate(() => document.querySelector('.idle-prestige-raidjoin-checkbox').checked);
+    expect(stillUnchecked).toBe(false);
+  });
+
   test('Automatische Rune-Aufwertung (auto_rune_upgrade_unlock): wertet die guenstigste ausgeruestete Rune ohne Klick auf', async ({ page, qaBaseURL, fixtureData, store, qaClock }) => {
     await openAndLogin(page, qaBaseURL, fixtureData);
     await waitForDragonReady(page);

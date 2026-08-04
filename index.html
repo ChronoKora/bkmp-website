@@ -146,7 +146,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260803-combatpolish1">
+<link rel="stylesheet" href="style.css?v=20260804-raidactionbar1">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 </head>
 <body>
@@ -771,9 +771,8 @@
         </div>
         <div class="idle-res-strip" id="raidRewardsStrip"></div>
         <div class="raid-action-bar" id="raidActionBar">
-          <span class="raid-auto-pill">🟢 Auto-Kampf aktiv</span>
-          <button type="button" class="raid-attack-btn" id="raidAttackBtn" aria-label="Angreifen">⚔️</button>
-          <span class="idle-res-chip idle-res-tap" id="raidTapDamagePill"><i class="idle-res-icon">👆</i><b class="idle-res-val">0</b></span>
+          <span class="raid-auto-pill" title="Zusätzlich zu deinen eigenen Klicks fügt dein Dorf automatisch alle paar Sekunden Schaden zu, solange der Kampf läuft.">🟢 Auto-Kampf aktiv</span>
+          <span class="idle-res-chip idle-res-tap" id="raidTapDamagePill" title="Deine eigenen Klicks/Tipper in diesem Kampf"><i class="idle-res-icon">👆</i><b class="idle-res-val">0</b></span>
         </div>
         <div class="raid-participants-list" id="raidParticipantsList"></div>
         <div class="raid-result-card" id="raidResultCard" style="display:none;"></div>
@@ -1582,9 +1581,9 @@
   <script src="js/systems/bkmp-guild.js?v=20260801-guildlvlcap1" defer></script>
   <script src="js/systems/bkmp-guild-tech.js?v=20260801-zuchtcategory1" defer></script>
   <script src="js/systems/bkmp-runes.js?v=20260730-legimaximize1" defer></script>
-  <script src="js/systems/bkmp-raid.js?v=20260801-tapcounterfix1" defer></script>
+  <script src="js/systems/bkmp-raid.js?v=20260804-raidactionbar1" defer></script>
   <script src="js/systems/bkmp-tower.js?v=20260726-stagebarvisfix1" defer></script>
-  <script src="js/systems/bkmp-prestige.js?v=20260803-schluesselmeisterremoved1" defer></script>
+  <script src="js/systems/bkmp-prestige.js?v=20260804-raidactionbar1" defer></script>
   <script src="js/systems/bkmp-arena.js?v=20260730-arenalimitfix1" defer></script>
   <script src="js/systems/bkmp-meister.js?v=20260717-p2bfoundation" defer></script>
   <script src="js/systems/bkmp-skilltree.js?v=20260717-p2bfoundation" defer></script>
@@ -1594,7 +1593,7 @@
   <script src="js/systems/bkmp-leaderboard.js?v=20260717-p2cfoundation" defer></script>
   <script src="js/ui/bkmp-ui-components.js?v=20260731-guildtechtreev3" defer></script>
   <script src="js/ui/bkmp-reward-presenter.js?v=20260719-p55e" defer></script>
-  <script src="idledorf.js?v=20260803-combatpolish1" defer></script>
+  <script src="idledorf.js?v=20260804-raidactionbar1" defer></script>
   <script src="mapart.js?v=20260717-kartenfirmen1" defer></script>
   <script src="js/core/bkmp-idle-bootstrap.js?v=20260717-p2afoundation" defer></script>
   <script src="js/core/bkmp-site.js?v=20260728-investorpayout3" defer></script>

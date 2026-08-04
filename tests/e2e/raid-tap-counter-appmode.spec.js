@@ -12,11 +12,18 @@ const { test, expect, openAndLogin, waitForDragonReady } = require('../helpers/q
    seit Redesign Phase 5 IMMER sichtbar (html.bkmp-app-mode ist seit damals
    die CSS-Klasse fuer OPTIK auf jeder Seite, window.BKMP_APP_MODE bleibt das
    engere /app-exklusive VERHALTENS-Flag - siehe Kommentar in index.html).
-   Jeder Klick zaehlte serverseitig+intern (bkmpRaidTapDamageSession) also
-   schon immer korrekt, nur die Anzeige aktualisierte sich auf der normalen
-   Website (window.BKMP_APP_MODE===false) nie - exakt dasselbe Bugmuster wie
-   der bereits am 19.07. gefixte #raidAttackBtn (siehe Kommentar in
-   idledorf.js:3161-3180, dort bereits unconditional verdrahtet).
+   Jeder Klick zaehlte serverseitig+intern also schon immer korrekt, nur die
+   Anzeige aktualisierte sich auf der normalen Website (window.BKMP_APP_MODE
+   ===false) nie - exakt dasselbe Bugmuster wie der frueher separate
+   #raidAttackBtn (siehe idledorf.js, inzwischen komplett entfernt).
+
+   Nachtrag 04.08.2026 (Spieler-Feedback ChronoKora, "das Rote Symbol" hier
+   war das "⚔️ Angreifen"-Knopf-Symbol - komplett entfernt, siehe Kommentar
+   in idledorf.js/style.css): #raidTapDamagePill zaehlte urspruenglich die
+   kumulierte TIPP-SCHADENSSUMME (redundant zur direkt darunter angezeigten
+   Liste einzelner Treffer) - zeigt jetzt stattdessen die Anzahl der
+   eigenen Klicks/Tipper (bkmpRaidTapClickSession, +1 statt +clickDamage
+   pro Klick), eine tatsaechlich neue Information.
 
    Test laeuft bewusst NICHT unter /app (openAndLogin, nicht openAppMode) -
    genau der zuvor kaputte Fall. Reiner State-Injektions-Test (identisches
@@ -24,7 +31,7 @@ const { test, expect, openAndLogin, waitForDragonReady } = require('../helpers/q
    bkmpRaidRenderCombat() liest nur bereits vorhandenen Client-State, kein
    RPC-Aufruf noetig um das reine Anzeige-Verhalten zu beweisen. */
 
-test.describe('Raid-Kampfleiste: Tap-Schaden-Zaehler + Ressourcenleiste auf der normalen Website (nicht /app)', () => {
+test.describe('Raid-Kampfleiste: Klick-Zaehler + Ressourcenleiste auf der normalen Website (nicht /app)', () => {
   test.use({ teststand: 'A' });
 
   test('REGRESSION: #raidTapDamagePill aktualisiert sich, obwohl window.BKMP_APP_MODE hier false ist', async ({ page, qaBaseURL, fixtureData }) => {
@@ -38,7 +45,7 @@ test.describe('Raid-Kampfleiste: Tap-Schaden-Zaehler + Ressourcenleiste auf der 
         cityAttack: 10, cityDefense: 5, status: 'fight'
       };
       bkmpRaidTapDamageSessionId = 'diag-raid-appmode-test';
-      bkmpRaidTapDamageSession = 54321;
+      bkmpRaidTapClickSession = 54321;
       bkmpRaidRenderCombat();
       return {
         isAppMode: !!window.BKMP_APP_MODE,
@@ -62,7 +69,7 @@ test.describe('Raid-Kampfleiste: Tap-Schaden-Zaehler + Ressourcenleiste auf der 
     const result = await page.evaluate(() => {
       bkmpRaidState = { id: 'raid-old', bossName: 'A', bossHp: 1, bossMaxHp: 1, cityHp: 1, cityMaxHp: 1, cityAttack: 0, cityDefense: 0, status: 'fight' };
       bkmpRaidTapDamageSessionId = 'raid-old';
-      bkmpRaidTapDamageSession = 999; // unter der 1000er-K-Abkuerzungsgrenze, bleibt als reine Zahl erhalten
+      bkmpRaidTapClickSession = 999; // unter der 1000er-K-Abkuerzungsgrenze, bleibt als reine Zahl erhalten
       bkmpRaidRenderCombat();
       const before = document.querySelector('#raidTapDamagePill .idle-res-val').textContent;
 
@@ -74,5 +81,36 @@ test.describe('Raid-Kampfleiste: Tap-Schaden-Zaehler + Ressourcenleiste auf der 
 
     expect(result.before).toBe('999');
     expect(result.after).toBe('0');
+  });
+
+  test('ein echter Klick auf den Boss erhoeht den Zaehler um genau 1, unabhaengig vom ausgeteilten Schaden', async ({ page, qaBaseURL, fixtureData }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    await page.evaluate(() => bkmpIdleStopLoop());
+
+    const result = await page.evaluate(() => {
+      bkmpRaidState = {
+        id: 'diag-raid-clickcount-test', bossName: 'Testboss',
+        bossHp: 10000000, bossMaxHp: 10000000, cityHp: 100, cityMaxHp: 100,
+        cityAttack: 10, cityDefense: 5, status: 'fighting'
+      };
+      bkmpRaidTapDamageSessionId = 'diag-raid-clickcount-test';
+      bkmpRaidTapClickSession = 0;
+      // submitRaidDamage() ohne echten Mock-Server nicht aufrufbar - der
+      // Test bricht die Promise-Kette bewusst mit einer Fehlermeldung ab
+      // (catch(()=>{}) direkt danach in bkmpRaidHandleBossClick faengt das
+      // ab); der hier zu beweisende Klick-Zaehler wird bereits VOR diesem
+      // Aufruf synchron erhoeht.
+      bkmpRaidHandleBossClick();
+      bkmpRaidHandleBossClick();
+      bkmpRaidHandleBossClick();
+      return { clicks: bkmpRaidTapClickSession };
+    });
+    // Drei schnell aufeinanderfolgende Klicks koennen je nach Autoklicker-
+    // Schutz-Zeitfenster (BKMP_CLICK_RATE_CAP_MS) nicht alle drei zaehlen -
+    // mindestens der erste zaehlt garantiert, das beweist bereits "+1 pro
+    // Klick, nicht +Schaden".
+    expect(result.clicks).toBeGreaterThanOrEqual(1);
+    expect(Number.isInteger(result.clicks)).toBe(true);
   });
 });

@@ -1353,6 +1353,10 @@ function bkmpIdleRenderPrestigePanel() {
   if (prestigeBtn) prestigeBtn.addEventListener('click', bkmpIdlePerformPrestige);
   panel.querySelectorAll('.idle-prestige-buy').forEach(btn => btn.addEventListener('click', () => bkmpPrestigeBuyUpgrade(btn.dataset.prestigeId)));
   panel.querySelectorAll('.idle-prestige-buy-paragon').forEach(btn => btn.addEventListener('click', () => bkmpPrestigeBuyParagon(btn.dataset.prestigeId)));
+  panel.querySelectorAll('.idle-prestige-raidjoin-checkbox').forEach(cb => cb.addEventListener('change', () => {
+    if (typeof bkmpRaidAutoJoinEnabledSet === 'function') bkmpRaidAutoJoinEnabledSet(cb.checked);
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`Automatischer Weltboss-Beitritt: ${cb.checked ? 'eingeschaltet' : 'ausgeschaltet'}.`, 2400);
+  }));
   if (typeof bkmpUiWireTooltipTrigger === 'function') {
     panel.querySelectorAll('.idle-prestige-paragon-info').forEach(btn => {
       const tip = document.getElementById(btn.dataset.tooltipId);
@@ -1430,12 +1434,19 @@ function bkmpPrestigeRenderBranchGridHtml(alloc, available) {
     const paragonTipHtml = showParagon && typeof bkmpUiTooltipHtml === 'function'
       ? bkmpUiTooltipHtml('Kostet dieselben Prestige-Punkte wie der Baum oben - keine eigene Währung. Jeder Paragon-Rang gibt nur 4% des normalen Bonus, dafür ohne Maximum (bis Rang 1.000).', paragonTipId)
       : '';
+    /* Spieler-Wunsch (04.08.2026, siehe Kommentar bei BKMP_RAID_AUTO_JOIN_
+       ENABLED_KEY in bkmp-raid.js): eigener, jederzeit erreichbarer Ein/Aus-
+       Schalter fuer genau diesen einen Knoten, sobald er gekauft ist -
+       lebt bewusst hier an der Knotenkarte statt am nur waehrend der kurzen
+       Vorbereitungsphase sichtbaren Raid-Beitritts-Banner. */
+    const showRaidAutoJoinToggle = def.id === 'automatischer_bosskampf' && maxed && typeof bkmpRaidAutoJoinEnabledGet === 'function';
     return `
       <div class="idle-upgrade-card${def.serverSyncRequired ? ' idle-prestige-needs-sql' : ''}">
         <div class="idle-upgrade-icon">${def.icon}</div>
         <div class="idle-upgrade-name">${escapeHtml(def.name)} <span class="idle-upgrade-level">Rang ${rank}${maxed ? ' (Max)' : '/' + def.maxRank}</span></div>
         <div class="idle-upgrade-desc">${escapeHtml(def.desc)}</div>
         ${showParagon ? `<div class="idle-prestige-paragon-row"><span class="idle-prestige-paragon-label">🌠 Paragon-Rang ${bkmpIdleFormatNumber(paragonRank)}${paragonMaxed ? ' (Max)' : '/' + bkmpIdleFormatNumber(BKMP_PRESTIGE_PARAGON_MAX_RANK)}</span><button type="button" class="idle-prestige-paragon-info" data-tooltip-id="${paragonTipId}" aria-label="Was ist Paragon?">?</button>${paragonTipHtml}</div>` : ''}
+        ${showRaidAutoJoinToggle ? `<label class="idle-autobuy-toggle idle-prestige-raidjoin-toggle"><input type="checkbox" class="idle-prestige-raidjoin-checkbox" ${bkmpRaidAutoJoinEnabledGet() ? 'checked' : ''}><span>Automatisch beitreten</span></label>` : ''}
         <button type="button" class="btn-ja idle-prestige-buy" data-prestige-id="${def.id}" ${maxed || !affordable ? 'disabled' : ''}>
           ${maxed ? 'Maximal' : `🌌 ${bkmpIdleFormatNumber(cost)}`}
         </button>

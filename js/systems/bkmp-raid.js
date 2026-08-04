@@ -1,14 +1,18 @@
 // Bkmp - Redesign Phase 2a (17.07.): mechanisch aus idledorf.js extrahiert (mit einem AST-Parser exakt abgegrenzt, keine Logik veraendert). js/systems/bkmp-raid.js
 
 let bkmpRaidLastClickAt = 0;
-/* App-Modus (Phase 16): echter Tap-Schaden-Zaehler fuer die aktuelle
-   Raid-Teilnahme (kein Fake-Wert - Summe der tatsaechlich per Tipp auf
-   den Boss ausgeteilten clickDamage-Betraege, siehe
-   bkmpRaidHandleBossClick weiter unten). Setzt sich automatisch zurueck,
-   sobald bkmpRaidRenderCombat() eine neue Raid-Id sieht (naechster Raid
-   = neue Zaehlung). Auf der normalen Website ungenutzt (kein Element mit
-   diesen IDs vorhanden), daher folgenlos. */
-let bkmpRaidTapDamageSession = 0;
+/* Echter Klick-/Tipp-Zaehler fuer die aktuelle Raid-Teilnahme (kein
+   Fake-Wert - Anzahl der tatsaechlich per Tipp auf den Boss ausgefuehrten
+   manuellen Angriffe, siehe bkmpRaidHandleBossClick weiter unten). Setzt
+   sich automatisch zurueck, sobald bkmpRaidRenderCombat() eine neue Raid-Id
+   sieht (naechster Raid = neue Zaehlung).
+   Spieler-Feedback (04.08.2026, ChronoKora, Screenshot der Kampfleiste):
+   zaehlte hier urspruenglich die kumulierte TIPP-SCHADENSSUMME statt der
+   Klick-ANZAHL - redundant zur bereits direkt darunter angezeigten Liste
+   der einzelnen Schadenswerte pro Treffer. Umbenannt+umgestellt auf einen
+   reinen Klick-Zaehler (+1 pro Klick statt +clickDamage), damit die Anzeige
+   tatsaechlich eine neue, bisher fehlende Information zeigt. */
+let bkmpRaidTapClickSession = 0;
 let bkmpRaidTapDamageSessionId = null;
 let bkmpRaidClickBurst = [];
 const BKMP_RAID_CLICK_LOCK_KEY = 'bkmp-raid-click-locked-until';
@@ -144,6 +148,30 @@ function bkmpRaidHasJoined(raidId) {
 function bkmpRaidMarkJoined(raidId) {
   try { localStorage.setItem(BKMP_RAID_JOINED_KEY_PREFIX + raidId, '1'); } catch (e) {}
   bkmpRaidJoinedId = raidId;
+}
+
+/* Spieler-Wunsch (04.08.2026, BagonTr01 im Feedback-Discord: "ist irgendwie
+   ne Moeglichkeit das man das automatische Bossbeitreten [beim stuendlichen
+   Weltboss] an und ausschalten kann?"): der Prestige-Knoten "Automatischer
+   Bosskampf" (auto_raid_join_unlock, bkmp-prestige.js) loeste bisher
+   IMMER+dauerhaft einen automatischen Beitritt aus, sobald er einmal gekauft
+   war (siehe bkmpIdleRunAutomationToggles(), idledorf.js) - keine
+   Moeglichkeit, das nach dem Kauf wieder abzuschalten. Rein lokaler
+   Ein/Aus-Schalter (localStorage, identisches Prinzip wie die Runen-
+   Hintergrund-Automatik-Schalter in bkmp-runes.js) - Default TRUE (nicht
+   FALSE wie bei den Runen-Schaltern), damit sich am bisherigen Verhalten fuer
+   alle, die den Knoten bereits gekauft haben, nichts aendert, bis sie aktiv
+   abschalten. Checkbox sitzt direkt an der Knotenkarte im Prestige-Baum
+   (bkmpPrestigeRenderBranchGridHtml) - dort, nicht am (nur waehrend der
+   ~5-Minuten-Vorbereitungsphase sichtbaren) Beitritts-Banner, weil der
+   Schalter jederzeit erreichbar sein soll, nicht nur in diesem schmalen
+   Zeitfenster. */
+const BKMP_RAID_AUTO_JOIN_ENABLED_KEY = 'bkmp-raid-auto-join-enabled';
+function bkmpRaidAutoJoinEnabledGet() {
+  try { return localStorage.getItem(BKMP_RAID_AUTO_JOIN_ENABLED_KEY) !== '0'; } catch (e) { return true; }
+}
+function bkmpRaidAutoJoinEnabledSet(on) {
+  try { localStorage.setItem(BKMP_RAID_AUTO_JOIN_ENABLED_KEY, on ? '1' : '0'); } catch (e) {}
 }
 
 /* FEHLER-FIX (Spieler-Report 14.07.: "Er hat gerade den Welt-Raidboss
@@ -524,26 +552,27 @@ function bkmpRaidRenderCombat() {
     const info = bkmpRaidGetPhaseInfo();
     timerEl.textContent = info.phase === 'fight' ? '⏳ ' + bkmpRaidFormatCountdown(info.msUntilFightEnd) : '';
   }
-  /* Tap-Schaden-Zaehler pro Raid zuruecksetzen (neue Raid-Id seit letztem
-     Render = neuer Kampf) und zusammen mit der Ressourcen-Leiste rendern -
-     beides rein lesend aus bereits vorhandenem State.
+  /* Klick-Zaehler pro Raid zuruecksetzen (neue Raid-Id seit letztem Render
+     = neuer Kampf) und zusammen mit der Ressourcen-Leiste rendern - beides
+     rein lesend aus bereits vorhandenem State.
      Bug gefunden 01.08.2026 (Spieler-Nachfrage "Klickzaehler funktioniert
      nicht"): dieser Block stand bisher hinter "if (window.BKMP_APP_MODE)"
      - der urspruengliche Kommentar behauptete, die Elemente existierten
      auf der normalen Website nicht, das stimmt aber nicht (#raidTapDamagePill/
      #raidRewardsStrip stehen unconditional in index.html, .raid-action-bar
      ist seit Redesign Phase 5 IMMER sichtbar, siehe Kommentar dort). Jeder
-     Klick zaehlte serverseitig+intern (bkmpRaidTapDamageSession) also
-     schon immer korrekt mit, nur die Anzeige aktualisierte sich auf der
-     normalen Website nie - exakt dasselbe Bugmuster wie der bereits am
-     19.07. gefixte #raidAttackBtn (siehe Kommentar in idledorf.js). Fix:
+     Klick zaehlte serverseitig+intern schon immer korrekt mit, nur die
+     Anzeige aktualisierte sich auf der normalen Website nie - exakt
+     dasselbe Bugmuster wie der frueher separate #raidAttackBtn (siehe
+     Kommentar in idledorf.js, inzwischen komplett entfernt - reine
+     Redundanz zum bereits klickbaren Boss-Sprite/zur Leertaste). Fix:
      unconditional, Elementpruefung statt App-Modus-Abhaengigkeit. */
   if (bkmpRaidState.id !== bkmpRaidTapDamageSessionId) {
     bkmpRaidTapDamageSessionId = bkmpRaidState.id;
-    bkmpRaidTapDamageSession = 0;
+    bkmpRaidTapClickSession = 0;
   }
   const tapVal = document.querySelector('#raidTapDamagePill .idle-res-val');
-  if (tapVal) tapVal.textContent = bkmpIdleFormatNumber(bkmpRaidTapDamageSession);
+  if (tapVal) tapVal.textContent = bkmpIdleFormatNumber(bkmpRaidTapClickSession);
   const strip = document.getElementById('raidRewardsStrip');
   if (strip && bkmpIdleState) {
     strip.innerHTML = `
@@ -776,7 +805,7 @@ function bkmpRaidHandleBossClick() {
 
   const isCrit = Math.random() * 100 < bkmpIdleEffectiveStats.critChance;
   const clickDamage = bkmpIdleApplyBossDamageBonus(Math.max(1, Math.round(bkmpIdleEffectiveStats.attack * (0.12 + (bkmpIdleEffectiveStats.clickDamagePct || 0) / 100) * (isCrit ? Math.max(1, bkmpIdleEffectiveStats.critDamage / 100) : 1))));
-  bkmpRaidTapDamageSession += clickDamage;
+  bkmpRaidTapClickSession += 1;
   bkmpRaidSpawnFx('raid-fx-magic', 'raidBoss', clickDamage, isCrit);
   bkmpRaidHitFlash('raidBoss');
   submitRaidDamage(bkmpRaidState.id, clickDamage, isCrit, true).then(result => {
