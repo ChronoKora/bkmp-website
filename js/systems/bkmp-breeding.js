@@ -10,7 +10,13 @@
    laufen serverseitig (raid_finish/claim_epic_dragon_egg). */
 let bkmpDragonSpeciesCatalog = [];
 let bkmpDragonUiEggFilter = null;
-let bkmpDragonLagerFilter = { rarity: 'all', stage: 'all', favoritesOnly: false, sort: 'rarity' };
+/* Nutzerwunsch (05.08.2026): "diese Sortierung entfernen. Einfach nur
+   Buttons mit Legendäre/Epische/Seltene... neben Favoriten" - ersetzt die
+   vorherigen 3 <select>-Dropdowns (Seltenheit/Stufe/Sortierung) durch 3
+   einfache Umschalt-Knoepfe + den bereits bestehenden Favoriten-Schalter.
+   stage/sort waren nur ueber die jetzt entfernten Dropdowns aenderbar -
+   Sortierung ist seitdem fest auf Seltenheit (war ohnehin der Standard). */
+let bkmpDragonLagerFilter = { rarity: 'all', favoritesOnly: false };
 
 /* Kosten fuer Nest 2-5 (Index 0 = Nest 1, immer 0/automatisch frei) -
    deutlich steigend wie vom Spieler vorgegeben ("Nest 5: besonders teuer"). */
@@ -42,6 +48,18 @@ const BKMP_DRAGON_SUBSTAT_POOL = [
   { key: 'meat_bonus_pct', label: 'Fleischproduktion', suffix: '%', min: 2, max: 6 },
   { key: 'dragon_xp_bonus_pct', label: 'Drachen-EP', suffix: '%', min: 2, max: 6 }
 ];
+/* Icons fuer die Gesamtbonus-Anzeige (05.08.2026, siehe
+   bkmpDragonRenderCompanionStatsBlockHtml) - orientieren sich an bereits
+   im Projekt etablierten Emoji-Konventionen fuer dieselben Konzepte
+   (bkmpIdleResourceEmoji: gold=💰/crystals=💎; "🍎🥩 Vorräte"-Ueberschrift;
+   "🐲 +N Kampf-EP"-Chip in der Offline-Fortschritts-Karte), keine neuen
+   Erfindungen. */
+const BKMP_DRAGON_SUBSTAT_ICONS = {
+  attack_pct: '⚔️', defense_pct: '🛡️', hp_pct: '❤️',
+  crit_chance_pct: '🎯', crit_damage_pct: '💥', attack_speed_pct: '⚡',
+  shield_regen: '🔰', gold_find_pct: '💰', crystal_bonus_pct: '💎',
+  fruit_bonus_pct: '🍎', meat_bonus_pct: '🥩', dragon_xp_bonus_pct: '🐲'
+};
 const BKMP_DRAGON_MAIN_STAT_KEYS = ['attack', 'defense', 'hp'];
 /* Basiswerte fuer die Hauptwert-Wuerfelung, skaliert mit Seltenheit
    (mult uebernimmt die bestehende Runen-Raritaets-Skala 1/1.6/2.4/3.4,
@@ -421,17 +439,67 @@ async function bkmpDragonEvolveToTeen(dragonId) {
   bkmpIdleRenderDragonsPanel();
 }
 
-/* ---------------- Begleiter + Kampferfahrung (Jugendlich -> Erwachsen) ---------------- */
+/* ---------------- Begleiter + Kampferfahrung (Jugendlich -> Erwachsen) ----------------
+   Mehrere gleichzeitige Kampf-Begleiter (05.08.2026, Spieler-Idee MCSoGGe -
+   siehe ausfuehrlichen Kommentar beim neuen Prestige-Knoten "weitere_
+   gefaehrten" in bkmp-prestige.js). Zwei GETRENNTE "is_companion"-Konzepte
+   teilen sich weiterhin dasselbe boolesche Feld, bleiben aber unabhaengig:
+   - JUGENDLICHE Drachen: weiterhin GENAU EINER gleichzeitig (waechst
+     gerade heran, sammelt Kampf-EP - siehe bkmpDragonGrantCompanionBattleXp,
+     unveraendert seit vor diesem Feature) - zaehlt NICHT gegen das neue
+     Platz-Limit unten, komplett unabhaengig davon co-existierbar.
+   - ERWACHSENE Drachen: bis zu bkmpDragonMaxCompanionSlots() (1-3, je nach
+     Prestige-Rang von "weitere_gefaehrten") gleichzeitig ausruestbar -
+     tragen ALLE zum Kampf bei, aber mit abnehmendem Gewicht je nach
+     RECHNERISCHER STAERKE (nicht Ausruestungs-Reihenfolge) - siehe
+     bkmpDragonActiveCompanions()/BKMP_DRAGON_COMPANION_SLOT_WEIGHTS. Auto-
+     Sortierung nach Staerke statt manueller Slot-Wahl: verhindert, dass ein
+     Spieler versehentlich seinen staerksten Drachen in den schwachen Rang
+     "einsortiert" - das Spiel raeumt automatisch immer den staerksten in
+     Rang 1 (100%). */
+const BKMP_DRAGON_COMPANION_SLOT_WEIGHTS = [1, 0.5, 0.25];
+function bkmpDragonMaxCompanionSlots() {
+  const bonus = typeof bkmpDragonPrestigeBonus === 'function' ? bkmpDragonPrestigeBonus('companion_slot_bonus') : 0;
+  return 1 + Math.max(0, Math.min(2, Math.round(Number(bonus) || 0)));
+}
+/* Rangliste der aktuell wirksamen erwachsenen Kampf-Begleiter (staerkster
+   zuerst, auf bkmpDragonMaxCompanionSlots() gekappt) - dieselbe einfache
+   Staerkeformel wie die bestehende "Sortieren: Staerke"-Option im
+   Drachenlager-Filter (bewusst OHNE Aufstiegs-Bonus, damit die Reihenfolge
+   hier optisch mit dem, was der Spieler im Sortier-Dropdown sieht,
+   uebereinstimmt). */
+function bkmpDragonActiveCompanions() {
+  const maxSlots = bkmpDragonMaxCompanionSlots();
+  const strength = d => Number(d.stat_attack || 0) + Number(d.stat_defense || 0) + Number(d.stat_hp || 0) / 10;
+  return bkmpPlayerDragons
+    .filter(d => d.is_companion && d.stage === 'adult')
+    .slice()
+    .sort((a, b) => strength(b) - strength(a))
+    .slice(0, maxSlots);
+}
 async function bkmpDragonSetCompanion(dragonId) {
-  const current = bkmpPlayerDragons.find(d => d.is_companion);
-  if (current && current.id === dragonId) return;
-  try {
-    if (current) { current.is_companion = false; await updatePlayerDragon(current.id, { is_companion: false }); }
-    const dragon = bkmpPlayerDragons.find(d => d.id === dragonId);
-    if (dragon && (dragon.stage === 'teen' || dragon.stage === 'adult')) {
-      dragon.is_companion = true;
-      await updatePlayerDragon(dragon.id, { is_companion: true });
+  const dragon = bkmpPlayerDragons.find(d => d.id === dragonId);
+  if (!dragon || dragon.is_companion) return;
+  if (dragon.stage === 'adult') {
+    const equippedAdults = bkmpPlayerDragons.filter(d => d.is_companion && d.stage === 'adult').length;
+    const maxSlots = bkmpDragonMaxCompanionSlots();
+    if (equippedAdults >= maxSlots) {
+      if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`🐲 Maximal ${maxSlots} Begleiter gleichzeitig - lege zuerst einen ab (Prestige-Baum: "Weitere Gefährten" schaltet mehr Plätze frei).`, 3800);
+      return;
     }
+  } else if (dragon.stage === 'teen') {
+    // Jugendliche bleiben exklusiv (nur einer waechst gleichzeitig heran) - unabhaengig vom Erwachsenen-Platzlimit oben.
+    const currentTeen = bkmpPlayerDragons.find(d => d.is_companion && d.stage === 'teen');
+    if (currentTeen) {
+      currentTeen.is_companion = false;
+      try { await updatePlayerDragon(currentTeen.id, { is_companion: false }); } catch (e) {}
+    }
+  } else {
+    return;
+  }
+  try {
+    dragon.is_companion = true;
+    await updatePlayerDragon(dragon.id, { is_companion: true });
     bkmpIdleRecomputeEffectiveStats();
     bkmpIdleRenderHud();
     bkmpIdleRenderDragonsPanel();
@@ -440,11 +508,11 @@ async function bkmpDragonSetCompanion(dragonId) {
   }
 }
 
-async function bkmpDragonUnsetCompanion() {
-  const current = bkmpPlayerDragons.find(d => d.is_companion);
-  if (!current) return;
-  current.is_companion = false;
-  try { await updatePlayerDragon(current.id, { is_companion: false }); } catch (e) {}
+async function bkmpDragonUnsetCompanion(dragonId) {
+  const dragon = bkmpPlayerDragons.find(d => d.id === dragonId && d.is_companion);
+  if (!dragon) return;
+  dragon.is_companion = false;
+  try { await updatePlayerDragon(dragon.id, { is_companion: false }); } catch (e) {}
   bkmpIdleRecomputeEffectiveStats();
   bkmpIdleRenderHud();
   bkmpIdleRenderDragonsPanel();
@@ -472,15 +540,21 @@ function bkmpDragonGrantCompanionBattleXp(amount) {
   if (typeof bkmpIdleRefreshLiveTabs === 'function') bkmpIdleRefreshLiveTabs();
 }
 
-/* Nebenwert-Bonus eines aktiven erwachsenen Begleiters fuer NICHT im
-   allgemeinen Stat-Topf gefuehrte Schluessel (Fruechte/Fleisch/Drachen-EP) -
-   die anderen 8 Sub-Stat-Typen laufen stattdessen ganz normal durch
-   bkmpIdleDragonCompanionEffectTotals()/t() wie Runen-Sub-Stats. */
+/* Nebenwert-Bonus ALLER aktiven erwachsenen Begleiter (05.08.2026: bis zu
+   3 statt nur 1, siehe bkmpDragonActiveCompanions weiter unten) fuer NICHT
+   im allgemeinen Stat-Topf gefuehrte Schluessel (Fruechte/Fleisch/Drachen-
+   EP) - die anderen 8 Sub-Stat-Typen laufen stattdessen ganz normal durch
+   bkmpIdleDragonCompanionEffectTotals()/t() wie Runen-Sub-Stats. Jeder
+   Begleiter traegt gewichtet nach seinem Rang bei (100%/50%/25%), exakt
+   dasselbe Prinzip wie dort. */
 function bkmpDragonSubstatBonus(key) {
-  const dragon = bkmpPlayerDragons.find(d => d.is_companion && d.stage === 'adult');
-  if (!dragon) return 0;
-  const entry = (dragon.substats || []).find(s => s.stat === key);
-  return entry ? Number(entry.value || 0) : 0;
+  let total = 0;
+  bkmpDragonActiveCompanions().forEach((dragon, idx) => {
+    const weight = BKMP_DRAGON_COMPANION_SLOT_WEIGHTS[idx] || 0;
+    const entry = (dragon.substats || []).find(s => s.stat === key);
+    if (entry) total += Number(entry.value || 0) * weight;
+  });
+  return total;
 }
 
 async function bkmpDragonEvolveToAdult(dragonId) {
@@ -905,7 +979,14 @@ function bkmpDragonOpenDetail(dragonId) {
   document.getElementById('idleDragonDetailStats').innerHTML = dragon.stage === 'adult'
     ? `<div>${bkmpDragonMainStatLine(dragon) || '–'}</div>${substatsHtml}`
     : '<div class="idle-skin-desc">Werte werden erst als erwachsener Drache enthüllt.</div>';
-  document.getElementById('idleDragonDetailCompanion').textContent = dragon.is_companion ? '✅ Aktiver Begleiter' : '';
+  const companionRankIdx = dragon.is_companion && dragon.stage === 'adult' ? bkmpDragonActiveCompanions().findIndex(c => c.id === dragon.id) : -1;
+  document.getElementById('idleDragonDetailCompanion').textContent = !dragon.is_companion
+    ? ''
+    : companionRankIdx >= 0
+      ? `✅ Aktiver Begleiter - Rang ${companionRankIdx + 1} (${Math.round((BKMP_DRAGON_COMPANION_SLOT_WEIGHTS[companionRankIdx] || 0) * 100)}% Wirkung)`
+      : dragon.stage === 'adult'
+        ? '⚠️ Als Begleiter markiert, aber Platzlimit erreicht - trägt aktuell nicht bei'
+        : '✅ Wächst gerade als Begleiter heran';
   overlay.classList.add('visible');
   document.body.classList.add('modal-open');
   const closeBtn = document.getElementById('idleDragonDetailCloseBtn');
@@ -1018,20 +1099,31 @@ function bkmpIdleRollAdultDragonStats(species) {
    drachenmacht/maechtige_abstammung/aktiver_begleiter multiplizieren die
    VOM BEGLEITER SELBST beigetragenen Werte (nicht die des Spielers
    insgesamt) - passive_bindung speist stattdessen direkt in die
-   Dorf-Regeneration (siehe bkmpIdleRecomputeEffectiveStats, villageRegenPct). */
+   Dorf-Regeneration (siehe bkmpIdleRecomputeEffectiveStats, villageRegenPct).
+
+   Mehrere gleichzeitige Begleiter (05.08.2026): summiert jetzt ueber ALLE
+   von bkmpDragonActiveCompanions() gelieferten (bis zu 3, nach Staerke
+   sortierten) erwachsenen Begleiter, jeder gewichtet nach seinem Rang
+   (BKMP_DRAGON_COMPANION_SLOT_WEIGHTS: 100%/50%/25%) - bei genau einem
+   aktiven Begleiter (unveraendert der Normalfall ohne den neuen Prestige-
+   Knoten) ist das Ergebnis rechnerisch IDENTISCH zur alten Fassung (Gewicht
+   1 auf Rang 1), keine Regression fuer bestehende Spieler/Tests. */
 function bkmpIdleDragonCompanionEffectTotals() {
   const totals = {};
-  const dragon = bkmpPlayerDragons.find(d => d.is_companion && d.stage === 'adult');
-  if (!dragon) return totals;
+  const companions = bkmpDragonActiveCompanions();
+  if (!companions.length) return totals;
   const prestigeTotals = typeof bkmpPrestigeEffectTotals === 'function' ? bkmpPrestigeEffectTotals(bkmpPrestigeState ? bkmpPrestigeState.prestige_allocations : null) : {};
   /* Gilden-Technologie-Zweig "Drachenzucht" (01.08.2026, Nutzerwunsch nach
      eigenem Angriff/Verteidigung/Leben-Zweig fuer Begleitdrachen) - drei
      unabhaengige Wurzelknoten (guildCompanionAttackPct/-DefensePct/-HpPct)
      + eine Zusammenfuehrung (guildCompanionAllStatPct, wirkt auf alle drei
      gleichzeitig, identisches Prinzip wie companion_all_stat_pct im
-     Prestige-Baum). Gilt wie die Prestige-Gegenstuecke NUR, solange ein
-     erwachsener Begleitdrache aktiv ist - ergibt sich automatisch aus dem
-     bereits bestehenden fruehen Ausstieg oben, keine eigene Pruefung noetig. */
+     Prestige-Baum). Gilt wie die Prestige-Gegenstuecke NUR, solange
+     MINDESTENS EIN erwachsener Begleitdrache aktiv ist - ergibt sich
+     automatisch aus dem bereits bestehenden fruehen Ausstieg oben, keine
+     eigene Pruefung noetig. Diese Boni selbst sind Spieler-seitige
+     Multiplikatoren (nicht pro Begleiter unterschiedlich), gelten also
+     gleichermassen fuer jeden aktiven Rang. */
   const guildBonus = key => Math.min(200, typeof bkmpGuildTechBonus === 'function' ? bkmpGuildTechBonus(key) : 0);
   const guildAllStatPct = guildBonus('guildCompanionAllStatPct');
   const mainStatBoostPct = Math.min(200, (prestigeTotals.companion_stat_pct || 0) + (prestigeTotals.companion_all_stat_pct || 0));
@@ -1039,22 +1131,239 @@ function bkmpIdleDragonCompanionEffectTotals() {
   const defenseBoostPct = mainStatBoostPct + guildBonus('guildCompanionDefensePct') + guildAllStatPct;
   const hpBoostPct = mainStatBoostPct + guildBonus('guildCompanionHpPct') + guildAllStatPct;
   const substatBoostPct = Math.min(200, prestigeTotals.companion_all_stat_pct || 0);
-  if (dragon.stat_attack) totals.attack_flat = (totals.attack_flat || 0) + bkmpDragonAscendedMainStat(dragon, dragon.stat_attack) * (1 + attackBoostPct / 100);
-  if (dragon.stat_defense) totals.defense_flat = (totals.defense_flat || 0) + bkmpDragonAscendedMainStat(dragon, dragon.stat_defense) * (1 + defenseBoostPct / 100);
-  if (dragon.stat_hp) totals.hp_flat = (totals.hp_flat || 0) + bkmpDragonAscendedMainStat(dragon, dragon.stat_hp) * (1 + hpBoostPct / 100);
-  (dragon.substats || []).forEach(s => {
-    if (['fruit_bonus_pct', 'meat_bonus_pct', 'dragon_xp_bonus_pct'].includes(s.stat)) return;
-    totals[s.stat] = (totals[s.stat] || 0) + Number(s.value || 0) * (1 + substatBoostPct / 100);
+  companions.forEach((dragon, idx) => {
+    const weight = BKMP_DRAGON_COMPANION_SLOT_WEIGHTS[idx] || 0;
+    if (dragon.stat_attack) totals.attack_flat = (totals.attack_flat || 0) + bkmpDragonAscendedMainStat(dragon, dragon.stat_attack) * (1 + attackBoostPct / 100) * weight;
+    if (dragon.stat_defense) totals.defense_flat = (totals.defense_flat || 0) + bkmpDragonAscendedMainStat(dragon, dragon.stat_defense) * (1 + defenseBoostPct / 100) * weight;
+    if (dragon.stat_hp) totals.hp_flat = (totals.hp_flat || 0) + bkmpDragonAscendedMainStat(dragon, dragon.stat_hp) * (1 + hpBoostPct / 100) * weight;
+    (dragon.substats || []).forEach(s => {
+      if (['fruit_bonus_pct', 'meat_bonus_pct', 'dragon_xp_bonus_pct'].includes(s.stat)) return;
+      totals[s.stat] = (totals[s.stat] || 0) + Number(s.value || 0) * (1 + substatBoostPct / 100) * weight;
+    });
   });
   return totals;
 }
 /* Passive Bindung (Prestige, Zweig Drachen) - Bonus existiert nur, solange
-   ein erwachsener Begleitdrache aktiv ist, siehe Kommentar oben. */
+   MINDESTENS EIN erwachsener Begleitdrache aktiv ist (reiner Anwesenheits-
+   Schalter, kein pro-Begleiter-Stat - deshalb unabhaengig von der Anzahl
+   IMMER der volle Prestige-Wert, kein Gewichten noetig). */
 function bkmpDragonCompanionPassiveRegenPct() {
-  const dragon = bkmpPlayerDragons.find(d => d.is_companion && d.stage === 'adult');
-  if (!dragon) return 0;
+  if (!bkmpDragonActiveCompanions().length) return 0;
   const prestigeTotals = typeof bkmpPrestigeEffectTotals === 'function' ? bkmpPrestigeEffectTotals(bkmpPrestigeState ? bkmpPrestigeState.prestige_allocations : null) : {};
   return Number(prestigeTotals.companion_passive_regen_pct || 0);
+}
+
+/* Begleiter-Leiste (05.08.2026, Spieler-Idee MCSoGGe + Nutzerwunsch nach
+   einer sichtbaren, an anderen Idle-/Sammel-RPGs orientierten Slot-Leiste
+   statt eines reinen Text-Hinweises - siehe Kommentar bei
+   bkmpDragonMaxCompanionSlots): drei feste Plaetze oben im Drachenzucht-
+   Tab, GENAU nach dem in dieser Sitzung recherchierten Genre-Standard
+   (Idle Heroes/AFK-Arena-artige Spiele): gefuellter Slot = Portrait +
+   Rang-Prozent-Abzeichen + kleiner Ablegen-Knopf, freier aber
+   freigeschalteter Slot = gestrichelter "+"-Platzhalter, noch gesperrter
+   Slot = Schloss-Symbol + Freischalt-Hinweis statt eines leeren Platzes
+   (kommuniziert direkt, DASS es mehr gibt, nicht nur DASS gerade nichts
+   drin ist). Bewusst als eigener, kompakter Abschnitt GANZ OBEN im Tab
+   (nicht in der immer sichtbaren Kampf-HUD - die wurde in Phase 7.1 gezielt
+   verschlankt, ein dauerhafter neuer Zeilen-Zuwachs dort haette genau das
+   wieder aufgeweicht). */
+/* Nachbesserung (05.08.2026, direkter Nutzerwunsch nach dem ersten
+   Screenshot): (1) ein 4. Block MIT Abstand neben den 3 Kampf-Plaetzen fuer
+   den jugendlichen "trainieren"-Begleiter - ersetzt die vorherige reine
+   Textzeile darunter, gleiche Optik wie die 3 Kampf-Slots, aber eigenes
+   Icon (🐣) und klar erkennbar getrennt (eigene Flex-Gruppe mit groesserem
+   Gap). (2) jeder nicht gesperrte Slot ist jetzt anklickbar und oeffnet ein
+   kompaktes Auswahlfenster (bkmpDragonOpenCompanionPicker) mit ALLEN
+   passenden Drachen, statt dass man dafuer im Lager weiter unten scrollen
+   muss. */
+function bkmpDragonRenderCompanionSlotBarHtml(activeCompanions, maxSlots, teenCompanion) {
+  const combatSlots = [0, 1, 2].map(i => {
+    if (i >= maxSlots) {
+      return `
+        <div class="idle-dragon-companion-slot is-locked" title="Weiteren Platz im Prestige-Baum unter „Weitere Gefährten" (Vermächtnis) freischalten">
+          <div class="idle-dragon-companion-slot-icon">🔒</div>
+          <div class="idle-dragon-companion-slot-label">Gesperrt</div>
+        </div>`;
+    }
+    const dragon = activeCompanions[i];
+    if (!dragon) {
+      return `
+        <div class="idle-dragon-companion-slot is-empty idle-dragon-companion-slot-pickable" data-picker-stage="adult">
+          <div class="idle-dragon-companion-slot-icon">➕</div>
+          <div class="idle-dragon-companion-slot-label">Platz ${i + 1} frei</div>
+        </div>`;
+    }
+    const species = bkmpDragonSpeciesById(dragon.species_id) || {};
+    const rarity = bkmpDragonRarityMeta(species.rarity);
+    const weightPct = Math.round((BKMP_DRAGON_COMPANION_SLOT_WEIGHTS[i] || 0) * 100);
+    return `
+      <div class="idle-dragon-companion-slot is-filled idle-dragon-companion-slot-pickable" data-picker-stage="adult" style="--dragon-rarity-color:${rarity.color}" data-dragon-id="${dragon.id}">
+        <button type="button" class="idle-dragon-companion-slot-remove" data-dragon-id="${dragon.id}" title="Ablegen">×</button>
+        ${bkmpDragonThumbHtml(bkmpDragonStageImage(species, 'adult'), escapeHtml(species.name || ''))}
+        <div class="idle-dragon-companion-slot-name">${escapeHtml(species.name || '')}</div>
+        <div class="idle-dragon-companion-slot-rank">${i === 0 ? '⭐ ' : ''}${weightPct}%</div>
+      </div>`;
+  }).join('');
+
+  const teenSlot = teenCompanion
+    ? (() => {
+        const species = bkmpDragonSpeciesById(teenCompanion.species_id) || {};
+        const rarity = bkmpDragonRarityMeta(species.rarity);
+        const pct = species.battle_xp_required ? Math.min(100, Math.round((teenCompanion.battle_xp / species.battle_xp_required) * 100)) : 0;
+        return `
+          <div class="idle-dragon-companion-slot is-filled is-teen-slot idle-dragon-companion-slot-pickable" data-picker-stage="teen" style="--dragon-rarity-color:${rarity.color}" data-dragon-id="${teenCompanion.id}">
+            <button type="button" class="idle-dragon-companion-slot-remove" data-dragon-id="${teenCompanion.id}" title="Ablegen">×</button>
+            ${bkmpDragonThumbHtml(bkmpDragonStageImage(species, 'teen'), escapeHtml(species.name || ''))}
+            <div class="idle-dragon-companion-slot-name">${escapeHtml(species.name || '')}</div>
+            <div class="idle-dragon-companion-slot-rank">🐣 ${pct}%</div>
+          </div>`;
+      })()
+    : `
+      <div class="idle-dragon-companion-slot is-empty is-teen-slot idle-dragon-companion-slot-pickable" data-picker-stage="teen">
+        <div class="idle-dragon-companion-slot-icon">🐣</div>
+        <div class="idle-dragon-companion-slot-label">Trainieren</div>
+      </div>`;
+
+  return `
+    <div class="idle-dragon-companion-row">
+      <div class="idle-dragon-companion-bar">
+        <div class="idle-dragon-companion-combat-group">${combatSlots}</div>
+        <div class="idle-dragon-companion-teen-wrap">${teenSlot}</div>
+      </div>
+      ${bkmpDragonRenderCompanionStatsBlockHtml()}
+    </div>`;
+}
+
+/* Stats-Block (05.08.2026, Nutzerwunsch: "hier muss die Stats stylisch
+   angezeigt werden... Links oder rechts 1 einzelnen Block wo nur die Stats
+   stehen" - nach kurzer Genre-Recherche (Tactics-RPG-Stat-Panels: Icon +
+   Bezeichnung + Wert je Zeile, siehe Chat-Verlauf) rechts neben der
+   Begleiter-Leiste). Zeigt bewusst NICHT die Rohwerte eines einzelnen
+   Drachens (die stehen bereits auf jeder Lager-Karte), sondern den
+   TATSAECHLICH WIRKSAMEN Gesamtbonus aus bkmpIdleDragonCompanionEffectTotals()
+   - also inkl. Gewichtung (100/50/25%) UND aller Prestige-/Gilden-Tech-Boni.
+   Das ist die fuer den Spieler eigentlich relevante Zahl ("was bringt mir
+   das System gerade"), nicht nur eine Kopie vorhandener Karteninfos.
+
+   Bugfix (05.08.2026, Nutzerwunsch nach Screenshot-Vergleich: "Da fehlen
+   aber noch so paar Bonuse" - die Drachen-Detailkarte zeigte Substat-Boni
+   wie "Drachen-EP +27.7%"/"Goldbonus +7.1%", der Gesamtbonus-Block aber nur
+   Angriff/Verteidigung/Leben): zeigte bisher ausschliesslich die 3 flachen
+   Hauptwerte, ignorierte aber alle Prozent-Substats vollstaendig - obwohl
+   9 von 12 (siehe BKMP_DRAGON_SUBSTAT_POOL) bereits korrekt gewichtet in
+   `totals` liegen (bkmpIdleDragonCompanionEffectTotals()s substats-Schleife).
+   Die uebrigen 3 (fruit_bonus_pct/meat_bonus_pct/dragon_xp_bonus_pct) sind
+   dort ABSICHTLICH ausgeschlossen (haben ihren eigenen, bereits korrekt
+   gewichteten Zugriffspfad bkmpDragonSubstatBonus(), siehe Kommentar bei
+   BKMP_DRAGON_SUBSTAT_POOL) - werden hier zusaetzlich ueber genau diese
+   Funktion geholt, keine zweite Berechnung. Nur tatsaechlich von >0
+   ausgeruesteten Begleitern beigesteuerte Zeilen werden gezeigt (kein
+   "+0%"-Wall fuer nie gerollte Substat-Typen). */
+function bkmpDragonRenderCompanionStatsBlockHtml() {
+  const totals = typeof bkmpIdleDragonCompanionEffectTotals === 'function' ? bkmpIdleDragonCompanionEffectTotals() : {};
+  const rows = [
+    { icon: '⚔️', label: 'Angriff', value: totals.attack_flat || 0, suffix: '' },
+    { icon: '🛡️', label: 'Verteidigung', value: totals.defense_flat || 0, suffix: '' },
+    { icon: '❤️', label: 'Leben', value: totals.hp_flat || 0, suffix: '' }
+  ];
+  const EXCLUDED_FROM_TOTALS = ['fruit_bonus_pct', 'meat_bonus_pct', 'dragon_xp_bonus_pct'];
+  BKMP_DRAGON_SUBSTAT_POOL.forEach(def => {
+    const value = EXCLUDED_FROM_TOTALS.includes(def.key)
+      ? (typeof bkmpDragonSubstatBonus === 'function' ? bkmpDragonSubstatBonus(def.key) : 0)
+      : Number(totals[def.key] || 0);
+    if (value > 0) rows.push({ icon: BKMP_DRAGON_SUBSTAT_ICONS[def.key] || '✨', label: def.label, value, suffix: def.suffix });
+  });
+  const formatRowValue = r => {
+    if (r.suffix !== '%') return bkmpIdleFormatNumber(Math.round(r.value));
+    const rounded = Math.round(r.value * 10) / 10;
+    return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+  };
+  return `
+    <div class="idle-dragon-companion-stats-block">
+      <div class="idle-dragon-companion-stats-title">Gesamtbonus</div>
+      ${rows.map(r => `
+        <div class="idle-dragon-companion-stat-row">
+          <span class="idle-dragon-companion-stat-icon">${r.icon}</span>
+          <span class="idle-dragon-companion-stat-label">${r.label}</span>
+          <span class="idle-dragon-companion-stat-value">+${formatRowValue(r)}${r.suffix}</span>
+        </div>`).join('')}
+    </div>`;
+}
+
+/* Auswahlfenster (05.08.2026, Nutzerwunsch: "auf Platz 1 drücken kann und
+   alle Erwachsenden Drachen angezeigt werden in einen Kleinen Fenster das
+   man nicht Runterscrollen muss") - wiederverwendet bkmpUiModalHtml()/
+   bkmpUiTrapFocus() (js/ui/bkmp-ui-components.js, Phase 3 - zweiter echter
+   Einsatz im Idle-Dorf nach dem Gilden-Technologie-Beitrags-Modal, gleiches
+   Portal-Muster: document.body.insertAdjacentHTML, KEIN eigener z-index
+   noetig, da spaeter im DOM angehaengt als #idleDorfOverlay -> stapelt sich
+   bei gleicher .joke-overlay-Basis automatisch korrekt darueber). Ein
+   Klick auf eine Zeile schaltet den Begleiter-Status DIREKT um (aus- oder
+   einruesten) - kein zusaetzlicher Bestaetigungsschritt noetig, das ist
+   exakt dieselbe, jederzeit rueckgaengig machbare Aktion wie die
+   bestehenden "Als Begleiter"/"Ablegen"-Knoepfe auf den Lager-Karten. */
+let bkmpDragonCompanionPickerStage = 'adult';
+function bkmpDragonRenderCompanionPickerListHtml(stageFilter) {
+  const dragons = bkmpPlayerDragons.filter(d => d.stage === stageFilter);
+  if (!dragons.length) {
+    return `<p class="idle-skin-empty-hint">${stageFilter === 'adult' ? 'Noch keine erwachsenen Drachen im Lager.' : 'Noch keine jugendlichen Drachen im Lager.'}</p>`;
+  }
+  const activeCombat = stageFilter === 'adult' ? bkmpDragonActiveCompanions() : [];
+  return `<div class="idle-dragon-companion-picker-list">${dragons.map(d => {
+    const species = bkmpDragonSpeciesById(d.species_id);
+    if (!species) return '';
+    const rarity = bkmpDragonRarityMeta(species.rarity);
+    const rankIdx = stageFilter === 'adult' ? activeCombat.findIndex(c => c.id === d.id) : (d.is_companion ? 0 : -1);
+    const statusHtml = rankIdx >= 0
+      ? `<span class="idle-dragon-companion-picker-status is-active">${stageFilter === 'adult' ? `✅ Rang ${rankIdx + 1} · ${Math.round((BKMP_DRAGON_COMPANION_SLOT_WEIGHTS[rankIdx] || 0) * 100)}%` : '✅ Wächst gerade heran'}</span>`
+      : (stageFilter === 'adult' && d.is_companion ? `<span class="idle-dragon-companion-picker-status is-inactive">⚠️ Platzlimit erreicht - trägt nicht bei</span>` : '');
+    const detailLine = stageFilter === 'adult'
+      ? (bkmpDragonMainStatLine(d) || '')
+      : `${bkmpIdleFormatNumber(d.battle_xp)} / ${bkmpIdleFormatNumber(species.battle_xp_required)} Kampf-EP`;
+    return `
+      <div class="idle-dragon-companion-picker-row ${d.is_companion ? 'is-equipped' : ''}" style="--dragon-rarity-color:${rarity.color}" data-dragon-id="${d.id}">
+        ${bkmpDragonThumbHtml(bkmpDragonStageImage(species, d.stage), escapeHtml(species.name))}
+        <div class="idle-dragon-companion-picker-info">
+          <div class="idle-dragon-companion-picker-name">${escapeHtml(species.name)} <small>(${rarity.name})</small></div>
+          <div class="idle-dragon-companion-picker-stats">${escapeHtml(detailLine)}</div>
+          ${statusHtml}
+        </div>
+      </div>`;
+  }).join('')}</div>`;
+}
+function bkmpDragonEnsureCompanionPickerModalInDom() {
+  if (document.getElementById('idleDragonCompanionPickerOverlay')) return;
+  document.body.insertAdjacentHTML('beforeend', bkmpUiModalHtml({
+    id: 'idleDragonCompanionPicker',
+    extraClass: 'idle-dragon-companion-picker-card',
+    titleHtml: '<span id="idleDragonCompanionPickerTitle"></span>',
+    bodyHtml: '<div id="idleDragonCompanionPickerBody"></div>',
+    buttonsHtml: '<button type="button" class="btn-nein" id="idleDragonCompanionPickerCloseBtn">Schließen</button>'
+  }));
+  const overlay = document.getElementById('idleDragonCompanionPickerOverlay');
+  bkmpUiTrapFocus(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('visible'); });
+  document.getElementById('idleDragonCompanionPickerCloseBtn').addEventListener('click', () => overlay.classList.remove('visible'));
+}
+function bkmpDragonRenderCompanionPickerModal() {
+  const titleEl = document.getElementById('idleDragonCompanionPickerTitle');
+  const bodyEl = document.getElementById('idleDragonCompanionPickerBody');
+  if (!titleEl || !bodyEl) return;
+  titleEl.textContent = bkmpDragonCompanionPickerStage === 'adult' ? '⚔️ Kampf-Begleiter wählen' : '🐣 Jugendlichen zum Trainieren wählen';
+  bodyEl.innerHTML = bkmpDragonRenderCompanionPickerListHtml(bkmpDragonCompanionPickerStage);
+  bodyEl.querySelectorAll('.idle-dragon-companion-picker-row').forEach(row => row.addEventListener('click', async () => {
+    const id = row.dataset.dragonId;
+    const dragon = bkmpPlayerDragons.find(d => d.id === id);
+    if (!dragon) return;
+    if (dragon.is_companion) await bkmpDragonUnsetCompanion(id); else await bkmpDragonSetCompanion(id);
+    bkmpDragonRenderCompanionPickerModal();
+  }));
+}
+function bkmpDragonOpenCompanionPicker(stageFilter) {
+  bkmpDragonCompanionPickerStage = stageFilter;
+  bkmpDragonEnsureCompanionPickerModalInDom();
+  bkmpDragonRenderCompanionPickerModal();
+  document.getElementById('idleDragonCompanionPickerOverlay').classList.add('visible');
 }
 
 function bkmpIdleRenderDragonsPanel() {
@@ -1161,7 +1470,9 @@ function bkmpIdleRenderDragonsPanel() {
     : '';
 
   let grown = bkmpPlayerDragons.filter(d => d.stage === 'teen' || d.stage === 'adult');
-  const companion = bkmpPlayerDragons.find(d => d.is_companion);
+  const teenCompanion = bkmpPlayerDragons.find(d => d.is_companion && d.stage === 'teen');
+  const maxCompanionSlots = bkmpDragonMaxCompanionSlots();
+  const activeCompanions = bkmpDragonActiveCompanions();
   const grownTotalCount = grown.length;
   const RARITY_ORDER = ['legendaer', 'episch', 'selten', 'standard'];
   if (bkmpDragonLagerFilter.rarity !== 'all') {
@@ -1170,43 +1481,20 @@ function bkmpIdleRenderDragonsPanel() {
       return sp && sp.rarity === bkmpDragonLagerFilter.rarity;
     });
   }
-  if (bkmpDragonLagerFilter.stage !== 'all') grown = grown.filter(d => d.stage === bkmpDragonLagerFilter.stage);
   if (bkmpDragonLagerFilter.favoritesOnly) grown = grown.filter(d => d.is_favorite);
-  const dragonStrength = d => Number(d.stat_attack || 0) + Number(d.stat_defense || 0) + Number(d.stat_hp || 0) / 10;
   grown = grown.slice().sort((a, b) => {
     const spA = bkmpDragonSpeciesById(a.species_id);
     const spB = bkmpDragonSpeciesById(b.species_id);
-    switch (bkmpDragonLagerFilter.sort) {
-      case 'name': return (spA ? spA.name : '').localeCompare(spB ? spB.name : '');
-      case 'stage': return (b.stage === 'adult' ? 1 : 0) - (a.stage === 'adult' ? 1 : 0);
-      case 'strength': return dragonStrength(b) - dragonStrength(a);
-      case 'date': return Date.parse(b.hatched_at || 0) - Date.parse(a.hatched_at || 0);
-      case 'rarity':
-      default:
-        return RARITY_ORDER.indexOf(spA ? spA.rarity : 'standard') - RARITY_ORDER.indexOf(spB ? spB.rarity : 'standard');
-    }
+    return RARITY_ORDER.indexOf(spA ? spA.rarity : 'standard') - RARITY_ORDER.indexOf(spB ? spB.rarity : 'standard');
   });
+  const RARITY_FILTER_BUTTONS = [
+    { key: 'legendaer', label: 'Legendäre' },
+    { key: 'episch', label: 'Epische' },
+    { key: 'selten', label: 'Seltene' }
+  ];
   const filterBarHtml = `
     <div class="idle-dragon-filter-bar">
-      <select id="idleDragonFilterRarity">
-        <option value="all">Alle Seltenheiten</option>
-        <option value="standard">Standard</option>
-        <option value="selten">Selten</option>
-        <option value="episch">Episch</option>
-        <option value="legendaer">Legendär</option>
-      </select>
-      <select id="idleDragonFilterStage">
-        <option value="all">Alle Stufen</option>
-        <option value="teen">Jugendlich</option>
-        <option value="adult">Erwachsen</option>
-      </select>
-      <select id="idleDragonFilterSort">
-        <option value="rarity">Sortieren: Seltenheit</option>
-        <option value="stage">Sortieren: Entwicklungsstufe</option>
-        <option value="strength">Sortieren: Stärke</option>
-        <option value="name">Sortieren: Name</option>
-        <option value="date">Sortieren: Erhaltungsdatum</option>
-      </select>
+      ${RARITY_FILTER_BUTTONS.map(r => `<button type="button" class="idle-dragon-rarity-filter-btn${bkmpDragonLagerFilter.rarity === r.key ? ' active' : ''}" data-rarity="${r.key}" style="--rarity-filter-color:${bkmpDragonRarityMeta(r.key).color}">${r.label}</button>`).join('')}
       <label class="idle-dragon-filter-fav"><input type="checkbox" id="idleDragonFilterFav" ${bkmpDragonLagerFilter.favoritesOnly ? 'checked' : ''}> ★ nur Favoriten</label>
     </div>`;
   const grownHtml = grown.length
@@ -1218,12 +1506,20 @@ function bkmpIdleRenderDragonsPanel() {
         const pct = isTeen ? Math.min(100, Math.round((d.battle_xp / species.battle_xp_required) * 100)) : 100;
         const canEvolve = isTeen && d.battle_xp >= species.battle_xp_required;
         const substatsHtml = !isTeen ? (d.substats || []).map(s => `<div>${bkmpDragonSubstatLabel(s.stat)} +${s.value}${bkmpDragonSubstatSuffix(s.stat)}</div>`).join('') : '';
+        /* Rang-Abzeichen (05.08.2026, mehrere gleichzeitige Begleiter): nur
+           fuer erwachsene Drachen relevant - bei einem jugendlichen
+           "waechst heran"-Begleiter gibt es keinen Rang/keine Gewichtung. */
+        const companionRankIdx = !isTeen && d.is_companion ? activeCompanions.findIndex(c => c.id === d.id) : -1;
+        const companionRankBadge = companionRankIdx >= 0
+          ? `<div class="idle-dragon-companion-rank-badge">${companionRankIdx === 0 ? '⭐' : ''} Rang ${companionRankIdx + 1} · ${Math.round((BKMP_DRAGON_COMPANION_SLOT_WEIGHTS[companionRankIdx] || 0) * 100)}%</div>`
+          : (!isTeen && d.is_companion ? `<div class="idle-dragon-companion-rank-badge is-inactive">⚠️ Platzlimit erreicht - trägt nicht bei</div>` : '');
         return `
           <div class="idle-skin-card idle-dragon-lager-card ${d.is_companion ? 'idle-skin-card-equipped' : ''}" style="--dragon-rarity-color:${rarity.color}" data-dragon-id="${d.id}">
             ${d.is_favorite ? '<div class="idle-dragon-fav-badge">★</div>' : ''}
             ${bkmpDragonThumbHtml(bkmpDragonStageImage(species, d.stage), escapeHtml(species.name))}
             <div class="idle-skin-name">${escapeHtml(species.name)} <small>(${isTeen ? 'Jugendlich' : 'Erwachsen'})</small></div>
             <div class="idle-skin-desc">${rarity.name}</div>
+            ${companionRankBadge}
             ${isTeen
               ? `<div class="idle-xp-bar"><div class="idle-xp-fill" style="width:${pct}%"></div></div>
                  <div class="idle-xp-label">${bkmpIdleFormatNumber(d.battle_xp)} / ${bkmpIdleFormatNumber(species.battle_xp_required)} Kampf-EP</div>`
@@ -1233,7 +1529,7 @@ function bkmpIdleRenderDragonsPanel() {
             <div class="idle-dragon-actions-row">
               ${d.is_companion
                 ? `<button type="button" class="btn-nein idle-skin-action idle-dragon-uncompanion-btn" data-dragon-id="${d.id}">Ablegen</button>`
-                : `<button type="button" class="btn-ja idle-skin-action idle-dragon-companion-btn" data-dragon-id="${d.id}">Als Begleiter</button>`}
+                : `<button type="button" class="btn-ja idle-skin-action idle-dragon-companion-btn" data-dragon-id="${d.id}" ${!isTeen ? `title="Belegt einen von ${maxCompanionSlots} Kampf-Plätzen"` : ''}>Als Begleiter</button>`}
               <button type="button" class="idle-dragon-fav-btn" data-dragon-id="${d.id}" title="Favorit">${d.is_favorite ? '★' : '☆'}</button>
               <button type="button" class="idle-dragon-release-btn" data-dragon-id="${d.id}" title="Freilassen">🗑️</button>
             </div>
@@ -1244,14 +1540,16 @@ function bkmpIdleRenderDragonsPanel() {
       : `<p class="idle-skin-empty-hint">Kein Drache entspricht diesem Filter.</p>`;
 
   panel.innerHTML = `
+    <div class="idle-dragon-section idle-dragon-companion-section">
+      <h4>🐲 Begleiter im Kampf (${activeCompanions.length}/${maxCompanionSlots})</h4>
+      ${bkmpDragonRenderCompanionSlotBarHtml(activeCompanions, maxCompanionSlots, teenCompanion)}
+    </div>
     <div class="idle-dragon-section">
-      <h4>🍎🥩 Vorräte</h4>
+      <h4>🍎🥩 Vorräte ${typeof bkmpUiTooltipHtml === 'function' ? `<button type="button" class="idle-dragon-vorraete-info" data-tooltip-id="dragonVorraeteTip" aria-label="Wo finde ich Gebäude-Upgrades?">ℹ️</button>${bkmpUiTooltipHtml('Gebäude-Upgrades findest du im Tab "⬆️ Upgrades".', 'dragonVorraeteTip')}` : ''}</h4>
       <p class="idle-skin-desc">
         🌳 Obstgarten Lv.${Number(bkmpIdleState.obstgarten_level || 0)}: ${bkmpIdleFormatNumber(Math.floor(bkmpIdleState.fruit || 0))} / ${bkmpIdleFormatNumber(bkmpDragonResourceCap(bkmpIdleState.obstgarten_level))} Früchte (+${bkmpIdleFormatNumber(bkmpDragonResourceRatePerHour('fruit', bkmpIdleState.obstgarten_level))}/Std.)<br>
         🥩 Jagdhütte Lv.${Number(bkmpIdleState.jagdhuette_level || 0)}: ${bkmpIdleFormatNumber(Math.floor(bkmpIdleState.meat || 0))} / ${bkmpIdleFormatNumber(bkmpDragonResourceCap(bkmpIdleState.jagdhuette_level))} Fleisch (+${bkmpIdleFormatNumber(bkmpDragonResourceRatePerHour('meat', bkmpIdleState.jagdhuette_level))}/Std.)
-        ${companion ? `<br>Begleiter: ${escapeHtml((bkmpDragonSpeciesById(companion.species_id) || {}).name || '')}` : ''}
       </p>
-      <p class="idle-skin-desc" style="margin-top:0.3rem;">Gebäude-Upgrades findest du im Tab "⬆️ Upgrades".</p>
     </div>
     <div class="idle-dragon-section">
       <h4>🏠 Drachennester</h4>
@@ -1283,21 +1581,28 @@ function bkmpIdleRenderDragonsPanel() {
   panel.querySelectorAll('.idle-dragon-evolve-adult-btn').forEach(btn => btn.addEventListener('click', () => bkmpDragonEvolveToAdult(btn.dataset.dragonId)));
   panel.querySelectorAll('.idle-dragon-ascend-btn').forEach(btn => btn.addEventListener('click', () => bkmpDragonAscend(btn.dataset.dragonId)));
   panel.querySelectorAll('.idle-dragon-companion-btn').forEach(btn => btn.addEventListener('click', () => bkmpDragonSetCompanion(btn.dataset.dragonId)));
-  panel.querySelectorAll('.idle-dragon-uncompanion-btn').forEach(btn => btn.addEventListener('click', bkmpDragonUnsetCompanion));
+  panel.querySelectorAll('.idle-dragon-uncompanion-btn').forEach(btn => btn.addEventListener('click', () => bkmpDragonUnsetCompanion(btn.dataset.dragonId)));
+  panel.querySelectorAll('.idle-dragon-companion-slot-remove').forEach(btn => btn.addEventListener('click', e => { e.stopPropagation(); bkmpDragonUnsetCompanion(btn.dataset.dragonId); }));
+  panel.querySelectorAll('.idle-dragon-companion-slot-pickable').forEach(slot => slot.addEventListener('click', () => bkmpDragonOpenCompanionPicker(slot.dataset.pickerStage)));
   panel.querySelectorAll('.idle-dragon-fav-btn').forEach(btn => btn.addEventListener('click', () => bkmpDragonToggleFavorite(btn.dataset.dragonId)));
   panel.querySelectorAll('.idle-dragon-release-btn').forEach(btn => btn.addEventListener('click', () => bkmpDragonConfirmAndRelease(btn.dataset.dragonId)));
   panel.querySelectorAll('.idle-dragon-baby-delete-btn').forEach(btn => btn.addEventListener('click', () => bkmpDragonConfirmAndRelease(btn.dataset.dragonId)));
   panel.querySelectorAll('.idle-dragon-egg-delete-btn').forEach(btn => btn.addEventListener('click', () => bkmpDragonReleaseEgg(btn.dataset.eggId)));
   const expandBtn = document.getElementById('idleDragonExpandStorageBtn');
   if (expandBtn) expandBtn.addEventListener('click', bkmpDragonExpandStorage);
+  if (typeof bkmpUiWireTooltipTrigger === 'function') {
+    panel.querySelectorAll('.idle-dragon-vorraete-info').forEach(btn => {
+      const tip = document.getElementById(btn.dataset.tooltipId);
+      bkmpUiWireTooltipTrigger(btn, tip);
+    });
+  }
 
-  const filterRarity = document.getElementById('idleDragonFilterRarity');
-  const filterStage = document.getElementById('idleDragonFilterStage');
-  const filterSort = document.getElementById('idleDragonFilterSort');
+  panel.querySelectorAll('.idle-dragon-rarity-filter-btn').forEach(btn => btn.addEventListener('click', () => {
+    const key = btn.dataset.rarity;
+    bkmpDragonLagerFilter.rarity = bkmpDragonLagerFilter.rarity === key ? 'all' : key;
+    bkmpIdleRenderDragonsPanel();
+  }));
   const filterFav = document.getElementById('idleDragonFilterFav');
-  if (filterRarity) { filterRarity.value = bkmpDragonLagerFilter.rarity; filterRarity.addEventListener('change', () => { bkmpDragonLagerFilter.rarity = filterRarity.value; bkmpIdleRenderDragonsPanel(); }); }
-  if (filterStage) { filterStage.value = bkmpDragonLagerFilter.stage; filterStage.addEventListener('change', () => { bkmpDragonLagerFilter.stage = filterStage.value; bkmpIdleRenderDragonsPanel(); }); }
-  if (filterSort) { filterSort.value = bkmpDragonLagerFilter.sort; filterSort.addEventListener('change', () => { bkmpDragonLagerFilter.sort = filterSort.value; bkmpIdleRenderDragonsPanel(); }); }
   if (filterFav) filterFav.addEventListener('change', () => { bkmpDragonLagerFilter.favoritesOnly = filterFav.checked; bkmpIdleRenderDragonsPanel(); });
 
   /* Klick auf die Karte selbst (nicht auf einen der Aktions-Buttons)

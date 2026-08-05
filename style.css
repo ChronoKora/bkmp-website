@@ -6636,6 +6636,20 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 .idle-upgrade-effect-arrow { color: var(--muted); }
 .idle-upgrade-effect-next { color: var(--gold); font-weight: 600; }
 .idle-upgrade-card.is-maxed .idle-upgrade-effect-current { color: var(--gold); font-weight: 600; }
+/* Bugfix (05.08.2026, Nutzer-Screenshot "Sieht schrecklich aus" zum
+   Prestige-Baum-Knoten "Weitere Gefaehrten"): .idle-upgrade-desc (nutzt
+   ausschliesslich bkmpPrestigeRenderBranchGridHtml() fuer die Prestige-
+   Knoten-Beschreibung) hatte bisher UEBERHAUPT KEINE eigene Regel - reiner
+   unstyled Browser-Default-Text (falsche Farbe, kein overflow-wrap, keine
+   Groessenabstimmung auf den Rest der Karte). Zweiter, unabhaengiger Fund
+   an derselben Karte: Icon+Name standen bisher als flache Flex-Kinder
+   direkt in der Karte (kein .idle-upgrade-card-head/-card-title-Wrapper
+   wie beim bereits redesignten Upgrades-Tab, siehe Kommentar oben bei
+   .idle-upgrade-card-head, 18.07.) - das Icon rutschte dadurch als eigene
+   grosse Zeile UEBER den Titel statt daneben zu stehen. Beide Bugs waren
+   nur in bkmp-prestige.js's Kartenmarkup, jetzt auf dasselbe Muster wie
+   idledorf.js's bkmpIdleUpgradeCardHtml() umgestellt. */
+.idle-upgrade-desc { font-size: 0.74rem; color: var(--muted); line-height: 1.4; overflow-wrap: break-word; }
 /* Progression-Rebalance Phase 3/4 (26.07.2026): Softcap-Zone/Meilenstein-
    Hinweis - bewusst kleiner/gedaempfter als die Effekt-Zeilen (Zusatzinfo,
    nicht der Haupt-Blickfang der Karte). */
@@ -6755,6 +6769,141 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 @keyframes bkmpDragonNestReadyPulse { 0%, 100% { box-shadow: 0 0 0 1px var(--gold) inset; } 50% { box-shadow: 0 0 0 3px var(--gold) inset; } }
 .idle-dragon-nest-empty { opacity: 0.6; }
 .idle-dragon-nest-buy { border-style: dashed; opacity: 0.85; }
+/* Begleiter-Leiste (05.08.2026, siehe bkmpDragonRenderCompanionSlotBarHtml
+   in bkmp-breeding.js fuer die volle Herleitung) - drei feste Plaetze,
+   Genre-ueblich (Idle Heroes/AFK-Arena-artige Spiele) als kompakte
+   Portrait-Reihe ganz oben im Drachenzucht-Tab. Wiederverwendet dieselben
+   Karten-Grundwerte wie .idle-dragon-nest-card (Rahmen/Radius/Padding/
+   Hintergrund) fuer optische Konsistenz mit dem Rest des Tabs. */
+/* Nachbesserung (05.08.2026): eigene Zeile mit der Begleiter-Leiste LINKS
+   und dem neuen Stats-Block RECHTS (Nutzerwunsch: "Links oder rechts 1
+   einzelnen Block wo nur die Stats stehen") - bricht auf schmalen Breiten
+   sauber um (Stats-Block rutscht unter die Leiste), da beide Kinder ueber
+   flex-wrap statt fixer Positionierung angeordnet sind. */
+.idle-dragon-companion-row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-start; }
+.idle-dragon-companion-bar { display: flex; gap: 1.1rem; flex-wrap: wrap; flex: 1 1 auto; }
+/* Kampf-Gruppe (3 Plaetze) + Trainings-Platz (1, per data-picker-stage="teen"
+   erkennbar) - eigene verschachtelte Flex-Gruppe statt margin-left auf dem
+   4. Slot direkt, damit beim Umbruch auf schmalen Breiten kein unschoener
+   einseitiger Einzug entsteht (margin wuerde beim Zeilenumbruch haengen
+   bleiben, ein echter Gruppen-Gap nicht).
+   Bug-Fix (Nutzer-Screenshot 05.08.2026: Trainings-Platz erschien MITTEN
+   zwischen den 3 Kampf-Plaetzen statt sauber daneben/darunter, einer der 3
+   Kampf-Plaetze riss dabei auf eine zweite Zeile ab): combat-group hatte
+   selbst flex-wrap:wrap - bei knappem Platz liess das den Browser
+   combat-group UND teen-wrap gleichzeitig in dieselbe Zeile quetschen,
+   wodurch combat-group's EIGENE 3 Kinder unabhaengig von teen-wrap intern
+   umbrachen (kein sauberer "als Ganzes umbrechen"-Effekt). Fix:
+   flex-wrap:nowrap auf combat-group - seine 3 Kinder bleiben dadurch IMMER
+   zusammen in einer Reihe (duerfen bei knappem Platz gemeinsam schrumpfen,
+   siehe .idle-dragon-companion-slot's eigenes flex-shrink weiter unten,
+   aber nie intern umbrechen). .idle-dragon-companion-bar (die aeussere
+   Zeile) entscheidet dadurch sauber binaer: entweder passen beide Gruppen
+   nebeneinander, oder teen-wrap rutscht ALS GANZES in die naechste Zeile -
+   nie ein einzelner Kampf-Platz allein. */
+/* Nachbesserung (05.08.2026, Nutzer-Screenshot des LIVE-Standes: "Wir haben
+   sooviel platz. Nutze denn doch mal." - grosse leere Flaeche zwischen dem
+   4. Block und dem Stats-Block rechts): combat-group/teen-wrap hatten
+   bisher KEIN flex-grow (Standard 0) - .idle-dragon-companion-bar selbst
+   ist zwar flex:1 1 auto und beansprucht dadurch den ganzen verfuegbaren
+   Platz in der Zeile, gibt ihn aber nie an seine beiden Kind-Gruppen
+   weiter, wenn die selbst nicht wachsen duerfen - die Karten blieben immer
+   bei ihrer kleinen Basisbreite haengen, der Rest blieb einfach leer.
+   Fix: flex-grow im Verhaeltnis 3:1 (combat-group haelt 3 Plaetze,
+   teen-wrap nur 1) - beide Gruppen beanspruchen den Freiraum jetzt
+   proportional zu ihrer Platzanzahl, ihre einzelnen Slots wachsen ueber
+   das eigene flex-grow (siehe .idle-dragon-companion-slot) bis zum
+   erhoehten max-width mit. Betrifft NUR das Wachsen bei UEBERSCHUSS-Platz -
+   das flex-wrap:nowrap-Verhalten bei KNAPPEM Platz (siehe Fix direkt
+   darueber) bleibt unangetastet, da flex-grow nur bei positivem Freiraum
+   greift, niemals beim Schrumpfen. */
+.idle-dragon-companion-combat-group { display: flex; gap: 0.6rem; flex-wrap: nowrap; flex-grow: 3; }
+.idle-dragon-companion-teen-wrap { display: flex; flex-grow: 1; }
+.idle-dragon-companion-slot {
+  flex: 1 1 110px; max-width: 220px; min-height: 128px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border: 1px solid var(--line); border-radius: 14px; padding: 0.7rem;
+  background: var(--paper); text-align: center; position: relative;
+}
+.idle-dragon-companion-slot.is-filled { border-color: var(--dragon-rarity-color, var(--gold)); box-shadow: 0 0 0 1px var(--dragon-rarity-color, var(--gold)) inset; }
+.idle-dragon-companion-slot.is-empty { border-style: dashed; opacity: 0.85; }
+.idle-dragon-companion-slot.is-locked { border-style: dashed; opacity: 0.55; }
+.idle-dragon-companion-slot-icon { font-size: 1.9rem; margin-bottom: 0.25rem; }
+.idle-dragon-companion-slot-label { font-size: 0.78rem; color: var(--muted); }
+.idle-dragon-companion-slot .idle-dragon-thumb { max-width: 78px; margin-bottom: 0.3rem; }
+.idle-dragon-companion-slot-name { font-size: 0.88rem; font-weight: 600; line-height: 1.2; }
+.idle-dragon-companion-slot-rank { font-size: 0.78rem; color: var(--gold); margin-top: 0.15rem; }
+/* Anklickbare Plaetze (05.08.2026, oeffnen bkmpDragonOpenCompanionPicker) -
+   dezente Hover-Anhebung, damit die Klickbarkeit spuerbar ist ohne die
+   ruhige Kartenoptik zu stoeren. Gesperrte Plaetze bekommen bewusst NICHT
+   diese Klasse (siehe bkmp-breeding.js) - bleiben rein informativ. */
+.idle-dragon-companion-slot-pickable { cursor: pointer; transition: transform 0.15s ease, border-color 0.15s ease; }
+.idle-dragon-companion-slot-pickable:hover { transform: translateY(-2px); border-color: var(--dragon-rarity-color, var(--gold)); }
+/* !important auf Radius/Padding/Mindesthoehe: gleicher Grund wie bei
+   .idle-dragon-mini-delete-btn weiter unten - das generische
+   "html.bkmp-app-mode .idle-dorf-panel button"-Reset (14px Radius, grosses
+   Innenpolster, 46px Mindesthoehe) hat sonst hoehere Spezifitaet. */
+.idle-dragon-companion-slot-remove {
+  position: absolute; top: 0.3rem; right: 0.4rem; width: 20px; height: 20px; line-height: 18px;
+  min-height: 0 !important; padding: 0 !important; border-radius: 50% !important;
+  border: 1px solid var(--line); background: var(--paper-2); color: var(--muted);
+  font-size: 0.9rem; cursor: pointer;
+}
+.idle-dragon-companion-slot-remove:hover { color: var(--danger, #e05252); border-color: var(--danger, #e05252); }
+/* Rang-Abzeichen auf der Drachenlager-Karte selbst (im Grid weiter unten) -
+   zeigt an, MIT WELCHEM Gewicht (100%/50%/25%) ein bereits ausgeruesteter
+   erwachsener Begleiter gerade tatsaechlich beitraegt. */
+.idle-dragon-companion-rank-badge { font-size: 0.72rem; color: var(--gold); margin: 0.15rem 0; }
+.idle-dragon-companion-rank-badge.is-inactive { color: var(--muted); }
+/* Stats-Block (05.08.2026, Nutzerwunsch nach einem eigenen "nur Stats"-
+   Block neben der Begleiter-Leiste, Vorbild Tactics-RPG-Stat-Panels: Icon +
+   Bezeichnung + Wert je Zeile) - schmale Karte, feste Breite auf breiten
+   Bildschirmen, volle Breite sobald sie (per .idle-dragon-companion-row
+   flex-wrap) unter die Leiste rutscht. */
+.idle-dragon-companion-stats-block {
+  flex: 0 1 200px; min-width: 168px;
+  border: 1px solid var(--line); border-radius: 14px; padding: 0.7rem 0.9rem;
+  background: var(--paper);
+}
+.idle-dragon-companion-stats-title { font-size: 0.78rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 0.5rem; }
+.idle-dragon-companion-stat-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; font-size: 0.85rem; }
+.idle-dragon-companion-stat-row + .idle-dragon-companion-stat-row { border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+.idle-dragon-companion-stat-icon { font-size: 1rem; flex-shrink: 0; }
+.idle-dragon-companion-stat-label { flex: 1; color: var(--muted); }
+.idle-dragon-companion-stat-value { font-weight: 700; color: var(--gold); font-variant-numeric: tabular-nums; }
+/* Vorraete-Hinweis hinter ein "i" versteckt (05.08.2026, Nutzerwunsch: "Diese
+   Anleitung kann auch ganz nach unten. Oder irgendwo hinter einen 'I'
+   versteckt als Hilfe Anleitung") - vorher permanent sichtbarer Hinweistext
+   ("Gebaeude-Upgrades findest du im Tab...") ist jetzt ein Tap-/Hover-
+   Tooltip, exakt dasselbe Muster wie .idle-prestige-paragon-info. */
+.idle-dragon-vorraete-info {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; vertical-align: middle;
+  border: none; background: transparent; color: var(--muted);
+  font-size: 0.9rem; line-height: 1; cursor: help; padding: 0; opacity: 0.75;
+}
+.idle-dragon-vorraete-info:hover, .idle-dragon-vorraete-info:focus-visible { opacity: 1; }
+/* Auswahlfenster (05.08.2026) - wiederverwendet .joke-overlay/.joke-card
+   (bkmpUiModalHtml) mit einer breiteren, linksbuendigen Kartenvariante statt
+   der schmalen zentrierten Standard-Bestaetigungskarte. Die eigentliche
+   Liste bekommt eine eigene Hoehenbegrenzung + eigenes Scrollen - das
+   Fenster selbst (und die Seite dahinter) muss dafuer nie scrollen. */
+.idle-dragon-companion-picker-card { max-width: 560px; width: 92vw; text-align: left; }
+.idle-dragon-companion-picker-list { display: flex; flex-direction: column; gap: 0.5rem; max-height: min(52vh, 420px); overflow-y: auto; margin-top: 0.4rem; }
+.idle-dragon-companion-picker-row {
+  display: flex; align-items: center; gap: 0.7rem;
+  border: 1px solid var(--line); border-radius: 12px; padding: 0.5rem 0.7rem;
+  background: var(--paper); cursor: pointer; transition: border-color 0.15s ease;
+}
+.idle-dragon-companion-picker-row:hover { border-color: var(--dragon-rarity-color, var(--gold)); }
+.idle-dragon-companion-picker-row.is-equipped { border-color: var(--dragon-rarity-color, var(--gold)); box-shadow: 0 0 0 1px var(--dragon-rarity-color, var(--gold)) inset; }
+.idle-dragon-companion-picker-row .idle-dragon-thumb { max-width: 44px; margin: 0; flex-shrink: 0; }
+.idle-dragon-companion-picker-info { flex: 1; min-width: 0; }
+.idle-dragon-companion-picker-name { font-size: 0.85rem; font-weight: 600; }
+.idle-dragon-companion-picker-stats { font-size: 0.72rem; color: var(--muted); margin-top: 0.1rem; }
+.idle-dragon-companion-picker-status { font-size: 0.7rem; display: block; margin-top: 0.15rem; }
+.idle-dragon-companion-picker-status.is-active { color: var(--gold); }
+.idle-dragon-companion-picker-status.is-inactive { color: var(--muted); }
 .idle-dragon-baby-card { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 14px; padding: 0.9rem; background: var(--paper); text-align: center; position: relative; }
 /* Bug-Fix 18.07. (Spieler-Screenshot: "Füttern"-Knöpfe außerhalb der
    Karte): dieselbe Ursache wie bei .idle-dragon-actions-row oben - das
@@ -6821,8 +6970,37 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 .idle-dragon-fav-btn, .idle-dragon-release-btn { border: 1px solid var(--line); background: var(--paper-2); border-radius: 8px; padding: 0.3rem 0.5rem; cursor: pointer; font-size: 0.9rem; }
 .idle-dragon-fav-btn:hover, .idle-dragon-release-btn:hover { border-color: var(--gold); }
 .idle-dragon-filter-bar { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 0.8rem; }
-.idle-dragon-filter-bar select { border: 1px solid var(--line); background: var(--paper); color: var(--ink); border-radius: 8px; padding: 0.35rem 0.5rem; font-size: 0.76rem; }
 .idle-dragon-filter-fav { display: flex; align-items: center; gap: 0.3rem; font-size: 0.76rem; color: var(--muted); cursor: pointer; }
+/* Rarity-Schnellfilter (05.08.2026, Nutzerwunsch: "diese Sortierung
+   entfernen. Einfach nur Buttons mit Legendäre/Epische/Seltene... neben
+   Favoriten") - ersetzt die vorherigen 3 <select>-Dropdowns (Seltenheit/
+   Stufe/Sortierung), gleiches Chip-Muster wie .fbb-filter-chip. Klick auf
+   den bereits aktiven Knopf setzt wieder auf "alle" zurueck (kein extra
+   "Alle"-Knopf noetig, siehe JS). !important auf Radius/Padding/Mindesthoehe:
+   gleicher Grund wie bei .idle-dragon-mini-delete-btn weiter unten - das
+   generische "html.bkmp-app-mode .idle-dorf-panel button"-Reset (14px
+   Radius, grosses Innenpolster, 46px Mindesthoehe) hat sonst hoehere
+   Spezifitaet und wuerde aus der schlanken Pille wieder ein grosses
+   eckiges Rechteck machen. */
+.idle-dragon-rarity-filter-btn {
+  font-size: 0.78rem !important; font-weight: 600;
+  padding: 0.38rem 0.85rem !important;
+  border-radius: 999px !important;
+  min-height: 0 !important;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.idle-dragon-rarity-filter-btn:hover { color: var(--ink); }
+.idle-dragon-rarity-filter-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.idle-dragon-rarity-filter-btn.active {
+  border-color: color-mix(in srgb, var(--rarity-filter-color, var(--gold)) 55%, var(--line));
+  background: color-mix(in srgb, var(--rarity-filter-color, var(--gold)) 16%, var(--paper));
+  color: var(--rarity-filter-color, var(--gold));
+}
 .idle-dragon-lager-card { cursor: pointer; }
 .idle-dragon-detail-card { max-width: 360px; text-align: center; }
 .idle-dragon-detail-img { width: 100%; max-width: 160px; margin: 0 auto 0.6rem; display: block; }
@@ -10541,6 +10719,7 @@ html.bkmp-app-mode .idle-dorf-panel .idle-upgrade-level {
   font-size: .8rem !important;
 }
 html.bkmp-app-mode .idle-dorf-panel .idle-upgrade-effect-row,
+html.bkmp-app-mode .idle-dorf-panel .idle-upgrade-desc,
 html.bkmp-app-mode .idle-dorf-panel .idle-skin-desc {
   font-size: .84rem !important;
   line-height: 1.4;
@@ -10857,9 +11036,9 @@ html.bkmp-app-mode .idle-dorf-panel .idle-dragon-release-btn {
 html.bkmp-app-mode .idle-dorf-panel .idle-dragon-fav-badge { font-size: 1.3rem !important; }
 html.bkmp-app-mode .idle-dorf-panel .idle-dragon-mini-delete-btn { width: 30px !important; height: 30px !important; font-size: 0.92rem !important; }
 html.bkmp-app-mode .idle-dorf-panel .idle-dragon-filter-fav,
-html.bkmp-app-mode .idle-dorf-panel .idle-dragon-filter-bar select {
+html.bkmp-app-mode .idle-dorf-panel .idle-dragon-rarity-filter-btn {
   font-size: .86rem !important;
-  min-height: 44px;
+  min-height: 44px !important;
 }
 html.bkmp-app-mode .idle-dorf-panel .idle-dragon-assign-btn,
 html.bkmp-app-mode .idle-dorf-panel .idle-dragon-hatch-btn,

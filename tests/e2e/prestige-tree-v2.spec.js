@@ -45,7 +45,7 @@ test.describe('Prestige-Baum v2: Struktur/Kosten/Paragon/Meilensteine (Teststand
     expect(result.rankStillValid).toBe(true);
   });
 
-  test('5 Zweige + Vermaechtnis vorhanden, je 10 Knoten in den 5 Hauptzweigen (runen_dungeon seit 03.08.2026 nur noch 9 - Schluesselmeister entfernt)', async ({ page, qaBaseURL, fixtureData }) => {
+  test('5 Zweige + Vermaechtnis vorhanden, je 10 Knoten in den 5 Hauptzweigen (runen_dungeon seit 03.08.2026 nur noch 9 - Schluesselmeister entfernt; Vermaechtnis seit 05.08.2026 3 statt 2 - "Weitere Gefaehrten" ergaenzt)', async ({ page, qaBaseURL, fixtureData }) => {
     await openAndLogin(page, qaBaseURL, fixtureData);
     await waitForDragonReady(page);
     const counts = await page.evaluate(() => {
@@ -58,7 +58,28 @@ test.describe('Prestige-Baum v2: Struktur/Kosten/Paragon/Meilensteine (Teststand
     expect(counts.drachen).toBe(10);
     expect(counts.runen_dungeon).toBe(9); // Schluesselmeister komplett entfernt (Nutzerwunsch: feste Schluesselzeiten machen den Knoten wirkungslos)
     expect(counts.automation).toBe(10);
-    expect(counts.legacy).toBe(2);
+    expect(counts.legacy).toBe(3); // "Weitere Gefaehrten" (05.08.2026, Spieler-Idee MCSoGGe) ergaenzt
+  });
+
+  test('"Weitere Gefährten" (mehrere Kampf-Begleiter): exakte Kosten 1.500/3.000, maxRank 2, kein Paragon', async ({ page, qaBaseURL, fixtureData }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    const result = await page.evaluate(() => {
+      const def = bkmpPrestigeNodeById('weitere_gefaehrten');
+      return {
+        branch: def.branch, effectType: def.effectType, effectPerRank: def.effectPerRank, maxRank: def.maxRank,
+        paragonEligible: bkmpPrestigeParagonEligible(def),
+        rank1Cost: bkmpPrestigeUpgradeCost(def, 0),
+        rank2Cost: bkmpPrestigeUpgradeCost(def, 1)
+      };
+    });
+    expect(result.branch).toBe('legacy');
+    expect(result.effectType).toBe('companion_slot_bonus');
+    expect(result.effectPerRank).toBe(1);
+    expect(result.maxRank).toBe(2);
+    expect(result.paragonEligible).toBe(false);
+    expect(result.rank1Cost).toBe(1500);
+    expect(result.rank2Cost).toBe(3000);
   });
 
   test('Kosten sind exponentiell (jeder Rang teurer als der vorherige, Wachstum beschleunigt sich)', async ({ page, qaBaseURL, fixtureData }) => {
@@ -379,5 +400,63 @@ test.describe('Prestige-Baum v2: Struktur/Kosten/Paragon/Meilensteine (Teststand
     });
     expect(result.spent).toBe(500);
     expect(result.otherRankUntouched).toBe(5);
+  });
+
+  /* REGRESSION (Nutzer-Screenshot 05.08.2026, "Sieht schrecklich aus" zum
+     "Weitere Gefährten"-Knoten): bkmpPrestigeRenderBranchGridHtml() setzte
+     Icon+Name bisher als flache Flex-Kinder direkt in die Karte statt in
+     den seit Phase 5.4 (18.07., siehe idledorf.js/bkmpIdleUpgradeCardHtml)
+     etablierten .idle-upgrade-card-head/-card-title-Wrapper - das Icon
+     rutschte dadurch als eigene grosse Zeile UEBER den Titel statt daneben
+     zu stehen. Zweiter, unabhaengiger Fund an derselben Karte: .idle-
+     upgrade-desc hatte ueberhaupt keine CSS-Regel (reiner unstyled Browser-
+     Default-Text). Ruft die echte Render-Funktion direkt auf (kein Tab-
+     Klick noetig, gleiches Muster wie der Rest dieser Datei). */
+  test('Prestige-Knoten-Karte nutzt dieselbe Icon+Titel-Kopfzeile wie der Upgrades-Tab, Beschreibung ist gestylt (nicht Browser-Default)', async ({ page, qaBaseURL, fixtureData }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    const result = await page.evaluate(() => {
+      bkmpPrestigeSetActiveBranch('legacy');
+      const panel = document.createElement('div');
+      panel.className = 'idle-dorf-panel';
+      document.body.appendChild(panel);
+      panel.innerHTML = bkmpPrestigeRenderBranchGridHtml(bkmpPrestigeState.prestige_allocations || {}, 999999999);
+      const card = Array.from(panel.querySelectorAll('.idle-upgrade-card')).find(c => c.textContent.includes('Weitere Gefährten'));
+      const head = card.querySelector('.idle-upgrade-card-head');
+      const icon = card.querySelector('.idle-upgrade-icon');
+      const title = card.querySelector('.idle-upgrade-card-title');
+      const name = card.querySelector('.idle-upgrade-name');
+      const level = card.querySelector('.idle-upgrade-level');
+      const desc = card.querySelector('.idle-upgrade-desc');
+      const iconRect = icon.getBoundingClientRect();
+      const titleRect = title.getBoundingClientRect();
+      const descCs = getComputedStyle(desc);
+      const out = {
+        hasHeadWrapper: !!head,
+        iconInsideHead: head ? head.contains(icon) : false,
+        titleInsideHead: head ? head.contains(title) : false,
+        // "Gleiche Zeile" heisst: vertikaler Ueberlapp, NICHT gleicher top-Wert -
+        // align-items:center verschiebt den top eines kuerzeren Icons (32px)
+        // gegenueber dem zweizeiligen Titel (56.6px) bewusst nach unten.
+        iconSameRowAsTitle: iconRect.top < titleRect.bottom && iconRect.bottom > titleRect.top,
+        iconLeftOfTitle: iconRect.right <= titleRect.left + 2,
+        nameText: name.textContent.trim(),
+        levelText: level.textContent.trim(),
+        // Browser-Default fuer <div> ist stets rgb(0,0,0) (schwarz) - ein gestyltes muted Grau/Lila darf das nie sein.
+        descIsNotBlackDefault: descCs.color !== 'rgb(0, 0, 0)',
+        descOverflowWrap: descCs.overflowWrap
+      };
+      panel.remove();
+      return out;
+    });
+    expect(result.hasHeadWrapper).toBe(true);
+    expect(result.iconInsideHead).toBe(true);
+    expect(result.titleInsideHead).toBe(true);
+    expect(result.iconSameRowAsTitle).toBe(true);
+    expect(result.iconLeftOfTitle).toBe(true);
+    expect(result.nameText).toBe('Weitere Gefährten');
+    expect(result.levelText).toMatch(/^Rang \d+\/2$/);
+    expect(result.descIsNotBlackDefault).toBe(true);
+    expect(result.descOverflowWrap).toBe('break-word');
   });
 });

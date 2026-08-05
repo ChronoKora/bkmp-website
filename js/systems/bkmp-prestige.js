@@ -197,7 +197,24 @@ const BKMP_PRESTIGE_UPGRADES = [
 
   /* ---------------- Vermächtnis (2 bestehende Knoten, passen thematisch in keinen der 5 Zweige) ---------------- */
   { id: 'zeitraffer', branch: 'legacy', name: 'Zeitraffer', desc: '+8% XP pro Rang - dauerhaft.', icon: '⏳', effectType: 'xp_pct', effectPerRank: 8, ...bkmpPrestigeTierDef('STRONG') },
-  { id: 'portal_meisterschaft', branch: 'legacy', name: 'Portal-Meisterschaft', desc: '+8% mehr Prestige-Punkte bei jedem künftigen Aufstieg pro Rang.', icon: '🌌', effectType: 'prestige_point_bonus_pct', effectPerRank: 8, ...BKMP_PRESTIGE_TIER_SELF_REINFORCING }
+  { id: 'portal_meisterschaft', branch: 'legacy', name: 'Portal-Meisterschaft', desc: '+8% mehr Prestige-Punkte bei jedem künftigen Aufstieg pro Rang.', icon: '🌌', effectType: 'prestige_point_bonus_pct', effectPerRank: 8, ...BKMP_PRESTIGE_TIER_SELF_REINFORCING },
+  /* Spieler-Idee MCSoGGe (05.08.2026, Feedback-Board): "wenn man ein
+     gewisses Level an Prestiges hat dass man dann 2 oder mehr Drachen
+     ausruesten kann" - vom Nutzer konkretisiert: 2 Ranks (2./3. Begleiter-
+     Platz), abnehmender Wert (50%/25%, siehe BKMP_DRAGON_COMPANION_SLOT_
+     WEIGHTS in bkmp-breeding.js), "teuer": 1.500 Punkte fuer Rang 1,
+     3.000 fuer Rang 2. Bewusst KEIN normaler Tier (WEAK/MEDIUM/STRONG/
+     SPECIAL/TOGGLE) - eigener 2-Rang-Kostenverlauf, der die vom Nutzer
+     genannten Werte exakt trifft: bkmpPrestigeUpgradeCost() rechnet
+     baseCost*costGrowth^rankBeingBought, also 1500*2^0=1500 (Rang 1) und
+     1500*2^1=3000 (Rang 2) - keine krumme Rundung noetig. paragonEligible:
+     false (ein Platz-Zaehler eignet sich nicht fuer endlose Paragon-
+     Skalierung - es gibt ohnehin nur 3 sinnvolle Plaetze). Passt thematisch
+     eher ins "Vermaechtnis" als in den bereits vollen "Drachen"-Zweig
+     (10/10 Knoten) - der hohe Preis (deutlich ueber jedem einzelnen
+     STRONG-Knoten-Gesamtwert von ~3.179 Punkten) signalisiert ohnehin einen
+     bewussten Endgame-/Kapstein-Charakter, der zum Vermaechtnis-Zweig passt. */
+  { id: 'weitere_gefaehrten', branch: 'legacy', name: 'Weitere Gefährten', desc: 'Schaltet einen zusätzlichen gleichzeitig ausrüstbaren Begleitdrachen frei (Rang 1: 2. Platz, Rang 2: 3. Platz). Jeder weitere Platz bringt abnehmenden Nutzen - der 2. Begleiter zählt nur mit 50%, der 3. nur mit 25% seiner Werte.', icon: '🐲', effectType: 'companion_slot_bonus', effectPerRank: 1, maxRank: 2, baseCost: 1500, costGrowth: 2, paragonEligible: false }
 ];
 
 const BKMP_PRESTIGE_BRANCHES = [
@@ -1442,8 +1459,13 @@ function bkmpPrestigeRenderBranchGridHtml(alloc, available) {
     const showRaidAutoJoinToggle = def.id === 'automatischer_bosskampf' && maxed && typeof bkmpRaidAutoJoinEnabledGet === 'function';
     return `
       <div class="idle-upgrade-card${def.serverSyncRequired ? ' idle-prestige-needs-sql' : ''}">
-        <div class="idle-upgrade-icon">${def.icon}</div>
-        <div class="idle-upgrade-name">${escapeHtml(def.name)} <span class="idle-upgrade-level">Rang ${rank}${maxed ? ' (Max)' : '/' + def.maxRank}</span></div>
+        <div class="idle-upgrade-card-head">
+          <span class="idle-upgrade-icon">${def.icon}</span>
+          <div class="idle-upgrade-card-title">
+            <span class="idle-upgrade-name">${escapeHtml(def.name)}</span>
+            <span class="idle-upgrade-level">Rang ${rank}${maxed ? ' (Max)' : '/' + def.maxRank}</span>
+          </div>
+        </div>
         <div class="idle-upgrade-desc">${escapeHtml(def.desc)}</div>
         ${showParagon ? `<div class="idle-prestige-paragon-row"><span class="idle-prestige-paragon-label">🌠 Paragon-Rang ${bkmpIdleFormatNumber(paragonRank)}${paragonMaxed ? ' (Max)' : '/' + bkmpIdleFormatNumber(BKMP_PRESTIGE_PARAGON_MAX_RANK)}</span><button type="button" class="idle-prestige-paragon-info" data-tooltip-id="${paragonTipId}" aria-label="Was ist Paragon?">?</button>${paragonTipHtml}</div>` : ''}
         ${showRaidAutoJoinToggle ? `<label class="idle-autobuy-toggle idle-prestige-raidjoin-toggle"><input type="checkbox" class="idle-prestige-raidjoin-checkbox" ${bkmpRaidAutoJoinEnabledGet() ? 'checked' : ''}><span>Automatisch beitreten</span></label>` : ''}
