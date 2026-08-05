@@ -1148,7 +1148,8 @@ function bkmpIdleRenderDragonsPanel() {
             ${bkmpDragonThumbHtml(species.baby_image, escapeHtml(species.name))}
             <div class="idle-skin-name">${escapeHtml(species.name)} <small>(Baby)</small></div>
             <div class="idle-skin-desc">Frisst am liebsten: ${foodLabel} · Vorrat: ${bkmpIdleFormatNumber(Math.floor(bkmpIdleState[d.food_preference] || 0))}</div>
-            <div class="idle-xp-bar"><div class="idle-xp-fill" style="width:${pct}%"></div><span>${d.growth_points}/${species.growth_points_required}</span></div>
+            <div class="idle-xp-bar"><div class="idle-xp-fill" style="width:${pct}%"></div></div>
+            <div class="idle-xp-label">${bkmpIdleFormatNumber(d.growth_points)} / ${bkmpIdleFormatNumber(species.growth_points_required)} Fütterungs-EP</div>
             ${canEvolve
               ? `<button type="button" class="btn-ja idle-skin-action idle-dragon-evolve-teen-btn" data-dragon-id="${d.id}">Zum jugendlichen Drachen entwickeln</button>`
               : `<div class="idle-dragon-feed-row">
@@ -1224,7 +1225,8 @@ function bkmpIdleRenderDragonsPanel() {
             <div class="idle-skin-name">${escapeHtml(species.name)} <small>(${isTeen ? 'Jugendlich' : 'Erwachsen'})</small></div>
             <div class="idle-skin-desc">${rarity.name}</div>
             ${isTeen
-              ? `<div class="idle-xp-bar"><div class="idle-xp-fill" style="width:${pct}%"></div><span>${d.battle_xp}/${species.battle_xp_required} Kampf-EP</span></div>`
+              ? `<div class="idle-xp-bar"><div class="idle-xp-fill" style="width:${pct}%"></div></div>
+                 <div class="idle-xp-label">${bkmpIdleFormatNumber(d.battle_xp)} / ${bkmpIdleFormatNumber(species.battle_xp_required)} Kampf-EP</div>`
               : `<div class="idle-dragon-stats">${bkmpDragonMainStatLine(d)}<div class="idle-dragon-substats">${substatsHtml}</div></div>`}
             ${canEvolve ? `<button type="button" class="btn-ja idle-skin-action idle-dragon-evolve-adult-btn" data-dragon-id="${d.id}">⭐ Erwachsen werden</button>` : ''}
             ${!isTeen && bkmpDragonCanAscend(d) ? `<button type="button" class="btn-ja idle-skin-action idle-dragon-ascend-btn" data-dragon-id="${d.id}" title="Verbraucht eine zweite erwachsene ${escapeHtml(species.name)} (nicht favorisiert/Begleiter) + ${bkmpIdleFormatNumber(BKMP_DRAGON_ASCEND_COST_GOLD)} Gold für +${BKMP_DRAGON_ASCEND_BONUS_PCT}% Hauptwerte.">🌟 Aufsteigen (${Number(d.ascension_level || 0)}/${BKMP_DRAGON_ASCEND_MAX_LEVEL})</button>` : ''}

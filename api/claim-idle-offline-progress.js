@@ -214,6 +214,50 @@ module.exports = async function handler(req, res) {
       return send(res, 502, { error: 'dragons_unavailable' });
     }
 
+    /* Bug-Fix (Spieler-Meldung 05.08.2026: "über nacht offline timer
+       passiert auch nichts an Fortschritt" - gemeint war der Begleitdrache,
+       der von Jugendlich zu Erwachsen heranwaechst): bkmpDragonGrantCompanion
+       BattleXp() (js/systems/bkmp-breeding.js) vergibt Kampf-EP an den
+       aktuellen jugendlichen Begleitdrachen bei JEDEM Kill - aber NUR waehrend
+       das Spiel aktiv offen/tickend ist (Aufrufstellen: idledorf.js, bkmp-
+       dungeon.js, bkmp-tower.js - alle drei nur im Live-Betrieb). Diese
+       Offline-Simulation kannte player_dragons bisher gar nicht - waehrend
+       einer Abwesenheit blieb der Begleitdrache dadurch komplett bei seinem
+       alten Kampf-EP-Stand haengen, unabhaengig davon, wie viele Kills
+       simuliert wurden. Fix: liest den aktuellen jugendlichen Begleitdrachen
+       (falls vorhanden) + dessen Art-Anforderung, sammelt waehrend der
+       Kampf-Simulation unten denselben Betrag pro Kill wie live (Boss 25,
+       sonst 4 - siehe bkmpDragonGrantCompanionBattleXp), deckelt am Ende auf
+       battle_xp_required und schreibt das Ergebnis separat in player_dragons.
+       Bewusst NICHT repliziert: der Kampf-EP-Bonus aus Substats/Skilltree/
+       Prestige (dragon_xp_bonus_pct/dragon_xp_pct, siehe bkmpDragonGrant
+       CompanionBattleXp) - das wuerde zusaetzlich idle_prestige_state +
+       player_dragons-Substats laden und die komplexe, mehrstufige Prestige-
+       Bonus-Formel serverseitig duplizieren muessen. Ergebnis: Offline-EP
+       koennen bei Spielern mit hohem EP-Bonus etwas NIEDRIGER ausfallen als
+       bei identischer Zeit live erspielt - ein kleiner, dokumentierter
+       Kompromiss gegenueber dem vorherigen Zustand (komplett 0 EP offline),
+       kein neuer Fehler. Schlaegt dieser Lookup fehl, bleibt der bestehende
+       Belohnungs-Fluss unangetastet (eigenes try/catch, gleiches Prinzip wie
+       der Gilden-Nachtwache-Lookup oben). */
+    let companion = null;
+    let companionBattleXpRequired = 0;
+    try {
+      const companionRes = await sbFetch(serviceKey, `player_dragons?auth_user_id=eq.${encodeURIComponent(user.id)}&is_companion=eq.true&stage=eq.teen&select=id,species_id,battle_xp&limit=1`);
+      const companionRows = companionRes.ok ? await companionRes.json() : [];
+      const companionRow = Array.isArray(companionRows) && companionRows[0] ? companionRows[0] : null;
+      if (companionRow) {
+        const speciesRes = await sbFetch(serviceKey, `dragon_species?id=eq.${encodeURIComponent(companionRow.species_id)}&select=battle_xp_required&limit=1`);
+        const speciesRows = speciesRes.ok ? await speciesRes.json() : [];
+        const speciesRow = Array.isArray(speciesRows) && speciesRows[0] ? speciesRows[0] : null;
+        if (speciesRow) {
+          companion = companionRow;
+          companionBattleXpRequired = Number(speciesRow.battle_xp_required || 0);
+        }
+      }
+    } catch (e) { /* Begleitdrache-Lookup fehlgeschlagen - Kampf-EP-Gutschrift bleibt einfach aus, Rest der Belohnung unangetastet */ }
+    let companionXpGain = 0;
+
     /* Bug-Fix (Spieler-Report Crocodilandy927, 20.07.: "Man bekommt keine
        Gems und Essenzen mehr, wenn man offline ist") - selectDragonKindId()
        oben setzt die "seltene" Drachen-Chance (schattendrache/wuffdrache -
@@ -435,6 +479,10 @@ module.exports = async function handler(req, res) {
       kills += 1;
       if (dragon.isBoss) bossKills += 1;
       if (autoAdvance) killIndex += 1;
+      // Kampf-EP fuer den jugendlichen Begleitdrachen, siehe Kommentar beim
+      // companion-Lookup oben - gleicher Betrag pro Kill wie live
+      // (bkmpDragonGrantCompanionBattleXp: Boss 25, sonst 4).
+      if (companion) companionXpGain += dragon.isBoss ? 25 : 4;
     }
 
     goldGain += Math.round(rareGoldRaw);
@@ -486,6 +534,26 @@ module.exports = async function handler(req, res) {
       const detail = await claimRes.text().catch(() => '');
       return send(res, 502, { error: 'claim_failed', detail: detail.slice(0, 300) });
     }
+
+    // Begleitdrache-Kampf-EP separat schreiben (eigene Tabelle, siehe
+    // Kommentar beim companion-Lookup oben) - bewusst NACH dem bereits
+    // erfolgreich bestaetigten Haupt-Claim und in einem eigenen try/catch,
+    // damit ein Fehlschlag hier nie den bereits gewaehrten Rest der
+    // Offline-Belohnung gefaehrdet.
+    let dragonXpGain = 0;
+    if (companion && companionXpGain > 0 && companionBattleXpRequired > 0) {
+      try {
+        const newBattleXp = Math.min(companionBattleXpRequired, Number(companion.battle_xp || 0) + companionXpGain);
+        dragonXpGain = newBattleXp - Number(companion.battle_xp || 0);
+        if (dragonXpGain > 0) {
+          await sbFetch(serviceKey, `player_dragons?id=eq.${encodeURIComponent(companion.id)}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ battle_xp: newBattleXp })
+          });
+        }
+      } catch (e) { /* Begleitdrache-EP-Schreibvorgang fehlgeschlagen - der Rest der Offline-Belohnung bleibt trotzdem gueltig */ }
+    }
+
     const claimed = await claimRes.json();
     if (!Array.isArray(claimed) || claimed.length === 0) {
       // Zwischenzeitlich hat eine andere Anfrage (z. B. ein zweiter Tab) den
@@ -500,7 +568,7 @@ module.exports = async function handler(req, res) {
     return send(res, 200, {
       ok: true,
       elapsedSeconds,
-      rewards: { gold: goldGain, xp: xpGain, wood: woodGain, stone: stoneGain, crystals: crystalGain, essence: essenceGain, dragonKills: kills, levelsGained },
+      rewards: { gold: goldGain, xp: xpGain, wood: woodGain, stone: stoneGain, crystals: crystalGain, essence: essenceGain, dragonKills: kills, levelsGained, dragonXpGain },
       newTotals
     });
   } catch (error) {

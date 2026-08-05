@@ -1946,6 +1946,25 @@ async function bkmpIdleClaimOfflineProgress(name) {
 function bkmpIdleApplyOfflineResult(result) {
   if (!result || !result.newTotals || !bkmpIdleState) return;
   Object.assign(bkmpIdleState, result.newTotals);
+  /* Bug-Fix (Spieler-Meldung 05.08.2026: "über nacht offline timer passiert
+     auch nichts an Fortschritt" - gemeint war der Begleitdrache): der Server
+     hat player_dragons.battle_xp bei einem erfolgreichen Offline-Claim jetzt
+     bereits aktualisiert (siehe companion-Lookup-Kommentar in api/claim-
+     idle-offline-progress.js), der lokal geladene bkmpPlayerDragons-Cache
+     (bkmpIdleLoadDragonBreedingState laeuft VOR diesem Aufruf, siehe
+     bkmpIdleOpenModal) kennt den neuen Stand aber noch nicht - ohne dieses
+     Neu-Laden waere der frisch gutgeschriebene Fortschritt erst nach einem
+     erneuten Fenster-Wechsel/Reload sichtbar gewesen. Nur bei tatsaechlich
+     gewaehrten Kampf-EP (>0) neu laden, kein unnoetiger Request im
+     Normalfall (fire-and-forget, blockiert das Oeffnen des Fensters nicht). */
+  if (result.rewards && result.rewards.dragonXpGain > 0 && typeof loadPlayerDragons === 'function' && typeof bkmpGetMcName === 'function') {
+    const name = bkmpGetMcName();
+    if (name) {
+      loadPlayerDragons(name).then(dragons => {
+        if (Array.isArray(dragons)) bkmpPlayerDragons = dragons;
+      }).catch(() => {});
+    }
+  }
 }
 
 function bkmpIdleShowOfflineCard(result) {
@@ -1991,6 +2010,7 @@ function bkmpIdleShowOfflineCard(result) {
       <span>💎 +${bkmpIdleFormatNumber(r.crystals)}</span><span>🧪 +${bkmpIdleFormatNumber(r.essence)}</span>
       <span>🐉 ${bkmpIdleFormatNumber(r.dragonKills || 0)} besiegt</span>
       ${r.levelsGained ? `<span>⬆️ +${r.levelsGained} Level</span>` : ''}
+      ${r.dragonXpGain ? `<span>🐲 +${bkmpIdleFormatNumber(r.dragonXpGain)} Kampf-EP</span>` : ''}
     </div>`;
   card.style.display = '';
   const closeBtn = document.getElementById('idleOfflineCardClose');

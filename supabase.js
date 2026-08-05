@@ -2844,6 +2844,20 @@ function bkmpIsHiddenTestAccount(nameOrKey) {
   return BKMP_HIDDEN_TEST_ACCOUNTS.includes(String(nameOrKey || '').trim().toLowerCase());
 }
 
+/* Duplikat-/Alt-Accounts, die auf ausdruecklichen Nutzerwunsch aus der
+   OEFFENTLICHEN Bestenliste ausgeblendet werden (04.08.2026, Screenshot:
+   "Bagon1990"/"BagonTr02" - "Das waren Bagon 2 Accounts. Die können weg").
+   Bewusst NICHT die vollstaendige Account-Loeschung (existiert bereits im
+   Admin-Panel unter "Spieler-Verwaltung", admin_delete_player_account) -
+   Nutzer-Entscheidung nach Rueckfrage: nur aus der Bestenliste ausblenden,
+   Spielstand/Account bleibt unangetastet. Gleiches Muster/gleiche
+   Filterstelle wie BKMP_HIDDEN_TEST_ACCOUNTS oben (nur an der oeffentlichen
+   Render-Stelle rausgefiltert, im Admin-Panel weiterhin normal sichtbar). */
+const BKMP_HIDDEN_LEADERBOARD_ACCOUNTS = ['bagon1990', 'bagontr02'];
+function bkmpIsHiddenFromLeaderboard(nameOrKey) {
+  return BKMP_HIDDEN_LEADERBOARD_ACCOUNTS.includes(String(nameOrKey || '').trim().toLowerCase());
+}
+
 function bkmpMapPlayerStatsFromSupabase(row) {
   return {
     name: row.display_name,

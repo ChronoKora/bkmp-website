@@ -4238,7 +4238,7 @@
       if (typeof loadLeaderboardStats !== 'function' || !bkmpGetSupabaseClient()) { renderLeaderboard(); return; }
       try {
         const stats = await loadLeaderboardStats();
-        if (stats) bkmpLeaderboardStats = stats.filter(s => !bkmpIsHiddenTestAccount(s.name));
+        if (stats) bkmpLeaderboardStats = stats.filter(s => !bkmpIsHiddenTestAccount(s.name) && !bkmpIsHiddenFromLeaderboard(s.name));
       } catch (e) {
         console.warn('Bestenliste konnte nicht geladen werden.', e);
       }
