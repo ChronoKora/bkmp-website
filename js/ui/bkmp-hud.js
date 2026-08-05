@@ -195,8 +195,13 @@ function bkmpIdleSpawnDragon() {
   bkmpIdleRenderStageBar();
   bkmpIdleMaybeShowEventDragonPopup();
   bkmpIdleBroadcastCombatState(true);
-  if (bkmpIdleCurrentDragon.isBoss && typeof bkmpIdleShowCombatStatus === 'function') {
-    bkmpIdleShowCombatStatus('bosskampf', '👑 Bosskampf!', { strong: true, durationMs: 1400 });
+  if (bkmpIdleCurrentDragon.isBoss) {
+    if (bkmpIdleLastBannerBossIndex !== bkmpIdleCurrentDragon.killIndex && typeof bkmpIdleShowCombatStatus === 'function') {
+      bkmpIdleShowCombatStatus('bosskampf', '👑 Bosskampf!', { strong: true, durationMs: 1400 });
+    }
+    bkmpIdleLastBannerBossIndex = bkmpIdleCurrentDragon.killIndex;
+  } else {
+    bkmpIdleLastBannerBossIndex = null;
   }
 }
 
@@ -299,6 +304,20 @@ function bkmpIdleTrackDmgFloat(targetId, el, ttlMs) {
    Meldung kontrolliert ersetzen"). */
 const BKMP_COMBAT_STATUS_PRIORITY = { niederlage: 4, bosskampf: 3, sieg: 2, naechsteStufe: 1 };
 let bkmpCombatStatusActive = null;
+/* Bug-Fix (Spieler-Meldung 05.08.2026, Screenshot: "Bleibt hier" aktiv,
+   trotzdem dauerhaft wiederkehrendes "Bosskampf!"-Banner): bkmpIdleSpawnDragon()
+   zeigte das Banner bisher UNBEDINGT bei jedem Aufruf mit isBoss=true - bei
+   "Bleibt hier" (auto_advance=false) bleibt current_dragon_index nach jedem
+   Kill unveraendert auf der Boss-Stufe, bkmpIdleSpawnDragon() laeuft aber
+   trotzdem bei JEDEM neuen Kill erneut (baut denselben Boss einfach mit
+   vollem HP neu auf) - das Banner feuerte dadurch bei jedem einzelnen Kill
+   erneut, nicht nur beim ersten Erreichen der Stufe. Merkt sich jetzt den
+   zuletzt tatsaechlich bebannerten Stufen-Index; wird bei JEDEM Nicht-Boss-
+   Dragon (also sobald man die Boss-Stufe wieder verlaesst - Sieg+Weiterzug,
+   Niederlage+Rueckzug, Prestige-Reset) wieder geleert, damit ein spaeteres
+   erneutes Erreichen derselben (oder einer anderen) Boss-Stufe das Banner
+   wieder korrekt einmalig zeigt. */
+let bkmpIdleLastBannerBossIndex = null;
 function bkmpIdleShowCombatStatus(type, text, opts) {
   opts = opts || {};
   const field = document.getElementById('idleBattlefield');

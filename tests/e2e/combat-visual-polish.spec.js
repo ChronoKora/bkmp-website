@@ -316,6 +316,65 @@ test.describe('Kampf-Feinschliff (visuell)', () => {
     expect(bannerText).toContain('Bosskampf');
   });
 
+  /* REGRESSION (Spieler-Meldung 05.08.2026, Screenshot: "Bleibt hier" aktiv,
+     Bosskampf-Banner erscheint trotzdem dauerhaft wiederkehrend statt nur
+     einmal beim Erreichen der Stufe) - siehe Root-Cause-Kommentar bei
+     bkmpIdleLastBannerBossIndex (js/ui/bkmp-hud.js). */
+  test('REGRESSION: Bosskampf-Banner erscheint nur beim ERSTEN Erreichen der Stufe, nicht bei jedem erneuten Spawn derselben Stufe ("Bleibt hier")', async ({ page, qaBaseURL, fixtureData }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+
+    const result = await page.evaluate(() => {
+      bkmpIdleState.current_dragon_index = 24;
+      bkmpIdleState.highest_dragon_index = Math.max(bkmpIdleState.highest_dragon_index || 0, 24);
+      bkmpIdleSpawnDragon();
+      const firstBanner = document.querySelector('#idleBattlefield .idle-combat-status');
+      const firstText = firstBanner ? firstBanner.textContent : null;
+      // Banner manuell entfernen (simuliert Ablauf der durationMs) statt nur
+      // die bereits anderswo getestete "neuere Meldung ersetzt aeltere"-
+      // Prioritaetsregel erneut zu pruefen - hier geht es um einen echten
+      // ZWEITEN Spawn-Aufruf mit unveraendertem Index.
+      if (firstBanner) firstBanner.remove();
+      bkmpCombatStatusActive = null;
+      // "Bleibt hier" (auto_advance=false): current_dragon_index bleibt nach
+      // einem Kill unveraendert, derselbe Boss wird einfach mit vollem HP
+      // neu aufgebaut - genau das simuliert ein zweiter bkmpIdleSpawnDragon()-
+      // Aufruf ohne Indexwechsel.
+      bkmpIdleSpawnDragon();
+      const secondBanner = document.querySelector('#idleBattlefield .idle-combat-status');
+      return { firstText, secondBannerPresent: !!secondBanner };
+    });
+    expect(result.firstText).toContain('Bosskampf');
+    expect(result.secondBannerPresent).toBe(false);
+  });
+
+  test('REGRESSION: verlaesst man die Boss-Stufe (Nicht-Boss-Stufe dazwischen) und erreicht sie erneut, zeigt das Banner wieder', async ({ page, qaBaseURL, fixtureData }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+
+    const result = await page.evaluate(() => {
+      bkmpIdleState.current_dragon_index = 24;
+      bkmpIdleSpawnDragon();
+      document.querySelector('#idleBattlefield .idle-combat-status')?.remove();
+      bkmpCombatStatusActive = null;
+
+      // Nicht-Boss-Stufe dazwischen (z.B. Rueckzug nach einer Niederlage,
+      // oder ein Prestige-Reset, der current_dragon_index zuruecksetzt).
+      bkmpIdleState.current_dragon_index = 23;
+      bkmpIdleSpawnDragon();
+      const nonBossBannerPresent = !!document.querySelector('#idleBattlefield .idle-combat-status');
+
+      // Zurueck auf die Boss-Stufe - Banner muss wieder erscheinen, nicht
+      // dauerhaft unterdrueckt bleiben.
+      bkmpIdleState.current_dragon_index = 24;
+      bkmpIdleSpawnDragon();
+      const secondBanner = document.querySelector('#idleBattlefield .idle-combat-status');
+      return { nonBossBannerPresent, secondBannerText: secondBanner ? secondBanner.textContent : null };
+    });
+    expect(result.nonBossBannerPresent).toBe(false);
+    expect(result.secondBannerText).toContain('Bosskampf');
+  });
+
   test('Belohnungs-Hochschweb-Anzeige: Deckel bei schnell aufeinanderfolgenden Siegen, kein unbegrenztes DOM-Wachstum', async ({ page, qaBaseURL, fixtureData }) => {
     await openAndLogin(page, qaBaseURL, fixtureData);
     await waitForDragonReady(page);
