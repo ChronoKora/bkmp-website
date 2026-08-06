@@ -5507,6 +5507,15 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   background: linear-gradient(120deg, rgba(167, 139, 250, 0.16), rgba(56, 189, 248, 0.1));
   border: 1px dashed color-mix(in srgb, var(--gold) 55%, var(--line));
   font-size: 0.85rem;
+  /* Perf-Audit 06.08.2026 (INP-Fix #idleOfflineCardClose, siehe
+     bkmpIdleCloseOfflineCardAnimated in idledorf.js) - weicher Ausblend-
+     statt hartem display:none-Sprung, rein optisch, keine neue Funktion. */
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.idle-dorf-offline-card.idle-offline-card-closing {
+  opacity: 0;
+  transform: scale(0.97);
+  pointer-events: none;
 }
 .idle-dorf-offline-card strong { display: block; margin-bottom: 0.4rem; }
 .idle-offline-rewards { display: flex; flex-wrap: wrap; gap: 0.5rem 0.9rem; font-weight: 600; }

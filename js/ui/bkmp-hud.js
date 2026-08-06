@@ -134,11 +134,7 @@ function bkmpIdleTriggerDragonSpawnAnim(dragonSprite) {
      rechtfertigen. Gleicher Neustart-Trick wie bkmpIdlePlaySpriteAttack,
      deshalb sicher mehrfach schnell hintereinander aufrufbar, ohne sich zu
      stapeln. */
-  const startAnim = () => {
-    dragonSprite.classList.remove('idle-dragon-spawn-in');
-    void dragonSprite.offsetWidth;
-    dragonSprite.classList.add('idle-dragon-spawn-in');
-  };
+  const startAnim = () => bkmpIdleRestartAnimClass(dragonSprite, 'idle-dragon-spawn-in');
   const dragonVideo = dragonSprite.querySelector('video.idle-dragon-sprite-video');
   if (dragonVideo && dragonVideo.readyState < 2 /* HAVE_CURRENT_DATA */) {
     let triggered = false;
@@ -482,15 +478,40 @@ function bkmpIdleSpawnProjectile(kind, amount, isCrit) {
   }
 }
 
+/* Perf-Audit 06.08.2026 (Nutzer-Messung: 20-48 Layouts/48-92 Style-
+   Neuberechnungen pro Sekunde trotz "Effekte: Aus"): der bisherige
+   "remove class -> void el.offsetWidth -> add class"-Neustart-Trick (zum
+   zuverlaessigen Neustarten einer CSS-Animation bei einem erneuten Treffer
+   waehrend die vorige noch laeuft) erzwingt mit "void el.offsetWidth" einen
+   SYNCHRONEN Layout-Read genau zwischen den beiden Schreibvorgaengen - das
+   ist die Standard-Technik, aber sie loest bei jedem Aufruf einen echten
+   "Forced Synchronous Layout" aus (per Code-Audit an 5 Stellen in diesem
+   Modul gefunden: hier + bkmpIdleSpawnHitFlash 3x + bkmpIdleTriggerDragonSpawnAnim,
+   jeweils bis zu mehrmals pro Kampf-Tick). Fix: derselbe zuverlaessige
+   Neustart, aber ueber einen doppelten requestAnimationFrame statt eines
+   erzwungenen synchronen Reflows - der Browser hat die "ohne Klasse"-
+   Zwischenzustand dann bereits durch den natuerlichen naechsten Frame
+   gemalt (kein Forced Reflow noetig), der Neustart bleibt exakt so
+   zuverlaessig wie vorher (etablierte, breit genutzte Technik), nur um ein
+   bis zwei Frames (~16-32ms) verzoegert - fuer einen Hit-Flash/Sprite-Effekt
+   nicht wahrnehmbar, keine sichtbare Verhaltensaenderung. */
+function bkmpIdleRestartAnimClass(el, className) {
+  if (!el) return;
+  el.classList.remove(className);
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      if (el.isConnected) el.classList.add(className);
+    });
+  });
+}
+
 /* Spielt den Angriffs-Frame-Zyklus des Drachensprites ab (Elementaratem).
    Nutzt animationend statt eines festen Timeouts, damit ein neuer Angriff
    die laufende Animation sauber neu startet, auch bei sehr kurzen Ticks. */
 function bkmpIdlePlaySpriteAttack() {
   const sprite = document.getElementById('idleDragonSprite');
   if (!sprite) return;
-  sprite.classList.remove('idle-sprite-attacking');
-  void sprite.offsetWidth;
-  sprite.classList.add('idle-sprite-attacking');
+  bkmpIdleRestartAnimClass(sprite, 'idle-sprite-attacking');
 }
 
 /* Kampf-Feinschliff (03.08.2026, Nutzer-Auftrag "Trefferfeedback fuer die
@@ -526,22 +547,14 @@ let bkmpVillagePulseRemoveTimer = null;
 function bkmpIdleSpawnHitFlash(targetId) {
   const el = document.getElementById(targetId);
   if (!el) return;
-  el.classList.remove('idle-hit-flash');
-  void el.offsetWidth;
-  el.classList.add('idle-hit-flash');
+  bkmpIdleRestartAnimClass(el, 'idle-hit-flash');
   if (targetId === 'idleVillage') {
-    el.classList.remove('idle-village-damage-pulse');
-    void el.offsetWidth;
-    el.classList.add('idle-village-damage-pulse');
+    bkmpIdleRestartAnimClass(el, 'idle-village-damage-pulse');
     window.clearTimeout(bkmpVillagePulseRemoveTimer);
     bkmpVillagePulseRemoveTimer = window.setTimeout(() => el.classList.remove('idle-village-damage-pulse'), 420);
     const hpFill = document.getElementById('idleVillageHpFill');
     const hpBar = hpFill ? hpFill.parentElement : null;
-    if (hpBar) {
-      hpBar.classList.remove('idle-hp-bar-flash');
-      void hpBar.offsetWidth;
-      hpBar.classList.add('idle-hp-bar-flash');
-    }
+    if (hpBar) bkmpIdleRestartAnimClass(hpBar, 'idle-hp-bar-flash');
   }
 }
 

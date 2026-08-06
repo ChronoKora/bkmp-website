@@ -361,16 +361,41 @@
            aufzuspueren (dutzende Stellen), beobachtet ein MutationObserver
            einfach, ob GERADE ein Unter-Dialog (oder das "Mehr"-Menue)
            sichtbar ist, und haelt per pushState() genau EINEN "Puffer"-
-           Eintrag in der History bereit, solange das der Fall ist. */
+           Eintrag in der History bereit, solange das der Fall ist.
+
+           Perf-Audit 06.08.2026 (Code-Audit-Fund, als "LIKELY LEAK"
+           markiert): beobachtet mit subtree:true den KOMPLETTEN
+           document.body - jeder classList-Wechsel irgendwo auf der Seite
+           (u.a. jeder Kampf-Treffer/Hit-Flash/Schadenszahl, siehe
+           bkmpIdleRestartAnimClass in js/ui/bkmp-hud.js, laeuft mehrfach
+           pro Kampf-Tick) loest dadurch bisher JEDES MAL erneut den
+           relativ teuren querySelectorAll('.joke-overlay.visible')-Scan in
+           visibleSubOverlays() aus - rein App-Modus-spezifisch
+           (window.BKMP_APP_MODE), betrifft die normale Website/den
+           Browser-Modus nicht. Das eigentliche Beobachtungsziel bleibt
+           bewusst unveraendert (ein enger geratener Container haette
+           riskiert, echte Sub-Overlays ausserhalb davon zu verpassen) -
+           stattdessen werden mehrere Mutationen, die im selben Frame
+           eintreffen, jetzt zu EINEM Scan gebuendelt (rAF-Coalescing) -
+           exakt dieselbe Erkennungs-Genauigkeit (jede echte Sichtbarkeits-
+           Aenderung wird weiterhin spaetestens im naechsten Frame erkannt),
+           nur ohne wiederholte Scans fuer Aenderungen, die ohnehin
+           zusammen in denselben Frame fallen. */
+        var appGuardRafPending = false;
         new MutationObserver(function () {
-          var moreOpen = window.__bkmpAppMoreSheetOpen && window.__bkmpAppMoreSheetOpen();
-          var hasSub = visibleSubOverlays().length > 0 || moreOpen;
-          if (hasSub && !guardPushed) {
-            guardPushed = true;
-            history.pushState({ bkmpAppGuard: true }, '');
-          } else if (!hasSub) {
-            guardPushed = false;
-          }
+          if (appGuardRafPending) return;
+          appGuardRafPending = true;
+          requestAnimationFrame(function () {
+            appGuardRafPending = false;
+            var moreOpen = window.__bkmpAppMoreSheetOpen && window.__bkmpAppMoreSheetOpen();
+            var hasSub = visibleSubOverlays().length > 0 || moreOpen;
+            if (hasSub && !guardPushed) {
+              guardPushed = true;
+              history.pushState({ bkmpAppGuard: true }, '');
+            } else if (!hasSub) {
+              guardPushed = false;
+            }
+          });
         }).observe(document.body, { attributes: true, attributeFilter: ['class'], subtree: true });
 
         /* "Auf den Startbildschirm holen" - Chrome verlangt fuer den

@@ -964,7 +964,13 @@ function bkmpIdleHandleDragonDefeated() {
      ohne die eigentliche (bereits synchron abgeschlossene) Zustands-
      aenderung je zu verzoegern. */
   const defeatedSprite = document.getElementById('idleDragonSprite');
-  if (defeatedSprite) {
+  /* Perf-Audit 06.08.2026: derselbe rAF-basierte Neustart wie
+     bkmpIdleRestartAnimClass() (js/ui/bkmp-hud.js) statt "void offsetWidth"
+     - vermeidet den erzwungenen synchronen Reflow bei JEDEM Kill, siehe
+     dortiger Kommentar fuer die volle Begruendung. */
+  if (defeatedSprite && typeof bkmpIdleRestartAnimClass === 'function') {
+    bkmpIdleRestartAnimClass(defeatedSprite, 'idle-dragon-defeat-out');
+  } else if (defeatedSprite) {
     defeatedSprite.classList.remove('idle-dragon-defeat-out');
     void defeatedSprite.offsetWidth;
     defeatedSprite.classList.add('idle-dragon-defeat-out');
@@ -1712,6 +1718,7 @@ function bkmpIdleAutoBuyUpgrades() {
   const maxPerTick = bkmpIdleAutoBuyMaxPurchasesPerTick();
   const excludedResources = bkmpIdleGetAutoBuyExcludedResources();
   let guard = 0;
+  let purchasedCount = 0;
   while (guard < maxPerTick) {
     guard++;
     const purchases = bkmpIdleState.upgrade_purchases || {};
@@ -1728,11 +1735,37 @@ function bkmpIdleAutoBuyUpgrades() {
         return a.cost - b.cost;
       });
     if (affordable.length === 0) break;
-    bkmpIdleBuyUpgrade(affordable[0].def.id);
+    /* Perf-Audit 06.08.2026 (Nutzer-Messung: 22-61% CPU/20-48 Layouts pro
+       Sekunde im Kampffenster trotz "Effekte: Aus"): bkmpIdleBuyUpgrade()
+       loeste bisher bei JEDEM einzelnen Kauf einen kompletten
+       Upgrades-Panel- UND HUD-innerHTML-Neuaufbau aus - bei bis zu
+       maxPerTick (Standard 50, mit Prestige-/Gilden-Bonus mehr) Kaeufen
+       INNERHALB EINES EINZIGEN Kampf-Ticks (~400-900ms) konnten das
+       Dutzende vollstaendige DOM-Neuaufbauten pro Tick sein, VOELLIG
+       unabhaengig davon, ob der Upgrades-Tab ueberhaupt sichtbar war (siehe
+       Code-Audit: bkmpIdleOpenModal() rendert nur den aktiven Tab, ein
+       Tab-Wechsel baut jeden Zielpanel ohnehin komplett neu - ein
+       ausgelassenes Zwischen-Rendern eines unsichtbaren Panels geht daher
+       nie verloren). deferRender=true unterdrueckt hier nur die teuren
+       DOM-Rebuilds - Ressourcenabzug/Stufe/bkmpIdleAccrueProductionBuildings
+       (in bkmpIdleBuyUpgrade selbst, siehe dort) laufen bei JEDEM einzelnen
+       Kauf unveraendert weiter, exakt wie vorher - keine Spielwert-Aenderung. */
+    bkmpIdleBuyUpgrade(affordable[0].def.id, true);
+    purchasedCount++;
+  }
+  /* EIN gebuendelter Render-Durchlauf nach dem gesamten Kauf-Batch statt
+     einem pro Kauf. HUD ist immer sichtbar, sobald das Fenster offen ist -
+     bleibt unconditional. Das Upgrades-Panel selbst nur, wenn es GERADE der
+     sichtbare Tab ist (identisches Muster wie bkmpIdleRefreshLiveTabsRender
+     weiter unten in dieser Datei) - unsichtbar wird es beim naechsten
+     Tab-Wechsel ohnehin frisch aufgebaut. */
+  if (purchasedCount > 0) {
+    bkmpIdleRenderHud();
+    if (bkmpIdleActiveTab === 'upgrades') bkmpIdleRenderUpgradesPanel();
   }
 }
 
-function bkmpIdleBuyUpgrade(id) {
+function bkmpIdleBuyUpgrade(id, deferRender) {
   const def = BKMP_IDLE_UPGRADES.find(u => u.id === id);
   if (!def || !bkmpIdleState) return;
   const purchases = bkmpIdleState.upgrade_purchases || (bkmpIdleState.upgrade_purchases = {});
@@ -1742,9 +1775,17 @@ function bkmpIdleBuyUpgrade(id) {
   if ((bkmpIdleState[def.resource] || 0) < cost) return;
   bkmpIdleState[def.resource] -= cost;
   purchases[id] = level + 1;
+  /* Direkt hier statt nur ueber bkmpIdleRenderUpgradesPanel() (das selbst
+     denselben Aufruf am Anfang macht, siehe dort) - laeuft dadurch bei JEDEM
+     Kauf weiter, auch wenn deferRender=true den DOM-Rebuild ueberspringt.
+     Reine Verschiebung der bereits bestehenden Aufrufstelle, kein neuer
+     Aufruf, keine geaenderte Haeufigkeit/Kadenz. */
+  bkmpIdleAccrueProductionBuildings();
   bkmpIdleRecomputeEffectiveStats();
-  bkmpIdleRenderUpgradesPanel();
-  bkmpIdleRenderHud();
+  if (!deferRender) {
+    bkmpIdleRenderUpgradesPanel();
+    bkmpIdleRenderHud();
+  }
   bkmpIdleQueueSync();
 }
 
@@ -2106,9 +2147,40 @@ function bkmpIdleApplyOfflineResult(result) {
   }
 }
 
+/* Perf-Audit 06.08.2026 (Nutzer-Messung: 288-312ms INP beim Klick auf
+   #idleOfflineCardClose): der Klick-Handler selbst war schon immer trivial
+   (nur "card.style.display='none'") - die gemessene Verzoegerung kommt aus
+   dem, was der BROWSER daraus macht: .idle-dorf-offline-card ist
+   position:relative, sitzt in normalem Dokumentfluss GANZ OBEN im Kampf-
+   Panel (vor Stufenleiste/Schlachtfeld/Statistik-Spalte) - ein sofortiges
+   "display:none" zwingt den kompletten, teils sehr grossen restlichen
+   Panel-Inhalt zu einem SYNCHRONEN Reflow, dessen Kosten die Event-Timing-
+   API dem Klick noch zurechnet (bestaetigt per PerformanceObserver({
+   entryTypes:['event']}) vor/nach diesem Fix, siehe Abschlussbericht).
+   Fix (identisch zum vom Auftrag selbst vorgeschlagenen Muster): der
+   Klick-Handler selbst wird noch leichter (nur eine CSS-Klasse setzen,
+   praktisch kostenlos), die eigentliche, layout-relevante Aenderung
+   (display:none, reklamiert den Platz zurueck) passiert ERST beim naechsten
+   Frame per rAF-Timeout - liegt dadurch AUSSERHALB des vom Klick gemessenen
+   Zeitfensters. Sichtbar bleibt eine kurze, weiche Ausblend-Transition
+   (style.css) statt eines harten Sprungs - keine Funktionsaenderung, kein
+   doppeltes Schliessen moeglich (Klasse-bereits-gesetzt-Wache). */
+let bkmpIdleOfflineCardCloseTimer = null;
+function bkmpIdleCloseOfflineCardAnimated(card) {
+  if (!card || card.classList.contains('idle-offline-card-closing')) return;
+  card.classList.add('idle-offline-card-closing');
+  window.clearTimeout(bkmpIdleOfflineCardCloseTimer);
+  bkmpIdleOfflineCardCloseTimer = window.setTimeout(() => {
+    card.style.display = 'none';
+    card.classList.remove('idle-offline-card-closing');
+  }, 220);
+}
+
 function bkmpIdleShowOfflineCard(result) {
   const card = document.getElementById('idleDorfOfflineCard');
   if (!card) return;
+  card.classList.remove('idle-offline-card-closing');
+  window.clearTimeout(bkmpIdleOfflineCardCloseTimer);
   if (result && result.authError) {
     card.innerHTML = `
       <button type="button" class="idle-offline-close" id="idleOfflineCardClose" aria-label="Schließen">&times;</button>
@@ -2116,7 +2188,7 @@ function bkmpIdleShowOfflineCard(result) {
       <div class="idle-offline-rewards"><span>Deine Sitzung war beim Laden nicht mehr gültig. Falls das öfter passiert: einmal aus- und wieder einloggen.</span></div>`;
     card.style.display = '';
     const closeErrBtn = document.getElementById('idleOfflineCardClose');
-    if (closeErrBtn) closeErrBtn.addEventListener('click', () => { card.style.display = 'none'; });
+    if (closeErrBtn) closeErrBtn.addEventListener('click', () => bkmpIdleCloseOfflineCardAnimated(card));
     return;
   }
   /* Bug-Fix (Spieler-Meldung ChronoKora, 20.07., siehe ausfuehrlicher
@@ -2134,7 +2206,7 @@ function bkmpIdleShowOfflineCard(result) {
       <div class="idle-offline-rewards"><span>Kurzes Server-Problem - dein Fortschritt geht dadurch NICHT verloren. Bitte die Seite neu laden, dann klappt der Abruf normalerweise beim nächsten Versuch.</span></div>`;
     card.style.display = '';
     const closeSrvBtn = document.getElementById('idleOfflineCardClose');
-    if (closeSrvBtn) closeSrvBtn.addEventListener('click', () => { card.style.display = 'none'; });
+    if (closeSrvBtn) closeSrvBtn.addEventListener('click', () => bkmpIdleCloseOfflineCardAnimated(card));
     return;
   }
   if (!result || !result.rewards || !result.elapsedSeconds || result.elapsedSeconds < 60) { card.style.display = 'none'; return; }
@@ -2153,7 +2225,7 @@ function bkmpIdleShowOfflineCard(result) {
     </div>`;
   card.style.display = '';
   const closeBtn = document.getElementById('idleOfflineCardClose');
-  if (closeBtn) closeBtn.addEventListener('click', () => { card.style.display = 'none'; });
+  if (closeBtn) closeBtn.addEventListener('click', () => bkmpIdleCloseOfflineCardAnimated(card));
 }
 
 /* Spieler-Report (16.07., Screenshot Kampf-Tab): "Habe ich das Gefühl,
