@@ -564,8 +564,25 @@ function bkmpIdleRenderHud() {
      Viewports unveraendert die bestehende Vorlage weiter unten (dort
      passt die volle Statuszeile besser). Wird bei jedem Tick neu
      ausgewertet (kein "einmal beim Laden" Caching noetig wie bei der
-     Tableiste), reagiert dadurch live auf Fenstergroessenaenderungen. */
-  if (window.BKMP_APP_MODE || window.matchMedia('(max-width: 760px)').matches) {
+     Tableiste), reagiert dadurch live auf Fenstergroessenaenderungen.
+     Bug-Fix 06.08.2026 (Spieler-Screenshot: FX-Icon/Feedback/Schliessen
+     ueberlappen sich in einer dichten Ecke oben rechts): dieser Schwellwert
+     war beim heutigen Mobile-Redesign (alle anderen Breakpoints 640/760/768
+     -> 999px vereinheitlicht) UEBERSEHEN worden - blieb bei 760px, waehrend
+     bkmpProtoChudWantCompact()/bkmpIdleWantCompactTabNav() bereits auf 999px
+     liefen. In der dadurch entstandenen Luecke (761-999px, z.B. ein Tablet
+     im Hochformat oder ein breiteres Handy im Querformat) hielt SIE HIER
+     die Ansicht faelschlich fuer "Desktop" und nahm den unteren Zweig -
+     der portalisiert #idleFxModeBtn (das TEXT-Original "🚫 Effekte: Aus",
+     nicht das kompakte Icon bkmpProtoChudFxBtn) in .idle-hud-top hinein UND
+     setzt dabei seine sichtbare Anzeige zurueck, waehrend System A
+     (bkmp-proto-compact-hud.js) im GLEICHEN Breitenbereich bereits davon
+     ausging, kompakt zu sein und #idleDorfHud eigentlich versteckt haben
+     wollte - je nach Aufrufreihenfolge/Cache-Stand konnte dadurch das
+     Original-Textbutton-Fragment ("🚫"-Icon + das abgeschnittene Wortende
+     "...e:" aus "Effekte:") sichtbar neben Feedback/Schliessen auftauchen.
+     Fix: identischer 999px-Schwellwert wie die anderen beiden Systeme. */
+  if (window.BKMP_APP_MODE || window.matchMedia('(max-width: 999px)').matches) {
     const playerName = (typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : '') || bkmpIdleState.name_key || 'Spieler';
     hud.innerHTML = `
       <div class="idle-hud-app-top">
