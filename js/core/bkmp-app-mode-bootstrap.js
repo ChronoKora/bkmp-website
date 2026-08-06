@@ -53,11 +53,19 @@
        Liste, die alten Gruppen-Huellen werden weiterhin einmalig beim
        ersten Aufbau entfernt (rein kosmetisch, spart ein paar leere
        DOM-Knoten), muessen aber nie wieder hergestellt werden. */
-    var BKMP_TAB_OVERFLOW_PRIMARY_IDS = ['idleTabBtnKampf', 'idleTabBtnUpgrades', 'idleTabBtnSkilltree', 'idleTabBtnPrestige', 'idleTabBtnDrachen', 'idleTabBtnDungeon'];
+    /* MOBILE-REDESIGN (06.08.2026, Auftrag Abschnitt 11): von 6 auf die vom
+       Auftrag selbst genannten 4 Haupt-Tabs reduziert (deckt sich mit
+       BKMP_PROTO_NAV_PRIMARY in bkmp-proto-compact-hud.js) - Skilltree und
+       Dungeon wandern in die Gruppen unten (Fortschritt bzw. Kampf & Rang).
+       Nebenbefund beim Durchgehen: "Gilden-Arena" (idleTabBtnClan, seit
+       30.07. umbenannt von "Clan") war in KEINER Gruppe gelistet und landete
+       dadurch bisher nur ueber das ungruppierte Sicherheitsnetz weiter unten
+       im Menue - jetzt sauber der Gilde-Gruppe zugeordnet. */
+    var BKMP_TAB_OVERFLOW_PRIMARY_IDS = ['idleTabBtnKampf', 'idleTabBtnUpgrades', 'idleTabBtnPrestige', 'idleTabBtnDrachen'];
     var BKMP_TAB_OVERFLOW_GROUPS = [
-      { title: '📈 Fortschritt', ids: ['idleTabBtnRunen', 'idleTabBtnErfolge'] },
-      { title: '⚔️ Kampf & Rang', ids: ['idleTabBtnArena', 'idleTabBtnBestenliste', 'idleTabBtnTurm'] },
-      { title: '🛡️ Gilde', ids: ['idleTabBtnGilde', 'idleTabBtnGildeTech', 'idleTabBtnGildeBoss'] },
+      { title: '📈 Fortschritt', ids: ['idleTabBtnSkilltree', 'idleTabBtnRunen', 'idleTabBtnErfolge'] },
+      { title: '⚔️ Kampf & Rang', ids: ['idleTabBtnDungeon', 'idleTabBtnArena', 'idleTabBtnBestenliste', 'idleTabBtnTurm'] },
+      { title: '🛡️ Gilde', ids: ['idleTabBtnGilde', 'idleTabBtnGildeTech', 'idleTabBtnGildeBoss', 'idleTabBtnClan'] },
       { title: '🏆 Sammlung', ids: ['idleTabBtnSkins'] }
     ];
     var bkmpTabOverflowAllIdsInOrder = null;
@@ -73,9 +81,14 @@
        existierte vorher genauso) auf so einem Geraet die alte Desktop-
        Tableiste in einem viel zu flachen Fenster statt der dafuer gebauten
        kompakten Fassung. */
+    /* MOBILE-REDESIGN (06.08.2026): 760px -> 999px, siehe identischer
+       Kommentar bei bkmpProtoChudWantCompact() in bkmp-proto-compact-hud.js
+       (dieselbe Bedingung, muss synchron bleiben). Schliesst die vorher
+       existierende 761-999px-Luecke, in der weder die kompakte Mobil-
+       Fassung noch das echte "min-width:1000px"-Breitgrid griff. */
     function bkmpIdleWantCompactTabNav() {
       return !!(window.BKMP_APP_MODE
-        || window.matchMedia('(max-width: 760px)').matches
+        || window.matchMedia('(max-width: 999px)').matches
         || window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches);
     }
 

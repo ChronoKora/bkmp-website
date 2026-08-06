@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BKMP Asset Generator</title>
+<style>
+  :root {
+    --bg: #0b0710;
+    --panel: #150d20;
+    --panel-border: #3a2a52;
+    --accent: #a855f7;
+    --accent-soft: #7c3aed;
+    --gold: #d4af37;
+    --text: #ece6f5;
+    --muted: #a89bbf;
+    --checker-a: #1a1224;
+    --checker-b: #241736;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: radial-gradient(circle at top, #1c1128 0%, var(--bg) 60%);
+    color: var(--text);
+    font-family: "Segoe UI", Tahoma, Verdana, sans-serif;
+    padding: 2rem 1.25rem 4rem;
+  }
+  header.top {
+    max-width: 1200px;
+    margin: 0 auto 1.5rem;
+    text-align: center;
+  }
+  header.top h1 {
+    margin: 0 0 0.35rem;
+    font-size: 1.9rem;
+    letter-spacing: 0.03em;
+    background: linear-gradient(120deg, var(--gold), var(--accent));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  header.top .subtitle { color: var(--muted); font-size: 0.95rem; margin: 0; }
+  .toolbar {
+    max-width: 1200px;
+    margin: 0 auto 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    align-items: center;
+    justify-content: center;
+  }
+  .toolbar input[type="search"] {
+    flex: 1 1 240px;
+    max-width: 340px;
+    padding: 0.55rem 0.8rem;
+    border-radius: 999px;
+    border: 1px solid var(--panel-border);
+    background: var(--panel);
+    color: var(--text);
+    font-size: 0.9rem;
+  }
+  .filter-btn {
+    padding: 0.45rem 0.9rem;
+    border-radius: 999px;
+    border: 1px solid var(--panel-border);
+    background: var(--panel);
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .filter-btn.active {
+    color: #0b0710;
+    background: linear-gradient(120deg, var(--gold), var(--accent));
+    border-color: transparent;
+  }
+  .count-line {
+    max-width: 1200px;
+    margin: 0 auto 1rem;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+  .grid {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1.1rem;
+  }
+  .asset-card {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 14px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+  .asset-card.hidden { display: none; }
+  .asset-thumb-wrap {
+    border-radius: 10px;
+    overflow: hidden;
+    background-image:
+      linear-gradient(45deg, var(--checker-a) 25%, transparent 25%),
+      linear-gradient(-45deg, var(--checker-a) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, var(--checker-a) 75%),
+      linear-gradient(-45deg, transparent 75%, var(--checker-a) 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    background-color: var(--checker-b);
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .asset-thumb { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .asset-id { margin: 0; font-size: 1rem; color: var(--gold); word-break: break-all; }
+  .asset-meta { margin: 0; font-size: 0.78rem; color: var(--muted); display: grid; gap: 0.3rem; }
+  .asset-meta div { display: flex; justify-content: space-between; gap: 0.5rem; }
+  .asset-meta dt { color: var(--muted); }
+  .asset-meta dd { margin: 0; color: var(--text); text-align: right; }
+  .asset-meta-path { word-break: break-all; font-size: 0.72rem; }
+  .asset-meta-sub { color: var(--muted); font-size: 0.72rem; }
+  .empty-state {
+    max-width: 560px;
+    margin: 3rem auto;
+    text-align: center;
+    background: var(--panel);
+    border: 1px dashed var(--panel-border);
+    border-radius: 16px;
+    padding: 2.5rem 1.5rem;
+    color: var(--muted);
+  }
+  .empty-state-emoji { font-size: 2.4rem; margin: 0 0 0.5rem; }
+  .empty-state h2 { color: var(--text); margin: 0 0 0.6rem; }
+  .empty-state code {
+    background: rgba(168, 85, 247, 0.15);
+    border-radius: 6px;
+    padding: 0.1rem 0.4rem;
+    color: var(--gold);
+  }
+  footer.note {
+    max-width: 1200px;
+    margin: 2.5rem auto 0;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.75rem;
+  }
+</style>
+</head>
+<body>
+  <header class="top">
+    <h1>BKMP Asset Generator</h1>
+    <p class="subtitle">Lokale Vorschau - generiert am 2026-08-05T23:16:48Z</p>
+  </header>
+
+  <div class="toolbar">
+    <input type="search" id="searchInput" placeholder="Nach Asset-ID suchen ...">
+    <button type="button" class="filter-btn active" data-category="">Alle</button>
+      <button type="button" class="filter-btn" data-category="icons">icons</button>
+      <button type="button" class="filter-btn" data-category="buttons">buttons</button>
+      <button type="button" class="filter-btn" data-category="panels">panels</button>
+      <button type="button" class="filter-btn" data-category="frames">frames</button>
+      <button type="button" class="filter-btn" data-category="effects">effects</button>
+      <button type="button" class="filter-btn" data-category="backgrounds">backgrounds</button>
+  </div>
+
+  <p class="count-line" id="countLine">10 Asset(s) im Manifest</p>
+
+  <main class="grid" id="assetGrid">
+    <article class="asset-card" data-category="effects" data-id="battle-max-dragon-aura">
+      <div class="asset-thumb-wrap">
+        <img class="asset-thumb" src="assets/generated/effects/battle-max-dragon-aura.png" alt="battle-max-dragon-aura" loading="lazy">
+      </div>
+      <h3 class="asset-id">battle-max-dragon-aura</h3>
+      <dl class="asset-meta">
+        <div><dt>Kategorie</dt><dd>effects</dd></div>
+        <div><dt>Preset</dt><dd>fantasy-effect</dd></div>
+        <div><dt>Groesse</dt><dd>900&times;900 <span class="asset-meta-sub">(API: 1024x1024)</span></dd></div>
+        <div><dt>Modell</dt><dd>gpt-image-1.5</dd></div>
+        <div><dt>Qualitaet</dt><dd>medium</dd></div>
+        <div><dt>Pfad</dt><dd class="asset-meta-path">assets/generated/effects/battle-max-dragon-aura.png</dd></div>
+        <div><dt>Alpha</dt><dd>Ja</dd></div>
+        <div><dt>Erstellt</dt><dd>2026-08-05T23:15:23Z</dd></div>
+      </dl>
+    </article>
+    <article class="asset-card" data-category="effects" data-id="battle-max-foreground">
+      <div class="asset-thumb-wrap">
+        <img class="asset-thumb" src="assets/generated/effects/battle-max-foreground.png" alt="battle-max-foreground" loading="lazy">
+      </div>
+      <h3 class="asset-id">battle-max-foreground</h3>
+      <dl class="asset-meta">
+        <div><dt>Kategorie</dt><dd>effects</dd></div>
+        <div><dt>Preset</dt><dd>fantasy-effect</dd></div>
+        <div><dt>Groesse</dt><dd>1600&times;500 <span class="asset-meta-sub">(API: 1536x1024)</span></dd></div>
+        <div><dt>Modell</dt><dd>gpt-image-1.5</dd></div>
+        <div><dt>Qualitaet</dt><dd>medium</dd></div>
+        <div><dt>Pfad</dt><dd class="asset-meta-path">assets/generated/effects/battle-max-foreground.png</dd></div>
+        <div><dt>Alpha</dt><dd>Ja</dd></div>
+        <div><dt>Erstellt</dt><dd>2026-08-05T23:16:41Z</dd></div>
+      </dl>
+    </article>
+    <article class="asset-card" data-category="effects" data-id="battle-max-impact">
+      <div class="asset-thumb-wrap">
+        <img class="asset-thumb" src="assets/generated/effects/battle-max-impact.png" alt="battle-max-impact" loading="lazy">
+      </div>
+      <h3 class="asset-id">battle-max-impact</h3>
+      <dl class="asset-meta">
+        <div><dt>Kategorie</dt><dd>effects</dd></div>
+        <div><dt>Preset</dt><dd>fantasy-effect</dd></div>
+        <div><dt>Groesse</dt><dd>512&times;512 <span class="asset-meta-sub">(API: 1024x1024)</span></dd></div>
+        <div><dt>Modell</dt><dd>gpt-image-1.5</dd></div>
+        <div><dt>Qualitaet</dt><dd>medium</dd></div>
+        <div><dt>Pfad</dt><dd class="asset-meta-path">assets/generated/effects/battle-max-impact.png</dd></div>
+        <div><dt>Alpha</dt><dd>Ja</dd></div>
+        <div><dt>Erstellt</dt><dd>2026-08-05T23:14:36Z</dd></div>
+      </dl>
+    </article>
+    <article class="asset-card" data-category="effects" data-id="battle-max-projectile">
+      <div class="asset-thumb-wrap">
+        <img class="asset-thumb" src="assets/generated/effects/battle-max-projectile.png" alt="battle-max-projectile" loading="lazy">
+      </div>
+      <h3 class="asset-id">battle-max-projectile</h3>
+      <dl class="asset-meta">
+        <div><dt>Kategorie</dt><dd>effects</dd></div>
+        <div><dt>Preset</dt><dd>fantasy-effect</dd></div>
+        <div><dt>Groesse</dt><dd>512&times;256 <span class="asset-meta-sub">(API: 1536x1024)</span></dd></div>
+        <div><dt>Modell</dt><dd>gpt-image-1.5</dd></div>
+        <div><dt>Qualitaet</dt><dd>medium</dd></div>
+        <div><dt>Pfad</dt><dd class="asset-meta-path">assets/generated/effects/battle-max-projectile.png</dd></div>
+        <div><dt>Alpha</dt><dd>Ja</dd></div>
+        <div><dt>Erstellt</dt><dd>2026-08-05T23:14:08Z</dd></div>
+      </dl>
+    </article>
+    <article class="asset-card" data-category="effects" data-id="battle-max-village-aura">
+      <div class="asset-thumb-wrap">
+        <img class="asset-thumb" src="assets/generated/effects/battle-max-village-aura.png" alt="battle-max-village-aura" loading="lazy">
+      </div>
+      <h3 class="asset-id">battle-max-village-aura</h3>
+      <dl class="asset-meta">
+        <div><dt>Kategorie</dt><dd>effects</dd></div>
+        <div><dt>Preset</dt><dd>fantasy-effect</dd></div>
+        <div><dt>Groesse</dt><dd>900&times;900 <span class="asset-meta-sub">(API: 1024x1024)</span></dd></div>
+        <div><dt>Modell</dt><dd>gpt-image-1.5</dd></div>
+        <div><dt>Qualitaet</dt><dd>medium</dd></div>
+        <div><dt>Pfad</dt><dd class="asset-meta-path">assets/generated/effects/battle-max-village-aura.png</dd></div>
+        <div><dt>Alpha</dt><dd>Ja</dd></div>
+        <div><dt>Erstellt</dt><dd>2026-08-05T23:14:59Z</dd></div>
+      </dl>
+    </article>
+    <article class="asset-card" data-category="effects" data-id="battle-max-vs-emblem">
+      <div class="asset-thumb-wrap">
+        <img class="asset-thumb" src="assets/generated/effects/battle-max-vs-emblem.png" alt="battle-max-vs-emblem" loading="lazy">
+      </div>
+      <h3 class="asset-id">battle-max-vs-emblem</h3>
+      <dl class="asset-meta">
+        <div><dt>Kategorie</dt><dd>effects</dd></div>
+        <div><dt>Preset</dt><dd>fantasy-effect</dd></div>
+        <div><dt>Groesse</dt><dd>512&times;512 <span class="asset-meta-sub">(API: 1024x1024)</span></dd></div>
+        <div><dt>Modell</dt><dd>gpt-image-1.5</dd></div>
+        <div><dt>Qualitaet</dt><dd>medium</dd></div>
+        <div><dt>Pfad</dt><dd class="asset-meta-path">assets/generated/effects/battle-max-vs-emblem.png</dd></div>
+        <div><dt>Alpha</dt><dd>Ja</dd></div>
+        <div><dt>Erstellt</dt><dd>2026-08-05T23:13:41Z</dd></div>
+      </dl>
+    </article>
+    <article class="asset-card" data-category="backgrounds" data-id="battle-test-arena-bg">
+      <div class="asset-thumb-wrap">
+        <img class="asset-thumb" src="assets/generated/backgrounds/battle-test-arena-bg.png" alt="battle-test-arena-bg" loading="lazy">
+      </div>
+      <h3 class="asset-id">battle-test-arena-bg</h3>
+      <dl class="asset-meta">
+        <div><dt>Kategorie</dt><dd>backgrounds</dd></div>
+        <div><dt>Preset</dt><dd>fantasy-background</dd></div>
+        <div><dt>Groesse</dt><dd>1600&times;900 <span class="asset-meta-sub">(API: 1536x1024)</span></dd></div>
+        <div><dt>Modell</dt><dd>gpt-image-1.5</dd></div>
+        <div><dt>Qualitaet</dt><dd>high</dd></div>
+        <div><dt>Pfad</dt><dd class="asset-meta-path">assets/generated/backgrounds/battle-test-arena-bg.png</dd></div>
+        <div><dt>Alpha</dt><dd>Nein</dd></div>
+        <div><dt>Erstellt</dt><dd>2026-08-05T21:01:33Z</dd></div>
+      </dl>
+    </article>
+    <article class="asset-card" data-category="effects" data-id="battle-test-dragon">
+      <div class="asset-thumb-wrap">
+        <img class="asset-thumb" src="assets/generated/effects/battle-test-dragon.png" alt="battle-test-dragon" loading="lazy">
+      </div>
+      <h3 class="asset-id">battle-test-dragon</h3>
+      <dl class="asset-meta">
+        <div><dt>Kategorie</dt><dd>effects</dd></div>
+        <div><dt>Preset</dt><dd>fantasy-effect</dd></div>
+        <div><dt>Groesse</dt><dd>900&times;900 <span class="asset-meta-sub">(API: 1024x1024)</span></dd></div>
+        <div><dt>Modell</dt><dd>gpt-image-1.5</dd></div>
+        <div><dt>Qualitaet</dt><dd>medium</dd></div>
+        <div><dt>Pfad</dt><dd class="asset-meta-path">assets/generated/effects/battle-test-dragon.png</dd></div>
+        <div><dt>Alpha</dt><dd>Ja</dd></div>
+        <div><dt>Erstellt</dt><dd>2026-08-05T21:02:22Z</dd></div>
+      </dl>
+    </article>
+    <article class="asset-card" data-category="effects" data-id="battle-test-village">
+      <div class="asset-thumb-wrap">
+        <img class="asset-thumb" src="assets/generated/effects/battle-test-village.png" alt="battle-test-village" loading="lazy">
+      </div>
+      <h3 class="asset-id">battle-test-village</h3>
+      <dl class="asset-meta">
+        <div><dt>Kategorie</dt><dd>effects</dd></div>
+        <div><dt>Preset</dt><dd>fantasy-effect</dd></div>
+        <div><dt>Groesse</dt><dd>900&times;900 <span class="asset-meta-sub">(API: 1024x1024)</span></dd></div>
+        <div><dt>Modell</dt><dd>gpt-image-1.5</dd></div>
+        <div><dt>Qualitaet</dt><dd>medium</dd></div>
+        <div><dt>Pfad</dt><dd class="asset-meta-path">assets/generated/effects/battle-test-village.png</dd></div>
+        <div><dt>Alpha</dt><dd>Ja</dd></div>
+        <div><dt>Erstellt</dt><dd>2026-08-05T21:01:57Z</dd></div>
+      </dl>
+    </article>
+    <article class="asset-card" data-category="icons" data-id="test-upgrade-hammer">
+      <div class="asset-thumb-wrap">
+        <img class="asset-thumb" src="assets/generated/icons/test-upgrade-hammer.png" alt="test-upgrade-hammer" loading="lazy">
+      </div>
+      <h3 class="asset-id">test-upgrade-hammer</h3>
+      <dl class="asset-meta">
+        <div><dt>Kategorie</dt><dd>icons</dd></div>
+        <div><dt>Preset</dt><dd>fantasy-icon</dd></div>
+        <div><dt>Groesse</dt><dd>256&times;256 <span class="asset-meta-sub">(API: 1024x1024)</span></dd></div>
+        <div><dt>Modell</dt><dd>gpt-image-1.5</dd></div>
+        <div><dt>Qualitaet</dt><dd>medium</dd></div>
+        <div><dt>Pfad</dt><dd class="asset-meta-path">assets/generated/icons/test-upgrade-hammer.png</dd></div>
+        <div><dt>Alpha</dt><dd>Ja</dd></div>
+        <div><dt>Erstellt</dt><dd>2026-08-05T17:18:30Z</dd></div>
+      </dl>
+    </article>
+  </main>
+
+  <footer class="note">
+    Rein statisch, keine externen Bibliotheken, kein Server noetig. Neu gebaut mit
+    <code>--rebuild-preview</code> direkt aus asset-manifest.json.
+  </footer>
+
+  <script>
+    (function () {
+      var search = document.getElementById("searchInput");
+      var buttons = document.querySelectorAll(".filter-btn");
+      var cards = document.querySelectorAll(".asset-card");
+      var countLine = document.getElementById("countLine");
+      var activeCategory = "";
+
+      function applyFilters() {
+        var term = (search && search.value ? search.value : "").toLowerCase();
+        var visible = 0;
+        cards.forEach(function (card) {
+          var matchesCategory = !activeCategory || card.dataset.category === activeCategory;
+          var matchesSearch = !term || card.dataset.id.indexOf(term) !== -1;
+          var show = matchesCategory && matchesSearch;
+          card.classList.toggle("hidden", !show);
+          if (show) visible += 1;
+        });
+        if (countLine) {
+          countLine.textContent = visible + " von " + cards.length + " Asset(s) sichtbar";
+        }
+      }
+
+      buttons.forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          buttons.forEach(function (b) { b.classList.remove("active"); });
+          btn.classList.add("active");
+          activeCategory = btn.dataset.category || "";
+          applyFilters();
+        });
+      });
+
+      if (search) {
+        search.addEventListener("input", applyFilters);
+      }
+    })();
+  </script>
+</body>
+</html>

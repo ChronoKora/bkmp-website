@@ -26,22 +26,23 @@ const BKMP_PROTO_NAV_ICONS = {
   dungeon: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17V9a6 6 0 0112 0v8"/><path d="M4 17h12"/></svg>'
 };
 
-/* Phase 7.0 Nachbesserung (20.07., Nutzerwunsch nach Sichten der ersten
-   Abnahmestufe: "Fügst du denn Prestige und Skilltree wieder hinzu?",
-   Entscheidung "6 Buttons total"): von urspruenglich 4 auf 6 Haupt-Tabs
-   erweitert - Kampf/Upgrades/Skilltree/Prestige/Drachenzucht/Dungeon alle
-   dauerhaft sichtbar (statt Skilltree/Prestige im "Mehr"-Menue zu
-   verstecken). Etwas schmalere Buttons auf kleinen Handys akzeptiert,
-   siehe Nutzer-Entscheidung. Deckt sich bewusst mit PRIMARY_TAB_IDS in
-   bkmp-app-mode-bootstrap.js, das dieselben 6 IDs verwendet, um sie aus
-   den Desktop-Gruppen-Containern zu loesen. */
+/* MOBILE-REDESIGN (06.08.2026, Nutzer-Auftrag "eigenstaendiges Mobile-
+   Game-Layout", Abschnitt 11 "maximal 5 Hauptpunkte, Beispiel Kampf/
+   Upgrades/Drachen/Prestige/Mehr"): von den bisherigen 6 Haupt-Tabs
+   (Phase-7.0-Nachbesserung 20.07., siehe Git-Historie) auf genau die vom
+   Auftrag selbst als Beispiel genannten 4 + Mehr = 5 Slots reduziert -
+   Skilltree/Dungeon wandern in die "Mehr"-Gruppen (siehe
+   BKMP_PROTO_NAV_SECONDARY unten). Grund: bei 6 Primaer-Tabs + Mehr (7
+   Elemente) auf ~390px Breite blieben pro Button nur ~55px - Icons/Labels
+   wurden dadurch unleserlich klein bzw. abgeschnitten (Auftrag-Screenshot,
+   Punkt 11). Deckt sich weiterhin bewusst mit BKMP_TAB_OVERFLOW_PRIMARY_IDS
+   in bkmp-app-mode-bootstrap.js (dieselben 4 IDs), das sie aus den
+   Desktop-Gruppen-Containern loest. */
 const BKMP_PROTO_NAV_PRIMARY = [
   { id: 'kampf', btn: 'idleTabBtnKampf', label: 'Kampf' },
   { id: 'upgrades', btn: 'idleTabBtnUpgrades', label: 'Upgrades' },
-  { id: 'skilltree', btn: 'idleTabBtnSkilltree', label: 'Skilltree' },
-  { id: 'prestige', btn: 'idleTabBtnPrestige', label: 'Prestige' },
   { id: 'drachen', btn: 'idleTabBtnDrachen', label: 'Drachen' },
-  { id: 'dungeon', btn: 'idleTabBtnDungeon', label: 'Dungeon' }
+  { id: 'prestige', btn: 'idleTabBtnPrestige', label: 'Prestige' }
 ];
 /* Nur noch der DESKTOP-Fallback fuer das "Mehr"-Menue (siehe
    bkmpProtoChudToggleMoreMenu): sobald dieses Kompakt-Nav sichtbar ist
@@ -55,17 +56,21 @@ const BKMP_PROTO_NAV_PRIMARY = [
    versteckt ist - dieser eigene, flache Dropdown-Fallback bleibt deshalb
    trotzdem als echter Ersatz bestehen fuer den (heute eher theoretischen)
    Fall, dass dieses Kompakt-Nav sichtbar waere, ohne dass jenes Setup
-   gelaufen ist. Dieselben 9 IDs wie BKMP_TAB_OVERFLOW_GROUPS in
-   bkmp-app-mode-bootstrap.js, nur ungruppiert. */
+   gelaufen ist. Dieselben 11 IDs wie BKMP_TAB_OVERFLOW_GROUPS in
+   bkmp-app-mode-bootstrap.js (Skilltree/Dungeon neu dazugekommen, siehe
+   oben), nur ungruppiert. */
 const BKMP_PROTO_NAV_SECONDARY = [
+  { id: 'skilltree', btn: 'idleTabBtnSkilltree', label: 'Skilltree' },
   { id: 'runen', btn: 'idleTabBtnRunen', label: 'Runen' },
   { id: 'erfolge', btn: 'idleTabBtnErfolge', label: 'Erfolge' },
+  { id: 'dungeon', btn: 'idleTabBtnDungeon', label: 'Dungeon' },
   { id: 'arena', btn: 'idleTabBtnArena', label: 'Arena' },
   { id: 'bestenliste', btn: 'idleTabBtnBestenliste', label: 'Bestenliste' },
   { id: 'turm', btn: 'idleTabBtnTurm', label: 'Turm' },
   { id: 'gilde', btn: 'idleTabBtnGilde', label: 'Gilde' },
   { id: 'gildetech', btn: 'idleTabBtnGildeTech', label: 'Gilden-Tech' },
   { id: 'gildeboss', btn: 'idleTabBtnGildeBoss', label: 'Gildenboss' },
+  { id: 'clan', btn: 'idleTabBtnClan', label: 'Gilden-Arena' },
   { id: 'skins', btn: 'idleTabBtnSkins', label: 'Dorf-Skins' }
 ];
 
@@ -373,10 +378,22 @@ var bkmpProtoChudCompactActive = null;
    (style.css) verwenden - sonst zeigt sich auf breite-aber-flache Quer-
    Handys (haeufig 700-950px breit) die alte Desktop-HUD/Tableiste in einem
    viel zu flachen Fenster statt der dafuer gebauten kompakten Fassung
-   (23.07. gefunden, siehe Kommentar dort, existierte vorher genauso). */
+   (23.07. gefunden, siehe Kommentar dort, existierte vorher genauso).
+   MOBILE-REDESIGN (06.08.2026): Breite von 760px auf 999px angehoben -
+   die Desktop-Breitgrid-Ansicht (.idle-dorf-card, style.css) selbst
+   greift erst ab "min-width:1000px". Dazwischen (761-999px) zeigte sich
+   bisher WEDER die kompakte Mobil-Fassung NOCH das echte Breitgrid,
+   sondern ein drittes, nie fuer sich gebautes Zwischenstadium (alte
+   flache Desktop-Tab-Zeile in einem noch nicht als Vollbild behandelten
+   Kartenfenster) - genau die vom Auftrag beschriebene "wie eine
+   zusammengedrueckte Desktopseite"-Wirkung. Jetzt bleibt ALLES unter
+   1000px konsequent die kompakte Mobil-/Tablet-Fassung (Auftrag
+   Abschnitt 14: "Unter 1000 Pixel bleibt Mobile beziehungsweise Tablet
+   aktiv"), exakt an der einen Stelle, wo ab "min-width:1000px" auch
+   wirklich die Desktop-Karte beginnt. */
 function bkmpProtoChudWantCompact() {
   return !!(window.BKMP_APP_MODE
-    || window.matchMedia('(max-width: 760px)').matches
+    || window.matchMedia('(max-width: 999px)').matches
     || window.matchMedia('(max-height: 500px) and (orientation: landscape)').matches);
 }
 

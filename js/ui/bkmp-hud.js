@@ -193,6 +193,11 @@ function bkmpIdleSpawnDragon() {
   bkmpIdleTriggerDragonSpawnAnim(document.getElementById('idleDragonSprite'));
   bkmpIdleUpdateDragonHpBar();
   bkmpIdleRenderStageBar();
+  /* Redesign 05.08.2026: haelt die neue rechte Kampf-Spalte (Boss-Karte +
+     Belohnungs-Vorschau, siehe idledorf.js) bei jedem Drachenwechsel
+     aktuell - identische Aufrufstelle wie das bestehende
+     bkmpIdleRenderStageBar() direkt darueber. */
+  if (typeof bkmpIdleRenderCombatSidebar === 'function') bkmpIdleRenderCombatSidebar();
   bkmpIdleMaybeShowEventDragonPopup();
   bkmpIdleBroadcastCombatState(true);
   if (bkmpIdleCurrentDragon.isBoss) {
@@ -268,6 +273,44 @@ function bkmpIdleDragonCounterAttack(stats, showVisuals) {
    vollstaendig entfernt (kein dauerhaft wachsendes DOM). */
 const BKMP_DMG_FLOAT_MAX_PER_TARGET = 5;
 const bkmpDmgFloatsByTarget = { idleDragon: [], idleVillage: [] };
+
+/* Redesign 05.08.2026 (rechte Kampf-Spalte, "Kampf-Statistiken"): fasst die
+   Zaehlerpflege fuer bkmpIdleCombatSessionStats (js/core/bkmp-idle-state.js)
+   an EINER Stelle zusammen, aufgerufen von jeder der vier bereits
+   bestehenden Schadenszahlen-Funktionen unten (Brand/Blitz/Projektil/Klick)
+   - genau die Stellen, die ohnehin schon jeden echten Treffer mit Betrag
+   kennen. Reine Anzeige-Bookkeeping, keine Kampflogik/keine Werte
+   veraendert. */
+function bkmpIdleTrackCombatHit(amount, isCrit, isProjectile) {
+  if (typeof bkmpIdleCombatSessionStats === 'undefined' || !bkmpIdleCombatSessionStats) return;
+  const s = bkmpIdleCombatSessionStats;
+  if (!s.startedAtMs) s.startedAtMs = Date.now();
+  s.totalDamage += Math.max(0, amount || 0);
+  s.hits += 1;
+  if (isCrit) s.critHits += 1;
+  if (isProjectile) s.projectiles += 1;
+  if (typeof bkmpIdleUpdateCombatStatsDisplay === 'function') bkmpIdleUpdateCombatStatsDisplay();
+}
+
+function bkmpIdleUpdateCombatStatsDisplay() {
+  const box = document.getElementById('idleCombatStats');
+  if (!box || typeof bkmpIdleCombatSessionStats === 'undefined') return;
+  const s = bkmpIdleCombatSessionStats;
+  const elapsedSec = Math.max(1, (Date.now() - (s.startedAtMs || Date.now())) / 1000);
+  const dps = s.totalDamage / elapsedSec;
+  const critRate = s.hits > 0 ? (s.critHits / s.hits) * 100 : 0;
+  const fields = {
+    idleCombatStatDamage: bkmpIdleFormatNumber(Math.round(s.totalDamage)),
+    idleCombatStatDps: bkmpIdleFormatNumber(Math.round(dps)),
+    idleCombatStatProjectiles: bkmpIdleFormatNumber(s.projectiles),
+    idleCombatStatCrit: critRate.toFixed(1) + '%',
+    idleCombatStatKills: bkmpIdleFormatNumber(bkmpIdleState ? (bkmpIdleState.boss_kills || 0) : 0)
+  };
+  Object.keys(fields).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = fields[id];
+  });
+}
 function bkmpIdleDmgJitter() {
   return { x: Math.round((Math.random() - 0.5) * 26), y: Math.round((Math.random() - 0.5) * 10) };
 }
@@ -359,6 +402,7 @@ function bkmpIdleSpawnBurnTick(amount) {
   dmg.style.marginTop = jitter.y + 'px';
   target.appendChild(dmg);
   bkmpIdleTrackDmgFloat('idleDragon', dmg, 800);
+  bkmpIdleTrackCombatHit(amount, false, false);
 }
 
 function bkmpIdleSpawnLightningBolt(amount) {
@@ -379,6 +423,7 @@ function bkmpIdleSpawnLightningBolt(amount) {
     dmg.style.marginTop = jitter.y + 'px';
     target.appendChild(dmg);
     bkmpIdleTrackDmgFloat('idleDragon', dmg, 800);
+    bkmpIdleTrackCombatHit(amount, false, false);
   }
 }
 
@@ -430,6 +475,10 @@ function bkmpIdleSpawnProjectile(kind, amount, isCrit) {
     dmg.style.marginTop = jitter.y + 'px';
     target.appendChild(dmg);
     bkmpIdleTrackDmgFloat(targetId, dmg, 800);
+    /* Nur "arrow" (Spieler->Drache) zaehlt fuer die Kampf-Statistiken -
+       "fire" ist der Gegenschlag des Drachen auf das Dorf, kein vom
+       Spieler ausgeteilter Schaden. */
+    if (kind === 'arrow') bkmpIdleTrackCombatHit(amount, isCrit, true);
   }
 }
 
@@ -717,6 +766,7 @@ function bkmpIdleSpawnClickDamage(amount, clientX, clientY) {
   }
   target.appendChild(dmg);
   bkmpIdleTrackDmgFloat('idleDragon', dmg, 800);
+  bkmpIdleTrackCombatHit(amount, false, false);
 }
 
 function bkmpIdleHandleDragonClick(e) {

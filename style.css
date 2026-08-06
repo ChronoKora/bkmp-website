@@ -433,6 +433,34 @@ html[data-theme="light"] .icon-moon { display: block; }
 body.modal-open {
   overflow: hidden;
 }
+/* NACHTRAG (06.08.2026, Spieler-Screenshot: sichtbarer Scrollbalken trotz
+   offenem Vollbild-Idle-Dorf-Fenster auf dem Handy): "overflow:hidden" nur
+   auf body reicht nicht IMMER aus - body bekommt hier zwar durch
+   "html,body{height:100%}" (Basisregel weiter oben) eine echte, auf den
+   Viewport begrenzte Boxhoehe, aber <html> selbst behaelt "overflow:
+   visible" (Standard) und blieb dadurch der eigentliche Scroll-Container
+   fuer die dahinterliegende, oft deutlich hoehere normale Website
+   (per direktem Test bestaetigt: document.documentElement.scrollHeight
+   zeigte 2512px bei einem 844px hohen Viewport, obwohl body selbst korrekt
+   auf 844px begrenzt war - "overflow:hidden" testweise auf <html> gesetzt
+   hat den Balken sofort verschwinden lassen). Betrifft NICHT nur Mobil
+   (keine Breiten-Bedingung noetig, gleiche Ursache bei jeder Fenstergroesse
+   mit hohem Hintergrundinhalt) - deshalb hier direkt neben der bestehenden
+   body-Regel ergaenzt statt in den mobilen Redesign-Block verschoben.
+   ":has(body.modal-open)" statt einer eigenen "html.modal-open"-Klasse:
+   "modal-open" wird an ueber 20 Stellen quer durchs Projekt (idledorf.js,
+   app.js, bkmp-prestige.js, bkmp-runes.js, bkmp-skilltree.js, bkmp-
+   cosmetics.js, bkmp-breeding.js, bkmp-changelog.js, bkmp-feedback-
+   board.js, bkmp-reward-presenter.js, bkmp-site.js) ausschliesslich auf
+   BODY gesetzt/entfernt - all diese Stellen zusaetzlich auf <html> zu
+   spiegeln waere eine riskante, ueber ein Dutzend Dateien verstreute
+   Aenderung fuer eine reine CSS-Randbedingung. :has() (in allen
+   evergreen Browsern seit 2022/2023 unterstuetzt, wird im Projekt bereits
+   an anderer Stelle wie color-mix()/dvh vorausgesetzt) bildet dieselbe
+   Bedingung rein deklarativ ab, ohne eine einzige JS-Datei anzufassen. */
+html:has(body.modal-open) {
+  overflow: hidden;
+}
 body.modal-open .streamer-marquee-track,
 body.modal-open .bkmp-easter > span {
   animation-play-state: paused !important;
@@ -5363,11 +5391,22 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 /* Bug-Fix 18.07.: zusaetzlicher Feedback-Zugang direkt im Idle-Dorf-Fenster
    (siehe Kommentar bei #idleDorfFeedbackBtn in index.html) - selbe Form/
    Groesse wie .idle-dorf-close, nur eine Position weiter links, damit
-   beide Kreise nicht ueberlappen. */
+   beide Kreise nicht ueberlappen.
+   NACHBESSERUNG (06.08.2026, Spieler-Screenshot: Feedback-Kreis ueberlappt
+   sichtbar mit dem Schliessen-Kreis): der urspruengliche Abstand der
+   beiden "right"-Anker (2.9rem - 0.9rem = 2rem = 32px) war 2px KLEINER
+   als die eigene Knopfbreite (34px) - beide 34px breiten Kreise
+   ueberlappten sich dadurch rechnerisch immer um genau 2px, unabhaengig
+   von der Fensterbreite (kein Breakpoint-Problem, reiner Rechenfehler im
+   urspruenglichen Fix). Per getBoundingClientRect bestaetigt (vorher:
+   Feedback-Knopf rechter Rand bei 343px, Schliessen-Knopf linker Rand bei
+   341px). Fix: "right" auf 3.5rem angehoben - Abstand jetzt 47.6px, also
+   13.6px mehr als die Knopfbreite = spuerbarer, aber kompakter Zwischen-
+   raum statt eines Ueberlapps. */
 .idle-dorf-feedback-btn {
   position: absolute;
   top: 0.8rem;
-  right: 2.9rem;
+  right: 3.5rem;
   width: 34px;
   height: 34px;
   border-radius: 50%;
@@ -5418,13 +5457,28 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   -webkit-user-select: none;
 }
 
-@media (max-width: 640px) {
+/* MOBILE-REDESIGN (06.08.2026): 640px -> 999px angehoben, siehe
+   ausfuehrliche Begruendung bei bkmpProtoChudWantCompact() (bkmp-proto-
+   compact-hud.js) - dieselbe "alles unter der 1000px-Desktopgrenze
+   bekommt konsequent die Vollbild-Mobilkarte"-Vereinheitlichung, hier fuer
+   die Karte selbst statt nur HUD/Nav/Stufenleiste. Vorher lief die Karte
+   zwischen 641-999px Breite als kleines, floatendes Modal mit bereits
+   kompakter Mobil-Navigation darin - genau die vom Auftrag beschriebene
+   "wie eine zusammengedrueckte Desktopseite"-Wirkung. */
+@media (max-width: 999px) {
   .idle-dorf-overlay .idle-dorf-card {
     width: 100vw;
     height: 100vh;
     max-height: 100vh;
     max-width: 100vw;
-    border-radius: 0;
+    /* !important noetig: ".zone-game .joke-card{border-radius:20px}"
+       (unconditional, style.css) hat gleiche Spezifitaet wie diese Regel
+       (je 2 Klassen) und steht spaeter in der Datei - #idleDorfOverlay
+       traegt IMMER die Klasse "zone-game" (Projekt-Konvention, nicht nur
+       im echten App-Modus), gewinnt sonst trotz dieser breiten-
+       spezifischen Vollbild-Regel hier (per getComputedStyle bestaetigt:
+       20px statt 0px bei 768px Breite). */
+    border-radius: 0 !important;
     padding: 1.4rem 1rem 1rem;
   }
   /* Spieler-Meldung 20.07. (Screenshot: schwarze Luecke unter dem Fenster
@@ -10232,8 +10286,17 @@ html[data-fx="aus"].bkmp-app-mode .idle-dorf-tabs {
    dieser eine Wert wird ergaenzt, alle anderen Seiten/Ecken/Farben der
    Karte bleiben unangetastet (siehe Basis-Regel weiter oben in dieser
    Datei). */
+/* NACHTRAG (06.08.2026, Spieler-Screenshot: "Warum haben wir hier so
+   einen Scrollbalken? Für gefühlt nichts?"): 6rem (96px) war grosszuegig
+   fuer die AELTERE, hoehere Kompakt-Nav-Fassung bemessen - die aktuelle
+   Bottom-Navigation (#bkmpProtoCompactNav) ist nur noch 66px hoch (per
+   getBoundingClientRect bestaetigt), die 30px Ueberschuss liessen die
+   Karte um ebenso viel weiter scrollbar sein, als tatsaechlich noetig -
+   sichtbar als Leerlauf-Scrollbalken ohne erkennbaren zusaetzlichen
+   Inhalt darunter. Auf 4.5rem (72px, Nav-Hoehe + kleiner Puffer)
+   reduziert. */
 html.bkmp-app-mode .idle-dorf-overlay .idle-dorf-card {
-  padding-bottom: calc(6rem + env(safe-area-inset-bottom));
+  padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
 }
 /* KRITISCHER FUND (Phase 5.1 Verifikation, 17.07.): ohne dies bricht die
    fixierte Bottom-Navigation komplett auf der normalen Website bei
@@ -11657,12 +11720,19 @@ html.bkmp-app-mode.zone-game #idlePanelKampf .idle-dorf-log {
   max-height: 13vh;
   margin-top: .6rem;
 }
-@media (max-width: 640px) {
+/* MOBILE-REDESIGN (06.08.2026): 640px -> 999px, synchron mit der Karten-
+   Vollbild-Regel weiter oben (dieselbe @media(max-width:640px)-Bindung,
+   die im Kommentar direkt darunter erwaehnt wird, ist selbst auf 999px
+   angehoben - ohne diese Anpassung haette die Karte zwischen 641-999px
+   bereits height:100dvh bekommen, aber DIESE Flex-Wachsen-Mechanik waere
+   dort nicht mitgelaufen, wodurch das Schlachtfeld die neu gewonnene Hoehe
+   nicht gefuellt haette). */
+@media (max-width: 999px) {
   /* Mobile Website-Ansicht (Modal ueber der normalen Seite, kein echter
-     App-Modus): .idle-dorf-card bekommt hier ueber die eigene
-     @media(max-width:640px)-Regel weiter oben ebenfalls explizit
-     height:100dvh - dieselbe Wachsen-Logik wie oben greift hier also
-     genauso korrekt, nur eben an die Breite statt an .zone-game
+     App-Modus): .idle-dorf-card bekommt hier ueber die eigene, jetzt
+     ebenfalls auf 999px angehobene Vollbild-Regel weiter oben in dieser
+     Datei explizit height:100dvh - dieselbe Wachsen-Logik wie oben greift
+     hier also genauso korrekt, nur eben an die Breite statt an .zone-game
      gebunden. */
   html.bkmp-app-mode #idlePanelKampf {
     flex: 1 1 auto !important;
@@ -11682,6 +11752,7 @@ html.bkmp-app-mode.zone-game #idlePanelKampf .idle-dorf-log {
     margin-top: .6rem;
   }
 }
+
 
 /* Bottom-Navigation auf 3 Haupt-Tabs + Mehr reduziert (Nutzer-Wunsch) -
    automatisch breitere Kacheln durch flex:1, hier die Ziffer explizit
@@ -11993,12 +12064,14 @@ html.bkmp-app-mode .idle-app-more-sheet-group-title:first-child {
 .bkmp-proto-stagebar-icon-btn.is-on { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); }
 
 /* Phase 7.0 Nachbesserung (20.07., beim eigenen Testen bei 800x369
-   gefunden): reines max-width:760px erreicht viele quer gehaltene
+   gefunden): reines max-width erreicht viele quer gehaltene
    Telefone nicht (haeufig 700-950px breit) - ohne die Landscape-
    Bedingung blieb u.a. die fixierte Bottom-Nav (#bkmpProtoCompactNav
    weiter unten in diesem Block) im Querformat wirkungslos und fiel in
-   den normalen Dokumentfluss zurueck. Komma = ODER-Verknuepfung. */
-@media (max-width: 760px), (max-height: 500px) and (orientation: landscape) {
+   den normalen Dokumentfluss zurueck. Komma = ODER-Verknuepfung.
+   MOBILE-REDESIGN (06.08.2026): 760px -> 999px, siehe Begruendung bei
+   bkmpProtoChudWantCompact() (bkmp-proto-compact-hud.js). */
+@media (max-width: 999px), (max-height: 500px) and (orientation: landscape) {
   .bkmp-proto-chud-row { flex-wrap: wrap; }
   .bkmp-proto-chud-xp { flex-basis: 100%; order: 3; }
   /* FIX (18.07., beim Testen gefunden): "left:0" drehte den Anker auf die
@@ -12145,7 +12218,7 @@ html.bkmp-app-mode .idle-app-more-sheet-group-title:first-child {
    den es eigentlich bekommen sollte. */
 .idle-combat-log-sheet, .idle-combat-log-sheet-handle, .idle-combat-log-sheet-header { display: none; }
 
-/* Portrait ODER Querformat-Telefon (Abschnitt 29): reines max-width:768px
+/* Portrait ODER Querformat-Telefon (Abschnitt 29): reines max-width
    greift bei einem quer gehaltenen Telefon oft NICHT (viele Telefone sind
    im Querformat 700-950px breit, z.B. 932px bei einem grossen iPhone) -
    beim eigenen Testen bei 800x369 gefunden: ohne die Breiten-Bedingung
@@ -12153,8 +12226,12 @@ html.bkmp-app-mode .idle-app-more-sheet-group-title:first-child {
    Dokumentfluss, obwohl das Schlachtfeld selbst (siehe eigene
    @media(max-height:500px)-Regel weiter unten) schon korrekt kompakter
    wurde - halbe Umstellung, HUD/Nav sahen weiterhin nach Desktop aus.
-   Komma-getrennt = ODER-Verknuepfung zwischen den beiden Bedingungen. */
-@media (max-width: 768px), (max-height: 500px) and (orientation: landscape) {
+   Komma-getrennt = ODER-Verknuepfung zwischen den beiden Bedingungen.
+   MOBILE-REDESIGN (06.08.2026): 768px -> 999px, siehe Begruendung bei
+   bkmpProtoChudWantCompact() (bkmp-proto-compact-hud.js) - vereinheitlicht
+   mit den beiden anderen Mobil-Breakpoints (Karte/Kompakt-HUD) auf exakt
+   die 1000px-Desktopgrenze. */
+@media (max-width: 999px), (max-height: 500px) and (orientation: landscape) {
   /* ---- Schlachtfeld: Untergrenze/Obergrenze fuer die schon bestehende
      Flex-Wachsen-Groesse (Abschnitt 6). WICHTIG (beim Testen per
      getComputedStyle gefunden): html.bkmp-app-mode #idlePanelKampf
@@ -12556,4 +12633,805 @@ html.bkmp-app-mode .idle-app-more-sheet-group-title:first-child {
 @media (max-width: 860px) {
   .fbb-admin-grid { grid-template-columns: 1fr; }
   .fbb-admin-preview-pane { position: static; }
+}
+
+/* ============================================================
+   Redesign 05.08.2026 - grosses episches Desktop-Kampffenster
+   (Nutzer-Auftrag mit Referenzbild: linke Navigation, grosse zentrale
+   Arena, rechte Boss-/Stufen-/Belohnungs-Spalte, obere kompakte
+   Ressourcenleiste, untere Bonus-/Kampfwerte-Leiste).
+
+   Scope-Entscheidungen (bewusst, siehe Analyse-Chat):
+   - Nur ab min-width:1000px aktiv - darunter (Mobil/Tablet, bereits
+     ausfuehrlich in Phase 7.0/7.1 getunt) bleibt ALLES exakt wie zuvor.
+   - :not(.zone-game) - der echte /app-Vollbild-Modus (installierte PWA)
+     behaelt sein bestehendes, separates 100vw/100vh-Layout unangetastet;
+     dieser Auftrag betrifft explizit "mein Kampffenster im Spiel" auf der
+     normalen Website/einem grossen Desktop-Monitor.
+   - #idleDorfTabs/#idleStageBar wurden dafuer im Markup umsortiert
+     (index.html) - beide Render-/Klick-Funktionen (bkmpIdleInitTabs,
+     bkmpIdleBuildMobileTabOverflowUi, bkmpIdleRenderStageBar) arbeiten
+     nachweislich ausschliesslich per getElementById, komplett
+     positionsunabhaengig (siehe Analyse-Chat) - reine Umsortierung, keine
+     JS-Aenderung noetig, um sie hierher zu verschieben.
+   ============================================================ */
+
+/* ---- Basis-Zustand (< 1000px, unveraendertes Mobil-/Tablet-Verhalten):
+   die drei neuen Wrapper werden zu reinen "display:contents"-Passthroughs,
+   damit ihre echten Kind-Elemente exakt wie VOR diesem Redesign in
+   #idlePanelKampf's bereits bestehendem Flex-Column-Kontext (siehe
+   "#idlePanelKampf{display:flex;flex-direction:column}" weiter oben in
+   dieser Datei) auftauchen. #idleStageBar bekommt "order:-1", um trotz
+   seiner neuen DOM-Position (jetzt in #idleKampfRightCol, NACH der Arena-
+   Spalte) visuell weiterhin ALS ERSTES zu erscheinen - identisch zur
+   urspruenglichen Reihenfolge vor dieser Umsortierung. Die drei komplett
+   neuen Inhalte (Bonusleiste/Boss-Karte/Belohnungen/Statistiken) sind auf
+   diesen Breiten bewusst unsichtbar - reines Zusatzangebot fuer die neue
+   grosse Desktop-Ansicht, kein bestehendes Mobil-Element wird entfernt. */
+#idleKampfLayout, #idleKampfArenaCol, #idleKampfRightCol {
+  display: contents;
+}
+#idleStageBar {
+  order: -1;
+}
+#idleKampfBonusBar, #idleCombatBossCard, #idleCombatRewards, #idleCombatStats {
+  display: none;
+}
+
+@media (min-width: 1000px) {
+  /* ---- Aeussere Fensterhuelle: gross, Grid-Schale ----
+     NACHTRAG (06.08.2026, Spieler-Screenshots 2560x1440 + 1920x1080):
+     "height:min(92vh,1120px)" zwang die Karte auf JEDEM breiten Bildschirm
+     auf eine FESTE Hoehe, unabhaengig vom tatsaechlichen Inhalt - die
+     Grid-Zeile "body" (1fr) musste diese Hoehe dann komplett ausfuellen,
+     auch wenn Sidebar/Arena-Spalte/Info-Spalte viel weniger Platz
+     brauchten. Zwei reale, per getComputedStyle/getBoundingClientRect
+     bewiesene Folgen:
+     1) Auf sehr hohen Viewports (>=~1217px, wo 92vh>=1120px und die Karte
+        dauerhaft am 1120px-Deckel klebt) blieb unterhalb der kuerzeren
+        Spalten (v.a. der rechten Info-Spalte, gemessen ~296px Leerraum
+        bei 2560x1440) und unterhalb der Bonusleiste in der Arena-Spalte
+        (~146px) reiner Leerraum stehen - der Footer wurde dadurch an den
+        weit entfernten unteren Kartenrand gedrueckt.
+     2) Auf einem NIEDRIGEREN echten Browser-Viewport (ein nominelles
+        1920x1080-Display liefert wegen Tab-/Adressleiste/Lesezeichen-
+        leiste/OS-Taskleiste selten eine tatsaechliche CSS-Viewporthoehe
+        von 1080px - bei einer simulierten effektiven Hoehe von 860px
+        reproduziert) schrumpfte die per 92vh berechnete Kartenhoehe (und
+        damit die "1fr"-Koerperzeile) STAERKER, als es der WIRKLICHE
+        Inhalt der linken Navigation (~808px fuer 16 Tab-Buttons, fast
+        breitenunabhaengig fest) und der rechten Info-Spalte (~626px)
+        erlaubten - beide bekamen dadurch unabhaengig voneinander einen
+        eigenen internen Scrollbalken (bewiesen: navOverflow.scrollHeight
+        808 > clientHeight 637, rightColOverflow.scrollHeight 626 >
+        clientHeight 594), obwohl die Karte selbst noch in den Viewport
+        gepasst haette.
+     Fix: "height:auto" + "max-height" als reine Obergrenze statt eines
+     erzwungenen Fixwerts - die bereits bestehende Kette aus
+     "flex:1 1 auto; min-height:0" (Body/Panel/Layout/Arena-Spalte/Info-
+     Spalte, alle weiter unten in diesem Block) passt sich dadurch
+     automatisch an: ohne freien Platz von aussen verteilt "flex-grow"
+     nichts mehr, jede Spalte wird stattdessen so hoch wie ihr eigener
+     Inhalt (die schon bestehenden Untergrenzen wie ".idle-battlefield"s
+     eigenes min-height:36vh/40vh bleiben unveraendert die Design-
+     Untergrenze fuer die Kampfszene selbst). Erst wenn der Inhalt
+     tatsaechlich die neue "calc(100dvh - 24px)"-Obergrenze uebersteigt,
+     greift die bereits vorhandene "overflow-y:auto" der Karte als EIN
+     gemeinsamer Scrollbalken - keine Aenderung an Kampfmechanik/Medien/
+     Werten, reine Groessen-/Grid-Korrektur. */
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-dorf-card {
+    width: min(94vw, 2000px);
+    max-width: min(94vw, 2000px);
+    height: auto;
+    max-height: calc(100dvh - 24px);
+    display: grid;
+    grid-template-columns: 214px 1fr;
+    grid-template-rows: auto 1fr;
+    grid-template-areas: "hud hud" "nav body";
+    column-gap: 1.2rem;
+    row-gap: .65rem;
+    padding: 1.35rem 1.6rem 1.15rem;
+  }
+  /* Verteidigung in der Tiefe (siehe Kommentar bei ".idle-dorf-overlay
+     .idle-dorf-card > *{position:relative;z-index:1}" weiter oben in
+     dieser Datei): rein dekorative/schwebende Direkt-Kinder bekommen
+     hier explizit den vollen Grid-Bereich zugewiesen, damit sie bei
+     "position:absolute" weiterhin relativ zur GESAMTEN Karte (nicht nur
+     einer einzelnen Grid-Zelle) positioniert bleiben. */
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-dorf-card > .app-bg-fx,
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-dorf-card > #idleDorfCloseX,
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-dorf-card > #idleDorfFeedbackBtn {
+    grid-column: 1 / -1;
+    grid-row: 1 / -1;
+  }
+
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleDorfHud {
+    grid-area: hud;
+    margin-bottom: 0;
+  }
+
+  /* ---- Linke Navigation: echte vertikale Sidebar statt horizontaler
+     Tab-Zeile - #idleDorfTabs bleibt dieselbe ID/Klasse, nur die
+     Flex-Richtung/Buttonform aendert sich. Icon/Label-Spans existieren
+     bereits fuer JEDEN Tab-Button (bkmpIdleBuildMobileTabOverflowUi()
+     baut sie unbedingt beim Laden, siehe Analyse-Chat) - keine neue
+     HTML-Struktur noetig. ---- */
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleDorfTabs {
+    grid-area: nav;
+    display: flex;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: .3rem;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: .2rem .3rem .2rem 0;
+    border-bottom: none;
+    margin-bottom: 0;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleDorfTabs .idle-dorf-tab {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: .65rem;
+    width: 100%;
+    flex: 0 0 auto;
+    min-height: 46px;
+    min-width: 0;
+    padding: .55rem .75rem;
+    font-size: .82rem;
+    border-radius: 12px;
+    text-align: left;
+    border-left: 3px solid transparent;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleDorfTabs .idle-dorf-tab-icon {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+    width: 1.5em;
+    text-align: center;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleDorfTabs .idle-dorf-tab-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  /* Der horizontale Unterstrich-Glow (::after) aus der Tab-Leisten-
+     Basisregel ist fuer eine liegende Zeile gedacht - in der Sidebar
+     ersetzt ein linker Akzentrand (border-left oben) dieselbe Funktion. */
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleDorfTabs .idle-dorf-tab.active::after {
+    display: none;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleDorfTabs .idle-dorf-tab:not(:disabled):hover {
+    transform: none;
+    background: color-mix(in srgb, var(--app-gold) 10%, transparent);
+    border-left-color: color-mix(in srgb, var(--app-gold) 55%, transparent);
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleDorfTabs .idle-dorf-tab.active {
+    transform: none;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--app-gold) 22%, transparent), transparent);
+    border-left-color: var(--app-gold);
+    color: var(--app-gold);
+    box-shadow: none;
+  }
+
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleDorfBody {
+    grid-area: body;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  /* ---- Kampf-Tab: zweispaltige Innenaufteilung (Arena links, Info-
+     Spalte rechts). #idlePanelKampf ist bereits (unconditional, siehe
+     Basisregel weiter oben in dieser Datei) eine Flex-Spalte - das neue
+     Layout haengt sich nur als zusaetzlicher, waachsender Bereich daran. ---- */
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idlePanelKampf {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleKampfLayout {
+    display: grid;
+    grid-template-columns: 1fr 336px;
+    column-gap: 1.1rem;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleKampfArenaCol {
+    display: flex;
+    flex-direction: column;
+    gap: .7rem;
+    min-height: 0;
+    min-width: 0;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleKampfArenaCol .idle-battlefield {
+    flex: 1 1 auto;
+    min-height: 0;
+    /* NACHTRAG (06.08.2026, Spieler-Screenshot: grosse leere Flaeche
+       zwischen Kampfszene und der Bonusleiste darunter): vorher
+       "max-height:none!important" liess das Feld bei viel verfuegbarer
+       Hoehe (grosse/hohe Fenster) unbegrenzt wachsen - .idle-battlefield
+       ist aber selbst nur ein Flex-Rahmen mit align-items:center, der die
+       eigentlichen Dorf-/Drachenbilder (#idleVillage/#idleDragon, beide
+       behalten ihr eigenes, meist recht breites/flaches Seitenverhaeltnis)
+       nur MITTIG zentriert statt zu strecken - je hoeher der Rahmen ueber
+       das von den Bildern tatsaechlich benoetigte Mass hinaus waechst,
+       desto groesser die dadurch entstehende leere Flaeche ueber+unter den
+       Bildern (per getComputedStyle/getBoundingClientRect am eigenen
+       QA-Testkonto bestaetigt: Dorf/Drache randferner als noetig zentriert,
+       Bonusleiste direkt danach mit nur ~11px echtem Abstand - die "leere
+       Flaeche" liegt strukturell INNERHALB des Kampffelds, nicht dazwischen).
+       Deckel begrenzt das ungebremste Wachstum, ohne die urspruengliche
+       Mindesthoehe (siehe Basisregel weiter oben in dieser Datei) zu
+       unterschreiten. */
+    max-height: min(620px, 60dvh) !important;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleKampfRightCol {
+    display: flex;
+    flex-direction: column;
+    gap: .7rem;
+    min-height: 0;
+    min-width: 0;
+    overflow-y: auto;
+    padding-right: .15rem;
+  }
+
+  /* NEU: untere "Globale Kampf-Boni"-Leiste (JS: bkmpIdleRenderCombatBonusBar
+     in idledorf.js) - liest ausschliesslich bereits bestehende Felder aus
+     bkmpIdleEffectiveStats, keine neue Berechnung. */
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleKampfBonusBar {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: .55rem;
+    flex-shrink: 0;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-kampf-bonus-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .15rem;
+    padding: .55rem .35rem .5rem;
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(0, 0, 0, .26));
+    border: 1px solid rgba(255, 255, 255, .09);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06);
+    text-align: center;
+    min-width: 0;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-kampf-bonus-icon { font-size: 1.15rem; }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-kampf-bonus-value {
+    font-size: .92rem;
+    font-weight: 800;
+    color: var(--app-gold);
+    font-variant-numeric: tabular-nums;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-kampf-bonus-label {
+    font-size: .6rem;
+    color: var(--app-muted);
+    text-transform: uppercase;
+    letter-spacing: .02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  /* NEU: rechte Info-Spalte - gemeinsamer Karten-Look fuer Stufenleiste
+     (wiederverwendet, siehe Markup-Kommentar in index.html)/Boss-Karte/
+     Belohnungen/Statistiken. */
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleKampfRightCol .idle-stage-bar,
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-combat-boss-card,
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-combat-rewards,
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-combat-stats {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, .1);
+    background: linear-gradient(180deg, rgba(255, 255, 255, .05), rgba(0, 0, 0, .28));
+    padding: .8rem .9rem;
+    margin-bottom: 0;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleKampfRightCol .idle-stage-bar {
+    gap: .55rem;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleKampfRightCol .idle-stage-label {
+    font-size: .92rem;
+    text-align: center;
+    white-space: normal;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleKampfRightCol .idle-stage-buttons {
+    flex-direction: column;
+    gap: .45rem;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleKampfRightCol .idle-stage-btn {
+    width: 100%;
+    padding: .6rem .8rem;
+    font-size: .82rem;
+    font-weight: 700;
+    border-radius: 10px;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleKampfRightCol #idleStageJumpBtn {
+    background: linear-gradient(180deg, var(--app-gold), var(--app-gold-deep));
+    color: #241708;
+    border: none;
+  }
+
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-combat-boss-icon {
+    font-size: 2.1rem;
+    text-align: center;
+    line-height: 1.1;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-combat-boss-name {
+    font-family: 'Fraunces', serif;
+    font-size: 1.02rem;
+    font-weight: 700;
+    text-align: center;
+    color: var(--app-gold);
+    margin-top: .2rem;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, .6);
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-combat-boss-stage {
+    font-size: .74rem;
+    color: var(--app-muted);
+    text-align: center;
+    margin-bottom: .5rem;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-combat-boss-hp {
+    height: 12px;
+  }
+
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-combat-rewards-title,
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-combat-stats-title {
+    font-size: .78rem;
+    font-weight: 700;
+    color: var(--app-ink);
+    margin-bottom: .5rem;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-combat-rewards-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-combat-reward-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    padding: .3rem .55rem;
+    border-radius: 999px;
+    background: rgba(255, 215, 106, .12);
+    border: 1px solid rgba(255, 215, 106, .3);
+    font-size: .78rem;
+    font-weight: 700;
+    color: var(--app-gold);
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-combat-stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: .5rem;
+    font-size: .78rem;
+    padding: .32rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, .06);
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-combat-stat-row:last-child { border-bottom: none; }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-combat-stat-row span { color: var(--app-muted); }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-combat-stat-row b {
+    color: var(--app-ink);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* NACHTRAG (06.08.2026): ergaenzt die obige "Aeussere Fensterhuelle nicht
+   mehr strecken"-Korrektur (height:auto statt min(92vh,1120px)) - dadurch
+   allein bleiben bei den vom Auftrag genannten Ziel-Aufloesungen 1600x900
+   und 1366x768 (per getBoundingClientRect/scrollHeight-vs-clientHeight
+   bewiesen, nicht nur vermutet) noch zwei eigene interne Scrollbalken
+   uebrig: die linke Sidebar (#idleDorfTabs, 17 Tab-Buttons a 46px Mindest-
+   hoehe = ~808px, praktisch fensterhoehen-unabhaengig fest) und in
+   geringerem Mass die rechte Info-Spalte (Stufenleiste/Boss-Karte/
+   Belohnungen/Statistik-Karten, ~613-660px) - beide passen bei diesen
+   Aufloesungen nicht mehr in die durch "max-height:calc(100dvh-24px)"
+   geschrumpfte Koerperzeile. Bei 2560x1440/1920x1080 (echter Viewport,
+   ohne Browser-Chrome-Abzug) tritt das NICHT auf - dort bleibt genug
+   Hoehe, diese Regeln greifen dort also gar nicht (max-height-Bedingung
+   trifft nicht zu). Gleiches, bereits etabliertes Stufen-Prinzip wie die
+   alte Phase-7.1-Kompaktregel bei ".idle-battlefield" (siehe
+   "@media(max-height:900px)" weiter oben in dieser Datei) - hier bewusst
+   zusaetzlich an "min-width:1000px" gebunden, damit die mobile/kompakte
+   Navigation (voellig andere Struktur, siehe #bkmpProtoCompactNav) nicht
+   beruehrt wird. Reine Groessen-/Abstands-Verdichtung (Mindesthoehe/
+   Innenabstand/Schriftgroesse/Zeilenabstand der ohnehin schon vorhandenen
+   Buttons/Karten) - kein Tab entfernt, keine Funktion/kein Wert geaendert. */
+@media (min-width: 1000px) and (max-height: 960px) {
+  /* !important auf gap/padding/min-height: die aeltere, breitenunabhaengige
+     Phase-7.1-Kompaktregel (siehe ".idle-dorf-tabs"/"​.idle-dorf-tab" in
+     "@media(max-height:900px/780px/700px)" weiter oben in dieser Datei,
+     urspruenglich fuer die flache horizontale Tab-Zeile gebaut) traegt an
+     denselben Eigenschaften bereits eigene !important-Werte und ueberlappt
+     bei diesen Hoehen - ohne eigenes !important wuerde sie hier gewinnen
+     und die neue Sidebar kaum verdichten (per getComputedStyle bestaetigt:
+     "gap:4.48px 6.4px" statt der hier beabsichtigten .18rem). */
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleDorfTabs {
+    gap: .18rem !important;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleDorfTabs .idle-dorf-tab {
+    min-height: 34px !important;
+    padding: .3rem .6rem !important;
+    font-size: .76rem;
+    gap: .55rem;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleDorfTabs .idle-dorf-tab-icon {
+    font-size: 1rem;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleKampfRightCol {
+    gap: .45rem;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleKampfRightCol .idle-stage-bar,
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-combat-boss-card,
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-combat-rewards,
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-combat-stats {
+    padding: .55rem .7rem;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleKampfRightCol .idle-stage-buttons {
+    gap: .3rem;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleKampfRightCol .idle-stage-btn {
+    padding: .42rem .7rem;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-combat-rewards-title,
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-combat-stats-title {
+    margin-bottom: .3rem;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-combat-boss-stage {
+    margin-bottom: .3rem;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-combat-stat-row {
+    padding: .2rem 0;
+  }
+}
+
+/* Zweite, tiefere Verdichtungsstufe fuer kleine Desktopfenster knapp ueber
+   der 1000px-Breitengrenze in Kombination mit geringer Hoehe (z.B.
+   1024x700 - per getBoundingClientRect/scrollHeight bewiesen: selbst nach
+   der Stufe oben blieben dort noch ~45px/~76px Ueberlauf in Sidebar/
+   Info-Spalte uebrig). Gleiches Prinzip wie oben, nur ein Stueck weiter -
+   greift NUR zusaetzlich zur ersten Stufe (beide Bedingungen ueberlappen
+   bei kleinen Werten), keine neuen Selektoren/Funktionen. */
+@media (min-width: 1000px) and (max-height: 740px) {
+  /* !important aus demselben Grund wie in der ersten Verdichtungsstufe
+     weiter oben (Konflikt mit der aelteren, breitenunabhaengigen
+     Phase-7.1-Kompaktregel bei "max-height:700px"). */
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleDorfTabs {
+    gap: .12rem !important;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleDorfTabs .idle-dorf-tab {
+    min-height: 26px !important;
+    padding: .22rem .55rem !important;
+    font-size: .72rem;
+    gap: .45rem;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleDorfTabs .idle-dorf-tab-icon {
+    font-size: .9rem;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleKampfRightCol {
+    gap: .22rem;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleKampfRightCol .idle-stage-bar,
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-combat-boss-card,
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-combat-rewards,
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-combat-stats {
+    padding: .34rem .5rem;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleKampfRightCol .idle-stage-bar {
+    gap: .24rem;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleKampfRightCol .idle-stage-buttons {
+    gap: .18rem;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleKampfRightCol .idle-stage-btn {
+    padding: .26rem .55rem;
+    font-size: .74rem;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-combat-boss-icon {
+    font-size: 1.3rem;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-combat-boss-name {
+    margin-top: .05rem;
+    font-size: .92rem;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-combat-boss-stage {
+    margin-bottom: .15rem;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-combat-rewards-title,
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-combat-stats-title {
+    margin-bottom: .15rem;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay .idle-combat-stat-row {
+    padding: .08rem 0;
+  }
+}
+
+@media (min-width: 1000px) and (prefers-reduced-motion: reduce) {
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleDorfTabs .idle-dorf-tab { transition: none; }
+}
+
+/* ============================================================
+   MOBILE-REDESIGN (06.08.2026) - eigenstaendiges Mobile-Game-Layout
+   ============================================================
+   Nutzer-Auftrag (28-Abschnitte-Brief, nicht 1:1 hier dupliziert): "Die
+   Handysicht darf nicht länger nur eine verkleinerte beziehungsweise
+   zusammengedrückte Desktopansicht sein." Screenshot-Beweis bei ~390px
+   Breite zeigte u.a.: riesige runde Niederlagen-Blase (Ursache+Fix siehe
+   bkmpIdleHandleDefeat() in idledorf.js), doppelte Niederlagen-Anzeige
+   (dieselbe Ursache), abgeschnittener Gegnername "Schwa…" (Ursache: siehe
+   ".idle-hp-row .idle-dragon-name" Basisregel weiter oben, feste
+   max-width:45% + nowrap+ellipsis), 6+Mehr ueberfuellte Bottom-Navigation
+   (Ursache+Fix siehe BKMP_PROTO_NAV_PRIMARY/BKMP_TAB_OVERFLOW_PRIMARY_IDS),
+   dominanter AD-Free-Button, hoher Kampf-Log-Leerblock, drei inkonsistente
+   Mobil-Breakpoints (640/760/768px, jetzt auf 999px vereinheitlicht, siehe
+   die drei @media-Kopfzeilen weiter oben in dieser Datei). Reine
+   Darstellungsschicht - keine Spielwerte/Formeln/Medien/DB-Aenderung, alle
+   bestehenden IDs/Event-Hooks unangetastet. Bewusst als eigener, klar
+   markierter Block ans Ende der bestehenden Mobil-Bloecke angehaengt
+   (gleiches Isolations-Muster wie "PROTOTYP 2"/"PHASE 7.0" oben) - hat
+   automatisch Vorrang durch Quellreihenfolge bei gleicher Spezifitaet,
+   ohne eine der aelteren Regeln anfassen zu muessen. */
+@media (max-width: 999px), (max-height: 500px) and (orientation: landscape) {
+
+  /* ---- 1) Kopfzeile: klare 3-Zeilen-Gruppierung statt einer einzigen,
+     je nach Inhaltsmenge unvorhersehbar umbrechenden Flex-Zeile (Auftrag
+     Abschnitt 3: "Erste Zeile: Level/Skillpunkte/EXP/Effekte/Nachrichten/
+     Schliessen", "Zweite Zeile: Ressourcen als kompakte Chips", "keine
+     mehrzeilige chaotische Chip-Wolke"). Level-Badge+Info/Fx-Icons bleiben
+     auf Zeile 1 (order:1/2), EXP-Leiste bekommt weiterhin ihre eigene volle
+     Zeile (order:3, bereits bestehende Regel oben in diesem Block - hier
+     nur um Ressourcen ERGAENZT, die vorher ohne festen "order" mal mit
+     Zeile 1, mal mit der EXP-Zeile kollidieren konnten, je nach Textlaenge/
+     Geraet), Ressourcen-Chips bekommen jetzt zusaetzlich ihre eigene dritte
+     Zeile (order:4) statt unvorhersehbar mit umzubrechen. */
+  .bkmp-proto-chud-row {
+    padding: .4rem .6rem;
+    padding-right: 5.3rem;
+    gap: .35rem;
+    row-gap: .3rem;
+  }
+  .bkmp-proto-chud-level { order: 1; }
+  .bkmp-proto-chud-icon-btn { order: 2; }
+  .bkmp-proto-chud-xp { order: 3; }
+  .bkmp-proto-chud-resources {
+    order: 4;
+    flex-basis: 100%;
+    gap: .5rem;
+    padding-top: .1rem;
+  }
+  .bkmp-proto-chud-res { font-size: .74rem; }
+
+  /* ---- 2) Stufenkarte (Auftrag Abschnitt 4): eigene, klar begrenzte
+     Kompakt-Karte statt einer schmalen, im Dokumentfluss haengenden Zeile -
+     dieselben drei bereits vorhandenen Aktionen (Auto-Umschalten/Stufe-
+     waehlen/Beste-Stufe-springen, siehe bkmpProtoChudRenderStageBar in
+     bkmp-proto-compact-hud.js), nur klarer angeordnet: Status-Text oben,
+     die beiden Icon-Knoepfe + der "Beste Stufe"-Knopf (falls vorhanden) in
+     einer zweiten Zeile darunter statt alle drei nebeneinander in einer
+     einzigen, bei langen Zahlen schnell zu schmal werdenden Reihe. */
+  .bkmp-proto-stagebar {
+    flex-wrap: wrap;
+    row-gap: .45rem;
+    padding: .55rem .7rem;
+  }
+  /* Nur der Status-Text (erstes Kind, reiner Text ohne eigene Klasse)
+     bekommt eine eigene volle Zeile - die Icon-/Aktions-Knoepfe danach
+     bleiben bewusst eine gemeinsame Reihe darunter (flex-wrap erledigt das
+     automatisch, sobald der Text durch flex-basis:100% umgebrochen ist). */
+  .bkmp-proto-stagebar > span:first-child {
+    flex-basis: 100%;
+    text-align: center;
+    font-size: .82rem;
+  }
+  .bkmp-proto-stagebar-icon-btn,
+  .bkmp-proto-stagebar-btn {
+    margin-left: 0;
+  }
+  .bkmp-proto-stagebar-icon-btn { width: 40px; height: 40px; font-size: 1rem; }
+  .bkmp-proto-stagebar-btn { flex: 1 1 auto; min-height: 44px; }
+
+  /* ---- 3) Niederlagen-/Status-Banner (Auftrag Abschnitt 5): die
+     Basisregel (".idle-combat-status" weiter oben in dieser Datei) nutzt
+     border-radius:999px + white-space:nowrap+ellipsis - fuer die auf Mobil
+     jetzt LAENGERE, zweizeilige Niederlagen-Meldung (siehe bkmpIdleHandle
+     Defeat() in idledorf.js, dort ausdruecklich nur fuer den kompakten
+     Mobil-/Tablet-Zustand aktiviert) waere eine Pillenform mit umbrechendem
+     Text praktisch ein Kreis - genau der im Auftrag gezeigte Fehler. Auf
+     Mobil deshalb ein echtes rechteckiges Banner mit weicheren Ecken,
+     voller nutzbarer Breite und echtem Zeilenumbruch (white-space:pre-line
+     interpretiert das \n aus dem JS-Text als Zeilenumbruch, textContent
+     bleibt dabei unveraendert XSS-sicher gesetzt). Andere Status-Typen
+     (Sieg/Bosskampf/Naechste Stufe) bleiben bei ihrem kurzen, einzeiligen
+     Text und damit optisch bei der kompakteren Pillenform. */
+  .idle-combat-status-defeat {
+    top: 4%;
+    max-width: 92%;
+    width: max-content;
+    white-space: pre-line;
+    overflow: visible;
+    text-overflow: clip;
+    border-radius: 14px;
+    font-size: clamp(.85rem, 3.6vw, 1.05rem);
+    line-height: 1.35;
+    padding: .55rem 1rem;
+    max-height: 110px;
+    background: linear-gradient(155deg, rgba(30, 8, 10, .88), rgba(20, 5, 8, .78));
+  }
+
+  /* ---- 4) Kampfkarte: Dorf/Gegner-Name (Auftrag Abschnitt 6, Beweis-
+     Screenshot "Schwa…"): die Basisregel (".idle-hp-row .idle-dragon-name"
+     weiter oben in dieser Datei) zwingt den Namen auf max-width:45% der
+     HP-Zeile mit hartem nowrap+ellipsis - bei kurzen Kampfkarten-Breiten
+     auf dem Handy reichen 45% oft fuer keinen einzigen vollstaendigen
+     Drachennamen. Name bekommt auf Mobil seine EIGENE Zeile UEBER der
+     HP-Leiste (volle Breite, echter Umbruch statt Ellipse) statt sich mit
+     ihr eine Zeile zu teilen - identisches Prinzip wie beim Kopfzeilen-
+     Umbau oben (eigene Zeile statt erzwungener Kuerzung). */
+  /* Bug-Fix beim eigenen mobilen Testen gefunden: eine erste Fassung setzte
+     hier "order:-1" (Name UEBER die HP-Leiste) - kollidierte sichtbar mit
+     den dort ueber #idleDragon/#idleVillage schwebenden Schadenszahlen
+     (siehe bkmpIdleSpawnProjectile/-ClickDamage in bkmp-hud.js, positioniert
+     relativ zum Sprite, nicht zur HP-Zeile). Name bleibt jetzt in der
+     urspruenglichen DOM-Reihenfolge NACH der HP-Leiste (eigene Zeile
+     darunter statt darueber) - keine Ueberlappung mehr moeglich, echter
+     Zeilenumbruch statt Ellipse bleibt erhalten. */
+  .idle-hp-row { flex-wrap: wrap; row-gap: .2rem; }
+  .idle-hp-row .idle-dragon-name {
+    flex: 1 1 100%;
+    max-width: 100%;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    text-align: center;
+  }
+  html.bkmp-app-mode .idle-dragon-name { font-size: .82rem; }
+
+  /* ---- 5) AD-Free-Kauf-Button (Auftrag Abschnitt 8): bleibt ein ECHTER,
+     funktionsfaehiger Kauf-Button (siehe Kommentar bei der App-Modus-
+     Basisregel weiter oben in dieser Datei) - "99$" ist laut dortiger
+     Beschriftung/Funktion der tatsaechlich hinterlegte, bewusste Preis
+     dieses Easter-Egg-Kaufs, keine erkennbare Test-/Platzhalter-Notation
+     (kein "TODO"/"XX"/offensichtlicher Lorem-Wert) - deshalb hier
+     ausdruecklich NICHT geaendert, nur seine optische Dominanz reduziert:
+     kleiner, weniger flaechige Farbe, mehr Abstand, damit er neben dem
+     Kampf nicht mehr wie das wichtigste Element der Seite wirkt.
+     !important noetig (per getComputedStyle bestaetigt, nicht nur
+     vermutet): der generische "html.bkmp-app-mode .idle-dorf-panel
+     button"-Reset (Padding-Vorgabe fuer normale Text-Buttons, seit Phase 5
+     praktisch immer aktiv, mehrfach in diesem Projekt dokumentiert) hat
+     durch seinen zusaetzlichen Typ-Selektor "button" HOEHERE Spezifitaet
+     als eine einzelne Klassen-Kombination wie hier - gewinnt sonst trotz
+     spaeterer Position im Quelltext. */
+  html.bkmp-app-mode .idle-adfree-btn {
+    padding: .55rem .8rem !important;
+    margin: .5rem 0;
+    border-radius: 10px;
+    font-size: .76rem;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--app-gold) 55%, var(--paper-2)), color-mix(in srgb, var(--app-gold) 70%, var(--paper-2)));
+    box-shadow: none;
+  }
+
+  /* ---- 6) Kampf-Log-Kopfzeile (Auftrag Abschnitt 9): bereits ein
+     kompakter Umschalt-Knopf (siehe Basisregel ".idle-combat-log-toggle"
+     weiter oben, ~44px), wirkte im Screenshot durch die volle Kartenbreite
+     + fehlenden visuellen Aufklapp-Hinweis trotzdem wie ein grosser,
+     leerer Button. Chevron-Pfeil rein dekorativ per ::after (kein neuer
+     JS-Text-Hook noetig, ".open"-Klasse existiert bereits am Sheet, siehe
+     bkmpIdleCombatLogOpen in bkmp-hud.js). !important auf padding aus
+     demselben Grund wie beim AD-Free-Knopf oben (generischer "html.bkmp-
+     app-mode .idle-dorf-panel button"-Reset hat durch den Typ-Selektor
+     "button" hoehere Spezifitaet). */
+  .idle-combat-log-toggle {
+    justify-content: space-between;
+    min-height: 46px;
+    padding: .5rem .9rem !important;
+    margin: .4rem 0;
+  }
+  .idle-combat-log-toggle::after {
+    content: '▾';
+    margin-left: auto;
+    color: var(--muted);
+    transition: transform .2s ease;
+  }
+  .idle-combat-log-toggle[aria-expanded="true"]::after {
+    transform: rotate(180deg);
+  }
+
+  /* ---- 7) Footer (Auftrag Abschnitt 10): "Als App installieren"/"Für
+     Streamer" sollen nicht mit der fixierten Bottom-Navigation kollidieren
+     und wenig Raum einnehmen - die Karte reserviert bereits Platz fuer die
+     Navigation (padding-bottom weiter oben in dieser Datei), hier nur
+     Schriftgroesse/Abstand der Links selbst verdichtet. */
+  .idle-dorf-footer-links {
+    gap: .8rem !important;
+    margin-top: .5rem !important;
+    padding-top: .4rem;
+    font-size: .78rem;
+  }
+  /* Nutzerwunsch (06.08.2026): "Für Streamer" auf der Handyansicht optisch
+     entfernen - das dahinterliegende OBS-Overlay-Setup (idle-stream-
+     mini.html) ist ein reines Desktop-/PC-Feature, auf dem Handy nicht
+     sinnvoll nutzbar. Nur auf Mobil (<1000px) ausgeblendet, Desktop
+     unveraendert - reine Anzeige, Link/Funktion selbst bleiben bestehen
+     (nichts geloescht, jederzeit reversibel). */
+  .idle-stream-help-btn { display: none; }
+
+  /* ---- 8) Bottom-Navigation (Auftrag Abschnitt 11): jetzt 4 Haupt-Tabs +
+     "Mehr" statt vorher 6 + "Mehr" (siehe BKMP_PROTO_NAV_PRIMARY in
+     bkmp-proto-compact-hud.js). Echter Bug beim eigenen mobilen Testen
+     gefunden (per getBoundingClientRect bewiesen, nicht nur vermutet):
+     ".bkmp-proto-nav-primary"(enthaelt ALLE Haupt-Tabs) und ".bkmp-proto-
+     nav-more-wrap"(enthaelt nur den EINEN "Mehr"-Knopf) haben in der
+     Basisregel weiter oben in dieser Datei BEIDE "flex:1" - die Nav-Zeile
+     teilte sich dadurch faktisch in zwei GLEICH GROSSE Haelften: die 4
+     Haupt-Tabs mussten sich eine Haelfte teilen (gemessen nur 45px pro
+     Knopf bei 390px Breite, "Upgrades" dadurch abgeschnitten), waehrend
+     der einzelne "Mehr"-Knopf die GESAMTE andere Haelfte (185px) fuer sich
+     allein bekam - weit mehr, als ein Wort braucht. Fix: "Mehr" bekommt
+     nur noch den Anteil EINES einzelnen Haupt-Tabs (Verhaeltnis 4:1 exakt
+     zur jetzigen Tab-Anzahl), die 4 Haupt-Tabs teilen sich den dadurch neu
+     gewonnenen Platz. !important als Absicherung: dieser gesamte Mobile-
+     Redesign-Block steht bewusst ganz am Dateiende (gewinnt dadurch
+     ohnehin per Quellreihenfolge gegen die bestehende, gleich spezifische
+     Basisregel ".bkmp-proto-nav-primary{flex:1;...}" weiter oben in
+     dieser Datei) - !important haelt das auch robust, falls jemals eine
+     weitere gleich spezifische Regel NACH diesem Block ergaenzt wird. */
+  .bkmp-proto-nav-primary { flex: 4 1 0 !important; }
+  .bkmp-proto-nav-more-wrap { flex: 1 1 0 !important; }
+  .bkmp-proto-nav-btn svg { width: 20px; height: 20px; }
+  .bkmp-proto-nav-btn span.bkmp-proto-nav-label { font-size: .68rem; }
+  .bkmp-proto-nav-more-btn { font-size: .68rem; }
+}
+
+/* Querformat (Auftrag Abschnitt 15, engerer @media(max-height:500px)-
+   Zusatz zum obigen Block, greift nur bei tatsaechlich flachen Viewports):
+   Kopfzeile/Stufenkarte weiter verdichten, Niederlagen-Banner bleibt eine
+   kleine Toast-Leiste statt der vollen Zwei-Zeilen-Version - genug Hoehe
+   fuer Kampfkarte/Navigation bleibt Prioritaet (Abschnitt 15: "Kampfkarte
+   sichtbar, Stufensteuerung erreichbar, Bottom-Navigation erreichbar,
+   keine komplette Bildschirmblockade durch Meldungen"). */
+@media (max-height: 500px) and (orientation: landscape) {
+  .bkmp-proto-chud-row { padding: .3rem .5rem; padding-right: 5.3rem; row-gap: .15rem; }
+  .bkmp-proto-stagebar { padding: .35rem .55rem; gap: .3rem; }
+  .idle-combat-status-defeat {
+    max-height: 60px;
+    font-size: clamp(.72rem, 3.2vw, .88rem);
+    padding: .35rem .8rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-radius: 999px;
+  }
+}
+
+/* NACHTRAG (06.08.2026, beim eigenen mobilen Testen gefunden): die
+   bestehende Schlachtfeld-Untergrenze ("min-height:clamp(340px,54dvh,
+   620px)!important", siehe Kommentar bei der Basisregel weiter oben in
+   dieser Datei) stammt aus einer Zeit, in der HUD/Navigation/Stufenleiste
+   noch mehr Chrome ausserhalb des Schlachtfelds brauchten. Nach dem
+   Mobile-Redesign oben (kompaktere 3-Zeilen-Kopfzeile, eigene Stufenkarte)
+   bleibt bei 54dvh spuerbar mehr Leerraum UM die kleinen, breiten-
+   begrenzten Dorf-/Drachenbilder herum stehen, als die Bilder selbst
+   brauchen (per getBoundingClientRect bestaetigt: Schlachtfeld 456px hoch
+   bei 844px Bildschirmhoehe, Dorf-/Drachenbild selbst nur 59-102px) - die
+   Karte ist als Ganzes SCROLLBAR (#idleDorfBody, overflow-y:auto), ein
+   kuerzeres Schlachtfeld erzeugt hier also (anders als beim vorher
+   behobenen Desktop-Fall mit fester Kartenhoehe) keine neue "Leerflaeche
+   im Nichts", sondern macht die Seite insgesamt kompakter. 54dvh -> 44dvh
+   (Unter-/Obergrenze 340-620px bleiben unveraendert). */
+@media (max-width: 999px), (max-height: 500px) and (orientation: landscape) {
+  html.bkmp-app-mode #idlePanelKampf .idle-battlefield {
+    min-height: clamp(340px, 44dvh, 620px) !important;
+  }
 }

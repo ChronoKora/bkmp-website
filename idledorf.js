@@ -576,6 +576,12 @@ function bkmpIdleRecomputeEffectiveStats() {
   const attackFlatTotal = t('attack_flat') + t('ballista_unlock') * 8;
   bkmpIdleEffectiveStats = {
     attack: (base.attack + attackFlatTotal) * (1 + attackPctTotal / 100),
+    /* Redesign 05.08.2026 (Kampffenster-Bonusleiste): reine Anzeige-
+       Ergaenzung - attackPctTotal wurde oben schon berechnet, war bisher
+       aber nur eine lokale Variable dieser Funktion, nirgends ueber
+       bkmpIdleEffectiveStats erreichbar. Kein bestehender Konsument
+       betroffen (rein additives neues Feld), keine Berechnung geaendert. */
+    attackBonusPct: attackPctTotal,
     /* Deckel ergaenzt (Dungeon-Balance-Analyse 16.07.): defense_pct war der
        einzige Sammel-Pott ohne die Obergrenze aus der NACHBESSERUNG oben
        (attack_pct/hp_pct/gold_prod_pct/xp_pct/loot_chance_pct/crit_chance
@@ -647,6 +653,108 @@ function bkmpIdleRecomputeEffectiveStats() {
   bkmpIdleState.xp_bonus = bkmpIdleEffectiveStats.xpBonus;
   bkmpIdleState.loot_bonus = bkmpIdleEffectiveStats.lootBonus;
   if (prevTickMs !== null && prevTickMs !== bkmpIdleEffectiveStats.tickIntervalMs) bkmpIdleSyncLoopInterval();
+  /* Redesign 05.08.2026: haelt die neue "Globale Kampf-Boni"-Leiste im
+     Kampf-Tab live mit jeder Staerkeaenderung synchron (Upgrades/Skilltree/
+     Prestige/Runen/Gilden-Tech/... rufen alle diese Funktion bereits auf).
+     Reiner Anzeige-Refresh (innerHTML von 6 kleinen Kacheln), unwirksam
+     bzw. no-op, solange #idleKampfBonusBar nicht existiert (andere
+     Seiten wie admin.html/idle-stream-mini.html haben dieses Element gar
+     nicht erst im Markup). */
+  if (typeof bkmpIdleRenderCombatBonusBar === 'function') bkmpIdleRenderCombatBonusBar();
+}
+
+/* Redesign 05.08.2026 (Nutzer-Auftrag "grosses episches Desktop-
+   Kampffenster", rechte Info-Spalte): fuellt die drei NEUEN Container
+   #idleCombatBossCard/#idleCombatRewards/#idleCombatStats. Laeuft immer
+   dann, wenn sich der aktuelle Drache aendert (bkmpIdleSpawnDragon) oder
+   das Fenster frisch geoeffnet wird (bkmpIdleOpenModal) - exakt dieselben
+   Aufrufstellen wie das bereits bestehende bkmpIdleRenderStageBar().
+   Boss-Name/-Stufe/-HP sind reine Spiegelungen von bkmpIdleCurrentDragon
+   (derselbe Stand, den auch #idleDragonName/#idleDragonHpFill zeigen -
+   keine zweite Quelle der Wahrheit). Die Belohnungs-Vorschau nutzt
+   bewusst dieselbe bkmpIdleRewardsAt()-Formel, die bkmpIdleHandleDragonDefeated()
+   beim ECHTEN Sieg verwendet (reiner Lesezugriff, keine Nebenwirkungen) -
+   keine zweite, potenziell abweichende Berechnung. */
+function bkmpIdleRenderCombatSidebar() {
+  if (!bkmpIdleCurrentDragon) return;
+  const d = bkmpIdleCurrentDragon;
+  const bossCard = document.getElementById('idleCombatBossCard');
+  if (bossCard) {
+    /* Nutzerwunsch (06.08.2026, Screenshot-Feedback): der Gegnername/Stufe/
+       HP-Balken stand hier redundant zu den bereits im Hauptfenster (Bild +
+       Namenszeile + eigener HP-Balken direkt unter #idleDragon) sichtbaren
+       Werten - "Das kann weg, wir sehen es ja im Hauptfenster". Ersetzt
+       durch zwei bisher nirgends im Kampfbereich sichtbare Fortschritts-
+       werte (Nutzer-Vorschlag: "Wieviele Drachen? Wieviel Prestige Punkte
+       ??/???") - echte, bereits vorhandene Werte, keine neue Berechnung:
+       bkmpPlayerDragons (Drachenzucht-Sammlung, js/systems/bkmp-breeding.js)
+       und bkmpPrestigeState.prestige_points/-_spent (js/systems/
+       bkmp-prestige.js, gleiche "verfuegbar = gesamt - ausgegeben"-Formel
+       wie an den bestehenden Stellen dort). */
+    const dragonsOwned = typeof bkmpPlayerDragons !== 'undefined' && bkmpPlayerDragons ? bkmpPlayerDragons.length : 0;
+    const prestigeTotal = bkmpPrestigeState ? Number(bkmpPrestigeState.prestige_points || 0) : 0;
+    const prestigeSpent = bkmpPrestigeState ? Number(bkmpPrestigeState.prestige_points_spent || 0) : 0;
+    const prestigeAvailable = Math.max(0, prestigeTotal - prestigeSpent);
+    bossCard.innerHTML = `
+      <div class="idle-combat-stats-title">📈 Fortschritt</div>
+      <div class="idle-combat-stat-row"><span>Drachen gezüchtet</span><b>${bkmpIdleFormatNumber(dragonsOwned)}</b></div>
+      <div class="idle-combat-stat-row"><span>Prestige-Level</span><b>${bkmpIdleFormatNumber(bkmpPrestigeState ? Number(bkmpPrestigeState.prestige_level || 0) : 0)}</b></div>
+      <div class="idle-combat-stat-row"><span>Prestige-Punkte</span><b>${bkmpIdleFormatNumber(prestigeAvailable)} / ${bkmpIdleFormatNumber(prestigeTotal)}</b></div>
+    `;
+  }
+
+  const rewardsBox = document.getElementById('idleCombatRewards');
+  if (rewardsBox && bkmpIdleEffectiveStats) {
+    const rewards = bkmpIdleRewardsAt(d, bkmpIdleEffectiveStats, bkmpIdleGetMergedRewardScalingCfg());
+    const chip = (icon, val) => val > 0 ? `<span class="idle-combat-reward-chip"><i>${icon}</i><b>+${bkmpIdleFormatNumber(Math.round(val))}</b></span>` : '';
+    rewardsBox.innerHTML = `
+      <div class="idle-combat-rewards-title">🎁 Belohnung bei Sieg</div>
+      <div class="idle-combat-rewards-grid">
+        ${chip('💰', rewards.gold)}${chip('✨', rewards.xp)}${chip('🌳', rewards.wood)}${chip('🗿', rewards.stone)}${chip('💎', rewards.crystals)}${chip('🧪', rewards.essence)}
+      </div>`;
+  }
+
+  const statsBox = document.getElementById('idleCombatStats');
+  if (statsBox) {
+    statsBox.innerHTML = `
+      <div class="idle-combat-stats-title">📊 Kampf-Statistiken</div>
+      <div class="idle-combat-stat-row"><span>Gesamter Schaden</span><b id="idleCombatStatDamage">0</b></div>
+      <div class="idle-combat-stat-row"><span>DPS (aktuell)</span><b id="idleCombatStatDps">0</b></div>
+      <div class="idle-combat-stat-row"><span>Projektile abgefeuert</span><b id="idleCombatStatProjectiles">0</b></div>
+      <div class="idle-combat-stat-row"><span>Kritische Treffer</span><b id="idleCombatStatCrit">0%</b></div>
+      <div class="idle-combat-stat-row"><span>Bosse besiegt</span><b id="idleCombatStatKills">${bkmpIdleFormatNumber(bkmpIdleState.boss_kills || 0)}</b></div>
+    `;
+    if (typeof bkmpIdleUpdateCombatStatsDisplay === 'function') bkmpIdleUpdateCombatStatsDisplay();
+  }
+}
+
+/* NEU (05.08.2026): "Globale Kampf-Boni"-Leiste unten in der Arena-Spalte -
+   liest ausschliesslich bereits bestehende Felder aus bkmpIdleEffectiveStats
+   (siehe bkmpIdleRecomputeEffectiveStats oben), keine neue Berechnung.
+   attack/critDamage/tickIntervalMs/goldBonus/xpBonus/bossDamageBonus
+   werden bereits an anderer Stelle (HUD-Zeile) angezeigt - hier nur in
+   Kachel-Form fuer die neue Bonusleiste, plus das neue attackBonusPct-Feld
+   (siehe Kommentar dort) fuer eine echte Prozent-Anzeige statt des rohen
+   Endwerts. */
+function bkmpIdleRenderCombatBonusBar() {
+  const bar = document.getElementById('idleKampfBonusBar');
+  if (!bar) return;
+  const s = bkmpIdleEffectiveStats;
+  if (!s) { bar.innerHTML = ''; return; }
+  const tile = (icon, label, val) => `
+    <div class="idle-kampf-bonus-tile">
+      <span class="idle-kampf-bonus-icon">${icon}</span>
+      <span class="idle-kampf-bonus-value">${val}</span>
+      <span class="idle-kampf-bonus-label">${label}</span>
+    </div>`;
+  bar.innerHTML = [
+    tile('⚔️', 'Helden-Schaden', '+' + Math.round(s.attackBonusPct || 0) + '%'),
+    tile('💥', 'Kritischer Schaden', '+' + Math.round(s.critDamage) + '%'),
+    tile('⚡', 'Angriffsgeschwindigkeit', '+' + (1000 / (s.tickIntervalMs || 900)).toFixed(2) + '/s'),
+    tile('💰', 'Gold Bonus', '+' + Math.round(s.goldBonus) + '%'),
+    tile('✨', 'Erfahrungsbonus', '+' + Math.round(s.xpBonus) + '%'),
+    tile('🐲', 'Bossschaden', '+' + Math.round(s.bossDamageBonus || 0) + '%')
+  ].join('');
 }
 
 /* ---------------- Achievement-Kontext-Felder (fuer index.html) ---------------- */
@@ -936,8 +1044,39 @@ function bkmpIdleCheckYakshasHeimatUnlock() {
 function bkmpIdleHandleDefeat() {
   if (bkmpDungeonActive) { bkmpDungeonHandleFailure(); return; }
   if (bkmpTowerActive) { bkmpTowerHandleDefeat(); return; }
-  if (typeof bkmpIdleShowCombatStatus === 'function') bkmpIdleShowCombatStatus('niederlage', '💀 Niederlage', { variant: 'defeat', durationMs: 1300 });
-  bkmpIdleLog(`💀 Niederlage gegen ${bkmpIdleCurrentDragon.emoji} ${bkmpIdleCurrentDragon.name}! Du fällst eine Stufe zurück.`);
+  /* MOBILE-REDESIGN (06.08.2026, Auftrag Abschnitt 5, Screenshot-Beweis
+     "riesige runde Niederlagen-Blase" + "Niederlage erscheint mehrfach"):
+     bkmpIdleLog() loeste bisher ZUSAETZLICH zu diesem eigens fuer den
+     Kampf gebauten, kompakten In-Battlefield-Banner (naechste Zeile) auch
+     noch den generischen, SEITENWEITEN bkmpShowJannikToast() aus (Standard-
+     Verhalten von bkmpIdleLog ohne zweiten Parameter) - ein Baustein, der
+     fuer kurze, seltene Website-weite Ansagen gedacht ist (border-
+     radius:999px, siehe .bkmp-jannik-toast in style.css), nicht fuer den
+     laengeren, auf schmalen Handybreiten mehrzeilig umbrechenden Kampf-
+     Log-Satz "Niederlage gegen X! Du fällst eine Stufe zurück." - eine
+     Pillenform mit mehrzeiligem Text rendert dabei praktisch als Kreis,
+     genau die im Auftrag gezeigte Blase. ZWEI verschiedene, unabhaengig
+     positionierte Niederlagen-Anzeigen gleichzeitig ("doppelte
+     Niederlagenanzeige", Auftrag Punkt 2) waren die Folge. Fix: der
+     generische Toast wird fuer DIESEN Log-Eintrag unterdrueckt
+     (skipToast=true) - der bereits existierende, purpose-built In-Battle-
+     field-Banner uebernimmt jetzt allein die Meldung. Auftrag verlangt
+     ausdruecklich "Desktop ab 1000 Pixel vollstaendig unangetastet
+     lassen" - der laengere, zweizeilige Text (Drachenname + Ruecksstufen-
+     Hinweis) aus dem Zielbild in Abschnitt 5 wird deshalb NUR im
+     kompakten Mobil-/Tablet-Zustand verwendet (bkmpProtoChudWantCompact,
+     jetzt <1000px, siehe bkmp-proto-compact-hud.js) - GENAUSO wie die
+     Toast-Unterdrueckung selbst: auf Desktop bleibt bkmpIdleLog() beim
+     unveraenderten Standardverhalten (Toast + kurzer "💀 Niederlage"-
+     Banner-Text), exakt wie vor diesem Umbau. */
+  const bkmpIdleDefeatIsCompactMobile = typeof bkmpProtoChudWantCompact === 'function' && bkmpProtoChudWantCompact();
+  if (typeof bkmpIdleShowCombatStatus === 'function') {
+    const defeatText = bkmpIdleDefeatIsCompactMobile
+      ? `💀 Niederlage gegen ${bkmpIdleCurrentDragon.emoji} ${bkmpIdleCurrentDragon.name}\nDu fällst eine Stufe zurück.`
+      : '💀 Niederlage';
+    bkmpIdleShowCombatStatus('niederlage', defeatText, { variant: 'defeat', durationMs: bkmpIdleDefeatIsCompactMobile ? 2600 : 1300 });
+  }
+  bkmpIdleLog(`💀 Niederlage gegen ${bkmpIdleCurrentDragon.emoji} ${bkmpIdleCurrentDragon.name}! Du fällst eine Stufe zurück.`, bkmpIdleDefeatIsCompactMobile);
   bkmpIdleState.current_dragon_index = Math.max(0, Number(bkmpIdleState.current_dragon_index || 0) - 1);
   bkmpIdleState.village_defeats = Number(bkmpIdleState.village_defeats || 0) + 1;
   bkmpIdleVillageHp = bkmpIdleEffectiveStats.hp;
@@ -3085,8 +3224,15 @@ async function bkmpIdleOpenModal() {
      Wiedereroeffnen des Fensters erneut erscheinen, solange der Kampf noch
      nicht mit dem Bereit-Button gestartet wurde (siehe Auftrag Abschnitt 3). */
   bkmpIdleMaybeShowEventDragonPopup();
+  /* Redesign 05.08.2026: neue Kampf-Sitzungsstatistiken (Gesamtschaden/DPS/
+     Projektile/Krit-Rate, siehe #idleCombatStats) setzen sich bei jedem
+     Oeffnen zurueck - rein clientseitig, nicht persistiert, exakt wie das
+     bereits bestehende Raid-Pendant bkmpRaidTapDamageSession. */
+  bkmpIdleCombatSessionStats = { totalDamage: 0, hits: 0, critHits: 0, projectiles: 0, startedAtMs: Date.now() };
   bkmpIdleRenderHud();
   bkmpIdleRenderStageBar();
+  if (typeof bkmpIdleRenderCombatSidebar === 'function') bkmpIdleRenderCombatSidebar();
+  if (typeof bkmpIdleRenderCombatBonusBar === 'function') bkmpIdleRenderCombatBonusBar();
   bkmpIdleUpdateVillageHpBar();
   bkmpIdleUpdateDragonHpBar();
   bkmpIdleStartLoop();

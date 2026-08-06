@@ -52,6 +52,17 @@ let bkmpIdleCurrentDragon = null;
 let bkmpIdleLastCounterAttackAt = 0;
 let bkmpIdleVillageHp = null;
 let bkmpIdleEffectiveStats = null;
+
+/* Redesign 05.08.2026 (Kampffenster-Rechte-Spalte, "Kampf-Statistiken"):
+   rein clientseitige, NICHT persistierte Sitzungs-Zaehler (Gesamtschaden/
+   Treffer/Kritische Treffer/Projektile seit dem Oeffnen des Fensters) -
+   werden in bkmp-hud.js an genau den Stellen erhoeht, die ohnehin schon
+   jede Schadenszahl anzeigen (bkmpIdleSpawnBurnTick/-LightningBolt/
+   -Projectile/-ClickDamage). Keine Datenbankaenderung, kein neues
+   persistiertes Feld - setzt sich bei jedem Oeffnen des Fensters
+   (bkmpIdleOpenModal) bewusst zurueck, exakt wie das bereits bestehende
+   Raid-Pendant bkmpRaidTapDamageSession/bkmpRaidTapClickSession. */
+let bkmpIdleCombatSessionStats = { totalDamage: 0, hits: 0, critHits: 0, projectiles: 0, startedAtMs: 0 };
 let bkmpIdleLoopTimer = null;
 let bkmpIdleLoopTimerMs = 900;
 let bkmpIdleModalOpen = false;

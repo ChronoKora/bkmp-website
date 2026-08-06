@@ -6,6 +6,12 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "8094"],
       "port": 8094
+    },
+    {
+      "name": "static-site-8084",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8084"],
+      "port": 8084
     }
   ]
 }

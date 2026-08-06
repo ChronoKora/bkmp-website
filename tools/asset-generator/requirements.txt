@@ -1,0 +1,7 @@
+# Lokaler BKMP-Asset-Generator - nur diese 3 Bibliotheken, keine unnoetigen Frameworks.
+# generate_asset.py selbst importiert openai/Pillow erst dort, wo sie wirklich
+# gebraucht werden (--generate), damit --doctor/--dry-run/--validate/Tests auch
+# ohne installierte Pakete funktionieren.
+openai>=1.0.0
+python-dotenv>=1.0.0
+Pillow>=10.0.0

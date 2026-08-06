@@ -146,7 +146,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260805-multicompanion7">
+<link rel="stylesheet" href="style.css?v=20260806-mobileredesign9">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 </head>
 <body>
@@ -709,20 +709,6 @@
            bestehende Button, keine eigene Logik. -->
       <button type="button" class="idle-dorf-feedback-btn" id="idleDorfFeedbackBtn" aria-label="Feedback geben" title="Feedback geben">💬</button>
       <button type="button" class="idle-dorf-close" id="idleDorfCloseX" aria-label="Schlie&szlig;en">&times;</button>
-      <!-- Spieler-Wunsch (14.07.): "Wir haben endlich ein banner fürs
-           Spiel. Bau das gerne ordentlich ein!" - ersetzt den bisherigen
-           kleinen Text-Header, gleiches WEBP+PNG-Fallback-Muster wie der
-           Haupt-Hero-Banner auf der Startseite (.hero-banner-picture). -->
-      <picture class="idle-dorf-banner-picture">
-        <source srcset="assets/idle-dorf-banner.webp?v=20260715-2" type="image/webp">
-        <img class="idle-dorf-banner-img" src="assets/idle-dorf-banner.png?v=20260715-2" width="2141" height="568" alt="Idle Drachen Dorf – Baue. Verbessere. Besiege. Werde zur Legende!" loading="lazy" decoding="async">
-      </picture>
-      <div class="idle-app-install-banner" id="idleAppInstallBanner">
-        <span>📲 Auf den Startbildschirm holen, damit es sich wie eine echte App anfühlt.</span>
-        <button type="button" id="idleAppInstallBtn">Installieren</button>
-      </div>
-      <div class="idle-dorf-offline-card" id="idleDorfOfflineCard" style="display:none;"></div>
-      <div class="raid-join-banner" id="raidJoinBanner" style="display:none;"></div>
 
       <!-- PROTOTYP 2 (18.07., isoliert & vollstaendig entfernbar): kompaktes
            HUD/Nav/Stufenleiste-Layout, siehe
@@ -758,36 +744,29 @@
 
       <div class="bkmp-proto-stagebar" id="bkmpProtoCompactStageBar" style="display:none;"></div>
 
+      <!-- Redesign 05.08.2026 (Nutzer-Auftrag "grosses episches Desktop-
+           Kampffenster", Referenzbild-Vorgabe): #idleDorfHud ist jetzt der
+           EINZIGE direkte Kind-Grid-Bereich "hud" (volle Breite, oben) -
+           #idleDorfTabs direkt danach ist der Grid-Bereich "nav" (linke
+           Spalte, wird unten per CSS zu einer echten vertikalen Sidebar
+           umgestylt - bkmpIdleInitTabs()/bkmpIdleBuildMobileTabOverflowUi()
+           arbeiten beide ausschliesslich per getElementById, komplett
+           positionsunabhaengig, siehe Analyse-Chat). Alles andere
+           (Banner/Raid-Ansicht/alle 15 Tab-Panels/Footer) ist NEU in
+           #idleDorfBody gebuendelt - EIN einziger Grid-Bereich "body"
+           rechts neben der Nav, damit diese vielen Geschwister-Elemente
+           dort weiterhin ganz normal (block/flex) untereinander flieszen
+           statt sich als separate Grid-Items zu ueberlappen. Keine ID/Klasse
+           eines bestehenden Elements wurde dabei geaendert oder entfernt -
+           reine Umsortierung + neue, anfangs leere Container fuer
+           JS-gerenderte neue Inhalte (Boss-Karte/Belohnungen/Statistiken/
+           Bonusleiste). #idleAppMoreSheet bleibt bewusst direkt NACH den
+           Tabs (nicht im Body-Wrapper) - wird ohnehin beim Laden per JS zu
+           einem Geschwister von .idle-dorf-card auf #idleDorfOverlay
+           umgehaengt (Stacking-Context-Grund, siehe bkmp-app-mode-
+           bootstrap.js), die Position hier vor dem ersten JS-Lauf ist
+           irrelevant. -->
       <div class="idle-dorf-hud" id="idleDorfHud"></div>
-
-      <div class="raid-combat-view idle-dorf-panel" id="raidCombatView" style="display:none;">
-        <div class="raid-combat-header">
-          <span>🐉 Weltboss-Raid</span>
-          <span class="raid-timer" id="raidCombatTimer"></span>
-        </div>
-        <div class="raid-battlefield" id="raidBattlefield">
-          <div class="raid-city" id="raidCity">
-            <video class="raid-city-sprite" src="assets/dragons/raid-stadt.mp4?v=20260716-raidcityvideo1" autoplay muted loop playsinline></video>
-            <div class="raid-hp-bar"><div class="raid-hp-fill raid-hp-fill-city" id="raidCityHpFill" style="width:100%"></div></div>
-            <div class="raid-hp-label" id="raidCityHpLabel"></div>
-            <div class="raid-city-stats" id="raidCityStats"></div>
-          </div>
-          <div class="raid-vs-badge" aria-hidden="true">VS</div>
-          <div class="raid-boss raid-clickable" id="raidBoss">
-            <video class="raid-boss-sprite raid-sprite-zerathor" id="raidBossSprite" src="assets/dragons/zerathor.mp4?v=20260716-zerathorvideo2" autoplay muted loop playsinline></video>
-            <div class="raid-hp-bar"><div class="raid-hp-fill raid-hp-fill-boss" id="raidBossHpFill" style="width:100%"></div></div>
-            <div class="raid-hp-label" id="raidBossHpLabel"></div>
-            <div class="raid-boss-name" id="raidBossName"></div>
-          </div>
-        </div>
-        <div class="idle-res-strip" id="raidRewardsStrip"></div>
-        <div class="raid-action-bar" id="raidActionBar">
-          <span class="raid-auto-pill" title="Zusätzlich zu deinen eigenen Klicks fügt dein Dorf automatisch alle paar Sekunden Schaden zu, solange der Kampf läuft.">🟢 Auto-Kampf aktiv</span>
-          <span class="idle-res-chip idle-res-tap" id="raidTapDamagePill" title="Deine eigenen Klicks/Tipper in diesem Kampf"><i class="idle-res-icon">👆</i><b class="idle-res-val">0</b></span>
-        </div>
-        <div class="raid-participants-list" id="raidParticipantsList"></div>
-        <div class="raid-result-card" id="raidResultCard" style="display:none;"></div>
-      </div>
 
       <div class="idle-dorf-tabs" id="idleDorfTabs" data-testid="idle-tabs-bar">
         <div class="idle-dorf-tab-group">
@@ -843,93 +822,177 @@
         </div>
       </div>
 
-      <div class="idle-dorf-panel" id="idlePanelKampf">
-        <div class="idle-dungeon-banner" id="idleDungeonBanner" style="display:none;"></div>
-        <div class="idle-dungeon-banner" id="idleTurmBanner" style="display:none;"></div>
-        <div class="idle-stage-bar" id="idleStageBar"></div>
-        <button type="button" class="idle-fx-mode-btn" id="idleFxModeBtn" title="Visuelle Effekte umschalten (Hoch/Reduziert/Aus) - wirkt sich nur auf die Darstellung aus, nie auf Werte oder Kampfergebnisse">✨ Effekte: Hoch</button>
-        <div class="idle-battlefield" id="idleBattlefield">
-          <div class="idle-village" id="idleVillage">
-            <div class="idle-village-sprite" id="idleVillageSprite"></div>
-            <div class="idle-hp-bar"><div class="idle-hp-fill idle-hp-fill-village" id="idleVillageHpFill" style="width:100%"></div></div>
-            <div class="idle-hp-label" id="idleVillageHpLabel"></div>
+      <div class="idle-dorf-body" id="idleDorfBody">
+        <!-- Spieler-Wunsch (14.07.): "Wir haben endlich ein banner fürs
+             Spiel. Bau das gerne ordentlich ein!" - ersetzt den bisherigen
+             kleinen Text-Header, gleiches WEBP+PNG-Fallback-Muster wie der
+             Haupt-Hero-Banner auf der Startseite (.hero-banner-picture).
+             Bleibt unter html.bkmp-app-mode (immer aktiv) ohnehin
+             display:none - reine Umsortierung, keine Sichtbarkeitsaenderung. -->
+        <picture class="idle-dorf-banner-picture">
+          <source srcset="assets/idle-dorf-banner.webp?v=20260715-2" type="image/webp">
+          <img class="idle-dorf-banner-img" src="assets/idle-dorf-banner.png?v=20260715-2" width="2141" height="568" alt="Idle Drachen Dorf – Baue. Verbessere. Besiege. Werde zur Legende!" loading="lazy" decoding="async">
+        </picture>
+        <div class="idle-app-install-banner" id="idleAppInstallBanner">
+          <span>📲 Auf den Startbildschirm holen, damit es sich wie eine echte App anfühlt.</span>
+          <button type="button" id="idleAppInstallBtn">Installieren</button>
+        </div>
+        <div class="idle-dorf-offline-card" id="idleDorfOfflineCard" style="display:none;"></div>
+        <div class="raid-join-banner" id="raidJoinBanner" style="display:none;"></div>
+
+        <div class="raid-combat-view idle-dorf-panel" id="raidCombatView" style="display:none;">
+          <div class="raid-combat-header">
+            <span>🐉 Weltboss-Raid</span>
+            <span class="raid-timer" id="raidCombatTimer"></span>
           </div>
-          <div class="idle-dragon" id="idleDragon">
-            <div class="idle-dragon-sprite" id="idleDragonSprite"></div>
-            <div class="idle-hp-row">
-              <div class="idle-hp-bar"><div class="idle-hp-fill idle-hp-fill-dragon" id="idleDragonHpFill" style="width:100%"></div></div>
-              <div class="idle-dragon-name" id="idleDragonName"></div>
+          <div class="raid-battlefield" id="raidBattlefield">
+            <div class="raid-city" id="raidCity">
+              <video class="raid-city-sprite" src="assets/dragons/raid-stadt.mp4?v=20260716-raidcityvideo1" autoplay muted loop playsinline></video>
+              <div class="raid-hp-bar"><div class="raid-hp-fill raid-hp-fill-city" id="raidCityHpFill" style="width:100%"></div></div>
+              <div class="raid-hp-label" id="raidCityHpLabel"></div>
+              <div class="raid-city-stats" id="raidCityStats"></div>
             </div>
-            <div class="idle-hp-label" id="idleDragonHpLabel"></div>
+            <div class="raid-vs-badge" aria-hidden="true">VS</div>
+            <div class="raid-boss raid-clickable" id="raidBoss">
+              <video class="raid-boss-sprite raid-sprite-zerathor" id="raidBossSprite" src="assets/dragons/zerathor.mp4?v=20260716-zerathorvideo2" autoplay muted loop playsinline></video>
+              <div class="raid-hp-bar"><div class="raid-hp-fill raid-hp-fill-boss" id="raidBossHpFill" style="width:100%"></div></div>
+              <div class="raid-hp-label" id="raidBossHpLabel"></div>
+              <div class="raid-boss-name" id="raidBossName"></div>
+            </div>
+          </div>
+          <div class="idle-res-strip" id="raidRewardsStrip"></div>
+          <div class="raid-action-bar" id="raidActionBar">
+            <span class="raid-auto-pill" title="Zusätzlich zu deinen eigenen Klicks fügt dein Dorf automatisch alle paar Sekunden Schaden zu, solange der Kampf läuft.">🟢 Auto-Kampf aktiv</span>
+            <span class="idle-res-chip idle-res-tap" id="raidTapDamagePill" title="Deine eigenen Klicks/Tipper in diesem Kampf"><i class="idle-res-icon">👆</i><b class="idle-res-val">0</b></span>
+          </div>
+          <div class="raid-participants-list" id="raidParticipantsList"></div>
+          <div class="raid-result-card" id="raidResultCard" style="display:none;"></div>
+        </div>
+
+        <div class="idle-dorf-panel" id="idlePanelKampf">
+          <div class="idle-dungeon-banner" id="idleDungeonBanner" style="display:none;"></div>
+          <div class="idle-dungeon-banner" id="idleTurmBanner" style="display:none;"></div>
+          <!-- Redesign 05.08.2026: NEUE zweispaltige Kampf-Innenaufteilung
+               (nur wirksam ab min-width:1000px, siehe style.css) - links die
+               grosse Arena+Bonusleiste, rechts die neue Stufen-/Boss-/
+               Belohnungs-/Statistik-Spalte. Unterhalb dieser Breite bleibt
+               die bisherige, bereits vielfach getestete Mobil-/Tablet-
+               Darstellung (einspaltig, Kampf-Log als Bottom-Sheet usw.)
+               komplett unangetastet - #idleKampfLayout ist dort einfach ein
+               wirkungsloser Wrapper ohne eigenes CSS. -->
+          <div class="idle-kampf-layout" id="idleKampfLayout">
+            <div class="idle-kampf-arena-col" id="idleKampfArenaCol">
+              <button type="button" class="idle-fx-mode-btn" id="idleFxModeBtn" title="Visuelle Effekte umschalten (Hoch/Reduziert/Aus) - wirkt sich nur auf die Darstellung aus, nie auf Werte oder Kampfergebnisse">✨ Effekte: Hoch</button>
+              <div class="idle-battlefield" id="idleBattlefield">
+                <div class="idle-village" id="idleVillage">
+                  <div class="idle-village-sprite" id="idleVillageSprite"></div>
+                  <div class="idle-hp-bar"><div class="idle-hp-fill idle-hp-fill-village" id="idleVillageHpFill" style="width:100%"></div></div>
+                  <div class="idle-hp-label" id="idleVillageHpLabel"></div>
+                </div>
+                <div class="idle-dragon" id="idleDragon">
+                  <div class="idle-dragon-sprite" id="idleDragonSprite"></div>
+                  <div class="idle-hp-row">
+                    <div class="idle-hp-bar"><div class="idle-hp-fill idle-hp-fill-dragon" id="idleDragonHpFill" style="width:100%"></div></div>
+                    <div class="idle-dragon-name" id="idleDragonName"></div>
+                  </div>
+                  <div class="idle-hp-label" id="idleDragonHpLabel"></div>
+                </div>
+              </div>
+
+              <!-- NEU (05.08.2026): "Globale Kampf-Boni"-Leiste, per JS aus
+                   dem bereits bestehenden bkmpIdleEffectiveStats-Objekt
+                   gefuellt (bkmpIdleRenderCombatBonusBar() in idledorf.js) -
+                   keine neue Berechnung, nur eine neue Anzeige bereits
+                   vorhandener Werte (dieselben, die vorher in .idle-hud-flow
+                   standen). Nur auf Breiten sichtbar, auf denen
+                   #idleKampfLayout aktiv ist. -->
+              <div class="idle-kampf-bonus-bar" id="idleKampfBonusBar" aria-hidden="true"></div>
+
+              <button type="button" class="idle-adfree-btn" id="idleAdFreeBtn" style="display:none;">AD-Free &ndash; nur 99$</button>
+
+              <!-- Phase 7.0 (20.07., Mobile-First-Redesign): auf schmalen
+                   Bildschirmen ist das Kampf-Log jetzt standardmaessig
+                   geschlossen (Bottom-Sheet) statt permanent Platz unter dem
+                   Schlachtfeld zu belegen - auf Desktop unveraendert direkt
+                   sichtbar (Umschalt-Button + Sheet-Huelle sind nur mobil
+                   wirksam, siehe style.css). #idleDorfLog/die Filter-Checkbox
+                   und ihre gesamte Logik (bkmpIdleLog etc.) bleiben exakt wie
+                   zuvor - reine Darstellungs-Verpackung. -->
+              <button type="button" class="idle-combat-log-toggle" id="idleCombatLogToggleBtn" aria-expanded="false" aria-controls="idleCombatLogSheet">
+                📜 Kampf-Log <span class="idle-combat-log-badge" id="idleCombatLogBadge" style="display:none;"></span>
+              </button>
+              <div class="idle-combat-log-sheet" id="idleCombatLogSheet">
+                <div class="idle-combat-log-sheet-card">
+                  <div class="idle-combat-log-sheet-handle"></div>
+                  <div class="idle-combat-log-sheet-header">
+                    <span>📜 Kampf-Log</span>
+                    <button type="button" class="idle-combat-log-close" id="idleCombatLogCloseBtn" aria-label="Kampf-Log schließen">✕</button>
+                  </div>
+                  <label class="idle-dorf-log-filter" for="idleLogLegendaryOnlyToggle">
+                    <input type="checkbox" id="idleLogLegendaryOnlyToggle">
+                    Nur legendäre Runenfunde im Log
+                  </label>
+                  <div class="idle-dorf-log" id="idleDorfLog"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- NEU (05.08.2026): rechte Info-Spalte - Stufe/Boss/Navigation
+                 (verschobenes, unveraendertes #idleStageBar - bkmpIdleRenderStageBar()
+                 liest/schreibt ausschliesslich per getElementById, komplett
+                 positionsunabhaengig), Boss-Karte/Belohnungen/Kampf-Statistiken
+                 (alle drei neu, per bkmpIdleRenderCombatSidebar() in idledorf.js
+                 gefuellt - Boss-HP/Name werden aus bkmpIdleCurrentDragon
+                 gespiegelt, Belohnungs-Vorschau nutzt die ECHTE, bereits an
+                 anderer Stelle produktiv genutzte bkmpIdleRewardsAt()-Formel,
+                 keine zweite/abweichende Berechnung). -->
+            <div class="idle-kampf-right-col" id="idleKampfRightCol">
+              <div class="idle-stage-bar" id="idleStageBar"></div>
+              <div class="idle-combat-boss-card" id="idleCombatBossCard"></div>
+              <div class="idle-combat-rewards" id="idleCombatRewards"></div>
+              <div class="idle-combat-stats" id="idleCombatStats"></div>
+            </div>
           </div>
         </div>
 
-        <button type="button" class="idle-adfree-btn" id="idleAdFreeBtn" style="display:none;">AD-Free &ndash; nur 99$</button>
-
-        <!-- Phase 7.0 (20.07., Mobile-First-Redesign): auf schmalen
-             Bildschirmen ist das Kampf-Log jetzt standardmaessig
-             geschlossen (Bottom-Sheet) statt permanent Platz unter dem
-             Schlachtfeld zu belegen - auf Desktop unveraendert direkt
-             sichtbar (Umschalt-Button + Sheet-Huelle sind nur mobil
-             wirksam, siehe style.css). #idleDorfLog/die Filter-Checkbox
-             und ihre gesamte Logik (bkmpIdleLog etc.) bleiben exakt wie
-             zuvor - reine Darstellungs-Verpackung. -->
-        <button type="button" class="idle-combat-log-toggle" id="idleCombatLogToggleBtn" aria-expanded="false" aria-controls="idleCombatLogSheet">
-          📜 Kampf-Log <span class="idle-combat-log-badge" id="idleCombatLogBadge" style="display:none;"></span>
-        </button>
-        <div class="idle-combat-log-sheet" id="idleCombatLogSheet">
-          <div class="idle-combat-log-sheet-card">
-            <div class="idle-combat-log-sheet-handle"></div>
-            <div class="idle-combat-log-sheet-header">
-              <span>📜 Kampf-Log</span>
-              <button type="button" class="idle-combat-log-close" id="idleCombatLogCloseBtn" aria-label="Kampf-Log schließen">✕</button>
-            </div>
-            <label class="idle-dorf-log-filter" for="idleLogLegendaryOnlyToggle">
-              <input type="checkbox" id="idleLogLegendaryOnlyToggle">
-              Nur legendäre Runenfunde im Log
-            </label>
-            <div class="idle-dorf-log" id="idleDorfLog"></div>
-          </div>
+        <div class="idle-dorf-panel" id="idlePanelUpgrades" style="display:none;"></div>
+        <div class="idle-dorf-panel" id="idlePanelSkilltree" style="display:none;"></div>
+        <div class="idle-dorf-panel" id="idlePanelErfolge" style="display:none;"></div>
+        <div class="idle-dorf-panel" id="idlePanelBestenliste" style="display:none;">
+          <div class="idle-dorf-leaderboard-tabs" id="idleLeaderboardTabs"></div>
+          <div id="idleLeaderboardList"></div>
         </div>
-      </div>
+        <div class="idle-dorf-panel" id="idlePanelPrestige" style="display:none;"></div>
+        <div class="idle-dorf-panel" id="idlePanelRunen" style="display:none;"></div>
+        <div class="idle-dorf-panel" id="idlePanelSkins" style="display:none;"></div>
+        <div class="idle-dorf-panel" id="idlePanelDungeon" style="display:none;"></div>
+        <div class="idle-dorf-panel" id="idlePanelTurm" style="display:none;"></div>
+        <div class="idle-dorf-panel" id="idlePanelArena" style="display:none;"></div>
+        <div class="idle-dorf-panel" id="idlePanelGilde" style="display:none;"></div>
+        <div class="idle-dorf-panel" id="idlePanelGildeTech" style="display:none;"></div>
+        <div class="idle-dorf-panel" id="idlePanelGildeBoss" style="display:none;"></div>
+        <div class="idle-dorf-panel" id="idlePanelClan" style="display:none;"></div>
+        <div class="idle-dorf-panel" id="idlePanelDrachen" style="display:none;"></div>
 
-      <div class="idle-dorf-panel" id="idlePanelUpgrades" style="display:none;"></div>
-      <div class="idle-dorf-panel" id="idlePanelSkilltree" style="display:none;"></div>
-      <div class="idle-dorf-panel" id="idlePanelErfolge" style="display:none;"></div>
-      <div class="idle-dorf-panel" id="idlePanelBestenliste" style="display:none;">
-        <div class="idle-dorf-leaderboard-tabs" id="idleLeaderboardTabs"></div>
-        <div id="idleLeaderboardList"></div>
-      </div>
-      <div class="idle-dorf-panel" id="idlePanelPrestige" style="display:none;"></div>
-      <div class="idle-dorf-panel" id="idlePanelRunen" style="display:none;"></div>
-      <div class="idle-dorf-panel" id="idlePanelSkins" style="display:none;"></div>
-      <div class="idle-dorf-panel" id="idlePanelDungeon" style="display:none;"></div>
-      <div class="idle-dorf-panel" id="idlePanelTurm" style="display:none;"></div>
-      <div class="idle-dorf-panel" id="idlePanelArena" style="display:none;"></div>
-      <div class="idle-dorf-panel" id="idlePanelGilde" style="display:none;"></div>
-      <div class="idle-dorf-panel" id="idlePanelGildeTech" style="display:none;"></div>
-      <div class="idle-dorf-panel" id="idlePanelGildeBoss" style="display:none;"></div>
-      <div class="idle-dorf-panel" id="idlePanelClan" style="display:none;"></div>
-      <div class="idle-dorf-panel" id="idlePanelDrachen" style="display:none;"></div>
-
-      <!-- Nutzerwunsch (15.07.): "Baust du das dann unten ein und im
-           gleichen Design overlay wie den Rest?" - der Link stand vorher
-           oben direkt neben dem Titel und kollidierte optisch mit dem
-           Live-Sync-Banner (Spieler-Screenshot). Jetzt unten in der
-           Button-Leiste, als ganz normaler .btn-nein-Pillenbutton -
-           gleiches Muster wie ueberall sonst auf der Seite (z.B. die
-           "❓ Hilfe"-Buttons), statt eines separaten Text-Links. -->
-      <!-- Phase 7.1 Stufe 3 (21.07., Nutzer-Auftrag "Schliessen ausschliesslich
-           oben rechts, permanenter Footer entfaellt"): der textuelle
-           "Schliessen"-Button ist entfernt (rein redundant - #idleDorfCloseX
-           oben rechts deckt exakt dieselbe Funktion bereits ab, eigener
-           Klick-Listener dort unveraendert vorhanden, siehe idledorf.js).
-           App-Install/Streamer bleiben als kleine, einzeilige Restleiste
-           bestehen (Auftrag erlaubt das explizit als Fallback: "maximal
-           8-16px Abstand, keine grosse Buttonreihe"). -->
-      <div class="joke-buttons idle-dorf-footer-links">
-        <a class="idle-app-link-btn" id="idleAppLinkBtn" href="/app">📲 Als App installieren</a>
-        <button class="idle-stream-help-btn" id="idleStreamHelpBtn" type="button">📡 Für Streamer</button>
+        <!-- Nutzerwunsch (15.07.): "Baust du das dann unten ein und im
+             gleichen Design overlay wie den Rest?" - der Link stand vorher
+             oben direkt neben dem Titel und kollidierte optisch mit dem
+             Live-Sync-Banner (Spieler-Screenshot). Jetzt unten in der
+             Button-Leiste, als ganz normaler .btn-nein-Pillenbutton -
+             gleiches Muster wie ueberall sonst auf der Seite (z.B. die
+             "❓ Hilfe"-Buttons), statt eines separaten Text-Links. -->
+        <!-- Phase 7.1 Stufe 3 (21.07., Nutzer-Auftrag "Schliessen ausschliesslich
+             oben rechts, permanenter Footer entfaellt"): der textuelle
+             "Schliessen"-Button ist entfernt (rein redundant - #idleDorfCloseX
+             oben rechts deckt exakt dieselbe Funktion bereits ab, eigener
+             Klick-Listener dort unveraendert vorhanden, siehe idledorf.js).
+             App-Install/Streamer bleiben als kleine, einzeilige Restleiste
+             bestehen (Auftrag erlaubt das explizit als Fallback: "maximal
+             8-16px Abstand, keine grosse Buttonreihe"). -->
+        <div class="joke-buttons idle-dorf-footer-links">
+          <a class="idle-app-link-btn" id="idleAppLinkBtn" href="/app">📲 Als App installieren</a>
+          <button class="idle-stream-help-btn" id="idleStreamHelpBtn" type="button">📡 Für Streamer</button>
+        </div>
       </div>
     </div>
 
@@ -1584,7 +1647,7 @@
        dann bkmp-idle-bootstrap.js (ruft bkmpIdleInit() auf - MUSS zuletzt
        laufen, siehe Kommentar in dieser Datei). Bei Aenderungen an dieser
        Reihenfolge IMMER admin.html und idle-stream-mini.html mit anpassen. -->
-  <script src="js/core/bkmp-idle-state.js?v=20260804-runecapremoved1" defer></script>
+  <script src="js/core/bkmp-idle-state.js?v=20260805-kampfredesign1" defer></script>
   <script src="js/systems/bkmp-achievements.js?v=20260717-p2cfoundation" defer></script>
   <script src="js/core/bkmp-combat-math.js?v=20260801-guildlvlcap1" defer></script>
   <script src="js/systems/bkmp-dungeon.js?v=20260731-dungeonkeyfix1" defer></script>
@@ -1600,11 +1663,11 @@
   <script src="js/systems/bkmp-skilltree.js?v=20260717-p2bfoundation" defer></script>
   <script src="js/systems/bkmp-cosmetics.js?v=20260804-skinpreview2" defer></script>
   <script src="js/systems/bkmp-events.js?v=20260726-guildtechext1" defer></script>
-  <script src="js/ui/bkmp-hud.js?v=20260805-bossbannerfix1" defer></script>
+  <script src="js/ui/bkmp-hud.js?v=20260806-battle-rollback1" defer></script>
   <script src="js/systems/bkmp-leaderboard.js?v=20260717-p2cfoundation" defer></script>
   <script src="js/ui/bkmp-ui-components.js?v=20260731-guildtechtreev3" defer></script>
   <script src="js/ui/bkmp-reward-presenter.js?v=20260719-p55e" defer></script>
-  <script src="idledorf.js?v=20260805-companionxpfix1" defer></script>
+  <script src="idledorf.js?v=20260806-mobileredesign1" defer></script>
   <script src="mapart.js?v=20260717-kartenfirmen1" defer></script>
   <script src="js/core/bkmp-idle-bootstrap.js?v=20260717-p2afoundation" defer></script>
   <script src="js/core/bkmp-site.js?v=20260804-leaderboardhide1" defer></script>
@@ -1614,10 +1677,10 @@
   <!-- Oeffentliches Changelog (26.07.2026) - eigenstaendig, siehe Datei-Kopf-
        Kommentar in js/ui/bkmp-changelog.js. -->
   <script src="js/ui/bkmp-changelog.js?v=20260801-unreaddot1" defer></script>
-  <script src="js/core/bkmp-app-mode-bootstrap.js?v=20260723-visibilityresync1" defer></script>
+  <script src="js/core/bkmp-app-mode-bootstrap.js?v=20260806-mobileredesign1" defer></script>
   <!-- PROTOTYP 2 (18.07., isoliert & jederzeit entfernbar) - siehe Kommentar
        in js/prototype/bkmp-proto-compact-hud.js. Laedt bewusst zuletzt. -->
-  <script src="js/prototype/bkmp-proto-compact-hud.js?v=20260723-visibilityresync1" defer></script>
+  <script src="js/prototype/bkmp-proto-compact-hud.js?v=20260806-mobileredesign1" defer></script>
   <!-- QA-Testgrundlage (24.07.2026, siehe CLAUDE.md) - laedt zuletzt, tut
        ausserhalb von window.BKMP_QA_MODE (nur localhost + ?qa=1) komplett
        nichts. Eigenstaendig, kein Redesign-/Business-Logic-Code. -->

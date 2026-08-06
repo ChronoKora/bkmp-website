@@ -25,3 +25,11 @@ Thumbs.db
 tests/report/
 playwright-report/
 test-results/
+
+# Lokaler Asset-Generator (tools/asset-generator, 05.08.2026): der echte
+# OpenAI-API-Key lebt ausschliesslich in einer lokalen, nie committeten
+# .env.local (Vorlage: .env.example, die bewusst versioniert bleibt).
+.env
+.env.local
+.env.*.local
+!.env.example

@@ -1,0 +1,28 @@
+Erstelle genau EIN einzelnes hochwertiges Fantasy-Upgrade-Hammer-Icon.
+
+Motiv:
+- kompakter magischer Schmiedehammer
+- dunkler Obsidian-Hammerkopf
+- antike goldene Metallkanten
+- kleine violette Amethyst-Kristalle
+- leichter warmer orangefarbener Schmiedeglanz
+- klare kraeftige Silhouette
+- frontal oder leicht in 3/4-Ansicht
+- fuer eine kleine Spieloberflaeche gut erkennbar
+
+Wichtig:
+- exakt ein Hammer
+- kein Text
+- keine Zahlen
+- kein Pluszeichen
+- kein Amboss
+- kein Charakter
+- keine Hand
+- kein UI-Fenster
+- kein zweites Objekt
+- keine Umgebung
+- keine Bodenflaeche
+- keine Wasserzeichen
+- sauber zentriert
+- ausreichend Abstand zum Rand
+- transparenter Hintergrund

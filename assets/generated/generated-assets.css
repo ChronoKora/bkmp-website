@@ -1,0 +1,86 @@
+/* AUTOMATISCH GENERIERT von tools/asset-generator/generate_asset.py --rebuild-preview */
+/* Nicht von Hand bearbeiten - Aenderungen gehen beim naechsten Rebuild verloren. */
+/* Diese Datei wird vom bestehenden Spiel aktuell NICHT automatisch eingebunden. */
+
+:root {
+  --asset-battle-max-dragon-aura: url("./effects/battle-max-dragon-aura.png");
+  --asset-battle-max-foreground: url("./effects/battle-max-foreground.png");
+  --asset-battle-max-impact: url("./effects/battle-max-impact.png");
+  --asset-battle-max-projectile: url("./effects/battle-max-projectile.png");
+  --asset-battle-max-village-aura: url("./effects/battle-max-village-aura.png");
+  --asset-battle-max-vs-emblem: url("./effects/battle-max-vs-emblem.png");
+  --asset-battle-test-arena-bg: url("./backgrounds/battle-test-arena-bg.png");
+  --asset-battle-test-dragon: url("./effects/battle-test-dragon.png");
+  --asset-battle-test-village: url("./effects/battle-test-village.png");
+  --asset-test-upgrade-hammer: url("./icons/test-upgrade-hammer.png");
+}
+
+.asset-battle-max-dragon-aura {
+  background-image: var(--asset-battle-max-dragon-aura);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.asset-battle-max-foreground {
+  background-image: var(--asset-battle-max-foreground);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.asset-battle-max-impact {
+  background-image: var(--asset-battle-max-impact);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.asset-battle-max-projectile {
+  background-image: var(--asset-battle-max-projectile);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.asset-battle-max-village-aura {
+  background-image: var(--asset-battle-max-village-aura);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.asset-battle-max-vs-emblem {
+  background-image: var(--asset-battle-max-vs-emblem);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.asset-battle-test-arena-bg {
+  background-image: var(--asset-battle-test-arena-bg);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.asset-battle-test-dragon {
+  background-image: var(--asset-battle-test-dragon);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.asset-battle-test-village {
+  background-image: var(--asset-battle-test-village);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.asset-test-upgrade-hammer {
+  background-image: var(--asset-test-upgrade-hammer);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}

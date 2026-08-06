@@ -1,0 +1,56 @@
+{
+  "fantasy-icon": {
+    "description": "Quadratisches Icon mit einem zentrierten Symbol, transparenter Hintergrund, gut lesbar in kleiner Groesse.",
+    "default_category": "icons",
+    "default_size": "1024x1024",
+    "default_quality": "medium",
+    "default_background": "transparent",
+    "prompt_prefix": "Premium fantasy game UI asset. Dark obsidian core, amethyst purple accents, aged antique gold trim, controlled warm orange rim lighting. Clear, readable silhouette. High quality material detail (metal, stone, crystal, wood grain as appropriate). Cleanly isolated subject. Symmetrical composition where appropriate. Reads clearly at small UI sizes. Not photorealistic. Not a full screenshot. No surrounding UI window or app chrome. No watermark. No signature. No text. No letters. No numbers. Exactly one main subject. Generous margin from the image edge.",
+    "prompt_suffix": "Square composition. A single centered symbol or icon, filling most of the frame with a bold, strong silhouette. No unnecessary background scenery or environment behind the subject. Transparent background."
+  },
+  "fantasy-button": {
+    "description": "Breite Fantasy-Schaltflaeche ohne Beschriftung, ruhige Mitte fuer spaeteren HTML-Text, transparenter Hintergrund.",
+    "default_category": "buttons",
+    "default_size": "1536x1024",
+    "default_quality": "medium",
+    "default_background": "transparent",
+    "prompt_prefix": "Premium fantasy game UI asset. Dark obsidian core, amethyst purple accents, aged antique gold trim, controlled warm orange rim lighting. Clear, readable silhouette. High quality material detail (metal, stone, crystal, wood grain as appropriate). Cleanly isolated subject. Symmetrical composition where appropriate. Reads clearly at small UI sizes. Not photorealistic. Not a full screenshot. No surrounding UI window or app chrome. No watermark. No signature. No text. No letters. No numbers. Exactly one main subject. Generous margin from the image edge.",
+    "prompt_suffix": "A wide fantasy game UI button/frame shape. No lettering or label baked into the artwork - leave a calm, visually quiet empty center area reserved for HTML text to be overlaid later by the game. Decorative ornamental edges and corners. As close to left-right symmetrical as the design allows. Transparent background."
+  },
+  "fantasy-panel": {
+    "description": "Dekoratives UI-Panel mit freier Innenflaeche, transparenter Hintergrund.",
+    "default_category": "panels",
+    "default_size": "1024x1536",
+    "default_quality": "medium",
+    "default_background": "transparent",
+    "prompt_prefix": "Premium fantasy game UI asset. Dark obsidian core, amethyst purple accents, aged antique gold trim, controlled warm orange rim lighting. Clear, readable silhouette. High quality material detail (metal, stone, crystal, wood grain as appropriate). Cleanly isolated subject. Symmetrical composition where appropriate. Reads clearly at small UI sizes. Not photorealistic. Not a full screenshot. No surrounding UI window or app chrome. No watermark. No signature. No text. No letters. No numbers. Exactly one main subject. Generous margin from the image edge.",
+    "prompt_suffix": "A decorative fantasy UI panel/background plate. Free, empty interior area - no icons, items, characters, or text baked into the panel. Corners and border frame are richly detailed and high quality. Transparent background."
+  },
+  "fantasy-frame": {
+    "description": "Leerer dekorativer Rahmen mit grosser freier Mitte fuer Portraits/Items/Karten, transparenter Hintergrund.",
+    "default_category": "frames",
+    "default_size": "1024x1536",
+    "default_quality": "medium",
+    "default_background": "transparent",
+    "prompt_prefix": "Premium fantasy game UI asset. Dark obsidian core, amethyst purple accents, aged antique gold trim, controlled warm orange rim lighting. Clear, readable silhouette. High quality material detail (metal, stone, crystal, wood grain as appropriate). Cleanly isolated subject. Symmetrical composition where appropriate. Reads clearly at small UI sizes. Not photorealistic. Not a full screenshot. No surrounding UI window or app chrome. No watermark. No signature. No text. No letters. No numbers. Exactly one main subject. Generous margin from the image edge.",
+    "prompt_suffix": "An empty decorative ornamental frame or border only - like a picture frame with nothing inside it. Large, fully empty center area, suitable for later placing a boss portrait, item icon, or UI card on top of it. Transparent background."
+  },
+  "fantasy-effect": {
+    "description": "Einzelner Glow-, Partikel- oder Magiekreis-Effekt, transparenter Hintergrund.",
+    "default_category": "effects",
+    "default_size": "1024x1024",
+    "default_quality": "medium",
+    "default_background": "transparent",
+    "prompt_prefix": "Premium fantasy game UI asset. Dark obsidian core, amethyst purple accents, aged antique gold trim, controlled warm orange rim lighting. Clear, readable silhouette. High quality material detail (metal, stone, crystal, wood grain as appropriate). Cleanly isolated subject. Symmetrical composition where appropriate. Reads clearly at small UI sizes. Not photorealistic. Not a full screenshot. No surrounding UI window or app chrome. No watermark. No signature. No text. No letters. No numbers. Exactly one main subject. Generous margin from the image edge.",
+    "prompt_suffix": "A single isolated visual effect only - a glow, a particle burst, or a magic circle - with no solid object depicted unless the prompt text above explicitly asks for one. Transparent background."
+  },
+  "fantasy-background": {
+    "description": "Vollstaendige Landschaft/Atmosphaere, randfuellend, kein transparenter Hintergrund, keine UI-Elemente.",
+    "default_category": "backgrounds",
+    "default_size": "1536x1024",
+    "default_quality": "high",
+    "default_background": "opaque",
+    "prompt_prefix": "Premium fantasy game background art. Dark obsidian tones, amethyst purple accents, aged antique gold highlights, controlled warm orange lighting where appropriate. High quality material and atmosphere detail. Not photorealistic. No watermark. No signature. No text. No letters. No numbers. Generous, balanced composition.",
+    "prompt_suffix": "A complete landscape or atmosphere scene, filling the entire canvas edge to edge. Opaque, fully non-transparent background. No UI elements, no icons, no frames, no borders, no text anywhere in the image."
+  }
+}
