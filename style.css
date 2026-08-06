@@ -9817,6 +9817,30 @@ html.bkmp-app-mode .idle-hud-top {
   border-radius: 16px;
   background: linear-gradient(180deg, rgba(255, 255, 255, .07), rgba(255, 255, 255, .02));
   border: 1px solid rgba(255, 255, 255, .09);
+  /* Bug-Fix 06.08.2026 (Nutzer-Screenshot, 2560px-Monitor, zweispaltiges
+     Desktop-Grid vom 05.08.2026): #idleFxModeBtn/#idleDorfCloseX/
+     #idleDorfFeedbackBtn ueberlappten sich sichtbar (nur "🚫"-Icon +
+     abgeschnittenes "...e:" aus "Effekte:" blieben lesbar). Ursache: .idle-
+     hud-top spannt seit dem Grid-Redesign ("grid-area:hud" = volle
+     Kartenbreite ueber beide Spalten) die GESAMTE Kartenbreite auf - der
+     hier hineinportalisierte #idleFxModeBtn (siehe Kommentar unten) landet
+     dadurch am rechten Rand GENAU dort, wo Feedback/Schliessen bereits
+     position:absolute liegen (right:0.9rem/3.5rem, siehe .idle-dorf-close/
+     .idle-dorf-feedback-btn). Live bei 2560px reproduziert+vermessen
+     (fxBtn [2133,2243] ueberlappte feedback [2163,2197] UND close
+     [2205,2239] vollstaendig). Fix: identisches, bereits bei
+     .bkmp-proto-chud-row bewaehrtes Muster - rechter Freiraum reserviert
+     exakt den von Feedback+Schliessen belegten Bereich (Feedback-
+     Linkskante bei right:3.5rem+34px Breite = 5.625rem vom Kartenrand),
+     die flexible .idle-hud-xp-wrap gibt dafuer nach, kein fixes Element
+     wird gequetscht. !important noetig, da @media(max-height:780px)
+     (Phase 7.1 Stufe 3, 21.07., weiter oben in dieser Datei) .idle-hud-top
+     bereits per "padding: .3rem .5rem !important" auf 0.5rem rechts
+     zurueckstutzt (bei niedrigen Fensterhoehen, unabhaengig von der
+     Breite) - ohne eigenes !important wuerde genau diese Kombination
+     (z.B. 1024x768, per Test bestaetigt) die Ueberlappung sofort
+     reproduzieren. */
+  padding-right: 5.9rem !important;
 }
 /* Phase 7.1 (21.07.): #idleFxModeBtn wird per Portal (siehe
    bkmpIdleRenderHud in js/ui/bkmp-hud.js) hier hineingehaengt statt eine
