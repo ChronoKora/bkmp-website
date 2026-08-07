@@ -365,8 +365,42 @@ const BKMP_DRAGON_STORAGE_EXPANSIONS = [
   { addSlots: 10, cost: 1000000 },
   { addSlots: 15, cost: 2500000 }
 ];
+/* Bug-Fix (Spieler-Meldung "Kaledoss", 06.08.2026: "27 Plaetze auf dem
+   Handy, 67 Plaetze am PC"): dieser Wert lebte bisher AUSSCHLIESSLICH in
+   localStorage ('bkmp-dragon-storage-expansions') - trotz echtem, mit Gold
+   bezahltem Fortschritt (siehe bkmpDragonExpandStorage) nie Teil von
+   idle_player_state, nie synchronisiert. Jetzt echte, serverseitig
+   gespeicherte Spalte (dragon_storage_expansions_bought, siehe
+   sql/20260806-dragon-storage-expansions-sync.sql) - liest/schreibt wie
+   jedes andere bkmpIdleState-Feld ueber die bereits bestehende
+   Speicher-Pipeline (bkmpIdleQueueSync). Bereits vorhandene lokale Werte
+   (wie bei Kaledoss auf beiden Geraeten) werden NICHT stillschweigend
+   verworfen - siehe bkmpDragonMigrateStorageExpansionsFromLocalStorage(),
+   einmalig beim Laden aufgerufen. */
 function bkmpDragonStorageExpansionsBought() {
-  try { return Number(localStorage.getItem('bkmp-dragon-storage-expansions') || 0); } catch (e) { return 0; }
+  return bkmpIdleState ? Number(bkmpIdleState.dragon_storage_expansions_bought || 0) : 0;
+}
+/* Einmalige Uebernahme, beim Laden aufgerufen (siehe
+   bkmpIdleLoadDragonBreedingState): auf JEDEM Geraet, auf dem der Spieler
+   frueher schon Lager-Erweiterungen gekauft hat, stand der Kauf bisher nur
+   lokal - der Server-Wert startet nach der Migration (SQL-Spalte neu,
+   default 0) also erstmal bei 0, obwohl der Spieler z.B. auf dem PC schon
+   5 Erweiterungen gekauft (und bezahlt!) hat. Nimmt deshalb IMMER den
+   GROESSEREN der beiden Werte (lokal vs. Server) - kein Geraet verliert
+   dadurch je bereits erspielten Fortschritt, unabhaengig davon, in welcher
+   Reihenfolge der Spieler seine Geraete als naechstes oeffnet. Sobald ALLE
+   Geraete einmal geladen haben, ist der alte lokale Schluessel ueberall
+   entfernt und der Server-Wert die einzige Quelle. */
+function bkmpDragonMigrateStorageExpansionsFromLocalStorage() {
+  if (!bkmpIdleState) return;
+  let legacyLocal = 0;
+  try { legacyLocal = Number(localStorage.getItem('bkmp-dragon-storage-expansions') || 0); } catch (e) {}
+  const serverVal = Number(bkmpIdleState.dragon_storage_expansions_bought || 0);
+  if (legacyLocal > serverVal) {
+    bkmpIdleState.dragon_storage_expansions_bought = legacyLocal;
+    if (typeof bkmpIdleQueueSync === 'function') bkmpIdleQueueSync();
+  }
+  try { localStorage.removeItem('bkmp-dragon-storage-expansions'); } catch (e) {}
 }
 function bkmpDragonStorageCapacity() {
   const bought = bkmpDragonStorageExpansionsBought();
@@ -383,7 +417,7 @@ function bkmpDragonExpandStorage() {
     return;
   }
   bkmpIdleState.gold -= next.cost;
-  try { localStorage.setItem('bkmp-dragon-storage-expansions', String(bought + 1)); } catch (e) {}
+  bkmpIdleState.dragon_storage_expansions_bought = bought + 1;
   bkmpIdleRenderHud();
   bkmpIdleQueueSync();
   bkmpIdleRenderDragonsPanel();
@@ -1024,6 +1058,7 @@ async function bkmpIdleLoadDragonBreedingState(name) {
     console.warn('Idle Dorf: Drachenzucht-Daten konnten nicht geladen werden (Migration evtl. noch nicht ausgefuehrt - siehe supabase-dragon-breeding.sql).', e);
   }
   bkmpIdleAccrueBuildingResources();
+  bkmpDragonMigrateStorageExpansionsFromLocalStorage();
 }
 
 /* ---------------- Fundschatz bei Kaempfen (ehemals Ei-Drop) ----------------
