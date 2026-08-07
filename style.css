@@ -4497,7 +4497,7 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 .idle-runen-stat-note { color: var(--muted); font-size: 0.74rem; margin: 0.3rem 0 0; }
 .idle-runen-substat-list {
   list-style: none;
-  margin: 0.4rem 0 0;
+  margin: 0.3rem 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -4529,10 +4529,14 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 }
 .idle-runen-reroll-btn:hover:not(:disabled) { border-color: var(--gold); transform: translateY(-1px); }
 .idle-runen-reroll-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-/* Nutzerwunsch 19.07.: Reroll-Zielspanne "ruhig daneben anzeigen und nicht
-   erst beim hovern" - steht jetzt permanent unter der Sub-Stat-Zeile
-   (title-Tooltip bleibt zusaetzlich als redundante Kurzform bestehen). */
-.idle-runen-reroll-range { display: block; font-size: 0.68rem; color: var(--muted); opacity: 0.75; margin: 0.1rem 0 0.2rem; }
+/* Nachbesserung 07.08.2026 (Nutzerwunsch, Screenshot 2560x1440: die vorher
+   permanent sichtbare "Spanne ..."-Zeile - siehe Kommentar 19.07. oben,
+   Klasse entfernt - kostete zu viel Hoehe, eigener Scrollbalken im
+   Runenfenster war die Folge): die Info steckt jetzt ausschliesslich im
+   title-Tooltip des Wuerfel-Buttons (Hover) + einem per Tastatur-Fokus
+   erscheinenden .bkmp-ui-tooltip (siehe rerollTipHtml in bkmp-runes.js) -
+   braucht dafuer einen positionierten Vorfahren als Anker. */
+.idle-runen-substat-list li { position: relative; }
 /* flex:1 statt width:100% (Nutzerwunsch 19.07.: Instant-Aufwerten-Button
    daneben) - .idle-runen-stat-actions ist bereits display:flex, dadurch
    teilen sich beide Buttons die Zeile automatisch je zur Haelfte. */
@@ -4612,7 +4616,12 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   text-align: center;
 }
 .idle-runen-level-badge { bottom: auto; top: 3px; left: 3px; right: auto; border-color: var(--gold); color: var(--gold); }
-.idle-runen-stat-actions { display: flex; gap: 0.5rem; margin-top: 0.7rem; }
+/* Feinschliff 07.08.2026 (Nutzerwunsch, im selben Zug wie die Spanne-Zeilen-
+   Entfernung oben): 0.7rem -> 0.55rem, betrifft alle drei gestapelten
+   .idle-runen-stat-actions-Bloecke (Aufwerten/Instant, ggf. Aufsteigen,
+   Verschmelzen/Verkaufen) gleichermassen - harmonisiert die Abstaende
+   zwischen den Aktions-Reihen, ohne sie unangenehm eng wirken zu lassen. */
+.idle-runen-stat-actions { display: flex; gap: 0.5rem; margin-top: 0.55rem; }
 .idle-runen-fuse-btn, .idle-runen-sell-btn { flex: 1; font-size: 0.74rem; padding: 0.45rem 0.5rem; white-space: nowrap; }
 .idle-runen-fuse-btn:disabled, .idle-runen-sell-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 

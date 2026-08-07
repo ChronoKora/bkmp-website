@@ -1101,9 +1101,25 @@ function bkmpRuneStatBoxHTML(slot, rune) {
            Hovern sichtbar. */
         const effectiveBoost = bkmpRuneSubstatEffectiveBoostCount(s, rune.rarity);
         const [rerollMin, rerollMax] = bkmpIdleSubstatValueRange(s.stat, rune.rarity, effectiveBoost);
+        const rerollTipText = `Diesen Sub-Stat neu würfeln (Spanne +${rerollMin}${subUnit} bis +${rerollMax}${subUnit})`;
+        /* Nutzerwunsch 07.08.2026 (Nachbesserung zu 19.07.): die permanent
+           sichtbare "Spanne ..."-Zeile kostete zu viel Hoehe (eigener
+           Scrollbalken im Runenfenster) - die Info reicht laut Nutzer
+           vollstaendig im bereits bestehenden title-Tooltip des Wuerfel-
+           Buttons aus (unveraendert, wirkt weiter bei Maus-Hover). Ergaenzt
+           NUR um einen kleinen eigenen Tooltip (bkmpUiTooltipHtml, Phase 3),
+           der EXTRA per Tastatur-Fokus erscheint - title="" allein zeigt in
+           den meisten Browsern bei reinem Tab-Fokus nichts an, das haette
+           denselben Hinweis fuer Tastatur-Nutzer sonst unerreichbar gemacht.
+           Bewusst NICHT bkmpUiWireTooltipTrigger() (siehe Verdrahtung weiter
+           unten) - dessen touchstart-Abfangen wuerde den ersten Tap auf
+           Mobilgeraeten in "Tooltip zeigen" statt "sofort wuerfeln"
+           verwandeln, ein zweiter Tap waere dann fuer den eigentlichen
+           Reroll noetig - reine Fokus/Blur-Verdrahtung vermeidet das. */
+        const rerollTipId = `runeRerollTip-${rune._cid}-${i}`;
+        const rerollTipHtml = typeof bkmpUiTooltipHtml === 'function' ? bkmpUiTooltipHtml(rerollTipText, rerollTipId) : '';
         return `<li>${meta.icon} +${s.value}${subUnit} ${escapeHtml(meta.desc)}
-          <button type="button" class="idle-runen-reroll-btn" data-cid="${rune._cid}" data-index="${i}" ${canAffordReroll ? '' : 'disabled'} title="Diesen Sub-Stat neu würfeln (Spanne +${rerollMin}${subUnit} bis +${rerollMax}${subUnit})">🎲 ${rerollCost} 💎</button>
-          <span class="idle-runen-reroll-range">Spanne +${rerollMin}${subUnit} bis +${rerollMax}${subUnit}</span></li>`;
+          <button type="button" class="idle-runen-reroll-btn" data-cid="${rune._cid}" data-index="${i}" data-tooltip-id="${rerollTipId}" ${canAffordReroll ? '' : 'disabled'} title="${rerollTipText}">🎲 ${rerollCost} 💎</button>${rerollTipHtml}</li>`;
       }).join('')}
     </ul>` : '<p class="idle-runen-stat-note">Noch keine Sub-Stats - bei +3/+6/+9/+12 kommt bis zu insgesamt 4 jeweils einer dazu.</p>'}
     <div class="idle-runen-stat-actions">
@@ -2341,6 +2357,17 @@ function bkmpIdleRenderRunenPanel() {
   const ascendBtn = document.getElementById('idleRuneAscendBtn');
   if (ascendBtn) ascendBtn.addEventListener('click', () => bkmpRuneAscend(ascendBtn.dataset.cid));
   panel.querySelectorAll('.idle-runen-reroll-btn').forEach(btn => btn.addEventListener('click', () => bkmpRuneRerollSubstat(btn.dataset.cid, Number(btn.dataset.index))));
+  /* Siehe Kommentar bei rerollTipHtml weiter oben: title="" allein erreicht
+     Tastatur-Nutzer nicht zuverlaessig - reine Fokus/Blur-Verdrahtung (kein
+     Hover/Touch, das bleibt bewusst native title-Tooltip-Territorium) macht
+     denselben Spannen-Hinweis auch per Tab-Fokus sichtbar. */
+  panel.querySelectorAll('.idle-runen-reroll-btn[data-tooltip-id]').forEach(btn => {
+    const tip = document.getElementById(btn.dataset.tooltipId);
+    if (!tip) return;
+    btn.setAttribute('aria-describedby', tip.id);
+    btn.addEventListener('focus', () => tip.classList.add('visible'));
+    btn.addEventListener('blur', () => tip.classList.remove('visible'));
+  });
   const fuseBtn = document.getElementById('idleRuneFuseBtn');
   if (fuseBtn) fuseBtn.addEventListener('click', () => bkmpRuneStartFuseSelection(fuseBtn.dataset.rarity));
   const sellBtn = document.getElementById('idleRuneSellBtn');
