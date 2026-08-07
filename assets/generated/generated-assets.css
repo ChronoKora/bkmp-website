@@ -3,6 +3,7 @@
 /* Diese Datei wird vom bestehenden Spiel aktuell NICHT automatisch eingebunden. */
 
 :root {
+  --asset-barn-background: url("./backgrounds/barn-background.png");
   --asset-battle-max-dragon-aura: url("./effects/battle-max-dragon-aura.png");
   --asset-battle-max-foreground: url("./effects/battle-max-foreground.png");
   --asset-battle-max-impact: url("./effects/battle-max-impact.png");
@@ -12,7 +13,29 @@
   --asset-battle-test-arena-bg: url("./backgrounds/battle-test-arena-bg.png");
   --asset-battle-test-dragon: url("./effects/battle-test-dragon.png");
   --asset-battle-test-village: url("./effects/battle-test-village.png");
+  --asset-carrot-item: url("./icons/carrot-item.png");
+  --asset-dirt-lane-tile: url("./backgrounds/dirt-lane-tile.png");
+  --asset-dust-puff-effect: url("./effects/dust-puff-effect.png");
+  --asset-easter-coin-rare: url("./icons/easter-coin-rare.png");
+  --asset-farm-field-tile: url("./backgrounds/farm-field-tile.png");
+  --asset-fence-segment: url("./icons/fence-segment.png");
+  --asset-golden-harvest-item: url("./icons/golden-harvest-item.png");
+  --asset-harvest-sparkle-effect: url("./effects/harvest-sparkle-effect.png");
+  --asset-hay-bale-prop: url("./icons/hay-bale-prop.png");
+  --asset-jake-tractor-main: url("./icons/jake-tractor-main.png");
+  --asset-mud-puddle-obstacle: url("./icons/mud-puddle-obstacle.png");
+  --asset-pumpkin-item: url("./icons/pumpkin-item.png");
+  --asset-sheep-obstacle: url("./icons/sheep-obstacle.png");
+  --asset-stone-obstacle: url("./icons/stone-obstacle.png");
   --asset-test-upgrade-hammer: url("./icons/test-upgrade-hammer.png");
+  --asset-wheat-item: url("./icons/wheat-item.png");
+}
+
+.asset-barn-background {
+  background-image: var(--asset-barn-background);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
 }
 
 .asset-battle-max-dragon-aura {
@@ -78,8 +101,113 @@
   background-size: contain;
 }
 
+.asset-carrot-item {
+  background-image: var(--asset-carrot-item);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.asset-dirt-lane-tile {
+  background-image: var(--asset-dirt-lane-tile);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.asset-dust-puff-effect {
+  background-image: var(--asset-dust-puff-effect);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.asset-easter-coin-rare {
+  background-image: var(--asset-easter-coin-rare);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.asset-farm-field-tile {
+  background-image: var(--asset-farm-field-tile);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.asset-fence-segment {
+  background-image: var(--asset-fence-segment);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.asset-golden-harvest-item {
+  background-image: var(--asset-golden-harvest-item);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.asset-harvest-sparkle-effect {
+  background-image: var(--asset-harvest-sparkle-effect);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.asset-hay-bale-prop {
+  background-image: var(--asset-hay-bale-prop);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.asset-jake-tractor-main {
+  background-image: var(--asset-jake-tractor-main);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.asset-mud-puddle-obstacle {
+  background-image: var(--asset-mud-puddle-obstacle);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.asset-pumpkin-item {
+  background-image: var(--asset-pumpkin-item);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.asset-sheep-obstacle {
+  background-image: var(--asset-sheep-obstacle);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.asset-stone-obstacle {
+  background-image: var(--asset-stone-obstacle);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
 .asset-test-upgrade-hammer {
   background-image: var(--asset-test-upgrade-hammer);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.asset-wheat-item {
+  background-image: var(--asset-wheat-item);
   background-repeat: no-repeat;
   background-position: center;
   background-size: contain;

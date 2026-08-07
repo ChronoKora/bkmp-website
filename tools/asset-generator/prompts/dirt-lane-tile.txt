@@ -1,0 +1,70 @@
+Create exactly ONE seamless square terrain tile for a cute 2D farming arcade game.
+
+STYLE:
+
+Keep exactly the same cheerful polished cartoon farm-game visual language as the already approved Jake tractor, wheat collectible, and farm field tile:
+
+- bright friendly saturated colors
+- lightly chibi
+- lightly toy-like
+- soft dimensional shading
+- clean readable shapes
+- professional casual mobile/web game quality
+
+TERRAIN:
+
+- a dusty dirt track / access lane, slightly lighter and more compacted than the plowed farm field tile
+- mostly EMPTY playable ground
+- subtle dust texture and a few small tire-track impressions
+- occasional tiny pebbles or dry grass tufts only near the edges
+- no plants, no crops, no vegetation rows
+- no objects that could be mistaken for gameplay pickups
+
+GAMEPLAY PURPOSE:
+
+This tile will scroll underneath a moving tractor, functioning as the tractor's driving lane.
+
+Collectibles and obstacles (wheat, carrots, pumpkins, stones, sheep, mud puddles) will later be placed on top.
+
+The terrain must stay visually calm and readable so the tractor and objects on top clearly stand out.
+
+SEAMLESS / SCROLLABLE:
+
+VERY IMPORTANT:
+
+- visually seamless top-to-bottom repetition
+- left and right edges should also feel naturally continuous
+- no unique central landmark
+- no border
+- no rounded outer frame
+- no vignette
+- no dark edge shading
+- similar texture density at opposite edges
+- suitable for continuously scrolling terrain
+
+CAMERA:
+
+- elevated game-camera perspective
+- mostly top-down
+- only a slight three-quarter/isometric tilt
+- no horizon
+- no sky
+
+STRICT REQUIREMENTS:
+
+- square terrain tile
+- opaque background
+- mostly empty playable dirt lane
+- no tractor
+- no character
+- no animals
+- no crops or vegetation rows
+- no wheat, no carrot, no pumpkin
+- no barn
+- no houses
+- no signs
+- no UI
+- no text
+- no logo
+- no watermark
+- no dark fantasy styling

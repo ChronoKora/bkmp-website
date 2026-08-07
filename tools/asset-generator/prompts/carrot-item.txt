@@ -1,0 +1,57 @@
+Create exactly ONE isolated collectible game asset.
+
+SUBJECT:
+
+A single cute carrot with a leafy green top.
+
+DESIGN:
+
+- classic tapered orange carrot shape
+- small bushy green leaf tuft at the top
+- compact, instantly readable silhouette
+- attractive collectible appearance
+- subtle warm highlight on the orange body
+- should immediately read as "carrot" even when displayed very small
+
+ART STYLE:
+
+- same cute polished farm-game style as the Jake tractor and wheat collectible assets
+- lightly chibi
+- lightly toy-like
+- professional casual-game asset
+- clean edges
+- soft dimensional shading
+- bright friendly saturated colors
+- charming but not childish
+- suitable as a collectible worth points
+
+COMPOSITION:
+
+- exactly one carrot
+- centered
+- fully visible
+- generous transparent padding
+- strong silhouette
+
+STRICT REQUIREMENTS:
+
+- transparent background
+- no field
+- no soil
+- no basket
+- no character
+- no tractor
+- no additional vegetables
+- no face
+- no text
+- no number
+- no UI
+- no badge
+- no frame
+- no watermark
+- no dark fantasy styling
+- no obsidian
+- no amethyst
+- no antique-gold fantasy ornamentation
+
+The final image must look like a reusable collectible item from the exact same farm minigame as the tractor and wheat assets.

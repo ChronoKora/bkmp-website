@@ -1,0 +1,54 @@
+Create exactly ONE isolated rare collectible game asset.
+
+SUBJECT:
+
+A rare, special golden coin/token, meant as an Easter-egg bonus reward - a small golden medallion or event token with a farm-themed feel.
+
+DESIGN:
+
+- round golden coin or medallion shape
+- a simple embossed farm-themed symbol on its face (for example a small wheat-sprig or sun motif), kept simple and iconic, not a detailed illustration
+- rich golden-yellow color with a warm metallic shine
+- a few small soft sparkle highlights to suggest it is rare and special
+- clearly more elaborate and eye-catching than the normal wheat/carrot/pumpkin collectibles
+- should instantly read as "rare, special, valuable" even when displayed very small
+
+ART STYLE:
+
+- same cute polished farm-game style as the Jake tractor and wheat collectible assets
+- lightly chibi
+- lightly toy-like
+- professional casual-game asset
+- clean edges
+- soft dimensional shading
+- bright, warm, saturated golden colors
+- charming and a little bit magical, but not childish
+
+COMPOSITION:
+
+- exactly one coin/token
+- centered
+- fully visible, facing the viewer
+- generous transparent padding
+- strong, bold, round silhouette
+
+STRICT REQUIREMENTS:
+
+- transparent background
+- exactly one object
+- no field
+- no soil
+- no character
+- no tractor
+- no additional objects
+- no readable text or letters on the coin
+- no number
+- no UI
+- no badge frame around the coin
+- no watermark
+- no dark fantasy styling
+- no obsidian
+- no amethyst
+- no antique-gold fantasy UI ornamentation (this is a warm golden farm-themed coin, not a fantasy UI trinket)
+
+The final image must look like a reusable rare collectible from the exact same farm minigame as the tractor and wheat assets.

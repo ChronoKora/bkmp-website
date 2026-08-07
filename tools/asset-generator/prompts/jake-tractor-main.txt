@@ -1,0 +1,83 @@
+Create exactly ONE isolated game asset.
+
+SUBJECT:
+
+A cute compact green farm tractor together with one small chibi Minecraft-inspired human character.
+
+The tractor is the dominant object.
+
+TRACTOR:
+
+- friendly modern agricultural tractor
+- rich green body
+- warm yellow wheels
+- large rear wheels
+- smaller front wheels
+- chunky toy-like proportions
+- recognizable tractor cabin
+- small orange warning beacon on top
+- charming farm-game appearance
+- slightly exaggerated proportions for readability
+- clean silhouette
+- viewed from a front-side three-quarter angle
+- oriented so it can later travel toward the right side of a 2D game screen
+
+CHARACTER:
+
+- exactly one small human character
+- standing directly beside the tractor or naturally leaning against it
+- Minecraft-inspired blocky/chibi proportions
+- dark hair
+- blue hoodie
+- dark trousers
+- small white/light shoes
+- cute and friendly appearance
+- clearly secondary to the tractor
+- character and tractor should visually form one compact game unit
+
+ART STYLE:
+
+- cute polished 2D farm game asset
+- lightly chibi
+- lightly toy-like
+- charming and playful
+- professional casual-game quality
+- saturated friendly colors
+- soft dimensional shading
+- clean readable edges
+- suitable for a small arcade farming minigame
+- visually readable when scaled down
+
+COMPOSITION:
+
+- tractor and character fully visible
+- centered as one compact group
+- generous transparent padding around the complete silhouette
+- no cropping
+- no objects touching image borders
+
+STRICT REQUIREMENTS:
+
+- transparent background
+- exactly one tractor
+- exactly one human character
+- no field
+- no road
+- no landscape
+- no sky
+- no barn
+- no trees
+- no additional animals
+- no text
+- no logo
+- no watermark
+- no UI
+- no frame
+- no circular badge
+- no ground rectangle
+- no dark fantasy styling
+- no obsidian
+- no amethyst decoration
+- no antique fantasy gold ornamentation
+
+The final result must look like a reusable isolated player asset for a cute farming arcade game.

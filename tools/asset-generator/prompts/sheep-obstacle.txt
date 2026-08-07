@@ -1,0 +1,53 @@
+Create exactly ONE isolated game asset.
+
+SUBJECT:
+
+One cute small sheep, used as an obstacle in a farming arcade game.
+
+DESIGN:
+
+- fluffy white wool body with a soft cloud-like rounded silhouette
+- small friendly face, dark legs, small ears
+- compact, chibi-proportioned, toy-like appearance
+- soft and charming, not realistic
+- clear, strong, instantly readable silhouette even when displayed very small
+
+ART STYLE:
+
+- same cute polished farm-game style as the Jake tractor and wheat collectible assets
+- lightly chibi
+- lightly toy-like
+- professional casual-game asset
+- clean edges
+- soft dimensional shading
+- bright, friendly, saturated colors
+- soft and charming
+
+COMPOSITION:
+
+- exactly one sheep
+- centered
+- fully visible, standing pose
+- generous transparent padding
+- strong silhouette
+
+STRICT REQUIREMENTS:
+
+- transparent background
+- exactly one sheep
+- no field
+- no soil
+- no character
+- no tractor
+- no additional animals
+- no text
+- no number
+- no UI
+- no frame
+- no watermark
+- no dark fantasy styling
+- no obsidian
+- no amethyst
+- no antique-gold fantasy ornamentation
+
+The final image must look like a reusable obstacle asset from the exact same farm minigame as the tractor and wheat assets.

@@ -1,0 +1,101 @@
+Create exactly ONE seamless square terrain tile for a cute 2D farming arcade game.
+
+STYLE:
+
+Keep exactly the same cheerful polished cartoon farm-game visual language as the already approved Jake tractor and wheat collectible:
+
+- bright friendly saturated colors
+- lightly chibi
+- lightly toy-like
+- soft dimensional shading
+- clean readable shapes
+- professional casual mobile/web game quality
+
+TERRAIN:
+
+- warm brown cultivated farm soil
+- clearly defined horizontal farming lanes / tracks
+- mostly EMPTY playable ground
+- subtle furrows and soil texture
+- occasional tiny grass details only near lane edges
+- very sparse decorative sprouts
+- NO mature wheat rows
+- NO large crop plants
+- NO collectible-looking vegetables
+- NO objects that could be mistaken for gameplay pickups
+
+GAMEPLAY PURPOSE:
+
+This tile will scroll underneath a moving tractor.
+
+Later, separate game objects will be placed on top:
+
+- wheat collectibles
+- carrots
+- pumpkins
+- golden harvest
+- sheep
+- stones
+- mud puddles
+- other obstacles
+
+Therefore the terrain must stay visually calm and readable.
+
+The player's tractor and collectible objects must clearly stand out against the ground.
+
+LANE STRUCTURE:
+
+Create approximately 4 to 5 clear horizontal driving lanes.
+
+Each lane should have enough open soil space for:
+
+- one tractor
+- collectibles
+- obstacles
+
+Use subtle darker furrows or small vegetation separators between lanes.
+
+Do not fill the separators with large crops.
+
+SEAMLESS / SCROLLABLE:
+
+VERY IMPORTANT:
+
+- visually seamless top-to-bottom repetition
+- left and right edges should also feel naturally continuous
+- no unique central landmark
+- no border
+- no rounded outer frame
+- no vignette
+- no dark edge shading
+- similar texture density at opposite edges
+- suitable for continuously scrolling terrain
+
+CAMERA:
+
+- elevated game-camera perspective
+- mostly top-down
+- only a slight three-quarter/isometric tilt
+- no horizon
+- no sky
+
+STRICT REQUIREMENTS:
+
+- square terrain tile
+- opaque background
+- mostly empty playable farm lanes
+- no tractor
+- no character
+- no animals
+- no wheat bundles
+- no mature crop rows
+- no carrot
+- no pumpkin
+- no barn
+- no houses
+- no signs
+- no UI
+- no text
+- no logo
+- no watermark
+- no dark fantasy styling

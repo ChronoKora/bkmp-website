@@ -147,8 +147,12 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260807-fusebtnoverflowfix1">
+<link rel="stylesheet" href="style.css?v=20260807-jakesfeldfahrt2">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
+<!-- Jake's Feldfahrt (07.08.2026) - eigenstaendiges Website-Easter-Egg,
+     komplett getrennt vom Idle-Dorf-Spiel, siehe js/easter-eggs/jakes-
+     feldfahrt.js Datei-Kopf-Kommentar. -->
+<link rel="stylesheet" href="css/jakes-feldfahrt.css?v=20260807-jakesfeldfahrt3">
 </head>
 <body>
 
@@ -306,7 +310,7 @@
       <div class="cosmetics-list" id="cosmeticsList" style="display:none;"></div>
       <div class="cosmetics-list" id="titlesList" style="display:none;"></div>
       <div id="plushiesPanel" style="display:none;">
-        <p class="plushie-panel-hint">🧸 Woher bekommt man Plüshies? Sie droppen zufällig aus den täglichen Random-Drops - oder du fragst einfach mal lieb unsere OPSUCHT Creator Lieblinge nach einem Code!</p>
+        <p class="plushie-panel-hint">🧸 Woher bekommt man Plüshies? Sie droppen zufällig aus den täglichen Random-Drops - oder du fragst einfach mal lieb unsere OPSUCHT Creator Lieblinge nach einem Code!<button type="button" class="jff-egg-trigger" id="jakeFarmEggTrigger" aria-label="Kleiner Farmhof-Traktor">🚜</button></p>
         <div class="plushie-redeem-box">
           <label for="plushieCodeInput">Code einl&ouml;sen</label>
           <div class="plushie-redeem-row">
@@ -1671,7 +1675,20 @@
   <script src="idledorf.js?v=20260806-perfaudit1" defer></script>
   <script src="mapart.js?v=20260717-kartenfirmen1" defer></script>
   <script src="js/core/bkmp-idle-bootstrap.js?v=20260717-p2afoundation" defer></script>
-  <script src="js/core/bkmp-site.js?v=20260804-leaderboardhide1" defer></script>
+  <!-- Jake's Feldfahrt (07.08.2026) - eigenstaendiges Website-Easter-Egg-
+       Minispiel, KEIN Bestandteil des Idle-Dorfs (siehe Datei-Kopf-
+       Kommentar). Laedt bewusst HIER, VOR bkmp-site.js: das Modul deklariert
+       window.BKMP_JAKESFELDFAHRT_SCORE_TIERS (Punkte-Meilensteine fuer
+       Erfolge/Titel) - bkmpBuildAchievementsList()/bkmpBuildTitlesList() in
+       bkmp-site.js lesen dieses Array synchron beim eigenen Laden (exakt
+       dasselbe Verdrahtungsmuster wie window.BKMP_IDLE_DRAGON_KILL_TIERS aus
+       idledorf.js), waere bei einem spaeteren Ladezeitpunkt schlicht leer.
+       Am eigentlichen Idle-Dorf-Isolationsversprechen aendert die Position
+       nichts - die Datei selbst haengt an keiner Stelle von idledorf.js/
+       bkmp-idle-*.js ab, nur die REIHENFOLGE relativ zu bkmp-site.js zaehlt
+       hier. -->
+  <script src="js/easter-eggs/jakes-feldfahrt.js?v=20260807-jakesfeldfahrt7" defer></script>
+  <script src="js/core/bkmp-site.js?v=20260807-jakesfeldfahrt1" defer></script>
   <!-- Feedback-/Status-Board Stufe 1 (20.07.2026) - eigenstaendig, reine
        lokale Testdaten, siehe Datei-Kopf-Kommentar. -->
   <script src="js/ui/bkmp-feedback-board.js?v=20260721-stufe34" defer></script>

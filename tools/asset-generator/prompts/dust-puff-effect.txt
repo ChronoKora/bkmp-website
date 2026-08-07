@@ -1,0 +1,51 @@
+Create exactly ONE isolated visual effect game asset.
+
+SUBJECT:
+
+A small soft dust cloud / driving-dust puff effect, meant to appear behind a small moving tractor.
+
+DESIGN:
+
+- soft, rounded, cartoon puffy cloud shapes
+- light warm beige/tan dust color
+- a gentle sense of motion (a few smaller trailing puffs alongside one main puff is acceptable)
+- soft, friendly, non-threatening appearance
+- clearly reads as "puff of dust" even when displayed very small
+
+ART STYLE:
+
+- same cute polished farm-game style as the Jake tractor, wheat collectible, and other farm assets
+- lightly chibi
+- lightly toy-like
+- professional casual-game effect asset
+- clean edges
+- soft dimensional shading
+- bright, friendly, warm colors
+- no UI frame or border around the effect
+
+COMPOSITION:
+
+- exactly one dust-puff effect
+- centered
+- fully visible
+- generous transparent padding
+- soft silhouette (effects do not need a hard-edged silhouette like items)
+
+STRICT REQUIREMENTS:
+
+- transparent background
+- exactly one effect
+- no solid object depicted (no tractor, no wheels, no character)
+- no field
+- no soil
+- no text
+- no number
+- no UI
+- no frame
+- no watermark
+- no dark fantasy styling
+- no obsidian
+- no amethyst
+- no antique-gold fantasy ornamentation
+
+The final image must look like a reusable particle/dust effect from the exact same farm minigame as the tractor and wheat assets.

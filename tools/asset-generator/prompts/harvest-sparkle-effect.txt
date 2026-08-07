@@ -1,0 +1,53 @@
+Create exactly ONE isolated visual effect game asset.
+
+SUBJECT:
+
+A small friendly, slightly magical sparkle/glitter burst effect, meant to appear when the player collects a bonus item.
+
+DESIGN:
+
+- soft, rounded, cartoon sparkle and star shapes
+- bright warm golden-yellow and soft white highlights
+- a gentle radiating burst arrangement
+- soft, friendly, magical but not dark or ominous
+- clearly reads as "collected!" celebration sparkle even when displayed very small
+
+ART STYLE:
+
+- same cute polished farm-game style as the Jake tractor, wheat collectible, and other farm assets
+- lightly chibi
+- lightly toy-like
+- professional casual-game effect asset
+- clean edges
+- soft dimensional shading
+- bright, friendly, warm colors
+- no UI frame or border around the effect
+
+COMPOSITION:
+
+- exactly one sparkle-burst effect
+- centered
+- fully visible
+- generous transparent padding
+- soft radiating silhouette (effects do not need a hard-edged silhouette like items)
+
+STRICT REQUIREMENTS:
+
+- transparent background
+- exactly one effect
+- no solid object depicted unless it is a small sparkle/star shape
+- no field
+- no soil
+- no character
+- no tractor
+- no text
+- no number
+- no UI
+- no frame
+- no watermark
+- no dark fantasy styling
+- no obsidian
+- no amethyst
+- no antique-gold fantasy ornamentation
+
+The final image must look like a reusable collection/sparkle effect from the exact same farm minigame as the tractor and wheat assets.

@@ -1,0 +1,47 @@
+Create exactly ONE complete background scene for a cute 2D farming arcade game.
+
+SUBJECT:
+
+A friendly farm background featuring a small charming barn set within a gentle field atmosphere.
+
+DESIGN:
+
+- one small, cute, red-and-white (or warm wood-toned) barn with a simple triangular roof, positioned off to one side rather than dead-center
+- rolling farmland, soft hills, and open sky filling the rest of the composition
+- warm, sunny, welcoming lighting
+- a few small decorative touches are fine (a distant fence line, a few small trees, soft clouds) as long as they stay calm and uncluttered
+- wide, calm, easily readable composition - nothing visually busy or overwhelming
+
+ART STYLE:
+
+- same cute polished farm-game visual language as the Jake tractor, wheat collectible, and farm field tile
+- lightly chibi
+- lightly toy-like
+- professional casual mobile/web game background quality
+- bright, warm, harmonious saturated colors
+- soft dimensional shading
+- clean, readable shapes
+
+COMPOSITION:
+
+- fills the entire canvas edge to edge
+- wide, calm, balanced composition
+- barn as the visual focal point but not overwhelming the scene
+
+STRICT REQUIREMENTS:
+
+- opaque background, no transparency
+- no human characters in the foreground
+- no tractor
+- no UI elements
+- no icons
+- no frames or borders
+- no text
+- no logo
+- no watermark
+- no dark fantasy styling
+- no obsidian
+- no amethyst
+- no antique-gold fantasy ornamentation
+
+The final image must function as a reusable background scene for the same cute farming arcade game as the tractor and wheat assets.

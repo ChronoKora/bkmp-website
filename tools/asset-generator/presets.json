@@ -52,5 +52,32 @@
     "default_background": "opaque",
     "prompt_prefix": "Premium fantasy game background art. Dark obsidian tones, amethyst purple accents, aged antique gold highlights, controlled warm orange lighting where appropriate. High quality material and atmosphere detail. Not photorealistic. No watermark. No signature. No text. No letters. No numbers. Generous, balanced composition.",
     "prompt_suffix": "A complete landscape or atmosphere scene, filling the entire canvas edge to edge. Opaque, fully non-transparent background. No UI elements, no icons, no frames, no borders, no text anywhere in the image."
+  },
+  "farm-cute-item": {
+    "description": "Einzelnes zentriertes Objekt/Charakter im cute Farm-Minispiel-Stil (charmant, chibi/plueschig-verspielt), transparenter Hintergrund - fuer Charaktere, Sammelobjekte, Hindernisse, Deko-Props und Coins des Farm-Easter-Eggs. Bewusst KEIN Obsidian/Amethyst/Dark-Fantasy-Look wie die sechs fantasy-*-Presets oben.",
+    "default_category": "icons",
+    "default_size": "1024x1024",
+    "default_quality": "medium",
+    "default_background": "transparent",
+    "prompt_prefix": "Cute farm minigame game asset. Charming, playful, lightly chibi and toy-like illustration style. Bold, friendly, saturated colors. Clear, readable, bold silhouette. Smooth rounded shapes, soft cartoon shading. High quality, clean, well-finished illustration. Cleanly isolated subject. Not photorealistic. Not a full screenshot. No surrounding UI window or app chrome. No watermark. No signature. No text. No letters. No numbers. Exactly one main subject. Generous margin from the image edge. Do NOT use dark obsidian, amethyst purple, antique gold ornamentation, or any dark/moody premium fantasy UI styling - this is a bright, cheerful, toy-like farm game asset, not a dark fantasy asset.",
+    "prompt_suffix": "Square composition. A single centered main subject filling most of the frame with a bold, strong, easy-to-read silhouette - this may be one object, one character, or one tightly-composed small scene combining a character with a closely related object. No unnecessary background scenery or environment behind the subject. Transparent background."
+  },
+  "farm-cute-effect": {
+    "description": "Einzelner isolierter Effekt (Staub, Glitzer, Partikel) im cute Farm-Minispiel-Stil, transparenter Hintergrund - passend zu farm-cute-item. Bewusst KEIN Obsidian/Amethyst/Dark-Fantasy-Look.",
+    "default_category": "effects",
+    "default_size": "1024x1024",
+    "default_quality": "medium",
+    "default_background": "transparent",
+    "prompt_prefix": "Cute farm minigame game asset. Charming, playful, friendly cartoon effect. Bold, friendly, saturated colors. Soft, rounded, cartoon particle/cloud shapes. High quality, clean, well-finished illustration. Cleanly isolated effect. Not photorealistic. No surrounding UI window or app chrome. No watermark. No signature. No text. No letters. No numbers. Exactly one main effect. Generous margin from the image edge. Do NOT use dark obsidian, amethyst purple, antique gold ornamentation, or any dark/moody premium fantasy UI styling - this is a bright, cheerful, toy-like farm game effect, not a dark fantasy effect. No UI frame or border around the effect.",
+    "prompt_suffix": "Square composition. A single isolated visual effect only - a dust cloud, a sparkle burst, or a similar soft particle effect - with no solid object depicted unless the prompt text above explicitly asks for one. Transparent background."
+  },
+  "farm-cute-scene": {
+    "description": "Opake Farmspiel-Szene/Boden-Tile im cute, hellen, leicht cartoonigen Stil - fuer Feld-/Fahrspur-Tiles und den Scheunen-Hintergrund, passend zu farm-cute-item/-effect. Bewusst KEIN Obsidian/Amethyst/Dark-Fantasy-Look.",
+    "default_category": "backgrounds",
+    "default_size": "1024x1024",
+    "default_quality": "high",
+    "default_background": "opaque",
+    "prompt_prefix": "Cute farm minigame game art. Bright, cheerful, warm, sunlit farm atmosphere. Friendly, lightly cartoonic 2D game art style. Bold, warm, saturated colors. Clean, high quality, well-finished illustration. Not photorealistic. No watermark. No signature. No text. No letters. No numbers. Do NOT use dark obsidian, amethyst purple, antique gold ornamentation, or any dark/moody premium fantasy UI styling - this is a bright, cheerful, toy-like farm game scene, not a dark fantasy scene.",
+    "prompt_suffix": "A complete, edge-to-edge farm scene or ground tile, filling the entire canvas. Opaque, fully non-transparent background. No UI elements, no icons, no frames, no borders, no text anywhere in the image. No characters unless explicitly requested above."
   }
 }

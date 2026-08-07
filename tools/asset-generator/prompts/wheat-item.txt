@@ -1,0 +1,58 @@
+Create exactly ONE isolated collectible game asset.
+
+SUBJECT:
+
+A small bundle of ripe golden wheat.
+
+DESIGN:
+
+- several recognizable wheat stalks bundled together
+- warm golden yellow color
+- slightly exaggerated thick wheat heads
+- compact readable silhouette
+- attractive collectible appearance
+- subtle warm highlight
+- tiny amount of natural green near the bottom is acceptable
+- should immediately read as "wheat" even when displayed very small
+
+ART STYLE:
+
+- same cute polished farm-game style as the Jake tractor asset
+- lightly chibi
+- lightly toy-like
+- professional casual-game asset
+- clean edges
+- soft dimensional shading
+- bright friendly colors
+- charming but not childish
+- suitable as a collectible worth +1 point
+
+COMPOSITION:
+
+- exactly one wheat bundle
+- centered
+- fully visible
+- generous transparent padding
+- strong silhouette
+
+STRICT REQUIREMENTS:
+
+- transparent background
+- no field
+- no soil
+- no basket
+- no character
+- no tractor
+- no additional vegetables
+- no text
+- no number
+- no UI
+- no badge
+- no frame
+- no watermark
+- no dark fantasy styling
+- no obsidian
+- no amethyst
+- no antique-gold fantasy ornamentation
+
+The final image must look like a reusable collectible item from the exact same farm minigame as the tractor asset.

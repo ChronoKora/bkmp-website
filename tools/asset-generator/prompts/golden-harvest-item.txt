@@ -1,0 +1,56 @@
+Create exactly ONE isolated rare bonus collectible game asset.
+
+SUBJECT:
+
+A rare, valuable golden harvest bonus object - a blend of a golden fruit, a golden bundle of grain, and a small magical bonus-harvest token. It must clearly read as a rare, special, high-value pickup, not a normal everyday crop.
+
+DESIGN:
+
+- rich golden-yellow color with a warm metallic shine
+- compact, rounded, harvest-inspired silhouette (may combine a golden fruit shape with a few golden grain heads)
+- a few small soft sparkle highlights to suggest it is magical and rare
+- clearly more elaborate and eye-catching than the normal wheat/carrot/pumpkin collectibles
+- should instantly read as "special, rare, valuable" even when displayed very small
+
+ART STYLE:
+
+- same cute polished farm-game style as the Jake tractor and wheat collectible assets
+- lightly chibi
+- lightly toy-like
+- professional casual-game asset
+- clean edges
+- soft dimensional shading
+- bright, warm, saturated golden colors
+- charming and a little bit magical, but not childish
+- suitable as the rarest, most valuable collectible in the game
+
+COMPOSITION:
+
+- exactly one golden harvest object
+- centered
+- fully visible
+- generous transparent padding
+- strong, bold silhouette
+
+STRICT REQUIREMENTS:
+
+- transparent background
+- exactly one object
+- no field
+- no soil
+- no basket
+- no character
+- no tractor
+- no additional separate objects
+- no text
+- no number
+- no UI
+- no badge
+- no frame
+- no watermark
+- no dark fantasy styling
+- no obsidian
+- no amethyst
+- no antique-gold fantasy UI ornamentation (this is a warm golden HARVEST object, not a fantasy UI trinket)
+
+The final image must look like a reusable, clearly rare bonus collectible from the exact same farm minigame as the tractor and wheat assets.

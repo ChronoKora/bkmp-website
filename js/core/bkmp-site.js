@@ -3247,6 +3247,7 @@
         feedbackKritikCount: bkmpGetFeedbackCount('kritik'),
         feedbackIdeeCount: bkmpGetFeedbackCount('idee'),
         feedbackSonstigesCount: bkmpGetFeedbackCount('sonstiges'),
+        jakeFeldfahrtHighscore: bkmpGetJakeFeldfahrtHighscore(),
         ...(typeof bkmpIdleGetAchievementContextFields === 'function' ? bkmpIdleGetAchievementContextFields() : {}),
         ...(typeof bkmpRaidGetAchievementContextFields === 'function' ? bkmpRaidGetAchievementContextFields() : {}),
         ...(typeof bkmpArenaGetAchievementContextFields === 'function' ? bkmpArenaGetAchievementContextFields() : {}),
@@ -3275,6 +3276,16 @@
       found.push(id);
       try { localStorage.setItem(BKMP_STREAMERS_CLICKED_KEY, JSON.stringify(found)); } catch (e) {}
       if (typeof renderAchievementBadge === 'function') renderAchievementBadge();
+    }
+    /* Jake's Feldfahrt (07.08.) - eigenstaendiges Minispiel (js/easter-eggs/
+       jakes-feldfahrt.js), speichert seinen Bestwert rein lokal unter genau
+       diesem Schluessel (siehe HIGHSCORE_KEY dort). Reiner Lesezugriff hier,
+       kein Import/keine Abhaengigkeit in die andere Richtung. */
+    function bkmpGetJakeFeldfahrtHighscore() {
+      try {
+        const raw = JSON.parse(localStorage.getItem('bkmp_jakes_feldfahrt_highscore_v1') || '{}');
+        return Number(raw.highscore) || 0;
+      } catch (e) { return 0; }
     }
 
     function bkmpTieredAchievements(idPrefix, category, metricKey, tiers, descFn) {
@@ -3443,7 +3454,11 @@
       ...(Array.isArray(window.BKMP_RUNE_UPGRADE_FAIL_TIERS) ? bkmpTieredAchievements('runeupgradefail', 'Runen', 'idleRuneUpgradeFailures', window.BKMP_RUNE_UPGRADE_FAIL_TIERS, n => `Erlebe ${n} fehlgeschlagene Runen-Aufwertung${n === 1 ? '' : 'en'}.`) : []),
       ...(Array.isArray(window.BKMP_RAID_ACHIEVEMENTS_EXTRA) ? window.BKMP_RAID_ACHIEVEMENTS_EXTRA : []),
       ...(Array.isArray(window.BKMP_ARENA_ACHIEVEMENTS_EXTRA) ? window.BKMP_ARENA_ACHIEVEMENTS_EXTRA : []),
-      ...(Array.isArray(window.BKMP_GUILD_ACHIEVEMENTS_EXTRA) ? window.BKMP_GUILD_ACHIEVEMENTS_EXTRA : [])
+      ...(Array.isArray(window.BKMP_GUILD_ACHIEVEMENTS_EXTRA) ? window.BKMP_GUILD_ACHIEVEMENTS_EXTRA : []),
+      /* Jake's Feldfahrt (07.08.) - Punkte-Meilensteine, Tabelle lebt in
+         js/easter-eggs/jakes-feldfahrt.js (window.BKMP_JAKESFELDFAHRT_SCORE_TIERS,
+         muss dafuer VOR dieser Datei laden, siehe Kommentar in index.html). */
+      ...(Array.isArray(window.BKMP_JAKESFELDFAHRT_SCORE_TIERS) ? bkmpTieredAchievements('jakefeld', "Jake's Feldfahrt", 'jakeFeldfahrtHighscore', window.BKMP_JAKESFELDFAHRT_SCORE_TIERS, n => `Erreiche ${n.toLocaleString('de-DE')} Punkte in einer Runde von Jake's Feldfahrt.`) : [])
     ];
     }
     let BKMP_ACHIEVEMENTS = bkmpBuildAchievementsList();
@@ -3643,7 +3658,22 @@
         desc: `Besitzt das ${p.name}.`,
         unlockAchievement: `plushie_${p.id}`
       })),
-      ...(Array.isArray(window.BKMP_IDLE_TITLES) ? window.BKMP_IDLE_TITLES : [])
+      ...(Array.isArray(window.BKMP_IDLE_TITLES) ? window.BKMP_IDLE_TITLES : []),
+      /* Jake's Feldfahrt (07.08.) - je ein Titel pro Punkte-Meilenstein
+         (siehe die gleichnamigen jakefeld_*-Erfolge oben in
+         bkmpBuildAchievementsList()). Ab 1000 Punkten mit steigend kraeftigem
+         Farm-Farbverlauf (titleGradient, siehe renderTitlesPanel() +
+         .title-gradient-*-Klassen in style.css) - erster gradientfaehiger
+         Titel ueberhaupt auf der Seite, daher bewusst nur fuer die
+         besseren Ergebnisse reserviert (spiegelt, wie jede andere
+         Raritaets-Faerbung auf der Seite bisher gehandhabt wird). */
+      ...(Array.isArray(window.BKMP_JAKESFELDFAHRT_SCORE_TIERS) ? window.BKMP_JAKESFELDFAHRT_SCORE_TIERS.map(([n, label]) => ({
+        id: `jaketitle_${n}`,
+        name: label,
+        desc: `Für ${n.toLocaleString('de-DE')} Punkte in einer Runde von Jake's Feldfahrt.`,
+        unlockAchievement: `jakefeld_${n}`,
+        titleGradient: n >= 3000 ? 'farmlegend' : (n >= 1500 ? 'farmgold' : (n >= 1000 ? 'farmgreen' : undefined))
+      })) : [])
     ];
     }
     let BKMP_TITLES = bkmpBuildTitlesList();
@@ -3687,10 +3717,11 @@
         const unlocked = bkmpTitleUnlocked(t, unlockedCount, ctx);
         const isActive = active === t.id;
         const lockedHint = t.unlockAchievement ? 'Erst diesen Erfolg freischalten.' : (t.unlockCustom ? 'Noch nicht freigeschaltet.' : `Ab ${t.unlockAt} Erfolgen`);
+        const gradientClass = unlocked && t.titleGradient ? ` title-gradient-${t.titleGradient}` : '';
         return `
           <button type="button" class="cosmetic-swatch ${unlocked ? '' : 'locked'} ${isActive ? 'active' : ''}" data-title-id="${escapeHtml(t.id)}" ${unlocked ? '' : 'disabled'}>
             ${newBadge(t.id)}
-            <span class="cosmetic-swatch-name">${unlocked ? escapeHtml(t.name) : '🔒'}</span>
+            <span class="cosmetic-swatch-name${gradientClass}">${unlocked ? escapeHtml(t.name) : '🔒'}</span>
             <span class="cosmetic-swatch-desc">${unlocked ? escapeHtml(t.desc) : lockedHint}</span>
           </button>`;
       }).join('');
@@ -4305,7 +4336,21 @@
           : '⛏️';
       }
       const activeTitleName = typeof bkmpGetActiveTitleName === 'function' ? bkmpGetActiveTitleName() : '';
-      badgeText.textContent = `${name}${activeTitleName ? ' — ' + activeTitleName : ''} · ${unlockedCount}/${BKMP_ACHIEVEMENTS.length}`;
+      /* 07.08. - von reinem textContent auf innerHTML umgestellt, NUR um dem
+         Jake's-Feldfahrt-Titel-Farbverlauf (titleGradient) eine <span> geben
+         zu koennen. Fuer JEDEN Titel ohne titleGradient (also praktisch
+         alle bisherigen) bleibt die Ausgabe zeichenidentisch zur alten
+         textContent-Fassung - name/Titel werden weiterhin vollstaendig per
+         escapeHtml() escaped, exakt wie an jeder anderen HTML-bauenden
+         Stelle in dieser Datei (z. B. renderTitlesPanel() direkt oberhalb). */
+      const activeTitleId = bkmpGetActiveTitle();
+      const activeTitleObj = activeTitleId && activeTitleId !== 'none' ? BKMP_TITLES.find(t => t.id === activeTitleId) : null;
+      const activeTitleHtml = activeTitleName
+        ? ' — ' + (activeTitleObj && activeTitleObj.titleGradient
+            ? `<span class="title-gradient-${escapeHtml(activeTitleObj.titleGradient)}">${escapeHtml(activeTitleName)}</span>`
+            : escapeHtml(activeTitleName))
+        : '';
+      badgeText.innerHTML = `${escapeHtml(name)}${activeTitleHtml} · ${unlockedCount}/${BKMP_ACHIEVEMENTS.length}`;
       badge.title = 'Deine Erfolge ansehen';
       const activeCosmetic = bkmpGetActiveCosmetic();
       if (!activeCosmetic || activeCosmetic === 'default') {

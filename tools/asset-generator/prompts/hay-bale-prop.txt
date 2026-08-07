@@ -1,0 +1,52 @@
+Create exactly ONE isolated decoration game asset.
+
+SUBJECT:
+
+A small round hay bale, suitable as a decorative prop in a farming arcade game.
+
+DESIGN:
+
+- compact cylindrical rolled hay bale shape
+- warm golden-yellow straw color with visible wispy straw texture
+- one or two simple twine bands wrapped around it
+- clean, instantly readable, friendly silhouette
+- charming farm-game appearance
+
+ART STYLE:
+
+- same cute polished farm-game style as the Jake tractor and wheat collectible assets
+- lightly chibi
+- lightly toy-like
+- professional casual-game asset
+- clean edges
+- soft dimensional shading
+- bright, friendly, saturated colors
+
+COMPOSITION:
+
+- exactly one hay bale
+- centered
+- fully visible
+- generous transparent padding
+- strong silhouette
+
+STRICT REQUIREMENTS:
+
+- transparent background
+- exactly one hay bale
+- no field
+- no soil
+- no character
+- no tractor
+- no animals
+- no text
+- no number
+- no UI
+- no frame
+- no watermark
+- no dark fantasy styling
+- no obsidian
+- no amethyst
+- no antique-gold fantasy ornamentation
+
+The final image must look like a reusable decorative prop asset from the exact same farm minigame as the tractor and wheat assets.

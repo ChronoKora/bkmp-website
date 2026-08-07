@@ -1,0 +1,52 @@
+Create exactly ONE isolated decoration/obstacle game asset.
+
+SUBJECT:
+
+A small wooden fence segment, suitable as field-edge decoration or an obstacle in a farming arcade game.
+
+DESIGN:
+
+- simple rustic wooden fence, two or three horizontal rails between two posts
+- warm light-brown wood color
+- compact, chunky, toy-like proportions
+- clean, instantly readable silhouette
+- charming farm-game appearance
+
+ART STYLE:
+
+- same cute polished farm-game style as the Jake tractor and wheat collectible assets
+- lightly chibi
+- lightly toy-like
+- professional casual-game asset
+- clean edges
+- soft dimensional shading
+- bright, friendly, saturated colors
+
+COMPOSITION:
+
+- exactly one fence segment
+- centered
+- fully visible
+- generous transparent padding
+- strong silhouette
+
+STRICT REQUIREMENTS:
+
+- transparent background
+- exactly one fence segment
+- no field
+- no soil
+- no character
+- no tractor
+- no animals
+- no text
+- no number
+- no UI
+- no frame
+- no watermark
+- no dark fantasy styling
+- no obsidian
+- no amethyst
+- no antique-gold fantasy ornamentation
+
+The final image must look like a reusable prop asset from the exact same farm minigame as the tractor and wheat assets.

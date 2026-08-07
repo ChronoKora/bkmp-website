@@ -1,0 +1,371 @@
+/* ============================================================
+   Jake's Feldfahrt - eigenstaendiges Website-Easter-Egg-Minispiel
+   ============================================================
+   Vollstaendig getrennt vom Idle-Dorf. Nutzt bewusst dieselbe .joke-overlay/
+   .joke-card-Basis wie jeder andere Dialog dieser Seite (Konsistenz), aber
+   NUR innerhalb dieses eigenen Scopes (#jakeFarmGameOverlay ...) eigene,
+   helle, farmige Token-Werte - der Rest der Website bleibt unangetastet
+   dunkel. Keine globalen --color-*/--mood-*-Variablen werden hier je
+   ueberschrieben, nur lokal neu definierte --jff-*-Variablen verwendet. */
+
+#jakeFarmGameOverlay {
+  z-index: 60; /* ueber dem normalen .joke-overlay-Basiswert (50) - noetig,
+    falls das Easter Egg aus einem bereits offenen Dialog (Erfolge-Karte)
+    heraus geoeffnet wird, gleiches Prinzip wie an anderen Stellen im
+    Projekt (siehe Skin-Vorschau/Investor-Foto-Vergroesserung). */
+}
+
+/* JakeCrayson-Pluschie-Belohnungs-Popup (07.08.) - eigenes, kleines Overlay
+   UEBER dem Spiel-Overlay (kann waehrend des noch offenen Endscreens
+   erscheinen), siehe bkmpJakeCraysonShowAnnouncement() in jakes-feldfahrt.js. */
+#jakeCraysonRewardOverlay {
+  z-index: 62;
+}
+.jff-reward-card {
+  width: min(92vw, 420px);
+  max-width: none;
+  padding: 1.7rem 1.5rem 1.5rem;
+  position: relative;
+  background: linear-gradient(180deg, #FFF6E4, #FFEBC7);
+  color: #4A3418;
+  border: 5px solid #B87A3D;
+  border-radius: 18px;
+  text-align: center;
+  box-shadow: 0 24px 70px rgba(20, 12, 4, 0.55);
+}
+.jff-reward-close {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(74, 52, 24, 0.12);
+  color: #4A3418;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.jff-reward-close:hover { background: rgba(74, 52, 24, 0.22); }
+.jff-reward-icon { font-size: 2.6rem; margin-bottom: 0.4rem; }
+.jff-reward-title { font-size: 1.25rem; font-weight: 900; margin: 0 0 0.5rem; }
+.jff-reward-text { font-size: 0.95rem; line-height: 1.5; margin: 0 0 0.4rem; }
+.jff-reward-hint { font-size: 0.82rem; opacity: 0.75; margin: 0 0 1rem; }
+
+.jff-card {
+  --jff-bg: #FFF6E4;
+  --jff-bg-2: #FFEBC7;
+  --jff-ink: #4A3418;
+  --jff-muted: #8A6E45;
+  --jff-line: rgba(74, 52, 24, 0.18);
+  --jff-wood: #B87A3D;
+  --jff-wood-dark: #8B5A2B;
+  --jff-accent: #E8A93C;
+  --jff-green: #4CAF50;
+  --jff-shadow: 0 24px 70px rgba(20, 12, 4, 0.55);
+
+  width: min(92vw, 1200px);
+  height: min(88dvh, 800px);
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, var(--jff-bg), var(--jff-bg-2));
+  color: var(--jff-ink);
+  border: 6px solid var(--jff-wood);
+  border-radius: 20px;
+  box-shadow: var(--jff-shadow);
+  overflow: hidden;
+  text-align: left;
+}
+
+.jff-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.6rem 1rem;
+  background: var(--jff-wood);
+  color: #fff8ea;
+  border-bottom: 4px solid var(--jff-wood-dark);
+}
+.jff-header-title {
+  font-weight: 800;
+  font-size: 1.05rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.jff-header-stats {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  font-weight: 700;
+  font-size: 0.92rem;
+  font-variant-numeric: tabular-nums;
+}
+.jff-header-stats .jff-combo { color: #ffe4a3; }
+.jff-header-stats .jff-timer { min-width: 3.4em; text-align: right; }
+.jff-header-stats .jff-timer.jff-timer-low { color: #ffb4a3; animation: jffPulse 0.6s ease-in-out infinite; }
+.jff-close-btn {
+  flex: 0 0 auto;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff8ea;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.jff-close-btn:hover { background: rgba(255, 255, 255, 0.32); }
+
+.jff-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+}
+.jff-canvas-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#jakeFarmGameCanvas {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  touch-action: none;
+  background: #caa262;
+}
+
+.jff-footer {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.5rem 1rem;
+  background: var(--jff-bg-2);
+  border-top: 4px solid var(--jff-wood-dark);
+  font-size: 0.85rem;
+  color: var(--jff-muted);
+}
+.jff-fever-badge {
+  display: none;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 800;
+  color: #a85b00;
+  background: linear-gradient(90deg, #ffe08a, #ffc94d);
+  border: 1px solid #d99a1f;
+  border-radius: 999px;
+  padding: 0.15rem 0.7rem;
+}
+.jff-fever-badge.jff-visible { display: inline-flex; }
+.jff-pause-btn {
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--jff-ink);
+  background: #fff;
+  border: 1.5px solid var(--jff-line);
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+}
+.jff-pause-btn:hover { border-color: var(--jff-wood); }
+
+/* ---------------- Overlay-Screens (Start/Countdown/Pause/Ende) ---------------- */
+.jff-screen {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  text-align: center;
+  padding: 1.2rem;
+  background-image: url('../assets/generated/backgrounds/barn-background.png');
+  background-size: cover;
+  background-position: center;
+  color: #fff;
+}
+.jff-screen.jff-visible { display: flex; }
+.jff-screen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(20, 12, 4, 0.35), rgba(20, 12, 4, 0.65));
+}
+.jff-screen > * { position: relative; z-index: 1; }
+
+.jff-screen-title {
+  font-size: clamp(1.4rem, 4vw, 2.2rem);
+  font-weight: 900;
+  text-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+}
+.jff-screen-subtitle {
+  font-size: 0.95rem;
+  opacity: 0.92;
+  max-width: 32em;
+}
+.jff-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  justify-content: center;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+.jff-legend span { background: rgba(0, 0, 0, 0.35); border-radius: 999px; padding: 0.2rem 0.7rem; }
+.jff-controls-hint {
+  font-size: 0.82rem;
+  opacity: 0.85;
+}
+.jff-btn-primary {
+  font-family: inherit;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #4a3418;
+  background: linear-gradient(180deg, #ffe08a, #f5c451);
+  border: 2px solid #a8721f;
+  border-radius: 14px;
+  padding: 0.75rem 2rem;
+  cursor: pointer;
+  box-shadow: 0 6px 0 #a8721f;
+}
+.jff-btn-primary:active { transform: translateY(3px); box-shadow: 0 3px 0 #a8721f; }
+.jff-btn-secondary {
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1.5px solid rgba(255, 255, 255, 0.5);
+  border-radius: 12px;
+  padding: 0.6rem 1.4rem;
+  cursor: pointer;
+}
+.jff-btn-row { display: flex; gap: 0.7rem; flex-wrap: wrap; justify-content: center; }
+
+.jff-countdown-number {
+  font-size: clamp(3rem, 12vw, 6rem);
+  font-weight: 900;
+  text-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+  animation: jffCountdownPop 0.5s ease-out;
+}
+@keyframes jffCountdownPop {
+  0% { transform: scale(0.4); opacity: 0; }
+  60% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.jff-end-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  gap: 0.35rem 1.4rem;
+  font-size: 0.9rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
+  padding: 0.7rem 1.1rem;
+  max-width: 26em;
+}
+.jff-end-stats .jff-stat-label { opacity: 0.8; text-align: left; }
+.jff-end-stats .jff-stat-value { font-weight: 800; text-align: right; }
+
+/* ---------------- Touch-Steuerung (Mobile) ---------------- */
+.jff-touch-controls {
+  position: absolute;
+  right: max(0.8rem, env(safe-area-inset-right));
+  bottom: max(0.8rem, env(safe-area-inset-bottom));
+  display: none;
+  flex-direction: column;
+  gap: 0.6rem;
+  z-index: 2;
+}
+.jff-touch-controls.jff-visible { display: flex; }
+.jff-touch-btn {
+  width: 56px; height: 56px;
+  min-width: 48px; min-height: 48px;
+  border-radius: 50%;
+  border: 2px solid rgba(74, 52, 24, 0.5);
+  background: rgba(255, 246, 228, 0.72);
+  color: #4a3418;
+  font-size: 1.4rem;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.jff-touch-btn:active { background: rgba(255, 246, 228, 0.95); }
+
+/* ---------------- Debug-Overlay ---------------- */
+.jff-debug {
+  position: absolute;
+  top: 0.4rem; left: 0.4rem;
+  z-index: 3;
+  background: rgba(0, 0, 0, 0.7);
+  color: #9dff9d;
+  font: 11px/1.4 monospace;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  white-space: pre;
+  pointer-events: none;
+  display: none;
+}
+.jff-debug.jff-visible { display: block; }
+
+/* ---------------- Fallback-Trigger (Pluushie-Bereich) ---------------- */
+.jff-egg-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-left: 0.4rem;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 1rem;
+  opacity: 0.55;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  vertical-align: middle;
+}
+.jff-egg-trigger:hover { opacity: 0.9; transform: scale(1.12) rotate(-4deg); }
+.jff-egg-trigger:focus-visible { outline: 2px solid var(--gold, #c9a56a); outline-offset: 2px; opacity: 1; }
+
+@keyframes jffPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .jff-countdown-number { animation: none; }
+  .jff-header-stats .jff-timer.jff-timer-low { animation: none; }
+}
+
+/* ---------------- Mobile ---------------- */
+@media (max-width: 760px), (max-height: 500px) and (orientation: landscape) {
+  .jff-card {
+    width: 100vw;
+    height: 100dvh;
+    border-radius: 0;
+    border-width: 0;
+  }
+  .jff-header { padding: max(0.45rem, env(safe-area-inset-top)) 0.7rem 0.45rem; }
+  .jff-header-title { font-size: 0.9rem; }
+  .jff-header-stats { font-size: 0.82rem; gap: 0.6rem; }
+  .jff-footer { padding: 0.4rem 0.7rem max(0.4rem, env(safe-area-inset-bottom)); font-size: 0.78rem; }
+  .jff-end-stats { grid-template-columns: 1fr 1fr; font-size: 0.82rem; }
+}

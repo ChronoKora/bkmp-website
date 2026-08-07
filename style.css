@@ -9241,6 +9241,35 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
   .mc-cosmetic-jenseits_der_sterne, .mc-cosmetic-jenseits_der_sterne #mcNameBadgeText, .mc-cosmetic-jenseits_der_sterne .cosmetic-swatch-name, .mc-cosmetic-jenseits_der_sterne .leaderboard-name-text { animation: none; }
 }
 
+/* ---- Titel-Farbverlauf (07.08., erster ueberhaupt - Jake's Feldfahrt) ----
+   Anders als die .mc-cosmetic-*-Namens-Effekte oben (Klasse sitzt auf einem
+   ANCESTOR-Element, z. B. dem Swatch-Button oder #mcNameBadge, und faerbt
+   per Nachkommen-Selektor mehrere Kind-Elemente gleichzeitig) sitzt diese
+   Klasse DIREKT auf dem Text-Element selbst (siehe renderTitlesPanel()'s
+   .cosmetic-swatch-name bzw. die neue <span> im Namens-Badge in
+   bkmp-site.js) - einfacher, da hier immer nur genau EIN Titeltext gefaerbt
+   werden muss, kein zweites Nachkommen-Muster noetig. Nutzt dieselben
+   bereits vorhandenen Keyframes (bkmpTierGlow/streamerShimmer) wie die
+   Kosmetik-Verlaeufe oben. */
+.title-gradient-farmgreen {
+  background: linear-gradient(120deg, #4CAF50, #8BC34A, #4CAF50);
+  background-size: 220% 220%; -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: bkmpTierGlow 3s ease infinite;
+}
+.title-gradient-farmgold {
+  background: linear-gradient(120deg, #4CAF50, #E8A93C, #4CAF50);
+  background-size: 220% 220%; -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: bkmpTierGlow 3.2s ease infinite;
+}
+.title-gradient-farmlegend {
+  background: linear-gradient(90deg, #4CAF50, #E8A93C, #fff8ea, #E8A93C, #4CAF50);
+  background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: streamerShimmer 4s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .title-gradient-farmgreen, .title-gradient-farmgold, .title-gradient-farmlegend { animation: none; }
+}
+
 /* ============================================================
    MapArt Marketplace ("Kartenaufträge")
    ============================================================ */
