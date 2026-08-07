@@ -76,11 +76,14 @@ module.exports = async function handler(req, res) {
        Belohnung (siehe raid_finish() in supabase-idle-event-dragons.sql)
        erhaeltlich sein. 'randomauto' soll NUR ueber das "AD-Free"-Easter-Egg
        im Idle-Dorf erhaeltlich sein (siehe index.html, BKMP_ADFREE_CODE).
-       Alle drei muessen deshalb aus diesem taeglichen Zufallspool
+       'jakecrayson' (07.08.) soll NUR ab 500 Punkten im Jake's-Feldfahrt-
+       Minispiel erhaeltlich sein (siehe bkmpJakeCraysonMaybeGrant() in
+       js/easter-eggs/jakes-feldfahrt.js, Code JAKESFELDFAHRT-500-HARVEST).
+       Alle vier muessen deshalb aus diesem taeglichen Zufallspool
        ausgeschlossen bleiben, sonst koennte der taegliche Cron-Job
        versehentlich einen zweiten, "normalen" Code fuer dieselben Pluschies
        erzeugen. */
-    const EXCLUDED_FROM_DAILY_POOL = new Set(['kora', 'zerathor_zorn_der_verdammnis', 'randomauto']);
+    const EXCLUDED_FROM_DAILY_POOL = new Set(['kora', 'zerathor_zorn_der_verdammnis', 'randomauto', 'jakecrayson']);
     const plushiesAll = await plushiesRes.json();
     const plushies = (Array.isArray(plushiesAll) ? plushiesAll : []).filter(p => !EXCLUDED_FROM_DAILY_POOL.has(p.id));
     if (!Array.isArray(plushies) || plushies.length === 0) {

@@ -3837,6 +3837,16 @@
         console.warn('Dorf-Skin-Besitz konnte nicht aktualisiert werden.', e);
       }
     }
+    /* Per-Pluschie ueberschriebener Sperr-Hinweis (07.08.) - der generische
+       "Nur per Code freischaltbar." trifft technisch auf JEDES Pluschie zu
+       (redeemPlushieCode() ist der einzige Vergabe-Weg ueberhaupt), ist aber
+       fuer die versteckten, automatisch-eingeloesten Easter-Egg-Pluschies
+       irrefuehrend - der Spieler tippt dort nie selbst einen Code ein. Bewusst
+       vage gehalten (kein Name/Trigger/Mechanik-Detail), gleiches Prinzip wie
+       der oeffentliche Changelog-Eintrag zu diesem Minispiel. */
+    const BKMP_PLUSHIE_LOCKED_HINT_OVERRIDES = {
+      jakecrayson: 'Nur durch ein geheimes Minispiel erreichbar.'
+    };
     function renderPlushiesPanel() {
       const el = document.getElementById('plushiesList');
       if (!el) return;
@@ -3845,12 +3855,13 @@
       el.innerHTML = BKMP_PLUSHIES.map(p => {
         const unlocked = bkmpOwnedPlushies.includes(p.id);
         const isActive = active === p.id;
+        const lockedHint = BKMP_PLUSHIE_LOCKED_HINT_OVERRIDES[p.id] || 'Nur per Code freischaltbar.';
         return `
           <button type="button" class="cosmetic-swatch plushie-swatch ${unlocked ? '' : 'locked'} ${isActive ? 'active' : ''}" data-plushie-id="${escapeHtml(p.id)}" ${unlocked ? '' : 'disabled'}>
             ${newBadge(p.id)}
             ${unlocked ? `<img class="plushie-swatch-img" src="${escapeHtml(p.image)}" alt="" loading="lazy">` : '<span class="plushie-swatch-lock">🔒</span>'}
             <span class="cosmetic-swatch-name">${unlocked ? escapeHtml(p.name) : '???'}</span>
-            <span class="cosmetic-swatch-desc">${unlocked ? escapeHtml(p.desc) : 'Nur per Code freischaltbar.'}</span>
+            <span class="cosmetic-swatch-desc">${unlocked ? escapeHtml(p.desc) : escapeHtml(lockedHint)}</span>
           </button>`;
       }).join('');
       el.querySelectorAll('.plushie-swatch:not(.locked)').forEach(btn => {
