@@ -1549,15 +1549,54 @@ function bkmpRuneSyncDrawerPosition() {
      Balken IMMER darunter verankert (gleiches Rand-Prinzip wie links: passt
      er nicht mehr vollstaendig in den restlichen Platz, ruckt er so weit
      wie moeglich hoch, ohne die Tabs jemals zu ueberdecken). */
+  /* Bug-Fix (Spieler-Screenshot 06.08.2026, 2560x1440-Monitor): der Balken
+     landete komplett ausserhalb des sichtbaren Bereichs unten rechts (nur
+     ein winziger Rest ragte noch ins Fenster). Ursache: seit dem
+     zweispaltigen Desktop-Grid-Redesign (05.08.2026, siehe
+     "grid-template-columns:214px 1fr"/"grid-area:nav" in style.css) ist
+     #idleDorfTabs auf breiten Fenstern keine flache horizontale Tab-Zeile
+     mehr, sondern eine ECHTE LINKE SEITENLEISTE (per Live-Messung bei
+     2560x1440 bestaetigt: 814px hoch statt der alten schmalen Kopfzeile).
+     Die urspruengliche 21.07.-Logik ("Balken IMMER unterhalb der Tab-Leiste
+     verankern", damals fuer eine echte obere Tab-Zeile gedacht) nahm
+     "tabsRect.bottom" dadurch faelschlich als sehr hohen Wert (nahe dem
+     Kartenende statt nahe dem Kartenanfang) - minTop wurde dadurch so
+     gross, dass der aeussere Sicherheitsclamp (maxTop) ihn NICHT MEHR nach
+     oben korrigieren konnte (Math.max(minTop, ...) waehlt bei einem bereits
+     zu hohen minTop immer minTop selbst). Fix: die "unterhalb der Tabs"-
+     Regel gilt jetzt nur noch, wenn sich Tab-Leiste und Balken bei der
+     AKTUELLEN Kartenbreite ueberhaupt HORIZONTAL ueberlappen koennten (echte
+     obere Tab-Zeile: ja, spannt fast die volle Kartenbreite; linke
+     Seitenleiste im neuen Grid-Layout: nein, endet weit links vom
+     rechts angedockten Balken) - reine Geometrie-Pruefung, kein fester
+     Breakpoint, funktioniert dadurch fuer beide Navigations-Varianten
+     automatisch richtig. Ohne diese Ueberlappung wird der Balken einfach
+     nur noch innerhalb des Fensters gehalten (kein "unterhalb"-Zwang mehr
+     noetig, die Seitenleiste liegt ja ohnehin nicht im Weg). */
   const tabs = document.getElementById('idleDorfTabs');
-  if (tabs) {
-    const tabsRect = tabs.getBoundingClientRect();
-    const drawerHeight = drawer.offsetHeight || 0;
+  const drawerHeight = drawer.offsetHeight || 0;
+  const tabsRect = tabs ? tabs.getBoundingClientRect() : null;
+  const horizontalOverlapPossible = !!tabsRect && tabsRect.width > 0 && tabsRect.right > left;
+  if (horizontalOverlapPossible) {
+    // Echte obere Tab-Zeile (schmalere Desktop-Breiten) - unveraendertes
+    // Verhalten seit 21.07.: immer darunter verankern, dabei innerhalb des
+    // Fensters bleiben.
     const minTop = tabsRect.bottom + 8;
     const maxTop = Math.max(minTop, window.innerHeight - drawerHeight - 8);
     drawer.style.top = Math.round(Math.min(minTop, maxTop)) + 'px';
-    drawer.style.transform = 'none';
+  } else {
+    // Keine Ueberlappungsgefahr (linke Seitenleiste im neuen Grid-Layout,
+    // oder gar keine Tab-Leiste gefunden) - entspricht wieder der
+    // urspruenglichen CSS-Grundregel "top:50%" (vertikal mittig im
+    // Fenster), nur als fester Pixelwert statt Prozent+Transform berechnet,
+    // damit "transform:none" (siehe unten, fuer den anderen Zweig noetig)
+    // nicht versehentlich die Zentrierung mitloescht. Zusaetzlich innerhalb
+    // des Fensters gehalten, falls der Balken selbst hoeher als der
+    // sichtbare Bereich waere.
+    const centered = Math.round((window.innerHeight - drawerHeight) / 2);
+    drawer.style.top = Math.max(8, Math.min(centered, window.innerHeight - drawerHeight - 8)) + 'px';
   }
+  drawer.style.transform = 'none';
 }
 
 function bkmpRuneToggleDrawer() {
