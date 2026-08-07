@@ -4622,7 +4622,18 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
    Verschmelzen/Verkaufen) gleichermassen - harmonisiert die Abstaende
    zwischen den Aktions-Reihen, ohne sie unangenehm eng wirken zu lassen. */
 .idle-runen-stat-actions { display: flex; gap: 0.5rem; margin-top: 0.55rem; }
-.idle-runen-fuse-btn, .idle-runen-sell-btn { flex: 1; font-size: 0.74rem; padding: 0.45rem 0.5rem; white-space: nowrap; }
+/* Bugfix (Nutzer-Screenshot 07.08.2026, 2560x1440): seit die Detailspalte im
+   Runen-Redesign auf eine feste Breite (min(340px,32vw)) gedeckelt ist, war
+   diese Zeile die einzige der drei .idle-runen-stat-actions-Reihen ohne
+   min-width:0 (die beiden anderen - .idle-runen-upgrade-btn/-instant-btn -
+   hatten es schon) - white-space:nowrap + der fehlende min-width-Reset
+   verhinderten das uebliche Flex-Schrumpfen, "✨ Verschmelzen (auswaehlen)
+   (N/3)" blieb dadurch auf seiner vollen Wortbreite stehen und schob
+   "verkaufen" sichtbar ueber den rechten Rand der Karte hinaus in den
+   Lager-Bereich. Fix: schrumpfbar + Text darf bei Bedarf auf eine zweite
+   Zeile umbrechen (waechst die Reihe dadurch geringfuegig in der Hoehe,
+   bleibt aber immer innerhalb der Kartenbreite). */
+.idle-runen-fuse-btn, .idle-runen-sell-btn { flex: 1; min-width: 0; font-size: 0.74rem; padding: 0.45rem 0.5rem; white-space: normal; line-height: 1.25; text-align: center; }
 .idle-runen-fuse-btn:disabled, .idle-runen-sell-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* Verschmelzen-Auswahlmodus (bkmpRuneFuseSelection) - Spieler waehlt gezielt
