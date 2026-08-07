@@ -1281,6 +1281,13 @@
     if (gameState !== 'closed') return; /* nur genau eine Spielinstanz */
     previouslyFocusedEl = triggerEl || document.activeElement;
 
+    /* 07.08. - traegt den Fund in die site-eigene Easter-Egg-Liste ein,
+       damit der zugehoerige "egg_jakesfeldfahrt"-Erfolg (bkmp-site.js)
+       ausloest - unabhaengig vom spaeter erreichten Punktestand, das
+       Finden des Triggers selbst zaehlt. Gleiches typeof-Guard-Prinzip wie
+       bei bkmpGetMcName()/redeemPlushieCode(), siehe Datei-Kopf-Kommentar. */
+    if (typeof bkmpMarkEggFound === 'function') bkmpMarkEggFound('jakesfeldfahrt');
+
     buildOverlayIfNeeded();
     resetRunState();
     gameState = 'start';
