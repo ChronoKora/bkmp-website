@@ -18,6 +18,20 @@ test.beforeEach(async ({}, testInfo) => {
   test.skip(/^mobile-/.test(testInfo.project.name), 'Nutzt echte Desktop-Tab-Klicks - siehe Kommentar oben, mobile-smoke.spec.js deckt die kompakte Navigation ab');
 });
 
+/* Redesign 06.08.2026: der Runen-Lager-Balken wird ab 1000px Fensterbreite in
+   den Panel-Hauptbereich eingebettet (siehe bkmpRuneSyncDrawerEmbedMode in
+   js/systems/bkmp-runes.js) und ist dort IMMER offen - der Zuklapp-Pfeil
+   (#idleRuneDrawerToggle) wird dafuer per CSS ausgeblendet, das urspruengliche
+   Ueberlapp-Problem mit #idleRuneEquipBtn (siehe Kommentar an den bisherigen
+   Aufrufstellen, Phase 7.2) existiert im eingebetteten Zustand strukturell
+   nicht mehr (eigene Spalte statt schwebender Balken). Ersetzt die bisherigen
+   direkten `#idleRuneDrawerToggle`-Klicks - klappt nur noch zu, wenn der
+   Pfeil ueberhaupt sichtbar ist (schmalere/nicht eingebettete Breiten). */
+async function bkmpTestToggleDrawerIfFloating(page) {
+  const toggle = page.locator('#idleRuneDrawerToggle');
+  if (await toggle.isVisible()) await toggle.click();
+}
+
 test.describe('Runensystem - Teststand D (beschaedigte Daten)', () => {
   test.use({ teststand: 'D' });
 
@@ -56,7 +70,7 @@ test.describe('Runensystem - Teststand B (mittlerer Spieler)', () => {
 
     const unequippedCard = page.locator('.idle-runen-item:not(.is-equipped)').first();
     await unequippedCard.click();
-    await page.locator('#idleRuneDrawerToggle').click(); // aus dem Weg, siehe CLAUDE.md Phase 7.2
+    await bkmpTestToggleDrawerIfFloating(page); // aus dem Weg, siehe CLAUDE.md Phase 7.2 / Redesign 06.08.2026
     await page.waitForTimeout(300);
     await page.locator('#idleRuneEquipBtn').click();
     await page.waitForTimeout(300);
@@ -76,7 +90,7 @@ test.describe('Runensystem - Teststand B (mittlerer Spieler)', () => {
     // 1) Die aktuell ausgeruestete Rune entfernen.
     const equippedCard = page.locator('.idle-runen-item.is-equipped').first();
     await equippedCard.click();
-    await page.locator('#idleRuneDrawerToggle').click();
+    await bkmpTestToggleDrawerIfFloating(page);
     await page.waitForTimeout(300);
     await expect(page.locator('#idleRuneEquipBtn')).toHaveText('Entfernen', { timeout: 5000 });
     await page.locator('#idleRuneEquipBtn').click();
@@ -86,11 +100,11 @@ test.describe('Runensystem - Teststand B (mittlerer Spieler)', () => {
     expect(equippedNow.length).toBe(0);
 
     // 2) Jetzt sollte sich die ANDERE (vorher blockierte) Rune einsetzen lassen.
-    await page.locator('#idleRuneDrawerToggle').click(); // Lager wieder aufklappen
+    await bkmpTestToggleDrawerIfFloating(page); // Lager wieder aufklappen (nur schwebender Modus)
     await page.waitForTimeout(300);
     const otherCard = page.locator('.idle-runen-item:not(.is-equipped)').first();
     await otherCard.click();
-    await page.locator('#idleRuneDrawerToggle').click();
+    await bkmpTestToggleDrawerIfFloating(page);
     await page.waitForTimeout(300);
     await expect(page.locator('#idleRuneEquipBtn')).toHaveText('Einsetzen', { timeout: 5000 });
     await page.locator('#idleRuneEquipBtn').click();

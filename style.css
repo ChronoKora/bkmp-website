@@ -4156,10 +4156,33 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
    Default (Var. noch nie gesetzt bzw. Balken geschlossen), transition synchron
    zur 0.25s-Breiten-Animation des Balkens selbst. */
 .idle-runen-main-row { display: flex; gap: 1.6rem; align-items: flex-start; padding-right: var(--rune-drawer-overlap, 0px); transition: padding-right 0.25s ease; }
-.idle-runen-main-row .idle-runen-circle-wrap { flex-shrink: 0; margin-bottom: 0; }
-.idle-runen-main-row .idle-runen-stat-box { flex: 1; min-width: 0; margin-bottom: 0; }
+.idle-runen-detail-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.idle-runen-detail-col .idle-runen-circle-wrap { flex-shrink: 0; margin-bottom: 0; }
+.idle-runen-detail-col .idle-runen-stat-box { flex: 1; min-width: 0; margin-bottom: 0; }
+/* Ziel-Container fuer das eingebettete Runenlager (Redesign 06.08.2026,
+   siehe bkmpRuneSyncDrawerEmbedMode() in js/systems/bkmp-runes.js) - unter
+   1000px bleibt er immer leer (der Balken schwebt dort weiterhin klassisch
+   ausserhalb, siehe .idle-runen-drawer weiter unten), deshalb hier
+   bewusst width:0 als Default, damit er dort keinen unsichtbaren Leerraum
+   reserviert. */
+.idle-runen-lager-slot { flex: 0 0 0; width: 0; min-width: 0; }
 @media (max-width: 720px) {
   .idle-runen-main-row { flex-direction: column; align-items: stretch; }
+}
+/* Redesign 06.08.2026 (Nutzerauftrag "Runenlager aus schmaler rechter
+   Sidebar in den grossen mittleren Hauptbereich integrieren" - Zitat:
+   "GENAU DIESE LEERE MITTLERE FLAECHE soll jetzt sinnvoll genutzt werden"):
+   ab 1000px (identischer Schwellwert wie das bestehende zweispaltige
+   Desktop-Kartenlayout) wird .idle-runen-main-row zu einer echten
+   Zwei-Spalten-Komposition - links eine schlanke, feste Detailspalte
+   (Runenkreis + ausgewaehlte Rune), rechts/mittig das grosse Lager als
+   Herzstueck. Unter 1000px bleibt die bisherige, bereits mehrfach
+   getestete Darstellung (Detailbereich allein im normalen Fluss, Lager
+   als schwebender Balken) komplett unangetastet. */
+@media (min-width: 1000px) {
+  .idle-runen-main-row { align-items: flex-start; padding-right: 0 !important; }
+  .idle-runen-detail-col { flex: 0 0 min(340px, 32vw); max-width: 340px; }
+  .idle-runen-lager-slot { flex: 1 1 auto; width: auto; min-width: 0; }
 }
 
 /* Ausklappbarer Lager-Balken (Nutzer-Wunsch, 15.07.: "direkt daneben extra
@@ -4273,6 +4296,42 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   .idle-runen-drawer-panel, .idle-runen-drawer-panel-inner { max-width: 78vw; }
   .idle-runen-drawer.open .idle-runen-drawer-panel { width: 78vw; }
 }
+/* Eingebetteter Zustand (Redesign 06.08.2026, ab 1000px - siehe
+   bkmpRuneSyncDrawerEmbedMode() in js/systems/bkmp-runes.js): der Balken
+   sitzt als echtes Kind von #idleRuneLagerSlot im normalen Dokumentfluss
+   der Mitte statt als schwebender position:fixed-Streifen. Rahmen/Glow/
+   Farbverlauf (.idle-runen-drawer-panel-Grundregel oben) bleiben komplett
+   unveraendert - nur Position/Breite/Hoehe werden hier gezielt aufgehoben,
+   damit es sich weiterhin wie derselbe "Zwillings-Kartenausschnitt"
+   anfuehlt, nur eben gross und mittig statt schmal und schwebend. Eine
+   grosszuegige, von der (variablen) Hoehe der linken Detailspalte bewusst
+   UNABHAENGIGE Zielhoehe (statt align-items:stretch) - das Lager bleibt
+   dadurch immer gross+gut lesbar, auch wenn die gerade ausgewaehlte Rune
+   wenig Text hat und die Detailspalte selbst kurz ausfaellt. */
+.idle-runen-drawer.embedded {
+  position: static;
+  top: auto; left: auto; transform: none;
+  z-index: auto;
+  width: 100%;
+  gap: 0;
+}
+.idle-runen-drawer.embedded .idle-runen-drawer-toggle { display: none; }
+.idle-runen-drawer.embedded .idle-runen-drawer-panel {
+  width: 100% !important;
+  min-width: 0;
+  height: min(66vh, 660px);
+  max-height: none;
+}
+.idle-runen-drawer.embedded .idle-runen-drawer-panel-inner {
+  width: 100%;
+  max-width: none;
+  padding: 1.1rem 1.3rem 1.3rem;
+}
+/* Etwas grosszuegigere Kartengroesse im grossen eingebetteten Lager (der
+   bestehende Grid-Mechanismus - repeat(auto-fill, minmax(...)) - passt die
+   Spaltenzahl dadurch automatisch an die jetzt deutlich groessere
+   verfuegbare Breite an, keine eigene Spaltenzahl-Berechnung noetig). */
+.idle-runen-drawer.embedded .idle-runen-inventory { grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 0.7rem; }
 .idle-runen-circle-wrap { display: flex; justify-content: center; margin-bottom: 1.2rem; }
 .idle-runen-circle-inner { position: relative; display: inline-block; }
 .idle-runen-circle-img {

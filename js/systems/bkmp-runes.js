@@ -1502,10 +1502,91 @@ function bkmpRuneSyncDrawerVisibility() {
    (ueberlappt dann leicht die Karte) statt teilweise unsichtbar zu sein -
    auf breiten Fenstern (genug Platz) bleibt das bisherige "flush an die
    Karte"-Verhalten unveraendert. */
+/* Redesign 06.08.2026 (Nutzerauftrag "Runenlager aus schmaler rechter
+   Sidebar in den grossen mittleren Hauptbereich integrieren", ab 1000px
+   Fensterbreite - identischer Schwellwert wie das bestehende zweispaltige
+   Desktop-Grid, siehe style.css "@media(min-width:1000px)"): haengt
+   #idleRuneDrawer per "Escape to Overlay"-Portal-Prinzip (gleiches Muster
+   wie bkmpProtoChudEscapeToOverlay in bkmp-proto-compact-hud.js, nur in die
+   umgekehrte Richtung - vom Overlay HINEIN in den Hauptbereich statt
+   heraus) zwischen seiner urspruenglichen Position (Geschwister von
+   .idle-dorf-card, fuer den schwebenden position:fixed-Balken auf
+   schmaleren Breiten) und #idleRuneLagerSlot (neuer Ziel-Container
+   INNERHALB von .idle-runen-main-row, siehe bkmpIdleRenderRunenPanel weiter
+   oben) um. Reines DOM-Verschieben desselben Knotens (kein Klonen) - alle
+   bestehenden Klick-Listener/Renderlogik im Innern (drawerContent) bleiben
+   dadurch unangetastet vollstaendig erhalten. */
+function bkmpRuneSyncDrawerEmbedMode(drawer) {
+  const wantEmbedded = window.innerWidth >= 1000;
+  const isEmbedded = drawer.classList.contains('embedded');
+  if (wantEmbedded === isEmbedded) return wantEmbedded;
+  if (wantEmbedded) {
+    const slot = document.getElementById('idleRuneLagerSlot');
+    if (slot) {
+      slot.appendChild(drawer);
+      drawer.classList.add('embedded');
+      /* Im eingebetteten Zustand ist der Balken das Herzstueck des mittleren
+         Bereichs, kein zuklappbarer Zusatz mehr - immer sichtbar geoeffnet,
+         der Pfeil-Umschalter selbst wird per CSS ausgeblendet (siehe
+         .idle-runen-drawer.embedded .idle-runen-drawer-toggle). Der globale
+         bkmpRuneDrawerOpen-Zustand (fuer den schwebenden Balken auf
+         schmaleren Breiten) bleibt davon unberuehrt - beim Zurueckwechseln
+         unter 1000px erscheint der Balken wieder genau im zuletzt dort
+         gewaehlten Auf/Zu-Zustand. */
+      drawer.classList.add('open');
+    }
+  } else {
+    const overlay = document.getElementById('idleDorfOverlay');
+    if (overlay && drawer.parentElement !== overlay) overlay.appendChild(drawer);
+    drawer.classList.remove('embedded');
+    drawer.classList.toggle('open', bkmpRuneDrawerOpen);
+    // Inline-Positionierung von vorherigen Faellen verwerfen - wird gleich
+    // im normalen (nicht eingebetteten) Zweig unten frisch neu berechnet.
+    drawer.style.left = '';
+    drawer.style.top = '';
+  }
+  return window.innerWidth >= 1000;
+}
+
+/* Redesign-Ergaenzung 06.08.2026: bkmpIdleRenderRunenPanel() baut
+   .idle-runen-main-row (und damit #idleRuneLagerSlot) bei JEDEM Aufruf per
+   innerHTML komplett neu - ist der Runen-Lager-Balken (#idleRuneDrawer)
+   gerade dort eingebettet (ab 1000px, siehe bkmpRuneSyncDrawerEmbedMode),
+   wuerde ein Neu-Render ihn dadurch als Nachfahre des Panels unwiderruflich
+   zerstoeren (inkl. Lager-Inhalt/Listener) - exakt dasselbe Bugmuster wie
+   beim Dorf-Skins-Vorschau-Flackern (04.08.2026, siehe dortiger Kommentar in
+   bkmp-cosmetics.js). Fix: den echten, persistenten Balken-Knoten VOR dem
+   innerHTML-Rebuild aus dem Panel herausloesen (temporaer zurueck zu
+   #idleDorfOverlay, seiner "Heimat" ausserhalb des Panels), danach in den
+   frisch gebauten #idleRuneLagerSlot zurueckhaengen - derselbe Knoten (kein
+   Klonen), alle Listener/Zustand bleiben dadurch vollstaendig erhalten. */
+function bkmpRunePreserveEmbeddedDrawer() {
+  const drawer = document.getElementById('idleRuneDrawer');
+  const panel = document.getElementById('idlePanelRunen');
+  if (!drawer || !panel || !panel.contains(drawer)) return null;
+  const overlay = document.getElementById('idleDorfOverlay');
+  (overlay || document.body).appendChild(drawer);
+  return drawer;
+}
+
+function bkmpRuneReattachPreservedDrawer(drawer) {
+  if (!drawer) return;
+  const slot = document.getElementById('idleRuneLagerSlot');
+  if (slot) slot.appendChild(drawer);
+}
+
 function bkmpRuneSyncDrawerPosition() {
   const drawer = document.getElementById('idleRuneDrawer');
   const card = document.querySelector('.idle-dorf-overlay .idle-dorf-card');
   if (!drawer || !card || !drawer.classList.contains('visible')) return;
+  if (bkmpRuneSyncDrawerEmbedMode(drawer)) {
+    // Eingebettet: normaler Dokumentfluss innerhalb von .idle-runen-main-row
+    // - keine position:fixed-Berechnung noetig, auch die fuer den
+    // schwebenden Zustand gedachte rechte Rand-Reservierung entfaellt.
+    const runenPanel = document.getElementById('idlePanelRunen');
+    if (runenPanel) runenPanel.style.setProperty('--rune-drawer-overlap', '0px');
+    return;
+  }
   const rect = card.getBoundingClientRect();
   /* Breite bewusst aus der CSS-Formel selbst berechnet (min(320px,84vw)
      bzw. 78vw unter 640px, siehe style.css .idle-runen-drawer-panel),
@@ -2047,6 +2128,10 @@ function bkmpIdleRenderRunenPanel() {
   const panel = document.getElementById('idlePanelRunen');
   const drawerContent = document.getElementById('idleRuneDrawerContent');
   if (!panel || !drawerContent) return;
+  // Siehe Kommentar bei bkmpRunePreserveEmbeddedDrawer(): muss VOR dem
+  // innerHTML-Rebuild weiter unten laufen, sonst wird ein gerade eingebetteter
+  // Runen-Lager-Balken durch den Neuaufbau zerstoert statt nur verschoben.
+  const preservedDrawer = bkmpRunePreserveEmbeddedDrawer();
   const equippedBySlot = {};
   bkmpIdlePlayerRunes.forEach(r => { if (r.equipped) equippedBySlot[r.rune_type] = r; });
   const allSixEquipped = Object.keys(equippedBySlot).length >= 6;
@@ -2104,25 +2189,44 @@ function bkmpIdleRenderRunenPanel() {
       }).join('')}
     </div>
     <div class="idle-runen-main-row">
-      <div class="idle-runen-circle-wrap">
-        <div class="idle-runen-circle-inner">
-          <img src="assets/runes/${allSixEquipped ? 'circle-full' : 'circle-empty'}.png?v=${BKMP_RUNE_IMG_V}" alt="Runen-Kreis" class="idle-runen-circle-img" decoding="async">
-          ${window.BKMP_RUNE_SLOTS.map(slot => {
-            const eq = equippedBySlot[slot.id];
-            if (!eq) return '';
-            const rarity = window.BKMP_RUNE_RARITIES.find(r => r.id === eq.rarity);
-            const pos = BKMP_RUNE_SLOT_POSITIONS[slot.id];
-            if (!rarity || !pos) return '';
-            return `<button type="button" class="idle-runen-equip-slot" style="top:${pos.top}; left:${pos.left}; width:${pos.width}; height:${pos.height}; --rune-color:${rarity.color}" data-cid="${eq._cid}" data-slot="${slot.id}" title="${escapeHtml(slot.name)} ansehen &amp; aufwerten">
-              <img src="assets/runes/${slot.id}-${eq.rarity}.png?v=${BKMP_RUNE_IMG_V}" alt="${escapeHtml(slot.name)} (${escapeHtml(rarity.name)})" loading="lazy" decoding="async">
-              ${eq.upgrade_level ? `<span class="idle-runen-slot-level">+${eq.upgrade_level}</span>` : ''}
-            </button>`;
-          }).join('')}
+      <div class="idle-runen-detail-col">
+        <div class="idle-runen-circle-wrap">
+          <div class="idle-runen-circle-inner">
+            <img src="assets/runes/${allSixEquipped ? 'circle-full' : 'circle-empty'}.png?v=${BKMP_RUNE_IMG_V}" alt="Runen-Kreis" class="idle-runen-circle-img" decoding="async">
+            ${window.BKMP_RUNE_SLOTS.map(slot => {
+              const eq = equippedBySlot[slot.id];
+              if (!eq) return '';
+              const rarity = window.BKMP_RUNE_RARITIES.find(r => r.id === eq.rarity);
+              const pos = BKMP_RUNE_SLOT_POSITIONS[slot.id];
+              if (!rarity || !pos) return '';
+              return `<button type="button" class="idle-runen-equip-slot" style="top:${pos.top}; left:${pos.left}; width:${pos.width}; height:${pos.height}; --rune-color:${rarity.color}" data-cid="${eq._cid}" data-slot="${slot.id}" title="${escapeHtml(slot.name)} ansehen &amp; aufwerten">
+                <img src="assets/runes/${slot.id}-${eq.rarity}.png?v=${BKMP_RUNE_IMG_V}" alt="${escapeHtml(slot.name)} (${escapeHtml(rarity.name)})" loading="lazy" decoding="async">
+                ${eq.upgrade_level ? `<span class="idle-runen-slot-level">+${eq.upgrade_level}</span>` : ''}
+              </button>`;
+            }).join('')}
+          </div>
         </div>
+        <div class="idle-runen-stat-box" id="idleRunenStatBox">${bkmpRuneFuseSelection ? bkmpRuneFuseSelectionHTML(activeSlot) : bkmpRuneStatBoxHTML(activeSlot, viewingRune)}</div>
       </div>
-      <div class="idle-runen-stat-box" id="idleRunenStatBox">${bkmpRuneFuseSelection ? bkmpRuneFuseSelectionHTML(activeSlot) : bkmpRuneStatBoxHTML(activeSlot, viewingRune)}</div>
+      <!-- Redesign 06.08.2026 (Nutzerauftrag "Runenlager aus schmaler rechter
+           Sidebar in den grossen mittleren Hauptbereich integrieren"): reiner
+           Ziel-Container fuer #idleRuneDrawer - der Balken selbst bleibt
+           technisch unveraendert (gleiches Element, gleiche render-Logik in
+           drawerContent weiter unten, gleiche Klick-Listener), wird aber ab
+           1000px per JS hierher umgehaengt statt als position:fixed-Balken
+           am Bildschirmrand zu schweben (siehe bkmpRuneSyncDrawerPosition()
+           - identisches "Escape to Overlay"-Portal-Prinzip wie an anderer
+           Stelle im Projekt bereits etabliert, nur in die andere Richtung:
+           vom Overlay HEREIN in den Hauptbereich). Unterhalb 1000px bleibt
+           die urspruengliche schwebende Balken-Darstellung unveraendert
+           bestehen (Mobile/schmale Desktop-Breiten nicht angefasst). -->
+      <div class="idle-runen-lager-slot" id="idleRuneLagerSlot"></div>
     </div>
   `;
+  // Siehe Kommentar bei bkmpRunePreserveEmbeddedDrawer(): den zuvor
+  // herausgeloesten, echten Balken-Knoten in den frisch gebauten Ziel-
+  // Container zurueckhaengen (No-Op, falls er gerade nicht eingebettet war).
+  bkmpRuneReattachPreservedDrawer(preservedDrawer);
 
   /* FEHLER-FIX (Spieler-Meldung 15.07.: "Wenn man runterscrollt.. scrollt
      er automatisch direkt wieder hoch") - dieser Neuaufbau laeuft ueber
