@@ -145,3 +145,150 @@ test.describe('Anti-Cheat-Tempo-Guard (idle_player_state)', () => {
     expect(Number(row.gold)).toBe(100); // unveraendert uebernommen, nicht auf den alten Wert zurueckgesetzt
   });
 });
+
+/* Nachtrag 09.08.2026 - Spieler-Meldung: Account mit "9999999 Skillpunkte",
+   oeffentliche Bestenliste mit "Level 846473". Root Cause bestaetigt: der
+   obige Guard daempfte Level/Skillpunkte bisher NUR als Nebeneffekt eines
+   implausiblen dragon_kills-Zuwachs - ein gezieltes Update, das NUR
+   skill_points_available/level setzt und dragon_kills unangetastet laesst,
+   loeste die Daempfung nie aus. sql/20260809-anticheat-guard-independent-
+   fields.sql fuegt zwei unabhaengige Signale hinzu (Level-Zuwachs,
+   Skillpunkte-GESAMT-Zuwachs), siehe tests/mock/anticheat-guard.js fuer den
+   aktualisierten JS-Nachbau. */
+test.describe('Anti-Cheat-Tempo-Guard - unabhaengige Level-/Skillpunkte-Signale (09.08.)', () => {
+  test.use({ teststand: 'A' });
+
+  test('gezielte Skillpunkte-Faelschung OHNE Kills-/Level-Aenderung wird jetzt erkannt und gekappt (der gemeldete Exploit)', async ({ page, qaBaseURL, fixtureData, store }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    await page.evaluate(() => bkmpIdleStopLoop());
+    await settle(page);
+    setLastSavedSecondsAgo(store, fixtureData, 4); // Budget hier: 4*3+500 = 512
+    const before = snapshot(store, fixtureData);
+
+    await page.evaluate(() => {
+      bkmpIdleState.skill_points_available += 9999999; // exakt das gemeldete Muster - kein Kill, kein Level-Aufstieg
+      bkmpIdleQueueSync();
+    });
+    await page.evaluate(() => bkmpIdleFlushSyncNow());
+
+    const row = findRow(store, fixtureData);
+    // dragon_kills/level unveraendert (Delta 0) - werden von KEINEM Signal ausgeloest, bleiben exakt gleich.
+    expect(Number(row.dragon_kills)).toBe(Number(before.dragon_kills));
+    expect(Number(row.level)).toBe(Number(before.level));
+    // skill_points_available wird auf genau das erlaubte Budget gekappt (512), NICHT proportional skaliert.
+    expect(Number(row.skill_points_available)).toBe(Number(before.skill_points_available) + 512);
+
+    const flags = store.tables.idle_anticheat_flags || [];
+    expect(flags.length).toBe(1);
+    expect(flags[0].triggered_by).toBe('skill_points');
+    expect(Number(flags[0].claimed_skillpoints_delta)).toBe(9999999);
+    expect(Number(flags[0].allowed_skillpoints_delta)).toBe(512);
+  });
+
+  test('gezielte Level-Faelschung OHNE Kills-/Skillpunkte-Aenderung wird jetzt erkannt und gekappt', async ({ page, qaBaseURL, fixtureData, store }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    await page.evaluate(() => bkmpIdleStopLoop());
+    await settle(page);
+    setLastSavedSecondsAgo(store, fixtureData, 4); // Budget hier: 4*3+500 = 512
+    const before = snapshot(store, fixtureData);
+
+    await page.evaluate(() => {
+      bkmpIdleState.level += 846000; // exakt das gemeldete Muster (Bestenlisten-Screenshot "Level 846473")
+      bkmpIdleQueueSync();
+    });
+    await page.evaluate(() => bkmpIdleFlushSyncNow());
+
+    const row = findRow(store, fixtureData);
+    expect(Number(row.dragon_kills)).toBe(Number(before.dragon_kills));
+    expect(Number(row.skill_points_available)).toBe(Number(before.skill_points_available));
+    expect(Number(row.level)).toBe(Number(before.level) + 512);
+
+    const flags = store.tables.idle_anticheat_flags || [];
+    expect(flags.length).toBe(1);
+    expect(flags[0].triggered_by).toBe('level');
+  });
+
+  test('Skilltree-Zuruecksetzen (grosser Zuwachs von skill_points_available bei gleichzeitig sinkendem skill_points_spent) bleibt unangetastet', async ({ page, qaBaseURL, fixtureData, store }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    await page.evaluate(() => bkmpIdleStopLoop());
+    // Realistischen Vor-Reset-Zustand herstellen: 300 Punkte ausgegeben, 0 verfuegbar.
+    await page.evaluate(() => {
+      bkmpIdleState.skill_points_spent = 300;
+      bkmpIdleState.skill_points_available = 0;
+      bkmpIdleQueueSync();
+    });
+    await page.evaluate(() => bkmpIdleFlushSyncNow());
+    setLastSavedSecondsAgo(store, fixtureData, 4); // Budget hier: 4*3+500 = 512 - der Reset-Sprung (300) waere OHNE die Summen-Pruefung faelschlich betroffen gewesen, waere aber selbst mit 300 < 512 in diesem Einzelfall knapp durchgekommen. Deshalb zusaetzlich Fall B unten mit einem 900er-Reset (> 512), der die reine Zeit-Rate-Regel definitiv gerissen haette.
+    const before = snapshot(store, fixtureData);
+
+    await page.evaluate(() => {
+      // Echtes "Zuruecksetzen": alle 300 ausgegebenen Punkte wandern zurueck in "verfuegbar".
+      bkmpIdleState.skill_points_available = 300;
+      bkmpIdleState.skill_points_spent = 0;
+      bkmpIdleQueueSync();
+    });
+    await page.evaluate(() => bkmpIdleFlushSyncNow());
+
+    const row = findRow(store, fixtureData);
+    expect(Number(row.skill_points_available)).toBe(300); // voller Reset-Betrag angekommen, NICHT gekappt
+    expect(Number(row.skill_points_spent)).toBe(0);
+    expect(Number(row.dragon_kills)).toBe(Number(before.dragon_kills)); // unangetastet, kein Kampf beteiligt
+    expect((store.tables.idle_anticheat_flags || []).length).toBe(0);
+  });
+
+  test('Skilltree-Zuruecksetzen mit einem Betrag WEIT UEBER dem Budget bleibt trotzdem unangetastet (beweist die Summen-Pruefung, nicht nur Zufall)', async ({ page, qaBaseURL, fixtureData, store }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    await page.evaluate(() => bkmpIdleStopLoop());
+    // Vorbedingung (900 bereits ausgegeben) muss selbst als plausibel gelten,
+    // sonst wuerde schon DIESER Setup-Schritt geflaggt (900 > 512-Budget bei
+    // frisch angelegtem Account) und den eigentlichen Test verfaelschen -
+    // deshalb hier bewusst weit in die Vergangenheit zurueckdatiert, so als
+    // haette der Spieler diese 900 Punkte ganz normal ueber echte Zeit
+    // erspielt.
+    setLastSavedSecondsAgo(store, fixtureData, 999999);
+    await page.evaluate(() => {
+      bkmpIdleState.skill_points_spent = 900; // > Budget (512) - eine naive "available darf nicht schneller wachsen"-Regel wuerde das faelschlich kappen
+      bkmpIdleState.skill_points_available = 0;
+      bkmpIdleQueueSync();
+    });
+    await page.evaluate(() => bkmpIdleFlushSyncNow());
+    setLastSavedSecondsAgo(store, fixtureData, 4); // jetzt das enge Zeitfenster fuer die eigentliche Reset-Aktion
+
+    await page.evaluate(() => {
+      bkmpIdleState.skill_points_available = 900;
+      bkmpIdleState.skill_points_spent = 0;
+      bkmpIdleQueueSync();
+    });
+    await page.evaluate(() => bkmpIdleFlushSyncNow());
+
+    const row = findRow(store, fixtureData);
+    expect(Number(row.skill_points_available)).toBe(900); // voller Betrag, trotz 900 > 512-Budget - Summe (available+spent) blieb ja konstant bei 900
+    expect(Number(row.skill_points_spent)).toBe(0);
+    expect((store.tables.idle_anticheat_flags || []).length).toBe(0);
+  });
+
+  test('grosser, aber plausibler Level-/Skillpunkte-Sprung durch Dungeon-/Turm-Belohnung (innerhalb des Burst-Puffers) bleibt unangetastet', async ({ page, qaBaseURL, fixtureData, store }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    await page.evaluate(() => bkmpIdleStopLoop());
+    await settle(page);
+    setLastSavedSecondsAgo(store, fixtureData, 4); // Budget hier: 4*3+500 = 512
+    const before = snapshot(store, fixtureData);
+
+    await page.evaluate(() => {
+      bkmpIdleState.level += 200; // deutlich unter dem 512er-Budget, aber weit ueber der reinen 12-Kills-Zeitrate - simuliert einen grossen Dungeon-/Turm-XP-Batch
+      bkmpIdleState.skill_points_available += 200;
+      bkmpIdleQueueSync();
+    });
+    await page.evaluate(() => bkmpIdleFlushSyncNow());
+
+    const row = findRow(store, fixtureData);
+    expect(Number(row.level)).toBe(Number(before.level) + 200);
+    expect(Number(row.skill_points_available)).toBe(Number(before.skill_points_available) + 200);
+    expect((store.tables.idle_anticheat_flags || []).length).toBe(0);
+  });
+});

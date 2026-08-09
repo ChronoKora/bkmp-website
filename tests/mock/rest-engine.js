@@ -252,7 +252,12 @@ function handleRestRequest(store, { method, tableName, searchParams, body, heade
             claimed_dragon_kills_delta: guard.claimedKillsDelta,
             allowed_dragon_kills_delta: guard.maxKillsDelta,
             elapsed_seconds: guard.elapsedSeconds,
-            ratio_applied: guard.ratio
+            ratio_applied: guard.ratio,
+            triggered_by: guard.triggeredBy,
+            claimed_level_delta: guard.claimedLevelDelta,
+            allowed_level_delta: guard.maxLevelDelta,
+            claimed_skillpoints_delta: guard.claimedSkillpointsDelta,
+            allowed_skillpoints_delta: guard.maxSkillpointsDelta
           });
         }
       }
