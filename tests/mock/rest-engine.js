@@ -257,7 +257,8 @@ function handleRestRequest(store, { method, tableName, searchParams, body, heade
             claimed_level_delta: guard.claimedLevelDelta,
             allowed_level_delta: guard.maxLevelDelta,
             claimed_skillpoints_delta: guard.claimedSkillpointsDelta,
-            allowed_skillpoints_delta: guard.maxSkillpointsDelta
+            allowed_skillpoints_delta: guard.maxSkillpointsDelta,
+            combat_stat_details: guard.combatStatDetails
           });
         }
       }

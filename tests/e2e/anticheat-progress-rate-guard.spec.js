@@ -292,3 +292,137 @@ test.describe('Anti-Cheat-Tempo-Guard - unabhaengige Level-/Skillpunkte-Signale 
     expect((store.tables.idle_anticheat_flags || []).length).toBe(0);
   });
 });
+
+/* Nachtrag 09.08.2026 (spaeter am selben Tag) - Spieler "OPShadowWolf" schickte
+   3 Videos vom eigenen LIVE-Account (bkinvestment.de), die attack=420.45M
+   (HUD-Anzeige) zeigen, jeder Boss wird instant one-shot besiegt. Bestaetigt:
+   attack/defense/hp/crit_chance/crit_damage/gold_bonus/xp_bonus/loot_bonus
+   sind Teil desselben Upserts wie dragon_kills/level/skill_points, hatten
+   aber KEINE eigene Pruefung - ein gezieltes Update, das NUR diese Felder
+   setzt und kills/level/skillpoints unangetastet laesst, rutschte durch.
+   sql/20260809-anticheat-guard-combat-stats.sql fuegt eine harte, von
+   verstrichener Zeit UNABHAENGIGE Multiplikator-Obergrenze hinzu (50x + fester
+   Sockel pro Feld) - siehe tests/mock/anticheat-guard.js fuer den JS-Nachbau
+   und die volle Begruendung, warum hier bewusst NICHT dieselbe zeitbasierte
+   Budget-Logik wie bei Kills/Level verwendet wird. */
+test.describe('Anti-Cheat-Tempo-Guard - Kampfwerte-Obergrenze (09.08. Nachtrag)', () => {
+  test.use({ teststand: 'A' });
+
+  test('gezielte Angriffswert-Faelschung OHNE Kills-/Level-/Skillpunkte-Aenderung wird erkannt und hart gekappt (der gemeldete Exploit)', async ({ page, qaBaseURL, fixtureData, store }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    await page.evaluate(() => bkmpIdleStopLoop());
+    await settle(page);
+    const before = snapshot(store, fixtureData); // Teststand A: attack=10 -> Obergrenze 10*50+1000 = 1500
+
+    await page.evaluate(() => {
+      bkmpIdleState.attack = 420450000; // exakt das im Video gezeigte Muster
+      bkmpIdleQueueSync();
+    });
+    await page.evaluate(() => bkmpIdleFlushSyncNow());
+
+    const row = findRow(store, fixtureData);
+    expect(Number(row.dragon_kills)).toBe(Number(before.dragon_kills));
+    expect(Number(row.level)).toBe(Number(before.level));
+    expect(Number(row.skill_points_available)).toBe(Number(before.skill_points_available));
+    expect(Number(row.attack)).toBe(Number(before.attack) * 50 + 1000);
+
+    const flags = store.tables.idle_anticheat_flags || [];
+    expect(flags.length).toBe(1);
+    expect(flags[0].triggered_by).toBe('combat_stats');
+    expect(flags[0].combat_stat_details.attack.old).toBe(Number(before.attack));
+    expect(flags[0].combat_stat_details.attack.claimed).toBe(420450000);
+    expect(flags[0].combat_stat_details.attack.capped_to).toBe(Number(before.attack) * 50 + 1000);
+  });
+
+  test('mehrere Kampfwerte gleichzeitig gefaelscht werden alle einzeln erkannt und gekappt', async ({ page, qaBaseURL, fixtureData, store }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    await page.evaluate(() => bkmpIdleStopLoop());
+    await settle(page);
+    const before = snapshot(store, fixtureData);
+
+    await page.evaluate(() => {
+      bkmpIdleState.attack = 9000000;
+      bkmpIdleState.crit_damage = 500000; // Prozentwert, Sockel 100 statt 1000
+      bkmpIdleState.hp = 5000000;
+      bkmpIdleQueueSync();
+    });
+    await page.evaluate(() => bkmpIdleFlushSyncNow());
+
+    const row = findRow(store, fixtureData);
+    expect(Number(row.attack)).toBe(Number(before.attack) * 50 + 1000);
+    expect(Number(row.crit_damage)).toBe(Number(before.crit_damage) * 50 + 100);
+    expect(Number(row.hp)).toBe(Number(before.hp) * 50 + 1000);
+    // Unbeteiligte Kampfwerte bleiben exakt unangetastet.
+    expect(Number(row.defense)).toBe(Number(before.defense));
+    expect(Number(row.crit_chance)).toBe(Number(before.crit_chance));
+
+    const flags = store.tables.idle_anticheat_flags || [];
+    expect(flags.length).toBe(1);
+    expect(Object.keys(flags[0].combat_stat_details).sort()).toEqual(['attack', 'crit_damage', 'hp']);
+  });
+
+  test('ein grosser, aber innerhalb der 50x-Grenze liegender legitimer Sprung (z.B. seltener Runen-Fund) bleibt unangetastet', async ({ page, qaBaseURL, fixtureData, store }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    await page.evaluate(() => bkmpIdleStopLoop());
+    await settle(page);
+    const before = snapshot(store, fixtureData); // attack=10 -> Obergrenze 1500, 20x-Sprung (200) bleibt weit darunter
+
+    await page.evaluate(() => {
+      bkmpIdleState.attack = 200; // 20x der alten 10 - deutlich unter der 50x-Grenze
+      bkmpIdleQueueSync();
+    });
+    await page.evaluate(() => bkmpIdleFlushSyncNow());
+
+    const row = findRow(store, fixtureData);
+    expect(Number(row.attack)).toBe(200);
+    expect((store.tables.idle_anticheat_flags || []).length).toBe(0);
+  });
+
+  test('fallende Kampfwerte (z.B. durch einen schwaecheren Ausruestungswechsel) werden nie angetastet', async ({ page, qaBaseURL, fixtureData, store }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    await page.evaluate(() => bkmpIdleStopLoop());
+    // Setup-Sprung bewusst UNTER der 50x-Grenze (10*50+1000=1500), damit der
+    // Aufbauschritt selbst keinen Alarm ausloest - sonst wuerde die Setup-
+    // Speicherung faelschlich in die zu pruefende Flag-Anzahl mit einfliessen.
+    await page.evaluate(() => { bkmpIdleState.attack = 500; bkmpIdleQueueSync(); });
+    await page.evaluate(() => bkmpIdleFlushSyncNow());
+
+    await page.evaluate(() => {
+      bkmpIdleState.attack = 300; // sinkt - z.B. ein Runen-Wechsel oder Prestige-Reset
+      bkmpIdleQueueSync();
+    });
+    await page.evaluate(() => bkmpIdleFlushSyncNow());
+
+    const row = findRow(store, fixtureData);
+    expect(Number(row.attack)).toBe(300);
+    expect((store.tables.idle_anticheat_flags || []).length).toBe(0);
+  });
+
+  test('Kampfwert-Faelschung UND implausibler Kills-Sprung im selben Speichervorgang - beide Signale werden protokolliert', async ({ page, qaBaseURL, fixtureData, store }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    await page.evaluate(() => bkmpIdleStopLoop());
+    await settle(page);
+    setLastSavedSecondsAgo(store, fixtureData, 4); // Kills-Budget hier: 12
+    const before = snapshot(store, fixtureData);
+
+    await page.evaluate(() => {
+      bkmpIdleState.dragon_kills += 9000; // loest die bestehende Kills-Pruefung aus
+      bkmpIdleState.attack = 9000000; // loest zusaetzlich die neue Kampfwert-Pruefung aus
+      bkmpIdleQueueSync();
+    });
+    await page.evaluate(() => bkmpIdleFlushSyncNow());
+
+    const row = findRow(store, fixtureData);
+    expect(Number(row.dragon_kills)).toBe(Number(before.dragon_kills) + 12); // weiterhin proportional gekuerzt
+    expect(Number(row.attack)).toBe(Number(before.attack) * 50 + 1000); // weiterhin hart gekappt
+
+    const flags = store.tables.idle_anticheat_flags || [];
+    expect(flags.length).toBe(1);
+    expect(flags[0].triggered_by).toBe('dragon_kills,combat_stats');
+  });
+});

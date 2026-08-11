@@ -3805,8 +3805,14 @@ async function bkmpCreateStripeCheckoutSession(nameKey, skinId) {
 async function loadIdleLeaderboardStats() {
   const client = bkmpGetSupabaseClient();
   if (!client) return null;
+  /* 09.08. - laeuft jetzt ueber die gefilterte View statt direkt gegen
+     idle_player_state, damit manuell oder per Anti-Cheat-Alarm versteckte
+     Accounts server-seitig fehlen (siehe sql/20260809-leaderboard-hide-
+     mechanism.sql) - unauffaellig, kein Hinweis "hier fehlt jemand".
+     Identische Spaltenauswahl wie zuvor, kein Verhaltensunterschied fuer
+     einen Account ohne Alarm/Ausblendung. */
   const { data, error } = await client
-    .from('idle_player_state')
+    .from('idle_player_state_leaderboard')
     .select('name_key, display_name, level, total_gold_earned, dragon_kills, playtime_seconds, highest_dragon_index, prestige_stage_offset, turm_highest_wave');
   if (error) throw error;
   const rows = data || [];
@@ -4459,6 +4465,72 @@ async function bkmpAdminDeletePlayerAccount(authUserId) {
   const { data, error } = await client.rpc('admin_delete_player_account', { p_auth_user_id: authUserId });
   if (error) throw error;
   return data || '';
+}
+
+/* ---------------- Bestenlisten-Ausblendung / Anti-Cheat-Alarme (09.08.2026)
+   siehe sql/20260809-leaderboard-hide-mechanism.sql. Reiner Direktzugriff
+   auf die Tabellen (kein RPC noetig) - RLS erlaubt Lesen/Schreiben dort
+   ausschliesslich eingeloggten Admins (is_active_admin()), gleiches Prinzip
+   wie z. B. loadPlushieCodes(). Die oeffentliche Bestenliste selbst laeuft
+   separat ueber die gefilterte idle_player_state_leaderboard-View, siehe
+   loadIdleLeaderboardStats() oben. */
+
+async function bkmpAdminCurrentEmail() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data } = await client.auth.getSession();
+  return data && data.session && data.session.user ? data.session.user.email : null;
+}
+
+async function loadAnticheatFlags(limit) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from('idle_anticheat_flags')
+    .select('*')
+    .order('flagged_at', { ascending: false })
+    .limit(limit || 100);
+  if (error) throw error;
+  return data || [];
+}
+
+async function dismissAnticheatFlag(id) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const email = await bkmpAdminCurrentEmail();
+  const { error } = await client
+    .from('idle_anticheat_flags')
+    .update({ dismissed: true, dismissed_by: email, dismissed_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+async function loadHiddenLeaderboardAccounts() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from('idle_leaderboard_hidden_accounts')
+    .select('*')
+    .order('hidden_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+async function hideFromLeaderboard(nameKey, reason) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const email = await bkmpAdminCurrentEmail();
+  const { error } = await client
+    .from('idle_leaderboard_hidden_accounts')
+    .upsert({ name_key: String(nameKey || '').trim().toLowerCase(), reason: reason || '', hidden_by: email, hidden_at: new Date().toISOString() }, { onConflict: 'name_key' });
+  if (error) throw error;
+}
+
+async function unhideFromLeaderboard(nameKey) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { error } = await client.from('idle_leaderboard_hidden_accounts').delete().eq('name_key', nameKey);
+  if (error) throw error;
 }
 
 /* ---------------- Gilden (siehe supabase-idle-guilds.sql) ----------------

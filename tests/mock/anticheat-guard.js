@@ -63,6 +63,28 @@ const MAX_KILLS_PER_SECOND = 3;
 const MIN_ELAPSED_SECONDS = 4;
 const BURST_BUFFER = 500;
 
+/* Kampfwerte (09.08. Nachtrag, sql/20260809-anticheat-guard-combat-stats.sql)
+   - Spieler "OPShadowWolf" schickte 3 Videos, die einen LIVE-Account mit
+   attack=420.45M (HUD) zeigen, der jeden Boss instant one-shottet.
+   attack/defense/hp/crit_chance/crit_damage/gold_bonus/xp_bonus/loot_bonus
+   sind Teil desselben BKMP_IDLE_PLAYER_STATE_COLUMNS-Upserts wie
+   dragon_kills/level/skill_points, hatten aber KEINE eigene Pruefung -
+   anders als Kills/Level (die ueber echte Zeit akkumulieren) sind
+   Kampfwerte eine bei jeder Aenderung neu berechnete Momentaufnahme, ein
+   legitimer Sprung darf also instant passieren - deshalb hier bewusst KEIN
+   zeitbasiertes Budget, sondern ein harter, sehr grosszuegiger Multiplikator
+   (50x + Sockel) pro einzelner Speicherung, unabhaengig von verstrichener
+   Zeit. Wird NICHT proportional wie die anderen Felder skaliert (kein
+   v_ratio), sondern direkt hart gekappt - siehe SQL-Datei-Kopf-Kommentar. */
+const MAX_STAT_GROWTH_FACTOR = 50;
+const STAT_GROWTH_FLOOR = 1000;
+const PERCENT_STAT_GROWTH_FLOOR = 100;
+const COMBAT_STAT_FIELDS = {
+  attack: STAT_GROWTH_FLOOR, defense: STAT_GROWTH_FLOOR, hp: STAT_GROWTH_FLOOR,
+  crit_chance: PERCENT_STAT_GROWTH_FLOOR, crit_damage: PERCENT_STAT_GROWTH_FLOOR,
+  gold_bonus: PERCENT_STAT_GROWTH_FLOOR, xp_bonus: PERCENT_STAT_GROWTH_FLOOR, loot_bonus: PERCENT_STAT_GROWTH_FLOOR
+};
+
 const PROPORTIONAL_GUARDED_FIELDS = [
   'dragon_kills', 'boss_kills', 'gold', 'total_gold_earned',
   'wood', 'stone', 'crystals', 'essence', 'xp', 'level'
@@ -100,7 +122,28 @@ function applyIdlePlayerStateAntiCheatGuard(oldRow, incomingBody, nowMs) {
   if (claimedSkillpointsDelta > maxSkillpointsDelta) ratioSkillpoints = maxSkillpointsDelta / claimedSkillpointsDelta;
 
   const ratio = Math.min(ratioKills, ratioLevel, ratioSkillpoints);
-  if (ratio >= 1) {
+
+  /* Kampfwerte (09.08.): harte Multiplikator-Obergrenze, UNABHAENGIG von
+     ratio oben - laeuft auch, wenn kills/level/skillpoints komplett
+     unveraendert sind (genau der gemeldete Fall: nur attack/etc. gefaelscht).
+     Direkt hart gekappt, nicht proportional wie die anderen Felder. */
+  const patched = { ...incomingBody };
+  const combatStatDetails = {};
+  let combatStatTriggered = false;
+  Object.keys(COMBAT_STAT_FIELDS).forEach(field => {
+    if (incomingBody[field] == null) return;
+    const oldVal = Number(oldRow[field] || 0);
+    const claimedVal = Number(incomingBody[field]);
+    const floor = COMBAT_STAT_FIELDS[field];
+    const cap = oldVal * MAX_STAT_GROWTH_FACTOR + floor;
+    if (claimedVal > cap) {
+      combatStatDetails[field] = { old: oldVal, claimed: claimedVal, capped_to: cap };
+      patched[field] = cap;
+      combatStatTriggered = true;
+    }
+  });
+
+  if (ratio >= 1 && !combatStatTriggered) {
     return { body: incomingBody, flagged: false };
   }
 
@@ -108,35 +151,38 @@ function applyIdlePlayerStateAntiCheatGuard(oldRow, incomingBody, nowMs) {
   if (ratioKills < 1) triggeredBy.push('dragon_kills');
   if (ratioLevel < 1) triggeredBy.push('level');
   if (ratioSkillpoints < 1) triggeredBy.push('skill_points');
+  if (combatStatTriggered) triggeredBy.push('combat_stats');
 
-  const patched = { ...incomingBody };
-  PROPORTIONAL_GUARDED_FIELDS.forEach(field => {
-    if (incomingBody[field] == null) return;
-    const oldVal = Number(oldRow[field] || 0);
-    const newVal = Number(incomingBody[field]);
-    const delta = newVal - oldVal;
-    if (delta <= 0) return; // Verringerungen (Ausgeben, Prestige-Reset) bleiben unangetastet
-    patched[field] = oldVal + Math.floor(delta * ratio);
-  });
-  // Skillpunkte: die GESAMTE Ratio gilt auch hier (nicht nur, wenn
-  // ausgerechnet das Skillpunkte-Signal selbst der Ausloeser war - sonst
-  // wuerde z.B. ein durch dragon_kills ausgeloester Kuerzungsfaktor
-  // faelschlich NICHT auf mitgemeldete Skillpunkte angewendet). Skaliert
-  // wird aber NUR der NETTO-NEUE Anteil (claimedSkillpointsDelta, > 0 heisst
-  // "es wurden per Saldo neue Punkte behauptet") - eine reine Umbuchung
-  // zwischen available/spent (Delta <= 0 oder = 0) bleibt immer unangetastet,
-  // unabhaengig davon, wie gross der Betrag ist (siehe Datei-Kopf-Kommentar,
-  // Skilltree-Zuruecksetzen-Fall).
-  const netNewSkillpoints = Math.max(0, claimedSkillpointsDelta);
-  if (netNewSkillpoints > 0 && incomingBody.skill_points_available != null) {
-    const allowedNewSkillpoints = Math.floor(netNewSkillpoints * ratio);
-    patched.skill_points_available = Math.max(0, claimedAvailable - Math.ceil(netNewSkillpoints - allowedNewSkillpoints));
+  if (ratio < 1) {
+    PROPORTIONAL_GUARDED_FIELDS.forEach(field => {
+      if (incomingBody[field] == null) return;
+      const oldVal = Number(oldRow[field] || 0);
+      const newVal = Number(incomingBody[field]);
+      const delta = newVal - oldVal;
+      if (delta <= 0) return; // Verringerungen (Ausgeben, Prestige-Reset) bleiben unangetastet
+      patched[field] = oldVal + Math.floor(delta * ratio);
+    });
+    // Skillpunkte: die GESAMTE Ratio gilt auch hier (nicht nur, wenn
+    // ausgerechnet das Skillpunkte-Signal selbst der Ausloeser war - sonst
+    // wuerde z.B. ein durch dragon_kills ausgeloester Kuerzungsfaktor
+    // faelschlich NICHT auf mitgemeldete Skillpunkte angewendet). Skaliert
+    // wird aber NUR der NETTO-NEUE Anteil (claimedSkillpointsDelta, > 0 heisst
+    // "es wurden per Saldo neue Punkte behauptet") - eine reine Umbuchung
+    // zwischen available/spent (Delta <= 0 oder = 0) bleibt immer unangetastet,
+    // unabhaengig davon, wie gross der Betrag ist (siehe Datei-Kopf-Kommentar,
+    // Skilltree-Zuruecksetzen-Fall).
+    const netNewSkillpoints = Math.max(0, claimedSkillpointsDelta);
+    if (netNewSkillpoints > 0 && incomingBody.skill_points_available != null) {
+      const allowedNewSkillpoints = Math.floor(netNewSkillpoints * ratio);
+      patched.skill_points_available = Math.max(0, claimedAvailable - Math.ceil(netNewSkillpoints - allowedNewSkillpoints));
+    }
   }
 
   return {
     body: patched, flagged: true, ratio, elapsedSeconds,
     claimedKillsDelta, maxKillsDelta, claimedLevelDelta, maxLevelDelta, claimedSkillpointsDelta, maxSkillpointsDelta,
-    ratioKills, ratioLevel, ratioSkillpoints, triggeredBy: triggeredBy.join(',')
+    ratioKills, ratioLevel, ratioSkillpoints, triggeredBy: triggeredBy.join(','),
+    combatStatTriggered, combatStatDetails: combatStatTriggered ? combatStatDetails : null
   };
 }
 

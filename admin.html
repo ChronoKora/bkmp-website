@@ -970,6 +970,28 @@
             <button class="edit-btn" type="button" id="playerMgmtRefreshBtn" style="margin-bottom:1rem;">Aktualisieren</button>
             <div class="feedback-list" id="playerMgmtList"></div>
           </div>
+
+          <!-- Anti-Cheat-Alarme + Bestenlisten-Ausblendung (09.08.2026) - siehe
+               sql/20260809-leaderboard-hide-mechanism.sql. Betroffene Accounts
+               verschwinden serverseitig aus der öffentlichen Bestenliste, bleiben
+               hier aber mit den echten Werten sichtbar. -->
+          <div class="admin-section">
+            <h2>🚨 Anti-Cheat-Alarme</h2>
+            <p class="admin-help-text">Automatisch protokollierte Verstöße gegen die Server-Tempo-Grenze (idle_player_state). Ein Alarm blendet den Account sofort aus der öffentlichen Bestenliste aus - "Als geprüft markieren" hebt das wieder auf, ohne den Eintrag zu löschen. Voraussetzung: sql/20260730-idle-player-state-anticheat-guard.sql + sql/20260809-anticheat-guard-independent-fields.sql + sql/20260809-leaderboard-hide-mechanism.sql müssen ausgeführt sein.</p>
+            <button class="edit-btn" type="button" id="anticheatFlagsRefreshBtn" style="margin-bottom:1rem;">Aktualisieren</button>
+            <div class="feedback-list" id="anticheatFlagsList"></div>
+          </div>
+
+          <div class="admin-section">
+            <h2>🙈 Manuell von der Bestenliste ausgeblendet</h2>
+            <p class="admin-help-text">Für bereits bekannte Fälle, die älter als der Anti-Cheat-Trigger sind und deshalb noch keinen automatischen Alarm haben. Der Account funktioniert normal weiter, taucht nur nicht mehr in der öffentlichen Bestenliste auf.</p>
+            <div class="form-grid form-grid-3">
+              <div><label for="leaderboardHideName">Minecraft-Name</label><input type="text" id="leaderboardHideName" placeholder="z. B. SkyTiger"></div>
+              <div style="grid-column:span 2;"><label for="leaderboardHideReason">Grund (nur intern sichtbar)</label><input type="text" id="leaderboardHideReason" placeholder="z. B. Level 846473, gemeldet 09.08."></div>
+            </div>
+            <button class="btn btn-primary" type="button" id="leaderboardHideAddBtn" style="margin-bottom:1rem;">Ausblenden</button>
+            <div class="feedback-list" id="leaderboardHiddenList"></div>
+          </div>
         </section>
 
         <!-- Zugaenge -->
@@ -1030,7 +1052,7 @@
        da admin.html kein window.BKMP_QA_MODE-Gate setzt; macht nur
        bkmpGetGameNow() fuer bkmp-events.js verfuegbar (identisch Date.now()). -->
   <script src="js/core/bkmp-game-clock.js?v=20260724-qafoundation1"></script>
-  <script src="supabase.js?v=20260806-dragonstoragesync1"></script>
+  <script src="supabase.js?v=20260809-leaderboardhide1"></script>
   <script src="app.js?v=20260718-selbstverdient1"></script>
   <!-- Redesign Phase 2a (17.07.): siehe index.html fuer die Begruendung der
        festen Ladereihenfolge (bkmp-idle-state.js zuerst, bkmp-idle-
@@ -1303,7 +1325,7 @@
         if (page === 'investorRequests') refreshInvestorRequestsFromSupabase();
         if (page === 'cardcatalog') refreshCardCatalogFromSupabase();
         if (page === 'feedback') refreshFeedbackList();
-        if (page === 'playermgmt') refreshPlayerMgmtList();
+        if (page === 'playermgmt') { refreshPlayerMgmtList(); refreshAnticheatFlagsList(); refreshLeaderboardHiddenList(); }
         if (page === 'plushies') { bkmpRefreshPlushieDefinitionsAdmin(); refreshPlushieCodesList(); }
         if (page === 'dailyevents') { bkmpRefreshPlushieDefinitionsAdmin(); refreshDailyEventsPage(); }
         if (page === 'polls') refreshPollsAdmin();
@@ -2285,6 +2307,128 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
 
     const playerMgmtRefreshBtn = document.getElementById('playerMgmtRefreshBtn');
     if (playerMgmtRefreshBtn) playerMgmtRefreshBtn.addEventListener('click', refreshPlayerMgmtList);
+
+    /* ---------------- Anti-Cheat-Alarme (09.08.2026) ---------------- */
+    let bkmpAnticheatFlagsCache = [];
+
+    async function refreshAnticheatFlagsList() {
+      if (typeof loadAnticheatFlags !== 'function' || !bkmpGetSupabaseClient()) return;
+      try {
+        bkmpAnticheatFlagsCache = await loadAnticheatFlags(100);
+      } catch (e) {
+        console.warn('Anti-Cheat-Alarme konnten nicht geladen werden.', e);
+        /* Kein Toast bei "Tabelle existiert nicht" - die zugehoerige SQL-
+           Datei wurde evtl. noch nicht ausgefuehrt, das ist kein echter
+           Fehler, sondern der erwartete Zustand vor dem ersten Deploy. */
+        bkmpAnticheatFlagsCache = [];
+      }
+      renderAnticheatFlagsList();
+    }
+
+    function renderAnticheatFlagsList() {
+      const el = document.getElementById('anticheatFlagsList');
+      if (!el) return;
+      const openFlags = bkmpAnticheatFlagsCache.filter(f => !f.dismissed);
+      const dismissedFlags = bkmpAnticheatFlagsCache.filter(f => f.dismissed);
+      if (bkmpAnticheatFlagsCache.length === 0) {
+        el.innerHTML = '<p class="empty-hint">Keine Alarme (oder die SQL-Datei wurde noch nicht ausgeführt).</p>';
+        return;
+      }
+      const rowHtml = f => `
+        <div class="feedback-card ${f.dismissed ? '' : 'is-unread'}" data-flag-id="${escapeHtml(f.id)}">
+          <div class="feedback-card-head">
+            ${f.dismissed ? '' : '<span class="feedback-card-unread-dot" aria-hidden="true" title="Ungeprüfter Alarm - Account ist aktuell aus der Bestenliste ausgeblendet"></span>'}
+            <span class="feedback-card-name">${escapeHtml(f.name_key || '')}</span>
+            <span class="feedback-card-date">${escapeHtml(f.flagged_at ? new Date(f.flagged_at).toLocaleString('de-DE') : '')}</span>
+          </div>
+          <p class="feedback-card-message">Ausgelöst durch: <strong>${escapeHtml(f.triggered_by || 'dragon_kills')}</strong> · Kills ${escapeHtml(String(f.claimed_dragon_kills_delta ?? '?'))} von erlaubt ${escapeHtml(String(f.allowed_dragon_kills_delta ?? '?'))}${f.claimed_level_delta != null ? ` · Level ${escapeHtml(String(f.claimed_level_delta))} von erlaubt ${escapeHtml(String(f.allowed_level_delta))}` : ''}${f.claimed_skillpoints_delta != null ? ` · Skillpunkte ${escapeHtml(String(f.claimed_skillpoints_delta))} von erlaubt ${escapeHtml(String(f.allowed_skillpoints_delta))}` : ''} · Faktor ${escapeHtml(Number(f.ratio_applied || 0).toFixed(4))}${f.dismissed ? ` · <strong>Geprüft (falscher Alarm) von ${escapeHtml(f.dismissed_by || '?')}</strong>` : ''}</p>
+          ${f.dismissed ? '' : '<div class="feedback-card-actions"><button class="edit-btn dismiss-btn" type="button">✅ Als geprüft markieren (falscher Alarm)</button><button class="edit-btn hide-btn" type="button">🙈 Account dauerhaft ausblenden</button></div>'}
+        </div>`;
+      el.innerHTML = openFlags.map(rowHtml).join('') + dismissedFlags.map(rowHtml).join('');
+      el.querySelectorAll('.feedback-card').forEach(card => {
+        const id = card.dataset.flagId;
+        const flag = bkmpAnticheatFlagsCache.find(f => String(f.id) === id);
+        if (!flag) return;
+        const dismissBtn = card.querySelector('.dismiss-btn');
+        if (dismissBtn) dismissBtn.addEventListener('click', async () => {
+          try {
+            await dismissAnticheatFlag(flag.id);
+            showAdminToast('Alarm als geprüft markiert - Account ist wieder in der Bestenliste sichtbar (falls kein weiterer offener Alarm besteht).', 'success');
+            refreshAnticheatFlagsList();
+          } catch (e) { showAdminToast('Konnte nicht gespeichert werden: ' + supabaseErrorText(e), 'error'); }
+        });
+        const hideBtn = card.querySelector('.hide-btn');
+        if (hideBtn) hideBtn.addEventListener('click', async () => {
+          try {
+            await hideFromLeaderboard(flag.name_key, `Anti-Cheat-Alarm vom ${flag.flagged_at ? new Date(flag.flagged_at).toLocaleDateString('de-DE') : '?'}`);
+            showAdminToast(`"${flag.name_key}" wurde dauerhaft von der Bestenliste ausgeblendet.`, 'success');
+            refreshLeaderboardHiddenList();
+          } catch (e) { showAdminToast('Konnte nicht gespeichert werden: ' + supabaseErrorText(e), 'error'); }
+        });
+      });
+    }
+
+    const anticheatFlagsRefreshBtn = document.getElementById('anticheatFlagsRefreshBtn');
+    if (anticheatFlagsRefreshBtn) anticheatFlagsRefreshBtn.addEventListener('click', refreshAnticheatFlagsList);
+
+    /* ---------------- Manuelle Bestenlisten-Ausblendung (09.08.2026) ---------------- */
+    let bkmpLeaderboardHiddenCache = [];
+
+    async function refreshLeaderboardHiddenList() {
+      if (typeof loadHiddenLeaderboardAccounts !== 'function' || !bkmpGetSupabaseClient()) return;
+      try {
+        bkmpLeaderboardHiddenCache = await loadHiddenLeaderboardAccounts();
+      } catch (e) {
+        console.warn('Ausgeblendete Accounts konnten nicht geladen werden.', e);
+        bkmpLeaderboardHiddenCache = [];
+      }
+      renderLeaderboardHiddenList();
+    }
+
+    function renderLeaderboardHiddenList() {
+      const el = document.getElementById('leaderboardHiddenList');
+      if (!el) return;
+      if (bkmpLeaderboardHiddenCache.length === 0) {
+        el.innerHTML = '<p class="empty-hint">Aktuell niemand manuell ausgeblendet.</p>';
+        return;
+      }
+      el.innerHTML = bkmpLeaderboardHiddenCache.map(h => `
+        <div class="feedback-card" data-hidden-name="${escapeHtml(h.name_key)}">
+          <div class="feedback-card-head">
+            <span class="feedback-card-name">${escapeHtml(h.name_key)}</span>
+            <span class="feedback-card-date">${escapeHtml(h.hidden_at ? new Date(h.hidden_at).toLocaleString('de-DE') : '')}</span>
+          </div>
+          <p class="feedback-card-message">${escapeHtml(h.reason || '(kein Grund angegeben)')}${h.hidden_by ? ` · von ${escapeHtml(h.hidden_by)}` : ''}</p>
+          <div class="feedback-card-actions"><button class="edit-btn unhide-btn" type="button">👁️ Wieder anzeigen</button></div>
+        </div>`).join('');
+      el.querySelectorAll('.unhide-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const card = btn.closest('[data-hidden-name]');
+          const nameKey = card ? card.dataset.hiddenName : null;
+          if (!nameKey) return;
+          try {
+            await unhideFromLeaderboard(nameKey);
+            showAdminToast(`"${nameKey}" ist wieder in der Bestenliste sichtbar.`, 'success');
+            refreshLeaderboardHiddenList();
+          } catch (e) { showAdminToast('Konnte nicht gespeichert werden: ' + supabaseErrorText(e), 'error'); }
+        });
+      });
+    }
+
+    const leaderboardHideAddBtn = document.getElementById('leaderboardHideAddBtn');
+    if (leaderboardHideAddBtn) leaderboardHideAddBtn.addEventListener('click', async () => {
+      const nameInput = document.getElementById('leaderboardHideName');
+      const reasonInput = document.getElementById('leaderboardHideReason');
+      const name = (nameInput.value || '').trim();
+      if (!name) { showAdminToast('Bitte einen Namen eingeben.', 'error'); return; }
+      try {
+        await hideFromLeaderboard(name, (reasonInput.value || '').trim());
+        nameInput.value = '';
+        reasonInput.value = '';
+        showAdminToast(`"${name}" wurde von der Bestenliste ausgeblendet.`, 'success');
+        refreshLeaderboardHiddenList();
+      } catch (e) { showAdminToast('Konnte nicht gespeichert werden: ' + supabaseErrorText(e), 'error'); }
+    });
 
     async function removeCardCatalogEntry(id) {
       if (!window.confirm('Diese Karte wirklich endgültig löschen?')) return;
