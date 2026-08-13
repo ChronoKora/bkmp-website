@@ -3806,11 +3806,17 @@ async function loadIdleLeaderboardStats() {
   const client = bkmpGetSupabaseClient();
   if (!client) return null;
   /* 09.08. - laeuft jetzt ueber die gefilterte View statt direkt gegen
-     idle_player_state, damit manuell oder per Anti-Cheat-Alarm versteckte
-     Accounts server-seitig fehlen (siehe sql/20260809-leaderboard-hide-
-     mechanism.sql) - unauffaellig, kein Hinweis "hier fehlt jemand".
-     Identische Spaltenauswahl wie zuvor, kein Verhaltensunterschied fuer
-     einen Account ohne Alarm/Ausblendung. */
+     idle_player_state, damit manuell ausgeblendete Accounts server-seitig
+     fehlen (siehe sql/20260809-leaderboard-hide-mechanism.sql) - unauffaellig,
+     kein Hinweis "hier fehlt jemand". Identische Spaltenauswahl wie zuvor,
+     kein Verhaltensunterschied fuer einen Account ohne Ausblendung.
+     NACHTRAG 11.08.2026: die View blendete zwischenzeitlich zusaetzlich JEDEN
+     Account mit einem undismissed Anti-Cheat-Alarm automatisch aus - fuehrte
+     zu einem Falsch-Alarm-Sturm (33 von 217 echten Accounts unsichtbar,
+     siehe sql/20260811-leaderboard-hide-decouple-from-flags.sql fuer die
+     volle Diagnose). Seitdem entscheidet ausschliesslich die manuelle
+     Ausblend-Liste - ein Anti-Cheat-Alarm ist reine Admin-Panel-Telemetrie,
+     bis ein Mensch ihn bewusst per "Ausblenden"-Knopf umsetzt. */
   const { data, error } = await client
     .from('idle_player_state_leaderboard')
     .select('name_key, display_name, level, total_gold_earned, dragon_kills, playtime_seconds, highest_dragon_index, prestige_stage_offset, turm_highest_wave');

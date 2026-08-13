@@ -971,20 +971,24 @@
             <div class="feedback-list" id="playerMgmtList"></div>
           </div>
 
-          <!-- Anti-Cheat-Alarme + Bestenlisten-Ausblendung (09.08.2026) - siehe
-               sql/20260809-leaderboard-hide-mechanism.sql. Betroffene Accounts
-               verschwinden serverseitig aus der öffentlichen Bestenliste, bleiben
-               hier aber mit den echten Werten sichtbar. -->
+          <!-- Anti-Cheat-Alarme + Bestenlisten-Ausblendung (09.08.2026, seit
+               11.08.2026 ENTKOPPELT - siehe sql/20260811-leaderboard-hide-
+               decouple-from-flags.sql: ein Alarm allein blendet NICHT mehr
+               automatisch aus, das fuehrte am 11.08. zu 33 faelschlich
+               unsichtbaren echten Accounts, siehe dortige Diagnose). Ein
+               Alarm ist jetzt reine Telemetrie hier - erst ein bewusster
+               Klick auf "Account dauerhaft ausblenden" traegt jemanden in
+               die manuelle Ausblend-Liste unten ein. -->
           <div class="admin-section">
             <h2>🚨 Anti-Cheat-Alarme</h2>
-            <p class="admin-help-text">Automatisch protokollierte Verstöße gegen die Server-Tempo-Grenze (idle_player_state). Ein Alarm blendet den Account sofort aus der öffentlichen Bestenliste aus - "Als geprüft markieren" hebt das wieder auf, ohne den Eintrag zu löschen. Voraussetzung: sql/20260730-idle-player-state-anticheat-guard.sql + sql/20260809-anticheat-guard-independent-fields.sql + sql/20260809-leaderboard-hide-mechanism.sql müssen ausgeführt sein.</p>
+            <p class="admin-help-text">Automatisch protokollierte Verstöße gegen die Server-Tempo-/Kampfwerte-Grenze (idle_player_state) - reine Beobachtung, blendet NIEMANDEN automatisch aus der öffentlichen Bestenliste aus. Erst ein Klick auf "Account dauerhaft ausblenden" trägt den Namen in die manuelle Liste unten ein. "Als geprüft markieren" räumt nur diese Liste hier auf (falscher Alarm), ohne den Eintrag zu löschen. Voraussetzung: sql/20260730-idle-player-state-anticheat-guard.sql + sql/20260809-anticheat-guard-independent-fields.sql + sql/20260811-anticheat-guard-absolute-ceiling.sql + sql/20260811-leaderboard-hide-decouple-from-flags.sql müssen ausgeführt sein.</p>
             <button class="edit-btn" type="button" id="anticheatFlagsRefreshBtn" style="margin-bottom:1rem;">Aktualisieren</button>
             <div class="feedback-list" id="anticheatFlagsList"></div>
           </div>
 
           <div class="admin-section">
             <h2>🙈 Manuell von der Bestenliste ausgeblendet</h2>
-            <p class="admin-help-text">Für bereits bekannte Fälle, die älter als der Anti-Cheat-Trigger sind und deshalb noch keinen automatischen Alarm haben. Der Account funktioniert normal weiter, taucht nur nicht mehr in der öffentlichen Bestenliste auf.</p>
+            <p class="admin-help-text">Die EINZIGE Stelle, die tatsächlich entscheidet, wer auf der öffentlichen Bestenliste fehlt (seit 11.08.2026, siehe oben) - egal ob für einen bereits bekannten Altfall von Hand eingetragen oder per "Account dauerhaft ausblenden"-Knopf bei einem geprüften Alarm. Der Account funktioniert normal weiter, taucht nur nicht mehr in der öffentlichen Bestenliste auf.</p>
             <div class="form-grid form-grid-3">
               <div><label for="leaderboardHideName">Minecraft-Name</label><input type="text" id="leaderboardHideName" placeholder="z. B. SkyTiger"></div>
               <div style="grid-column:span 2;"><label for="leaderboardHideReason">Grund (nur intern sichtbar)</label><input type="text" id="leaderboardHideReason" placeholder="z. B. Level 846473, gemeldet 09.08."></div>
@@ -2337,7 +2341,7 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       const rowHtml = f => `
         <div class="feedback-card ${f.dismissed ? '' : 'is-unread'}" data-flag-id="${escapeHtml(f.id)}">
           <div class="feedback-card-head">
-            ${f.dismissed ? '' : '<span class="feedback-card-unread-dot" aria-hidden="true" title="Ungeprüfter Alarm - Account ist aktuell aus der Bestenliste ausgeblendet"></span>'}
+            ${f.dismissed ? '' : '<span class="feedback-card-unread-dot" aria-hidden="true" title="Ungeprüfter Alarm - Account ist WEITERHIN normal auf der Bestenliste sichtbar, bis du ihn bewusst ausblendest"></span>'}
             <span class="feedback-card-name">${escapeHtml(f.name_key || '')}</span>
             <span class="feedback-card-date">${escapeHtml(f.flagged_at ? new Date(f.flagged_at).toLocaleString('de-DE') : '')}</span>
           </div>
@@ -2353,7 +2357,7 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
         if (dismissBtn) dismissBtn.addEventListener('click', async () => {
           try {
             await dismissAnticheatFlag(flag.id);
-            showAdminToast('Alarm als geprüft markiert - Account ist wieder in der Bestenliste sichtbar (falls kein weiterer offener Alarm besteht).', 'success');
+            showAdminToast('Alarm als geprüft markiert (falscher Alarm) - hat keine Auswirkung auf die Bestenliste, der Account war die ganze Zeit über normal sichtbar.', 'success');
             refreshAnticheatFlagsList();
           } catch (e) { showAdminToast('Konnte nicht gespeichert werden: ' + supabaseErrorText(e), 'error'); }
         });

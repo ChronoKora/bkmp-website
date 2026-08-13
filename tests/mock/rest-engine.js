@@ -202,7 +202,34 @@ function findConflictMatch(rows, incoming, conflictCols) {
   return rows.find(row => conflictCols.every(col => valuesEqual(row[col], incoming[col])));
 }
 
+/* Nachbau der Postgres-VIEW public.idle_player_state_leaderboard (siehe
+   sql/20260811-leaderboard-hide-decouple-from-flags.sql) - blendet NUR noch
+   manuell ausgeblendete Accounts (idle_leaderboard_hidden_accounts) aus,
+   NICHT mehr automatisch jeden Account mit einem undismissed Anti-Cheat-
+   Alarm (das war der am 11.08.2026 gemeldete Falsch-Alarm-Bug: 33 von 217
+   echten Accounts wurden dadurch faelschlich unsichtbar). Nur GET wird
+   nachgebaut (die echte View ist read-only) - reine Read-Time-Filterung
+   ueber idle_player_state, keine eigene Zeilen-Tabelle im Store. */
+function computeLeaderboardViewRows(store) {
+  const playerRows = getTable(store, 'idle_player_state');
+  const hiddenNames = new Set(getTable(store, 'idle_leaderboard_hidden_accounts').map(r => r.name_key));
+  return playerRows
+    .filter(r => !hiddenNames.has(r.name_key))
+    .map(r => ({
+      name_key: r.name_key, display_name: r.display_name, level: r.level,
+      total_gold_earned: r.total_gold_earned, dragon_kills: r.dragon_kills,
+      playtime_seconds: r.playtime_seconds, highest_dragon_index: r.highest_dragon_index,
+      prestige_stage_offset: r.prestige_stage_offset, turm_highest_wave: r.turm_highest_wave
+    }));
+}
+
 function handleRestRequest(store, { method, tableName, searchParams, body, headers }) {
+  if (tableName === 'idle_player_state_leaderboard' && method === 'GET') {
+    let result = applyFilters(computeLeaderboardViewRows(store), searchParams);
+    result = applyOrder(result, searchParams);
+    result = applyLimitOffset(result, searchParams);
+    return { status: 200, json: result };
+  }
   const rows = getTable(store, tableName);
   const prefer = String(headers && headers['prefer'] || headers && headers['Prefer'] || '');
 
@@ -245,21 +272,32 @@ function handleRestRequest(store, { method, tableName, searchParams, body, heade
         const guard = applyIdlePlayerStateAntiCheatGuard(row, body, store.clock.nowMs());
         patchBody = guard.body;
         if (guard.flagged) {
-          getTable(store, 'idle_anticheat_flags').push({
-            id: store.nextId(),
-            name_key: row.name_key,
-            flagged_at: store.clock.nowIso(),
-            claimed_dragon_kills_delta: guard.claimedKillsDelta,
-            allowed_dragon_kills_delta: guard.maxKillsDelta,
-            elapsed_seconds: guard.elapsedSeconds,
-            ratio_applied: guard.ratio,
-            triggered_by: guard.triggeredBy,
-            claimed_level_delta: guard.claimedLevelDelta,
-            allowed_level_delta: guard.maxLevelDelta,
-            claimed_skillpoints_delta: guard.claimedSkillpointsDelta,
-            allowed_skillpoints_delta: guard.maxSkillpointsDelta,
-            combat_stat_details: guard.combatStatDetails
-          });
+          /* Sicherheitsnetz (11.08.2026, siehe sql/20260811-anticheat-guard-
+             flag-insert-safety-net.sql fuer die volle Begruendung - Spieler
+             "OPShadowWolf" konnte nach dem Deploy der Absolute-Ceiling-
+             Aenderung gar nicht mehr speichern, weil ein Fehler beim
+             Protokollieren des Alarms die GESAMTE Speicherung mitgerissen
+             hat): ein Fehler beim reinen Protokollieren darf NIE die
+             eigentliche, bereits gekappte Speicherung blockieren - gleiches
+             Prinzip wie im echten SQL-Trigger, hier per try/catch statt
+             BEGIN/EXCEPTION nachgebaut. */
+          try {
+            getTable(store, 'idle_anticheat_flags').push({
+              id: store.nextId(),
+              name_key: row.name_key,
+              flagged_at: store.clock.nowIso(),
+              claimed_dragon_kills_delta: guard.claimedKillsDelta,
+              allowed_dragon_kills_delta: guard.maxKillsDelta,
+              elapsed_seconds: guard.elapsedSeconds,
+              ratio_applied: guard.ratio,
+              triggered_by: guard.triggeredBy,
+              claimed_level_delta: guard.claimedLevelDelta,
+              allowed_level_delta: guard.maxLevelDelta,
+              claimed_skillpoints_delta: guard.claimedSkillpointsDelta,
+              allowed_skillpoints_delta: guard.maxSkillpointsDelta,
+              combat_stat_details: guard.combatStatDetails
+            });
+          } catch (e) { /* siehe Kommentar oben - Protokollierungsfehler duerfen die Speicherung nie blockieren */ }
         }
       }
       Object.assign(row, patchBody);

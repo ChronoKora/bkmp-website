@@ -63,26 +63,38 @@ const MAX_KILLS_PER_SECOND = 3;
 const MIN_ELAPSED_SECONDS = 4;
 const BURST_BUFFER = 500;
 
-/* Kampfwerte (09.08. Nachtrag, sql/20260809-anticheat-guard-combat-stats.sql)
-   - Spieler "OPShadowWolf" schickte 3 Videos, die einen LIVE-Account mit
-   attack=420.45M (HUD) zeigen, der jeden Boss instant one-shottet.
-   attack/defense/hp/crit_chance/crit_damage/gold_bonus/xp_bonus/loot_bonus
-   sind Teil desselben BKMP_IDLE_PLAYER_STATE_COLUMNS-Upserts wie
-   dragon_kills/level/skill_points, hatten aber KEINE eigene Pruefung -
-   anders als Kills/Level (die ueber echte Zeit akkumulieren) sind
-   Kampfwerte eine bei jeder Aenderung neu berechnete Momentaufnahme, ein
-   legitimer Sprung darf also instant passieren - deshalb hier bewusst KEIN
-   zeitbasiertes Budget, sondern ein harter, sehr grosszuegiger Multiplikator
-   (50x + Sockel) pro einzelner Speicherung, unabhaengig von verstrichener
-   Zeit. Wird NICHT proportional wie die anderen Felder skaliert (kein
-   v_ratio), sondern direkt hart gekappt - siehe SQL-Datei-Kopf-Kommentar. */
-const MAX_STAT_GROWTH_FACTOR = 50;
-const STAT_GROWTH_FLOOR = 1000;
-const PERCENT_STAT_GROWTH_FLOOR = 100;
-const COMBAT_STAT_FIELDS = {
-  attack: STAT_GROWTH_FLOOR, defense: STAT_GROWTH_FLOOR, hp: STAT_GROWTH_FLOOR,
-  crit_chance: PERCENT_STAT_GROWTH_FLOOR, crit_damage: PERCENT_STAT_GROWTH_FLOOR,
-  gold_bonus: PERCENT_STAT_GROWTH_FLOOR, xp_bonus: PERCENT_STAT_GROWTH_FLOOR, loot_bonus: PERCENT_STAT_GROWTH_FLOOR
+/* Kampfwerte (09.08. Nachtrag, ERSETZT 11.08. durch absolute Obergrenzen -
+   sql/20260811-anticheat-guard-absolute-ceiling.sql) - Spieler "OPShadowWolf"
+   schickte 3 Videos, die einen LIVE-Account mit attack=420.45M (HUD) zeigen,
+   der jeden Boss instant one-shottet. attack/defense/hp/crit_chance/
+   crit_damage/gold_bonus/xp_bonus/loot_bonus sind Teil desselben
+   BKMP_IDLE_PLAYER_STATE_COLUMNS-Upserts wie dragon_kills/level/skill_points,
+   hatten aber KEINE eigene Pruefung.
+
+   NACHTRAG 11.08.2026 (Nutzer-Meldung: "einige nicht mehr in der
+   Leaderboards angezeigt"): die urspruengliche 09.08.-Fassung (relative
+   50x-pro-Speicherung-Grenze) war viel zu eng - Kampfwerte werden bei JEDER
+   relevanten Aenderung (Prestige-Reset, Gilden-Technologie-Sprung, Runen-
+   Aufwertung/-Verschmelzung/-Aufstieg, mehrstufiger Auto-Kauf) komplett NEU
+   berechnet, ein einzelner legitimer Investitions-Burst kann dadurch voellig
+   normal mehr als das 50-fache in EINER Speicherung ausmachen. Live-
+   Auswertung (curl gegen die echte Produktions-DB): 33 von 217 Accounts
+   wurden dadurch faelschlich von der oeffentlichen Bestenliste ausgeblendet,
+   praktisch nur lange dokumentierte, echte Spieler (u.a. der eigene Account
+   des Betreibers). Fix: absolute, vom vorherigen Wert komplett UNABHAENGIGE
+   Obergrenzen statt eines Verhaeltnisses - kalibriert an den tatsaechlich
+   staerksten aktuell existierenden Accounts im Spiel (Level 5900-9200:
+   attack ~13.500-15.000, defense ~6.300-9.400, hp ~12.800-14.800,
+   crit_damage ~500-556, gold_bonus ~918-966, xp_bonus ~478-744,
+   loot_bonus ~324-527) - die neuen Grenzen liegen beim 70-140-fachen davon,
+   riesiger Sicherheitsabstand fuer jahrelanges weiteres Powercreep, aber
+   immer noch um Groessenordnungen unter dem gemeldeten echten Exploit-Wert
+   (420.450.000). Ein legitimer Burst, egal wie gross, wird dadurch nie mehr
+   faelschlich als Forgery gewertet - nur das Ergebnis muss plausibel bleiben. */
+const COMBAT_STAT_CEILINGS = {
+  attack: 1000000, defense: 1000000, hp: 2000000,
+  crit_chance: 100, crit_damage: 5000,
+  gold_bonus: 10000, xp_bonus: 10000, loot_bonus: 10000
 };
 
 const PROPORTIONAL_GUARDED_FIELDS = [
@@ -123,22 +135,21 @@ function applyIdlePlayerStateAntiCheatGuard(oldRow, incomingBody, nowMs) {
 
   const ratio = Math.min(ratioKills, ratioLevel, ratioSkillpoints);
 
-  /* Kampfwerte (09.08.): harte Multiplikator-Obergrenze, UNABHAENGIG von
+  /* Kampfwerte (11.08.): absolute Obergrenze, UNABHAENGIG von OLD.* und von
      ratio oben - laeuft auch, wenn kills/level/skillpoints komplett
      unveraendert sind (genau der gemeldete Fall: nur attack/etc. gefaelscht).
      Direkt hart gekappt, nicht proportional wie die anderen Felder. */
   const patched = { ...incomingBody };
   const combatStatDetails = {};
   let combatStatTriggered = false;
-  Object.keys(COMBAT_STAT_FIELDS).forEach(field => {
+  Object.keys(COMBAT_STAT_CEILINGS).forEach(field => {
     if (incomingBody[field] == null) return;
     const oldVal = Number(oldRow[field] || 0);
     const claimedVal = Number(incomingBody[field]);
-    const floor = COMBAT_STAT_FIELDS[field];
-    const cap = oldVal * MAX_STAT_GROWTH_FACTOR + floor;
-    if (claimedVal > cap) {
-      combatStatDetails[field] = { old: oldVal, claimed: claimedVal, capped_to: cap };
-      patched[field] = cap;
+    const ceiling = COMBAT_STAT_CEILINGS[field];
+    if (claimedVal > ceiling) {
+      combatStatDetails[field] = { old: oldVal, claimed: claimedVal, capped_to: ceiling };
+      patched[field] = ceiling;
       combatStatTriggered = true;
     }
   });

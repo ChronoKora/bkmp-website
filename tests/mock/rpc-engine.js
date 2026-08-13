@@ -303,6 +303,17 @@ function renamePlayerAccountCurrentBuggyBehavior(store, uid, params) {
   if (authUser) authUser.user_metadata = { ...(authUser.user_metadata || {}), display_name: newName };
 
   // ABSICHTLICH NICHT aktualisiert (siehe Funktionskommentar) - idle_player_runes/idle_prestige_state/idle_player_village_skins.
+  //
+  // NACHTRAG 13.08.2026 (Discord-DM "Moni", siehe CLAUDE.md-Bericht
+  // "Weiterer Runenverlust..." - eigentlich der DRITTE, unabhaengige Fall
+  // derselben Bugklasse): der 25.07.-Fix ist inzwischen live (runes/
+  // prestige/village_skins propagieren in Produktion tatsaechlich korrekt),
+  // dieser Mock bildet bewusst NUR NOCH die verbleibende Luecke nach - auch
+  // player_dragons/player_dragon_eggs/player_dragon_nests (sql/supabase-
+  // dragon-breeding.sql, 17.07.2026) wurden bei BEIDEN bisherigen Fixes
+  // schlicht uebersehen und werden hier ABSICHTLICH NICHT aktualisiert,
+  // damit dieser Test denselben Codepfad wie eine echte Umbenennung heute
+  // durchlaeuft.
   return null;
 }
 
@@ -347,6 +358,15 @@ function renamePlayerAccountFixedPreview(store, uid, params) {
   getTable(store, 'idle_player_runes').filter(r => r.name_key === oldKey).forEach(r => { r.name_key = newKey; });
   getTable(store, 'idle_prestige_state').filter(r => r.name_key === oldKey).forEach(r => { r.name_key = newKey; r.display_name = newName; });
   getTable(store, 'idle_player_village_skins').filter(r => r.name_key === oldKey).forEach(r => { r.name_key = newKey; });
+
+  /* NEU (13.08.2026-Fix, sql/20260813-fix-rename-dragon-tables-propagation.sql)
+     - anders als oben ueber auth_user_id gefiltert, nicht ueber den alten
+     name_key: alle drei Tabellen fuehren auth_user_id bereits als Spalte
+     (sql/supabase-dragon-breeding.sql), robuster als ein name_key-Vergleich
+     und identisch zum bereits bestehenden idle_player_state-Update oben. */
+  getTable(store, 'player_dragons').filter(r => r.auth_user_id === uid).forEach(r => { r.name_key = newKey; });
+  getTable(store, 'player_dragon_eggs').filter(r => r.auth_user_id === uid).forEach(r => { r.name_key = newKey; });
+  getTable(store, 'player_dragon_nests').filter(r => r.auth_user_id === uid).forEach(r => { r.name_key = newKey; });
 
   const authUser = [...store.authUsersByEmail.values()].find(u => u.id === uid);
   if (authUser) authUser.user_metadata = { ...(authUser.user_metadata || {}), display_name: newName };
