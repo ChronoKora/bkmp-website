@@ -9479,6 +9479,15 @@ body.admin-mode-company .admin-nav-btn:not([data-role="company"]) { display: non
 body.admin-mode-company .admin-nav-btn[data-role="company"] { display: flex; }
 body.admin-mode-sheepeditor .admin-nav-btn:not([data-role="sheep_editor"]) { display: none; }
 body.admin-mode-sheepeditor .admin-nav-btn[data-role="sheep_editor"] { display: flex; }
+/* Ausgaben-Eintragung (14.08.2026) - anders als company/sheep_editor oben
+   KEIN eigener, sonst versteckter Nav-Button: data-role="expenses_editor"
+   sitzt direkt auf dem bereits bestehenden, normalen "Ausgaben"-Button, den
+   volle Admins ohnehin schon immer sehen - deshalb bewusst OHNE die
+   "[data-role=...]{display:none}"-Basisregel, die es fuer company/
+   sheep_editor oben gibt (die haetten sonst den Ausgaben-Button auch fuer
+   normale Admins versteckt). */
+body.admin-mode-expenseseditor .admin-nav-btn:not([data-role="expenses_editor"]) { display: none; }
+body.admin-mode-expenseseditor .admin-nav-btn[data-role="expenses_editor"] { display: flex; }
 
 .map-order-card .map-order-claim-btn { width: 100%; margin-top: 0.6rem; }
 .map-order-card { cursor: pointer; }
