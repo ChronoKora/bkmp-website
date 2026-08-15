@@ -209,7 +209,7 @@
           <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v2"/></svg>
           Spieler-Verwaltung
         </button>
-        <button class="admin-nav-btn" data-page="employees">
+        <button class="admin-nav-btn" data-page="employees" data-role="expenses_editor">
           <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3-6 7-6s7 2.7 7 6"/><path d="M17 8v4M15 10h4"/></svg>
           Mitarbeiter
         </button>
@@ -1252,15 +1252,26 @@
         return;
       }
       /* Eingeschraenktes Konto (Mitarbeiter-Zugang, 14.08.2026 - Nutzerauftrag
-         "der Ausgaben eingeben soll... nur das vorerst"): sieht wirklich NUR
-         die bestehende "Ausgaben"-Seite (Liste + Eintragen), keine andere
-         Navigation, keine anderen Daten - gleiches Prinzip wie oben bei
-         isSheepEditor, nur ohne eigene Mini-Seite, da #page-expenses bereits
-         in sich abgeschlossen ist (keine anderen sensiblen Daten dort
-         gemischt). Laedt bewusst NUR data.expenses (nicht die volle
-         refreshAdminDataFromSupabase(), die auch Investoren/Feedback/etc.
-         abfragen wuerde, fuer die diese Rolle serverseitig ohnehin keinen
-         Zugriff hat, siehe sql/20260814-expenses-editor-role.sql). */
+         "der Ausgaben eingeben soll... nur das vorerst"): sieht NUR die
+         Seiten "Ausgaben" (Liste + Eintragen) und "Mitarbeiter" (eigener
+         Gehalts-Stand, seit demselben Tag Abend auf Nutzerwunsch freige-
+         schaltet), keine andere Navigation, keine anderen Daten - gleiches
+         Prinzip wie oben bei isSheepEditor, nur ohne eigene Mini-Seite, da
+         #page-expenses/#page-employees bereits in sich abgeschlossen sind
+         (keine anderen sensiblen Daten dort gemischt). Landet beim Login
+         weiterhin auf "Ausgaben" (unveraendertes Verhalten), "Mitarbeiter"
+         ist zusaetzlich ueber die Navigation erreichbar (data-role="expenses_
+         editor" auf beiden Nav-Buttons, siehe CSS) - laedt dort beim Klick
+         wie bei jeder anderen Admin-Seite ueber den bestehenden generischen
+         Klick-Handler (if (page === 'employees') refreshEmployeePayoutPage())
+         nach, kein spezieller Vorab-Ladeaufruf hier noetig. Laedt bewusst NUR
+         data.expenses (nicht die volle refreshAdminDataFromSupabase(), die
+         auch Investoren/Feedback/etc. abfragen wuerde, fuer die diese Rolle
+         serverseitig ohnehin keinen Zugriff hat, siehe sql/20260814-expenses-
+         editor-role.sql - Mitarbeiter-Lohn braucht dagegen data.income, das
+         ist oeffentlich lesbar und wird erst bei echtem Seitenaufruf per
+         refreshEmployeePayoutPage() geladen, exakt wie bei jeder anderen
+         Admin-Seite auch). */
       const isExpensesEditor = Boolean(profile && profile.role === 'expenses_editor');
       document.body.classList.toggle('admin-mode-expenseseditor', isExpensesEditor);
       if (isExpensesEditor) {
@@ -1371,6 +1382,7 @@
         if (page === 'polls') refreshPollsAdmin();
         if (page === 'idledorf') refreshIdleDorfAdmin();
         if (page === 'access') refreshAdminAccessList();
+        if (page === 'employees') refreshEmployeePayoutPage();
         if (page === 'mapartcompanies') refreshMapartCompaniesAdmin();
       });
     });
@@ -2930,10 +2942,40 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
        Berechnung ueber die ohnehin schon geladenen data.income-Eintraege -
        keine neue Tabelle/Spalte, kein zusaetzlicher Ladevorgang: aendert
        sich data.income (neue Einnahme, Bearbeitung, Loeschung), zeigt der
-       naechste renderAll()-Durchlauf automatisch den korrekten neuen Stand. */
+       naechste renderAll()-Durchlauf automatisch den korrekten neuen Stand.
+
+       NACHTRAG (14.08.2026, spaeter am selben Tag): Nutzerwunsch "auch fuer
+       DerJannikhase freischalten - darf ruhig richtig stehen, jeder der den
+       Zugang hat wird dort aufgezaehlt (wird nur bei ihm bleiben)". Zeigt
+       jetzt den/die Namen des/der Mitarbeiter(s) statt einer anonymen
+       Sammelbezeichnung - geladen ueber dieselbe loadAdminProfiles()/RLS wie
+       die bestehende "Zugaenge"-Seite (dort liest ein voller Admin ALLE
+       Zeilen, ein eingeschraenkter expenses_editor-Zugang wegen "Read own
+       admin profile" nur seine EIGENE - kein neues SQL noetig, RLS
+       uebernimmt die Einschraenkung strukturell schon richtig). Bleibt
+       weiterhin EIN gemeinsamer Topf (keine Aenderung an der Rechenlogik
+       oben) - bei mehr als einem Zugang wird das explizit als "gemeinsamer
+       Topf" gekennzeichnet, damit nie faelschlich eine Aufteilung pro
+       Person suggeriert wird, die es serverseitig gar nicht gibt. */
     const BKMP_EMPLOYEE_WAGE_CATEGORIES = ['Bücher', 'Werkzeug', 'Netherite', 'Schmiede Vorlagen', 'Tränke'];
     const BKMP_EMPLOYEE_WAGE_START_DATE = '2026-08-15';
     const BKMP_EMPLOYEE_WAGE_SHARE = 0.5;
+    const BKMP_EMPLOYEE_WAGE_ROLE = 'expenses_editor';
+    let bkmpEmployeeAccessProfiles = [];
+
+    async function refreshEmployeePayoutPage() {
+      try {
+        const [profiles] = await Promise.all([
+          loadAdminProfiles(),
+          typeof syncIncomesFromSupabase === 'function' ? syncIncomesFromSupabase(data, null, { force: true }) : Promise.resolve()
+        ]);
+        bkmpEmployeeAccessProfiles = (profiles || []).filter(p => p.role === BKMP_EMPLOYEE_WAGE_ROLE);
+      } catch (e) {
+        console.warn('Mitarbeiter-Zugänge konnten nicht geladen werden.', e);
+        bkmpEmployeeAccessProfiles = [];
+      }
+      renderEmployeePayoutPage();
+    }
 
     function bkmpEmployeeWageQualifyingIncomes() {
       return (data.income || []).filter(item =>
@@ -2951,9 +2993,22 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       const totalIncome = bkmpSum(qualifying);
       const totalWage = totalIncome * BKMP_EMPLOYEE_WAGE_SHARE;
 
+      const names = bkmpEmployeeAccessProfiles.map(p => p.display_name || p.login_name).filter(Boolean);
+      let wageLabel, wageSub;
+      if (names.length === 0) {
+        wageLabel = 'Mitarbeiter-Lohn (50%)';
+        wageSub = 'Noch kein Mitarbeiter-Zugang vorhanden';
+      } else if (names.length === 1) {
+        wageLabel = names[0] + ' – Gehalt (50%)';
+        wageSub = qualifying.length + ' Einnahme' + (qualifying.length === 1 ? '' : 'n') + ' seit 15.08.2026';
+      } else {
+        wageLabel = names.join(' + ') + ' – gemeinsamer Lohn-Topf (50%)';
+        wageSub = 'Gemeinsam, nicht einzeln aufgeteilt · ' + qualifying.length + ' Einnahme' + (qualifying.length === 1 ? '' : 'n') + ' seit 15.08.2026';
+      }
+
       if (summaryEl) {
         summaryEl.innerHTML = [
-          overviewCard('💰', 'Mitarbeiter-Lohn gesamt (50%)', bkmpFormatCurrency(totalWage), qualifying.length + ' Einnahme' + (qualifying.length === 1 ? '' : 'n') + ' seit 15.08.2026'),
+          overviewCard('💰', wageLabel, bkmpFormatCurrency(totalWage), wageSub),
           overviewCard('📊', 'Zugrunde liegende Einnahmen (100%)', bkmpFormatCurrency(totalIncome), 'Bücher, Werkzeug, Netherite, Schmiede Vorlagen, Tränke')
         ].join('');
       }
