@@ -209,6 +209,10 @@
           <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v2"/></svg>
           Spieler-Verwaltung
         </button>
+        <button class="admin-nav-btn" data-page="employees">
+          <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3-6 7-6s7 2.7 7 6"/><path d="M17 8v4M15 10h4"/></svg>
+          Mitarbeiter
+        </button>
         <button class="admin-nav-btn" data-page="access">
           <svg viewBox="0 0 24 24"><path d="M12 3a5 5 0 0 0-5 5v3H5v10h14V11h-2V8a5 5 0 0 0-5-5z"/><path d="M9 11V8a3 3 0 0 1 6 0v3"/></svg>
           Zug&auml;nge
@@ -995,6 +999,19 @@
             </div>
             <button class="btn btn-primary" type="button" id="leaderboardHideAddBtn" style="margin-bottom:1rem;">Ausblenden</button>
             <div class="feedback-list" id="leaderboardHiddenList"></div>
+          </div>
+        </section>
+
+        <!-- Mitarbeiter -->
+        <section class="admin-page" id="page-employees">
+          <div class="admin-section">
+            <h2>&#128119; Mitarbeiter-Lohn</h2>
+            <p class="admin-help-text">Errechnet sich automatisch als 50% aller Einnahmen ab dem 15.08.2026 in den Kategorien B&uuml;cher, Werkzeug, Netherite, Schmiede Vorlagen und Tr&auml;nke &ndash; eine gemeinsame Summe f&uuml;r alle Mitarbeiter zusammen, kein Feld pro Einnahme n&ouml;tig. Trage eine Einnahme wie gewohnt unter "Einnahmen" ein &ndash; die Summe hier passt sich sofort an, auch beim &Auml;ndern/L&ouml;schen einer bestehenden Einnahme.</p>
+            <div class="overview-grid" id="employeePayoutSummary"></div>
+          </div>
+          <div class="admin-section">
+            <h2>Aufschl&uuml;sselung nach Kategorie</h2>
+            <div class="entry-table-wrapper"><div class="entry-list" id="employeePayoutBreakdown"></div></div>
           </div>
         </section>
 
@@ -2898,7 +2915,71 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       if (bkmpAdminSectionVisible('investorRequestList')) renderInvestorRequestList();
       if (bkmpAdminSectionVisible('cardSaleRequestList')) renderCardSaleRequestList();
       if (bkmpAdminSectionVisible('cardCatalogPendingList')) renderCardCatalogList();
+      if (bkmpAdminSectionVisible('employeePayoutSummary')) renderEmployeePayoutPage();
       if (window.bkmpEnhanceImages) window.bkmpEnhanceImages(document);
+    }
+
+    /* Mitarbeiter-Lohn (14.08.2026, Nutzerauftrag): 50% aller Einnahmen ab
+       BKMP_EMPLOYEE_WAGE_START_DATE in den 5 genannten Kategorien - EINE
+       gemeinsame Summe fuer alle Mitarbeiter (Nutzer-Entscheidung nach
+       Rueckfrage: Einnahmen tragen aktuell KEIN Feld, wer sie erzielt hat -
+       eine Zuordnung pro Person haette eine neue Spalte + ein zusaetzliches
+       Auswahlfeld beim Eintragen gebraucht, ausdruecklich NICHT gewuenscht:
+       "wenn ich Einnahmen tracke soll sich das direkt mit anpassen", also
+       ohne jeden weiteren manuellen Schritt beim Eintragen). Reine
+       Berechnung ueber die ohnehin schon geladenen data.income-Eintraege -
+       keine neue Tabelle/Spalte, kein zusaetzlicher Ladevorgang: aendert
+       sich data.income (neue Einnahme, Bearbeitung, Loeschung), zeigt der
+       naechste renderAll()-Durchlauf automatisch den korrekten neuen Stand. */
+    const BKMP_EMPLOYEE_WAGE_CATEGORIES = ['Bücher', 'Werkzeug', 'Netherite', 'Schmiede Vorlagen', 'Tränke'];
+    const BKMP_EMPLOYEE_WAGE_START_DATE = '2026-08-15';
+    const BKMP_EMPLOYEE_WAGE_SHARE = 0.5;
+
+    function bkmpEmployeeWageQualifyingIncomes() {
+      return (data.income || []).filter(item =>
+        BKMP_EMPLOYEE_WAGE_CATEGORIES.includes(item.category || item.name) &&
+        item.date && item.date >= BKMP_EMPLOYEE_WAGE_START_DATE
+      );
+    }
+
+    function renderEmployeePayoutPage() {
+      const summaryEl = document.getElementById('employeePayoutSummary');
+      const breakdownEl = document.getElementById('employeePayoutBreakdown');
+      if (!summaryEl && !breakdownEl) return;
+
+      const qualifying = bkmpEmployeeWageQualifyingIncomes();
+      const totalIncome = bkmpSum(qualifying);
+      const totalWage = totalIncome * BKMP_EMPLOYEE_WAGE_SHARE;
+
+      if (summaryEl) {
+        summaryEl.innerHTML = [
+          overviewCard('💰', 'Mitarbeiter-Lohn gesamt (50%)', bkmpFormatCurrency(totalWage), qualifying.length + ' Einnahme' + (qualifying.length === 1 ? '' : 'n') + ' seit 15.08.2026'),
+          overviewCard('📊', 'Zugrunde liegende Einnahmen (100%)', bkmpFormatCurrency(totalIncome), 'Bücher, Werkzeug, Netherite, Schmiede Vorlagen, Tränke')
+        ].join('');
+      }
+
+      if (breakdownEl) {
+        if (qualifying.length === 0) {
+          breakdownEl.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Noch keine passenden Einnahmen seit dem 15.08.2026.</p>';
+        } else {
+          breakdownEl.innerHTML = BKMP_EMPLOYEE_WAGE_CATEGORIES.map(category => {
+            const catEntries = qualifying.filter(item => (item.category || item.name) === category);
+            const catIncome = bkmpSum(catEntries);
+            const catWage = catIncome * BKMP_EMPLOYEE_WAGE_SHARE;
+            return `
+              <div class="entry-row">
+                <div class="desc">
+                  <span class="name">${escapeHtml(category)}</span>
+                  <span class="meta">${catEntries.length} Einnahme${catEntries.length === 1 ? '' : 'n'} · ${bkmpFormatCurrency(catIncome)} gesamt</span>
+                </div>
+                <div class="desc" style="text-align:right; flex:0 0 auto;">
+                  <span class="name">${bkmpFormatCurrency(catWage)}</span>
+                  <span class="meta">Lohn-Anteil</span>
+                </div>
+              </div>`;
+          }).join('');
+        }
+      }
     }
 
     function overviewCard(icon, label, value, sub) {
