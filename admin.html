@@ -1006,7 +1006,19 @@
         <section class="admin-page" id="page-employees">
           <div class="admin-section">
             <h2>&#128119; Mitarbeiter-Lohn</h2>
-            <p class="admin-help-text">Errechnet sich automatisch als 50% aller Einnahmen ab dem 15.08.2026 in den Kategorien B&uuml;cher, Werkzeug, Netherite, Schmiede Vorlagen, Tr&auml;nke, Raketen und Elytra &ndash; eine gemeinsame Summe f&uuml;r alle Mitarbeiter zusammen, kein Feld pro Einnahme n&ouml;tig. Trage eine Einnahme wie gewohnt unter "Einnahmen" ein &ndash; die Summe hier passt sich sofort an, auch beim &Auml;ndern/L&ouml;schen einer bestehenden Einnahme. Ausgaben, die der Mitarbeiter selbst unter "Ausgaben" eintr&auml;gt, werden automatisch von seiner Auszahlung abgezogen &ndash; Ausgaben, die DU als Admin eintr&auml;gst, z&auml;hlen NICHT mit.</p>
+            <!-- 18.08.2026, Nutzerauftrag "Text anpassen.. weil Mitarbeiter soll das
+                 nicht lesen": der urspruengliche Hilfetext war komplett aus Admin-Sicht
+                 geschrieben (nannte die genaue Formel/50%/Kategorienliste nochmal aus
+                 UND explizit "Ausgaben, die DU als Admin eintraegst, zaehlen NICHT
+                 mit" - fuer einen Mitarbeiter, der diese Seite ja selbst sieht,
+                 grammatisch falsch ("DU" meint dort den Admin, nicht ihn) und inhaltlich
+                 nicht fuer ihn bestimmt. Statischer Default-Inhalt ist jetzt bewusst
+                 bereits die KURZE, mitarbeiter-taugliche Fassung (Sicherheitsnetz,
+                 falls das Skript aus irgendeinem Grund verzoegert startet) -
+                 renderEmployeePayoutPage() ersetzt sie nur fuer einen bestaetigten
+                 echten Admin (kein admin-mode-expenseseditor auf body) durch die
+                 ausfuehrliche interne Fassung. -->
+            <p class="admin-help-text" id="employeePayoutHelpText">Hier siehst du deine aktuelle Auszahlung. Die Zahlen aktualisieren sich automatisch, sobald eine neue Einnahme erfasst wird.</p>
             <div class="overview-grid" id="employeePayoutSummary"></div>
           </div>
           <div class="admin-section">
@@ -3017,40 +3029,71 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
     }
 
     function renderEmployeePayoutPage() {
+      /* 18.08.2026: die ausfuehrliche interne Formel-/Regel-Erklaerung (genaue
+         Kategorienliste/50%/"Ausgaben die DU als Admin eintraegst zaehlen NICHT
+         mit") ist nur fuer einen echten Admin gedacht - ein eingeloggter
+         Mitarbeiter (Rolle expenses_editor, erkennbar an derselben admin-mode-
+         expenseseditor-Klasse, die auch die Navigation einschraenkt, siehe
+         showAdmin()) bekommt stattdessen eine kurze, neutrale Fassung ohne
+         Formel-/Kategorie-Details. Statischer HTML-Default ist bereits die
+         kurze Fassung (siehe Kommentar dort) - hier wird sie nur fuer einen
+         bestaetigten Admin durch die lange ersetzt. */
+      const helpEl = document.getElementById('employeePayoutHelpText');
+      if (helpEl) {
+        const isRealAdminViewer = !document.body.classList.contains('admin-mode-expenseseditor');
+        helpEl.textContent = isRealAdminViewer
+          ? 'Errechnet sich automatisch als 50% des GEWINNS (Einnahmen minus seiner eigenen Ausgaben, nicht 50% der reinen Einnahmen) ab dem 15.08.2026 in den Kategorien Bücher, Werkzeug, Netherite, Schmiede Vorlagen, Tränke, Raketen und Elytra – eine gemeinsame Summe für alle Mitarbeiter zusammen, kein Feld pro Einnahme nötig. Trage eine Einnahme wie gewohnt unter "Einnahmen" ein – die Summe hier passt sich sofort an, auch beim Ändern/Löschen einer bestehenden Einnahme. Ausgaben, die der Mitarbeiter selbst unter "Ausgaben" einträgt, schmälern zuerst den gemeinsamen Gewinn (ihr teilt euch die Kosten hälftig, 50/50) – Ausgaben, die DU als Admin einträgst, zählen NICHT mit.'
+          : 'Hier siehst du deine aktuelle Auszahlung. Die Zahlen aktualisieren sich automatisch, sobald eine neue Einnahme erfasst wird.';
+      }
+
       const summaryEl = document.getElementById('employeePayoutSummary');
       const breakdownEl = document.getElementById('employeePayoutBreakdown');
       const ownExpensesEl = document.getElementById('employeePayoutOwnExpenses');
       if (!summaryEl && !breakdownEl && !ownExpensesEl) return;
 
+      /* 18.08.2026, Nutzerauftrag "wir brauchen scheinbar die Ausgaben-Tabelle
+         anders berechnen" (Screenshot einer externen Gegenrechnung, per
+         AskUserQuestion bestaetigt: "Gewinn-Teilung (empfohlen)"): die
+         urspruengliche Fassung (14./16.08.) zog seine eigenen Ausgaben ERST
+         NACH dem 50%-Split vom BEREITS HALBIERTEN Lohn ab ("(Einnahmen×50%)
+         − Ausgaben") - er trug seine Materialkosten dadurch effektiv zu 100%
+         allein, waehrend der Admin seine 50% ungekuerzt behielt. Fachlich
+         korrekt fuer eine "50% vom GEWINN"-Abmachung ist stattdessen, die
+         Ausgaben VOR dem Split vom gemeinsamen Gewinn-Topf abzuziehen
+         ("(Einnahmen − Ausgaben) × 50%") - beide tragen die Kosten dann
+         hälftig, exakt wie bei einer normalen Gewinnbeteiligung. Macht bei
+         gleichen Zahlen einen spuerbaren Unterschied (die Haelfte seiner
+         Ausgaben) - deshalb bewusst per Rueckfrage bestaetigt, nicht einfach
+         angenommen. */
       const qualifying = bkmpEmployeeWageQualifyingIncomes();
       const totalIncome = bkmpSum(qualifying);
-      const totalWage = totalIncome * BKMP_EMPLOYEE_WAGE_SHARE;
       const ownExpenses = bkmpEmployeeOwnExpenses();
       const totalOwnExpenses = bkmpSum(ownExpenses);
-      const netPayout = totalWage - totalOwnExpenses;
+      const netProfit = totalIncome - totalOwnExpenses;
+      const netPayout = netProfit * BKMP_EMPLOYEE_WAGE_SHARE;
 
       const names = bkmpEmployeeAccessProfiles.map(p => p.display_name || p.login_name).filter(Boolean);
-      let wageLabel, wageSub, payoutLabel;
+      let payoutLabel, payoutSub, profitLabel;
       if (names.length === 0) {
-        wageLabel = 'Mitarbeiter-Lohn brutto (50%)';
-        wageSub = 'Noch kein Mitarbeiter-Zugang vorhanden';
-        payoutLabel = 'Auszahlung (netto)';
+        payoutLabel = 'Mitarbeiter-Lohn (50% vom Gewinn)';
+        payoutSub = 'Noch kein Mitarbeiter-Zugang vorhanden';
+        profitLabel = 'Gewinn-Grundlage (Einnahmen − Ausgaben)';
       } else if (names.length === 1) {
-        wageLabel = names[0] + ' – Gehalt brutto (50%)';
-        wageSub = qualifying.length + ' Einnahme' + (qualifying.length === 1 ? '' : 'n') + ' seit 15.08.2026';
-        payoutLabel = names[0] + ' – Auszahlung (netto)';
+        payoutLabel = names[0] + ' – Lohn (50% vom Gewinn)';
+        payoutSub = qualifying.length + ' Einnahme' + (qualifying.length === 1 ? '' : 'n') + ' seit 15.08.2026';
+        profitLabel = 'Gewinn-Grundlage (Einnahmen − ' + names[0] + 's Ausgaben)';
       } else {
-        wageLabel = names.join(' + ') + ' – gemeinsamer Lohn-Topf brutto (50%)';
-        wageSub = 'Gemeinsam, nicht einzeln aufgeteilt · ' + qualifying.length + ' Einnahme' + (qualifying.length === 1 ? '' : 'n') + ' seit 15.08.2026';
-        payoutLabel = 'Gemeinsame Auszahlung (netto)';
+        payoutLabel = names.join(' + ') + ' – gemeinsamer Lohn (50% vom Gewinn)';
+        payoutSub = 'Gemeinsam, nicht einzeln aufgeteilt · ' + qualifying.length + ' Einnahme' + (qualifying.length === 1 ? '' : 'n') + ' seit 15.08.2026';
+        profitLabel = 'Gewinn-Grundlage (Einnahmen − Ausgaben)';
       }
 
       if (summaryEl) {
         summaryEl.innerHTML = [
-          overviewCard('💵', payoutLabel, bkmpFormatCurrency(netPayout), 'Nach Abzug der eigenen Ausgaben'),
-          overviewCard('💰', wageLabel, bkmpFormatCurrency(totalWage), wageSub),
-          overviewCard('🧾', 'Eigene Ausgaben (Abzug)', bkmpFormatCurrency(totalOwnExpenses > 0 ? totalOwnExpenses * -1 : 0), ownExpenses.length + ' selbst eingetragene Ausgabe' + (ownExpenses.length === 1 ? '' : 'n')),
-          overviewCard('📊', 'Zugrunde liegende Einnahmen (100%)', bkmpFormatCurrency(totalIncome), 'Bücher, Werkzeug, Netherite, Schmiede Vorlagen, Tränke, Raketen, Elytra')
+          overviewCard('💵', payoutLabel, bkmpFormatCurrency(netPayout), payoutSub),
+          overviewCard('📊', profitLabel, bkmpFormatCurrency(netProfit), '50% davon = Lohn oben'),
+          overviewCard('🧾', 'Eigene Ausgaben (bereits im Gewinn abgezogen)', bkmpFormatCurrency(totalOwnExpenses > 0 ? totalOwnExpenses * -1 : 0), ownExpenses.length + ' selbst eingetragene Ausgabe' + (ownExpenses.length === 1 ? '' : 'n') + ' · Kosten werden hälftig geteilt'),
+          overviewCard('📈', 'Einnahmen brutto (100%, vor Ausgaben)', bkmpFormatCurrency(totalIncome), 'Bücher, Werkzeug, Netherite, Schmiede Vorlagen, Tränke, Raketen, Elytra')
         ].join('');
       }
 
@@ -3058,10 +3101,16 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
         if (qualifying.length === 0) {
           breakdownEl.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Noch keine passenden Einnahmen seit dem 15.08.2026.</p>';
         } else {
+          /* "50% davon" hier ist bewusst VOR dem Ausgaben-Abzug (Ausgaben
+             sind nicht einzelnen Einnahme-Kategorien zugeordnet, sondern
+             werden einmal gesamt vom Gewinn-Topf abgezogen, siehe oben) -
+             die Summe dieser Zeilen ergibt deshalb NICHT den finalen Lohn
+             oben, das ist Absicht (reine Kategorie-Uebersicht, keine zweite
+             Lohn-Wahrheit). */
           breakdownEl.innerHTML = BKMP_EMPLOYEE_WAGE_CATEGORIES.map(category => {
             const catEntries = qualifying.filter(item => (item.category || item.name) === category);
             const catIncome = bkmpSum(catEntries);
-            const catWage = catIncome * BKMP_EMPLOYEE_WAGE_SHARE;
+            const catHalf = catIncome * BKMP_EMPLOYEE_WAGE_SHARE;
             return `
               <div class="entry-row">
                 <div class="desc">
@@ -3069,8 +3118,8 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
                   <span class="meta">${catEntries.length} Einnahme${catEntries.length === 1 ? '' : 'n'} · ${bkmpFormatCurrency(catIncome)} gesamt</span>
                 </div>
                 <div class="desc" style="text-align:right; flex:0 0 auto;">
-                  <span class="name">${bkmpFormatCurrency(catWage)}</span>
-                  <span class="meta">Lohn-Anteil</span>
+                  <span class="name">${bkmpFormatCurrency(catHalf)}</span>
+                  <span class="meta">50% davon (vor Ausgaben-Abzug)</span>
                 </div>
               </div>`;
           }).join('');
