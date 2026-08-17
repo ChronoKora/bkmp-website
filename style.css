@@ -2470,6 +2470,373 @@ body:has(.admin-wrap), body:has(.login-card) {
 .overview-activity-amount.neg { color: var(--neg); }
 .overview-activity-date { flex-shrink: 0; color: var(--muted); font-size: 0.76rem; }
 
+/* ============================================================
+   Mitarbeiter-Lohn — Payroll-Dashboard (18.08.2026, kompletter
+   Logik+Design-Auftrag "modernes Finance-/Payroll-Dashboard, weiterhin
+   klar BK-Investment-Design, kein neues Theme"). Eigene "payroll-"-
+   Klassen statt Wiederverwendung von .overview-card/.admin-section
+   h2::after, damit KEINE andere Admin-Seite (die diese generischen Regeln
+   mitbenutzt) durch dieses Redesign beeinflusst wird. Tokens durchgehend
+   aus dem bestehenden System (--gold/--purple/--pos/--neg/--danger/
+   --paper-*/--line/--muted/--accent-ink) - --payroll-cyan ist bewusst
+   derselbe Farbwert wie der bereits bestehende .admin-section::before-
+   Rahmen-Farbverlauf (kein neuer, frei erfundener Ton), nur lokal auf
+   .payroll-section gescoped statt global in design-tokens.css ergänzt. */
+.payroll-section { --payroll-cyan: #38BDF8; }
+
+/* Punkt 15 "Live Sync modernisieren, aber nicht dominant": der generische
+   ".admin-section h2::after" (Live Sync-Textbadge) gilt weiterhin site-weit
+   fuer JEDE andere Admin-Seite unveraendert - nur der EINE Haupttitel dieser
+   Seite (h2.payroll-title) bekommt statt des reinen Textes ein echtes,
+   etwas hochwertigeres Badge-Element (Punkt-Puls + Text) als eigenständiges
+   Kind-Element - deshalb muss NUR hier das Pseudo-Element genullt werden,
+   der Rest der Seite (Umsatz nach Kategorie/Geschäftsausgaben) behält den
+   normalen, unveränderten Live-Sync-Text wie jede andere Admin-Seite auch. */
+#page-employees h2.payroll-title::after { content: none; }
+.payroll-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  flex-shrink: 0;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--pos);
+  border: 1px solid color-mix(in srgb, var(--pos) 30%, transparent);
+  background: color-mix(in srgb, var(--pos) 10%, transparent);
+  border-radius: 999px;
+  padding: 0.32rem 0.7rem 0.32rem 0.56rem;
+}
+.payroll-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--pos);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--pos) 22%, transparent), 0 0 10px color-mix(in srgb, var(--pos) 65%, transparent);
+  animation: payrollLivePulse 2.2s ease-in-out infinite;
+}
+@keyframes payrollLivePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .payroll-live-dot { animation: none; }
+}
+
+/* Punkt 7 "Erklärungstext stark kürzen" - kurzer Fließtext + separates
+   Info-Icon mit Tooltip (bestehende bkmp-ui-tooltip-Komponente, siehe
+   js/ui/bkmp-ui-components.js) statt der bisherigen langen Formel im Text. */
+.payroll-help-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  position: relative;
+}
+.payroll-help-row .admin-help-text { flex: 1; margin: 0 0 1.4rem; }
+.payroll-info-btn {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--gold) 40%, var(--line));
+  background: color-mix(in srgb, var(--gold) 12%, transparent);
+  color: var(--gold);
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.16s ease, border-color 0.16s ease;
+}
+.payroll-info-btn:hover, .payroll-info-btn:focus-visible {
+  transform: scale(1.08);
+  border-color: var(--gold);
+}
+
+/* ---- Hero-Karte: die mit Abstand wichtigste Zahl auf der Seite (Punkt 4) ---- */
+.payroll-hero-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 1.4rem;
+  overflow: hidden;
+  padding: clamp(1.5rem, 3vw, 2.3rem);
+  margin-bottom: 1.4rem;
+  border-radius: 22px;
+  background: linear-gradient(155deg, color-mix(in srgb, var(--gold) 12%, var(--paper-3)), var(--paper-2) 55%, var(--paper) 100%);
+  border: 1px solid color-mix(in srgb, var(--gold) 38%, var(--line));
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.32), 0 0 60px color-mix(in srgb, var(--pos) 10%, transparent);
+}
+.payroll-hero-glow {
+  position: absolute;
+  inset: -40% -10% auto auto;
+  width: 60%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--pos) 22%, transparent), transparent 70%);
+  filter: blur(10px);
+  pointer-events: none;
+}
+.payroll-hero-icon {
+  position: relative;
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(150deg, color-mix(in srgb, var(--gold) 30%, transparent), color-mix(in srgb, var(--pos) 16%, transparent));
+  border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent);
+}
+.payroll-hero-icon svg { width: 30px; height: 30px; stroke: var(--gold); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.payroll-hero-body { position: relative; min-width: 0; }
+.payroll-hero-name {
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 0.3rem;
+}
+.payroll-hero-label {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 0.15rem;
+}
+.payroll-hero-value {
+  font-family: 'Fraunces', serif;
+  font-size: clamp(2rem, 4.4vw, 3rem);
+  font-weight: 600;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.payroll-hero-sub {
+  margin-top: 0.35rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+/* ---- KPI-Karten (Punkt 5): kompakt, gleiche Höhe, dezente Akzente ---- */
+.payroll-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.6rem;
+}
+@media (max-width: 900px) {
+  .payroll-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .payroll-kpi-grid { grid-template-columns: 1fr; }
+}
+.payroll-kpi-card {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1.1rem 1.2rem;
+  border-radius: 16px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--paper-3) 46%, transparent), color-mix(in srgb, var(--paper-2) 92%, transparent));
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.18);
+  transition: transform 0.16s ease, border-color 0.16s ease;
+}
+.payroll-kpi-card:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--gold) 30%, var(--line)); }
+.payroll-kpi-icon {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.payroll-kpi-icon svg { width: 20px; height: 20px; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.payroll-kpi-body { min-width: 0; }
+.payroll-kpi-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.22rem; }
+.payroll-kpi-value { font-family: 'Fraunces', serif; font-size: 1.32rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.payroll-kpi-sub { margin-top: 0.18rem; font-size: 0.72rem; color: var(--muted); }
+
+/* Akzentrotation Gold/Cyan/Violett (+ Danger fuer einen negativen Gewinn) -
+   wiederverwendet fuer KPI-Icons, Kategorie-Icons/-Balken, Ausgaben-Icons.
+   Bewusst "payroll-accent-*" statt kurzem "accent-*" praefixiert, damit
+   dieser generische Name nie mit einer kuenftigen, andernorts im Projekt
+   verwendeten gleichnamigen Klasse kollidieren kann. */
+.payroll-accent-gold { background: color-mix(in srgb, var(--gold) 16%, transparent); }
+.payroll-accent-gold svg { stroke: var(--gold); }
+.payroll-accent-cyan { background: color-mix(in srgb, var(--payroll-cyan) 16%, transparent); }
+.payroll-accent-cyan svg { stroke: var(--payroll-cyan); }
+.payroll-accent-violet { background: color-mix(in srgb, var(--purple) 18%, transparent); }
+.payroll-accent-violet svg { stroke: var(--purple); }
+.payroll-accent-danger { background: color-mix(in srgb, var(--danger) 18%, transparent); }
+.payroll-accent-danger svg { stroke: var(--danger); }
+.payroll-category-bar-fill.payroll-accent-gold, .payroll-badge-employee { background: var(--gold); }
+.payroll-category-bar-fill.payroll-accent-cyan { background: var(--payroll-cyan); }
+.payroll-category-bar-fill.payroll-accent-violet { background: var(--purple); }
+
+/* ---- Berechnungs-Flow (Punkt 6) ---- */
+.payroll-flow {
+  padding: 1.1rem 1.3rem;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--paper) 55%, transparent);
+  border: 1px solid var(--line);
+}
+.payroll-flow-title { font-size: 0.86rem; font-weight: 700; color: var(--muted); margin-bottom: 0.9rem; }
+.payroll-flow-track {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+.payroll-flow-step {
+  flex: 1 1 110px;
+  min-width: 100px;
+  padding: 0.65rem 0.8rem;
+  border-radius: 12px;
+  text-align: center;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+}
+.payroll-flow-step.neg { border-color: color-mix(in srgb, var(--neg) 30%, var(--line)); }
+.payroll-flow-step.highlight {
+  background: linear-gradient(150deg, color-mix(in srgb, var(--gold) 24%, transparent), color-mix(in srgb, var(--pos) 14%, transparent));
+  border-color: color-mix(in srgb, var(--gold) 45%, transparent);
+}
+.payroll-flow-value { font-family: 'Fraunces', serif; font-size: 1.02rem; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.payroll-flow-label { margin-top: 0.15rem; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.payroll-flow-arrow { flex-shrink: 0; color: var(--gold); font-weight: 700; font-size: 1.1rem; }
+@media (max-width: 760px) {
+  .payroll-flow-track { flex-direction: column; align-items: stretch; }
+  .payroll-flow-step { flex: none; }
+  .payroll-flow-arrow { align-self: center; transform: rotate(90deg); }
+}
+
+/* ---- Umsatz-nach-Kategorie (Punkte 11-13) ---- */
+.payroll-category-list { display: flex; flex-direction: column; gap: 0.65rem; }
+.payroll-category-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  column-gap: 0.9rem;
+  row-gap: 0.55rem;
+  padding: 0.9rem 1.05rem;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--paper) 55%, transparent);
+  border: 1px solid var(--line);
+  transition: border-color 0.16s ease, background 0.16s ease;
+}
+.payroll-category-row:hover { border-color: color-mix(in srgb, var(--gold) 26%, var(--line)); background: var(--paper-2); }
+.payroll-category-icon, .payroll-expense-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.payroll-category-icon svg, .payroll-expense-icon svg { width: 18px; height: 18px; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.payroll-category-info { min-width: 0; }
+.payroll-category-name, .payroll-expense-name { font-weight: 600; font-size: 0.92rem; }
+.payroll-category-meta, .payroll-expense-meta { color: var(--muted); font-size: 0.76rem; margin-top: 0.1rem; }
+.payroll-category-stats { text-align: right; flex-shrink: 0; }
+.payroll-category-amount { font-weight: 700; font-variant-numeric: tabular-nums; }
+.payroll-category-percent { color: var(--muted); font-size: 0.72rem; margin-top: 0.1rem; }
+.payroll-category-bar {
+  grid-column: 1 / -1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--paper-3);
+  overflow: hidden;
+}
+.payroll-category-bar-fill { height: 100%; border-radius: 999px; transition: width 0.3s var(--ease-out, ease); }
+
+/* ---- Geschäftsausgaben (Punkte 9-10) ---- */
+.payroll-expense-list { display: flex; flex-direction: column; gap: 0.55rem; }
+.payroll-expense-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.8rem 1.05rem;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--paper) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--neg) 16%, var(--line));
+  transition: border-color 0.16s ease, background 0.16s ease;
+}
+.payroll-expense-row:hover { border-color: color-mix(in srgb, var(--neg) 32%, var(--line)); background: var(--paper-2); }
+.payroll-expense-info { flex: 1; min-width: 0; }
+.payroll-badge {
+  flex-shrink: 0;
+  font-size: 0.64rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.24rem 0.5rem;
+  border-radius: 999px;
+}
+.payroll-badge-admin { color: var(--purple); background: color-mix(in srgb, var(--purple) 16%, transparent); border: 1px solid color-mix(in srgb, var(--purple) 30%, transparent); }
+.payroll-badge-employee { color: var(--accent-ink); background: var(--gold); }
+.payroll-expense-amount { flex-shrink: 0; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--neg); }
+
+@media (max-width: 640px) {
+  .payroll-category-row { grid-template-columns: auto 1fr; }
+  .payroll-category-stats { grid-column: 1 / -1; text-align: left; padding-left: calc(38px + 0.9rem); }
+  .payroll-expense-row { flex-wrap: wrap; }
+  .payroll-expense-info { flex-basis: 100%; }
+  .payroll-expense-amount { margin-left: calc(38px + 0.85rem); }
+}
+
+/* ---- Leerzustände (Punkt 20) ---- */
+.payroll-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.5rem;
+  padding: 2.2rem 1.2rem;
+  color: var(--muted);
+}
+.payroll-empty-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+}
+.payroll-empty-icon svg { width: 20px; height: 20px; stroke: var(--muted); fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.payroll-empty-title { font-weight: 700; color: var(--ink); font-size: 0.94rem; }
+.payroll-empty-text { font-size: 0.82rem; max-width: 34ch; }
+
+/* Punkt 17 "dezente Hintergrund-Glows" hinter dem Seitentitel/den Sektionen -
+   Wiederverwendung derselben Farbmischung wie der Hero-Glow, aber deutlich
+   schwächer/breiter, damit es nicht mit dem eigentlichen Hero-Glow konkurriert. */
+.payroll-section { position: relative; }
+.payroll-section::after {
+  content: "";
+  position: absolute;
+  inset: -20% -15% auto auto;
+  width: 40%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--gold) 6%, transparent), transparent 70%);
+  filter: blur(20px);
+  pointer-events: none;
+  z-index: 0;
+}
+.payroll-section > * { position: relative; z-index: 1; }
+
 /* ---------- Toast-Benachrichtigungen ---------- */
 .admin-toasts {
   position: fixed;
