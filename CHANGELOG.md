@@ -11,6 +11,12 @@ Automatisch von Claude Code gepflegt: **nach jeder Code-/SQL-Änderung kommt hie
 
 ---
 
+## 2026-08-15
+
+- **[Änderung]** Fehlender Stückpreis für die Einnahmen-Kategorie "Werkzeug" ergänzt (75.000 €) - Nutzermeldung. War bisher eine der 4 Kategorien ohne festen Stückpreis (Betrag musste direkt eingetragen werden), jetzt rechnet das Formular wie bei Bücher/Netherite/etc. automatisch Anzahl × Stückpreis. Verifiziert: 3 × 75.000 € = 225.000 € wird korrekt ins Betragsfeld übernommen. Nichts committed/gepusht. — geändert: `admin.html` — 🟡 lokal
+
+---
+
 ## 2026-08-14 (3)
 
 - **[Änderung]** Mitarbeiter-Lohn-Seite (siehe Eintrag (2) unten) für den eingeschränkten "Ausgaben-Eintragung"-Zugang (`expenses_editor`, u.a. DerJannikhase) freigeschaltet + namentlich beschriftet - Nutzerwunsch: "Soll für den Zugang auch freigeschaltet werden... richtig DerJannikHase = Gehalt". Zweiter Nav-Button bekommt dasselbe `data-role="expenses_editor"`-Attribut wie der bestehende Ausgaben-Button (beide gemeinsam sichtbar für diese Rolle, kein neues CSS nötig - dieselbe Regel matcht mehrere Elemente). Zeigt jetzt "[Name] – Gehalt (50%)" statt einer anonymen Sammelbezeichnung - Namen kommen aus `admin_profiles` (gefiltert auf `role='expenses_editor'`), wiederverwendet dieselbe `loadAdminProfiles()`-Funktion wie die bestehende "Zugänge"-Seite: RLS liefert einem vollen Admin automatisch ALLE Zugänge, einem eingeschränkten Konto (wie DerJannikhase) wegen "Read own admin profile" strukturell nur die EIGENE Zeile - kein neues SQL nötig, bleibt bei mehr als einem Zugang trotzdem EIN gemeinsamer Topf (keine Änderung an der Rechenlogik), wird dann explizit als "gemeinsamer Lohn-Topf" gekennzeichnet statt fälschlich eine Aufteilung zu suggerieren. Verifiziert per injiziertem Mock (kein echter Login möglich): DerJannikhases Sicht zeigt jetzt 2 Nav-Buttons (Ausgaben+Mitarbeiter) statt 1, echter Klick auf "Mitarbeiter" zeigt korrekt "DERJANNIKHASE – GEHALT (50%) 6.750 €" (2 Test-Einnahmen, 13.500€ Basis); volle Admin-Sicht filtert korrekt nur `expenses_editor`-Zugänge (ein zusätzlicher Admin-Account bleibt außen vor); Leerfall (kein Mitarbeiter-Zugang vorhanden) zeigt sauberen Hinweistext statt Fehler. `node --check` sauber, keine neuen Konsolenfehler. Nichts committed/gepusht. — geändert: `admin.html` — 🟡 lokal
