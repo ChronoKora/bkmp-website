@@ -11,7 +11,13 @@ Automatisch von Claude Code gepflegt: **nach jeder Code-/SQL-Änderung kommt hie
 
 ---
 
-## 2026-08-15
+## 2026-08-15 (2)
+
+- **[Änderung]** Mitarbeiter-Lohn-Kategorien um Raketen und Elytra erweitert (jetzt 7 statt 5: Bücher, Werkzeug, Netherite, Schmiede Vorlagen, Tränke, Raketen, Elytra) - Nutzerauftrag ("bei JannickHase sein Lohn auch raketen noch hinzufügen und Elytra"). Reine Erweiterung der bestehenden `BKMP_EMPLOYEE_WAGE_CATEGORIES`-Liste + zwei Textstellen, die die Kategorien fest ausgeschrieben hatten - die Aufschlüsselungs-Tabelle iteriert bereits automatisch über die Liste, keine Änderung dort nötig. Verifiziert per isoliert gestubbten Testdaten (2.500€ Bücher + 1.000€ Raketen + 8.000€ Elytra → korrekt 11.500€ Basis → 5.750€ Gehalt, "DerJannikhase – Gehalt" weiterhin korrekt beschriftet). `node --check` sauber. Nichts committed/gepusht. — geändert: `admin.html` — 🟡 lokal
+
+---
+
+## 2026-08-15 (1)
 
 - **[Änderung]** Fehlender Stückpreis für die Einnahmen-Kategorie "Werkzeug" ergänzt (75.000 €) - Nutzermeldung. War bisher eine der 4 Kategorien ohne festen Stückpreis (Betrag musste direkt eingetragen werden), jetzt rechnet das Formular wie bei Bücher/Netherite/etc. automatisch Anzahl × Stückpreis. Verifiziert: 3 × 75.000 € = 225.000 € wird korrekt ins Betragsfeld übernommen. Nichts committed/gepusht. — geändert: `admin.html` — 🟡 lokal
 
