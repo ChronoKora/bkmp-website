@@ -1015,6 +1015,11 @@ function bkmpMapExpenseFromSupabase(row) {
     date: row.date,
     note: row.note || '',
     createdAt: row.created_at ? Date.parse(row.created_at) : 0,
+    /* 16.08.2026 (Mitarbeiter-Lohn-Abzug): wird server-seitig automatisch per
+       "default auth.uid()" gesetzt (sql/20260816-expenses-editor-payroll-
+       deduction.sql), NICHT vom Client mitgeschickt - faelschungssicher.
+       Bei Altzeilen (vor der Migration eingetragen) ist die Spalte NULL. */
+    enteredByAuthUserId: row.entered_by_auth_user_id || null,
     source: 'supabase'
   };
 }
@@ -1033,7 +1038,7 @@ async function loadExpenses() {
   if (!client) return null;
   const { data, error } = await client
     .from('expenses')
-    .select('id, category, amount, date, note, created_at')
+    .select('id, category, amount, date, note, created_at, entered_by_auth_user_id')
     .order('date', { ascending: true })
     .order('created_at', { ascending: true });
   if (error) throw error;

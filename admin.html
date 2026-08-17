@@ -1006,12 +1006,16 @@
         <section class="admin-page" id="page-employees">
           <div class="admin-section">
             <h2>&#128119; Mitarbeiter-Lohn</h2>
-            <p class="admin-help-text">Errechnet sich automatisch als 50% aller Einnahmen ab dem 15.08.2026 in den Kategorien B&uuml;cher, Werkzeug, Netherite, Schmiede Vorlagen, Tr&auml;nke, Raketen und Elytra &ndash; eine gemeinsame Summe f&uuml;r alle Mitarbeiter zusammen, kein Feld pro Einnahme n&ouml;tig. Trage eine Einnahme wie gewohnt unter "Einnahmen" ein &ndash; die Summe hier passt sich sofort an, auch beim &Auml;ndern/L&ouml;schen einer bestehenden Einnahme.</p>
+            <p class="admin-help-text">Errechnet sich automatisch als 50% aller Einnahmen ab dem 15.08.2026 in den Kategorien B&uuml;cher, Werkzeug, Netherite, Schmiede Vorlagen, Tr&auml;nke, Raketen und Elytra &ndash; eine gemeinsame Summe f&uuml;r alle Mitarbeiter zusammen, kein Feld pro Einnahme n&ouml;tig. Trage eine Einnahme wie gewohnt unter "Einnahmen" ein &ndash; die Summe hier passt sich sofort an, auch beim &Auml;ndern/L&ouml;schen einer bestehenden Einnahme. Ausgaben, die der Mitarbeiter selbst unter "Ausgaben" eintr&auml;gt, werden automatisch von seiner Auszahlung abgezogen &ndash; Ausgaben, die DU als Admin eintr&auml;gst, z&auml;hlen NICHT mit.</p>
             <div class="overview-grid" id="employeePayoutSummary"></div>
           </div>
           <div class="admin-section">
-            <h2>Aufschl&uuml;sselung nach Kategorie</h2>
+            <h2>Aufschl&uuml;sselung nach Kategorie (Einnahmen)</h2>
             <div class="entry-table-wrapper"><div class="entry-list" id="employeePayoutBreakdown"></div></div>
+          </div>
+          <div class="admin-section">
+            <h2>Vom Mitarbeiter selbst eingetragene Ausgaben (werden abgezogen)</h2>
+            <div class="entry-table-wrapper"><div class="entry-list" id="employeePayoutOwnExpenses"></div></div>
           </div>
         </section>
 
@@ -2959,7 +2963,21 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
        weiterhin EIN gemeinsamer Topf (keine Aenderung an der Rechenlogik
        oben) - bei mehr als einem Zugang wird das explizit als "gemeinsamer
        Topf" gekennzeichnet, damit nie faelschlich eine Aufteilung pro
-       Person suggeriert wird, die es serverseitig gar nicht gibt. */
+       Person suggeriert wird, die es serverseitig gar nicht gibt.
+
+       NACHTRAG (16.08.2026): Nutzerauftrag "DerJannikhase Ausgaben so
+       tracken, dass sie von seinem Lohn abgezogen werden... wenn ICH
+       Ausgaben tracke soll nichts passieren". Anders als bei Einnahmen HIER
+       bewusst MIT Zuordnung: sql/20260816-expenses-editor-payroll-
+       deduction.sql ergaenzt expenses.entered_by_auth_user_id, automatisch
+       und faelschungssicher per "default auth.uid()" gesetzt (der Client
+       schickt dieses Feld nie selbst mit, siehe bkmpMapExpenseToSupabase()
+       in supabase.js - deshalb kann es niemand faelschen). Ausgaben, die
+       der Admin selbst eintraegt, tragen SEINE auth_user_id und zaehlen
+       dadurch strukturell nie mit - exakt die verlangte Unterscheidung,
+       ohne ein zusaetzliches Auswahlfeld im Ausgaben-Formular. Zieht die
+       Summe seiner eigenen Ausgaben von seinem Brutto-Lohn ab, zeigt beides
+       (brutto/Abzug/netto) transparent nebeneinander. */
     const BKMP_EMPLOYEE_WAGE_CATEGORIES = ['Bücher', 'Werkzeug', 'Netherite', 'Schmiede Vorlagen', 'Tränke', 'Raketen', 'Elytra'];
     const BKMP_EMPLOYEE_WAGE_START_DATE = '2026-08-15';
     const BKMP_EMPLOYEE_WAGE_SHARE = 0.5;
@@ -2970,7 +2988,8 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       try {
         const [profiles] = await Promise.all([
           loadAdminProfiles(),
-          typeof syncIncomesFromSupabase === 'function' ? syncIncomesFromSupabase(data, null, { force: true }) : Promise.resolve()
+          typeof syncIncomesFromSupabase === 'function' ? syncIncomesFromSupabase(data, null, { force: true }) : Promise.resolve(),
+          typeof syncExpensesFromSupabase === 'function' ? syncExpensesFromSupabase(data, null, { force: true }) : Promise.resolve()
         ]);
         bkmpEmployeeAccessProfiles = (profiles || []).filter(p => p.role === BKMP_EMPLOYEE_WAGE_ROLE);
       } catch (e) {
@@ -2987,31 +3006,50 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       );
     }
 
+    /* Nur Ausgaben, deren entered_by_auth_user_id zu einem AKTUELLEN
+       expenses_editor-Zugang gehoert - Altzeilen (vor der Migration
+       eingetragen, entered_by_auth_user_id=NULL) und Ausgaben des Admins
+       selbst zaehlen dadurch automatisch NICHT mit. */
+    function bkmpEmployeeOwnExpenses() {
+      const employeeAuthUserIds = new Set(bkmpEmployeeAccessProfiles.map(p => p.auth_user_id).filter(Boolean));
+      if (!employeeAuthUserIds.size) return [];
+      return (data.expenses || []).filter(item => item.enteredByAuthUserId && employeeAuthUserIds.has(item.enteredByAuthUserId));
+    }
+
     function renderEmployeePayoutPage() {
       const summaryEl = document.getElementById('employeePayoutSummary');
       const breakdownEl = document.getElementById('employeePayoutBreakdown');
-      if (!summaryEl && !breakdownEl) return;
+      const ownExpensesEl = document.getElementById('employeePayoutOwnExpenses');
+      if (!summaryEl && !breakdownEl && !ownExpensesEl) return;
 
       const qualifying = bkmpEmployeeWageQualifyingIncomes();
       const totalIncome = bkmpSum(qualifying);
       const totalWage = totalIncome * BKMP_EMPLOYEE_WAGE_SHARE;
+      const ownExpenses = bkmpEmployeeOwnExpenses();
+      const totalOwnExpenses = bkmpSum(ownExpenses);
+      const netPayout = totalWage - totalOwnExpenses;
 
       const names = bkmpEmployeeAccessProfiles.map(p => p.display_name || p.login_name).filter(Boolean);
-      let wageLabel, wageSub;
+      let wageLabel, wageSub, payoutLabel;
       if (names.length === 0) {
-        wageLabel = 'Mitarbeiter-Lohn (50%)';
+        wageLabel = 'Mitarbeiter-Lohn brutto (50%)';
         wageSub = 'Noch kein Mitarbeiter-Zugang vorhanden';
+        payoutLabel = 'Auszahlung (netto)';
       } else if (names.length === 1) {
-        wageLabel = names[0] + ' – Gehalt (50%)';
+        wageLabel = names[0] + ' – Gehalt brutto (50%)';
         wageSub = qualifying.length + ' Einnahme' + (qualifying.length === 1 ? '' : 'n') + ' seit 15.08.2026';
+        payoutLabel = names[0] + ' – Auszahlung (netto)';
       } else {
-        wageLabel = names.join(' + ') + ' – gemeinsamer Lohn-Topf (50%)';
+        wageLabel = names.join(' + ') + ' – gemeinsamer Lohn-Topf brutto (50%)';
         wageSub = 'Gemeinsam, nicht einzeln aufgeteilt · ' + qualifying.length + ' Einnahme' + (qualifying.length === 1 ? '' : 'n') + ' seit 15.08.2026';
+        payoutLabel = 'Gemeinsame Auszahlung (netto)';
       }
 
       if (summaryEl) {
         summaryEl.innerHTML = [
+          overviewCard('💵', payoutLabel, bkmpFormatCurrency(netPayout), 'Nach Abzug der eigenen Ausgaben'),
           overviewCard('💰', wageLabel, bkmpFormatCurrency(totalWage), wageSub),
+          overviewCard('🧾', 'Eigene Ausgaben (Abzug)', bkmpFormatCurrency(totalOwnExpenses > 0 ? totalOwnExpenses * -1 : 0), ownExpenses.length + ' selbst eingetragene Ausgabe' + (ownExpenses.length === 1 ? '' : 'n')),
           overviewCard('📊', 'Zugrunde liegende Einnahmen (100%)', bkmpFormatCurrency(totalIncome), 'Bücher, Werkzeug, Netherite, Schmiede Vorlagen, Tränke, Raketen, Elytra')
         ].join('');
       }
@@ -3036,6 +3074,23 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
                 </div>
               </div>`;
           }).join('');
+        }
+      }
+
+      if (ownExpensesEl) {
+        if (ownExpenses.length === 0) {
+          ownExpensesEl.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Noch keine selbst eingetragenen Ausgaben.</p>';
+        } else {
+          ownExpensesEl.innerHTML = sortByDateDesc(ownExpenses).map(item => `
+            <div class="entry-row">
+              <div class="desc">
+                <span class="name">${escapeHtml(item.name || item.category || '')}</span>
+                <span class="meta">${escapeHtml(formatDate(item.date))}</span>
+              </div>
+              <div class="desc" style="text-align:right; flex:0 0 auto;">
+                <span class="name">-${bkmpFormatCurrency(item.amount)}</span>
+              </div>
+            </div>`).join('');
         }
       }
     }

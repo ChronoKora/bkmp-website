@@ -1,0 +1,36 @@
+-- Bkmp - Ausgaben, die der Mitarbeiter (Rolle "expenses_editor", z.B.
+-- DerJannikhase) selbst im Admin-Panel eintraegt, sollen automatisch von
+-- seinem berechneten Lohn (siehe Mitarbeiter-Seite, 14.08.2026) abgezogen
+-- werden - Nutzerauftrag 16.08.2026: "bis dato bleibe ich ja auf seinen
+-- Ausgaben sitzen... wenn ich Ausgaben tracke soll nichts passieren" (d.h.
+-- NUR seine eigenen Eintraege sollen zaehlen, nicht die des Admins selbst).
+--
+-- Loesung: eine neue Spalte, die AUTOMATISCH und FAELSCHUNGSSICHER erfasst,
+-- WER eine Ausgabe eingetragen hat - `default auth.uid()` wird von Postgres
+-- serverseitig aus dem echten JWT der einreichenden Person gesetzt, der
+-- Client kann diesen Wert nicht selbst mitschicken/faelschen (die bestehende
+-- saveExpense()/bkmpMapExpenseToSupabase()-Funktion in supabase.js sendet
+-- dieses Feld gar nicht - genau deshalb greift der DEFAULT bei jedem
+-- INSERT automatisch, ohne dass am Einfuege-Code irgendetwas geaendert
+-- werden musste). Ergebnis: traegt der Admin selbst eine Ausgabe ein, steht
+-- dort SEINE auth_user_id (zaehlt nicht als "seine" fuer den Mitarbeiter-
+-- Abzug) - traegt der Mitarbeiter sie ein, steht dort SEINE - exakt die vom
+-- Nutzer verlangte Unterscheidung, ganz ohne ein zusaetzliches Auswahlfeld
+-- im Formular.
+--
+-- Bereits bestehende (vor dieser Migration eingetragene) Ausgaben bleiben
+-- unangetastet (NULL in der neuen Spalte) - koennen rueckwirkend keinem
+-- Konto zugeordnet werden, da zum Zeitpunkt ihrer Eintragung noch niemand
+-- erfasst wurde. Wirkt sich nur auf KUENFTIGE Eintragungen aus - der Nutzer
+-- wurde darauf hingewiesen.
+--
+-- Kein neues RLS noetig: `expenses` SELECT ist bereits oeffentlich lesbar
+-- (siehe sql/supabase-all-policies-fix.sql), INSERT ist bereits fuer
+-- is_active_admin() UND is_expenses_editor() erlaubt (siehe sql/20260814-
+-- expenses-editor-role.sql) - beide koennen die neue Spalte also ganz
+-- normal setzen (automatisch) und lesen (fuer die Mitarbeiter-Seite).
+--
+-- Supabase Dashboard > SQL Editor > New query > diesen Inhalt ausfuehren.
+-- idempotent: mehrfaches Ausfuehren ist unschaedlich.
+
+alter table public.expenses add column if not exists entered_by_auth_user_id uuid default auth.uid();
