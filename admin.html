@@ -20,7 +20,7 @@
 <title>BKMP — Admin</title>
 
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
-<link rel="stylesheet" href="style.css?v=20260818-payrolldashboard1">
+<link rel="stylesheet" href="style.css?v=20260818-payrollnocat3">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 </head>
 <body>
@@ -297,30 +297,18 @@
           <div class="admin-section">
             <h2>Ausgaben</h2>
             <div class="entry-table-wrapper"><div class="entry-list" id="expenseList"></div></div>
-            <div class="form-grid form-grid-4">
+            <!-- 18.08.2026, Nutzerauftrag nach kurzem Zwischenstand mit echtem
+                 Kategorie-Dropdown ("Bitte entfernen das... Keine Geschäfts-
+                 bereiche? Sowas haben wir nicht... wenn ich 50k Ausgabe tracke
+                 und Jannik 50k, stehen am Ende 100k bei Geschäftsausgaben"):
+                 Formular wieder wie ursprünglich (Bezeichnung/Betrag/Datum,
+                 3 Felder) - JEDE Ausgabe zählt automatisch mit, unabhängig von
+                 einer Kategorie (die gibt es für Ausgaben bewusst nicht mehr)
+                 und unabhängig davon, wer sie einträgt (Admin oder Mitarbeiter,
+                 siehe bkmpEmployeeWageExpenses() weiter unten in dieser Datei) -
+                 einzige Bedingung bleibt das Datum (ab 15.08.2026). -->
+            <div class="form-grid form-grid-3">
               <div><label for="expenseName">Bezeichnung</label><input type="text" id="expenseName" placeholder="z. B. Marketing" required></div>
-              <!-- 18.08.2026, Nutzerauftrag "nur relevante Geschäftsausgaben ...
-                   möglichst die vorhandene Struktur verwenden, keine unnötige
-                   Datenbankmigration": neu - vorher gab es HIER gar kein
-                   Kategoriefeld, die DB-Spalte "category" wurde 1:1 mit der
-                   freien "Bezeichnung" befüllt (siehe bkmpMapExpenseToSupabase()
-                   in supabase.js). Jetzt echte, eigenständige Kategorie -
-                   "Allgemein" (Default) für alles, was NICHT zu Jannikhases
-                   Geschäftsbereichen gehört (Server, Marketing, ...), die 7
-                   Lohn-Kategorien für alles, was dazugehört (Smaragde für
-                   Bücher-Produktion etc.) - keine neue Spalte nötig, die
-                   bereits bestehende "category"-Spalte wird nur endlich echt
-                   benutzt, "note" (bisher ungenutzt) übernimmt stattdessen die
-                   freie Bezeichnung. Alte Zeilen (vor dieser Änderung) bleiben
-                   unangetastet kompatibel - ihre freie Bezeichnung landet dort
-                   weiterhin in "category", matcht dadurch korrekt KEINE der 7
-                   Kategorien und zählt also (wie bisher) nicht in Jannikhases
-                   Gewinnberechnung mit. -->
-              <div><label for="expenseCategory">Geschäftsbereich</label>
-                <select id="expenseCategory">
-                  <option value="Allgemein">Allgemein (nicht zugeordnet)</option>
-                </select>
-              </div>
               <div><label for="expenseAmount">Betrag (€)</label><input type="number" id="expenseAmount" placeholder="0" required></div>
               <div><label for="expenseDate">Datum</label><input type="date" id="expenseDate"></div>
             </div>
@@ -1125,7 +1113,7 @@
        da admin.html kein window.BKMP_QA_MODE-Gate setzt; macht nur
        bkmpGetGameNow() fuer bkmp-events.js verfuegbar (identisch Date.now()). -->
   <script src="js/core/bkmp-game-clock.js?v=20260724-qafoundation1"></script>
-  <script src="supabase.js?v=20260818-payrolldashboard1"></script>
+  <script src="supabase.js?v=20260818-payrollnocat3"></script>
   <script src="app.js?v=20260718-selbstverdient1"></script>
   <!-- Redesign Phase 2a (17.07.): siehe index.html fuer die Begruendung der
        festen Ladereihenfolge (bkmp-idle-state.js zuerst, bkmp-idle-
@@ -1475,29 +1463,19 @@
     });
 
     /* Mitarbeiter-Lohn-Konstanten (14.-18.08.2026, siehe renderEmployeePayoutPage()
-       weiter unten für die volle Rechenlogik+Historie) - stehen bewusst
-       schon HIER (statt erst bei renderEmployeePayoutPage()), weil das neue
-       Kategorie-Dropdown im Ausgaben-Formular direkt darunter dieselbe Liste
-       braucht - ein "const" weiter unten im selben Script wäre an dieser
-       Stelle noch nicht initialisiert (TDZ). */
+       weiter unten für die volle Rechenlogik+Historie). BKMP_EMPLOYEE_WAGE_
+       CATEGORIES gilt seit 18.08.2026 NUR NOCH für Einnahmen (siehe
+       bkmpEmployeeWageQualifyingIncomes()) - für Ausgaben wurde die Kategorie-
+       Zuordnung auf Nutzerwunsch wieder komplett entfernt (jede Ausgabe zählt,
+       siehe bkmpEmployeeWageExpenses()). Stehen bewusst schon HIER (statt erst
+       bei renderEmployeePayoutPage()), da BKMP_INCOME_CATEGORIES direkt
+       darüber ebenfalls hier verdrahtet wird - ein "const" weiter unten im
+       selben Script wäre an dieser Stelle noch nicht initialisiert (TDZ). */
     const BKMP_EMPLOYEE_WAGE_CATEGORIES = ['Bücher', 'Werkzeug', 'Netherite', 'Schmiede Vorlagen', 'Tränke', 'Raketen', 'Elytra'];
     const BKMP_EMPLOYEE_WAGE_START_DATE = '2026-08-15';
     const BKMP_EMPLOYEE_WAGE_SHARE = 0.5;
     const BKMP_EMPLOYEE_WAGE_ROLE = 'expenses_editor';
     let bkmpEmployeeAccessProfiles = [];
-
-    /* 18.08.2026, Nutzerauftrag "nur relevante Geschäftsausgaben ... möglichst
-       die vorhandene Struktur verwenden": Ausgaben-Formular bekommt ein
-       echtes Kategorie-Dropdown (dieselben 7 Kategorien wie bei Einnahmen) -
-       "Allgemein" bleibt Standard fuer alles, was NICHT zu Jannikhases
-       Geschäftsbereichen gehört. */
-    const expenseCategorySelect = document.getElementById('expenseCategory');
-    BKMP_EMPLOYEE_WAGE_CATEGORIES.forEach(cat => {
-      const opt = document.createElement('option');
-      opt.value = cat;
-      opt.textContent = cat;
-      expenseCategorySelect.appendChild(opt);
-    });
 
     function getIncomeUnitPrice(category) {
       return incomeUnitPrices[bkmpNormalizeCategoryName(category)];
@@ -3040,27 +3018,27 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
          "Mitarbeiter"-Badge in der Ausgaben-Liste). (b) Lohn kann nie
          negativ werden (Math.max(0, ...)), Gewinn-Anzeige selbst darf aber
          ehrlich negativ sein.
-       Formel: Gewinn = relevante Einnahmen − relevante Geschäftsausgaben;
-       Mitarbeiter-Lohn = max(0, Gewinn × 50%). "Relevant" heißt für BEIDE
-       Seiten: Kategorie ist eine der 7 BKMP_EMPLOYEE_WAGE_CATEGORIES UND
-       Datum >= BKMP_EMPLOYEE_WAGE_START_DATE (15.08.2026).
-
-       "Relevante Geschäftsausgabe" erkennen (Nutzerauftrag Punkt 2: "möglichst
-       die vorhandene Struktur verwenden, keine unnötige Datenbankmigration"):
-       das Ausgaben-Formular hatte bisher GAR KEIN Kategoriefeld - die DB-
-       Spalte "category" wurde 1:1 mit der freien "Bezeichnung" befüllt (siehe
-       bkmpMapExpenseToSupabase() weiter oben in dieser Datei). Jetzt bekommt
-       "category" endlich seine eigentliche Bedeutung (echte Kategorie, per
-       neuem Dropdown gewählt), "note" (bisher komplett ungenutzt) übernimmt
-       stattdessen die freie Bezeichnung - keine neue Spalte nötig, beide
-       existierten in der DB schon. Alte Zeilen (vor dieser Änderung) bleiben
-       kompatibel: ihre freie Bezeichnung landet weiterhin in "category",
-       matcht dadurch korrekt KEINE der 7 Kategorien und zählt also (wie
-       bisher) nicht mit - kein stiller Datenverlust, nur keine rückwirkende
-       Zuordnung möglich (die gab es vorher ja auch nicht). BKMP_EMPLOYEE_
-       WAGE_CATEGORIES/_START_DATE/_SHARE/_ROLE + bkmpEmployeeAccessProfiles
-       sind bereits weiter oben deklariert (siehe Kommentar dort - müssen vor
-       dem Kategorie-Dropdown im Ausgaben-Formular stehen). ============ */
+       - 18.08. (3, DIESE Fassung, direkte Folge desselben Tages): Nutzer-
+         Feedback nach kurzem Test mit dem echten Kategorie-Dropdown aus
+         Schritt (2) - "Keine Geschäftsbereiche? Sowas haben wir nicht...
+         wenn ich 50k Ausgabe tracke und Jannik 50k, stehen am Ende 100k bei
+         Geschäftsausgaben, fertig". Die Kategorie-Zuordnung für AUSGABEN ist
+         damit komplett entfallen (das Dropdown im Formular ist wieder weg,
+         Formular wieder wie ursprünglich Bezeichnung/Betrag/Datum) - für
+         Ausgaben zählt jetzt AUSNAHMSLOS jede Ausgabe seit dem Stichtag, egal
+         welche Bezeichnung/Kategorie sie in der DB trägt und egal wer sie
+         einträgt. BKMP_EMPLOYEE_WAGE_CATEGORIES bleibt bestehen, gilt aber
+         seit diesem Schritt NUR NOCH für die Einnahmen-Seite (Bücher/
+         Werkzeug/... sind weiterhin die einzigen fürs Gehalt zählenden
+         Einnahme-Kategorien, siehe bkmpEmployeeWageQualifyingIncomes()).
+       Formel: Gewinn = relevante Einnahmen − ALLE Geschäftsausgaben seit dem
+       15.08.2026; Mitarbeiter-Lohn = max(0, Gewinn × 50%). "Relevant" gilt
+       NUR NOCH für Einnahmen (Kategorie ist eine der 7
+       BKMP_EMPLOYEE_WAGE_CATEGORIES UND Datum >= BKMP_EMPLOYEE_WAGE_START_
+       DATE) - für Ausgaben zählt allein das Datum, siehe
+       bkmpEmployeeWageExpenses() weiter unten. BKMP_EMPLOYEE_WAGE_CATEGORIES/
+       _START_DATE/_SHARE/_ROLE + bkmpEmployeeAccessProfiles sind bereits
+       weiter oben deklariert (siehe Kommentar dort). ============ */
 
     /* Hand-gezeichnete Inline-SVGs im selben minimalistischen Strichstil wie
        die bereits bestehenden Dashboard-Icons (siehe renderOverview() weiter
@@ -3119,16 +3097,15 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       );
     }
 
-    /* 18.08.2026: ersetzt bkmpEmployeeOwnExpenses() - zaehlt jetzt JEDE
-       Ausgabe, deren KATEGORIE zu einem der 7 Geschaeftsbereiche gehoert,
-       unabhaengig davon, wer sie eingetragen hat (Nutzerauftrag: "Diese
-       Unterscheidung soll fuer die Gewinnberechnung NICHT mehr entscheidend
-       sein"). entered_by_auth_user_id (weiterhin faelschungssicher server-
-       seitig gesetzt) dient nur noch der Anzeige, siehe
-       bkmpEmployeeExpenseEnteredByLabel(). */
-    function bkmpEmployeeRelevantExpenses() {
+    /* 18.08.2026 (Schritt 3, ersetzt die kategoriebasierte Fassung von Schritt 2
+       - Nutzerwunsch "keine Geschäftsbereiche, jede Ausgabe zählt"): zaehlt
+       JEDE Ausgabe seit dem Stichtag, unabhaengig von Kategorie/Bezeichnung
+       UND unabhaengig davon, wer sie eingetragen hat (Admin oder Mitarbeiter,
+       beide zaehlen gemeinsam in denselben Topf). entered_by_auth_user_id
+       (weiterhin faelschungssicher server-seitig gesetzt) dient nur noch der
+       Anzeige, siehe bkmpEmployeeExpenseEnteredByLabel(). */
+    function bkmpEmployeeWageExpenses() {
       return (data.expenses || []).filter(item =>
-        BKMP_EMPLOYEE_WAGE_CATEGORIES.includes(item.category) &&
         item.date && item.date >= BKMP_EMPLOYEE_WAGE_START_DATE
       );
     }
@@ -3172,7 +3149,7 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       if (helpEl) {
         const isRealAdminViewer = !document.body.classList.contains('admin-mode-expenseseditor');
         helpEl.textContent = isRealAdminViewer
-          ? 'Errechnet sich automatisch als 50% des tatsächlichen Gewinns (relevante Einnahmen minus relevante Geschäftsausgaben aus Bücher/Werkzeug/Netherite/Schmiede Vorlagen/Tränke/Raketen/Elytra, ab 15.08.2026) – zählt unabhängig davon, ob Admin oder Mitarbeiter die Ausgabe einträgt, solange der passende Geschäftsbereich gewählt wurde ("Allgemein" zählt nicht mit).'
+          ? 'Errechnet sich automatisch als 50% des tatsächlichen Gewinns: relevante Einnahmen aus Bücher/Werkzeug/Netherite/Schmiede Vorlagen/Tränke/Raketen/Elytra seit 15.08.2026, minus ALLE seitdem getrackten Geschäftsausgaben – unabhängig davon, ob Admin oder Mitarbeiter sie einträgt.'
           : 'Deine Auszahlung basiert auf 50% des tatsächlichen Gewinns deiner Geschäftsbereiche und wird automatisch live aktualisiert.';
       }
 
@@ -3185,8 +3162,8 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
 
       const qualifying = bkmpEmployeeWageQualifyingIncomes();
       const totalIncome = bkmpSum(qualifying);
-      const relevantExpenses = bkmpEmployeeRelevantExpenses();
-      const totalExpenses = bkmpSum(relevantExpenses);
+      const wageExpenses = bkmpEmployeeWageExpenses();
+      const totalExpenses = bkmpSum(wageExpenses);
       const netProfit = totalIncome - totalExpenses;
       /* Punkt 21 "Negativer Gewinn": Lohn darf nie negativ werden, die
          Gewinn-KPI-Karte selbst zeigt den echten (ggf. negativen) Wert. */
@@ -3220,7 +3197,7 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
         summaryEl.innerHTML = [
           bkmpPayrollKpiCardHtml(BKMP_PAYROLL_ICONS.trendUp, 'gold', 'Einnahmen', bkmpFormatCurrency(totalIncome), 'Brutto vor Geschäftsausgaben'),
           bkmpPayrollKpiCardHtml(BKMP_PAYROLL_ICONS.receipt, 'cyan', 'Geschäftsausgaben', bkmpFormatCurrency(totalExpenses > 0 ? totalExpenses * -1 : 0), 'Admin + Mitarbeiter'),
-          bkmpPayrollKpiCardHtml(BKMP_PAYROLL_ICONS.chart, netProfit < 0 ? 'danger' : 'violet', 'Gewinn', bkmpFormatCurrency(netProfit), 'Nach allen relevanten Geschäftsausgaben'),
+          bkmpPayrollKpiCardHtml(BKMP_PAYROLL_ICONS.chart, netProfit < 0 ? 'danger' : 'violet', 'Gewinn', bkmpFormatCurrency(netProfit), 'Nach allen Geschäftsausgaben seit 15.08.2026'),
           bkmpPayrollKpiCardHtml(BKMP_PAYROLL_ICONS.percent, 'gold', 'Gewinnbeteiligung', Math.round(BKMP_EMPLOYEE_WAGE_SHARE * 100) + '%', 'Vom tatsächlichen Gewinn')
         ].join('');
       }
@@ -3274,18 +3251,21 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       }
 
       if (ownExpensesEl) {
-        if (relevantExpenses.length === 0) {
-          ownExpensesEl.innerHTML = bkmpPayrollEmptyStateHtml(BKMP_PAYROLL_ICONS.receipt, 'Noch keine Geschäftsausgaben', 'Aktuell wurden für deine Geschäftsbereiche keine relevanten Kosten erfasst.');
+        if (wageExpenses.length === 0) {
+          ownExpensesEl.innerHTML = bkmpPayrollEmptyStateHtml(BKMP_PAYROLL_ICONS.receipt, 'Noch keine Geschäftsausgaben', 'Seit dem 15.08.2026 wurde noch keine Ausgabe erfasst.');
         } else {
-          ownExpensesEl.innerHTML = sortByDateDesc(relevantExpenses).map(item => {
-            const meta = BKMP_PAYROLL_CATEGORY_META[item.category] || { icon: BKMP_PAYROLL_ICONS.receipt, accent: 'gold' };
+          /* 18.08.2026 (Schritt 3): keine Kategorie mehr pro Ausgabe (siehe
+             Kommentar bei bkmpEmployeeWageExpenses()) - jede Zeile bekommt
+             deshalb denselben neutralen Beleg-Icon statt eines pro Kategorie
+             gewählten, die Meta-Zeile zeigt nur noch das Datum. */
+          ownExpensesEl.innerHTML = sortByDateDesc(wageExpenses).map(item => {
             const enteredBy = bkmpEmployeeExpenseEnteredByLabel(item);
             return `
               <div class="payroll-expense-row">
-                <div class="payroll-expense-icon payroll-accent-${meta.accent}">${meta.icon}</div>
+                <div class="payroll-expense-icon payroll-accent-gold">${BKMP_PAYROLL_ICONS.receipt}</div>
                 <div class="payroll-expense-info">
                   <div class="payroll-expense-name">${escapeHtml(item.name || item.category || '')}</div>
-                  <div class="payroll-expense-meta">${escapeHtml(item.category || '')} · ${escapeHtml(formatDate(item.date))}</div>
+                  <div class="payroll-expense-meta">${escapeHtml(formatDate(item.date))}</div>
                 </div>
                 ${enteredBy ? `<span class="payroll-badge payroll-badge-${enteredBy === 'Admin' ? 'admin' : 'employee'}">${enteredBy}</span>` : ''}
                 <div class="payroll-expense-amount">−${bkmpFormatCurrency(item.amount)}</div>
@@ -3932,20 +3912,17 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       const expenseAmountInput = document.getElementById('expenseAmount');
       const expenseDateInput = document.getElementById('expenseDate');
       const name = expenseNameInput.value.trim();
-      const category = expenseCategorySelect.value || 'Allgemein';
       const amount = Number(expenseAmountInput.value);
       const date = expenseDateInput.value || todayStr;
       if (!name) { expenseNameInput.reportValidity(); return; }
       if (!amount) { expenseAmountInput.reportValidity(); return; }
-      /* 18.08.2026: "category" ist jetzt die echte, im neuen Dropdown
-         gewählte Kategorie (statt wie bisher 1:1 die freie Bezeichnung) -
-         "note" trägt stattdessen die Bezeichnung, siehe bkmpMapExpenseToSupabase()
-         in supabase.js + ausführlicher Kommentar bei renderEmployeePayoutPage(). */
-      const expense = { id: bkmpUid('exp'), name, category, amount, date, note: name, createdAt: Date.now() };
+      /* 18.08.2026: wieder wie ursprünglich - "category" ist die freie
+         Bezeichnung selbst (kein separates Kategoriefeld mehr, siehe
+         Kommentar bei renderEmployeePayoutPage() weiter unten). */
+      const expense = { id: bkmpUid('exp'), name, category: name, amount, date, note: '', createdAt: Date.now() };
       const saved = await persistExpense(expense);
       if (saved) {
         expenseNameInput.value = '';
-        expenseCategorySelect.value = 'Allgemein';
         expenseAmountInput.value = '';
         expenseDateInput.value = todayStr;
       }

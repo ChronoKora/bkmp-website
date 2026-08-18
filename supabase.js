@@ -1006,25 +1006,19 @@ async function importLocalInvestorsToSupabase() {
 
 window.importLocalInvestorsToSupabase = importLocalInvestorsToSupabase;
 
-/* 18.08.2026 (Mitarbeiter-Lohn-Redesign): "category" trug bisher 1:1 die
-   freie "Bezeichnung", die im Ausgaben-Formular getippt wurde (kein echtes
-   Kategoriefeld existierte) - "note" war komplett ungenutzt. Jetzt hat das
-   Formular ein echtes Kategorie-Dropdown (siehe admin.html), "category"
-   traegt ab jetzt die ECHTE Kategorie (eine der 7 Mitarbeiter-Geschaeftsbe-
-   reiche, oder "Allgemein"), "note" traegt stattdessen die freie
-   Bezeichnung - keine neue DB-Spalte noetig, beide existierten bereits.
-   name faellt weiterhin auf normalize(category) zurueck, WENN kein note
-   gesetzt ist - das haelt Altzeilen (vor dieser Aenderung, note=NULL,
-   category=alte freie Bezeichnung) unveraendert korrekt lesbar: ihre
-   Anzeige bleibt gleich, sie matchen weiterhin keine der 7 echten
-   Kategorien (kein rueckwirkender Datenverlust, aber auch keine rueck-
-   wirkende Zuordnung - die gab es vorher ja ebenfalls nicht). */
+/* 18.08.2026 (Schritt 3 - Nutzerwunsch "keine Geschäftsbereiche fürs
+   Ausgabenformular, wie vorher"): der kurzzeitig eingeführte category/note-
+   Split (Schritt 2, category=echte Kategorie, note=freie Bezeichnung) wurde
+   wieder verworfen, da das zugehörige Kategorie-Dropdown selbst entfernt
+   wurde - jede Ausgabe zählt jetzt unabhängig von Kategorie/Bezeichnung
+   automatisch mit (siehe bkmpEmployeeWageExpenses() in admin.html). Mapper
+   wieder wie ursprünglich: "category" trägt 1:1 die freie Bezeichnung,
+   "note" bleibt ungenutzt. */
 function bkmpMapExpenseFromSupabase(row) {
-  const normalizedCategory = typeof bkmpNormalizeCategoryName === 'function' ? bkmpNormalizeCategoryName(row.category) : row.category;
   return {
     id: row.id,
-    name: row.note || normalizedCategory,
-    category: normalizedCategory,
+    name: typeof bkmpNormalizeCategoryName === 'function' ? bkmpNormalizeCategoryName(row.category) : row.category,
+    category: typeof bkmpNormalizeCategoryName === 'function' ? bkmpNormalizeCategoryName(row.category) : row.category,
     amount: Number(row.amount || 0),
     date: row.date,
     note: row.note || '',
@@ -1033,9 +1027,9 @@ function bkmpMapExpenseFromSupabase(row) {
        "default auth.uid()" gesetzt (sql/20260816-expenses-editor-payroll-
        deduction.sql), NICHT vom Client mitgeschickt - faelschungssicher.
        Bei Altzeilen (vor der Migration eingetragen) ist die Spalte NULL.
-       Dient seit 18.08.2026 nur noch der Anzeige (Admin/Mitarbeiter-Badge),
-       nicht mehr der Gewinnberechnung selbst - siehe renderEmployeePayoutPage()
-       in admin.html. */
+       Dient nur der Anzeige (Admin/Mitarbeiter-Badge auf der Mitarbeiter-
+       Lohn-Seite), nicht der Gewinnberechnung selbst - siehe
+       renderEmployeePayoutPage() in admin.html. */
     enteredByAuthUserId: row.entered_by_auth_user_id || null,
     source: 'supabase'
   };
@@ -1043,10 +1037,10 @@ function bkmpMapExpenseFromSupabase(row) {
 
 function bkmpMapExpenseToSupabase(expense) {
   return {
-    category: expense.category || 'Allgemein',
+    category: expense.category || expense.name,
     amount: Number(expense.amount || 0),
     date: expense.date,
-    note: expense.name || expense.note || null
+    note: expense.note || null
   };
 }
 
@@ -2875,7 +2869,7 @@ function bkmpIsHiddenTestAccount(nameOrKey) {
    Spielstand/Account bleibt unangetastet. Gleiches Muster/gleiche
    Filterstelle wie BKMP_HIDDEN_TEST_ACCOUNTS oben (nur an der oeffentlichen
    Render-Stelle rausgefiltert, im Admin-Panel weiterhin normal sichtbar). */
-const BKMP_HIDDEN_LEADERBOARD_ACCOUNTS = ['bagon1990', 'bagontr02'];
+const BKMP_HIDDEN_LEADERBOARD_ACCOUNTS = ['bagon1990', 'bagontr02', 'marshmello0wrp'];
 function bkmpIsHiddenFromLeaderboard(nameOrKey) {
   return BKMP_HIDDEN_LEADERBOARD_ACCOUNTS.includes(String(nameOrKey || '').trim().toLowerCase());
 }

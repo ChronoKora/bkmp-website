@@ -2626,10 +2626,20 @@ body:has(.admin-wrap), body:has(.login-card) {
   color: var(--muted);
 }
 
-/* ---- KPI-Karten (Punkt 5): kompakt, gleiche Höhe, dezente Akzente ---- */
+/* ---- KPI-Karten (Punkt 5): kompakt, gleiche Höhe, dezente Akzente ----
+   Nutzer-Screenshot (18.08.2026): 4. Karte ("Gewinnbeteiligung") ragte auf
+   normaler Laptop-Breite rechts aus dem sichtbaren Bereich - klassische CSS-
+   Grid-Falle: "1fr" allein hat ein implizites "minmax(auto, 1fr)", die
+   Spalte darf also nie unter die MIN-CONTENT-Breite ihres Inhalts (z.B. die
+   lange Beschriftung "GEWINNBETEILIGUNG") schrumpfen, wodurch das Grid als
+   Ganzes breiter als der Container wurde. Fix: explizit "minmax(0, 1fr)"
+   (bereits korrekt so bei der 900px-Tablet-Regel darunter, hier auf der
+   Basis-Regel nachgezogen) + min-width:0 auf der Karte selbst als
+   Sicherheitsnetz, damit lange Labels/Zahlen innerhalb der Karte umbrechen
+   statt sie zu sprengen. */
 .payroll-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1rem;
   margin-bottom: 1.6rem;
 }
@@ -2643,6 +2653,7 @@ body:has(.admin-wrap), body:has(.login-card) {
   display: flex;
   align-items: center;
   gap: 0.85rem;
+  min-width: 0;
   padding: 1.1rem 1.2rem;
   border-radius: 16px;
   background: linear-gradient(180deg, color-mix(in srgb, var(--paper-3) 46%, transparent), color-mix(in srgb, var(--paper-2) 92%, transparent));
@@ -2662,8 +2673,8 @@ body:has(.admin-wrap), body:has(.login-card) {
 }
 .payroll-kpi-icon svg { width: 20px; height: 20px; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .payroll-kpi-body { min-width: 0; }
-.payroll-kpi-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.22rem; }
-.payroll-kpi-value { font-family: 'Fraunces', serif; font-size: 1.32rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.payroll-kpi-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.22rem; overflow-wrap: break-word; }
+.payroll-kpi-value { font-family: 'Fraunces', serif; font-size: 1.32rem; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: break-word; }
 .payroll-kpi-sub { margin-top: 0.18rem; font-size: 0.72rem; color: var(--muted); }
 
 /* Akzentrotation Gold/Cyan/Violett (+ Danger fuer einen negativen Gewinn) -
