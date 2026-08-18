@@ -11,6 +11,10 @@ Automatisch von Claude Code gepflegt: **nach jeder Code-/SQL-Änderung kommt hie
 
 ---
 
+## 2026-08-18 (4)
+
+- **[Fix]** Mitarbeiter-Lohn-KPI-Werte brachen bei normaler Laptop-Breite zwischen Zahl und "€" um ("8.961.000" / "€" auf zwei Zeilen, Nutzer-Screenshot). Drei kombinierte Fixes: (1) `.admin-wrap` (gesamter Admin-Bereich, nicht nur diese Seite) von 1220px auf 1440px max-width verbreitert, per Nutzervorschlag ("vergrößere die ganze Seitenansicht"). (2) `.payroll-kpi-value` bekommt `white-space:nowrap` (Zahl+€ immer zusammen) + eine mit der Fensterbreite mitschrumpfende Schriftgröße (clamp) statt fester 1.32rem. (3) `.payroll-kpi-card{overflow:hidden}` als reines Sicherheitsnetz für den theoretischen Extremfall. Live bei 1366px (exakte Nutzerzahlen 8.961.000€/-2.776.000€/6.185.000€) und 820px (Tablet-2-Spalten) verifiziert: alle 4 Werte durchgehend einzeilig, kein horizontales Überlaufen. — `style.css` — 🟡 lokal
+
 ## 2026-08-18 (3)
 
 - **[Fix]** Mitarbeiter-Lohn-KPI-Grid: 4. Karte ("Gewinnbeteiligung") ragte auf normaler Laptop-Breite rechts aus dem sichtbaren Bereich — klassische CSS-Grid-Falle (`repeat(4, 1fr)` ohne `minmax(0, ...)`, die Spalte durfte nicht unter die Min-Content-Breite ihres Labels schrumpfen). Fix: `minmax(0, 1fr)` + `min-width:0` auf der Karte selbst. Live bei 1366px verifiziert: 4. Karte endet jetzt exakt am Grid-Rand, kein Überlauf mehr. — `style.css` — 🟡 lokal

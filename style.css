@@ -2275,7 +2275,14 @@ body:has(.admin-wrap), body:has(.login-card) {
     linear-gradient(180deg, #07070b 0%, var(--paper) 62%, #050506 100%);
 }
 .admin-wrap {
-  max-width: 1220px;
+  /* 18.08.2026, Nutzer-Screenshot ("sieht schrecklich aus... vergrößere die
+     ganze Seitenansicht in die Breite"): war bei 1220px auf normaler Laptop-
+     Breite zu knapp fuer die neue 4-spaltige Mitarbeiter-Lohn-KPI-Reihe -
+     lange Werte wie "8.961.000 €" brachen mitten zwischen Zahl und "€" um.
+     Betrifft die GESAMTE Admin-Seite (kein neuer, gescopter Wert), das ist
+     hier absichtlich so gewaehlt statt nur die Mitarbeiter-Seite separat zu
+     verbreitern. */
+  max-width: 1440px;
   padding-top: 4.5rem;
 }
 .admin-top-actions {
@@ -2654,6 +2661,12 @@ body:has(.admin-wrap), body:has(.login-card) {
   align-items: center;
   gap: 0.85rem;
   min-width: 0;
+  /* Sicherheitsnetz gegen den unten behobenen "€ bricht in eigene Zeile"-Bug
+     (18.08.2026): sollte der Wert trotz breiterem .admin-wrap + schrumpfender
+     Schrift auf einer sehr schmalen Zwischenbreite je doch nicht passen,
+     wird er hier sauber am Kartenrand abgeschnitten statt in die Nachbar-
+     karte zu ragen - reine Rand-Absicherung, keine echte Loesung. */
+  overflow: hidden;
   padding: 1.1rem 1.2rem;
   border-radius: 16px;
   background: linear-gradient(180deg, color-mix(in srgb, var(--paper-3) 46%, transparent), color-mix(in srgb, var(--paper-2) 92%, transparent));
@@ -2674,7 +2687,16 @@ body:has(.admin-wrap), body:has(.login-card) {
 .payroll-kpi-icon svg { width: 20px; height: 20px; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .payroll-kpi-body { min-width: 0; }
 .payroll-kpi-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.22rem; overflow-wrap: break-word; }
-.payroll-kpi-value { font-family: 'Fraunces', serif; font-size: 1.32rem; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: break-word; }
+/* Nutzer-Screenshot (18.08.2026): "8.961.000 €" brach zwischen Zahl und "€"
+   um, weil overflow-wrap:break-word auf zu wenig Kartenbreite traf - für
+   eine Geldsumme sieht ein Umbruch mitten im Wert immer kaputt aus, ein
+   Kürzen/Abschneiden waere ausserdem irreführend. Fix: white-space:nowrap
+   haelt Zahl+€ IMMER zusammen, dafuer schrumpft die Schrift stattdessen
+   leicht mit der Fensterbreite (clamp, gleiche Technik wie schon bei der
+   Hero-Auszahlung) - kombiniert mit dem breiteren .admin-wrap oben reicht
+   das in der Praxis, .payroll-kpi-card{overflow:hidden} bleibt nur als
+   letztes Sicherheitsnetz fuer einen theoretischen Extremfall. */
+.payroll-kpi-value { font-family: 'Fraunces', serif; font-size: clamp(1rem, 1.6vw, 1.32rem); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .payroll-kpi-sub { margin-top: 0.18rem; font-size: 0.72rem; color: var(--muted); }
 
 /* Akzentrotation Gold/Cyan/Violett (+ Danger fuer einen negativen Gewinn) -
