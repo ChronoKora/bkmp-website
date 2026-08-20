@@ -104,6 +104,10 @@ async function bkmpGuildRefreshTreasuryBonusCache() {
 
     if (typeof bkmpIdleRecomputeEffectiveStats === 'function') bkmpIdleRecomputeEffectiveStats();
     if (typeof renderAchievementBadge === 'function') renderAchievementBadge(true);
+    /* Bugfix 20.08.2026 (siehe Kommentar bei bkmpIdleRerenderErfolgeIfActive,
+       idledorf.js) - identisches Muster wie bei der Arena, hier praeventiv
+       mitgefixt (gleiche Bugklasse, gleicher Cache-Aufbau). */
+    if (typeof bkmpIdleRerenderErfolgeIfActive === 'function') bkmpIdleRerenderErfolgeIfActive();
   } catch (e) { /* offline/kein Login - alter Cache-Stand bleibt bestehen */ }
 }
 

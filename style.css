@@ -3879,6 +3879,39 @@ body.bkmp-aura-active::after {
   .bkmp-loot-rain-banner { transition: opacity 0.15s ease; }
 }
 
+/* ---------- Easter Egg "Positivmodus" (19.08.2026, 5x auf die Ausgaben-
+   Kachel klicken) - reine Overlay-Optik, ruehrt an keiner echten Zahl.
+   Konfetti wiederverwendet .bkmp-loot-rain oben unveraendert. ---------- */
+.bkmp-positivmodus-shake { animation: bkmpPositivmodusShake 0.5s ease; }
+@keyframes bkmpPositivmodusShake {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  20% { transform: translate3d(-6px, 0, 0); }
+  40% { transform: translate3d(6px, 0, 0); }
+  60% { transform: translate3d(-4px, 0, 0); }
+  80% { transform: translate3d(4px, 0, 0); }
+}
+.bkmp-positivmodus-overlay { position: fixed; inset: 0; z-index: 94; pointer-events: none; }
+.bkmp-positivmodus-note {
+  position: fixed;
+  transform: translate(-50%, -50%) rotate(var(--rot, 0deg)) scale(0.4);
+  padding: 0.4rem 0.7rem;
+  border-radius: 8px;
+  background: #d4f7c5;
+  color: #14532d;
+  font-family: 'Inter', sans-serif;
+  font-weight: 800;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35), inset 0 -2px 0 rgba(0, 0, 0, 0.08);
+  opacity: 0;
+  transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.bkmp-positivmodus-note.visible { opacity: 1; transform: translate(-50%, -50%) rotate(var(--rot, 0deg)) scale(1); }
+@media (prefers-reduced-motion: reduce) {
+  .bkmp-positivmodus-shake { animation: none; }
+  .bkmp-positivmodus-note { transition: opacity 0.15s ease; }
+}
+
 /* ---------- Drachenfeuer (Easter Egg: "drache" tippen) ---------- */
 .bkmp-fire {
   position: fixed;

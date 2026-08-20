@@ -340,6 +340,98 @@
       });
     }
 
+    /* ---------------- Easter Egg: "Positivmodus" (19.08.2026) ----------------
+       Nutzerauftrag "Easter Egg Idee die komplett ausflippt" nach Inspiration
+       durch den Feedback-Board-Eintrag von DerJannikHase ("Positiv-Modus" -
+       alle Zahlen gruen faerben, rein zum Spass, ohne echte Datenaenderung).
+       5x schnell auf die (immer rot gestylte, siehe .stat-value.negative in
+       style.css) "Ausgaben"-Kachel klicken - identisches Klick-Zaehler-Muster
+       wie egg_diamond oben (bkmpBannerClickCount/triggerBkmpDiamondRain). */
+    let bkmpExpenseClickCount = 0;
+    let bkmpExpenseClickResetTimer = null;
+    const bkmpStatExpensesEl = document.getElementById('statExpenses');
+    const bkmpExpenseCardEl = bkmpStatExpensesEl ? bkmpStatExpensesEl.closest('.stat-card') : null;
+    if (bkmpExpenseCardEl) {
+      bkmpExpenseCardEl.style.cursor = 'pointer';
+      bkmpExpenseCardEl.addEventListener('click', () => {
+        bkmpExpenseClickCount++;
+        clearTimeout(bkmpExpenseClickResetTimer);
+        bkmpExpenseClickResetTimer = setTimeout(() => { bkmpExpenseClickCount = 0; }, 2500);
+        if (bkmpExpenseClickCount >= 5) {
+          bkmpExpenseClickCount = 0;
+          triggerBkmpPositivmodus();
+        }
+      });
+    }
+
+    /* Findet JEDE aktuell sichtbare rot gestylte Finanz-Zahl auf der Seite
+       (immer die "Ausgaben"-Kachel, "Netto Gewinn" nur wenn gerade negativ,
+       plus jede rote Zeile in "Alle Einträge") und klatscht per fixed-
+       positionierten Overlay-Spans (kein Eingriff in die eigentlichen
+       Elemente/ihr Layout) einen gruenen Post-it drauf - rein kosmetisch,
+       reine Fake-Overlays, KEINE echte Zahl wird jemals veraendert. */
+    function bkmpPositivmodusFindRedTargets() {
+      const targets = [];
+      const statExpenses = document.getElementById('statExpenses');
+      if (statExpenses) targets.push(statExpenses);
+      const statNet = document.getElementById('statNet');
+      if (statNet && statNet.classList.contains('negative')) targets.push(statNet);
+      document.querySelectorAll('.ledger-row .amount.out').forEach(el => targets.push(el));
+      return targets;
+    }
+
+    function triggerBkmpPositivmodus() {
+      if (document.getElementById('bkmpPositivmodusOverlay')) return;
+      document.body.classList.add('bkmp-positivmodus-shake');
+      setTimeout(() => document.body.classList.remove('bkmp-positivmodus-shake'), 500);
+      bkmpShowJannikToast('🙈 NEIN NEIN NEIN, ICH SEHE DAS NICHT!', 2400);
+
+      const overlay = document.createElement('div');
+      overlay.id = 'bkmpPositivmodusOverlay';
+      overlay.className = 'bkmp-positivmodus-overlay';
+      document.body.appendChild(overlay);
+
+      setTimeout(() => {
+        const notes = bkmpPositivmodusFindRedTargets().map(el => {
+          const rect = el.getBoundingClientRect();
+          if (rect.width === 0 && rect.height === 0) return null;
+          const note = document.createElement('span');
+          note.className = 'bkmp-positivmodus-note';
+          note.textContent = '😊 ALLES SUPER';
+          note.style.left = (rect.left + rect.width / 2) + 'px';
+          note.style.top = (rect.top + rect.height / 2) + 'px';
+          note.style.setProperty('--rot', (Math.random() * 16 - 8).toFixed(1) + 'deg');
+          overlay.appendChild(note);
+          requestAnimationFrame(() => note.classList.add('visible'));
+          return note;
+        }).filter(Boolean);
+
+        /* Konfetti wiederverwendet exakt dasselbe .bkmp-loot-rain-Muster wie
+           triggerBkmpDiamondRain() oben - nur mit positiv gefaerbten Emojis. */
+        const rain = document.createElement('div');
+        rain.id = 'bkmpPositivmodusRain';
+        rain.className = 'bkmp-loot-rain';
+        const loot = ['💚', '✅', '😊'];
+        rain.innerHTML = Array.from({ length: 24 }, (_, i) => {
+          const emoji = loot[i % loot.length];
+          const left = Math.round(Math.random() * 100);
+          const duration = (2.4 + Math.random() * 1.8).toFixed(2);
+          const delay = (Math.random() * 1).toFixed(2);
+          const size = (1.2 + Math.random() * 1.1).toFixed(2);
+          return `<span style="left:${left}%; animation-duration:${duration}s; animation-delay:${delay}s; font-size:${size}rem;">${emoji}</span>`;
+        }).join('');
+        document.body.appendChild(rain);
+
+        setTimeout(() => {
+          notes.forEach(n => n.classList.remove('visible'));
+          rain.remove();
+          setTimeout(() => overlay.remove(), 350);
+          bkmpShowJannikToast('😅 Puh... war wohl doch nix.', 2600);
+          if (typeof bkmpMarkEggFound === 'function') bkmpMarkEggFound('positivmodus');
+        }, 3400);
+      }, 350);
+    }
+
     /* ---------------- Bonk-Button (oben links) ---------------- */
     const BKMP_BONK_COUNT_KEY = 'bkmp-bonk-count';
     function bkmpGetBonkCount() {
@@ -3404,8 +3496,14 @@
       { id: 'egg_mouseshake', category: 'Easter Eggs', title: '???', revealName: 'Maus-Schüttler', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Manchmal verliert man seinen Mauszeiger auf dem Bildschirm aus den Augen... wackle mal ganz wild hin und her.', check: ctx => ctx.eggsFound.includes('mouseshake') },
       { id: 'egg_rightclick', category: 'Easter Eggs', title: '???', revealName: 'Rechtsklick-Entdecker', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Was passiert wohl, wenn man dreimal schnell hintereinander die rechte Maustaste drückt?', check: ctx => ctx.eggsFound.includes('rightclick') },
       { id: 'egg_jakesfeldfahrt', category: 'Easter Eggs', title: '???', revealName: 'Feldfahrt-Entdecker', desc: 'Finde ein verstecktes Easter Egg.', hint: 'Ein kleiner Traktor irgendwo auf der Seite freut sich über mehrere schnelle Klicks.', check: ctx => ctx.eggsFound.includes('jakesfeldfahrt') },
+      /* 19.08.2026, Nutzerauftrag ("Easter Egg Idee die komplett ausflippt",
+         Feedback-Board-Inspiration DerJannikHase "Positiv-Modus"): 5x schnell
+         auf die rote "Ausgaben"-Zahl auf der Investoren-Seite klicken - siehe
+         triggerBkmpPositivmodus() weiter unten. Gleiches Muster wie
+         egg_diamond (bkmpBannerClickCount/triggerBkmpDiamondRain). */
+      { id: 'egg_positivmodus', category: 'Easter Eggs', title: '???', revealName: 'Realitätsverweigerer', desc: 'Finde ein verstecktes Easter Egg.', revealDesc: 'Rote Zahlen? Kenn ich nicht. 🙈', hint: 'Manche Zahlen auf der Investoren-Seite sind einfach zu rot. Klick fünfmal schnell drauf.', check: ctx => ctx.eggsFound.includes('positivmodus') },
       ...bkmpTieredAchievements('sheepstreak', 'Zeit & Treue', 'sheepStreak', BKMP_SHEEP_STREAK_TIERS, n => `Klicke ${n} Tag${n === 1 ? '' : 'e'} in Folge ab 12 Uhr auf unser Schaf für das Zitat des Tages.`),
-      { id: 'egg_all', category: 'Easter Eggs', title: 'Osterhase', desc: 'Finde alle 18 versteckten Easter Eggs.', progress: ctx => [ctx.eggsFound.length, 18], check: ctx => ctx.eggsFound.length >= 18 },
+      { id: 'egg_all', category: 'Easter Eggs', title: 'Osterhase', desc: 'Finde alle 19 versteckten Easter Eggs.', progress: ctx => [ctx.eggsFound.length, 19], check: ctx => ctx.eggsFound.length >= 19 },
       { id: 'combo_card_wish', category: 'Sonstiges', title: 'Vielseitig', desc: 'Reiche mindestens 1 Karte und 1 Kartenidee ein.', check: ctx => ctx.cardCount >= 1 && ctx.wishCount >= 1 },
       { id: 'night_owl', category: 'Sonstiges', title: 'Nachteule', desc: 'Besuche die Seite zwischen 0 und 5 Uhr nachts.', check: ctx => ctx.nightOwl },
       { id: 'early_bird', category: 'Sonstiges', title: 'Frühaufsteher', desc: 'Besuche die Seite zwischen 5 und 7 Uhr morgens.', check: ctx => ctx.earlyBird },
@@ -3571,6 +3669,7 @@
       { id: 'ostereier', name: 'Der EasterEggHunter', desc: 'Alle Easter Eggs gefunden.', unlockAchievement: 'egg_all' },
       { id: 'habkeingeld', name: 'Hab kein Geld', desc: '99 Dollar gespart. Bester Deal überhaupt.', unlockAchievement: 'egg_adfree' },
       { id: 'liberjaeger', name: 'Liber-Jäger', desc: 'Alle Strichmännchen gefunden.', unlockAchievement: 'egg_derliber' },
+      { id: 'realitaetsverweigerer', name: 'Realitätsverweigerer', desc: 'Rote Zahlen? Kenn ich nicht.', unlockAchievement: 'egg_positivmodus' },
       { id: 'legende', name: 'BKMP-Legende', desc: 'Weit über dem Durchschnitt.', unlockAt: 60 },
       { id: 'unaufhaltsam', name: 'Unaufhaltsam', desc: 'Kaum zu stoppen.', unlockAt: 100 },
       { id: 'allmaechtig', name: 'Der/Die Allmächtige', desc: 'Fast alles erreicht.', unlockAt: 120 },

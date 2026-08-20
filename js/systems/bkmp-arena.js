@@ -42,6 +42,11 @@ async function bkmpArenaRefreshAchievementCache() {
     const fields = { arenaWins: rating ? rating.wins : 0, arenaRating: rating ? rating.rating : 1000 };
     localStorage.setItem(BKMP_ARENA_ACHIEVEMENT_CACHE_KEY, JSON.stringify(fields));
     if (typeof renderAchievementBadge === 'function') renderAchievementBadge(true);
+    /* Bugfix 20.08.2026 (siehe Kommentar bei bkmpIdleRerenderErfolgeIfActive,
+       idledorf.js) - ohne diesen Aufruf blieb ein bereits offener Idle-Dorf-
+       'Erfolge'-Tab (Titel-Boni-Liste) bei einem frisch aktualisierten
+       arenaWins-Stand dauerhaft auf dem alten (gesperrten) Zustand haengen. */
+    if (typeof bkmpIdleRerenderErfolgeIfActive === 'function') bkmpIdleRerenderErfolgeIfActive();
   } catch (e) { /* offline/kein Login - alter Cache-Stand bleibt bestehen */ }
 }
 

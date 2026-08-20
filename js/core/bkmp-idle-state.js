@@ -266,8 +266,30 @@ function bkmpIdleShowDismissibleResultCard(id, innerHtml) {
       ${innerHtml}
     </div>
   `;
+  /* Bugfix 19.08.2026 (Spieler-Meldung Kaledoss: "Man muss die Seite reloaden,
+     sobald man einen Dungeon gemacht hat. Sonst kann man keine Stufen mehr
+     rechts auswählen" - per CSS-Kaskaden-Analyse bewiesen, nicht nur
+     vermutet): .bkmp-easter{position:fixed;inset:0;pointer-events:none} ist
+     die Basisregel, ABER .bkmp-easter-dismissible{pointer-events:auto} (fuer
+     das Backdrop-Klick-zum-Schliessen) hat GLEICHE Spezifitaet und steht
+     SPAETER in style.css - gewinnt die Kaskade also IMMER, unabhaengig vom
+     .visible-Zustand. Das bisherige close() entfernte nur die .visible-
+     Klasse und wartete 450ms bis zum echten overlay.remove() - waehrend
+     dieser gesamten Zeit blieb das Element ein VOLLBILD-, KLICKFANGENDES
+     Element (auch unsichtbar/ausgeblendet), das JEDEN Klick irgendwo auf der
+     Seite (inkl. auf die Stufenleiste dahinter) abfing statt ihn durchzu-
+     lassen - im Normalfall nur ein enges 450ms-Zeitfenster, im theoretischen
+     Fall eines je uebersprungenen/unterbrochenen remove()-Timers aber
+     DAUERHAFT (genau das erklaert "muss reloaden" - ein Reload ist der
+     einzige Weg, ein rein im Speicher haengendes DOM-Element wieder
+     loszuwerden). Fix: pointer-events sofort beim Schliessen selbst
+     erzwingen, unabhaengig vom spaeteren Entfernen - das Element kann ab
+     hier nie wieder einen Klick abfangen, auch wenn remove() aus
+     irgendeinem Grund nie liefe. Gemeinsame Funktion fuer Dungeon- UND
+     Turm-Ergebnis - ein Fund, zwei Systeme gleichzeitig abgesichert. */
   const close = () => {
     overlay.classList.remove('visible');
+    overlay.style.pointerEvents = 'none';
     setTimeout(() => overlay.remove(), 450);
   };
   overlay.addEventListener('click', e => { if (e.target === overlay) close(); });

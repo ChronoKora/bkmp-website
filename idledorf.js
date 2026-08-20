@@ -771,12 +771,46 @@ const BKMP_IDLE_ACHIEVEMENT_CACHE_KEY = 'bkmp-idle-achievement-fields-cache';
 function bkmpIdleGetCachedAchievementFields() {
   try { return JSON.parse(localStorage.getItem(BKMP_IDLE_ACHIEVEMENT_CACHE_KEY) || 'null'); } catch (e) { return null; }
 }
+/* Bugfix 20.08.2026 (Spieler-Report FlinkerBoy7289: "Arena-Champion" zeigt im
+   Idle-Dorf selbst dauerhaft gesperrt trotz 250+ echten Arena-Siegen, obwohl
+   die normalen Webseiten-Erfolge/-Titel es laengst korrekt zeigen) - Root
+   Cause per Live-Test im Browser bewiesen (nicht nur vermutet): diese
+   Funktion (nicht bkmpBuildAchievementContext auf der Webseite, siehe
+   js/core/bkmp-site.js) speist SOWOHL die Titel-Boni-Anzeige im Idle-Dorf-
+   'Erfolge'-Tab (bkmpIdleBuildTitleBonusListHtml) ALS AUCH - entscheidender -
+   die tatsaechliche Kampf-Stat-Berechnung selbst (bkmpIdleRecomputeEffectiveStats,
+   ~Zeile 499: bkmpIdleTitleEffectTotals(bkmpIdleGetAchievementContextFields())).
+   Sie enthielt bisher aber gar keine arena-/raid-/gilden-bezogenen Felder
+   (arenaWins/arenaRating/raidBossesDefeated/raidMvpCount/guildLevel/
+   guildRole/guildBossesDefeated/inGuild) - jeder der 15 Gilde/Arena/Weltboss-
+   Titel (idletitle_arena_win200 usw., siehe weiter unten in dieser Datei)
+   wertete dadurch IMMER "ctx.arenaWins >= 200" als "undefined >= 200" = false
+   aus, unabhaengig vom echten Spielstand. bkmpIdleTitleUnlockedSticky() (siehe
+   js/systems/bkmp-cosmetics.js) faengt das normalerweise durch einen dauerhaft
+   persistierten Freischalt-Zeitpunkt ab - der wurde bisher aber ausschliesslich
+   von der WEBSEITEN-eigenen Titel-Unteransicht (bkmpTitleUnlocked, mit der
+   dort bereits vollstaendigen bkmpBuildAchievementContext()) gesetzt. Ein
+   Spieler, der diese spezielle Unteransicht nie gezielt geoeffnet hat (die
+   meisten schauen eher auf "Erfolge" als auf "Titel"), sah den Titel deshalb
+   nicht nur im Idle-Dorf faelschlich gesperrt, sondern bekam auch dessen
+   echten Kampfbonus (z.B. +8% kritischer Schaden) nie tatsaechlich gutgeschrieben
+   - kein reiner Anzeigefehler, ein echter, stiller Bonus-Verlust. Fix: exakt
+   dasselbe Merge-Muster wie bkmpBuildAchievementContext() auf der Webseite
+   (js/core/bkmp-site.js) direkt hier uebernommen, typeof-Guards da diese drei
+   Subsystem-Dateien theoretisch vor idledorf.js laden (siehe Modul-Ladereihenfolge
+   in CLAUDE.md), zur Sicherheit trotzdem defensiv geprueft. */
 function bkmpIdleGetAchievementContextFields() {
   const s = bkmpIdleState;
+  const crossSystemFields = {
+    ...(typeof bkmpArenaGetAchievementContextFields === 'function' ? bkmpArenaGetAchievementContextFields() : {}),
+    ...(typeof bkmpRaidGetAchievementContextFields === 'function' ? bkmpRaidGetAchievementContextFields() : {}),
+    ...(typeof bkmpGuildGetAchievementContextFields === 'function' ? bkmpGuildGetAchievementContextFields() : {})
+  };
   if (!s) {
-    return bkmpIdleGetCachedAchievementFields() || { idleDragonKills: 0, idleBossKills: 0, idleLevel: 0, idleGoldEarned: 0, idleSkillPointsSpent: 0, idleBranchesMaxed: 0, shenlossDefeated: false, liberDefeated: false, idlePrestigeLevel: 0, idleRuneFuseSuccesses: 0, idleRuneFuseFailures: 0, idleRuneUpgradeSuccesses: 0, idleRuneUpgradeFailures: 0, idleAllEquippedRarity: null, idleAllEquippedMinLevel: -1, idleDungeonCleared: bkmpDungeonIsHardestCleared(), idleLoginStreak: 0, idleDragonsHatched: 0, idleDragonsAdult: 0, idleDragonSpeciesOwned: 0, idleLegendaryDragonsOwned: 0, idleHasSteampunkSkin: false };
+    return { ...(bkmpIdleGetCachedAchievementFields() || { idleDragonKills: 0, idleBossKills: 0, idleLevel: 0, idleGoldEarned: 0, idleSkillPointsSpent: 0, idleBranchesMaxed: 0, shenlossDefeated: false, liberDefeated: false, idlePrestigeLevel: 0, idleRuneFuseSuccesses: 0, idleRuneFuseFailures: 0, idleRuneUpgradeSuccesses: 0, idleRuneUpgradeFailures: 0, idleAllEquippedRarity: null, idleAllEquippedMinLevel: -1, idleDungeonCleared: bkmpDungeonIsHardestCleared(), idleLoginStreak: 0, idleDragonsHatched: 0, idleDragonsAdult: 0, idleDragonSpeciesOwned: 0, idleLegendaryDragonsOwned: 0, idleHasSteampunkSkin: false }), ...crossSystemFields };
   }
   const fields = {
+    ...crossSystemFields,
     idleDragonKills: Number(s.dragon_kills || 0),
     idleBossKills: Number(s.boss_kills || 0),
     idleLevel: Number(s.level || 0),
@@ -2008,6 +2042,32 @@ function bkmpIdleRenderErfolgePanel() {
     if (mcNameBadge) mcNameBadge.click();
     window.setTimeout(() => { const cosBtn = document.getElementById('achievementsSubtabCosmetics'); if (cosBtn) cosBtn.click(); }, 60);
   });
+}
+
+/* Bugfix 20.08.2026 (Spieler-Report FlinkerBoy7289: "Arena-Champion" zeigt im
+   Idle-Dorf-'Erfolge'-Tab (zeigt trotz des Namens die TITEL-Boni-Liste, siehe
+   bkmpIdleBuildTitleBonusListHtml) weiterhin gesperrt trotz 250+ echten
+   Arena-Siegen, obwohl die normalen Webseiten-Erfolge es laengst korrekt
+   zeigen). Root Cause: bkmpIdleRenderErfolgePanel() wird NUR beim Aktivieren
+   des Tabs einmalig gerendert - bleibt der Tab offen (oder wird er geoeffnet,
+   BEVOR bkmpArenaRefreshAchievementCache()/bkmpRaidRefreshAchievementCache()/
+   bkmpGuildRefreshTreasuryBonusCache() ihren asynchronen Ladevorgang beendet
+   haben), zeigt er dauerhaft den zum Render-Zeitpunkt zwischengespeicherten
+   (evtl. veralteten) ctx.arenaWins/raidBossesDefeated/guildLevel-Stand - der
+   bereits bestehende Combat-Tick-Live-Refresh (bkmpIdleRefreshLiveTabsPanelId)
+   deckt nur 5 andere Tabs ab, 'erfolge' bewusst nicht (braucht kein Kampf-
+   Ereignis, sondern reagiert auf einen ganz anderen Trigger: einen frisch
+   abgeschlossenen Arena-/Raid-/Gilden-Netzwerk-Refresh). Die Webseiten-eigene
+   Erfolge-Ansicht hat dieses Problem nicht, da sie bei jedem eigenstaendigen
+   Oeffnen ctx frisch aus genau denselben (dann laengst aktualisierten) Caches
+   neu aufbaut (siehe bkmpBuildAchievementContext, js/core/bkmp-site.js) - der
+   Idle-Dorf-Tab dagegen wird nie von sich aus neu aufgebaut. Fix: alle drei
+   Cache-Refresh-Funktionen rufen diesen Helfer direkt neben ihrem bereits
+   bestehenden renderAchievementBadge(true)-Aufruf auf - baut den Tab exakt
+   dann neu auf, wenn sich sein zugrundeliegender Kontext tatsaechlich
+   geaendert haben KOENNTE, unabhaengig vom Kampfgeschehen. */
+function bkmpIdleRerenderErfolgeIfActive() {
+  if (bkmpIdleModalOpen && bkmpIdleActiveTab === 'erfolge') bkmpIdleRenderErfolgePanel();
 }
 
 /* ---------------- Rendering: Bestenliste-Tab ---------------- */

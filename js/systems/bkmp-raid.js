@@ -1097,6 +1097,10 @@ async function bkmpRaidRefreshAchievementCache() {
     };
     try { localStorage.setItem(BKMP_RAID_ACHIEVEMENT_CACHE_KEY, JSON.stringify(fields)); } catch (e) {}
     if (typeof renderAchievementBadge === 'function') renderAchievementBadge(true);
+    /* Bugfix 20.08.2026 (siehe Kommentar bei bkmpIdleRerenderErfolgeIfActive,
+       idledorf.js) - identisches Muster wie bei der Arena, hier praeventiv
+       mitgefixt (gleiche Bugklasse, gleicher Cache-Aufbau). */
+    if (typeof bkmpIdleRerenderErfolgeIfActive === 'function') bkmpIdleRerenderErfolgeIfActive();
   } catch (e) { /* Cache bleibt auf altem Stand */ }
 }
 
