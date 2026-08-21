@@ -142,7 +142,7 @@ module.exports = async function handler(req, res) {
     const state = Array.isArray(stateRows) ? stateRows[0] : null;
     if (!state) return send(res, 200, { ok: true, elapsedSeconds: 0, rewards: null, newTotals: null });
 
-    const configRes = await sbFetch(serviceKey, `idle_game_config?key=in.(offline_progress,dragon_scaling,reward_scaling,boss_scaling,rare_spawn)&select=key,value`);
+    const configRes = await sbFetch(serviceKey, `idle_game_config?key=in.(offline_progress,dragon_scaling,reward_scaling,boss_scaling,rare_spawn,offline_floor)&select=key,value`);
     const configRows = configRes.ok ? await configRes.json() : [];
     const config = {};
     (Array.isArray(configRows) ? configRows : []).forEach(row => { config[row.key] = row.value; });
@@ -374,6 +374,12 @@ module.exports = async function handler(req, res) {
        genau das Live-Verhalten von "Bleibt auf dieser Stufe". */
     const autoAdvance = state.auto_advance !== false;
     let killIndex = Number(state.current_dragon_index || 0);
+    // Bugfix 21.08.2026 (siehe grosser Kommentar beim Mindestlohn-Block weiter
+    // unten): der garantierte Mindestlohn muss die Stufe verwenden, auf der
+    // der Spieler beim Verlassen WIRKLICH stand - killIndex selbst wird von
+    // der Simulation unten mutiert (Vorstoss bei Sieg, Rueckzug bei
+    // Niederlage), floorRefKillIndex friert den Ausgangswert davor ein.
+    const floorRefKillIndex = killIndex;
     let simulatedSeconds = 0;
     let kills = 0;
     let bossKills = 0;
@@ -492,6 +498,129 @@ module.exports = async function handler(req, res) {
     crystalGain += Math.round(rareCrystalRaw);
     essenceGain += Math.round(rareEssenceRaw);
 
+    /* ============================================================
+       Bugfix 21.08.2026 - garantierter Mindestlohn (Spieler-Meldung
+       BagonTr01: "ganzen Abend weg... nichts bekommen fuers AFK",
+       Nutzerauftrag "Wir muessen das AFK System ueberarbeiten").
+
+       Root Cause (bestaetigt, nicht nur vermutet): die gesamte Belohnung
+       oben haengt EINZIG am Erfolg der Zug-fuer-Zug-Kampfsimulation - kann
+       schon der ALLERERSTE Kampf am aktuellen current_dragon_index nicht
+       innerhalb des Zeitbudgets gewonnen werden (z.B. Spieler unterlevelt
+       fuer seine Stufe, oder die persistierten Kampfwerte sind aus
+       irgendeinem Grund niedriger als die echte Live-Staerke), bricht die
+       while-Schleife weiter oben bei der allerersten Iteration ab - JEDE
+       *Gain-Variable bleibt bei 0, unabhaengig davon, ob der Spieler 5
+       Minuten oder den vollen 12h-Deckel weg war. Dieses genaue Muster
+       wurde bereits 5x einzeln fuer je eine andere Unterursache gepatcht
+       (fehlende Drachen-Daten/Blazehunter07 19.07., fehlende Magie-
+       Skilltree-Effekte/ChronoKora 20.07., fehlende seltene Drachen/
+       Crocodilandy927 20.07., zu langsamer Rueckzug/ChronoKora 20.07.,
+       fehlender Begleitdrachen-Kontext 05.08.) - ohne dass die eigentliche
+       "Alles-oder-nichts-Simulation"-Struktur je angefasst wurde.
+
+       Recherche zu Offline-/AFK-Belohnungssystemen in anderen Idle-Spielen
+       (Whiteout Survival "Untaetigkeitsertraege", AFK Arena "AFK Rewards",
+       Cookie Clicker/Egg Inc Offline-Prozentsaetze, Machinations.io-
+       Designleitfaden, plus die dokumentierten Ausfaelle von Idle
+       Champions - deren Kampf-Simulation bei einem unwinnbaren Encounter
+       ebenfalls komplett leer ausgehen kann und dafuer die exakt gleiche
+       Spieler-Beschwerde erntet) bestaetigt: der Standard-Fix ist ein vom
+       Simulationsergebnis UNABHAENGIGER garantierter Mindestbetrag pro
+       Ressource, kombiniert per max() statt Addition/Mischung - eine
+       bereits erfolgreiche Simulation wird dadurch NIE schlechter (kein
+       Abwerten auf den Mindestwert) und NIE besser (kein doppeltes
+       Gutschreiben), nur ein leerer/fehlgeschlagener Lauf wird angehoben.
+
+       Der Mindestlohn liest bewusst NUR deterministische, nie fehlerhafte
+       Drachen-Basisdaten (dieselben *_reward_base-Felder, die die
+       Simulation ohnehin schon nutzt) + eine feste Sekunden-pro-Kill-
+       Annahme - absichtlich OHNE jede Abhaengigkeit von attack/defense/
+       critChance/Skilltree-Zustand, da genau DIESE Werte die Ursache
+       mehrerer der oben genannten historischen Bugs waren. Effizienz
+       bewusst niedrig (Standard 35%, deutlich unter einer echten
+       erfolgreichen Simulation) - der Mindestlohn ist ein Sicherheitsnetz,
+       keine attraktivere Alternativ-Strategie ("einfach auf einer
+       unschaffbaren Stufe stehen bleiben" darf sich nie lohnen).
+
+       current_dragon_index selbst wird vom Mindestlohn bewusst NIE
+       veraendert (bleibt exakt der von der Simulation gesetzte/
+       unveraenderte Wert) - ein Spieler, der seine aktuelle Stufe nicht
+       schafft, soll durch den Mindestlohn nicht zusaetzlich auf eine noch
+       schwerere Stufe vorruecken, das wuerde das Problem beim naechsten
+       Rueckkehr-Versuch nur verschaerfen. dragon_kills/boss_kills (reine
+       Lebenszeit-/Erfolgs-Zaehler, gaten keinen echten Fortschritt) duerfen
+       dagegen konsistent zum tatsaechlich gewaehrten Ressourcen-Pfad
+       mitwachsen.
+
+       Neuer, additiver Config-Schluessel 'offline_floor' (idle_game_config,
+       gleiches Muster wie offline_progress/dragon_scaling/...) mit
+       enabled-Kill-Schalter - siehe sql/20260821-offline-floor-config.sql.
+       ============================================================ */
+    let floorApplied = false;
+    const floorAppliedResources = [];
+    const offlineFloorCfg = config.offline_floor || {};
+    if (offlineFloorCfg.enabled !== false && elapsedSeconds >= 60) {
+      const floorSecondsPerKill = Math.max(1, Number(offlineFloorCfg.assumedSecondsPerKill || 45));
+      const floorSecondsPerEliteKill = Math.max(1, Number(offlineFloorCfg.assumedSecondsPerBossKill || 180));
+      const floorEfficiency = Math.max(0, Math.min(100, Number(offlineFloorCfg.efficiencyPct != null ? offlineFloorCfg.efficiencyPct : 35))) / 100;
+      const floorCompanionXpPerHour = Math.max(0, Number(offlineFloorCfg.companionXpPerHour || 8));
+
+      // Referenzdrache: die Stufe, auf der der Spieler beim Verlassen stand
+      // (floorRefKillIndex, s.o.) - fallback auf den allerersten Drachen,
+      // falls dieser Lookup je fehlschlaegt (deckt exakt die Ursache von 2
+      // der 5 historischen Vorfaelle oben ab - der Mindestlohn darf NIE an
+      // derselben Luecke scheitern wie die Simulation selbst).
+      let refDragon = null;
+      try {
+        refDragon = dragonStatsAt(floorRefKillIndex, dragons, dragonCfg) || dragonStatsAt(0, dragons, dragonCfg);
+      } catch (e) { refDragon = null; }
+
+      if (refDragon) {
+        const isEliteRef = Boolean(refDragon.bossTier);
+        const floorKills = Math.max(0, Math.floor(elapsedSeconds / (isEliteRef ? floorSecondsPerEliteKill : floorSecondsPerKill)));
+
+        if (floorKills > 0) {
+          const floorGoldGrowth = growthMult(rewardCfg.goldGrowthPerKill, rewardCfg.goldGrowthExponent, floorRefKillIndex);
+          const floorXpGrowth = growthMult(rewardCfg.xpGrowthPerKill, rewardCfg.xpGrowthExponent, floorRefKillIndex);
+          const floorRewardMult = refDragon.bossTier === 'boss' ? (rewardCfg.bossRewardMult || 4) : refDragon.bossTier === 'miniboss' ? (rewardCfg.minibossRewardMult || 2) : 1;
+
+          const floorGold = Math.round(floorKills * (refDragon.archetype.gold_reward_base || 0) * floorGoldGrowth * floorRewardMult * (1 + goldBonus / 100) * floorEfficiency);
+          const floorXp = Math.round(floorKills * (refDragon.archetype.xp_reward_base || 0) * floorXpGrowth * floorRewardMult * (1 + xpBonus / 100) * floorEfficiency);
+          const floorWood = Math.round(floorKills * (refDragon.archetype.wood_reward_base || 0) * (1 + lootBonus / 100) * floorEfficiency);
+          const floorStone = Math.round(floorKills * (refDragon.archetype.stone_reward_base || 0) * (1 + lootBonus / 100) * floorEfficiency);
+          const floorCrystals = Math.round(floorKills * (refDragon.archetype.crystal_reward_base || 0) * (1 + lootBonus / 100) * floorEfficiency);
+          const floorEssence = Math.round(floorKills * (refDragon.archetype.essence_reward_base || 0) * (1 + lootBonus / 100) * floorEfficiency);
+
+          // max() PRO RESSOURCE, nicht ueber die ganze Belohnung hinweg - ein
+          // Lauf mit ein paar echten Kills vor dem Rueckzug (kleines, aber
+          // echtes Gold/XP/Holz, aber 0 Kristalle/Essenz da kein Boss/kein
+          // seltener Wurf) soll seine echten Teilergebnisse behalten UND
+          // trotzdem bei den leer gebliebenen Ressourcen aufgefuellt werden.
+          if (floorGold > goldGain) { goldGain = floorGold; floorApplied = true; floorAppliedResources.push('gold'); }
+          if (floorXp > xpGain) { xpGain = floorXp; floorApplied = true; floorAppliedResources.push('xp'); }
+          if (floorWood > woodGain) { woodGain = floorWood; floorApplied = true; floorAppliedResources.push('wood'); }
+          if (floorStone > stoneGain) { stoneGain = floorStone; floorApplied = true; floorAppliedResources.push('stone'); }
+          if (floorCrystals > crystalGain) { crystalGain = floorCrystals; floorApplied = true; floorAppliedResources.push('crystals'); }
+          if (floorEssence > essenceGain) { essenceGain = floorEssence; floorApplied = true; floorAppliedResources.push('essence'); }
+
+          // Lebenszeit-Kill-Zaehler nur anheben, wenn der Mindestlohn
+          // tatsaechlich mehr "Kills" ergibt als die Simulation echt
+          // erreicht hat - current_dragon_index bleibt bewusst unangetastet
+          // (siehe Kommentar-Kopf oben).
+          if (floorKills > kills) {
+            if (isEliteRef) bossKills = Math.max(bossKills, floorKills);
+            kills = floorKills;
+          }
+        }
+      }
+
+      if (companion && floorCompanionXpPerHour > 0) {
+        const floorCompanionXp = Math.floor((elapsedSeconds / 3600) * floorCompanionXpPerHour);
+        if (floorCompanionXp > companionXpGain) { companionXpGain = floorCompanionXp; floorApplied = true; }
+      }
+    }
+
     let level = Number(state.level || 1);
     let xp = Number(state.xp || 0) + xpGain;
     let skillPointsAvailable = Number(state.skill_points_available || 0);
@@ -522,7 +651,7 @@ module.exports = async function handler(req, res) {
       current_dragon_index: killIndex,
       highest_dragon_index: Math.max(Number(state.highest_dragon_index || 0), killIndex),
       last_seen_at: new Date().toISOString(),
-      last_offline_claim: { elapsedSeconds, goldGain, xpGain, woodGain, stoneGain, crystalGain, essenceGain, dragonKills: kills, levelsGained, claimedAt: new Date().toISOString() }
+      last_offline_claim: { elapsedSeconds, goldGain, xpGain, woodGain, stoneGain, crystalGain, essenceGain, dragonKills: kills, levelsGained, claimedAt: new Date().toISOString(), floorApplied, floorAppliedResources }
     };
 
     const claimRes = await sbFetch(serviceKey, `idle_player_state?auth_user_id=eq.${encodeURIComponent(user.id)}&last_seen_at=eq.${encodeURIComponent(lastSeenIso)}`, {
@@ -568,7 +697,7 @@ module.exports = async function handler(req, res) {
     return send(res, 200, {
       ok: true,
       elapsedSeconds,
-      rewards: { gold: goldGain, xp: xpGain, wood: woodGain, stone: stoneGain, crystals: crystalGain, essence: essenceGain, dragonKills: kills, levelsGained, dragonXpGain },
+      rewards: { gold: goldGain, xp: xpGain, wood: woodGain, stone: stoneGain, crystals: crystalGain, essence: essenceGain, dragonKills: kills, levelsGained, dragonXpGain, floorApplied },
       newTotals
     });
   } catch (error) {

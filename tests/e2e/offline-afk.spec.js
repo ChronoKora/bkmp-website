@@ -84,7 +84,12 @@ test.describe('Offline-/AFK-Fortschritt', () => {
     const result = await claimOffline(page);
 
     expect(result.ok).toBe(true);
+    // Bugfix 21.08.2026 (garantierter Mindestlohn, siehe offline-reward-
+    // floor.spec.js): rewards traegt seitdem zusaetzlich das boolesche Feld
+    // floorApplied - derselbe Nicht-Zahl-Filter wie bei newTotals direkt
+    // darunter (galt schon vorher fuer current_dragon_index & Co.).
     Object.values(result.rewards).forEach(v => {
+      if (typeof v !== 'number') return;
       expect(Number.isNaN(v)).toBe(false);
       expect(v).toBeGreaterThanOrEqual(0);
     });

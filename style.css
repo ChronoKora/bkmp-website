@@ -6044,6 +6044,24 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   padding: 0.2rem;
 }
 .idle-offline-close:hover { color: var(--ink); }
+/* Bugfix 21.08.2026 (garantierter Mindestlohn, siehe grosser Kommentar in
+   api/claim-idle-offline-progress.js) - kleiner, ehrlicher Hinweis statt
+   die Mindestlohn-Zahlen unmarkiert wie eine normale erfolgreiche
+   Simulation aussehen zu lassen (Recherche-Erkenntnis: Spieler lesen einen
+   unerklaerten kleinen Betrag sonst eher als "ich habe was verpasst" statt
+   "das Spiel hat mich abgesichert"). Nur sichtbar, wenn der Mindestlohn bei
+   mindestens einer Ressource tatsaechlich gegriffen hat. */
+.idle-offline-floor-badge {
+  margin-top: 0.5rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--gold) 12%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--gold) 45%, var(--line));
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+  width: fit-content;
+}
 
 .idle-dorf-tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1rem; }
 .idle-dorf-tab {
@@ -12382,6 +12400,15 @@ html.bkmp-app-mode .idle-offline-close {
   width: 32px !important;
   height: 32px !important;
   font-size: 1.1rem !important;
+}
+/* Mindestlohn-Badge (21.08.2026) an dieselbe App-Modus-Optik wie die
+   .idle-offline-rewards-Pillen direkt darueber angeglichen - html.bkmp-
+   app-mode ist global aktiv (siehe CLAUDE.md), die Basisregel oben nutzt
+   noch --gold statt --app-gold und haette sonst optisch nicht gepasst. */
+html.bkmp-app-mode .idle-offline-floor-badge {
+  background: rgba(0, 0, 0, .25) !important;
+  border-color: color-mix(in srgb, var(--app-gold) 55%, transparent) !important;
+  color: var(--app-muted) !important;
 }
 
 /* "Mehr"-Menue-Gruppen (siehe setupMoreMenu in index.html) */
