@@ -13,7 +13,7 @@ select 'bug',
   'kampf',
   'behoben',
   'Nach einer längeren Abwesenheit gab es teilweise gar keine AFK-Belohnung, obwohl man mehrere Stunden weg war.',
-  'Gefunden und behoben: war die aktuelle Kampf-Stufe offline nicht simulierbar gewinnbar, ging die komplette Abwesenheit leer aus - egal wie lange sie war. Es gibt jetzt einen garantierten Mindestlohn, der unabhängig davon greift und eine Abwesenheit nie mehr komplett leer ausgehen lässt.',
+  'Behoben - und dabei gleich das ganze System überarbeitet: die Offline-/AFK-Belohnung wird jetzt als fester, vorhersehbarer Wert anhand deiner höchsten je erreichten Stufe berechnet, statt wie bisher einen Kampf zu simulieren. Eine Abwesenheit kann dadurch strukturell nie mehr leer ausgehen.',
   'anonymous', true, now(), now(), now()
 where not exists (
   select 1 from public.feedback_public where title = 'AFK-/Offline-Belohnung war teils komplett 0'

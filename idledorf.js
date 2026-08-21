@@ -2282,8 +2282,7 @@ function bkmpIdleShowOfflineCard(result) {
       <span>🐉 ${bkmpIdleFormatNumber(r.dragonKills || 0)} besiegt</span>
       ${r.levelsGained ? `<span>⬆️ +${r.levelsGained} Level</span>` : ''}
       ${r.dragonXpGain ? `<span>🐲 +${bkmpIdleFormatNumber(r.dragonXpGain)} Kampf-EP</span>` : ''}
-    </div>
-    ${r.floorApplied ? `<div class="idle-offline-floor-badge" title="Deine Kämpfe an der aktuellen Stufe waren offline nicht gewinnbar - du hast trotzdem eine garantierte Mindest-Belohnung erhalten, damit deine Abwesenheit nie leer ausgeht.">🛡️ Basis-Absicherung angewendet</div>` : ''}`;
+    </div>`;
   card.style.display = '';
   const closeBtn = document.getElementById('idleOfflineCardClose');
   if (closeBtn) closeBtn.addEventListener('click', () => bkmpIdleCloseOfflineCardAnimated(card));

@@ -1,5 +1,5 @@
 /* ============================================================
-   Bkmp - Idle Drachen Dorf: Offline-Fortschritt serverseitig
+   Bkmp - Idle Drachen Dorf: Offline-/AFK-Fortschritt serverseitig
    berechnen und atomar gutschreiben.
 
    idle_player_state hatte lange offene RLS fuer den laufenden Kampf
@@ -19,12 +19,43 @@
    die Gutschrift, die andere erhaelt den bereits aktualisierten
    Stand zurueck statt doppelt gutzuschreiben.
 
-   Hinweis fuer zukuenftige Aenderungen: die Kill-Rate-Schaetzung
-   unten ist eine vereinfachte, eigenstaendige Kopie der Logik aus
-   idledorf.js (bkmpIdleDragonStatsAt/bkmpIdleDamageRoll). Aendert
-   sich dort die Kampf-Formel grundlegend, sollte sie hier
-   nachgezogen werden, damit Offline- und Live-Fortschritt nicht
-   zu weit auseinanderlaufen.
+   ============================================================
+   UMBAU 21.08.2026 - fester Wert statt Kampf-Simulation
+   ============================================================
+   Bis zu diesem Datum simulierte diese Funktion einen echten Zug-fuer-
+   Zug-Kampf (Kampfwerte, Gegenschlaege, Rueckzug bei Niederlage, Magie-
+   Skilltree-Effekte, seltene Drachen-Chance - siehe Git-Historie fuer
+   die volle, inzwischen entfernte Logik). Diese Simulation hatte eine
+   strukturelle Schwaeche: war schon der ALLERERSTE Kampf an der
+   aktuellen Stufe nicht innerhalb der Abwesenheitszeit gewinnbar, blieb
+   die GESAMTE Belohnung bei 0 - unabhaengig von der Dauer der
+   Abwesenheit. Dieses Muster wurde ueber mehrere Monate hinweg
+   wiederholt fuer je eine andere Unterursache gepatcht (fehlende
+   Drachen-Daten, fehlende Magie-Skilltree-Effekte, fehlende seltene
+   Drachen, zu langsamer Rueckzug, fehlender Begleitdrachen-Kontext),
+   ohne die eigentliche "Alles-oder-nichts"-Struktur zu aendern. Ein
+   erster Fix (garantierter Mindestlohn ALS ZUSATZ zur Simulation,
+   max() pro Ressource) loeste das Problem bereits strukturell.
+
+   Direkter Nutzerauftrag danach, nach Betrachtung des Live-Ergebnisses:
+   "Ich will das wir nur noch einen 'Festwert' haben. Anhand der
+   hoechsten Stufe. 75% Der Belohnung der hoechsten Stufe." - die
+   Simulation wurde daraufhin VOLLSTAENDIG entfernt (nicht nur ergaenzt).
+   Die Offline-/AFK-Belohnung ist jetzt eine einzige, deterministische
+   Formel: sie liest NUR die Basis-Belohnungswerte des Drachen an
+   state.highest_dragon_index (die hoechste je erreichte Stufe, nicht
+   die aktuelle - bleibt auch bestehen, wenn der Spieler zwischenzeitlich
+   zurueckgefallen ist), nimmt eine feste, konfigurierbare Kill-Rate pro
+   Stunde an und zahlt davon einen festen Prozentsatz (Standard 75%,
+   siehe idle_game_config-Schluessel 'offline_afk_reward'). Komplett
+   unabhaengig von Kampfstats/Skilltree-Kampfzustand (Wirtschafts-
+   Skilltree-Knoten "wirt_offline" bleibt als bewusste Ausnahme wirksam,
+   siehe unten) - kann dadurch strukturell NIE mehr komplett leer
+   ausgehen und liefert bei gleicher Abwesenheitsdauer/gleicher Stufe
+   IMMER denselben Betrag (kein Zufall, keine Simulation, kein "hat es
+   geklappt oder nicht"). current_dragon_index/highest_dragon_index
+   selbst werden von einer Abwesenheit nicht mehr veraendert - echter
+   Stufen-Fortschritt passiert weiterhin nur durch aktives Spielen.
 
    SICHERHEITS-NACHTRAG (Perf-/Sicherheits-Audit 15.07.): der
    mitgeschickte "playerName" wurde bisher ungeprueft als Lookup-
@@ -60,12 +91,11 @@ async function sbFetch(serviceKey, path, options = {}) {
   });
 }
 
-/* Eigenstaendige, vereinfachte Kopie von bkmpIdleSelectDragonKindId +
-   bkmpIdleDragonStatsAt aus idledorf.js - siehe Hinweis oben im Datei-Kopf.
-   Rare-Chance wird hier bewusst deterministisch auf "nie" gesetzt statt
-   zufaellig gewuerfelt: Offline-Fortschritt ist ein Erwartungswert-Modell
-   (kein echter Tick-fuer-Tick-Kampf), da waere ein Zufalls-Rare-Spawn nur
-   Rauschen ohne echten Mehrwert fuer die Schaetzung. */
+/* Eigenstaendige, vereinfachte Kopie von bkmpIdleSelectDragonKindId aus
+   idledorf.js - entscheidet nur, WELCHER Drachen-Archetyp an einer
+   gegebenen Stufe steht (fuer die Belohnungs-Basiswerte + Boss-Erkennung),
+   keine Kampfwerte mehr noetig seit dem Umbau 21.08.2026 (siehe Datei-
+   Kopf-Kommentar). */
 function selectDragonKindId(killIndex, dragons) {
   const stage = killIndex + 1;
   const active = (dragons || []).filter(d => d.active !== false);
@@ -90,24 +120,18 @@ function growthMult(ratePerKill, exponent, killIndex) {
   return Math.pow(1 + (ratePerKill || 0) * killIndex, exponent || 1);
 }
 
-function dragonStatsAt(killIndex, dragons, cfg) {
+/* Liefert nur noch Archetyp + Boss-/Miniboss-Einstufung - maxHp/attack
+   wurden mit der Kampf-Simulation entfernt (siehe Umbau-Kommentar oben),
+   die Belohnungsformel braucht ausschliesslich die *_reward_base-Felder
+   des Archetyps selbst. */
+function dragonKindAt(killIndex, dragons) {
   const kindId = selectDragonKindId(killIndex, dragons);
   const archetype = (dragons || []).find(d => d.id === kindId);
   if (!archetype) return null;
-  const hpGrowth = growthMult(cfg.hpGrowthPerKill, cfg.hpGrowthExponent, killIndex);
-  const atkGrowth = growthMult(cfg.atkGrowthPerKill, cfg.atkGrowthExponent, killIndex);
   let bossTier = null;
-  let hpMult = 1;
-  let atkMult = 1;
-  if (archetype.spawn_rule === 'boss_25') { bossTier = 'boss'; hpMult = cfg.bossHpMult || 3.2; atkMult = cfg.bossAtkMult || 1.7; }
-  else if (archetype.spawn_rule === 'miniboss_10') { bossTier = 'miniboss'; hpMult = cfg.minibossHpMult || 1.8; atkMult = cfg.minibossAtkMult || 1.3; }
-  return {
-    archetype,
-    isBoss: Boolean(bossTier),
-    bossTier,
-    maxHp: Math.max(1, Math.round((archetype.base_hp || 50) * hpGrowth * hpMult)),
-    attack: Math.max(1, (archetype.base_attack || 5) * atkGrowth * atkMult)
-  };
+  if (archetype.spawn_rule === 'boss_25') bossTier = 'boss';
+  else if (archetype.spawn_rule === 'miniboss_10') bossTier = 'miniboss';
+  return { archetype, isBoss: Boolean(bossTier), bossTier };
 }
 
 module.exports = async function handler(req, res) {
@@ -142,31 +166,25 @@ module.exports = async function handler(req, res) {
     const state = Array.isArray(stateRows) ? stateRows[0] : null;
     if (!state) return send(res, 200, { ok: true, elapsedSeconds: 0, rewards: null, newTotals: null });
 
-    const configRes = await sbFetch(serviceKey, `idle_game_config?key=in.(offline_progress,dragon_scaling,reward_scaling,boss_scaling,rare_spawn,offline_floor)&select=key,value`);
+    const configRes = await sbFetch(serviceKey, `idle_game_config?key=in.(offline_progress,reward_scaling,boss_scaling,offline_afk_reward)&select=key,value`);
     const configRows = configRes.ok ? await configRes.json() : [];
     const config = {};
     (Array.isArray(configRows) ? configRows : []).forEach(row => { config[row.key] = row.value; });
-    const offlineCfg = config.offline_progress || { maxHours: 12, efficiencyPct: 50 };
-    const bossCfg = config.boss_scaling || { minibossHpMult: 1.8, minibossAtkMult: 1.3, minibossRewardMult: 2, bossHpMult: 3.2, bossAtkMult: 1.7, bossRewardMult: 4 };
-    const dragonCfg = { ...(config.dragon_scaling || { hpGrowthPerKill: 0.05, hpGrowthExponent: 1.15, atkGrowthPerKill: 0.045, atkGrowthExponent: 1.1 }), ...bossCfg };
+    const offlineCfg = config.offline_progress || { maxHours: 12 };
+    const bossCfg = config.boss_scaling || { minibossRewardMult: 2, bossRewardMult: 4 };
     const rewardCfg = { ...(config.reward_scaling || { goldGrowthPerKill: 0.05, goldGrowthExponent: 1.2, xpGrowthPerKill: 0.05, xpGrowthExponent: 1.2 }), ...bossCfg };
-    const rareCfg = config.rare_spawn || { chancePct: 8 };
-    const rareChance = Math.max(0, Math.min(100, Number(rareCfg.chancePct != null ? rareCfg.chancePct : 8))) / 100;
+    const afkCfg = config.offline_afk_reward || {};
 
     /* Gilden-Technologie v3 (31.07.2026), "Nachtwache" (guild_nachtwache):
        erhoeht den Offline-Deckel um effect_per_tier Std./Stufe fuer
-       Mitglieder einer Gilde mit diesem Knoten. Bis 31.07. hier direkt aus
-       guild_tech_levels (altes System) gelesen - das Baum-System v3 ersetzt
-       das VOLLSTAENDIG (siehe sql/20260731-guild-tech-tree-v2-foundation.sql,
-       js/systems/bkmp-guild-tech.js), guild_tech_levels wird ab jetzt
-       nirgends mehr befuellt und bliebe sonst stumm auf 0 haengen. Tier UND
-       effect_per_tier werden bewusst dynamisch aus guild_tech_progress/
-       guild_tech_nodes gelesen (keine zweite hartcodierte Kopie des
-       Stufenwerts, gleiches Prinzip wie bei arena_attack()/raid_join() in
-       derselben SQL-Datei). Rein additive Abfrage (beide Tabellen oeffentlich
-       lesbar, hier per Service-Role ohnehin RLS-unabhaengig) - liefert 0,
-       wenn der Spieler in keiner Gilde ist oder der Knoten noch nicht
-       freigeschaltet wurde, aendert dann nichts am bestehenden Verhalten. */
+       Mitglieder einer Gilde mit diesem Knoten. Tier UND effect_per_tier
+       werden bewusst dynamisch aus guild_tech_progress/guild_tech_nodes
+       gelesen (keine zweite hartcodierte Kopie des Stufenwerts, gleiches
+       Prinzip wie bei arena_attack()/raid_join()). Rein additive Abfrage,
+       liefert 0, wenn der Spieler in keiner Gilde ist oder der Knoten
+       noch nicht freigeschaltet wurde. Unveraendert durch den Umbau
+       21.08.2026 - der Deckel selbst betrifft weiterhin nur, wie viel
+       Abwesenheitszeit ueberhaupt zaehlt, unabhaengig von der Formel. */
     let guildOfflineBonusHours = 0;
     try {
       const memberRes = await sbFetch(serviceKey, `guild_members?auth_user_id=eq.${encodeURIComponent(user.id)}&select=guild_id&limit=1`);
@@ -198,48 +216,23 @@ module.exports = async function handler(req, res) {
     const dragonsRes = await sbFetch(serviceKey, `idle_dragons?active=eq.true&select=*&order=tier_order.asc`);
     const dragons = dragonsRes.ok ? await dragonsRes.json() : [];
     /* Bug-Fix (Spieler-Report 19.07., Blazehunter07: "550 Min. weg, 0
-       Belohnung"): schlug dieser Fetch fehl oder kam leer zurueck (z.B.
-       kurzer Supabase-Ausreisser), lief die Simulation unten trotzdem
-       durch - die erste dragonStatsAt()-Abfrage fand mangels Eintraegen
-       keinen Erzeugertyp, brach die while-Schleife bei kills=0 sofort ab,
-       UND (das eigentlich Schaedliche) der Claim wurde trotzdem als
-       Erfolg abgespeichert, inklusive last_seen_at=jetzt - die komplette
-       Abwesenheits-Zeitspanne war dadurch fuer immer weg, ein erneuter
-       Versuch haette wieder bei 0 angefangen. Jetzt: bei leerem/fehl-
-       geschlagenem Drachen-Fetch gar nichts speichern (last_seen_at bleibt
-       unveraendert) und einen echten Fehler zurueckgeben, damit der Client
-       es spaeter erneut versuchen kann, statt die Zeit stillschweigend zu
-       verbrennen. */
+       Belohnung"): schlaegt dieser Fetch fehl oder kommt leer zurueck (z.B.
+       kurzer Supabase-Ausreisser), wird gar nichts gespeichert (last_seen_at
+       bleibt unveraendert) und ein echter Fehler zurueckgegeben, damit der
+       Client es spaeter erneut versuchen kann, statt die Zeit still-
+       schweigend zu verbrennen. */
     if (!dragonsRes.ok || !Array.isArray(dragons) || dragons.length === 0) {
       return send(res, 502, { error: 'dragons_unavailable' });
     }
 
     /* Bug-Fix (Spieler-Meldung 05.08.2026: "über nacht offline timer
        passiert auch nichts an Fortschritt" - gemeint war der Begleitdrache,
-       der von Jugendlich zu Erwachsen heranwaechst): bkmpDragonGrantCompanion
-       BattleXp() (js/systems/bkmp-breeding.js) vergibt Kampf-EP an den
-       aktuellen jugendlichen Begleitdrachen bei JEDEM Kill - aber NUR waehrend
-       das Spiel aktiv offen/tickend ist (Aufrufstellen: idledorf.js, bkmp-
-       dungeon.js, bkmp-tower.js - alle drei nur im Live-Betrieb). Diese
-       Offline-Simulation kannte player_dragons bisher gar nicht - waehrend
-       einer Abwesenheit blieb der Begleitdrache dadurch komplett bei seinem
-       alten Kampf-EP-Stand haengen, unabhaengig davon, wie viele Kills
-       simuliert wurden. Fix: liest den aktuellen jugendlichen Begleitdrachen
-       (falls vorhanden) + dessen Art-Anforderung, sammelt waehrend der
-       Kampf-Simulation unten denselben Betrag pro Kill wie live (Boss 25,
-       sonst 4 - siehe bkmpDragonGrantCompanionBattleXp), deckelt am Ende auf
-       battle_xp_required und schreibt das Ergebnis separat in player_dragons.
-       Bewusst NICHT repliziert: der Kampf-EP-Bonus aus Substats/Skilltree/
-       Prestige (dragon_xp_bonus_pct/dragon_xp_pct, siehe bkmpDragonGrant
-       CompanionBattleXp) - das wuerde zusaetzlich idle_prestige_state +
-       player_dragons-Substats laden und die komplexe, mehrstufige Prestige-
-       Bonus-Formel serverseitig duplizieren muessen. Ergebnis: Offline-EP
-       koennen bei Spielern mit hohem EP-Bonus etwas NIEDRIGER ausfallen als
-       bei identischer Zeit live erspielt - ein kleiner, dokumentierter
-       Kompromiss gegenueber dem vorherigen Zustand (komplett 0 EP offline),
-       kein neuer Fehler. Schlaegt dieser Lookup fehl, bleibt der bestehende
-       Belohnungs-Fluss unangetastet (eigenes try/catch, gleiches Prinzip wie
-       der Gilden-Nachtwache-Lookup oben). */
+       der von Jugendlich zu Erwachsen heranwaechst). Unveraendert durch den
+       Umbau 21.08.2026 - der Begleitdrache bekommt weiterhin eine eigene,
+       von der Haupt-Formel unabhaengige Kampf-EP-Trickle-Menge pro Stunde
+       (siehe companionXpPerHour weiter unten), deckelt am Ende auf
+       battle_xp_required und schreibt das Ergebnis separat in
+       player_dragons. */
     let companion = null;
     let companionBattleXpRequired = 0;
     try {
@@ -256,370 +249,62 @@ module.exports = async function handler(req, res) {
         }
       }
     } catch (e) { /* Begleitdrache-Lookup fehlgeschlagen - Kampf-EP-Gutschrift bleibt einfach aus, Rest der Belohnung unangetastet */ }
-    let companionXpGain = 0;
 
-    /* Bug-Fix (Spieler-Report Crocodilandy927, 20.07.: "Man bekommt keine
-       Gems und Essenzen mehr, wenn man offline ist") - selectDragonKindId()
-       oben setzt die "seltene" Drachen-Chance (schattendrache/wuffdrache -
-       die einzigen Nicht-Boss/Miniboss-Quellen fuer Kristalle/Essenz, siehe
-       idle_dragons: jeder normale Standarddrache hat crystal/essence_
-       reward_base=0) bewusst deterministisch auf "nie" statt zufaellig zu
-       wuerfeln (Kommentar dort: "Rauschen ohne echten Mehrwert"). Live
-       wuerfelt bkmpIdleSelectDragonKindId() dagegen bei JEDEM Nicht-Boss/
-       Miniboss-Kill eine echte rare_spawn.chancePct%-Chance (Standard 8%,
-       siehe idle_game_config) - bei laengeren Abwesenheiten mit vielen
-       simulierten Kills ist das kein Rauschen mehr, sondern ein spuerbarer,
-       systematisch fehlender Einnahmepfad. Fix: Erwartungswert der seltenen
-       Drachen (Durchschnitt ueber den ganzen "rare"-Pool, damit neue
-       seltene Arten automatisch mitgezaehlt werden) wird weiter unten pro
-       simuliertem Nicht-Boss/Miniboss-Kill anteilig zu allen
-       Belohnungsarten dazugerechnet - aendert NICHTS an HP/Angriff/Dauer
-       der Simulation (bleibt beim naeherungsweise korrekten Standard-
-       Drachen), nur an den Ressourcen-Betraegen. */
-    const rarePool = dragons.filter(d => d.spawn_rule === 'rare');
-    const rareAvg = { gold: 0, xp: 0, wood: 0, stone: 0, crystals: 0, essence: 0 };
-    if (rarePool.length) {
-      rarePool.forEach(d => {
-        rareAvg.gold += Number(d.gold_reward_base || 0);
-        rareAvg.xp += Number(d.xp_reward_base || 0);
-        rareAvg.wood += Number(d.wood_reward_base || 0);
-        rareAvg.stone += Number(d.stone_reward_base || 0);
-        rareAvg.crystals += Number(d.crystal_reward_base || 0);
-        rareAvg.essence += Number(d.essence_reward_base || 0);
-      });
-      Object.keys(rareAvg).forEach(k => { rareAvg[k] = (rareAvg[k] / rarePool.length) * rareChance; });
-    }
+    /* ============================================================
+       Feste AFK-Belohnungsformel (21.08.2026, siehe Datei-Kopf-Kommentar
+       fuer die volle Herleitung). Referenzstufe ist ausdruecklich
+       highest_dragon_index (die hoechste je erreichte Stufe), NICHT
+       current_dragon_index - eine Abwesenheit soll den bereits bewiesenen
+       Fortschritt beloehnen, nicht davon abhaengen, wo der Spieler gerade
+       zufaellig steht (auto_advance=false/ein Rueckzug wuerde sie sonst
+       kuenstlich druecken). Keine Kampfsimulation mehr - die einzigen
+       Eingaben sind: wie lange war der Spieler weg, welche Basis-
+       Belohnung zahlt der Drache an seiner besten Stufe, und ein fester,
+       admin-anpassbarer Prozentsatz (Standard 75%, idle_game_config-
+       Schluessel 'offline_afk_reward'). */
+    const highestKillIndex = Number(state.highest_dragon_index || 0);
+    let refDragon = null;
+    try {
+      refDragon = dragonKindAt(highestKillIndex, dragons) || dragonKindAt(0, dragons);
+    } catch (e) { refDragon = null; }
+    if (!refDragon) return send(res, 502, { error: 'dragons_unavailable' });
 
-    /* Bug-Fix (Spieler-Report ChronoKora 20.07., mit Screenshot: 46 Min.
-       weg, 0 Belohnung, dabei eine "Niederlage gegen Yaksha der
-       Drachenboss"-Meldung) - die Simulation kannte bisher nur Angriff/
-       Verteidigung/Krit (siehe attack/defense/critChance/critDamage oben),
-       nicht aber die drei Magie-Skilltree-Effekte, die im LIVE-Tick
-       (bkmpIdleTick, idledorf.js) tatsaechlich mitkaempfen: Brand (elem_fire,
-       DoT), Blitzschlag (elem_lightning, Bonusschlag) und die passive Dorf-
-       HP-Regeneration (villageRegenPct, aus shield_regen/repair_speed_pct/
-       heal_pct). Bei stark in den Magie-Zweig investierten Spielern kann
-       das den Unterschied zwischen "gewinnt live problemlos" und "verliert
-       hier in der vereinfachten Simulation" ausmachen - und da ein
-       verlorener Kampf unten nur um EINE Stufe zurueckfaellt (siehe
-       killIndex weiter unten), konnte ein breiter, unmodellierter Kraft-
-       unterschied das gesamte Zeitbudget in einer langen Rueckzugs-Schleife
-       verbrennen, ohne je wieder einen gewinnbaren Kampf zu finden - daher
-       exakt 0 Belohnung fuer die komplette Abwesenheit, unabhaengig von der
-       Dauer. Gleiche eigenstaendige/vereinfachte Kopie wie schon bei
-       selectDragonKindId/growthMult oben (siehe Datei-Kopf-Kommentar) -
-       deckt nur den Skilltree-Anteil dieser drei Effekte ab (Upgrades/
-       Titel/Prestige/Gilden-Tech/Runen tragen laut aktuellem Datenstand
-       nichts zu elem_fire/elem_lightning/shield_regen/repair_speed_pct/
-       heal_pct bei), keine neue Migration noetig (skill_allocations ist
-       bereits Teil der oben per "*" geladenen Zeile). */
-    const skillNodesRes = await sbFetch(serviceKey, `idle_skill_nodes?select=id,effect_type,effect_value_per_rank`);
-    const skillNodes = skillNodesRes.ok ? await skillNodesRes.json() : [];
-    const skillAlloc = state.skill_allocations || {};
-    const magicTotals = {};
-    (Array.isArray(skillNodes) ? skillNodes : []).forEach(node => {
-      const rank = Number(skillAlloc[node.id] || 0);
-      if (rank <= 0) return;
-      magicTotals[node.effect_type] = (magicTotals[node.effect_type] || 0) + rank * Number(node.effect_value_per_rank || 0);
-    });
-    // Deckel wie im Client (bkmpIdleRecomputeEffectiveStats): Math.min(60, t('elem_fire'/'elem_lightning')).
-    const fireChancePct = Math.max(0, Math.min(60, magicTotals.elem_fire || 0));
-    const lightningChancePct = Math.max(0, Math.min(60, magicTotals.elem_lightning || 0));
-    // Gleiche Gewichtung wie villageRegenPct im Client.
-    const villageRegenPct = Math.max(0, (magicTotals.shield_regen || 0) * 0.4 + (magicTotals.repair_speed_pct || 0) * 0.3 + (magicTotals.heal_pct || 0) * 0.3);
-
-    // Zwei-seitige Erwartungswert-Simulation: der Drache schlaegt bei jedem
-    // Treffer bis auf den letzten (der ihn toetet) zurueck, genau wie im
-    // Live-Tick (bkmpIdleTick: erst Spieler-Treffer, dann - falls der
-    // Drache noch lebt - Gegenschlag). Sobald ein Kampf das Dorf auf 0 HP
-    // bringen wuerde, wird NICHT mehr weiter aufgestiegen, exakt wie live
-    // (bkmpIdleHandleDefeat) - vorher wurde offline nur der optimistische
-    // Sieges-Pfad ohne jeden Schaden am Dorf simuliert, wodurch AFK-Spieler
-    // beliebig weit ueber ihre tatsaechliche Staerke hinaus aufsteigen
-    // konnten und nach der Rueckkehr sofort an zu starken Drachen scheiterten.
-    /* Offline-Einnahmen (Wirtschaft-Skilltree, Knoten "wirt_offline"): erhoeht
-       die Effizienz zusaetzlich zum Basiswert. Rang direkt aus
-       skill_allocations gelesen (ist Teil des ohnehin schon per "*"
-       geladenen Zeilen-Objekts) statt einer eigenen DB-Spalte - vermeidet
-       eine weitere Migration mit Deploy-Reihenfolge-Risiko wie zuletzt bei
-       last_skilltree_reset_at. effect_value_per_rank=5, max_rank=6 (siehe
-       supabase-idle-dorf-schema.sql). */
+    /* Wirtschafts-Skilltree-Knoten "wirt_offline" bleibt als bewusste
+       Ausnahme wirksam (bereits investierte Spielerpunkte sollen nicht
+       durch den Umbau entwertet werden) - erhoeht den festen Prozentsatz
+       additiv, bei 6 Raengen a 5% max. +30%. effect_value_per_rank=5,
+       max_rank=6 (siehe supabase-idle-dorf-schema.sql). Rang direkt aus
+       skill_allocations gelesen (bereits Teil der oben per "*" geladenen
+       Zeile), keine weitere Migration noetig. */
     const wirtOfflineRank = Number((state.skill_allocations && state.skill_allocations.wirt_offline) || 0);
-    const offlineBonusPct = Math.max(0, Math.min(6, wirtOfflineRank)) * 5;
-    const efficiency = Math.max(0, Math.min(95, (offlineCfg.efficiencyPct || 50) + offlineBonusPct)) / 100;
-    const attack = Number(state.attack || 10);
-    const defense = Number(state.defense || 2);
-    const critChance = Number(state.crit_chance || 5);
-    const critDamage = Number(state.crit_damage || 150);
-    const expectedCritMult = 1 + (critChance / 100) * (Math.max(1, critDamage / 100) - 1);
-    // Der Drache greift live mit fixen 5% Krit / 150% Kritschaden an (siehe
-    // bkmpIdleTick: bkmpIdleDamageRoll(dragon.attack, 5, 150, defense)).
-    const dragonExpectedCritMult = 1 + 0.05 * (1.5 - 1);
-    const secondsPerTick = 0.9;
-    // Village-HP startet bei jedem Oeffnen des Modals immer voll (siehe
-    // bkmpIdleOpenModal/bkmpIdleRecomputeEffectiveStats) - dieselbe Annahme
-    // gilt hier fuer den Start der Offline-Periode.
-    let villageHp = Number(state.hp || 100);
-    const villageMaxHp = villageHp;
+    const wirtOfflineBonusPct = Math.max(0, Math.min(6, wirtOfflineRank)) * 5;
+    const baseEfficiencyPct = afkCfg.efficiencyPct != null ? Number(afkCfg.efficiencyPct) : 75;
+    const efficiency = Math.max(0, Math.min(100, baseEfficiencyPct + wirtOfflineBonusPct)) / 100;
+    const assumedSecondsPerKill = Math.max(1, Number(afkCfg.assumedSecondsPerKill || 45));
+    const assumedSecondsPerEliteKill = Math.max(1, Number(afkCfg.assumedSecondsPerBossKill || 180));
+    const companionXpPerHour = Math.max(0, Number(afkCfg.companionXpPerHour || 8));
 
-    /* Bug-Report 17.07. (ChronoKora): "Bleibt auf dieser Stufe" wird nach
-       einem Reload ignoriert, Spieler landet automatisch wieder auf der
-       hoechsten Stufe. Ursache: diese Offline-Simulation kannte
-       state.auto_advance gar nicht und hat killIndex bei jedem simulierten
-       Sieg/jeder Niederlage immer weitergeschoben - exakt wie der Live-Tick
-       es bei auto_advance=true tut (siehe bkmpIdleHandleDragonDefeated in
-       idledorf.js), aber eben auch dann, wenn der Spieler sich bewusst auf
-       einer Stufe festgesetzt hatte. Jetzt: bei auto_advance=false bleibt
-       killIndex fix, es wird einfach derselbe Drache wiederholt simuliert -
-       genau das Live-Verhalten von "Bleibt auf dieser Stufe". */
-    const autoAdvance = state.auto_advance !== false;
-    let killIndex = Number(state.current_dragon_index || 0);
-    // Bugfix 21.08.2026 (siehe grosser Kommentar beim Mindestlohn-Block weiter
-    // unten): der garantierte Mindestlohn muss die Stufe verwenden, auf der
-    // der Spieler beim Verlassen WIRKLICH stand - killIndex selbst wird von
-    // der Simulation unten mutiert (Vorstoss bei Sieg, Rueckzug bei
-    // Niederlage), floorRefKillIndex friert den Ausgangswert davor ein.
-    const floorRefKillIndex = killIndex;
-    let simulatedSeconds = 0;
-    let kills = 0;
-    let bossKills = 0;
-    let goldGain = 0, xpGain = 0, woodGain = 0, stoneGain = 0, crystalGain = 0, essenceGain = 0;
-    /* Rohe (nicht pro Kill gerundete) Summe fuer den seltenen-Drachen-
-       Erwartungswert - bei z.B. 0,08 erwarteten Kristallen pro Kill wuerde
-       Math.round() JEDEN einzelnen Kill auf 0 abrunden und die komplette
-       Ausbeute verschwinden lassen, selbst wenn die Summe ueber hunderte
-       Kills (z.B. 176*0,08=14) laengst spuerbar waere. Nur EINMAL am Ende
-       gerundet, siehe direkt nach der while-Schleife unten. */
-    let rareGoldRaw = 0, rareXpRaw = 0, rareWoodRaw = 0, rareStoneRaw = 0, rareCrystalRaw = 0, rareEssenceRaw = 0;
     const goldBonus = Number(state.gold_bonus || 0);
     const xpBonus = Number(state.xp_bonus || 0);
     const lootBonus = Number(state.loot_bonus || 0);
-    const budgetSeconds = elapsedSeconds * efficiency;
-    // Erwartete Bonusschaden-Quelle pro Treffer aus Brand/Blitzschlag (siehe
-    // bkmpIdleTick: Brand = attack*0.18 fuer 4 Ticks bei fireChancePct%
-    // Chance, Blitzschlag = attack*0.6 bei lightningChancePct% Chance je
-    // Tick) - vereinfacht als steady-state Erwartungswert pro Treffer statt
-    // die Mehr-Tick-Auffrisch-Mechanik des Brands 1:1 nachzubilden.
-    const expectedMagicDmgPerHit = attack * ((fireChancePct / 100) * 0.18 + (lightningChancePct / 100) * 0.6);
-    // Passive Dorf-Regeneration je Tick (siehe bkmpIdleTick: villageRegenPct
-    // heilt jeden Tick einen Teil der Dorf-Max-HP) - reduziert den NETTO-
-    // Schaden, den das Dorf pro Gegenschlag tatsaechlich behaelt.
-    const regenPerTick = villageMaxHp * (villageRegenPct / 100);
 
-    let guard = 0;
-    let consecutiveDefeats = 0;
-    while (simulatedSeconds < budgetSeconds && guard < 200000) {
-      guard += 1;
-      const dragon = dragonStatsAt(killIndex, dragons, dragonCfg);
-      if (!dragon) break;
-      const dmgPerHit = Math.max(1, attack * expectedCritMult - (dragon.archetype.base_defense || 0) * 0.5 + expectedMagicDmgPerHit);
-      const hitsNeeded = Math.max(1, Math.ceil(dragon.maxHp / dmgPerHit));
-      const timeToKill = hitsNeeded * secondsPerTick;
-      if (simulatedSeconds + timeToKill > budgetSeconds) break;
+    const isEliteRef = Boolean(refDragon.bossTier);
+    const kills = Math.max(0, Math.floor(elapsedSeconds / (isEliteRef ? assumedSecondsPerEliteKill : assumedSecondsPerKill)));
+    const bossKills = isEliteRef ? kills : 0;
 
-      // Gegenschlaege: auf allen Treffern AUSSER dem letzten (der toetet),
-      // wie im Live-Tick. Regen wirkt JEDEN Tick dagegen, genau wie live.
-      const dragonDmgPerHit = Math.max(1, dragon.attack * dragonExpectedCritMult - defense * 0.5);
-      const netDragonDmgPerHit = Math.max(0, dragonDmgPerHit - regenPerTick);
-      const villageHpLoss = Math.max(0, hitsNeeded - 1) * netDragonDmgPerHit;
-      if (villageHpLoss >= villageHp) {
-        // Dieser Kampf wuerde das Dorf toeten - genau wie live
-        // (bkmpIdleHandleDefeat): NICHT komplett aufgeben, sondern
-        // zurueckfallen, Dorf-HP zuruecksetzen und dort weitergrinden.
-        // Vorher wurde hier hart abgebrochen, was bei einer einzigen zu
-        // starken Stufe die GESAMTE Offline-Zeit auf 0 Belohnung setzte,
-        // obwohl man im Livespiel einfach eine Stufe tiefer weiterfarmt.
-        const ticksUntilDefeat = Math.max(1, Math.ceil(villageHp / Math.max(1, netDragonDmgPerHit)));
-        const timeLost = ticksUntilDefeat * secondsPerTick;
-        if (simulatedSeconds + timeLost > budgetSeconds) break;
-        simulatedSeconds += timeLost;
-        /* Bug-Fix (Spieler-Report ChronoKora 20.07., siehe Kommentar bei
-           fireChancePct/lightningChancePct/villageRegenPct oben): frueher
-           IMMER nur 1 Stufe pro Niederlage zurueck - bei einem breiten,
-           unmodellierten Kraftunterschied (z.B. Magie-Boni, oder einfach
-           ein zu hoher Sprung ueber viele Stufen) konnte das ganze
-           Zeitbudget in einer langen Rueckzugs-Schleife verbrennen, ohne
-           je einen gewinnbaren Kampf zu finden - 0 Belohnung fuer die
-           komplette Abwesenheit, unabhaengig von deren Laenge. Jetzt:
-           exponentiell wachsender Rueckzug bei mehreren Niederlagen in
-           Folge (1, 2, 4, 8, ...) - findet einen gewinnbaren Kampf
-           spaetestens nach ~log2(killIndex) statt bis zu killIndex
-           einzelnen Schritten, ohne das normale "faellt eine Stufe
-           zurueck"-Verhalten beim ERSTEN Fehlschlag zu aendern. Wird bei
-           jedem erfolgreichen Kill (siehe consecutiveDefeats=0 unten)
-           wieder auf 1 zurueckgesetzt. */
-        consecutiveDefeats += 1;
-        const retreatStep = Math.min(killIndex, Math.pow(2, consecutiveDefeats - 1));
-        if (autoAdvance) killIndex = Math.max(0, killIndex - retreatStep);
-        villageHp = villageMaxHp;
-        continue;
-      }
-
-      simulatedSeconds += timeToKill;
-      villageHp -= villageHpLoss;
-      villageHp = Math.min(villageMaxHp, villageHp);
-      consecutiveDefeats = 0;
-
-      const goldGrowth = growthMult(rewardCfg.goldGrowthPerKill, rewardCfg.goldGrowthExponent, killIndex);
-      const xpGrowth = growthMult(rewardCfg.xpGrowthPerKill, rewardCfg.xpGrowthExponent, killIndex);
-      const rewardMult = dragon.bossTier === 'boss' ? (rewardCfg.bossRewardMult || 4) : dragon.bossTier === 'miniboss' ? (rewardCfg.minibossRewardMult || 2) : 1;
-      goldGain += Math.round((dragon.archetype.gold_reward_base || 0) * goldGrowth * rewardMult * (1 + goldBonus / 100));
-      xpGain += Math.round((dragon.archetype.xp_reward_base || 0) * xpGrowth * rewardMult * (1 + xpBonus / 100));
-      woodGain += Math.round((dragon.archetype.wood_reward_base || 0) * (1 + lootBonus / 100));
-      stoneGain += Math.round((dragon.archetype.stone_reward_base || 0) * (1 + lootBonus / 100));
-      crystalGain += Math.round((dragon.archetype.crystal_reward_base || 0) * (1 + lootBonus / 100));
-      essenceGain += Math.round((dragon.archetype.essence_reward_base || 0) * (1 + lootBonus / 100));
-      /* Erwartungswert der seltenen Drachen (siehe rareAvg-Kommentar oben) -
-         nur auf Stufen, auf denen live ueberhaupt eine Chance auf einen
-         seltenen Drachen bestuende (kein Boss/Miniboss - die haben dort
-         laut bkmpIdleSelectDragonKindId() Vorrang und schliessen "rare"
-         fuer diesen Kill aus). */
-      if (!dragon.bossTier) {
-        rareGoldRaw += rareAvg.gold * goldGrowth * (1 + goldBonus / 100);
-        rareXpRaw += rareAvg.xp * xpGrowth * (1 + xpBonus / 100);
-        rareWoodRaw += rareAvg.wood * (1 + lootBonus / 100);
-        rareStoneRaw += rareAvg.stone * (1 + lootBonus / 100);
-        rareCrystalRaw += rareAvg.crystals * (1 + lootBonus / 100);
-        rareEssenceRaw += rareAvg.essence * (1 + lootBonus / 100);
-      }
-      kills += 1;
-      if (dragon.isBoss) bossKills += 1;
-      if (autoAdvance) killIndex += 1;
-      // Kampf-EP fuer den jugendlichen Begleitdrachen, siehe Kommentar beim
-      // companion-Lookup oben - gleicher Betrag pro Kill wie live
-      // (bkmpDragonGrantCompanionBattleXp: Boss 25, sonst 4).
-      if (companion) companionXpGain += dragon.isBoss ? 25 : 4;
+    let goldGain = 0, xpGain = 0, woodGain = 0, stoneGain = 0, crystalGain = 0, essenceGain = 0;
+    if (kills > 0) {
+      const goldGrowth = growthMult(rewardCfg.goldGrowthPerKill, rewardCfg.goldGrowthExponent, highestKillIndex);
+      const xpGrowth = growthMult(rewardCfg.xpGrowthPerKill, rewardCfg.xpGrowthExponent, highestKillIndex);
+      const rewardMult = refDragon.bossTier === 'boss' ? (rewardCfg.bossRewardMult || 4) : refDragon.bossTier === 'miniboss' ? (rewardCfg.minibossRewardMult || 2) : 1;
+      goldGain = Math.round(kills * (refDragon.archetype.gold_reward_base || 0) * goldGrowth * rewardMult * (1 + goldBonus / 100) * efficiency);
+      xpGain = Math.round(kills * (refDragon.archetype.xp_reward_base || 0) * xpGrowth * rewardMult * (1 + xpBonus / 100) * efficiency);
+      woodGain = Math.round(kills * (refDragon.archetype.wood_reward_base || 0) * (1 + lootBonus / 100) * efficiency);
+      stoneGain = Math.round(kills * (refDragon.archetype.stone_reward_base || 0) * (1 + lootBonus / 100) * efficiency);
+      crystalGain = Math.round(kills * (refDragon.archetype.crystal_reward_base || 0) * (1 + lootBonus / 100) * efficiency);
+      essenceGain = Math.round(kills * (refDragon.archetype.essence_reward_base || 0) * (1 + lootBonus / 100) * efficiency);
     }
-
-    goldGain += Math.round(rareGoldRaw);
-    xpGain += Math.round(rareXpRaw);
-    woodGain += Math.round(rareWoodRaw);
-    stoneGain += Math.round(rareStoneRaw);
-    crystalGain += Math.round(rareCrystalRaw);
-    essenceGain += Math.round(rareEssenceRaw);
-
-    /* ============================================================
-       Bugfix 21.08.2026 - garantierter Mindestlohn (Spieler-Meldung
-       BagonTr01: "ganzen Abend weg... nichts bekommen fuers AFK",
-       Nutzerauftrag "Wir muessen das AFK System ueberarbeiten").
-
-       Root Cause (bestaetigt, nicht nur vermutet): die gesamte Belohnung
-       oben haengt EINZIG am Erfolg der Zug-fuer-Zug-Kampfsimulation - kann
-       schon der ALLERERSTE Kampf am aktuellen current_dragon_index nicht
-       innerhalb des Zeitbudgets gewonnen werden (z.B. Spieler unterlevelt
-       fuer seine Stufe, oder die persistierten Kampfwerte sind aus
-       irgendeinem Grund niedriger als die echte Live-Staerke), bricht die
-       while-Schleife weiter oben bei der allerersten Iteration ab - JEDE
-       *Gain-Variable bleibt bei 0, unabhaengig davon, ob der Spieler 5
-       Minuten oder den vollen 12h-Deckel weg war. Dieses genaue Muster
-       wurde bereits 5x einzeln fuer je eine andere Unterursache gepatcht
-       (fehlende Drachen-Daten/Blazehunter07 19.07., fehlende Magie-
-       Skilltree-Effekte/ChronoKora 20.07., fehlende seltene Drachen/
-       Crocodilandy927 20.07., zu langsamer Rueckzug/ChronoKora 20.07.,
-       fehlender Begleitdrachen-Kontext 05.08.) - ohne dass die eigentliche
-       "Alles-oder-nichts-Simulation"-Struktur je angefasst wurde.
-
-       Recherche zu Offline-/AFK-Belohnungssystemen in anderen Idle-Spielen
-       (Whiteout Survival "Untaetigkeitsertraege", AFK Arena "AFK Rewards",
-       Cookie Clicker/Egg Inc Offline-Prozentsaetze, Machinations.io-
-       Designleitfaden, plus die dokumentierten Ausfaelle von Idle
-       Champions - deren Kampf-Simulation bei einem unwinnbaren Encounter
-       ebenfalls komplett leer ausgehen kann und dafuer die exakt gleiche
-       Spieler-Beschwerde erntet) bestaetigt: der Standard-Fix ist ein vom
-       Simulationsergebnis UNABHAENGIGER garantierter Mindestbetrag pro
-       Ressource, kombiniert per max() statt Addition/Mischung - eine
-       bereits erfolgreiche Simulation wird dadurch NIE schlechter (kein
-       Abwerten auf den Mindestwert) und NIE besser (kein doppeltes
-       Gutschreiben), nur ein leerer/fehlgeschlagener Lauf wird angehoben.
-
-       Der Mindestlohn liest bewusst NUR deterministische, nie fehlerhafte
-       Drachen-Basisdaten (dieselben *_reward_base-Felder, die die
-       Simulation ohnehin schon nutzt) + eine feste Sekunden-pro-Kill-
-       Annahme - absichtlich OHNE jede Abhaengigkeit von attack/defense/
-       critChance/Skilltree-Zustand, da genau DIESE Werte die Ursache
-       mehrerer der oben genannten historischen Bugs waren. Effizienz
-       bewusst niedrig (Standard 35%, deutlich unter einer echten
-       erfolgreichen Simulation) - der Mindestlohn ist ein Sicherheitsnetz,
-       keine attraktivere Alternativ-Strategie ("einfach auf einer
-       unschaffbaren Stufe stehen bleiben" darf sich nie lohnen).
-
-       current_dragon_index selbst wird vom Mindestlohn bewusst NIE
-       veraendert (bleibt exakt der von der Simulation gesetzte/
-       unveraenderte Wert) - ein Spieler, der seine aktuelle Stufe nicht
-       schafft, soll durch den Mindestlohn nicht zusaetzlich auf eine noch
-       schwerere Stufe vorruecken, das wuerde das Problem beim naechsten
-       Rueckkehr-Versuch nur verschaerfen. dragon_kills/boss_kills (reine
-       Lebenszeit-/Erfolgs-Zaehler, gaten keinen echten Fortschritt) duerfen
-       dagegen konsistent zum tatsaechlich gewaehrten Ressourcen-Pfad
-       mitwachsen.
-
-       Neuer, additiver Config-Schluessel 'offline_floor' (idle_game_config,
-       gleiches Muster wie offline_progress/dragon_scaling/...) mit
-       enabled-Kill-Schalter - siehe sql/20260821-offline-floor-config.sql.
-       ============================================================ */
-    let floorApplied = false;
-    const floorAppliedResources = [];
-    const offlineFloorCfg = config.offline_floor || {};
-    if (offlineFloorCfg.enabled !== false && elapsedSeconds >= 60) {
-      const floorSecondsPerKill = Math.max(1, Number(offlineFloorCfg.assumedSecondsPerKill || 45));
-      const floorSecondsPerEliteKill = Math.max(1, Number(offlineFloorCfg.assumedSecondsPerBossKill || 180));
-      const floorEfficiency = Math.max(0, Math.min(100, Number(offlineFloorCfg.efficiencyPct != null ? offlineFloorCfg.efficiencyPct : 35))) / 100;
-      const floorCompanionXpPerHour = Math.max(0, Number(offlineFloorCfg.companionXpPerHour || 8));
-
-      // Referenzdrache: die Stufe, auf der der Spieler beim Verlassen stand
-      // (floorRefKillIndex, s.o.) - fallback auf den allerersten Drachen,
-      // falls dieser Lookup je fehlschlaegt (deckt exakt die Ursache von 2
-      // der 5 historischen Vorfaelle oben ab - der Mindestlohn darf NIE an
-      // derselben Luecke scheitern wie die Simulation selbst).
-      let refDragon = null;
-      try {
-        refDragon = dragonStatsAt(floorRefKillIndex, dragons, dragonCfg) || dragonStatsAt(0, dragons, dragonCfg);
-      } catch (e) { refDragon = null; }
-
-      if (refDragon) {
-        const isEliteRef = Boolean(refDragon.bossTier);
-        const floorKills = Math.max(0, Math.floor(elapsedSeconds / (isEliteRef ? floorSecondsPerEliteKill : floorSecondsPerKill)));
-
-        if (floorKills > 0) {
-          const floorGoldGrowth = growthMult(rewardCfg.goldGrowthPerKill, rewardCfg.goldGrowthExponent, floorRefKillIndex);
-          const floorXpGrowth = growthMult(rewardCfg.xpGrowthPerKill, rewardCfg.xpGrowthExponent, floorRefKillIndex);
-          const floorRewardMult = refDragon.bossTier === 'boss' ? (rewardCfg.bossRewardMult || 4) : refDragon.bossTier === 'miniboss' ? (rewardCfg.minibossRewardMult || 2) : 1;
-
-          const floorGold = Math.round(floorKills * (refDragon.archetype.gold_reward_base || 0) * floorGoldGrowth * floorRewardMult * (1 + goldBonus / 100) * floorEfficiency);
-          const floorXp = Math.round(floorKills * (refDragon.archetype.xp_reward_base || 0) * floorXpGrowth * floorRewardMult * (1 + xpBonus / 100) * floorEfficiency);
-          const floorWood = Math.round(floorKills * (refDragon.archetype.wood_reward_base || 0) * (1 + lootBonus / 100) * floorEfficiency);
-          const floorStone = Math.round(floorKills * (refDragon.archetype.stone_reward_base || 0) * (1 + lootBonus / 100) * floorEfficiency);
-          const floorCrystals = Math.round(floorKills * (refDragon.archetype.crystal_reward_base || 0) * (1 + lootBonus / 100) * floorEfficiency);
-          const floorEssence = Math.round(floorKills * (refDragon.archetype.essence_reward_base || 0) * (1 + lootBonus / 100) * floorEfficiency);
-
-          // max() PRO RESSOURCE, nicht ueber die ganze Belohnung hinweg - ein
-          // Lauf mit ein paar echten Kills vor dem Rueckzug (kleines, aber
-          // echtes Gold/XP/Holz, aber 0 Kristalle/Essenz da kein Boss/kein
-          // seltener Wurf) soll seine echten Teilergebnisse behalten UND
-          // trotzdem bei den leer gebliebenen Ressourcen aufgefuellt werden.
-          if (floorGold > goldGain) { goldGain = floorGold; floorApplied = true; floorAppliedResources.push('gold'); }
-          if (floorXp > xpGain) { xpGain = floorXp; floorApplied = true; floorAppliedResources.push('xp'); }
-          if (floorWood > woodGain) { woodGain = floorWood; floorApplied = true; floorAppliedResources.push('wood'); }
-          if (floorStone > stoneGain) { stoneGain = floorStone; floorApplied = true; floorAppliedResources.push('stone'); }
-          if (floorCrystals > crystalGain) { crystalGain = floorCrystals; floorApplied = true; floorAppliedResources.push('crystals'); }
-          if (floorEssence > essenceGain) { essenceGain = floorEssence; floorApplied = true; floorAppliedResources.push('essence'); }
-
-          // Lebenszeit-Kill-Zaehler nur anheben, wenn der Mindestlohn
-          // tatsaechlich mehr "Kills" ergibt als die Simulation echt
-          // erreicht hat - current_dragon_index bleibt bewusst unangetastet
-          // (siehe Kommentar-Kopf oben).
-          if (floorKills > kills) {
-            if (isEliteRef) bossKills = Math.max(bossKills, floorKills);
-            kills = floorKills;
-          }
-        }
-      }
-
-      if (companion && floorCompanionXpPerHour > 0) {
-        const floorCompanionXp = Math.floor((elapsedSeconds / 3600) * floorCompanionXpPerHour);
-        if (floorCompanionXp > companionXpGain) { companionXpGain = floorCompanionXp; floorApplied = true; }
-      }
-    }
+    const companionXpGain = companion ? Math.floor((elapsedSeconds / 3600) * companionXpPerHour) : 0;
 
     let level = Number(state.level || 1);
     let xp = Number(state.xp || 0) + xpGain;
@@ -648,10 +333,11 @@ module.exports = async function handler(req, res) {
       skill_points_available: skillPointsAvailable,
       dragon_kills: Number(state.dragon_kills || 0) + kills,
       boss_kills: Number(state.boss_kills || 0) + bossKills,
-      current_dragon_index: killIndex,
-      highest_dragon_index: Math.max(Number(state.highest_dragon_index || 0), killIndex),
+      // Bugfix 21.08.2026 - keine Kampfsimulation mehr, current_dragon_index/
+      // highest_dragon_index werden von einer Abwesenheit nicht mehr
+      // veraendert (echter Stufen-Fortschritt passiert nur noch aktiv).
       last_seen_at: new Date().toISOString(),
-      last_offline_claim: { elapsedSeconds, goldGain, xpGain, woodGain, stoneGain, crystalGain, essenceGain, dragonKills: kills, levelsGained, claimedAt: new Date().toISOString(), floorApplied, floorAppliedResources }
+      last_offline_claim: { elapsedSeconds, goldGain, xpGain, woodGain, stoneGain, crystalGain, essenceGain, dragonKills: kills, levelsGained, claimedAt: new Date().toISOString() }
     };
 
     const claimRes = await sbFetch(serviceKey, `idle_player_state?auth_user_id=eq.${encodeURIComponent(user.id)}&last_seen_at=eq.${encodeURIComponent(lastSeenIso)}`, {
@@ -697,7 +383,7 @@ module.exports = async function handler(req, res) {
     return send(res, 200, {
       ok: true,
       elapsedSeconds,
-      rewards: { gold: goldGain, xp: xpGain, wood: woodGain, stone: stoneGain, crystals: crystalGain, essence: essenceGain, dragonKills: kills, levelsGained, dragonXpGain, floorApplied },
+      rewards: { gold: goldGain, xp: xpGain, wood: woodGain, stone: stoneGain, crystals: crystalGain, essence: essenceGain, dragonKills: kills, levelsGained, dragonXpGain },
       newTotals
     });
   } catch (error) {
