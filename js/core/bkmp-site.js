@@ -386,6 +386,34 @@
       setTimeout(() => document.body.classList.remove('bkmp-positivmodus-shake'), 500);
       bkmpShowJannikToast('🙈 NEIN NEIN NEIN, ICH SEHE DAS NICHT!', 2400);
 
+      /* Bugfix 21.08.2026 (Nutzer-Meldung: "wenn ich scrolle verrutscht ja
+         alles") - die Post-its werden weiter unten einmalig per
+         getBoundingClientRect() (Viewport-relative Koordinaten) positioniert
+         und danach nie neu berechnet. Scrollt die Seite waehrend der Effekt
+         laeuft, wandern die echten roten Zahlen darunter im Dokumentfluss
+         weiter, waehrend die fixed positionierten Post-its an ihrer
+         urspruenglichen Bildschirmposition kleben bleiben - genau die
+         gemeldete Verrutschung. Fix (Nutzer-Vorschlag: "kann ruhig ein
+         fester Modus sein") - Seite fuer die kurze Dauer des Effekts
+         komplett gegen Scrollen sperren, statt die Notizen bei jedem
+         Scroll-Event neu zu positionieren (robuster, kein zusaetzlicher
+         Scroll-Listener noetig).
+
+         BEWUSST NICHT das bereits bestehende body.modal-open wiederverwendet
+         (erster Versuch, live getestet und verworfen): dessen reines
+         overflow:hidden schnellt die Seite sofort auf scrollY=0 UND stellt
+         die Position beim Entsperren nicht wieder her - fuer ein echtes
+         blickdichtes Vollbild-Modal unsichtbar, hier aber verheerend, da
+         der Positivmodus-Effekt transparent UEBER der sichtbaren Seite
+         liegt. Stattdessen eine eigene Klasse (siehe style.css), die den
+         Body exakt an der aktuellen Scroll-Position einfriert
+         (position:fixed + negativer top-Offset) - der Hintergrund bleibt
+         dadurch optisch an Ort und Stelle, die echte Position wird beim
+         Entsperren per window.scrollTo() wiederhergestellt. */
+      const bkmpPositivmodusScrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0;
+      document.body.style.top = (-bkmpPositivmodusScrollY) + 'px';
+      document.body.classList.add('bkmp-positivmodus-scroll-lock');
+
       const overlay = document.createElement('div');
       overlay.id = 'bkmpPositivmodusOverlay';
       overlay.className = 'bkmp-positivmodus-overlay';
@@ -407,28 +435,39 @@
         }).filter(Boolean);
 
         /* Konfetti wiederverwendet exakt dasselbe .bkmp-loot-rain-Muster wie
-           triggerBkmpDiamondRain() oben - nur mit positiv gefaerbten Emojis. */
+           triggerBkmpDiamondRain() oben - nur mit positiv gefaerbten Emojis.
+           Nutzerwunsch 21.08.2026 ("bisschen groesser, paar Sekunden
+           laenger"): mehr Konfetti-Stuecke, groesser, ueber ein breiteres
+           Zeitfenster verteilt (Verzoegerung bis 2.4s statt 1s) - sonst
+           waere der Regen bei der jetzt verlaengerten Anzeigedauer schon
+           lange vorbei, bevor der Effekt endet. */
         const rain = document.createElement('div');
         rain.id = 'bkmpPositivmodusRain';
         rain.className = 'bkmp-loot-rain';
         const loot = ['💚', '✅', '😊'];
-        rain.innerHTML = Array.from({ length: 24 }, (_, i) => {
+        rain.innerHTML = Array.from({ length: 32 }, (_, i) => {
           const emoji = loot[i % loot.length];
           const left = Math.round(Math.random() * 100);
           const duration = (2.4 + Math.random() * 1.8).toFixed(2);
-          const delay = (Math.random() * 1).toFixed(2);
-          const size = (1.2 + Math.random() * 1.1).toFixed(2);
+          const delay = (Math.random() * 2.4).toFixed(2);
+          const size = (1.3 + Math.random() * 1.3).toFixed(2);
           return `<span style="left:${left}%; animation-duration:${duration}s; animation-delay:${delay}s; font-size:${size}rem;">${emoji}</span>`;
         }).join('');
         document.body.appendChild(rain);
 
+        // Nutzerwunsch 21.08.2026 "paar Sekunden laenger" - vorher 3400ms.
         setTimeout(() => {
           notes.forEach(n => n.classList.remove('visible'));
           rain.remove();
-          setTimeout(() => overlay.remove(), 350);
+          setTimeout(() => {
+            overlay.remove();
+            document.body.classList.remove('bkmp-positivmodus-scroll-lock');
+            document.body.style.top = '';
+            window.scrollTo(0, bkmpPositivmodusScrollY);
+          }, 350);
           bkmpShowJannikToast('😅 Puh... war wohl doch nix.', 2600);
           if (typeof bkmpMarkEggFound === 'function') bkmpMarkEggFound('positivmodus');
-        }, 3400);
+        }, 6400);
       }, 350);
     }
 

@@ -3890,19 +3890,38 @@ body.bkmp-aura-active::after {
   60% { transform: translate3d(-4px, 0, 0); }
   80% { transform: translate3d(4px, 0, 0); }
 }
+/* Bugfix 21.08.2026 (Nutzer-Meldung: "wenn ich scrolle verrutscht ja
+   alles") - eigene, vom bestehenden body.modal-open bewusst GETRENNTE
+   Scroll-Sperre: reines overflow:hidden (wie modal-open) wurde live
+   getestet und schnellt die Seite dabei auf scrollY=0 UND stellt die
+   Position beim Entsperren nicht wieder her - fuer ein echtes Vollbild-
+   Modal unsichtbar (der Hintergrund ist ohnehin komplett verdeckt), hier
+   aber verheerend, da der transparente Positivmodus-Effekt genau UEBER
+   der sichtbaren Seite liegt und ein Sprung auf die Seiten-Oberkante
+   sofort auffaellt. Stattdessen die Standard-Technik "Body an der
+   aktuellen Scroll-Position einfrieren" (position:fixed + negativer
+   top-Offset in genau der Hoehe des aktuellen Scrollstands, top-Wert wird
+   inline per JS gesetzt, siehe triggerBkmpPositivmodus) - der Hintergrund
+   bleibt dadurch optisch exakt an Ort und Stelle, kann aber nicht mehr
+   scrollen, und die echte Position wird beim Entsperren per
+   window.scrollTo() exakt wiederhergestellt. */
+body.bkmp-positivmodus-scroll-lock { position: fixed; left: 0; right: 0; width: 100%; }
+html:has(body.bkmp-positivmodus-scroll-lock) { overflow: hidden; }
 .bkmp-positivmodus-overlay { position: fixed; inset: 0; z-index: 94; pointer-events: none; }
 .bkmp-positivmodus-note {
   position: fixed;
+  /* Nutzerwunsch 21.08.2026 ("ruhig bisschen groesser") - Schriftgroesse/
+     Innenabstand deutlich angehoben (vorher 0.78rem/0.4rem 0.7rem). */
   transform: translate(-50%, -50%) rotate(var(--rot, 0deg)) scale(0.4);
-  padding: 0.4rem 0.7rem;
-  border-radius: 8px;
+  padding: 0.65rem 1.05rem;
+  border-radius: 11px;
   background: #d4f7c5;
   color: #14532d;
   font-family: 'Inter', sans-serif;
   font-weight: 800;
-  font-size: 0.78rem;
+  font-size: 1.05rem;
   white-space: nowrap;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35), inset 0 -2px 0 rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.38), inset 0 -2px 0 rgba(0, 0, 0, 0.08);
   opacity: 0;
   transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
