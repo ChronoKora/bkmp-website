@@ -419,6 +419,25 @@
       overlay.className = 'bkmp-positivmodus-overlay';
       document.body.appendChild(overlay);
 
+      /* Bugfix 21.08.2026, Nachtrag (Nutzer-Meldung mit Screenshot: "bewegt
+         sich immernoch mit" - der obige Scroll-Fix allein reichte nicht).
+         Root Cause per Live-Messung bewiesen (bodyTransform bei jedem
+         50ms-Sample waehrend der Note-Erzeugung geprueft): die Schuettel-
+         Animation (.bkmp-positivmodus-shake, transform:translate3d auf
+         BODY, 500ms Laufzeit) war zum bisherigen Erzeugungszeitpunkt
+         (350ms) noch aktiv - ein Element mit transform aendert per CSS-
+         Spezifikation den Containing Block fuer JEDES position:fixed-
+         Nachfahren (hier: #bkmpPositivmodusOverlay + die Notizen darin,
+         beides direkte/verschachtelte Kinder von body). Die per
+         getBoundingClientRect() berechneten (Viewport-relativen)
+         Koordinaten wurden dadurch auf ein noch verschobenes/transformiertes
+         Bezugssystem angewendet statt auf den echten Viewport - die
+         Notizen landeten sichtbar neben ihrem eigentlichen Ziel, nicht nur
+         bei einem spaeteren Scroll-Versuch. Fix: Notizen werden jetzt erst
+         NACH dem vollstaendigen Ende der Schuettel-Animation erzeugt (550ms
+         statt 350ms, 50ms Sicherheitsabstand zu den 500ms Animationsdauer -
+         body traegt zu diesem Zeitpunkt garantiert keinen transform mehr,
+         live per Messung bestaetigt). */
       setTimeout(() => {
         const notes = bkmpPositivmodusFindRedTargets().map(el => {
           const rect = el.getBoundingClientRect();
@@ -468,7 +487,7 @@
           bkmpShowJannikToast('😅 Puh... war wohl doch nix.', 2600);
           if (typeof bkmpMarkEggFound === 'function') bkmpMarkEggFound('positivmodus');
         }, 6400);
-      }, 350);
+      }, 550);
     }
 
     /* ---------------- Bonk-Button (oben links) ---------------- */
