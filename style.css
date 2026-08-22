@@ -1397,6 +1397,24 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
 .mini-line-chart {
   position: relative;
   height: 205px;
+  /* Nutzer-Meldung 23.08.2026 (Screenshot): der Hover-Tooltip eines hohen
+     Datenpunkts (nah am oberen Rand des Charts, y bis zu 16%) ragte sichtbar
+     über die Täglich/Wöchentlich/Monatlich-Umschalter darüber. Eigentlich
+     sollte .mini-line-charts overflow:hidden das abschneiden - live per
+     elementFromPoint() bewiesen, dass es das in diesem konkreten Fall NICHT
+     tut: die verschachtelten transform-Vorfahren (.panels-track fuers
+     Seiten-Wischen + .line-point selbst fuers Zentrieren des Punkts) lassen
+     den Tooltip die Kaskaden-Begrenzung sichtbar durchbrechen (aehnliche
+     Bugklasse wie der bereits dokumentierte Positivmodus-Transform-Fund vom
+     21.08.). Statt die Escape-Eigenheit selbst zu jagen (browser-/versions-
+     abhaengig, schwer zuverlaessig zu schliessen): der Chart bekommt genug
+     Vorlauf-Platz ueber sich, damit der Tooltip selbst am hoechsten Punkt
+     (16% von oben, Tooltip-Hoehe ~47px) gar nicht mehr in den Kopfbereich
+     hineinragen kann - exakt der Nutzerwunsch "Diagramm ein Stueck runter,
+     damit man die Zahl beim Hover erkennt". Live an genau diesem hoechsten
+     Punkt nachgemessen: 2.5rem deckt den vorher gemessenen ~24-28px-
+     Ueberschuss (Desktop 205px/Mobil 190px Charthoehe) mit Puffer ab. */
+  margin-top: 2.5rem;
   border-radius: 10px;
   overflow: hidden;
   background:

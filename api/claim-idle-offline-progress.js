@@ -91,28 +91,6 @@ async function sbFetch(serviceKey, path, options = {}) {
   });
 }
 
-/* Eigenstaendige, vereinfachte Kopie von bkmpIdleSelectDragonKindId aus
-   idledorf.js - entscheidet nur, WELCHER Drachen-Archetyp an einer
-   gegebenen Stufe steht (fuer die Belohnungs-Basiswerte + Boss-Erkennung),
-   keine Kampfwerte mehr noetig seit dem Umbau 21.08.2026 (siehe Datei-
-   Kopf-Kommentar). */
-function selectDragonKindId(killIndex, dragons) {
-  const stage = killIndex + 1;
-  const active = (dragons || []).filter(d => d.active !== false);
-  const byRule = rule => active.filter(d => d.spawn_rule === rule);
-  if (stage % 25 === 0) {
-    const pool = byRule('boss_25');
-    if (pool.length) return pool[stage % pool.length].id;
-  }
-  if (stage % 10 === 0) {
-    const pool = byRule('miniboss_10');
-    if (pool.length) return pool[stage % pool.length].id;
-  }
-  const standard = byRule('standard');
-  const pool = standard.length ? standard : active;
-  return pool.length ? pool[stage % pool.length].id : ((active[0] || {}).id || null);
-}
-
 /* Muss deckungsgleich mit bkmpIdleGrowthMult() in idledorf.js bleiben:
    (1+rate*kill)^exponent statt reiner Exponential-Compoundierung, die bei
    jeder Rate > 0 irgendwann astronomisch wird (siehe Kommentar dort). */
@@ -120,18 +98,47 @@ function growthMult(ratePerKill, exponent, killIndex) {
   return Math.pow(1 + (ratePerKill || 0) * killIndex, exponent || 1);
 }
 
-/* Liefert nur noch Archetyp + Boss-/Miniboss-Einstufung - maxHp/attack
-   wurden mit der Kampf-Simulation entfernt (siehe Umbau-Kommentar oben),
-   die Belohnungsformel braucht ausschliesslich die *_reward_base-Felder
-   des Archetyps selbst. */
-function dragonKindAt(killIndex, dragons) {
-  const kindId = selectDragonKindId(killIndex, dragons);
-  const archetype = (dragons || []).find(d => d.id === kindId);
-  if (!archetype) return null;
-  let bossTier = null;
-  if (archetype.spawn_rule === 'boss_25') bossTier = 'boss';
-  else if (archetype.spawn_rule === 'miniboss_10') bossTier = 'miniboss';
-  return { archetype, isBoss: Boolean(bossTier), bossTier };
+/* Bugfix 23.08.2026 (Spieler-Meldung NikschiOG ueber das Feedback-Board:
+   "Zu wenig Belohnungen obwohl ich pro Drache knapp 4K mache" + Nutzer-
+   Besteatigung "das muss selbst ich sagen das es ziemlich wenig ist").
+
+   Root Cause (per Live-Vergleich der ECHTEN Kampf-Formel bkmpIdleRewardsAt()
+   gegen die Offline-Formel bewiesen, nicht nur vermutet): der Umbau vom
+   21.08.2026 waehlte GENAU EINEN Referenz-Drachen an state.highest_dragon_
+   index und behandelte die GESAMTE Abwesenheit so, als wuerde der Spieler
+   ausschliesslich GENAU DIESEN einen Drachentyp bekaempfen. Live wechselt
+   der Gegner aber staendig (jede 25. Stufe Boss, jede 10. Miniboss, sonst
+   Standard/gelegentlich ein seltener Drache) - Boss-Kaempfe zahlen bis zu
+   4x, Minibosse bis zu 2x, UND haben typischerweise selbst einen deutlich
+   hoeheren *_reward_base als Standard-Drachen. Landete state.highest_
+   dragon_index (wie bei den meisten Spielern) zufaellig NICHT exakt auf
+   einer Boss-/Miniboss-Stufe, bekam die komplette Offline-Zeit NIE auch
+   nur einen einzigen Boss-/Miniboss-Anteil gutgeschrieben - erklaert direkt
+   die im Bug-Report sichtbaren "💎+0 🧪+0" (Kristalle/Essenz kommen bei
+   Standard-Drachen NIE vor, nur bei Boss/Miniboss/seltenen Drachen) und den
+   insgesamt deutlich zu niedrigen Gold-/XP-Ertrag.
+
+   Fix: statt EINES festen Referenz-Drachen wird jetzt der STATISTISCH
+   ERWARTETE Ertrag ueber die tatsaechliche Spawn-Verteilung berechnet - ein
+   Kilometerstein-Raster von 50 Stufen (kgV aus 25 und 10) enthaelt IMMER
+   genau 2 Boss- (4%), 4 Miniboss- (8%) und 44 "normale" (88%, davon
+   wiederum rare_spawn.chancePct% ein seltener Drache statt eines echten
+   Standard-Drachen) Slots - exakt dieselbe deterministische Verteilung wie
+   bkmpIdleSelectDragonKindId() im Client. Pro Tier wird der DURCHSCHNITT
+   aller aktiven Archetypen dieser Kategorie verwendet (nicht nur einer) -
+   bei mehreren Standard-/Boss-Archetypen mit unterschiedlichem *_reward_
+   base (in Produktion ueblich, hoehere Tier-Order = hoeherer Basiswert)
+   trifft der reine Zyklus-Mechanismus (stage % pool.length) ueber viele
+   Kaempfe ohnehin jeden Pool-Eintrag etwa gleich oft - der Durchschnitt
+   ist daher die korrekte Erwartungswert-Naeherung, kein Naeherungsfehler
+   zulasten eines einzelnen willkuerlich gewaehlten Members. Bleibt eine
+   reine geschlossene Formel (kein Zeit-/Kill-Loop) - "Festwert" im Sinne
+   des Nutzerauftrags vom 21.08. bleibt vollstaendig erhalten, nur die
+   zugrundeliegende Erwartungswert-Berechnung ist jetzt korrekt. */
+function poolAverage(dragons, rule, field) {
+  const pool = (dragons || []).filter(d => d.active !== false && d.spawn_rule === rule);
+  if (!pool.length) return 0;
+  return pool.reduce((sum, d) => sum + Number(d[field] || 0), 0) / pool.length;
 }
 
 module.exports = async function handler(req, res) {
@@ -166,7 +173,7 @@ module.exports = async function handler(req, res) {
     const state = Array.isArray(stateRows) ? stateRows[0] : null;
     if (!state) return send(res, 200, { ok: true, elapsedSeconds: 0, rewards: null, newTotals: null });
 
-    const configRes = await sbFetch(serviceKey, `idle_game_config?key=in.(offline_progress,reward_scaling,boss_scaling,offline_afk_reward)&select=key,value`);
+    const configRes = await sbFetch(serviceKey, `idle_game_config?key=in.(offline_progress,reward_scaling,boss_scaling,rare_spawn,offline_afk_reward)&select=key,value`);
     const configRows = configRes.ok ? await configRes.json() : [];
     const config = {};
     (Array.isArray(configRows) ? configRows : []).forEach(row => { config[row.key] = row.value; });
@@ -174,6 +181,7 @@ module.exports = async function handler(req, res) {
     const bossCfg = config.boss_scaling || { minibossRewardMult: 2, bossRewardMult: 4 };
     const rewardCfg = { ...(config.reward_scaling || { goldGrowthPerKill: 0.05, goldGrowthExponent: 1.2, xpGrowthPerKill: 0.05, xpGrowthExponent: 1.2 }), ...bossCfg };
     const afkCfg = config.offline_afk_reward || {};
+    const rareCfg = config.rare_spawn || { chancePct: 8 };
 
     /* Gilden-Technologie v3 (31.07.2026), "Nachtwache" (guild_nachtwache):
        erhoeht den Offline-Deckel um effect_per_tier Std./Stufe fuer
@@ -251,23 +259,19 @@ module.exports = async function handler(req, res) {
     } catch (e) { /* Begleitdrache-Lookup fehlgeschlagen - Kampf-EP-Gutschrift bleibt einfach aus, Rest der Belohnung unangetastet */ }
 
     /* ============================================================
-       Feste AFK-Belohnungsformel (21.08.2026, siehe Datei-Kopf-Kommentar
-       fuer die volle Herleitung). Referenzstufe ist ausdruecklich
-       highest_dragon_index (die hoechste je erreichte Stufe), NICHT
-       current_dragon_index - eine Abwesenheit soll den bereits bewiesenen
-       Fortschritt beloehnen, nicht davon abhaengen, wo der Spieler gerade
-       zufaellig steht (auto_advance=false/ein Rueckzug wuerde sie sonst
-       kuenstlich druecken). Keine Kampfsimulation mehr - die einzigen
-       Eingaben sind: wie lange war der Spieler weg, welche Basis-
-       Belohnung zahlt der Drache an seiner besten Stufe, und ein fester,
+       Feste AFK-Belohnungsformel (21.08.2026, ueberarbeitet 23.08.2026 -
+       siehe Datei-Kopf-Kommentar UND der grosse Kommentar bei
+       poolAverage() weiter oben fuer die volle Herleitung des Blend-Fixes).
+       Referenzstufe ist ausdruecklich highest_dragon_index (die hoechste
+       je erreichte Stufe), NICHT current_dragon_index - eine Abwesenheit
+       soll den bereits bewiesenen Fortschritt beloehnen, nicht davon
+       abhaengen, wo der Spieler gerade zufaellig steht. Keine Kampf-
+       simulation - die Eingaben sind: wie lange war der Spieler weg,
+       welche durchschnittliche Belohnung zahlt die Gegner-Mischung
+       (Standard/selten/Miniboss/Boss) an dieser Stufe, und ein fester,
        admin-anpassbarer Prozentsatz (Standard 75%, idle_game_config-
        Schluessel 'offline_afk_reward'). */
     const highestKillIndex = Number(state.highest_dragon_index || 0);
-    let refDragon = null;
-    try {
-      refDragon = dragonKindAt(highestKillIndex, dragons) || dragonKindAt(0, dragons);
-    } catch (e) { refDragon = null; }
-    if (!refDragon) return send(res, 502, { error: 'dragons_unavailable' });
 
     /* Wirtschafts-Skilltree-Knoten "wirt_offline" bleibt als bewusste
        Ausnahme wirksam (bereits investierte Spielerpunkte sollen nicht
@@ -281,28 +285,71 @@ module.exports = async function handler(req, res) {
     const baseEfficiencyPct = afkCfg.efficiencyPct != null ? Number(afkCfg.efficiencyPct) : 75;
     const efficiency = Math.max(0, Math.min(100, baseEfficiencyPct + wirtOfflineBonusPct)) / 100;
     const assumedSecondsPerKill = Math.max(1, Number(afkCfg.assumedSecondsPerKill || 45));
-    const assumedSecondsPerEliteKill = Math.max(1, Number(afkCfg.assumedSecondsPerBossKill || 180));
     const companionXpPerHour = Math.max(0, Number(afkCfg.companionXpPerHour || 8));
 
     const goldBonus = Number(state.gold_bonus || 0);
     const xpBonus = Number(state.xp_bonus || 0);
     const lootBonus = Number(state.loot_bonus || 0);
 
-    const isEliteRef = Boolean(refDragon.bossTier);
-    const kills = Math.max(0, Math.floor(elapsedSeconds / (isEliteRef ? assumedSecondsPerEliteKill : assumedSecondsPerKill)));
-    const bossKills = isEliteRef ? kills : 0;
+    /* Spawn-Verteilung ueber ein 50-Stufen-Raster (kgV aus 25/10) - exakt
+       dieselbe deterministische Logik wie bkmpIdleSelectDragonKindId() im
+       Client: jede 25. Stufe Boss (2 von 50 = 4%), jede 10. (ausser wenn
+       schon Boss) Miniboss (4 von 50 = 8%), der Rest (44 von 50 = 88%)
+       "normale" Slots - von denen wiederum rare_spawn.chancePct% durch
+       einen seltenen Drachen ersetzt werden (Kristalle/Essenz auch ausserhalb
+       von Boss/Miniboss, exakt wie live). */
+    const BOSS_SLOT_SHARE = 2 / 50;
+    const MINIBOSS_SLOT_SHARE = 4 / 50;
+    const NORMAL_SLOT_SHARE = 44 / 50;
+    const rareChance = Math.max(0, Math.min(100, Number(rareCfg.chancePct != null ? rareCfg.chancePct : 8))) / 100;
+
+    const REWARD_FIELDS = ['gold_reward_base', 'xp_reward_base', 'wood_reward_base', 'stone_reward_base', 'crystal_reward_base', 'essence_reward_base'];
+    const avgStandard = {}, avgRare = {}, avgMiniboss = {}, avgBoss = {};
+    REWARD_FIELDS.forEach(f => {
+      avgStandard[f] = poolAverage(dragons, 'standard', f);
+      avgRare[f] = poolAverage(dragons, 'rare', f);
+      avgMiniboss[f] = poolAverage(dragons, 'miniboss_10', f);
+      avgBoss[f] = poolAverage(dragons, 'boss_25', f);
+    });
+    // "Normaler" Slot ist selbst nochmal eine Mischung aus echtem Standard-
+    // Drachen UND (mit rareChance%) einem seltenen Drachen.
+    function normalSlotAvg(field) { return (1 - rareChance) * (avgStandard[field] || 0) + rareChance * (avgRare[field] || 0); }
+    // Nur Gold/XP wachsen exponentiell mit der Stufe (deckungsgleich mit
+    // bkmpIdleRewardsAt() im Client) - Holz/Stein/Kristalle/Essenz bleiben
+    // pro Kill flach, nur nach Gegner-Typ unterschiedlich.
+    function blendedGrowing(field, growth, minibossMult, bossMult) {
+      return growth * (NORMAL_SLOT_SHARE * normalSlotAvg(field) + MINIBOSS_SLOT_SHARE * (avgMiniboss[field] || 0) * minibossMult + BOSS_SLOT_SHARE * (avgBoss[field] || 0) * bossMult);
+    }
+    function blendedFlat(field) {
+      return NORMAL_SLOT_SHARE * normalSlotAvg(field) + MINIBOSS_SLOT_SHARE * (avgMiniboss[field] || 0) + BOSS_SLOT_SHARE * (avgBoss[field] || 0);
+    }
+
+    const goldGrowth = growthMult(rewardCfg.goldGrowthPerKill, rewardCfg.goldGrowthExponent, highestKillIndex);
+    const xpGrowth = growthMult(rewardCfg.xpGrowthPerKill, rewardCfg.xpGrowthExponent, highestKillIndex);
+    const minibossMult = rewardCfg.minibossRewardMult || 2;
+    const bossMult = rewardCfg.bossRewardMult || 4;
+    const perKillGold = blendedGrowing('gold_reward_base', goldGrowth, minibossMult, bossMult);
+    const perKillXp = blendedGrowing('xp_reward_base', xpGrowth, minibossMult, bossMult);
+    const perKillWood = blendedFlat('wood_reward_base');
+    const perKillStone = blendedFlat('stone_reward_base');
+    const perKillCrystals = blendedFlat('crystal_reward_base');
+    const perKillEssence = blendedFlat('essence_reward_base');
+
+    const kills = Math.max(0, Math.floor(elapsedSeconds / assumedSecondsPerKill));
+    // Statistisch erwartete Anzahl an Boss-Kills innerhalb der simulierten
+    // Kill-Zahl - reiner Lebenszeit-/Erfolgs-Zaehler, gatet keinen echten
+    // Fortschritt (current_dragon_index/highest_dragon_index selbst werden
+    // durch eine Abwesenheit nicht veraendert, siehe newTotals unten).
+    const bossKills = Math.round(kills * BOSS_SLOT_SHARE);
 
     let goldGain = 0, xpGain = 0, woodGain = 0, stoneGain = 0, crystalGain = 0, essenceGain = 0;
     if (kills > 0) {
-      const goldGrowth = growthMult(rewardCfg.goldGrowthPerKill, rewardCfg.goldGrowthExponent, highestKillIndex);
-      const xpGrowth = growthMult(rewardCfg.xpGrowthPerKill, rewardCfg.xpGrowthExponent, highestKillIndex);
-      const rewardMult = refDragon.bossTier === 'boss' ? (rewardCfg.bossRewardMult || 4) : refDragon.bossTier === 'miniboss' ? (rewardCfg.minibossRewardMult || 2) : 1;
-      goldGain = Math.round(kills * (refDragon.archetype.gold_reward_base || 0) * goldGrowth * rewardMult * (1 + goldBonus / 100) * efficiency);
-      xpGain = Math.round(kills * (refDragon.archetype.xp_reward_base || 0) * xpGrowth * rewardMult * (1 + xpBonus / 100) * efficiency);
-      woodGain = Math.round(kills * (refDragon.archetype.wood_reward_base || 0) * (1 + lootBonus / 100) * efficiency);
-      stoneGain = Math.round(kills * (refDragon.archetype.stone_reward_base || 0) * (1 + lootBonus / 100) * efficiency);
-      crystalGain = Math.round(kills * (refDragon.archetype.crystal_reward_base || 0) * (1 + lootBonus / 100) * efficiency);
-      essenceGain = Math.round(kills * (refDragon.archetype.essence_reward_base || 0) * (1 + lootBonus / 100) * efficiency);
+      goldGain = Math.round(kills * perKillGold * (1 + goldBonus / 100) * efficiency);
+      xpGain = Math.round(kills * perKillXp * (1 + xpBonus / 100) * efficiency);
+      woodGain = Math.round(kills * perKillWood * (1 + lootBonus / 100) * efficiency);
+      stoneGain = Math.round(kills * perKillStone * (1 + lootBonus / 100) * efficiency);
+      crystalGain = Math.round(kills * perKillCrystals * (1 + lootBonus / 100) * efficiency);
+      essenceGain = Math.round(kills * perKillEssence * (1 + lootBonus / 100) * efficiency);
     }
     const companionXpGain = companion ? Math.floor((elapsedSeconds / 3600) * companionXpPerHour) : 0;
 
