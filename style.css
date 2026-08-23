@@ -1437,6 +1437,14 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
   padding: 0;
   box-shadow: 0 0 0 3px color-mix(in srgb, #3b82f6 24%, transparent);
 }
+/* Nutzer-Screenshot 23.08.2026 ("Wir haben es fast"): der Punkt-Kreis eines
+   spaeter im DOM stehenden (weiter rechts liegenden) Nachbarpunkts teilte
+   sich denselben z-index:3 wie der gerade gehoverte Punkt und ueberdeckte
+   dadurch einen Teil von dessen breitem Tooltip-Text ("...zum Vor[tag]" am
+   17.08., da der 18.08.-Punkt im DOM danach kommt und bei gleichem z-index
+   gewinnt). Der gehoverte/fokussierte Punkt bekommt jetzt einen hoeheren
+   z-index als alle Geschwister-Punkte, unabhaengig von der DOM-Reihenfolge. */
+.line-point:hover, .line-point:focus-visible { z-index: 4; }
 .line-date-row {
   position: absolute;
   left: 0;
