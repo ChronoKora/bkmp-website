@@ -147,7 +147,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260823-revenuecharttooltipzfix1">
+<link rel="stylesheet" href="style.css?v=20260823-investorpayoutprank1">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 <!-- Jake's Feldfahrt (07.08.2026) - eigenstaendiges Website-Easter-Egg,
      komplett getrennt vom Idle-Dorf-Spiel, siehe js/easter-eggs/jakes-
@@ -407,6 +407,26 @@
       <img id="investorPayoutViewerImg" class="investor-payout-viewer-img" src="" alt="Auszahlungsbeweis">
       <div class="joke-buttons">
         <button class="btn-nein" id="investorPayoutViewerCloseBtn" type="button">Schließen</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Auszahlungs-Beantragen-Prank (23.08.2026) - per Admin-Panel gezielt pro
+       Investor scharf geschaltet, siehe .investor-payout-request-btn -->
+  <div class="joke-overlay" id="investorPayoutPrankOverlay">
+    <div class="joke-card investor-payout-prank-card">
+      <div id="investorPayoutPrankProcessing">
+        <div class="investor-payout-prank-spinner" aria-hidden="true"></div>
+        <p>Auszahlung wird bearbeitet …</p>
+      </div>
+      <div id="investorPayoutPrankReveal" hidden>
+        <h3>😂 GERICKROLLT!</h3>
+        <div class="investor-payout-prank-video-wrap">
+          <iframe id="investorPayoutPrankIframe" src="" title="Überraschung" allow="autoplay; encrypted-media" allowfullscreen loading="lazy"></iframe>
+        </div>
+        <div class="joke-buttons">
+          <button class="btn-ja" id="investorPayoutPrankCloseBtn" type="button">Haha, gut gemacht 😅</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1643,7 +1663,7 @@
        liest. window.BKMP_QA_MODE selbst wird noch frueher gesetzt (Kopf-Skript
        oben, vor jedem <script src>). Reiner No-Op ausserhalb des QA-Modus. -->
   <script src="js/core/bkmp-game-clock.js?v=20260724-qafoundation1" defer></script>
-  <script src="supabase.js?v=20260818-payrollnocat3" defer></script>
+  <script src="supabase.js?v=20260823-investorpayoutprank1" defer></script>
   <script src="app.js?v=20260718-selbstverdient1" defer></script>
   <!-- Redesign Phase 2a (17.07.): idledorf.js in geteilten Zustand + Subsysteme
        zerlegt. Ladereihenfolge ist bewusst fest: bkmp-idle-state.js zuerst
@@ -1688,7 +1708,7 @@
        bkmp-idle-*.js ab, nur die REIHENFOLGE relativ zu bkmp-site.js zaehlt
        hier. -->
   <script src="js/easter-eggs/jakes-feldfahrt.js?v=20260807-jakesfeldfahrt8" defer></script>
-  <script src="js/core/bkmp-site.js?v=20260823-revenuecharttooltipflip1" defer></script>
+  <script src="js/core/bkmp-site.js?v=20260823-investorpayoutprank1" defer></script>
   <!-- Feedback-/Status-Board Stufe 1 (20.07.2026) - eigenstaendig, reine
        lokale Testdaten, siehe Datei-Kopf-Kommentar. -->
   <script src="js/ui/bkmp-feedback-board.js?v=20260721-stufe34" defer></script>

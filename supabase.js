@@ -853,7 +853,11 @@ async function importLocalIncomesToSupabase() {
 /* Auszahlungsnachweis (28.07.2026): paid_out/payout_proof_url sind additive
    Spalten (sql/20260728-investor-payout-proof.sql, noch nicht ausgefuehrt) -
    defensiv ausgewertet (Number/Boolean/||''), damit ein noch nicht
-   migriertes Schema keinen Fehler wirft, nur die neuen Felder leer bleiben. */
+   migriertes Schema keinen Fehler wirft, nur die neuen Felder leer bleiben.
+   payout_button_prank (23.08.2026, sql/20260823-investor-payout-prank.sql,
+   noch nicht ausgefuehrt) - admin-togglebarer Schalter, ob der "Auszahlung
+   beantragen"-Scherzknopf auf der oeffentlichen Investoren-Karte dieses
+   einen Investors erscheint (siehe js/core/bkmp-site.js). */
 function bkmpMapInvestorFromSupabase(row) {
   return {
     id: row.id,
@@ -866,6 +870,7 @@ function bkmpMapInvestorFromSupabase(row) {
     anonymous: Boolean(row.anonymous),
     paidOut: Boolean(row.paid_out),
     payoutProofUrl: row.payout_proof_url || '',
+    payoutButtonPrank: Boolean(row.payout_button_prank),
     createdAt: row.created_at ? Date.parse(row.created_at) : 0,
     source: 'supabase'
   };
@@ -881,7 +886,8 @@ function bkmpMapInvestorToSupabase(investor) {
     note: investor.minecraftName || investor.note || null,
     anonymous: Boolean(investor.anonymous),
     paid_out: Boolean(investor.paidOut),
-    payout_proof_url: investor.payoutProofUrl || null
+    payout_proof_url: investor.payoutProofUrl || null,
+    payout_button_prank: Boolean(investor.payoutButtonPrank)
   };
 }
 
@@ -891,7 +897,7 @@ async function loadInvestors() {
 
   const { data, error } = await client
     .from('investors')
-    .select('id, name, investment, profit_percent, start_date, end_date, note, anonymous, paid_out, payout_proof_url, created_at')
+    .select('id, name, investment, profit_percent, start_date, end_date, note, anonymous, paid_out, payout_proof_url, payout_button_prank, created_at')
     .order('created_at', { ascending: true });
 
   if (error) throw error;
@@ -909,13 +915,13 @@ async function saveInvestor(investor) {
       .from('investors')
       .update(payload)
       .eq('id', investor.id)
-      .select('id, name, investment, profit_percent, start_date, end_date, note, anonymous, paid_out, payout_proof_url, created_at')
+      .select('id, name, investment, profit_percent, start_date, end_date, note, anonymous, paid_out, payout_proof_url, payout_button_prank, created_at')
       .single();
   } else {
     query = client
       .from('investors')
       .insert(payload)
-      .select('id, name, investment, profit_percent, start_date, end_date, note, anonymous, paid_out, payout_proof_url, created_at')
+      .select('id, name, investment, profit_percent, start_date, end_date, note, anonymous, paid_out, payout_proof_url, payout_button_prank, created_at')
       .single();
   }
 

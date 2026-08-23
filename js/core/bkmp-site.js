@@ -1658,7 +1658,8 @@
               <div><span>Investiert</span><strong>${bkmpFormatCurrency(inv.invested)}</strong></div>
               <div><span>Beteiligung</span><strong>${Number(inv.sharePercent || 0)}%</strong></div>
               <div><span>Zeitraum-Gewinn</span><strong class="${periodNet >= 0 ? 'pos' : 'neg'}">${bkmpFormatCurrency(periodNet)}</strong></div>
-            </div>`;
+            </div>
+            ${inv.payoutButtonPrank ? `<button class="investor-payout-request-btn" type="button" data-investor-name="${escapeHtml(invName)}" data-payout-amount="${escapeHtml(bkmpFormatCurrency(payout))}">💸 Auszahlung beantragen</button>` : ''}`;
         return `
           <div class="investor-card investor-card-rich${isConcluded ? ' investor-card-concluded' : ''}">
             <div class="investor-head">
@@ -1724,6 +1725,60 @@
       const investorPayoutViewerCloseBtn = document.getElementById('investorPayoutViewerCloseBtn');
       if (investorPayoutViewerCloseBtn) investorPayoutViewerCloseBtn.addEventListener('click', closeInvestorPayoutViewer);
       investorPayoutViewerOverlay.addEventListener('click', e => { if (e.target === investorPayoutViewerOverlay) closeInvestorPayoutViewer(); });
+    }
+
+    /* Auszahlungs-Beantragen-Prank (23.08.2026, Nutzeridee): pro Investor
+       im Admin-Panel scharf schaltbarer "Auszahlung beantragen"-Knopf -
+       echt wirkendes Ja/Nein ueber das bereits bestehende bkmpConfirmDialog()
+       (603), bei "Ja" ein kurzer "wird bearbeitet"-Zwischenschritt (baut
+       Spannung auf statt sofort aufzufliegen), danach der Rickroll. Gleiches
+       Delegations-Prinzip wie der Auszahlungsbeweis-Viewer direkt darueber -
+       #investorGrid wird nur per innerHTML neu befuellt, der Listener sitzt
+       EINMAL hier aussen. */
+    const investorPayoutPrankOverlay = document.getElementById('investorPayoutPrankOverlay');
+    if (investorGridEl && investorPayoutPrankOverlay) {
+      const prankProcessing = document.getElementById('investorPayoutPrankProcessing');
+      const prankReveal = document.getElementById('investorPayoutPrankReveal');
+      const prankIframe = document.getElementById('investorPayoutPrankIframe');
+      let prankRevealTimer = null;
+
+      function closeInvestorPayoutPrank() {
+        investorPayoutPrankOverlay.classList.remove('visible');
+        document.body.classList.remove('modal-open');
+        clearTimeout(prankRevealTimer);
+        prankIframe.src = ''; // stoppt Ton/Wiedergabe sofort beim Schliessen
+      }
+
+      async function openInvestorPayoutPrank(name, amountLabel) {
+        const ok = await bkmpConfirmDialog(
+          'Auszahlung beantragen',
+          `Möchtest du deine komplette Summe (${amountLabel}) jetzt vollständig auszahlen lassen?`,
+          'Ja, auszahlen',
+          'Abbrechen'
+        );
+        if (!ok) return;
+        prankProcessing.hidden = false;
+        prankReveal.hidden = true;
+        document.body.classList.add('modal-open');
+        investorPayoutPrankOverlay.classList.add('visible');
+        prankRevealTimer = setTimeout(() => {
+          prankProcessing.hidden = true;
+          prankReveal.hidden = false;
+          prankIframe.src = 'https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&rel=0';
+        }, 1400);
+      }
+
+      investorGridEl.addEventListener('click', e => {
+        const btn = e.target.closest('.investor-payout-request-btn');
+        if (!btn) return;
+        openInvestorPayoutPrank(btn.dataset.investorName || '', btn.dataset.payoutAmount || '');
+      });
+      const investorPayoutPrankCloseBtn = document.getElementById('investorPayoutPrankCloseBtn');
+      if (investorPayoutPrankCloseBtn) investorPayoutPrankCloseBtn.addEventListener('click', closeInvestorPayoutPrank);
+      investorPayoutPrankOverlay.addEventListener('click', e => { if (e.target === investorPayoutPrankOverlay) closeInvestorPayoutPrank(); });
+      document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && investorPayoutPrankOverlay.classList.contains('visible')) closeInvestorPayoutPrank();
+      });
     }
 
     /* Easter Egg: Donut-Chart oft klicken -> dreht sich immer schneller, Farben
