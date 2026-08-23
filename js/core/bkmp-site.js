@@ -1750,6 +1750,9 @@
       let prankCloseUnlockTimer = null;
       let prankCloseAllowed = false;
       let prankPreloaded = false;
+      let prankPlayer = null;
+      let prankPlayerReady = false;
+      let prankPendingPlay = false;
       const PRANK_VIDEO_ID = 'dQw4w9WgXcQ';
 
       /* Nutzer-Meldung 23.08.2026 ("bis das Video laedt ist so ein 5
@@ -1760,15 +1763,51 @@
          (also VOR dem Ja/Nein-Dialog, mit reichlich Vorlauf bis zum
          eigentlichen Reveal) OHNE Autoplay geladen (`autoplay=0` - der
          Player initialisiert/puffert bereits, spielt aber nicht los, sonst
-         waere die Position beim echten Reveal schon vorgerueckt). Beim
-         Reveal selbst wird nur noch per postMessage (`enablejsapi=1`
-         macht das moeglich, ganz ohne die volle YouTube-IFrame-API laden
-         zu muessen) "playVideo" an das BEREITS GELADENE Fenster geschickt -
-         kein zweiter Kaltstart mehr noetig. */
+         waere die Position beim echten Reveal schon vorgerueckt).
+
+         NACHBESSERUNG (Nutzer-Screenshot "Jetzt startet es garnicht mehr
+         direkt"): der erste Versuch schickte beim Reveal ein rohes, nicht
+         ueber die offizielle API laufendes postMessage("playVideo") an das
+         iframe - YouTubes eingebetteter Player verarbeitet solche rohen
+         Kommandos nachweislich NICHT zuverlaessig, wenn kein vorheriger
+         "onReady"-Handschlag stattgefunden hat (kein Fehler, das Kommando
+         verpufft einfach lautlos - der Player zeigte danach nur noch den
+         Standard-Thumbnail mit manuellem Play-Knopf). Fix: die offizielle
+         YouTube-IFrame-Player-API (laedt einmalig youtube.com/iframe_api,
+         NUR wenn tatsaechlich vorgeladen wird - kein Dauerlast fuer Besucher
+         ohne aktiven Prank-Knopf) - new YT.Player(bestehendesIframe,...)
+         uebernimmt das SCHON GELADENE iframe unveraendert (kein erneutes
+         Laden), das onReady-Event bestaetigt zuverlaessig, wann .playVideo()
+         tatsaechlich wirkt statt blind zu hoffen. */
       function preloadInvestorPayoutPrankVideo() {
         if (prankPreloaded) return;
         prankPreloaded = true;
         prankIframe.src = `https://www.youtube.com/embed/${PRANK_VIDEO_ID}?enablejsapi=1&autoplay=0&rel=0`;
+        function createPlayer() {
+          prankPlayer = new YT.Player(prankIframe, {
+            events: {
+              onReady: () => {
+                prankPlayerReady = true;
+                if (prankPendingPlay) { prankPlayer.playVideo(); prankPendingPlay = false; }
+              }
+            }
+          });
+        }
+        if (window.YT && window.YT.Player) {
+          createPlayer();
+        } else {
+          const previousCallback = window.onYouTubeIframeAPIReady;
+          window.onYouTubeIframeAPIReady = function() {
+            if (typeof previousCallback === 'function') previousCallback();
+            createPlayer();
+          };
+          if (!document.getElementById('bkmpYoutubeIframeApiScript')) {
+            const apiScript = document.createElement('script');
+            apiScript.id = 'bkmpYoutubeIframeApiScript';
+            apiScript.src = 'https://www.youtube.com/iframe_api';
+            document.head.appendChild(apiScript);
+          }
+        }
       }
 
       function closeInvestorPayoutPrank() {
@@ -1779,6 +1818,9 @@
         clearTimeout(prankCloseUnlockTimer);
         prankIframe.src = ''; // stoppt Ton/Wiedergabe sofort beim Schliessen
         prankPreloaded = false; // beim naechsten Mal wieder frisch vorladen
+        prankPlayer = null;
+        prankPlayerReady = false;
+        prankPendingPlay = false;
       }
       /* Der projektweite ESC-Sweep (BKMP_OVERLAY_CLOSERS, weiter unten in
          dieser Datei) entfernt bei JEDEM .joke-overlay.visible ohne
@@ -1806,13 +1848,15 @@
         prankRevealTimer = setTimeout(() => {
           prankProcessing.hidden = true;
           prankReveal.hidden = false;
-          if (prankIframe.contentWindow) {
-            // Bereits vorgeladenes Fenster nur noch starten (kein Neuladen).
-            prankIframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), 'https://www.youtube.com');
+          if (prankPlayer && prankPlayerReady) {
+            prankPlayer.playVideo(); // bereits geladen+bereit -> startet sofort, kein Neuladen
+          } else if (prankPlayer) {
+            prankPendingPlay = true; // Player existiert, onReady ist nur noch nicht durch - wird dort nachgeholt
           } else {
             // Sicherheitsnetz, falls das Vorladen aus irgendeinem Grund nie
-            // griff (z.B. sehr seltene Race) - dann eben doch der alte,
-            // etwas langsamere Kaltstart statt gar kein Video.
+            // griff (z.B. YouTube-IFrame-API blockiert/nicht erreichbar) -
+            // dann eben doch der alte, etwas langsamere Kaltstart statt
+            // gar kein Video.
             prankIframe.src = `https://www.youtube.com/embed/${PRANK_VIDEO_ID}?autoplay=1&rel=0`;
           }
           prankCloseUnlockTimer = setTimeout(() => {
