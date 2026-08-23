@@ -3568,8 +3568,17 @@ input.cardcatalog-search:focus {
 /* Auszahlungs-Beantragen-Prank (23.08.2026, Nachbesserung: "ruhig viel
    Größer") - Video-Modal + Ladezustand, bewusst gross (fast Vollbild auf
    kleineren Screens) fuer maximale Wirkung. */
-.investor-payout-prank-card { max-width: min(920px, 96vw); text-align: center; padding: 2.2rem 2.4rem 1.9rem; }
-.investor-payout-prank-card h3 { font-size: 1.6rem; margin-bottom: 0.9rem; }
+/* Nachbesserung ("Bitte so weit vergrößern", per markiertem Screenshot) -
+   gleiche Groessenordnung wie die anderen bereits etablierten "grossen"
+   Modals im Projekt (.arena-battle-card/.investor-payout-viewer-card).
+   Echter Bug beim eigenen Testen gefunden: .joke-card ist ein Flex-Kind von
+   .joke-overlay ohne eigene "width" - reines "max-width" begrenzt nur eine
+   obere Schranke, erzwingt aber kein tatsaechliches Wachstum, wenn der
+   Inhalt (Spinner/kurzer Ladetext) selbst schmal ist - die Karte blieb
+   dadurch bei ~184px haengen statt die 1200px auszunutzen. "width:100%"
+   ergaenzt, damit die Karte den verfuegbaren Platz bis zu max-width
+   tatsaechlich fuellt. */
+.investor-payout-prank-card { width: 100%; max-width: min(1200px, 94vw); text-align: center; padding: 2.2rem 2.4rem 1.9rem; }
 #investorPayoutPrankProcessing p { color: var(--muted); font-size: 1.05rem; margin: 0; }
 .investor-payout-prank-spinner {
   width: 56px; height: 56px; margin: 0 auto 1.3rem;
