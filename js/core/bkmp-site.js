@@ -1483,34 +1483,34 @@
         return mode === 'daily' ? sorted.slice(-14) : sorted;
       }
 
-      /* Hover-Anzeige 23.08.2026 (Nutzer-Screenshot "Weiterhin verdeckt", zwei
-         Nachbesserungsversuche vorher): der Wert eines Datenpunkts stand
-         bisher in einem schwebenden, per CSS relativ zum Punkt positionierten
-         Tooltip (<span> in .line-point, "bottom: calc(100% + 10px)"). Bei
-         einem hohen Punkt (nah am oberen Chart-Rand) fuehrte das zu ZWEI
-         voneinander unabhaengigen Problemen, live per elementFromPoint()
-         gegen die echten Produktionsdaten bewiesen: (1) verschachtelte
-         transform-Vorfahren (.panels-track fuers Tab-Wischen + .line-point
-         selbst) liessen den Tooltip .mini-line-charts overflow:hidden
-         sichtbar durchbrechen und ueber die Taeglich/Woechentlich/Monatlich-
-         Umschalter ragen - ein erster Fix (margin-top auf den Chart) behob
-         GENAU DAS. (2) unabhaengig davon ragte der UNTERE Teil desselben
-         Tooltips weiterhin in die eigene gerasterte Chart-Flaeche hinein
-         (dort, wo Achsen-Beschriftung/Gitterlinien sitzen) - ein zweiter
-         margin-top-Versuch aenderte daran NICHTS, weil margin-top nur den
-         Abstand VOR dem Chart vergroessert, nicht die Position des Tooltips
-         RELATIV ZUM CHART SELBST (die haengt einzig von der Punkt-Hoehe in
-         Prozent + der festen Tooltip-Eigengroesse ab, komplett unabhaengig
-         vom margin-top des Charts).
-
-         Sauberer Fix statt eines dritten CSS-Zahlenversuchs: der Wert steht
-         jetzt in einer EIGENEN, IMMER GLEICH POSITIONIERTEN Anzeige-Zeile
-         zwischen Kopfzeile und Chart (echter Dokumentfluss, kein floatendes
-         .line-point-Tooltip mehr) - kann dadurch strukturell nie wieder
-         irgendetwas ueberlappen, unabhaengig davon wie nah ein Punkt am
-         oberen Rand liegt. Aktualisiert per mouseenter/focus auf dem Punkt
-         (Maus UND Tastatur), reagiert weiterhin auch fuer Screenreader ueber
-         das unveraendert vorhandene aria-label je Punkt. */
+      /* Hover-Tooltip 23.08.2026 (Nutzer-Screenshots "Weiterhin verdeckt" +
+         danach explizit "Möchte das wie vorher.." - der schwebende, am Punkt
+         klebende Tooltip aus der Zeit VOR diesem Fix war das gewuenschte
+         Verhalten, eine feste Anzeige-Zeile darueber (kurzzeitig ausprobiert)
+         war es NICHT). Root Cause der eigentlichen Ueberlappung, live per
+         elementFromPoint() gegen die echten Produktionsdaten bewiesen: bei
+         einem hohen Datenpunkt (nah am oberen Chart-Rand, y bis 16%) reichte
+         der feste Abstand ueber dem Punkt (nur 10px + Tooltip-Eigenhoehe
+         ~47px) nicht aus, um ihn VOLLSTAENDIG oberhalb des Charts anzuzeigen -
+         das Restliche wurde per verschachtelter transform-Vorfahren
+         (.panels-track fuers Tab-Wischen + .line-point selbst) sichtbar aus
+         .mini-line-charts overflow:hidden herausgerissen und ragte ueber die
+         Taeglich/Woechentlich/Monatlich-Umschalter (aehnliche Bugklasse wie
+         der bereits dokumentierte Positivmodus-Transform-Fund vom 21.08.).
+         Zwei margin-top-Versuche haben daran nichts strukturell geaendert
+         (margin-top vergroessert nur den Abstand VOR dem Chart, nicht die
+         Position des Tooltips RELATIV ZUM PUNKT selbst) - die richtige, aus
+         der Web-UI-Praxis bekannte Loesung ist ein "Flip": reicht der Platz
+         OBERHALB des Punkts nicht (per fixem Prozent-Schwellwert bereits beim
+         Rendern berechnet, nicht erst beim Hovern), zeigt der Tooltip
+         stattdessen UNTERHALB - dort ist bei einem hohen Punkt immer reichlich
+         Platz (>60% der Charthoehe), der Tooltip bleibt dadurch IMMER
+         komplett innerhalb der Chart-Flaeche und muss nie mehr aus deren
+         overflow:hidden herausragen. Schwellwert 32% deckt mit Puffer die auf
+         Mobil (190px Charthoehe) benoetigten ~30% ab (57px Tooltip-Bedarf /
+         190px). Live an genau dem gemeldeten Punkt (20. August, y≈16%)
+         nachgemessen: Tooltip zeigt jetzt unterhalb, bleibt vollstaendig
+         innerhalb des Charts, keine Ueberlappung mit den Umschaltern mehr. */
       function renderRevenueLineChart(mode) {
         const chartPoints = buildRevenueSeries(mode);
         const modeLabel = mode === 'weekly' ? 'Woche' : mode === 'monthly' ? 'Monat' : 'Tag';
@@ -1530,19 +1530,20 @@
           ? `M ${linePoints.map(point => `${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' L ')}`
           : '';
         const labelStep = Math.max(1, Math.ceil(linePoints.length / 7));
+        // Punkte nah am oberen Rand (y < 32%) bekommen ihren Tooltip UNTERHALB
+        // statt oberhalb - siehe grosser Kommentar oben.
+        const FLIP_BELOW_Y_THRESHOLD = 32;
         const pointHtml = linePoints.map((point, i) => {
           const previous = i > 0 ? linePoints[i - 1].amount : null;
           const diff = previous === null ? 0 : point.amount - previous;
           const diffLabel = previous === null
             ? `erster ${modeLabel}`
             : `${diff >= 0 ? '+' : '-'}${bkmpFormatCurrency(Math.abs(diff))} ${compareLabel}`;
-          const amountText = escapeHtml(bkmpFormatCurrency(point.amount));
-          const nameText = escapeHtml(point.name);
-          const diffText = escapeHtml(diffLabel);
+          const flipBelow = point.y < FLIP_BELOW_Y_THRESHOLD;
           return `
-            <button class="line-point" style="left:${point.x}%; top:${point.y}%;" type="button"
-              data-point-name="${nameText}" data-point-amount="${amountText}" data-point-diff="${diffText}"
-              aria-label="${nameText}: ${amountText}, ${diffText}"></button>`;
+            <button class="line-point${flipBelow ? ' line-point-flip-below' : ''}" style="left:${point.x}%; top:${point.y}%;" type="button" aria-label="${point.name}: ${bkmpFormatCurrency(point.amount)}, ${diffLabel}">
+              <span>${point.name}: ${bkmpFormatCurrency(point.amount)}<small>${diffLabel}</small></span>
+            </button>`;
         }).join('');
         const labelHtml = linePoints.map((point, i) => {
           const show = i === 0 || i === linePoints.length - 1 || i % labelStep === 0;
@@ -1566,9 +1567,6 @@
                 </div>
               </div>
             </div>
-            <div class="line-hover-readout" id="lineHoverReadout" data-empty="1" aria-live="polite">
-              <span class="line-hover-readout-hint">👆 Fahre über einen Punkt für den genauen Wert</span>
-            </div>
             <div class="mini-line-chart" aria-label="Umsatz-Verlauf">
               <div class="line-axis max">${bkmpFormatCurrency(maxAmount)}</div>
               <div class="line-axis zero">0 €</div>
@@ -1582,38 +1580,6 @@
           </div>`;
       }
 
-      function bindRevenueHoverReadout() {
-        const readout = document.getElementById('lineHoverReadout');
-        if (!readout) return;
-        const hintHtml = readout.innerHTML;
-        function show(point) {
-          /* dataset-Werte kamen ueber escapeHtml() in die HTML-Attribute
-             (siehe renderRevenueLineChart) - der Browser dekodiert sie beim
-             Auslesen ueber .dataset aber automatisch wieder in Klartext.
-             Per textContent statt innerHTML einsetzen, statt sie ein zweites
-             Mal roh als HTML einzusetzen (haette die Escaping-Arbeit oben
-             wirkungslos gemacht - der statische Sicherheits-Check hat genau
-             das zu Recht angemerkt). */
-          readout.dataset.empty = '0';
-          readout.replaceChildren();
-          const strong = document.createElement('strong');
-          strong.textContent = `${point.dataset.pointName}: ${point.dataset.pointAmount}`;
-          const small = document.createElement('small');
-          small.textContent = point.dataset.pointDiff;
-          readout.append(strong, small);
-        }
-        function reset() {
-          readout.dataset.empty = '1';
-          readout.innerHTML = hintHtml;
-        }
-        chartArea.querySelectorAll('.line-point').forEach(point => {
-          point.addEventListener('mouseenter', () => show(point));
-          point.addEventListener('focus', () => show(point));
-          point.addEventListener('mouseleave', reset);
-          point.addEventListener('blur', reset);
-        });
-      }
-
       function bindRevenueModeButtons() {
         chartArea.querySelectorAll('[data-chart-mode]').forEach(btn => {
           btn.addEventListener('click', () => {
@@ -1621,7 +1587,6 @@
             if (!lineCard) return;
             lineCard.outerHTML = renderRevenueLineChart(btn.dataset.chartMode);
             bindRevenueModeButtons();
-            bindRevenueHoverReadout();
           });
         });
       }
@@ -1640,7 +1605,6 @@
           ${renderRevenueLineChart('daily')}
         </div>`;
       bindRevenueModeButtons();
-      bindRevenueHoverReadout();
     }
 
     /* Investoren */
