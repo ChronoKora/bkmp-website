@@ -1659,7 +1659,7 @@
               <div><span>Beteiligung</span><strong>${Number(inv.sharePercent || 0)}%</strong></div>
               <div><span>Zeitraum-Gewinn</span><strong class="${periodNet >= 0 ? 'pos' : 'neg'}">${bkmpFormatCurrency(periodNet)}</strong></div>
             </div>
-            ${inv.payoutButtonPrank ? `<button class="investor-payout-request-btn" type="button" data-investor-name="${escapeHtml(invName)}" data-payout-amount="${escapeHtml(bkmpFormatCurrency(payout))}">💸 Auszahlung beantragen</button>` : ''}`;
+            ${inv.payoutButtonPrank ? `<button class="investor-payout-request-btn" type="button" data-investor-name="${escapeHtml(invName)}" data-payout-amount="${escapeHtml(bkmpFormatCurrency(Number(inv.invested || 0) + payout))}">💸 Auszahlung beantragen</button>` : ''}`;
         return `
           <div class="investor-card investor-card-rich${isConcluded ? ' investor-card-concluded' : ''}">
             <div class="investor-head">
@@ -1727,27 +1727,44 @@
       investorPayoutViewerOverlay.addEventListener('click', e => { if (e.target === investorPayoutViewerOverlay) closeInvestorPayoutViewer(); });
     }
 
-    /* Auszahlungs-Beantragen-Prank (23.08.2026, Nutzeridee): pro Investor
-       im Admin-Panel scharf schaltbarer "Auszahlung beantragen"-Knopf -
-       echt wirkendes Ja/Nein ueber das bereits bestehende bkmpConfirmDialog()
+    /* Auszahlungs-Beantragen-Prank (23.08.2026, Nutzeridee, Nachbesserung
+       "erst nach 10 Sekunden ein Schliess-Button"): pro Investor im
+       Admin-Panel scharf schaltbarer "Auszahlung beantragen"-Knopf - echt
+       wirkendes Ja/Nein ueber das bereits bestehende bkmpConfirmDialog()
        (603), bei "Ja" ein kurzer "wird bearbeitet"-Zwischenschritt (baut
-       Spannung auf statt sofort aufzufliegen), danach der Rickroll. Gleiches
-       Delegations-Prinzip wie der Auszahlungsbeweis-Viewer direkt darueber -
-       #investorGrid wird nur per innerHTML neu befuellt, der Listener sitzt
-       EINMAL hier aussen. */
+       Spannung auf statt sofort aufzufliegen), danach der Rickroll. Der
+       Schliessen-Knopf bleibt die ersten 10 Sekunden nach dem Reveal
+       versteckt UND alle drei Schliess-Wege (Knopf/Hintergrund-Klick/Escape)
+       sind waehrend dieser Zeit gesperrt (`prankCloseAllowed`) - sonst
+       waere "erst nach 10 Sekunden schliessbar" durch einen einzelnen
+       Escape-Druck sofort wirkungslos. Gleiches Delegations-Prinzip wie der
+       Auszahlungsbeweis-Viewer direkt darueber - #investorGrid wird nur per
+       innerHTML neu befuellt, der Listener sitzt EINMAL hier aussen. */
     const investorPayoutPrankOverlay = document.getElementById('investorPayoutPrankOverlay');
     if (investorGridEl && investorPayoutPrankOverlay) {
       const prankProcessing = document.getElementById('investorPayoutPrankProcessing');
       const prankReveal = document.getElementById('investorPayoutPrankReveal');
       const prankIframe = document.getElementById('investorPayoutPrankIframe');
+      const prankCloseBtn = document.getElementById('investorPayoutPrankCloseBtn');
       let prankRevealTimer = null;
+      let prankCloseUnlockTimer = null;
+      let prankCloseAllowed = false;
 
       function closeInvestorPayoutPrank() {
+        if (!prankCloseAllowed) return;
         investorPayoutPrankOverlay.classList.remove('visible');
         document.body.classList.remove('modal-open');
         clearTimeout(prankRevealTimer);
+        clearTimeout(prankCloseUnlockTimer);
         prankIframe.src = ''; // stoppt Ton/Wiedergabe sofort beim Schliessen
       }
+      /* Der projektweite ESC-Sweep (BKMP_OVERLAY_CLOSERS, weiter unten in
+         dieser Datei) entfernt bei JEDEM .joke-overlay.visible ohne
+         eingetragenen Closer einfach direkt die "visible"-Klasse - das
+         wuerde die 10-Sekunden-Sperre komplett umgehen. Ueber window
+         freigeben, damit der Sweep stattdessen durch diese (gegatete)
+         Funktion geht, statt sie zu ignorieren. */
+      window.bkmpCloseInvestorPayoutPrank = closeInvestorPayoutPrank;
 
       async function openInvestorPayoutPrank(name, amountLabel) {
         const ok = await bkmpConfirmDialog(
@@ -1757,6 +1774,8 @@
           'Abbrechen'
         );
         if (!ok) return;
+        prankCloseAllowed = false;
+        prankCloseBtn.hidden = true;
         prankProcessing.hidden = false;
         prankReveal.hidden = true;
         document.body.classList.add('modal-open');
@@ -1765,6 +1784,10 @@
           prankProcessing.hidden = true;
           prankReveal.hidden = false;
           prankIframe.src = 'https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&rel=0';
+          prankCloseUnlockTimer = setTimeout(() => {
+            prankCloseAllowed = true;
+            prankCloseBtn.hidden = false;
+          }, 10000);
         }, 1400);
       }
 
@@ -1773,12 +1796,11 @@
         if (!btn) return;
         openInvestorPayoutPrank(btn.dataset.investorName || '', btn.dataset.payoutAmount || '');
       });
-      const investorPayoutPrankCloseBtn = document.getElementById('investorPayoutPrankCloseBtn');
-      if (investorPayoutPrankCloseBtn) investorPayoutPrankCloseBtn.addEventListener('click', closeInvestorPayoutPrank);
+      if (prankCloseBtn) prankCloseBtn.addEventListener('click', closeInvestorPayoutPrank);
       investorPayoutPrankOverlay.addEventListener('click', e => { if (e.target === investorPayoutPrankOverlay) closeInvestorPayoutPrank(); });
-      document.addEventListener('keydown', e => {
-        if (e.key === 'Escape' && investorPayoutPrankOverlay.classList.contains('visible')) closeInvestorPayoutPrank();
-      });
+      // ESC laeuft ausschliesslich ueber den projektweiten Sweep (siehe
+      // BKMP_OVERLAY_CLOSERS.investorPayoutPrankOverlay) - kein eigener,
+      // zweiter Escape-Listener hier, sonst zwei konkurrierende Wege.
     }
 
     /* Easter Egg: Donut-Chart oft klicken -> dreht sich immer schneller, Farben
@@ -5498,6 +5520,14 @@
         const overlay = document.getElementById('idlePrestigeCeremonyOverlay');
         if (!overlay || !overlay.classList.contains('phase-result')) return;
         if (typeof bkmpPrestigeCloseCeremony === 'function') bkmpPrestigeCloseCeremony();
+      },
+      /* Auszahlungs-Beantragen-Prank (23.08.2026): ohne diesen Eintrag
+         wuerde der generische Sweep unten die "visible"-Klasse einfach
+         entfernen und damit die 10-Sekunden-Schliess-Sperre umgehen -
+         window.bkmpCloseInvestorPayoutPrank() traegt diese Sperre bereits
+         selbst und ist ein No-op, solange sie noch aktiv ist. */
+      investorPayoutPrankOverlay: () => {
+        if (typeof window.bkmpCloseInvestorPayoutPrank === 'function') window.bkmpCloseInvestorPayoutPrank();
       }
     };
     document.addEventListener('keydown', e => {

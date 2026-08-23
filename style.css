@@ -3565,12 +3565,15 @@ input.cardcatalog-search:focus {
 .investor-payout-viewer-card { max-width: min(1100px, 96vw); text-align: center; }
 .investor-payout-viewer-img { max-width: 100%; max-height: 80vh; width: 100%; object-fit: contain; border-radius: 10px; border: 1px solid var(--line); margin: 0.6rem 0; }
 
-/* Auszahlungs-Beantragen-Prank (23.08.2026) - Video-Modal + Ladezustand. */
-.investor-payout-prank-card { max-width: min(560px, 94vw); text-align: center; }
-#investorPayoutPrankProcessing p { color: var(--muted); font-size: 0.95rem; margin: 0; }
+/* Auszahlungs-Beantragen-Prank (23.08.2026, Nachbesserung: "ruhig viel
+   Größer") - Video-Modal + Ladezustand, bewusst gross (fast Vollbild auf
+   kleineren Screens) fuer maximale Wirkung. */
+.investor-payout-prank-card { max-width: min(920px, 96vw); text-align: center; padding: 2.2rem 2.4rem 1.9rem; }
+.investor-payout-prank-card h3 { font-size: 1.6rem; margin-bottom: 0.9rem; }
+#investorPayoutPrankProcessing p { color: var(--muted); font-size: 1.05rem; margin: 0; }
 .investor-payout-prank-spinner {
-  width: 42px; height: 42px; margin: 0 auto 1.1rem;
-  border: 4px solid var(--line);
+  width: 56px; height: 56px; margin: 0 auto 1.3rem;
+  border: 5px solid var(--line);
   border-top-color: var(--gold);
   border-radius: 50%;
   animation: bkmpPayoutPrankSpin 0.8s linear infinite;
