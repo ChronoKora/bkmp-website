@@ -1397,24 +1397,6 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
 .mini-line-chart {
   position: relative;
   height: 205px;
-  /* Nutzer-Meldung 23.08.2026 (Screenshot): der Hover-Tooltip eines hohen
-     Datenpunkts (nah am oberen Rand des Charts, y bis zu 16%) ragte sichtbar
-     über die Täglich/Wöchentlich/Monatlich-Umschalter darüber. Eigentlich
-     sollte .mini-line-charts overflow:hidden das abschneiden - live per
-     elementFromPoint() bewiesen, dass es das in diesem konkreten Fall NICHT
-     tut: die verschachtelten transform-Vorfahren (.panels-track fuers
-     Seiten-Wischen + .line-point selbst fuers Zentrieren des Punkts) lassen
-     den Tooltip die Kaskaden-Begrenzung sichtbar durchbrechen (aehnliche
-     Bugklasse wie der bereits dokumentierte Positivmodus-Transform-Fund vom
-     21.08.). Statt die Escape-Eigenheit selbst zu jagen (browser-/versions-
-     abhaengig, schwer zuverlaessig zu schliessen): der Chart bekommt genug
-     Vorlauf-Platz ueber sich, damit der Tooltip selbst am hoechsten Punkt
-     (16% von oben, Tooltip-Hoehe ~47px) gar nicht mehr in den Kopfbereich
-     hineinragen kann - exakt der Nutzerwunsch "Diagramm ein Stueck runter,
-     damit man die Zahl beim Hover erkennt". Live an genau diesem hoechsten
-     Punkt nachgemessen: 2.5rem deckt den vorher gemessenen ~24-28px-
-     Ueberschuss (Desktop 205px/Mobil 190px Charthoehe) mit Puffer ab. */
-  margin-top: 2.5rem;
   border-radius: 10px;
   overflow: hidden;
   background:
@@ -1422,6 +1404,28 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
     linear-gradient(90deg, var(--line) 1px, transparent 1px) 0 0 / 25% 100%,
     var(--paper);
 }
+/* Hover-Anzeige 23.08.2026 (siehe grosser Kommentar bei renderRevenueLineChart()
+   in bkmp-site.js fuer die volle Herleitung, zwei vorherige CSS-Nachbesserungs-
+   versuche - margin-top auf .mini-line-chart - haben das eigentliche Problem
+   nicht sauber geloest). Ersetzt den vorherigen, floatenden Tooltip: eine feste
+   Zeile im normalen Dokumentfluss zwischen Kopfzeile und Chart, aktualisiert per
+   JS bei Hover/Fokus - kann dadurch strukturell nie wieder etwas ueberlappen. */
+.line-hover-readout {
+  min-height: 2.6rem;
+  margin-bottom: 0.6rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper-3);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.15rem;
+}
+.line-hover-readout[data-empty="1"] { border-style: dashed; background: transparent; }
+.line-hover-readout-hint { color: var(--muted); font-size: 0.75rem; }
+.line-hover-readout strong { font-size: 0.82rem; color: var(--ink); }
+.line-hover-readout small { color: var(--muted); font-size: 0.7rem; font-weight: 500; }
 .mini-line-chart svg {
   position: absolute;
   inset: 0;
@@ -1454,6 +1458,11 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
   cursor: pointer;
   padding: 0;
   box-shadow: 0 0 0 3px color-mix(in srgb, #3b82f6 24%, transparent);
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+.line-point:hover, .line-point:focus-visible {
+  transform: translate(-50%, -50%) scale(1.35);
+  box-shadow: 0 0 0 5px color-mix(in srgb, #3b82f6 38%, transparent);
 }
 .line-date-row {
   position: absolute;
@@ -1470,37 +1479,6 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
   color: var(--muted);
   font-size: 0.64rem;
   white-space: nowrap;
-}
-.line-point span {
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 10px);
-  transform: translate(-50%, 6px) scale(0.96);
-  min-width: max-content;
-  max-width: 240px;
-  padding: 0.55rem 0.7rem;
-  border: 1px solid color-mix(in srgb, var(--gold) 58%, var(--line));
-  border-radius: 9px;
-  background: var(--paper-3);
-  color: var(--ink);
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.34);
-  font-size: 0.75rem;
-  font-weight: 600;
-  opacity: 0;
-  pointer-events: none;
-  white-space: nowrap;
-  transition: opacity 0.16s ease, transform 0.16s ease;
-}
-.line-point small {
-  display: block;
-  margin-top: 0.22rem;
-  color: var(--muted);
-  font-size: 0.68rem;
-  font-weight: 500;
-}
-.line-point:hover span, .line-point:focus-visible span {
-  opacity: 1;
-  transform: translate(-50%, 0) scale(1);
 }
 @media (max-width: 980px) {
   .chart-block { grid-template-columns: 1fr; }
