@@ -1749,6 +1749,27 @@
       let prankRevealTimer = null;
       let prankCloseUnlockTimer = null;
       let prankCloseAllowed = false;
+      let prankPreloaded = false;
+      const PRANK_VIDEO_ID = 'dQw4w9WgXcQ';
+
+      /* Nutzer-Meldung 23.08.2026 ("bis das Video laedt ist so ein 5
+         Sekunden Ladezeit... kriegen wir das schon vorher geladen"): das
+         iframe bekam seine src bisher erst GENAU beim Reveal (kalter Start -
+         YouTube-Player-Bundle + Video-Puffer muessen dann live nachladen).
+         Jetzt wird das Video schon beim Klick auf den Auszahlung-Knopf
+         (also VOR dem Ja/Nein-Dialog, mit reichlich Vorlauf bis zum
+         eigentlichen Reveal) OHNE Autoplay geladen (`autoplay=0` - der
+         Player initialisiert/puffert bereits, spielt aber nicht los, sonst
+         waere die Position beim echten Reveal schon vorgerueckt). Beim
+         Reveal selbst wird nur noch per postMessage (`enablejsapi=1`
+         macht das moeglich, ganz ohne die volle YouTube-IFrame-API laden
+         zu muessen) "playVideo" an das BEREITS GELADENE Fenster geschickt -
+         kein zweiter Kaltstart mehr noetig. */
+      function preloadInvestorPayoutPrankVideo() {
+        if (prankPreloaded) return;
+        prankPreloaded = true;
+        prankIframe.src = `https://www.youtube.com/embed/${PRANK_VIDEO_ID}?enablejsapi=1&autoplay=0&rel=0`;
+      }
 
       function closeInvestorPayoutPrank() {
         if (!prankCloseAllowed) return;
@@ -1757,6 +1778,7 @@
         clearTimeout(prankRevealTimer);
         clearTimeout(prankCloseUnlockTimer);
         prankIframe.src = ''; // stoppt Ton/Wiedergabe sofort beim Schliessen
+        prankPreloaded = false; // beim naechsten Mal wieder frisch vorladen
       }
       /* Der projektweite ESC-Sweep (BKMP_OVERLAY_CLOSERS, weiter unten in
          dieser Datei) entfernt bei JEDEM .joke-overlay.visible ohne
@@ -1767,6 +1789,7 @@
       window.bkmpCloseInvestorPayoutPrank = closeInvestorPayoutPrank;
 
       async function openInvestorPayoutPrank(name, amountLabel) {
+        preloadInvestorPayoutPrankVideo(); // startet sofort, laeuft waehrend der Ja/Nein-Entscheidung im Hintergrund weiter
         const ok = await bkmpConfirmDialog(
           'Auszahlung beantragen',
           `Möchtest du deine komplette Summe (${amountLabel}) jetzt vollständig auszahlen lassen?`,
@@ -1783,7 +1806,15 @@
         prankRevealTimer = setTimeout(() => {
           prankProcessing.hidden = true;
           prankReveal.hidden = false;
-          prankIframe.src = 'https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&rel=0';
+          if (prankIframe.contentWindow) {
+            // Bereits vorgeladenes Fenster nur noch starten (kein Neuladen).
+            prankIframe.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), 'https://www.youtube.com');
+          } else {
+            // Sicherheitsnetz, falls das Vorladen aus irgendeinem Grund nie
+            // griff (z.B. sehr seltene Race) - dann eben doch der alte,
+            // etwas langsamere Kaltstart statt gar kein Video.
+            prankIframe.src = `https://www.youtube.com/embed/${PRANK_VIDEO_ID}?autoplay=1&rel=0`;
+          }
           prankCloseUnlockTimer = setTimeout(() => {
             prankCloseAllowed = true;
             prankCloseBtn.hidden = false;
