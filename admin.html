@@ -20,7 +20,7 @@
 <title>BKMP — Admin</title>
 
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
-<link rel="stylesheet" href="style.css?v=20260823-investorpayoutprank4">
+<link rel="stylesheet" href="style.css?v=20260829-swstats1">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 </head>
 <body>
@@ -139,6 +139,10 @@
         <button class="admin-nav-btn" data-page="expenses" data-role="expenses_editor">
           <svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
           Ausgaben
+        </button>
+        <button class="admin-nav-btn" data-page="swstats" data-role="expenses_editor">
+          <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M4 20h16"/></svg>
+          SW-Besucher
         </button>
         <button class="admin-nav-btn" data-page="news">
           <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h10M7 16h6"/></svg>
@@ -313,6 +317,25 @@
               <div><label for="expenseDate">Datum</label><input type="date" id="expenseDate"></div>
             </div>
             <button class="btn btn-primary" id="addExpense">+ Ausgabe hinzufügen</button>
+          </div>
+        </section>
+
+        <!-- SW-Besucher (/sw bk, 29.08.2026) -->
+        <section class="admin-page" id="page-swstats">
+          <div class="admin-section">
+            <h2>SW-Besucher eintragen</h2>
+            <p class="sw-admin-hint">Täglich um 00:00 Uhr den aktuellen Stand aller 6 CityBuilds eintragen. Für ein Datum mit bereits vorhandenen Werten wird der bestehende Eintrag automatisch geladen und beim Speichern aktualisiert - es entsteht nie ein zweiter Eintrag für denselben Tag.</p>
+            <div class="form-grid">
+              <div><label for="swStatsDate">Datum</label><input type="date" id="swStatsDate"></div>
+            </div>
+            <div class="sw-admin-cb-grid" id="swStatsCbGrid"></div>
+            <div class="sw-admin-total">Gesamt: <strong id="swStatsTotalPreview">0 Besucher</strong></div>
+            <div class="investor-form-actions">
+              <button class="btn btn-primary" id="saveSwStats">Speichern</button>
+              <span class="sw-admin-msg" id="swStatsMsg"></span>
+            </div>
+            <h3 class="sw-admin-recent-title">Letzte Einträge</h3>
+            <div class="entry-table-wrapper"><div class="entry-list" id="swStatsRecentList"></div></div>
           </div>
         </section>
 
@@ -1117,8 +1140,8 @@
        da admin.html kein window.BKMP_QA_MODE-Gate setzt; macht nur
        bkmpGetGameNow() fuer bkmp-events.js verfuegbar (identisch Date.now()). -->
   <script src="js/core/bkmp-game-clock.js?v=20260724-qafoundation1"></script>
-  <script src="supabase.js?v=20260823-investorpayoutprank1"></script>
-  <script src="app.js?v=20260718-selbstverdient1"></script>
+  <script src="supabase.js?v=20260829-swstats1"></script>
+  <script src="app.js?v=20260829-swstats1"></script>
   <!-- Redesign Phase 2a (17.07.): siehe index.html fuer die Begruendung der
        festen Ladereihenfolge (bkmp-idle-state.js zuerst, bkmp-idle-
        bootstrap.js zuletzt vor mapart.js). -->
@@ -1426,6 +1449,7 @@
         if (page === 'idledorf') refreshIdleDorfAdmin();
         if (page === 'access') refreshAdminAccessList();
         if (page === 'employees') refreshEmployeePayoutPage();
+        if (page === 'swstats') refreshSwStatsAdminPage();
         if (page === 'mapartcompanies') refreshMapartCompaniesAdmin();
       });
     });
@@ -1504,6 +1528,124 @@
 
     incomeNameSelect.addEventListener('change', updateIncomeCalculation);
     incomeQuantityInput.addEventListener('input', updateIncomeCalculation);
+
+    /* ---------------- SW-Besucher (/sw bk, 29.08.2026) ---------------- */
+    let bkmpSwStatsData = [];
+    let bkmpSwStatsLoaded = false;
+
+    function bkmpSwTodayIso() {
+      // Lokales Datum, KEIN new Date().toISOString() (das wuerde je nach
+      // Uhrzeit/Zeitzone auf den falschen Kalendertag verschieben, siehe
+      // Auftrag Abschnitt 24) - identisches Muster wie bkmpToIsoDate() in
+      // app.js, hier nochmal direkt inline, da app.js's Version nicht
+      // zwingend vor diesem Skriptblock definiert sein muss.
+      const d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
+    function bkmpSwRenderCbGrid() {
+      const grid = document.getElementById('swStatsCbGrid');
+      grid.innerHTML = BKMP_SW_CB_KEYS.map(key => `
+        <div class="sw-admin-cb-row">
+          <div class="sw-admin-cb-label">${BKMP_SW_CB_LABELS[key]}</div>
+          <div><label for="sw_${key}_visitors">Besucher</label><input type="number" min="0" id="sw_${key}_visitors" data-sw-visitors="${key}" value="0"></div>
+          <div><label for="sw_${key}_rank">Rang</label>
+            <select id="sw_${key}_rank" data-sw-rank="${key}">
+              <option value="">– kein Rang –</option>
+              <option value="1">#1</option>
+              <option value="2">#2</option>
+              <option value="3">#3</option>
+              <option value="4">#4</option>
+              <option value="5">#5</option>
+              <option value="not_in_top5">Nicht in Top 5</option>
+            </select>
+          </div>
+        </div>`).join('');
+      grid.querySelectorAll('[data-sw-visitors]').forEach(input => input.addEventListener('input', bkmpSwUpdateTotalPreview));
+      bkmpSwUpdateTotalPreview();
+    }
+
+    function bkmpSwUpdateTotalPreview() {
+      const total = BKMP_SW_CB_KEYS.reduce((sum, key) => {
+        const el = document.getElementById('sw_' + key + '_visitors');
+        return sum + (Number(el ? el.value : 0) || 0);
+      }, 0);
+      document.getElementById('swStatsTotalPreview').textContent = total.toLocaleString('de-DE') + ' Besucher';
+    }
+
+    function bkmpSwFillFormFromRow(row) {
+      BKMP_SW_CB_KEYS.forEach(key => {
+        document.getElementById('sw_' + key + '_visitors').value = row ? (row[key + '_visitors'] || 0) : 0;
+        document.getElementById('sw_' + key + '_rank').value = row && row[key + '_rank'] ? row[key + '_rank'] : '';
+      });
+      bkmpSwUpdateTotalPreview();
+    }
+
+    function bkmpSwRenderRecentList() {
+      const listEl = document.getElementById('swStatsRecentList');
+      const recent = [...bkmpSwStatsData].sort((a, b) => b.stat_date.localeCompare(a.stat_date)).slice(0, 14);
+      if (recent.length === 0) {
+        listEl.innerHTML = '<p class="empty-hint">Noch keine SW-Besucher-Daten eingetragen.</p>';
+        return;
+      }
+      listEl.innerHTML = recent.map(row => {
+        const total = BKMP_SW_CB_KEYS.reduce((sum, key) => sum + (Number(row[key + '_visitors']) || 0), 0);
+        return `<div class="entry-row"><span>${escapeHtml(formatDate(row.stat_date))}</span><span>${total.toLocaleString('de-DE')} Besucher</span><button class="edit-btn" type="button" data-sw-edit-date="${row.stat_date}">Bearbeiten</button></div>`;
+      }).join('');
+      listEl.querySelectorAll('[data-sw-edit-date]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.getElementById('swStatsDate').value = btn.dataset.swEditDate;
+          bkmpSwOnDateChange();
+          document.getElementById('swStatsDate').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+      });
+    }
+
+    function bkmpSwOnDateChange() {
+      const dateVal = document.getElementById('swStatsDate').value;
+      const existing = bkmpSwStatsData.find(row => row.stat_date === dateVal);
+      bkmpSwFillFormFromRow(existing || null);
+    }
+
+    async function refreshSwStatsAdminPage() {
+      bkmpSwRenderCbGrid();
+      const dateInput = document.getElementById('swStatsDate');
+      if (!dateInput.value) dateInput.value = bkmpSwTodayIso();
+      if (!bkmpSwStatsLoaded) {
+        try {
+          bkmpSwStatsData = (await loadSwDailyStats()) || [];
+          bkmpSwStatsLoaded = true;
+        } catch (e) {
+          document.getElementById('swStatsMsg').textContent = 'Fehler beim Laden: ' + (e.message || '');
+        }
+      }
+      bkmpSwOnDateChange();
+      bkmpSwRenderRecentList();
+    }
+
+    document.getElementById('swStatsDate').addEventListener('change', bkmpSwOnDateChange);
+
+    document.getElementById('saveSwStats').addEventListener('click', async () => {
+      const msgEl = document.getElementById('swStatsMsg');
+      const dateVal = document.getElementById('swStatsDate').value;
+      if (!dateVal) { msgEl.textContent = 'Bitte ein Datum wählen.'; return; }
+      const record = { stat_date: dateVal };
+      BKMP_SW_CB_KEYS.forEach(key => {
+        record[key + '_visitors'] = document.getElementById('sw_' + key + '_visitors').value;
+        record[key + '_rank'] = document.getElementById('sw_' + key + '_rank').value || null;
+      });
+      try {
+        const saved = await saveSwDailyStats(record);
+        const idx = bkmpSwStatsData.findIndex(row => row.stat_date === dateVal);
+        if (idx >= 0) bkmpSwStatsData[idx] = saved; else bkmpSwStatsData.push(saved);
+        bkmpSwRenderRecentList();
+        msgEl.textContent = 'Gespeichert.';
+        showAdminToast('SW-Besucher für ' + formatDate(dateVal) + ' gespeichert.', 'success');
+      } catch (e) {
+        msgEl.textContent = 'Fehler: ' + (e.message || '');
+        showAdminToast('Konnte nicht gespeichert werden: ' + (e.message || ''), 'error');
+      }
+    });
 
     /* Mitarbeiter-Lohn-Info-Icon (18.08.2026, Punkt 7 "Erklärungstext kürzen,
        Formel ins Tooltip") - wiederverwendet die bereits bestehende, bisher

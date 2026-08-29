@@ -355,6 +355,370 @@ function formatDate(isoDate) {
 }
 
 /* ============================================================
+   Umsatzseite: reine Statistik-Helfer (29.08.2026)
+   Erweiterung der bestehenden Hauptseite/Investoren-Finanzansicht um mehr
+   Kennzahlen - siehe renderFinancialSections() in js/core/bkmp-site.js für
+   die eigentliche Anzeige. Bewusst hier in app.js (gemeinsame Daten-Logik,
+   wird schon von index.html geladen) statt direkt im Render-Code verteilt -
+   reine, von der Darstellung getrennte Berechnungsfunktionen, alle arbeiten
+   ausschließlich mit bereits geladenen data.income/data.expenses (kein
+   zusätzlicher Supabase-Aufruf pro Kennzahl).
+   ============================================================ */
+
+/* Identischer Wert wie admin.html's "incomeUnitPrices" (dort: reiner
+   Eintrags-Rechenhelfer "Anzahl x Stückpreis -> Betrag", wird NIE mit
+   gespeichert - die incomes-Tabelle kennt nur amount, keine Stückzahl).
+   Bewusst NICHT dieselbe Objekt-Referenz/Datei geteilt, um admin.html's
+   bereits funktionierenden Eintrags-Rechner nicht anzufassen - beide
+   Konstanten müssen bei einer künftigen Preisänderung manuell synchron
+   gehalten werden (siehe Kommentar dort). Nur zum RÜCKRECHNEN einer
+   ungefähren Bücher-Stückzahl aus historischen amount-Werten verwendet -
+   NIE um neue Daten zu erzeugen. */
+const BKMP_INCOME_UNIT_PRICES = {
+  'Bücher': 2500,
+  'Raketen': 1000,
+  'Karten': 150000,
+  'Schmiede Vorlagen': 1500,
+  'Netherite': 11000,
+  'Tränke': 1500,
+  'Werkzeug': 75000
+};
+
+function bkmpToIsoDate(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function bkmpAddDaysIso(isoDate, days) {
+  const d = new Date(isoDate + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  return bkmpToIsoDate(d);
+}
+
+/* [startIso, endIso] - beide Grenzen eingeschlossen (Datumsvergleich als
+   String funktioniert bei 'YYYY-MM-DD' korrekt lexikografisch). */
+function bkmpEntriesInRange(list, startIso, endIso) {
+  return (list || []).filter(item => item.date && item.date >= startIso && item.date <= endIso);
+}
+
+function bkmpSumInRange(list, startIso, endIso) {
+  return bkmpSum(bkmpEntriesInRange(list, startIso, endIso));
+}
+
+/* Veränderung aktueller vs. vorheriger Wert. Division durch 0 sauber
+   abgefangen (Auftrag Abschnitt 15) - "Neu" wenn vorher 0 war und jetzt
+   etwas da ist, "Kein Vergleich" wenn beide 0 sind. */
+function bkmpCalculatePeriodChange(current, previous) {
+  const cur = Number(current) || 0;
+  const prev = Number(previous) || 0;
+  const diffAbs = cur - prev;
+  if (prev === 0) {
+    if (cur === 0) return { pct: null, diffAbs: 0, direction: 'flat', label: 'Kein Vergleich' };
+    return { pct: null, diffAbs: cur, direction: 'up', label: 'Neu' };
+  }
+  const pct = (diffAbs / Math.abs(prev)) * 100;
+  const direction = pct > 0.05 ? 'up' : pct < -0.05 ? 'down' : 'flat';
+  return { pct, diffAbs, direction, label: bkmpFormatPercent(pct) };
+}
+
+function bkmpFormatPercent(pct) {
+  if (pct === null || pct === undefined || Number.isNaN(pct)) return '–';
+  const sign = pct > 0 ? '+' : pct < 0 ? '−' : '±';
+  return `${sign}${Math.abs(pct).toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} %`;
+}
+
+function bkmpCalculateAverageDailyRevenue(list, days) {
+  if (!days) return 0;
+  return bkmpSum(list) / days;
+}
+
+/* Gruppiert nach Kalendertag, liefert den Tag mit der höchsten Summe (oder
+   null, falls die Liste leer ist). */
+function bkmpCalculateBestDay(list) {
+  const byDay = {};
+  (list || []).forEach(item => {
+    if (!item.date) return;
+    byDay[item.date] = (byDay[item.date] || 0) + (Number(item.amount) || 0);
+  });
+  let best = null;
+  Object.keys(byDay).forEach(date => {
+    if (!best || byDay[date] > best.amount) best = { date, amount: byDay[date] };
+  });
+  return best;
+}
+
+function bkmpCalculateAverageTransaction(list) {
+  const items = list || [];
+  if (items.length === 0) return null;
+  return bkmpSum(items) / items.length;
+}
+
+function bkmpCalculateProfitMargin(netProfit, totalIncome) {
+  if (!totalIncome) return null;
+  return (netProfit / totalIncome) * 100;
+}
+
+function bkmpCalculateExpenseRatio(totalExpenses, totalIncome) {
+  if (!totalIncome) return null;
+  return (totalExpenses / totalIncome) * 100;
+}
+
+/* Bücher-Kennzahlen (Auftrag Abschnitt 6-8) - Stückzahl wird ausschließlich
+   RÜCKGERECHNET aus amount/BKMP_INCOME_UNIT_PRICES['Bücher'], da die
+   incomes-Tabelle selbst keine Stückzahl kennt. Explizit als Schätzung
+   markiert (kein garantiert historisch konstanter Preis). */
+function bkmpCalculateBookStats(incomeList, todayIso) {
+  const unitPrice = BKMP_INCOME_UNIT_PRICES['Bücher'];
+  const bookEntries = (incomeList || []).filter(item => item.name === 'Bücher' || item.category === 'Bücher');
+  const qty = amount => unitPrice ? amount / unitPrice : 0;
+
+  const weekStart = bkmpAddDaysIso(todayIso, -6);
+  const prevWeekEnd = bkmpAddDaysIso(todayIso, -7);
+  const prevWeekStart = bkmpAddDaysIso(todayIso, -13);
+  const monthStart = todayIso.slice(0, 7) + '-01';
+
+  const todayRevenue = bkmpSumInRange(bookEntries, todayIso, todayIso);
+  const weekRevenue = bkmpSumInRange(bookEntries, weekStart, todayIso);
+  const prevWeekRevenue = bkmpSumInRange(bookEntries, prevWeekStart, prevWeekEnd);
+  const monthRevenue = bkmpSumInRange(bookEntries, monthStart, todayIso);
+
+  const weekEntries = bkmpEntriesInRange(bookEntries, weekStart, todayIso);
+  const bestDayByAmount = bkmpCalculateBestDay(bookEntries);
+
+  const totalBookRevenueAllTime = bkmpSum(bookEntries);
+
+  return {
+    hasAnyBooks: bookEntries.length > 0,
+    unitPrice,
+    todayQty: Math.round(qty(todayRevenue)),
+    todayRevenue,
+    weekQty: Math.round(qty(weekRevenue)),
+    weekRevenue,
+    prevWeekQty: Math.round(qty(prevWeekRevenue)),
+    weekChange: bkmpCalculatePeriodChange(weekRevenue, prevWeekRevenue),
+    avgPerDayQty: weekEntries.length ? qty(weekRevenue) / 7 : 0,
+    bestDay: bestDayByAmount ? { date: bestDayByAmount.date, qty: Math.round(qty(bestDayByAmount.amount)) } : null,
+    monthQty: Math.round(qty(monthRevenue)),
+    monthRevenue,
+    totalRevenueAllTime: totalBookRevenueAllTime
+  };
+}
+
+/* Top-Kategorie + größter Aufsteiger (Auftrag Abschnitt 11) - "aktuell" =
+   letzte 7 Tage (dieselbe Fensterlogik wie die drei Hauptkarten), verglichen
+   mit den 7 Tagen davor. */
+function bkmpCalculateTopCategory(incomeList, todayIso) {
+  const weekStart = bkmpAddDaysIso(todayIso, -6);
+  const prevWeekEnd = bkmpAddDaysIso(todayIso, -7);
+  const prevWeekStart = bkmpAddDaysIso(todayIso, -13);
+
+  const currentEntries = bkmpEntriesInRange(incomeList, weekStart, todayIso);
+  const previousEntries = bkmpEntriesInRange(incomeList, prevWeekStart, prevWeekEnd);
+
+  const sumByCategory = list => {
+    const out = {};
+    list.forEach(item => {
+      const cat = item.name || item.category || 'Sonstiges';
+      out[cat] = (out[cat] || 0) + (Number(item.amount) || 0);
+    });
+    return out;
+  };
+
+  const currentByCategory = sumByCategory(currentEntries);
+  const previousByCategory = sumByCategory(previousEntries);
+  const currentTotal = bkmpSum(currentEntries);
+
+  const categories = Object.keys(currentByCategory);
+  if (categories.length === 0) return { top: null, riser: null };
+
+  let top = null;
+  categories.forEach(cat => {
+    const amount = currentByCategory[cat];
+    if (!top || amount > top.amount) top = { category: cat, amount };
+  });
+  const topShare = currentTotal ? (top.amount / currentTotal) * 100 : null;
+  const topChange = bkmpCalculatePeriodChange(top.amount, previousByCategory[top.category] || 0);
+
+  let riser = null;
+  categories.forEach(cat => {
+    const change = bkmpCalculatePeriodChange(currentByCategory[cat], previousByCategory[cat] || 0);
+    if (change.pct === null) return; // "Neu"-Kategorien nicht als "größter Aufsteiger" werten
+    if (!riser || change.pct > riser.change.pct) riser = { category: cat, change };
+  });
+
+  return {
+    top: { category: top.category, share: topShare, change: topChange },
+    riser
+  };
+}
+
+/* Monats-Prognose (Auftrag Abschnitt 13) - hochgerechnet aus dem bisherigen
+   Tagesdurchschnitt des laufenden Monats. Ausdrücklich als Prognose markiert
+   (siehe UI), keine reale Zahl. */
+function bkmpCalculateMonthlyProjection(incomeList, todayDate) {
+  const todayIso = bkmpToIsoDate(todayDate);
+  const monthStart = todayIso.slice(0, 7) + '-01';
+  const daysElapsed = todayDate.getDate(); // 1-basiert, inkl. heute
+  const daysInMonth = new Date(todayDate.getFullYear(), todayDate.getMonth() + 1, 0).getDate();
+  const monthSoFar = bkmpSumInRange(incomeList, monthStart, todayIso);
+  if (daysElapsed <= 0) return { monthSoFar, projected: monthSoFar, daysElapsed, daysInMonth };
+  const projected = (monthSoFar / daysElapsed) * daysInMonth;
+  return { monthSoFar, projected, daysElapsed, daysInMonth };
+}
+
+/* ============================================================
+   SW-Besucher-Statistik fuer /sw bk (29.08.2026) - reine Berechnungs-Helfer,
+   getrennt von der Darstellung (renderFinancialSections() in js/core/
+   bkmp-site.js). Arbeiten ausschliesslich mit dem bereits geladenen
+   data.swStats (eine Zeile pro Tag, siehe supabase.js/loadSwDailyStats()) -
+   kein zusaetzlicher Supabase-Aufruf pro Kennzahl. Betrifft AUSSCHLIESSLICH
+   den eigenen Shop /sw bk - keine Konkurrenzdaten existieren in diesem
+   Datenmodell ueberhaupt (Auftrag Abschnitt 28).
+   ============================================================ */
+
+const BKMP_SW_CB_KEYS = ['cb1', 'cb2', 'cb3', 'cb4', 'cb5', 'cb6'];
+const BKMP_SW_CB_LABELS = { cb1: 'CB1', cb2: 'CB2', cb3: 'CB3', cb4: 'CB4', cb5: 'CB5', cb6: 'CB6' };
+const BKMP_SW_RANK_LABELS = { '1': '#1', '2': '#2', '3': '#3', '4': '#4', '5': '#5', not_in_top5: 'Nicht in Top 5' };
+
+function bkmpSwFindRow(list, dateIso) {
+  return (list || []).find(row => row.stat_date === dateIso) || null;
+}
+
+/* Summe aller 6 CBs EINER Zeile. Bewusst KEIN Fallback auf 0, wenn "row"
+   selbst null ist (Aufrufer muss die Zeilen-Existenz - "kein Datensatz" vs.
+   "Datensatz mit 0" - selbst unterscheiden, siehe Auftrag Abschnitt 23). */
+function bkmpSwRowTotal(row) {
+  if (!row) return 0;
+  return BKMP_SW_CB_KEYS.reduce((sum, key) => sum + (Number(row[key + '_visitors']) || 0), 0);
+}
+
+function bkmpSwRowsInRange(list, startIso, endIso) {
+  return (list || []).filter(row => row.stat_date && row.stat_date >= startIso && row.stat_date <= endIso);
+}
+
+/* Summe ueber einen Zeitraum - nur tatsaechlich vorhandene Zeilen zaehlen,
+   fehlende Tage werden NICHT als 0 mitgerechnet (sie tragen ohnehin nichts
+   zur Summe bei, das ist hier unkritisch - relevant wird der Unterschied
+   erst beim Durchschnitt, siehe bkmpSwAverage unten). */
+function bkmpSwSumInRange(list, startIso, endIso) {
+  return bkmpSwRowsInRange(list, startIso, endIso).reduce((sum, row) => sum + bkmpSwRowTotal(row), 0);
+}
+
+/* Auftrag Abschnitt 11: "Nicht automatisch fehlende Tage als echte 0
+   Besucher interpretieren" - der Nenner ist die ANZAHL tatsaechlich
+   vorhandener Zeilen im Zeitraum, nicht die Anzahl Kalendertage. */
+function bkmpSwAverage(list, startIso, endIso) {
+  const rows = bkmpSwRowsInRange(list, startIso, endIso);
+  if (rows.length === 0) return null;
+  return rows.reduce((sum, row) => sum + bkmpSwRowTotal(row), 0) / rows.length;
+}
+
+function bkmpSwBestDay(list) {
+  let best = null;
+  (list || []).forEach(row => {
+    const total = bkmpSwRowTotal(row);
+    if (!best || total > best.total) best = { date: row.stat_date, total };
+  });
+  return best;
+}
+
+/* Staerkster CB EINER Zeile (z.B. "heute") + sein Anteil an der Tagessumme. */
+function bkmpSwStrongestCb(row) {
+  if (!row) return null;
+  const total = bkmpSwRowTotal(row);
+  let best = null;
+  BKMP_SW_CB_KEYS.forEach(key => {
+    const visitors = Number(row[key + '_visitors']) || 0;
+    if (!best || visitors > best.visitors) best = { cb: key, visitors };
+  });
+  if (!best) return null;
+  return { cb: best.cb, visitors: best.visitors, sharePct: total ? (best.visitors / total) * 100 : null };
+}
+
+/* CB-Verteilung EINER Zeile - fuer die "Heutige Verteilung"-Balkenliste
+   (Auftrag Abschnitt 14). Absteigend nach Besucherzahl sortiert. */
+function bkmpSwDistribution(row) {
+  if (!row) return [];
+  const total = bkmpSwRowTotal(row);
+  return BKMP_SW_CB_KEYS.map(key => {
+    const visitors = Number(row[key + '_visitors']) || 0;
+    return { cb: key, visitors, sharePct: total ? (visitors / total) * 100 : null };
+  }).sort((a, b) => b.visitors - a.visitors);
+}
+
+/* Rang-Status EINER Zeile - fuer die "Ranglistenstatus"-Liste (Auftrag
+   Abschnitt 17) + Zaehlung "wie viele CBs sind heute in den Top 5". Ein
+   Rang von null ("nichts eingetragen") wird EXPLIZIT von 'not_in_top5'
+   unterschieden (dritter Zustand, siehe Auftrag Abschnitt 18/23). */
+function bkmpSwRankStatus(row) {
+  const cbs = BKMP_SW_CB_KEYS.map(key => {
+    const rank = row ? row[key + '_rank'] : null;
+    return { cb: key, rank, label: rank ? BKMP_SW_RANK_LABELS[rank] : 'Nicht eingetragen', inTop5: rank !== null && rank !== 'not_in_top5' && rank !== undefined };
+  });
+  const top5Count = cbs.filter(c => c.inTop5).length;
+  return { cbs, top5Count };
+}
+
+/* Auftrag Abschnitt 18: "wie haeufig war /sw bk auf einem CB in den Top 5",
+   Ø sichtbare Position, beste jemals erreichte Position + Datum. Zaehlt
+   AUSSCHLIESSLICH Tage, an denen fuer diesen CB tatsaechlich ein Rang
+   eingetragen wurde (weder null/fehlend NOCH als #6 geschaetzt). */
+function bkmpSwCbRankHistory(list, cbKey) {
+  const rankField = cbKey + '_rank';
+  const recorded = (list || []).filter(row => row[rankField] !== null && row[rankField] !== undefined);
+  if (recorded.length === 0) return { daysRecorded: 0, daysInTop5: 0, top5Pct: null, avgRank: null, bestRank: null, bestRankDate: null };
+  const inTop5 = recorded.filter(row => row[rankField] !== 'not_in_top5');
+  let best = null;
+  inTop5.forEach(row => {
+    const rankNum = Number(row[rankField]);
+    if (best === null || rankNum < best.rankNum) best = { rankNum, date: row.stat_date };
+  });
+  const avgRank = inTop5.length ? inTop5.reduce((sum, row) => sum + Number(row[rankField]), 0) / inTop5.length : null;
+  return {
+    daysRecorded: recorded.length,
+    daysInTop5: inTop5.length,
+    top5Pct: (inTop5.length / recorded.length) * 100,
+    avgRank,
+    bestRank: best ? best.rankNum : null,
+    bestRankDate: best ? best.date : null
+  };
+}
+
+/* Monats-Kennzahlen (Auftrag Abschnitt 22) - identisches Zeitraum-Prinzip
+   wie bkmpCalculateMonthlyProjection() fuer den Umsatz. */
+function bkmpSwMonthStats(list, todayDate) {
+  const todayIso = bkmpToIsoDate(todayDate);
+  const monthStart = todayIso.slice(0, 7) + '-01';
+  const prevMonthDate = new Date(todayDate.getFullYear(), todayDate.getMonth() - 1, 1);
+  const prevMonthStart = bkmpToIsoDate(prevMonthDate);
+  const prevMonthEnd = bkmpAddDaysIso(monthStart, -1);
+
+  const rowsThisMonth = bkmpSwRowsInRange(list, monthStart, todayIso);
+  const total = rowsThisMonth.reduce((sum, row) => sum + bkmpSwRowTotal(row), 0);
+  const avgPerDay = rowsThisMonth.length ? total / rowsThisMonth.length : null;
+  const bestDay = bkmpSwBestDay(rowsThisMonth);
+
+  let strongestCb = null;
+  BKMP_SW_CB_KEYS.forEach(key => {
+    const cbTotal = rowsThisMonth.reduce((sum, row) => sum + (Number(row[key + '_visitors']) || 0), 0);
+    if (!strongestCb || cbTotal > strongestCb.total) strongestCb = { cb: key, total: cbTotal };
+  });
+
+  const prevMonthTotal = bkmpSwSumInRange(list, prevMonthStart, prevMonthEnd);
+
+  return {
+    hasData: rowsThisMonth.length > 0,
+    total,
+    avgPerDay,
+    bestDay,
+    strongestCb,
+    change: bkmpCalculatePeriodChange(total, prevMonthTotal)
+  };
+}
+
+/* ============================================================
    Theme-Toggle + Hell-Modus-Popup
    Wird auf jeder Seite aufgerufen, die die entsprechenden
    Elemente (#themeToggle, #jokeOverlay, ...) im HTML hat.

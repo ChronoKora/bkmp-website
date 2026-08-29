@@ -1050,6 +1050,73 @@ function bkmpMapExpenseToSupabase(expense) {
   };
 }
 
+/* ============================================================
+   SW-Besucher-Statistik fuer /sw bk (29.08.2026, sql/20260829-sw-daily-
+   stats.sql) - eine Zeile pro Tag, 6 CityBuilds (cb1..cb6) je mit Besucher-
+   zahl + optionalem Top-5-Rang ('1'..'5'/'not_in_top5'/null). Bewusst KEINE
+   dedizierten Mapper-Funktionen (anders als bei incomes/expenses) - die
+   Supabase-Spaltennamen sind bereits camelCase-frei nutzbar, gleiches
+   leichteres Muster wie beim Buechershop-Admin-Code vom 28.08.2026. */
+async function loadSwDailyStats() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('sw_daily_stats')
+    .select('id, stat_date, cb1_visitors, cb1_rank, cb2_visitors, cb2_rank, cb3_visitors, cb3_rank, cb4_visitors, cb4_rank, cb5_visitors, cb5_rank, cb6_visitors, cb6_rank, created_at, updated_at')
+    .order('stat_date', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+/* Upsert ueber die "unique(stat_date)"-Bedingung - egal ob fuer dieses Datum
+   bereits eine Zeile existiert oder nicht, dieser eine Aufruf deckt sowohl
+   Neuanlage als auch Bearbeiten ab (Auftrag Abschnitt 6, "keine Duplikate"). */
+async function saveSwDailyStats(record) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const payload = {
+    stat_date: record.stat_date,
+    cb1_visitors: Number(record.cb1_visitors) || 0,
+    cb1_rank: record.cb1_rank || null,
+    cb2_visitors: Number(record.cb2_visitors) || 0,
+    cb2_rank: record.cb2_rank || null,
+    cb3_visitors: Number(record.cb3_visitors) || 0,
+    cb3_rank: record.cb3_rank || null,
+    cb4_visitors: Number(record.cb4_visitors) || 0,
+    cb4_rank: record.cb4_rank || null,
+    cb5_visitors: Number(record.cb5_visitors) || 0,
+    cb5_rank: record.cb5_rank || null,
+    cb6_visitors: Number(record.cb6_visitors) || 0,
+    cb6_rank: record.cb6_rank || null
+  };
+  const { data, error } = await client
+    .from('sw_daily_stats')
+    .upsert(payload, { onConflict: 'stat_date' })
+    .select('id, stat_date, cb1_visitors, cb1_rank, cb2_visitors, cb2_rank, cb3_visitors, cb3_rank, cb4_visitors, cb4_rank, cb5_visitors, cb5_rank, cb6_visitors, cb6_rank, created_at, updated_at')
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/* Identisches Sync-Muster wie syncIncomesFromSupabase/syncExpensesFromSupabase
+   (siehe dort) - laedt still im Hintergrund, aktualisiert targetData.swStats
+   nur bei tatsaechlichem Erfolg, faellt sonst auf den zwischengespeicherten
+   Stand zurueck statt die Seite brechen zu lassen. */
+async function syncSwStatsFromSupabase(targetData, onSynced) {
+  if (typeof loadSwDailyStats !== 'function' || !bkmpGetSupabaseClient()) return false;
+  try {
+    const rows = await loadSwDailyStats();
+    if (!rows) return false;
+    targetData.swStats = rows;
+    bkmpSaveData(targetData);
+    if (typeof onSynced === 'function') onSynced(targetData);
+    return true;
+  } catch (e) {
+    console.warn('Supabase konnte SW-Besucher-Statistik nicht laden. localStorage-Fallback wird verwendet.', e);
+    return false;
+  }
+}
+
 async function loadExpenses() {
   const client = bkmpGetSupabaseClient();
   if (!client) return null;

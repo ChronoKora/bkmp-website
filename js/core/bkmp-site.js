@@ -1273,7 +1273,8 @@
       Promise.all([
         syncIncomesFromSupabase(data, null),
         syncInvestorsFromSupabase(data, null),
-        syncExpensesFromSupabase(data, null)
+        syncExpensesFromSupabase(data, null),
+        syncSwStatsFromSupabase(data, null)
       ]).then(results => {
         if (results.some(Boolean) && typeof renderFinancialSections === 'function') renderFinancialSections();
       });
@@ -1293,6 +1294,7 @@
       incomes: () => syncIncomesFromSupabase(data, null).then(c => { if (c && typeof renderFinancialSections === 'function') renderFinancialSections(); }),
       expenses: () => syncExpensesFromSupabase(data, null).then(c => { if (c && typeof renderFinancialSections === 'function') renderFinancialSections(); }),
       investors: () => syncInvestorsFromSupabase(data, null).then(c => { if (c && typeof renderFinancialSections === 'function') renderFinancialSections(); }),
+      sw_daily_stats: () => syncSwStatsFromSupabase(data, null).then(c => { if (c && typeof renderFinancialSections === 'function') renderFinancialSections(); }),
       updates: () => syncUpdatesFromSupabase(data, null).then(() => { if (typeof renderNews === 'function') renderNews(); }),
       wishes: () => syncWishesFromSupabase(data, null).then(() => { if (typeof renderWishes === 'function') renderWishes(); }),
       streamer_links: () => syncStreamersFromSupabase(data, null).then(() => renderStreamers()),
@@ -1332,6 +1334,7 @@
       syncIncomesFromSupabase(data, null),
       syncInvestorsFromSupabase(data, null),
       syncExpensesFromSupabase(data, null),
+      syncSwStatsFromSupabase(data, null),
       syncStreamersFromSupabase(data, null, { force: true })
     ]).then(results => {
       const changed = results.some(Boolean);
@@ -1388,6 +1391,184 @@
     statNet.textContent = bkmpFormatCurrency(netProfit);
     statNet.classList.remove('neutral');
     statNet.classList.add(netProfit >= 0 ? 'positive' : 'negative');
+
+    /* ============================================================
+       Umsatzseiten-Ausbau (29.08.2026) - mehr Statistik-/Dashboard-Feeling,
+       siehe die reinen Berechnungsfunktionen in app.js. "Aktueller Zeitraum"
+       für die drei Hauptkarten = letzte 7 Tage (inkl. heute) vs. die 7 Tage
+       davor (Auftrag Abschnitt 3 - bewusst NICHT "heute vs. gestern" auf
+       Gesamtsummen, die naturgemäß immer steigen). Alles hier berechnet
+       ausschließlich aus dem bereits geladenen data.income/data.expenses -
+       kein zusätzlicher Supabase-Aufruf.
+       ============================================================ */
+    (function renderFinanceStatsExtras() {
+      const todayIso = bkmpToIsoDate(new Date());
+      const weekStart = bkmpAddDaysIso(todayIso, -6);
+      const prevWeekEnd = bkmpAddDaysIso(todayIso, -7);
+      const prevWeekStart = bkmpAddDaysIso(todayIso, -13);
+      const yesterdayIso = bkmpAddDaysIso(todayIso, -1);
+
+      const incomeThisWeek = bkmpSumInRange(data.income, weekStart, todayIso);
+      const incomePrevWeek = bkmpSumInRange(data.income, prevWeekStart, prevWeekEnd);
+      const expensesThisWeek = bkmpSumInRange(data.expenses, weekStart, todayIso);
+      const expensesPrevWeek = bkmpSumInRange(data.expenses, prevWeekStart, prevWeekEnd);
+      const netThisWeek = incomeThisWeek - expensesThisWeek;
+      const netPrevWeek = incomePrevWeek - expensesPrevWeek;
+
+      const expenseRatio = bkmpCalculateExpenseRatio(totalExpenses, totalIncome);
+      const profitMargin = bkmpCalculateProfitMargin(netProfit, totalIncome);
+
+      function renderCardSub(elId, change, extraLabel) {
+        const el = document.getElementById(elId);
+        if (!el) return;
+        const arrow = change.direction === 'up' ? '↗' : change.direction === 'down' ? '↘' : '→';
+        const dirClass = change.direction === 'up' ? 'up' : change.direction === 'down' ? 'down' : 'flat';
+        const diffLabel = change.diffAbs === 0 ? '' : `${change.diffAbs > 0 ? '+' : '−'}${bkmpFormatCurrency(Math.abs(change.diffAbs))} ggü. Vorwoche`;
+        el.innerHTML = `
+          <span class="stat-sub-change ${dirClass}">${arrow} ${escapeHtml(change.label)}</span>
+          ${diffLabel ? `<span class="stat-sub-diff">${escapeHtml(diffLabel)}</span>` : ''}
+          ${extraLabel ? `<span class="stat-sub-extra">${extraLabel}</span>` : ''}
+        `;
+      }
+
+      renderCardSub('statIncomeSub', bkmpCalculatePeriodChange(incomeThisWeek, incomePrevWeek), null);
+      renderCardSub('statExpensesSub', bkmpCalculatePeriodChange(expensesThisWeek, expensesPrevWeek),
+        expenseRatio === null ? null : `Ausgabenquote: ${bkmpFormatPercent(expenseRatio).replace(/^[+−±]/, '')}`);
+      renderCardSub('statNetSub', bkmpCalculatePeriodChange(netThisWeek, netPrevWeek),
+        profitMargin === null ? null : `Gewinnmarge: ${bkmpFormatPercent(profitMargin).replace(/^[+−±]/, '')}`);
+
+      /* Dezente Sparklines (Auftrag Abschnitt 4) - letzte 14 Tage, keine
+         Achsen/Beschriftung, reine Entwicklungslinie. */
+      function dailySeries(list, days) {
+        const out = [];
+        for (let i = days - 1; i >= 0; i--) {
+          const iso = bkmpAddDaysIso(todayIso, -i);
+          out.push(bkmpSumInRange(list, iso, iso));
+        }
+        return out;
+      }
+      function sparklineSvg(values, strokeVar) {
+        if (!values || values.every(v => v === 0)) return '';
+        const max = Math.max(...values, 0);
+        const min = Math.min(...values, 0);
+        const range = (max - min) || 1;
+        const pts = values.map((v, i) => {
+          const x = values.length > 1 ? (i / (values.length - 1)) * 100 : 50;
+          const y = 30 - ((v - min) / range) * 26;
+          return `${x.toFixed(1)},${y.toFixed(1)}`;
+        }).join(' ');
+        return `<svg viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts}" style="fill:none;stroke:var(${strokeVar});stroke-width:2;opacity:0.75" vector-effect="non-scaling-stroke"/></svg>`;
+      }
+      const incomeSeries = dailySeries(data.income, 14);
+      const expenseSeries = dailySeries(data.expenses, 14);
+      const netSeries = incomeSeries.map((v, i) => v - expenseSeries[i]);
+      const sparkIncomeEl = document.getElementById('statIncomeSpark');
+      const sparkExpensesEl = document.getElementById('statExpensesSpark');
+      const sparkNetEl = document.getElementById('statNetSpark');
+      if (sparkIncomeEl) sparkIncomeEl.innerHTML = sparklineSvg(incomeSeries, '--pos');
+      if (sparkExpensesEl) sparkExpensesEl.innerHTML = sparklineSvg(expenseSeries, '--neg');
+      // --gold-fixed statt --gold (Nutzer-Screenshot 29.08.2026, Akzentfarben-
+      // Regler auf Schwarz gestellt machte die Linie unsichtbar) - reine
+      // Informationsanzeige, muss unabhaengig von der gewaehlten Akzentfarbe
+      // sichtbar bleiben.
+      if (sparkNetEl) sparkNetEl.innerHTML = sparklineSvg(netSeries, '--gold-fixed');
+
+      /* ---------------- Kompakte KPI-Zeile (Auftrag Abschnitt 5) ---------------- */
+      const kpiRow = document.getElementById('kpiRow');
+      if (kpiRow) {
+        const todayRevenue = bkmpSumInRange(data.income, todayIso, todayIso);
+        const yesterdayRevenue = bkmpSumInRange(data.income, yesterdayIso, yesterdayIso);
+        const todayChange = bkmpCalculatePeriodChange(todayRevenue, yesterdayRevenue);
+
+        const avgDaily7 = bkmpCalculateAverageDailyRevenue(bkmpEntriesInRange(data.income, weekStart, todayIso), 7);
+        const bestDay = bkmpCalculateBestDay(data.income);
+        const avgTransaction = bkmpCalculateAverageTransaction(bkmpEntriesInRange(data.income, weekStart, todayIso));
+        const bookingsThisWeek = bkmpEntriesInRange(data.income, weekStart, todayIso).length;
+        const bookingsPrevWeek = bkmpEntriesInRange(data.income, prevWeekStart, prevWeekEnd).length;
+        const bookingsChange = bkmpCalculatePeriodChange(bookingsThisWeek, bookingsPrevWeek);
+        const bookStatsForKpi = bkmpCalculateBookStats(data.income, todayIso);
+
+        function kpiCard(label, value, sub) {
+          return `<div class="kpi-card"><div class="kpi-label">${escapeHtml(label)}</div><div class="kpi-value">${value}</div>${sub ? `<div class="kpi-sub">${sub}</div>` : ''}</div>`;
+        }
+
+        kpiRow.innerHTML = [
+          kpiCard('Heute', bkmpFormatCurrency(todayRevenue), todayChange.pct === null ? escapeHtml(todayChange.label) : `<span class="${todayChange.direction}">${todayChange.direction === 'up' ? '↗' : todayChange.direction === 'down' ? '↘' : '→'} ${escapeHtml(bkmpFormatPercent(todayChange.pct))} vs. gestern</span>`),
+          kpiCard('Bücher diese Woche', bookStatsForKpi.hasAnyBooks ? bookStatsForKpi.weekQty.toLocaleString('de-DE') : '–', bookStatsForKpi.hasAnyBooks ? `${bookStatsForKpi.weekChange.pct === null ? escapeHtml(bookStatsForKpi.weekChange.label) : `<span class="${bookStatsForKpi.weekChange.direction}">${bookStatsForKpi.weekChange.direction === 'up' ? '↗' : bookStatsForKpi.weekChange.direction === 'down' ? '↘' : '→'} ${escapeHtml(bkmpFormatPercent(bookStatsForKpi.weekChange.pct))}</span>`}` : 'Noch keine Bücher-Einnahmen'),
+          kpiCard('Ø Umsatz/Tag', bkmpFormatCurrency(avgDaily7), 'letzte 7 Tage'),
+          kpiCard('Bester Tag', bestDay ? bkmpFormatCurrency(bestDay.amount) : '–', bestDay ? escapeHtml(formatDate(bestDay.date)) : 'Noch keine Daten'),
+          kpiCard('Ø Buchungswert', avgTransaction === null ? '–' : bkmpFormatCurrency(avgTransaction), 'Einnahmen, letzte 7 Tage'),
+          kpiCard('Buchungen', String(bookingsThisWeek), bookingsChange.pct === null ? escapeHtml(bookingsChange.label) + ' ggü. Vorwoche' : `<span class="${bookingsChange.direction}">${bookingsChange.diffAbs >= 0 ? '+' : ''}${bookingsChange.diffAbs} ggü. Vorwoche</span>`)
+        ].join('');
+      }
+
+      /* ---------------- Verkaufsstatistik: Bücher (Auftrag Abschnitt 9) ---------------- */
+      const bookSection = document.getElementById('bookStatsSection');
+      if (bookSection) {
+        const bs = bkmpCalculateBookStats(data.income, todayIso);
+        if (!bs.hasAnyBooks) {
+          bookSection.innerHTML = '';
+        } else {
+          const shareOfRevenue = totalIncome ? (bs.totalRevenueAllTime / totalIncome) * 100 : null;
+          const wc = bs.weekChange;
+          const arrow = wc.direction === 'up' ? '↗' : wc.direction === 'down' ? '↘' : '→';
+
+          /* Kompakter 30-Tage-Verlauf (Auftrag Abschnitt 10) - bewusst deutlich
+             kleiner als der Haupt-Umsatzchart, reine Balken statt Linie, damit
+             er nicht wie ein zweiter Hauptchart wirkt. */
+          const days30 = [];
+          for (let i = 29; i >= 0; i--) days30.push(bkmpAddDaysIso(todayIso, -i));
+          const bookEntries = data.income.filter(item => item.name === 'Bücher' || item.category === 'Bücher');
+          const dailyQty = days30.map(iso => {
+            const rev = bkmpSumInRange(bookEntries, iso, iso);
+            return bs.unitPrice ? Math.round(rev / bs.unitPrice) : 0;
+          });
+          const maxQty = Math.max(...dailyQty, 1);
+          const barsHtml = dailyQty.map((q, i) => {
+            const h = Math.max(2, Math.round((q / maxQty) * 100));
+            return `<span class="book-trend-bar" style="height:${h}%" title="${escapeHtml(formatDate(days30[i]))}: ${q} Bücher (geschätzt)"></span>`;
+          }).join('');
+
+          bookSection.innerHTML = `
+            <h3 class="panel-title book-stats-title">📚 Verkaufsstatistik <span>Schwerpunkt Bücher</span></h3>
+            <div class="book-stats-card">
+              <div class="book-stats-grid">
+                <div class="book-stat"><span class="book-stat-label">Verkauft diese Woche</span><span class="book-stat-value">${bs.weekQty.toLocaleString('de-DE')}</span></div>
+                <div class="book-stat"><span class="book-stat-label">Ø pro Tag</span><span class="book-stat-value">${bs.avgPerDayQty.toLocaleString('de-DE', { maximumFractionDigits: 1 })}</span></div>
+                <div class="book-stat"><span class="book-stat-label">Bester Tag</span><span class="book-stat-value">${bs.bestDay ? bs.bestDay.qty.toLocaleString('de-DE') : '–'}</span><span class="book-stat-sub">${bs.bestDay ? escapeHtml(formatDate(bs.bestDay.date)) : ''}</span></div>
+                <div class="book-stat"><span class="book-stat-label">Wochenvergleich</span><span class="book-stat-value ${wc.direction}">${arrow} ${wc.pct === null ? escapeHtml(wc.label) : escapeHtml(bkmpFormatPercent(wc.pct))}</span></div>
+                <div class="book-stat"><span class="book-stat-label">Umsatz Bücher</span><span class="book-stat-value">${bkmpFormatCurrency(bs.totalRevenueAllTime)}</span></div>
+                <div class="book-stat"><span class="book-stat-label">Anteil am Umsatz</span><span class="book-stat-value">${shareOfRevenue === null ? '–' : bkmpFormatPercent(shareOfRevenue).replace(/^[+−±]/, '')}</span></div>
+              </div>
+              <div class="book-trend-chart" aria-label="Bücher verkauft, letzte 30 Tage (geschätzt)">${barsHtml}</div>
+              <p class="book-stats-hint">Stückzahlen geschätzt aus dem hinterlegten Buchpreis (${bkmpFormatCurrency(bs.unitPrice)}) - die Datenbank speichert nur den Gesamtbetrag pro Buchung, keine Stückzahl.</p>
+            </div>`;
+        }
+      }
+
+      /* ---------------- Monats-Prognose (Auftrag Abschnitt 13, optional) ---------------- */
+      const projArea = document.getElementById('monthlyProjectionArea');
+      if (projArea) {
+        if (totalIncome === 0) {
+          projArea.innerHTML = '';
+        } else {
+          const proj = bkmpCalculateMonthlyProjection(data.income, new Date());
+          projArea.innerHTML = `
+            <div class="monthly-projection-card">
+              <div>
+                <span class="mp-label">Aktueller Monatsumsatz</span>
+                <strong class="mp-value">${bkmpFormatCurrency(proj.monthSoFar)}</strong>
+              </div>
+              <div class="mp-arrow">→</div>
+              <div>
+                <span class="mp-label">Prognose Monatsende <em>(Prognose)</em></span>
+                <strong class="mp-value mp-projected">${bkmpFormatCurrency(proj.projected)}</strong>
+                <span class="mp-hint">basierend auf aktuellem Tagesdurchschnitt (${proj.daysElapsed}/${proj.daysInMonth} Tage)</span>
+              </div>
+            </div>`;
+        }
+      }
+    })();
 
     /* Donut-Chart: Anteil jeder Einnahmequelle an den Gesamteinnahmen */
     const chartArea = document.getElementById('chartArea');
@@ -1551,6 +1732,26 @@
         }).join('');
         const active = value => value === mode ? 'active' : '';
 
+        /* Aktueller-Zeitraum-Vergleich (Auftrag Abschnitt 12) - nutzt bewusst
+           dieselben chartPoints wie der Chart selbst (letzter vs. vorletzter
+           Punkt), NICHT fest "heute/gestern" verdrahtet - passt sich dadurch
+           automatisch an Taeglich/Woechentlich/Monatlich an. */
+        let periodCompareHtml = '';
+        if (linePoints.length >= 1) {
+          const latest = linePoints[linePoints.length - 1];
+          const prevPoint = linePoints.length >= 2 ? linePoints[linePoints.length - 2] : null;
+          const change = bkmpCalculatePeriodChange(latest.amount, prevPoint ? prevPoint.amount : 0);
+          const arrow = change.direction === 'up' ? '↗' : change.direction === 'down' ? '↘' : '→';
+          const diffLabel = prevPoint ? `${change.diffAbs >= 0 ? '+' : '−'}${bkmpFormatCurrency(Math.abs(change.diffAbs))} ${compareLabel}` : '';
+          periodCompareHtml = `
+            <div class="line-period-compare">
+              <span class="lpc-label">${escapeHtml(latest.name)}</span>
+              <strong class="lpc-value">${bkmpFormatCurrency(latest.amount)}</strong>
+              <span class="lpc-change ${change.direction}">${arrow} ${change.pct === null ? escapeHtml(change.label) : escapeHtml(bkmpFormatPercent(change.pct))}</span>
+              ${diffLabel ? `<span class="lpc-diff">${escapeHtml(diffLabel)}</span>` : ''}
+            </div>`;
+        }
+
         return `
           <div class="line-card" id="revenueLineCard">
             <div class="line-head">
@@ -1567,6 +1768,7 @@
                 </div>
               </div>
             </div>
+            ${periodCompareHtml}
             <div class="mini-line-chart" aria-label="Umsatz-Verlauf">
               <div class="line-axis max">${bkmpFormatCurrency(maxAmount)}</div>
               <div class="line-axis zero">0 €</div>
@@ -1591,6 +1793,27 @@
         });
       }
 
+      /* Top-Kategorie + groesster Aufsteiger (Auftrag Abschnitt 11) - direkt
+         aus den bereits geladenen Daten, kein neuer Supabase-Aufruf. */
+      const topCatResult = bkmpCalculateTopCategory(data.income, bkmpToIsoDate(new Date()));
+      let topCategoryHtml = '';
+      if (topCatResult.top) {
+        const tc = topCatResult.top.change;
+        const tcArrow = tc.direction === 'up' ? '↗' : tc.direction === 'down' ? '↘' : '→';
+        topCategoryHtml = `
+          <div class="top-category-widget">
+            <div class="top-category-row"><span class="top-category-medal">🏆</span><span class="top-category-name">${escapeHtml(topCatResult.top.category)}</span></div>
+            <div class="top-category-share">${topCatResult.top.share === null ? '–' : bkmpFormatPercent(topCatResult.top.share).replace(/^[+−±]/, '')} aller Einnahmen (7 Tage)</div>
+            <div class="top-category-change ${tc.direction}">${tcArrow} ${tc.pct === null ? escapeHtml(tc.label) : escapeHtml(bkmpFormatPercent(tc.pct))} ggü. Vorwoche</div>
+            ${topCatResult.riser && topCatResult.riser.category !== topCatResult.top.category ? `
+              <div class="top-category-riser">
+                <span>Größter Aufsteiger</span>
+                <strong>${escapeHtml(topCatResult.riser.category)}</strong>
+                <span class="up">${escapeHtml(bkmpFormatPercent(topCatResult.riser.change.pct))}</span>
+              </div>` : ''}
+          </div>`;
+      }
+
       chartArea.innerHTML = `
         <div class="chart-block">
           <div class="chart-summary">
@@ -1601,6 +1824,7 @@
               </div>
             </div>
             <div class="legend">${legendHtml}</div>
+            ${topCategoryHtml}
           </div>
           ${renderRevenueLineChart('daily')}
         </div>`;
@@ -1702,6 +1926,184 @@
         </div>
       `).join('');
     }
+
+    /* ============================================================
+       SW-Besucher-Statistik fuer /sw bk (29.08.2026) - siehe die reinen
+       Berechnungs-Helfer (bkmpSw*) in app.js. Betrifft ausschliesslich den
+       eigenen Shop, keine Konkurrenzdaten (Auftrag Abschnitt 28 - das
+       Datenmodell selbst kennt gar keine fremden Shops).
+       ============================================================ */
+    (function renderSwStatsSection() {
+      const section = document.getElementById('swStatsSection');
+      if (!section) return;
+      const swList = Array.isArray(data.swStats) ? data.swStats : [];
+      if (swList.length === 0) { section.innerHTML = ''; return; }
+
+      const todayIso = bkmpToIsoDate(new Date());
+      const yesterdayIso = bkmpAddDaysIso(todayIso, -1);
+      const weekStart = bkmpAddDaysIso(todayIso, -6);
+      const prevWeekEnd = bkmpAddDaysIso(todayIso, -7);
+      const prevWeekStart = bkmpAddDaysIso(todayIso, -13);
+
+      const todayRow = bkmpSwFindRow(swList, todayIso);
+      const yesterdayRow = bkmpSwFindRow(swList, yesterdayIso);
+      const todayTotal = bkmpSwRowTotal(todayRow);
+
+      // Auftrag Abschnitt 23: fehlt der Eintrag fuer "gestern" komplett,
+      // ist das etwas anderes als "gestern war 0" - die generische Change-
+      // Formel darf hier nicht blind mit 0 rechnen.
+      const todayChange = !yesterdayRow
+        ? { pct: null, diffAbs: 0, direction: 'flat', label: 'Kein Vergleich (gestern nicht erfasst)' }
+        : bkmpCalculatePeriodChange(todayTotal, bkmpSwRowTotal(yesterdayRow));
+
+      const weekTotal = bkmpSwSumInRange(swList, weekStart, todayIso);
+      const prevWeekTotal = bkmpSwSumInRange(swList, prevWeekStart, prevWeekEnd);
+      const weekChange = bkmpCalculatePeriodChange(weekTotal, prevWeekTotal);
+
+      const avg7 = bkmpSwAverage(swList, weekStart, todayIso);
+      const bestDay = bkmpSwBestDay(swList);
+      const strongestToday = bkmpSwStrongestCb(todayRow);
+      const rankStatus = bkmpSwRankStatus(todayRow);
+
+      function dirArrow(dir) { return dir === 'up' ? '↗' : dir === 'down' ? '↘' : '→'; }
+      function changeLabel(change) { return change.pct === null ? change.label : bkmpFormatPercent(change.pct); }
+
+      /* ---------------- Sekundaere KPI-Zeile (wiederverwendet .kpi-row/.kpi-card) ---------------- */
+      function kpiCard(label, value, sub) {
+        return `<div class="kpi-card"><div class="kpi-label">${escapeHtml(label)}</div><div class="kpi-value">${value}</div>${sub ? `<div class="kpi-sub">${sub}</div>` : ''}</div>`;
+      }
+      const kpiRowHtml = [
+        kpiCard('Diese Woche', weekTotal.toLocaleString('de-DE'), `<span class="${weekChange.direction}">${dirArrow(weekChange.direction)} ${escapeHtml(changeLabel(weekChange))}</span> ggü. Vorwoche`),
+        kpiCard('Ø Besucher/Tag', avg7 === null ? '–' : Math.round(avg7).toLocaleString('de-DE'), 'letzte 7 Tage, nur erfasste Tage'),
+        kpiCard('Rekordtag', bestDay ? bestDay.total.toLocaleString('de-DE') : '–', bestDay ? escapeHtml(formatDate(bestDay.date)) : 'Noch keine Daten'),
+        kpiCard('Stärkster CB', strongestToday ? BKMP_SW_CB_LABELS[strongestToday.cb] : '–', strongestToday ? `${strongestToday.visitors.toLocaleString('de-DE')} Besucher${strongestToday.sharePct !== null ? ' · ' + bkmpFormatPercent(strongestToday.sharePct).replace(/^[+−±]/, '') : ''}` : 'Noch keine Daten'),
+        kpiCard('Top-5-Platzierungen', rankStatus.top5Count + ' von 6', 'CityBuilds heute in Top 5')
+      ].join('');
+
+      /* ---------------- 30-Tage-Chart mit CB-Filter (Auftrag Abschnitt 15) ---------------- */
+      // Nur tatsaechlich vorhandene Tage (keine erfundenen 0-Tage fuer
+      // Luecken) - identisches Prinzip wie buildRevenueSeries() beim
+      // bestehenden Umsatzchart weiter oben in dieser Datei.
+      const swSorted = [...swList].sort((a, b) => a.stat_date.localeCompare(b.stat_date));
+      function swSeriesFor(mode) {
+        const points = swSorted.slice(-30).map(row => ({
+          date: row.stat_date,
+          shortDate: new Date(row.stat_date + 'T00:00:00').toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }),
+          amount: mode === 'total' ? bkmpSwRowTotal(row) : (Number(row[mode + '_visitors']) || 0)
+        }));
+        return points;
+      }
+      function renderSwChart(mode) {
+        const points = swSeriesFor(mode);
+        const maxAmount = Math.max(...points.map(p => p.amount), 1);
+        const linePoints = points.length === 1
+          ? [{ ...points[0], x: 50, y: 50 }]
+          : points.map((p, i) => ({ ...p, x: points.length > 1 ? 10 + (i / (points.length - 1)) * 80 : 50, y: 82 - (p.amount / maxAmount) * 66 }));
+        const areaPath = linePoints.length
+          ? `M ${linePoints[0].x.toFixed(2)} 86 L ${linePoints.map(p => `${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(' L ')} L ${linePoints[linePoints.length - 1].x.toFixed(2)} 86 Z`
+          : '';
+        const linePath = linePoints.length ? `M ${linePoints.map(p => `${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(' L ')}` : '';
+        const labelStep = Math.max(1, Math.ceil(linePoints.length / 7));
+        const pointHtml = linePoints.map((p, i) => {
+          const flipBelow = p.y < 32;
+          return `<button class="line-point${flipBelow ? ' line-point-flip-below' : ''}" style="left:${p.x}%; top:${p.y}%;" type="button" aria-label="${p.date}: ${p.amount} Besucher"><span>${escapeHtml(p.shortDate)}: ${p.amount.toLocaleString('de-DE')} Besucher</span></button>`;
+        }).join('');
+        const labelHtml = linePoints.map((p, i) => (i === 0 || i === linePoints.length - 1 || i % labelStep === 0) ? `<span class="line-date-label" style="left:${p.x}%">${escapeHtml(p.shortDate)}</span>` : '').join('');
+        const tabDef = [['total', 'Gesamt'], ...BKMP_SW_CB_KEYS.map(k => [k, BKMP_SW_CB_LABELS[k]])];
+        const tabsHtml = tabDef.map(([val, label]) => `<button class="${val === mode ? 'active' : ''}" type="button" data-sw-chart-mode="${val}">${escapeHtml(label)}</button>`).join('');
+        return `
+          <div class="sw-chart-card" id="swChartCard">
+            <div class="sw-chart-head">
+              <h3>SW-Besucher – letzte 30 Tage</h3>
+              <div class="line-mode-tabs sw-cb-tabs" aria-label="CityBuild auswählen">${tabsHtml}</div>
+            </div>
+            <div class="mini-line-chart" aria-label="SW-Besucher-Verlauf">
+              <div class="line-axis max">${maxAmount.toLocaleString('de-DE')}</div>
+              <div class="line-axis zero">0</div>
+              <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                <path class="line-area" d="${areaPath}"></path>
+                <path class="line-stroke" d="${linePath}"></path>
+              </svg>
+              ${pointHtml}
+              <div class="line-date-row">${labelHtml}</div>
+            </div>
+          </div>`;
+      }
+      function bindSwChartTabs() {
+        section.querySelectorAll('[data-sw-chart-mode]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const card = document.getElementById('swChartCard');
+            if (!card) return;
+            card.outerHTML = renderSwChart(btn.dataset.swChartMode);
+            bindSwChartTabs();
+          });
+        });
+      }
+
+      /* ---------------- Heutige Verteilung + Ranglistenstatus (Abschnitt 14/17/19) ---------------- */
+      const distribution = bkmpSwDistribution(todayRow);
+      const maxVisitors = Math.max(...distribution.map(d => d.visitors), 1);
+      const distributionHtml = todayRow ? distribution.map(d => `
+        <div class="sw-distribution-row">
+          <span class="sw-distribution-cb">${BKMP_SW_CB_LABELS[d.cb]}</span>
+          <span class="sw-distribution-track"><span class="sw-distribution-fill" style="width:${Math.max(2, (d.visitors / maxVisitors) * 100)}%"></span></span>
+          <span class="sw-distribution-value">${d.visitors.toLocaleString('de-DE')}${d.sharePct !== null ? ' · ' + bkmpFormatPercent(d.sharePct).replace(/^[+−±]/, '') : ''}</span>
+        </div>`).join('') : '<p class="empty-hint">Noch keine Daten für heute eingetragen.</p>';
+
+      const rankRowsHtml = BKMP_SW_CB_KEYS.map(key => {
+        const rank = todayRow ? todayRow[key + '_rank'] : null;
+        const badgeClass = !rank ? 'unset' : rank === 'not_in_top5' ? 'not-top5' : 'in-top5';
+        const badgeLabel = !rank ? 'Nicht eingetragen' : BKMP_SW_RANK_LABELS[rank];
+        const history = bkmpSwCbRankHistory(swList, key);
+        const bestHint = history.bestRank ? `Beste Platzierung: #${history.bestRank}${history.bestRankDate ? ' am ' + formatDate(history.bestRankDate) : ''}` : '';
+        return `<div class="sw-rank-row"><span class="sw-rank-cb">${BKMP_SW_CB_LABELS[key]}</span><span><span class="sw-rank-badge ${badgeClass}">${escapeHtml(badgeLabel)}</span>${bestHint ? `<span class="sw-rank-best">${escapeHtml(bestHint)}</span>` : ''}</span></div>`;
+      }).join('');
+
+      /* ---------------- Umsatz pro SW-Besuch + Monatsstatistik (Abschnitt 20-22, optional) ---------------- */
+      const todayIncomeTotal = bkmpSumInRange(data.income, todayIso, todayIso);
+      const revenuePerVisit = todayTotal > 0 ? todayIncomeTotal / todayTotal : null;
+      const incomeThisWeekForCompare = bkmpSumInRange(data.income, weekStart, todayIso);
+      const incomePrevWeekForCompare = bkmpSumInRange(data.income, prevWeekStart, prevWeekEnd);
+      const incomeWeekChange = bkmpCalculatePeriodChange(incomeThisWeekForCompare, incomePrevWeekForCompare);
+      const monthStats = bkmpSwMonthStats(swList, new Date());
+
+      const extraHtml = `
+        <div class="sw-extra-grid">
+          <div class="sw-extra-card">
+            <h4>Besucher &amp; Umsatz</h4>
+            <div class="sw-extra-row"><span>Umsatz pro SW-Besuch (heute)</span><strong>${revenuePerVisit === null ? '–' : bkmpFormatCurrency(revenuePerVisit)}</strong></div>
+            <div class="sw-extra-row"><span>SW-Besucher (7 Tage)</span><strong class="${weekChange.direction}">${dirArrow(weekChange.direction)} ${escapeHtml(changeLabel(weekChange))}</strong></div>
+            <div class="sw-extra-row"><span>Umsatz (7 Tage)</span><strong class="${incomeWeekChange.direction}">${dirArrow(incomeWeekChange.direction)} ${escapeHtml(changeLabel(incomeWeekChange))}</strong></div>
+            <p class="sw-extra-hint">Kein Nachweis, dass SW-Besucher tatsächlich gekauft haben - reiner Performance-Indikator, keine Conversion Rate.</p>
+          </div>
+          <div class="sw-extra-card">
+            <h4>Diesen Monat</h4>
+            ${monthStats.hasData ? `
+              <div class="sw-extra-row"><span>Besucher gesamt</span><strong>${monthStats.total.toLocaleString('de-DE')}</strong></div>
+              <div class="sw-extra-row"><span>Ø pro Tag</span><strong>${monthStats.avgPerDay === null ? '–' : Math.round(monthStats.avgPerDay).toLocaleString('de-DE')}</strong></div>
+              <div class="sw-extra-row"><span>Bester Tag</span><strong>${monthStats.bestDay ? monthStats.bestDay.total.toLocaleString('de-DE') : '–'}</strong></div>
+              <div class="sw-extra-row"><span>Stärkster CB</span><strong>${monthStats.strongestCb ? BKMP_SW_CB_LABELS[monthStats.strongestCb.cb] : '–'}</strong></div>
+              <div class="sw-extra-row"><span>Vs. Vormonat</span><strong class="${monthStats.change.direction}">${dirArrow(monthStats.change.direction)} ${escapeHtml(changeLabel(monthStats.change))}</strong></div>
+            ` : '<p class="empty-hint">Noch keine Daten für diesen Monat.</p>'}
+          </div>
+        </div>`;
+
+      section.innerHTML = `
+        <h2 class="panel-title sw-stats-title">🚩 SW-Besucher <span>/sw bk</span></h2>
+        <div class="sw-stats-hero">
+          <span class="sw-stats-hero-value">${todayTotal.toLocaleString('de-DE')} Besucher heute</span>
+          <span class="sw-stats-hero-change ${todayChange.direction}">${dirArrow(todayChange.direction)} ${escapeHtml(changeLabel(todayChange))} vs. gestern</span>
+        </div>
+        <div class="kpi-row">${kpiRowHtml}</div>
+        ${renderSwChart('total')}
+        <div class="sw-secondary-grid">
+          <div class="sw-distribution-card"><h4>Heutige Verteilung</h4>${distributionHtml}</div>
+          <div class="sw-rank-card"><h4>Ranglistenstatus</h4>${rankRowsHtml}<div class="sw-rank-summary"><strong>${rankStatus.top5Count} von 6</strong> CityBuilds heute in den Top 5</div></div>
+        </div>
+        ${extraHtml}
+      `;
+      bindSwChartTabs();
+    })();
     }
     renderFinancialSections();
 

@@ -960,6 +960,14 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
    ein fixer Platz oben mittig kollidierte optisch mit dem Idle-Dorf-Button
    dort. Als normales Flex-Kind von .top-actions-left braucht es keine
    eigene Positionierung, nur eine kleine, zur Zeile passende Hoehe. */
+.opsucht-logo-link {
+  display: inline-flex;
+  line-height: 0;
+  border-radius: 6px;
+  transition: opacity 0.15s ease;
+}
+.opsucht-logo-link:hover,
+.opsucht-logo-link:focus-visible { opacity: 0.85; }
 .opsucht-logo {
   height: 40px;
   width: auto;
@@ -1547,6 +1555,198 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
 .ledger-row .amount { font-weight: 600; }
 .ledger-row .amount.in { color: var(--pos); }
 .ledger-row .amount.out { color: var(--neg); }
+
+/* ============================================================
+   Umsatzseiten-Ausbau (29.08.2026) - erweitert die bestehende Hauptseite
+   um mehr Statistik-/Dashboard-Feeling. Bewusst dieselben Tokens wie der
+   Rest der Seite (--paper-2/--line/--gold/--purple/--pos/--neg/--muted/
+   --shadow-1/--mood-radius-panel), kein neues Farbsystem. Glow nur sehr
+   gezielt (Sparklines/aktive Werte/Hover) statt ueberall.
+   ============================================================ */
+
+/* -- Hauptkarten: Zusatzzeile (Veraenderung/Quote/Marge) + Sparkline -- */
+.stat-sub { margin-top: 0.55rem; display: flex; flex-direction: column; align-items: center; gap: 0.15rem; min-height: 1.2em; }
+.stat-sub-change { font-size: 0.82rem; font-weight: 600; }
+.stat-sub-change.up { color: var(--pos); }
+.stat-sub-change.down { color: var(--neg); }
+.stat-sub-change.flat { color: var(--muted); }
+.stat-sub-diff, .stat-sub-extra { font-size: 0.72rem; color: var(--muted); }
+.stat-sparkline { height: 32px; margin-top: 0.7rem; opacity: 0.9; }
+.stat-sparkline svg { width: 100%; height: 100%; display: block; }
+@media (prefers-reduced-motion: reduce) { .stat-sparkline svg { transition: none; } }
+
+/* -- Kompakte KPI-Zeile -- */
+.kpi-row {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem; margin: 1.6rem 0 2.6rem;
+}
+.kpi-card {
+  background: var(--paper-2); border: 1px solid var(--line); border-radius: 12px;
+  padding: 0.9rem 1rem; text-align: center;
+  transition: transform var(--duration-base, 0.18s) var(--ease-out, ease), border-color var(--duration-base, 0.18s) var(--ease-out, ease);
+}
+.kpi-card:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--gold) 30%, var(--line)); }
+@media (prefers-reduced-motion: reduce) { .kpi-card { transition: none; } .kpi-card:hover { transform: none; } }
+.kpi-label { font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.4rem; }
+.kpi-value { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.15rem; }
+.kpi-sub { margin-top: 0.3rem; font-size: 0.72rem; color: var(--muted); }
+.kpi-sub .up { color: var(--pos); }
+.kpi-sub .down { color: var(--neg); }
+.kpi-sub .flat { color: var(--muted); }
+@media (max-width: 900px) { .kpi-row { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); } }
+@media (max-width: 520px) { .kpi-row { grid-template-columns: repeat(2, 1fr); } }
+
+/* -- Top-Kategorie-Widget (neben Donut/Legende) -- */
+.top-category-widget {
+  background: var(--paper-3); border: 1px solid var(--line); border-radius: 12px;
+  padding: 0.85rem 1.1rem; min-width: 180px; text-align: left;
+}
+.top-category-row { display: flex; align-items: center; gap: 0.4rem; font-weight: 700; font-size: 0.92rem; }
+.top-category-medal { font-size: 1.05rem; }
+.top-category-share { font-size: 0.74rem; color: var(--muted); margin-top: 0.15rem; }
+.top-category-change { font-size: 0.78rem; font-weight: 600; margin-top: 0.3rem; }
+.top-category-change.up { color: var(--pos); }
+.top-category-change.down { color: var(--neg); }
+.top-category-change.flat { color: var(--muted); }
+.top-category-riser { margin-top: 0.6rem; padding-top: 0.55rem; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 0.1rem; font-size: 0.74rem; color: var(--muted); }
+.top-category-riser strong { color: var(--ink); font-size: 0.86rem; }
+.top-category-riser .up { color: var(--pos); font-weight: 600; }
+
+/* -- Umsatz-pro-Zeitraum: aktueller-Zeitraum-Vergleich oben im Chart -- */
+.line-period-compare {
+  display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap;
+  margin-bottom: 0.7rem; padding-bottom: 0.7rem; border-bottom: 1px dashed var(--line);
+}
+.lpc-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.lpc-value { font-family: 'Fraunces', serif; font-size: 1.25rem; font-weight: 600; }
+.lpc-change { font-size: 0.82rem; font-weight: 600; }
+.lpc-change.up { color: var(--pos); }
+.lpc-change.down { color: var(--neg); }
+.lpc-change.flat { color: var(--muted); }
+.lpc-diff { font-size: 0.74rem; color: var(--muted); }
+
+/* -- Verkaufsstatistik (Buecher) -- */
+.book-stats-title { margin-top: 3rem; margin-bottom: 1rem !important; font-size: var(--font-size-xl, 1.35rem) !important; }
+.book-stats-title span { display: block; font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-weight: 500; margin-top: 0.25rem; }
+.book-stats-card {
+  background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--mood-radius-panel, 16px);
+  padding: 1.4rem 1.5rem; box-shadow: var(--shadow-1);
+}
+.book-stats-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem 1.4rem;
+}
+.book-stat { display: flex; flex-direction: column; gap: 0.2rem; text-align: center; }
+.book-stat-label { font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.book-stat-value { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.15rem; }
+.book-stat-value.up { color: var(--pos); }
+.book-stat-value.down { color: var(--neg); }
+.book-stat-sub { font-size: 0.7rem; color: var(--muted); }
+.book-trend-chart {
+  display: flex; align-items: flex-end; gap: 2px; height: 48px;
+  margin-top: 1.2rem; padding: 0 0.1rem;
+}
+.book-trend-bar {
+  flex: 1 1 0; min-width: 2px; border-radius: 2px 2px 0 0;
+  background: color-mix(in srgb, var(--purple, var(--gold)) 55%, var(--line));
+  transition: background var(--duration-base, 0.18s) var(--ease-out, ease);
+}
+.book-trend-bar:hover { background: var(--purple, var(--gold)); }
+@media (prefers-reduced-motion: reduce) { .book-trend-bar { transition: none; } }
+.book-stats-hint { margin-top: 0.9rem; font-size: 0.7rem; color: var(--muted); text-align: center; }
+
+/* -- Monats-Prognose -- */
+.monthly-projection-card {
+  display: flex; align-items: center; justify-content: center; gap: 1.6rem;
+  flex-wrap: wrap; margin: 2rem 0 0.5rem;
+  background: var(--paper-2); border: 1px dashed var(--line); border-radius: 12px;
+  padding: 1rem 1.4rem; text-align: center;
+}
+.monthly-projection-card .mp-label { display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.25rem; }
+/* --gold-fixed statt --gold (Nutzer-Screenshot 29.08.2026, "bei mir schwarz
+   eingestellt" - der Akzentfarben-Regler kann --gold beliebig ueberschreiben,
+   bis hin zu praktisch unsichtbarem Text auf dem dunklen Hintergrund. Diese
+   beiden Werte sind reine Informationsanzeigen (keine anklickbaren Akzent-
+   Elemente wie Buttons/Border), muessen also unabhaengig von der gewaehlten
+   Akzentfarbe lesbar bleiben - gleiches Prinzip wie --gold-fixed bei der
+   Bestenliste/den Streamer-Badges weiter oben in dieser Datei. */
+.monthly-projection-card .mp-label em { font-style: normal; color: var(--gold-fixed); }
+.monthly-projection-card .mp-value { font-family: 'Fraunces', serif; font-size: 1.2rem; font-weight: 600; }
+.monthly-projection-card .mp-projected { color: var(--gold-fixed); }
+.monthly-projection-card .mp-arrow { color: var(--muted); font-size: 1.2rem; }
+.monthly-projection-card .mp-hint { display: block; font-size: 0.68rem; color: var(--muted); margin-top: 0.2rem; }
+@media (max-width: 640px) { .monthly-projection-card { flex-direction: column; gap: 0.6rem; } .monthly-projection-card .mp-arrow { transform: rotate(90deg); } }
+
+/* ============================================================
+   SW-Besucher-Statistik fuer /sw bk (29.08.2026) - eigener Bereich auf der
+   Umsatzseite, nutzt bewusst dieselben Tokens/Klassen wie der Rest des
+   Dashboards (u.a. .kpi-row/.kpi-card, .line-mode-tabs, .mini-line-chart -
+   siehe renderFinancialSections()). --gold-fixed statt --gold ueberall dort,
+   wo der Text die eigentliche Information traegt (Lektion vom 29.08.2026,
+   Nutzer-Screenshot "bei mir schwarz eingestellt").
+   ============================================================ */
+.sw-stats-title { margin-top: 3rem; margin-bottom: 1rem !important; font-size: var(--font-size-xl, 1.35rem) !important; }
+.sw-stats-title span { display: block; font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-weight: 500; margin-top: 0.25rem; }
+
+.sw-stats-hero {
+  display: flex; align-items: baseline; justify-content: center; gap: 0.9rem; flex-wrap: wrap;
+  text-align: center; margin-bottom: 1.4rem;
+}
+.sw-stats-hero-value { font-family: 'Fraunces', serif; font-size: 2.1rem; font-weight: 600; color: var(--gold-fixed); }
+.sw-stats-hero-change { font-size: 0.95rem; font-weight: 600; }
+.sw-stats-hero-change.up { color: var(--pos); }
+.sw-stats-hero-change.down { color: var(--neg); }
+.sw-stats-hero-change.flat { color: var(--muted); }
+
+.sw-chart-card { background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--mood-radius-panel, 16px); padding: 1.2rem 1.3rem; box-shadow: var(--shadow-1); margin-bottom: 1.4rem; }
+.sw-chart-head { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; flex-wrap: wrap; margin-bottom: 0.8rem; }
+.sw-chart-head h3 { font-size: 0.9rem; font-weight: 700; }
+.sw-cb-tabs { display: flex; gap: 0.25rem; flex-wrap: wrap; }
+
+.sw-secondary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.4rem; }
+@media (max-width: 760px) { .sw-secondary-grid { grid-template-columns: 1fr; } }
+
+.sw-distribution-card, .sw-rank-card {
+  background: var(--paper-2); border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.15rem;
+}
+.sw-distribution-card h4, .sw-rank-card h4 { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.7rem; font-weight: 600; }
+.sw-distribution-row { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem; font-size: 0.82rem; }
+.sw-distribution-row:last-child { margin-bottom: 0; }
+.sw-distribution-cb { width: 34px; flex-shrink: 0; font-weight: 700; }
+.sw-distribution-track { flex: 1 1 auto; height: 9px; border-radius: 999px; background: var(--paper-3); overflow: hidden; }
+.sw-distribution-fill { height: 100%; border-radius: 999px; background: color-mix(in srgb, var(--purple, var(--gold-fixed)) 70%, transparent); }
+.sw-distribution-value { flex-shrink: 0; width: 92px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.sw-rank-row { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; padding: 0.4rem 0; border-bottom: 1px solid var(--line); font-size: 0.85rem; }
+.sw-rank-row:last-child { border-bottom: none; }
+.sw-rank-cb { font-weight: 600; }
+.sw-rank-badge { font-size: 0.72rem; font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 999px; }
+.sw-rank-badge.in-top5 { color: var(--pos); background: color-mix(in srgb, var(--pos) 16%, transparent); }
+.sw-rank-badge.not-top5 { color: var(--muted); background: var(--paper-3); }
+.sw-rank-badge.unset { color: var(--muted); background: transparent; border: 1px dashed var(--line); }
+.sw-rank-best { display: block; font-size: 0.68rem; color: var(--muted); margin-top: 0.1rem; text-align: right; }
+.sw-rank-summary { margin-top: 0.8rem; padding-top: 0.7rem; border-top: 1px dashed var(--line); font-size: 0.78rem; color: var(--muted); text-align: center; }
+.sw-rank-summary strong { color: var(--gold-fixed); }
+
+.sw-extra-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 760px) { .sw-extra-grid { grid-template-columns: 1fr; } }
+.sw-extra-card { background: var(--paper-2); border: 1px dashed var(--line); border-radius: 12px; padding: 0.9rem 1.1rem; }
+.sw-extra-card h4 { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.5rem; font-weight: 600; }
+.sw-extra-row { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; font-size: 0.85rem; margin-bottom: 0.3rem; }
+.sw-extra-row:last-child { margin-bottom: 0; }
+.sw-extra-row strong { font-family: 'Fraunces', serif; }
+.sw-extra-hint { font-size: 0.68rem; color: var(--muted); margin-top: 0.5rem; }
+
+/* -- Admin: Eingabemaske -- */
+.sw-admin-hint { font-size: 0.78rem; color: var(--muted); margin-bottom: 1rem; }
+.sw-admin-cb-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.9rem; margin: 1rem 0; }
+.sw-admin-cb-row { background: var(--paper-2); border: 1px solid var(--line); border-radius: 10px; padding: 0.75rem 0.85rem; }
+.sw-admin-cb-label { font-weight: 700; margin-bottom: 0.5rem; color: var(--gold-fixed); }
+.sw-admin-cb-row label { font-size: 0.7rem; color: var(--muted); }
+.sw-admin-cb-row + .sw-admin-cb-row { margin-top: 0; }
+.sw-admin-total { font-size: 0.95rem; margin: 0.5rem 0 1rem; }
+.sw-admin-total strong { color: var(--gold-fixed); }
+.sw-admin-msg { font-size: 0.8rem; color: var(--muted); }
+.sw-admin-recent-title { margin-top: 1.6rem; margin-bottom: 0.6rem; font-size: 0.85rem; }
 
 /* ---------- Kartenideen ---------- */
 .wish-cta {

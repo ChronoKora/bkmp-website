@@ -147,7 +147,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260823-investorpayoutprank4">
+<link rel="stylesheet" href="style.css?v=20260829-swstats1">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 <!-- Jake's Feldfahrt (07.08.2026) - eigenstaendiges Website-Easter-Egg,
      komplett getrennt vom Idle-Dorf-Spiel, siehe js/easter-eggs/jakes-
@@ -219,7 +219,9 @@
         <span aria-hidden="true">📜</span><span class="feedback-btn-label">Changelog</span><span class="chl-unread-dot" id="changelogUnreadDot" aria-hidden="true"></span>
       </button>
     </div>
-    <img class="opsucht-logo" src="assets/opsucht-logo.webp" alt="OPSUCHT.net" width="130" height="41">
+    <a class="opsucht-logo-link" href="https://www.opsucht.net" target="_blank" rel="noopener noreferrer" aria-label="OPSUCHT.net besuchen">
+      <img class="opsucht-logo" src="assets/opsucht-logo.webp" alt="OPSUCHT.net" width="130" height="41">
+    </a>
   </div>
 
   <div class="top-actions">
@@ -1192,19 +1194,40 @@
           <div class="stat-card">
             <div class="stat-label">Gesamteinnahmen</div>
             <div class="stat-value positive" id="statIncome">–</div>
+            <div class="stat-sub" id="statIncomeSub"></div>
+            <div class="stat-sparkline" id="statIncomeSpark"></div>
           </div>
           <div class="stat-card">
             <div class="stat-label">Ausgaben</div>
             <div class="stat-value negative" id="statExpenses">–</div>
+            <div class="stat-sub" id="statExpensesSub"></div>
+            <div class="stat-sparkline" id="statExpensesSpark"></div>
           </div>
           <div class="stat-card">
             <div class="stat-label">Netto Gewinn</div>
             <div class="stat-value neutral" id="statNet">–</div>
+            <div class="stat-sub" id="statNetSub"></div>
+            <div class="stat-sparkline" id="statNetSpark"></div>
           </div>
         </div>
 
+        <!-- Kompakte KPI-Zeile (29.08.2026, Umsatzseiten-Ausbau) - wird
+             komplett von renderFinancialSections() befuellt, siehe dort. -->
+        <div class="kpi-row" id="kpiRow"></div>
+
         <h2 class="panel-title">Woher kommen die Einnahmen?</h2>
         <div id="chartArea"></div>
+
+        <!-- Verkaufsstatistik (Auftrag Abschnitt 9-10, Schwerpunkt Buecher) -
+             ebenfalls vollstaendig von renderFinancialSections() befuellt. -->
+        <div id="bookStatsSection"></div>
+
+        <!-- Monats-Prognose (Auftrag Abschnitt 13, optional) -->
+        <div id="monthlyProjectionArea"></div>
+
+        <!-- SW-Besucher-Statistik (/sw bk, 29.08.2026) - vollstaendig von
+             renderFinancialSections() befuellt, siehe js/core/bkmp-site.js. -->
+        <div id="swStatsSection"></div>
 
         <h2 class="panel-title" style="margin-top:3.2rem; margin-bottom:0.4rem;">Alle Einträge</h2>
         <p style="text-align:center; color:var(--muted); font-size:0.82rem; margin-bottom:1.4rem;">Die letzten 15 Buchungen</p>
@@ -1662,8 +1685,8 @@
        liest. window.BKMP_QA_MODE selbst wird noch frueher gesetzt (Kopf-Skript
        oben, vor jedem <script src>). Reiner No-Op ausserhalb des QA-Modus. -->
   <script src="js/core/bkmp-game-clock.js?v=20260724-qafoundation1" defer></script>
-  <script src="supabase.js?v=20260823-investorpayoutprank1" defer></script>
-  <script src="app.js?v=20260718-selbstverdient1" defer></script>
+  <script src="supabase.js?v=20260829-swstats1" defer></script>
+  <script src="app.js?v=20260829-swstats1" defer></script>
   <!-- Redesign Phase 2a (17.07.): idledorf.js in geteilten Zustand + Subsysteme
        zerlegt. Ladereihenfolge ist bewusst fest: bkmp-idle-state.js zuerst
        (geteilte veraenderliche Variablen, TDZ-sicher), dann die Subsysteme in
@@ -1707,7 +1730,7 @@
        bkmp-idle-*.js ab, nur die REIHENFOLGE relativ zu bkmp-site.js zaehlt
        hier. -->
   <script src="js/easter-eggs/jakes-feldfahrt.js?v=20260807-jakesfeldfahrt8" defer></script>
-  <script src="js/core/bkmp-site.js?v=20260823-investorpayoutprank5" defer></script>
+  <script src="js/core/bkmp-site.js?v=20260829-swstats1" defer></script>
   <!-- Feedback-/Status-Board Stufe 1 (20.07.2026) - eigenstaendig, reine
        lokale Testdaten, siehe Datei-Kopf-Kommentar. -->
   <script src="js/ui/bkmp-feedback-board.js?v=20260721-stufe34" defer></script>
