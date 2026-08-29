@@ -2097,28 +2097,15 @@
         return `<div class="sw-rank-row"><span class="sw-rank-cb">${BKMP_SW_CB_LABELS[key]}</span><span><span class="sw-rank-badge ${badgeClass}">${escapeHtml(badgeLabel)}</span>${bestHint ? `<span class="sw-rank-best">${escapeHtml(bestHint)}</span>` : ''}</span></div>`;
       }).join('');
 
-      /* ---------------- Umsatz pro SW-Besuch + Monatsstatistik (Abschnitt 20-22, optional) ---------------- */
-      /* Nutzer-Wunsch 29.08.2026: "gestern" statt "heute" - der Eintrag für
-         einen Tag wird laut Nutzer erst um 0 Uhr des FOLGETAGS erfasst
-         ("wenn ich es eintrage ist 0 uhr vom vortag"), "heute" ist zum
-         Zeitpunkt des Betrachtens deshalb strukturell fast immer noch leer. */
-      const yesterdayIncomeTotal = bkmpSumInRange(data.income, yesterdayIso, yesterdayIso);
-      const yesterdayTotal = bkmpSwRowTotal(yesterdayRow);
-      const revenuePerVisit = yesterdayTotal > 0 ? yesterdayIncomeTotal / yesterdayTotal : null;
-      const incomeThisWeekForCompare = bkmpSumInRange(data.income, weekStart, todayIso);
-      const incomePrevWeekForCompare = bkmpSumInRange(data.income, prevWeekStart, prevWeekEnd);
-      const incomeWeekChange = bkmpCalculatePeriodChange(incomeThisWeekForCompare, incomePrevWeekForCompare);
+      /* ---------------- Monatsstatistik (Abschnitt 22, optional) ---------------- */
+      /* Nutzer-Wunsch 29.08.2026: die "Besucher & Umsatz"-Karte (Umsatz pro
+         SW-Besuch/Wochenvergleiche) wurde ersatzlos entfernt - der Bezug
+         zwischen SW-Besuchen und Umsatz war ohnehin nur ein indirekter
+         Performance-Indikator ohne echten Kausalitätsnachweis. */
       const monthStats = bkmpSwMonthStats(swList, new Date());
 
       const extraHtml = `
         <div class="sw-extra-grid">
-          <div class="sw-extra-card">
-            <h4>Besucher &amp; Umsatz</h4>
-            <div class="sw-extra-row"><span>Umsatz pro SW-Besuch (gestern)</span><strong>${revenuePerVisit === null ? '–' : bkmpFormatCurrency(revenuePerVisit)}</strong></div>
-            <div class="sw-extra-row"><span>SW-Besucher (7 Tage)</span><strong class="${weekChange.direction}">${dirArrow(weekChange.direction)} ${escapeHtml(changeLabel(weekChange))}</strong></div>
-            <div class="sw-extra-row"><span>Umsatz (7 Tage)</span><strong class="${incomeWeekChange.direction}">${dirArrow(incomeWeekChange.direction)} ${escapeHtml(changeLabel(incomeWeekChange))}</strong></div>
-            <p class="sw-extra-hint">Kein Nachweis, dass SW-Besucher tatsächlich gekauft haben - reiner Performance-Indikator, keine Conversion Rate.</p>
-          </div>
           <div class="sw-extra-card">
             <h4>Diesen Monat</h4>
             ${monthStats.hasData ? `

@@ -1745,8 +1745,10 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
 .sw-rank-summary { margin-top: 0.8rem; padding-top: 0.7rem; border-top: 1px dashed var(--line); font-size: 0.78rem; color: var(--muted); text-align: center; }
 .sw-rank-summary strong { color: var(--gold-fixed); }
 
-.sw-extra-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-@media (max-width: 760px) { .sw-extra-grid { grid-template-columns: 1fr; } }
+/* Nutzer-Wunsch 29.08.2026: "Besucher & Umsatz"-Karte entfernt - diese
+   Karten-Reihe traegt jetzt strukturell nur noch die "Diesen Monat"-Karte,
+   deshalb einspaltig statt der vorherigen 2-Spalten-Aufteilung. */
+.sw-extra-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
 .sw-extra-card { background: var(--paper-2); border: 1px dashed var(--line); border-radius: 12px; padding: 0.9rem 1.1rem; }
 .sw-extra-card h4 { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.5rem; font-weight: 600; }
 .sw-extra-row { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; font-size: 0.85rem; margin-bottom: 0.3rem; }
@@ -2738,10 +2740,22 @@ body:has(.admin-wrap), body:has(.login-card) {
    h2::after, damit KEINE andere Admin-Seite (die diese generischen Regeln
    mitbenutzt) durch dieses Redesign beeinflusst wird. Tokens durchgehend
    aus dem bestehenden System (--gold/--purple/--pos/--neg/--danger/
-   --paper-*/--line/--muted/--accent-ink) - --payroll-cyan ist bewusst
+   --paper-Familie/--line/--muted/--accent-ink) - --payroll-cyan ist bewusst
    derselbe Farbwert wie der bereits bestehende .admin-section::before-
    Rahmen-Farbverlauf (kein neuer, frei erfundener Ton), nur lokal auf
-   .payroll-section gescoped statt global in design-tokens.css ergänzt. */
+   .payroll-section gescoped statt global in design-tokens.css ergänzt.
+   ACHTUNG (29.08.2026 gefunden): eine fruehere Fassung dieses Kommentars
+   schrieb hier "--paper" gefolgt von Stern, Schraegstrich, "--line" direkt
+   hintereinander - Stern-direkt-gefolgt-von-Schraegstrich schliesst JEDEN
+   CSS-Kommentar sofort, egal ob beabsichtigt. Der Rest dieses Absatzes
+   (inklusive der eigentlich gewollten schliessenden Zeichenfolge ganz am
+   Ende) wurde dadurch als ungueltiger CSS-Selektor interpretiert und hat
+   die naechste echte Regel (die --payroll-cyan-Definition unten) komplett
+   verschluckt - dieselbe Bug-Klasse wie bei .idle-dungeon-diff gefolgt von
+   Stern weiter unten in dieser Datei. Nie wieder Stern direkt gefolgt von
+   Schraegstrich als Kurzschreibweise in einem Kommentar verwenden - immer
+   mit Leerzeichen trennen oder ausschreiben (gilt auch fuer diesen Hinweis
+   selbst - deshalb hier bewusst ausgeschrieben statt der Zeichen selbst). */
 .payroll-section { --payroll-cyan: #38BDF8; }
 
 /* Punkt 15 "Live Sync modernisieren, aber nicht dominant": der generische
@@ -8194,8 +8208,16 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 /* Dungeon-System 2.0 (Spieler-Vorgabe 17.07.): 7 Karten statt einem
    einzigen Panel - Ei-/Runen-Dungeon bekommen eine dezent hervorgehobene
    Optik (Spieler-Vorgabe: "sollte auch optisch etwas besonders/magisch
-   wirken"), alle anderen teilen sich den bestehenden .idle-dungeon-diff-*/
-   .idle-dungeon-auto-*-Look von oben. */
+   wirken"), alle anderen teilen sich den bestehenden .idle-dungeon-diff-
+   und .idle-dungeon-auto--Look von oben.
+   ACHTUNG (29.08.2026 gefunden): dieser Kommentar schrieb hier vorher
+   ".idle-dungeon-diff" gefolgt von Stern direkt gefolgt von Schraegstrich -
+   diese zwei Zeichen hintereinander schliessen JEDEN CSS-Kommentar sofort.
+   Dadurch wurde diese ganze .idle-dungeon-type-grid-Regel als ungueltiger
+   Selektor verworfen und ist seit dem 17.07.2026 komplett wirkungslos
+   geblieben (kein echtes CSS-Grid, reiner Block-Fluss) - gleiche Bug-Klasse
+   wie beim Payroll-Kommentar weiter oben in dieser Datei, siehe dortiger
+   Hinweis fuer Details. */
 .idle-dungeon-type-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
