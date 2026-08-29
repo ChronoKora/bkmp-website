@@ -1731,7 +1731,17 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
 .sw-distribution-row:last-child { margin-bottom: 0; }
 .sw-distribution-cb { width: 34px; flex-shrink: 0; font-weight: 700; }
 .sw-distribution-track { flex: 1 1 auto; height: 9px; border-radius: 999px; background: var(--paper-3); overflow: hidden; }
-.sw-distribution-fill { height: 100%; border-radius: 999px; background: color-mix(in srgb, var(--purple, var(--gold-fixed)) 70%, transparent); }
+/* 29.08.2026 (Nutzer-Screenshot: "53,2% aber der Balken ist leer") - dieses
+   Element ist ein <span> (Standard display:inline) und liegt NICHT direkt
+   in einem display:flex-Container (das waere .sw-distribution-track, nicht
+   dieses Element selbst - nur direkte Flex-Kinder werden automatisch
+   "blockifiziert"). width/height werden auf einem echten display:inline-
+   Element komplett ignoriert - der Balken hatte dadurch reale 0px Breite,
+   obwohl Farbe UND der width-Wert selbst in getComputedStyle() korrekt
+   ankamen (deshalb sah eine reine Computed-Style-Pruefung faelschlich
+   nach einem funktionierenden Element aus - erst getBoundingClientRect()
+   zeigte die tatsaechliche 0px-Breite). Explizites display:block behoben. */
+.sw-distribution-fill { display: block; height: 100%; border-radius: 999px; background: color-mix(in srgb, var(--purple, var(--gold-fixed)) 70%, transparent); }
 .sw-distribution-value { flex-shrink: 0; width: 92px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
 
 .sw-rank-row { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; padding: 0.4rem 0; border-bottom: 1px solid var(--line); font-size: 0.85rem; }
