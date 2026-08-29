@@ -1476,9 +1476,14 @@
       /* ---------------- Kompakte KPI-Zeile (Auftrag Abschnitt 5) ---------------- */
       const kpiRow = document.getElementById('kpiRow');
       if (kpiRow) {
-        const todayRevenue = bkmpSumInRange(data.income, todayIso, todayIso);
+        /* Nutzer-Wunsch 29.08.2026: "Gestern vs Vorgestern" statt "Heute vs
+           Gestern" - "Heute" ist zum Zeitpunkt des Betrachtens fast immer
+           noch (fast) leer und damit als Momentaufnahme kaum aussagekräftig,
+           während "Gestern" bereits ein vollständig abgeschlossener Tag ist. */
         const yesterdayRevenue = bkmpSumInRange(data.income, yesterdayIso, yesterdayIso);
-        const todayChange = bkmpCalculatePeriodChange(todayRevenue, yesterdayRevenue);
+        const dayBeforeYesterdayIso = bkmpAddDaysIso(todayIso, -2);
+        const dayBeforeYesterdayRevenue = bkmpSumInRange(data.income, dayBeforeYesterdayIso, dayBeforeYesterdayIso);
+        const todayChange = bkmpCalculatePeriodChange(yesterdayRevenue, dayBeforeYesterdayRevenue);
 
         const avgDaily7 = bkmpCalculateAverageDailyRevenue(bkmpEntriesInRange(data.income, weekStart, todayIso), 7);
         const bestDay = bkmpCalculateBestDay(data.income);
@@ -1493,7 +1498,7 @@
         }
 
         kpiRow.innerHTML = [
-          kpiCard('Heute', bkmpFormatCurrency(todayRevenue), todayChange.pct === null ? escapeHtml(todayChange.label) : `<span class="${todayChange.direction}">${todayChange.direction === 'up' ? '↗' : todayChange.direction === 'down' ? '↘' : '→'} ${escapeHtml(bkmpFormatPercent(todayChange.pct))} vs. gestern</span>`),
+          kpiCard('Gestern', bkmpFormatCurrency(yesterdayRevenue), todayChange.pct === null ? escapeHtml(todayChange.label) : `<span class="${todayChange.direction}">${todayChange.direction === 'up' ? '↗' : todayChange.direction === 'down' ? '↘' : '→'} ${escapeHtml(bkmpFormatPercent(todayChange.pct))} vs. vorgestern</span>`),
           kpiCard('Bücher diese Woche', bookStatsForKpi.hasAnyBooks ? bookStatsForKpi.weekQty.toLocaleString('de-DE') : '–', bookStatsForKpi.hasAnyBooks ? `${bookStatsForKpi.weekChange.pct === null ? escapeHtml(bookStatsForKpi.weekChange.label) : `<span class="${bookStatsForKpi.weekChange.direction}">${bookStatsForKpi.weekChange.direction === 'up' ? '↗' : bookStatsForKpi.weekChange.direction === 'down' ? '↘' : '→'} ${escapeHtml(bkmpFormatPercent(bookStatsForKpi.weekChange.pct))}</span>`}` : 'Noch keine Bücher-Einnahmen'),
           kpiCard('Ø Umsatz/Tag', bkmpFormatCurrency(avgDaily7), 'letzte 7 Tage'),
           kpiCard('Bester Tag', bestDay ? bkmpFormatCurrency(bestDay.amount) : '–', bestDay ? escapeHtml(formatDate(bestDay.date)) : 'Noch keine Daten'),
@@ -1697,6 +1702,13 @@
         const modeLabel = mode === 'weekly' ? 'Woche' : mode === 'monthly' ? 'Monat' : 'Tag';
         const compareLabel = mode === 'weekly' ? 'zur Vorwoche' : mode === 'monthly' ? 'zum Vormonat' : 'zum Vortag';
         const maxAmount = Math.max(...chartPoints.map(item => item.amount), 1);
+        // Uebersichtlicherer Achsen-Block (Nutzer-Screenshot 29.08.2026, "das
+        // rot markierte uebersichtlicher machen... Niedrigste... Durchschnitt")
+        // - statt eines starren "0 €" (bei Millionen-Betraegen kaum eine
+        // sinnvolle Referenz) zeigen wir den tatsaechlichen niedrigsten
+        // sichtbaren Punkt + den Durchschnitt aller sichtbaren Punkte.
+        const minAmount = chartPoints.length ? Math.min(...chartPoints.map(item => item.amount)) : 0;
+        const avgAmount = chartPoints.length ? chartPoints.reduce((sum, item) => sum + item.amount, 0) / chartPoints.length : 0;
         const linePoints = chartPoints.length === 1
           ? [{ ...chartPoints[0], x: 50, y: 50 }]
           : chartPoints.map((item, i) => ({
@@ -1770,8 +1782,11 @@
             </div>
             ${periodCompareHtml}
             <div class="mini-line-chart" aria-label="Umsatz-Verlauf">
-              <div class="line-axis max">${bkmpFormatCurrency(maxAmount)}</div>
-              <div class="line-axis zero">0 €</div>
+              <div class="line-axis-info">
+                <div class="line-axis-row is-max"><span class="line-axis-label">Max</span><span class="line-axis-value">${bkmpFormatCurrency(maxAmount)}</span></div>
+                <div class="line-axis-row is-avg"><span class="line-axis-label">Ø</span><span class="line-axis-value">${bkmpFormatCurrency(avgAmount)}</span></div>
+                <div class="line-axis-row is-min"><span class="line-axis-label">Min</span><span class="line-axis-value">${bkmpFormatCurrency(minAmount)}</span></div>
+              </div>
               <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
                 <path class="line-area" d="${areaPath}"></path>
                 <path class="line-stroke" d="${linePath}"></path>
@@ -1947,14 +1962,30 @@
 
       const todayRow = bkmpSwFindRow(swList, todayIso);
       const yesterdayRow = bkmpSwFindRow(swList, yesterdayIso);
-      const todayTotal = bkmpSwRowTotal(todayRow);
+      const dayBeforeYesterdayIso = bkmpAddDaysIso(todayIso, -2);
+      const dayBeforeYesterdayRow = bkmpSwFindRow(swList, dayBeforeYesterdayIso);
 
-      // Auftrag Abschnitt 23: fehlt der Eintrag fuer "gestern" komplett,
-      // ist das etwas anderes als "gestern war 0" - die generische Change-
-      // Formel darf hier nicht blind mit 0 rechnen.
-      const todayChange = !yesterdayRow
-        ? { pct: null, diffAbs: 0, direction: 'flat', label: 'Kein Vergleich (gestern nicht erfasst)' }
-        : bkmpCalculatePeriodChange(todayTotal, bkmpSwRowTotal(yesterdayRow));
+      /* "Aktueller Status" (Hero/Stärkster CB/Verteilung/Ranglistenstatus):
+         bevorzugt einen echten todayRow, faellt aber automatisch auf
+         yesterdayRow zurueck, sobald keiner existiert. Nutzer-Erklärung
+         29.08.2026: der Eintrag für einen abgeschlossenen Tag entsteht real
+         erst kurz NACH dessen Ende ("wenn ich es eintrage ist 0 uhr vom
+         vortag") - im normalen Tagesablauf ist "todayRow" dadurch praktisch
+         immer leer, bis der naechste Tag beginnt. Label passt sich dynamisch
+         an, damit nie "heute" behauptet wird, waehrend eigentlich "gestern"
+         gezeigt wird. */
+      const displayRow = todayRow || yesterdayRow;
+      const displayDateLabel = todayRow ? 'heute' : 'gestern';
+      const displayPrevRow = todayRow ? yesterdayRow : dayBeforeYesterdayRow;
+      const displayPrevLabel = todayRow ? 'gestern' : 'vorgestern';
+      const displayTotal = bkmpSwRowTotal(displayRow);
+
+      // Auftrag Abschnitt 23: fehlt der Vergleichs-Eintrag komplett, ist das
+      // etwas anderes als "war 0" - die generische Change-Formel darf hier
+      // nicht blind mit 0 rechnen.
+      const todayChange = !displayPrevRow
+        ? { pct: null, diffAbs: 0, direction: 'flat', label: `Kein Vergleich (${displayPrevLabel} nicht erfasst)` }
+        : bkmpCalculatePeriodChange(displayTotal, bkmpSwRowTotal(displayPrevRow));
 
       const weekTotal = bkmpSwSumInRange(swList, weekStart, todayIso);
       const prevWeekTotal = bkmpSwSumInRange(swList, prevWeekStart, prevWeekEnd);
@@ -1962,8 +1993,8 @@
 
       const avg7 = bkmpSwAverage(swList, weekStart, todayIso);
       const bestDay = bkmpSwBestDay(swList);
-      const strongestToday = bkmpSwStrongestCb(todayRow);
-      const rankStatus = bkmpSwRankStatus(todayRow);
+      const strongestToday = bkmpSwStrongestCb(displayRow);
+      const rankStatus = bkmpSwRankStatus(displayRow);
 
       function dirArrow(dir) { return dir === 'up' ? '↗' : dir === 'down' ? '↘' : '→'; }
       function changeLabel(change) { return change.pct === null ? change.label : bkmpFormatPercent(change.pct); }
@@ -1977,7 +2008,7 @@
         kpiCard('Ø Besucher/Tag', avg7 === null ? '–' : Math.round(avg7).toLocaleString('de-DE'), 'letzte 7 Tage, nur erfasste Tage'),
         kpiCard('Rekordtag', bestDay ? bestDay.total.toLocaleString('de-DE') : '–', bestDay ? escapeHtml(formatDate(bestDay.date)) : 'Noch keine Daten'),
         kpiCard('Stärkster CB', strongestToday ? BKMP_SW_CB_LABELS[strongestToday.cb] : '–', strongestToday ? `${strongestToday.visitors.toLocaleString('de-DE')} Besucher${strongestToday.sharePct !== null ? ' · ' + bkmpFormatPercent(strongestToday.sharePct).replace(/^[+−±]/, '') : ''}` : 'Noch keine Daten'),
-        kpiCard('Top-5-Platzierungen', rankStatus.top5Count + ' von 6', 'CityBuilds heute in Top 5')
+        kpiCard('Top-5-Platzierungen', rankStatus.top5Count + ' von 6', `CityBuilds ${displayDateLabel} in Top 5`)
       ].join('');
 
       /* ---------------- 30-Tage-Chart mit CB-Filter (Auftrag Abschnitt 15) ---------------- */
@@ -1996,6 +2027,10 @@
       function renderSwChart(mode) {
         const points = swSeriesFor(mode);
         const maxAmount = Math.max(...points.map(p => p.amount), 1);
+        // Gleicher Max/Ø/Min-Block wie beim Umsatzchart oben (Nutzer-Wunsch
+        // 29.08.2026, konsistent auf beide Charts angewendet).
+        const minAmount = points.length ? Math.min(...points.map(p => p.amount)) : 0;
+        const avgAmount = points.length ? points.reduce((sum, p) => sum + p.amount, 0) / points.length : 0;
         const linePoints = points.length === 1
           ? [{ ...points[0], x: 50, y: 50 }]
           : points.map((p, i) => ({ ...p, x: points.length > 1 ? 10 + (i / (points.length - 1)) * 80 : 50, y: 82 - (p.amount / maxAmount) * 66 }));
@@ -2018,8 +2053,11 @@
               <div class="line-mode-tabs sw-cb-tabs" aria-label="CityBuild auswählen">${tabsHtml}</div>
             </div>
             <div class="mini-line-chart" aria-label="SW-Besucher-Verlauf">
-              <div class="line-axis max">${maxAmount.toLocaleString('de-DE')}</div>
-              <div class="line-axis zero">0</div>
+              <div class="line-axis-info">
+                <div class="line-axis-row is-max"><span class="line-axis-label">Max</span><span class="line-axis-value">${maxAmount.toLocaleString('de-DE')}</span></div>
+                <div class="line-axis-row is-avg"><span class="line-axis-label">Ø</span><span class="line-axis-value">${Math.round(avgAmount).toLocaleString('de-DE')}</span></div>
+                <div class="line-axis-row is-min"><span class="line-axis-label">Min</span><span class="line-axis-value">${minAmount.toLocaleString('de-DE')}</span></div>
+              </div>
               <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
                 <path class="line-area" d="${areaPath}"></path>
                 <path class="line-stroke" d="${linePath}"></path>
@@ -2040,18 +2078,18 @@
         });
       }
 
-      /* ---------------- Heutige Verteilung + Ranglistenstatus (Abschnitt 14/17/19) ---------------- */
-      const distribution = bkmpSwDistribution(todayRow);
+      /* ---------------- Verteilung + Ranglistenstatus (Abschnitt 14/17/19) ---------------- */
+      const distribution = bkmpSwDistribution(displayRow);
       const maxVisitors = Math.max(...distribution.map(d => d.visitors), 1);
-      const distributionHtml = todayRow ? distribution.map(d => `
+      const distributionHtml = displayRow ? distribution.map(d => `
         <div class="sw-distribution-row">
           <span class="sw-distribution-cb">${BKMP_SW_CB_LABELS[d.cb]}</span>
           <span class="sw-distribution-track"><span class="sw-distribution-fill" style="width:${Math.max(2, (d.visitors / maxVisitors) * 100)}%"></span></span>
           <span class="sw-distribution-value">${d.visitors.toLocaleString('de-DE')}${d.sharePct !== null ? ' · ' + bkmpFormatPercent(d.sharePct).replace(/^[+−±]/, '') : ''}</span>
-        </div>`).join('') : '<p class="empty-hint">Noch keine Daten für heute eingetragen.</p>';
+        </div>`).join('') : `<p class="empty-hint">Noch keine Daten für ${displayDateLabel} eingetragen.</p>`;
 
       const rankRowsHtml = BKMP_SW_CB_KEYS.map(key => {
-        const rank = todayRow ? todayRow[key + '_rank'] : null;
+        const rank = displayRow ? displayRow[key + '_rank'] : null;
         const badgeClass = !rank ? 'unset' : rank === 'not_in_top5' ? 'not-top5' : 'in-top5';
         const badgeLabel = !rank ? 'Nicht eingetragen' : BKMP_SW_RANK_LABELS[rank];
         const history = bkmpSwCbRankHistory(swList, key);
@@ -2060,8 +2098,13 @@
       }).join('');
 
       /* ---------------- Umsatz pro SW-Besuch + Monatsstatistik (Abschnitt 20-22, optional) ---------------- */
-      const todayIncomeTotal = bkmpSumInRange(data.income, todayIso, todayIso);
-      const revenuePerVisit = todayTotal > 0 ? todayIncomeTotal / todayTotal : null;
+      /* Nutzer-Wunsch 29.08.2026: "gestern" statt "heute" - der Eintrag für
+         einen Tag wird laut Nutzer erst um 0 Uhr des FOLGETAGS erfasst
+         ("wenn ich es eintrage ist 0 uhr vom vortag"), "heute" ist zum
+         Zeitpunkt des Betrachtens deshalb strukturell fast immer noch leer. */
+      const yesterdayIncomeTotal = bkmpSumInRange(data.income, yesterdayIso, yesterdayIso);
+      const yesterdayTotal = bkmpSwRowTotal(yesterdayRow);
+      const revenuePerVisit = yesterdayTotal > 0 ? yesterdayIncomeTotal / yesterdayTotal : null;
       const incomeThisWeekForCompare = bkmpSumInRange(data.income, weekStart, todayIso);
       const incomePrevWeekForCompare = bkmpSumInRange(data.income, prevWeekStart, prevWeekEnd);
       const incomeWeekChange = bkmpCalculatePeriodChange(incomeThisWeekForCompare, incomePrevWeekForCompare);
@@ -2071,7 +2114,7 @@
         <div class="sw-extra-grid">
           <div class="sw-extra-card">
             <h4>Besucher &amp; Umsatz</h4>
-            <div class="sw-extra-row"><span>Umsatz pro SW-Besuch (heute)</span><strong>${revenuePerVisit === null ? '–' : bkmpFormatCurrency(revenuePerVisit)}</strong></div>
+            <div class="sw-extra-row"><span>Umsatz pro SW-Besuch (gestern)</span><strong>${revenuePerVisit === null ? '–' : bkmpFormatCurrency(revenuePerVisit)}</strong></div>
             <div class="sw-extra-row"><span>SW-Besucher (7 Tage)</span><strong class="${weekChange.direction}">${dirArrow(weekChange.direction)} ${escapeHtml(changeLabel(weekChange))}</strong></div>
             <div class="sw-extra-row"><span>Umsatz (7 Tage)</span><strong class="${incomeWeekChange.direction}">${dirArrow(incomeWeekChange.direction)} ${escapeHtml(changeLabel(incomeWeekChange))}</strong></div>
             <p class="sw-extra-hint">Kein Nachweis, dass SW-Besucher tatsächlich gekauft haben - reiner Performance-Indikator, keine Conversion Rate.</p>
@@ -2091,19 +2134,40 @@
       section.innerHTML = `
         <h2 class="panel-title sw-stats-title">🚩 SW-Besucher <span>/sw bk</span></h2>
         <div class="sw-stats-hero">
-          <span class="sw-stats-hero-value">${todayTotal.toLocaleString('de-DE')} Besucher heute</span>
-          <span class="sw-stats-hero-change ${todayChange.direction}">${dirArrow(todayChange.direction)} ${escapeHtml(changeLabel(todayChange))} vs. gestern</span>
+          <span class="sw-stats-hero-value">${displayTotal.toLocaleString('de-DE')} Besucher ${displayDateLabel}</span>
+          <span class="sw-stats-hero-change ${todayChange.direction}">${dirArrow(todayChange.direction)} ${escapeHtml(changeLabel(todayChange))} vs. ${displayPrevLabel}</span>
         </div>
         <div class="kpi-row">${kpiRowHtml}</div>
         ${renderSwChart('total')}
         <div class="sw-secondary-grid">
-          <div class="sw-distribution-card"><h4>Heutige Verteilung</h4>${distributionHtml}</div>
-          <div class="sw-rank-card"><h4>Ranglistenstatus</h4>${rankRowsHtml}<div class="sw-rank-summary"><strong>${rankStatus.top5Count} von 6</strong> CityBuilds heute in den Top 5</div></div>
+          <div class="sw-distribution-card"><h4>Verteilung (${displayDateLabel})</h4>${distributionHtml}</div>
+          <div class="sw-rank-card"><h4>Ranglistenstatus</h4>${rankRowsHtml}<div class="sw-rank-summary"><strong>${rankStatus.top5Count} von 6</strong> CityBuilds ${displayDateLabel} in den Top 5</div></div>
         </div>
         ${extraHtml}
       `;
       bindSwChartTabs();
     })();
+
+    /* Bugfix 29.08.2026 (Nutzer-Meldung: "wird viel von der Seite auf einmal
+       abgeschnitten") - bkmpSyncPanelHeight() (siehe ganz oben in dieser
+       Datei) setzt die Höhe von #panelsViewport explizit auf die aktuelle
+       scrollHeight des sichtbaren Panels, wird bisher aber NUR bei echtem
+       Tab-Wechsel (goTo()) und Fenster-Resize erneut aufgerufen. Da
+       renderFinancialSections() (u.a. via Realtime-Update oder - wie beim
+       eigenen Testen - durch manuelles Nachladen neuer Daten) die Höhe von
+       #panel-main jederzeit auch OHNE Tab-Wechsel spürbar verändern kann
+       (z.B. wenn #swStatsSection/#bookStatsSection von leer auf gefüllt
+       wechselt), blieb die vorher gemessene, jetzt zu niedrige Höhe stehen -
+       der überschüssige Inhalt wurde von #panelsViewport's overflow:hidden
+       einfach unsichtbar abgeschnitten, unabhängig vom "Positivmodus"-
+       Easter-Egg (der hat den Effekt nur sichtbarer gemacht, da er die Seite
+       zusätzlich scroll-sperrt). Bewusst KEIN ResizeObserver (siehe
+       Kommentar bei bkmpSyncPanelHeight() - Rückkopplungsrisiko), sondern
+       derselbe einfache "direkt + einmal verzögert"-Aufruf wie bei goTo(). */
+    if (typeof bkmpSyncPanelHeight === 'function') {
+      bkmpSyncPanelHeight();
+      setTimeout(bkmpSyncPanelHeight, 400);
+    }
     }
     renderFinancialSections();
 

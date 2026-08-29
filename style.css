@@ -1432,6 +1432,24 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
 }
 .line-axis.max { top: 0.55rem; }
 .line-axis.zero { bottom: 2.15rem; }
+
+/* Übersichtlicherer Ersatz fürs alte Max/"0 €"-Eckenpaar (Nutzer-Screenshot
+   29.08.2026, "das rot markierte übersichtlicher machen... Niedrigste...
+   Durchschnitt") - EIN zusammenhängender Block statt zwei verstreuter Ecken,
+   zeigt den tatsächlichen niedrigsten sichtbaren Wert statt eines starren
+   "0 €" (bei Werten im Millionenbereich ohnehin kaum eine sinnvolle
+   Referenz) plus den Durchschnitt der sichtbaren Punkte. */
+.line-axis-info {
+  position: absolute; left: 0.65rem; top: 0.55rem; z-index: 2;
+  display: flex; flex-direction: column; gap: 0.2rem;
+  font-size: 0.68rem; pointer-events: none;
+}
+.line-axis-info .line-axis-row { display: flex; align-items: baseline; gap: 0.35rem; }
+.line-axis-info .line-axis-label { font-weight: 700; min-width: 1.5em; }
+.line-axis-info .line-axis-value { color: var(--muted); }
+.line-axis-info .line-axis-row.is-max .line-axis-label { color: var(--pos); }
+.line-axis-info .line-axis-row.is-avg .line-axis-label { color: var(--gold-fixed); }
+.line-axis-info .line-axis-row.is-min .line-axis-label { color: var(--neg); }
 .line-point {
   position: absolute;
   z-index: 3;
