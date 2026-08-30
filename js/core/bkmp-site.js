@@ -2861,11 +2861,14 @@
       return bkmpPartnerSpotlightShops.find(s => s.id === nextId) || bkmpPartnerSpotlightShops[0];
     }
     /* Kompaktes Anzeigen-Layout (Nachbesserung 30.08.2026 - Spotlight lebt
-       jetzt im /sw-bk-Bannerkopf statt einer grossen Seiten-Karte): Badge
-       oben, dann Bild+Name/Ort/Kategorie in einer Zeile, dann Link+Countdown
-       in einer Fusszeile, dann ein duenner Fortschrittsbalken - bewusst OHNE
-       Beschreibung/Kontakt (keine erfundenen Daten, nur nicht mehr gerendert
-       - beide Felder bleiben unveraendert in `shop` selbst erhalten). */
+       jetzt im /sw-bk-Bannerkopf statt einer grossen Seiten-Karte, zweite
+       Nachbesserung selben Tages: deutlich groesser + kein Sekunden-Countdown-
+       Text mehr, nur noch der Fortschrittsbalken darunter reicht als
+       Zeitanzeige). Badge oben, dann Bild+Name/Ort/Kategorie in einer Zeile,
+       dann optional der Link, dann der duenne Fortschrittsbalken - bewusst
+       OHNE Beschreibung/Kontakt (keine erfundenen Daten, nur nicht mehr
+       gerendert - beide Felder bleiben unveraendert in `shop` selbst
+       erhalten). */
     function bkmpPartnerSpotlightPaint(shop) {
       const wrap = partnerSpotlightEl.querySelector('.partner-spotlight-inner');
       if (!wrap) return;
@@ -2885,10 +2888,7 @@
             <span class="partner-category">${escapeHtml(shop.category || 'Partner')}</span>
           </div>
         </div>
-        <div class="partner-spotlight-footer">
-          ${href ? `<a class="partner-spotlight-link" href="${href}" target="_blank" rel="noopener">Shop ansehen →</a>` : '<span></span>'}
-          <span class="partner-spotlight-countdown" id="partnerSpotlightCountdown"></span>
-        </div>
+        ${href ? `<div class="partner-spotlight-footer"><a class="partner-spotlight-link" href="${href}" target="_blank" rel="noopener">Shop ansehen →</a></div>` : ''}
         <div class="partner-spotlight-progress"><div class="partner-spotlight-progress-fill" id="partnerSpotlightProgressFill"></div></div>`;
       if (window.bkmpEnhanceImages) window.bkmpEnhanceImages(wrap);
       wrap.classList.remove('is-fading');
@@ -2915,13 +2915,14 @@
       const next = bkmpPartnerSpotlightPickNext();
       if (next) bkmpPartnerSpotlightApplyShop(next, immediate);
     }
+    /* Kein Sekunden-Countdown-Text mehr (Nutzerwunsch 30.08.2026: "Und dieses
+       60 sec timer kann weg nur dieser zeit Balken dadrunter reicht") - der
+       Fortschrittsbalken ist die einzige verbleibende Zeitanzeige. */
     function bkmpPartnerSpotlightUpdateProgressUi() {
       if (!partnerSpotlightEl) return;
       const fillEl = partnerSpotlightEl.querySelector('#partnerSpotlightProgressFill');
-      const countdownEl = partnerSpotlightEl.querySelector('#partnerSpotlightCountdown');
       const pct = Math.max(0, Math.min(100, (1 - bkmpPartnerSpotlightRemainingMs / BKMP_PARTNER_SPOTLIGHT_DURATION_MS) * 100));
       if (fillEl) fillEl.style.width = pct.toFixed(1) + '%';
-      if (countdownEl) countdownEl.textContent = `Nächster Shop in ${Math.max(0, Math.ceil(bkmpPartnerSpotlightRemainingMs / 1000))}s`;
     }
     function bkmpPartnerSpotlightTick() {
       const now = Date.now();
@@ -2932,6 +2933,31 @@
         if (bkmpPartnerSpotlightRemainingMs <= 0) bkmpPartnerSpotlightAdvance(false);
       }
       bkmpPartnerSpotlightUpdateProgressUi();
+    }
+    /* Klick auf den Spotlight -> zur PartnerShops-Seite wechseln + den
+       passenden Shop dort kurz aufleuchten lassen, als Orientierung wo er
+       in der Liste steht (Nutzerwunsch 30.08.2026). Nutzt den ECHTEN
+       Tab-Button (nie goTo() direkt aufrufen, gleiches Prinzip wie ueberall
+       sonst in diesem Projekt) - per `aria-controls` gefunden statt eines
+       hartkodierten Tab-Index, robust gegen eine kuenftige Umsortierung der
+       Tabs. Setzt Kategorie-Filter/Suche auf der PartnerShops-Seite bewusst
+       zurueck, bevor gesucht wird - sonst waere der Shop evtl. gar nicht in
+       der aktuell gefilterten Ansicht auffindbar. */
+    function bkmpPartnerSpotlightGoToShop(shop) {
+      if (!shop) return;
+      const partnerTabBtn = document.querySelector('.tab-btn[aria-controls="panel-partners"]');
+      if (partnerTabBtn) partnerTabBtn.click();
+      activePartnerCategory = 'Alle';
+      partnerSearchQuery = '';
+      if (partnerSearchInput) partnerSearchInput.value = '';
+      renderPartnerShops();
+      window.requestAnimationFrame(() => {
+        const card = partnerGrid ? partnerGrid.querySelector(`[data-shop-id="${CSS.escape(String(shop.id))}"]`) : null;
+        if (!card) return;
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        card.classList.add('partner-card-highlight');
+        window.setTimeout(() => card.classList.remove('partner-card-highlight'), 1700);
+      });
     }
     function bkmpUpdatePartnerSpotlightShopList(shops) {
       bkmpPartnerSpotlightShops = shops;
@@ -2956,6 +2982,16 @@
         bkmpPartnerSpotlightTimerId = window.setInterval(bkmpPartnerSpotlightTick, 200);
         partnerSpotlightEl.addEventListener('mouseenter', () => { bkmpPartnerSpotlightPaused = true; });
         partnerSpotlightEl.addEventListener('mouseleave', () => { bkmpPartnerSpotlightPaused = false; });
+        /* Klick auf die Karte (aber NICHT auf den externen "Shop ansehen"-
+           Link selbst, der oeffnet weiterhin normal in einem neuen Tab) -
+           Nutzerwunsch 30.08.2026: automatisch zur PartnerShops-Seite
+           wechseln und den passenden Shop dort kurz aufleuchten lassen.
+           Listener wird (wie mouseenter/mouseleave) nur EINMAL beim ersten
+           Aufbau angehaengt, nicht bei jedem Re-Paint neu. */
+        partnerSpotlightEl.addEventListener('click', e => {
+          if (e.target.closest('.partner-spotlight-link')) return;
+          bkmpPartnerSpotlightGoToShop(bkmpPartnerSpotlightCurrent);
+        });
       } else if (!bkmpPartnerSpotlightCurrent) {
         bkmpPartnerSpotlightAdvance(true);
       }
@@ -3023,7 +3059,7 @@
       partnerGrid.innerHTML = visible.map(shop => {
         const href = bkmpPartnerShopHref(shop);
         return `
-          <article class="partner-card">
+          <article class="partner-card" data-shop-id="${escapeHtml(String(shop.id))}">
             ${newShopBadge(shop.id)}
             <div class="partner-image-frame" data-bkmp-image-wrap data-empty-label="Kein Bild">
               ${shop.image ? `<img data-bkmp-img src="${shop.image}" alt="${escapeHtml(shop.name)}" loading="lazy" fetchpriority="low" decoding="async">` : '<div class="partner-image-empty">Kein Bild</div>'}

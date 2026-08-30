@@ -1857,6 +1857,27 @@ Cache-Busting `style.css?v=20260830-partnershops3` (alle 5 HTML-Dateien), `js/co
 
 **Nicht verändert (wie gefordert):** die Rotations-ENGINE selbst (Fisher-Yates-Warteschlange, No-Repeat-Logik, 200ms-Tick, Pause/Resume, Fade-Timing) - nur das Render-Ziel und die kompakte Innendarstellung wurden angepasst. PartnerShop-Daten/Links/Filterlogik/Kategorien unverändert. Shop-Karten-Gestaltung im Grid unverändert.
 
+## Zweite Nachbesserung: Spotlight größer, klickbar zur PartnerShops-Seite, Countdown-Text weg (30.08.2026, direkt danach)
+
+Nutzer-Screenshot des live laufenden globalen Spotlights + drei konkrete Wünsche: deutlich größer, Klick soll zur PartnerShops-Seite springen und den Shop dort kurz hervorheben ("kurz aufleuchtet als Orientierung wo es ist"), der Sekunden-Countdown-Text soll weg (nur der Fortschrittsbalken bleibt). **Nichts committed/gepusht.**
+
+**Größe:** alle 3 responsiven Stufen proportional vergrößert - Desktop `min(266px,42%)`→`min(340px,46%)` (Bild 42px→56px, Name-Schrift 0.84rem→1.02rem, Badge/Kategorie/Link-Schrift ebenfalls angehoben, Innenabstände großzügiger), Tablet `min(220px,44%)`→`min(272px,47%)`, Mobile-Minimalpille `min(150px,48%)`→`min(190px,50%)`. Live gemessen: 1400px→340×131px, 800px→272×158px, 390px→184×79px (vorher 266×131/220×124/150×62) - spürbar größer, ohne die Breakpoint-Logik (Bild/Ort/Kategorie verschwinden weiterhin unter 640px) anzutasten.
+
+**Kein Countdown-Text mehr:** `bkmpPartnerSpotlightUpdateProgressUi()` aktualisiert nur noch die Balkenbreite, das `#partnerSpotlightCountdown`-Element wurde aus dem Paint-Template UND aus der Update-Funktion entfernt (nicht nur per CSS versteckt - echter Wegfall, kein totes DOM). Die Fußzeile enthält jetzt nur noch den optionalen "Shop ansehen →"-Link (kein `justify-content:space-between`-Platzhalter-`<span>` mehr nötig, da nichts mehr rechts danebenstehen muss); ist kein Link vorhanden, entfällt die Fußzeile komplett (Progress-Bar bleibt trotzdem immer sichtbar, sitzt als eigenständiges Element darunter).
+
+**Klick-Navigation** (`bkmpPartnerSpotlightGoToShop(shop)`, neu, `js/core/bkmp-site.js`): ein Klick-Listener auf `partnerSpotlightEl` (im selben "nur beim allerersten Aufbau"-Block wie die bestehenden `mouseenter`/`mouseleave`-Listener ergänzt - kein doppeltes Anhängen bei Re-Paints) prüft zuerst `e.target.closest('.partner-spotlight-link')` - trifft der Klick den externen "Shop ansehen"-Link selbst, wird sofort `return`et (der Link öffnet unverändert normal in einem neuen Tab, keine Konkurrenz-Navigation). Bei jedem anderen Klick auf die Karte: der echte PartnerShops-Tab-Button wird über `document.querySelector('.tab-btn[aria-controls="panel-partners"]')` gefunden (nie `goTo()` direkt aufgerufen, robust gegen eine künftige Umsortierung der Tabs - `aria-controls` wird bereits ganz am Anfang des Scripts beim Tab-Setup gesetzt) und geklickt, Kategorie-Filter wird auf "Alle" zurückgesetzt und die Suche geleert (sonst wäre der Shop in der aktuell gefilterten Ansicht evtl. gar nicht auffindbar), `renderPartnerShops()` läuft danach synchron neu. Per `requestAnimationFrame` wird die passende Shopkarte über ein neu ergänztes `data-shop-id`-Attribut (`.partner-card`, vorher nicht vorhanden) gefunden, per `scrollIntoView({behavior:'smooth', block:'center'})` in den sichtbaren Bereich gescrollt und bekommt für ~1,6s die neue `.partner-card-highlight`-Klasse (violetter Glow-Puls per `@keyframes partnerCardHighlightFlash`, automatisch von der bereits bestehenden globalen `prefers-reduced-motion`-Kollektivregel erfasst, keine eigene Ausnahme nötig).
+
+**Verifiziert (Browser, echte Produktionsdaten):**
+- Klick auf die Spotlight-Karte (Badge-Bereich) wechselt korrekt zu `panel-partners`, findet die richtige Karte per `data-shop-id`, setzt `.partner-card-highlight`, scrollt sie sichtbar in den Viewport, setzt Kategorie-Filter korrekt auf "Alle" und Suchfeld korrekt leer.
+- Der Highlight verschwindet nach der erwarteten Zeit wieder von selbst (0 markierte Karten nach dem Timeout).
+- Klick DIREKT auf den "Shop ansehen"-Link (Navigation testweise per capturing `preventDefault()` unterbunden, um den Test-Tab nicht zu verlassen) löst die interne Navigation nachweislich NICHT aus - aktives Panel bleibt unverändert `panel-main`, `href`/`target="_blank"` des Links selbst bleiben unangetastet funktionsfähig.
+- Singleton-Rotation bleibt durch einen Spotlight-Klick unangetastet: gleiche Timer-ID, gleicher aktuell gezeigter Shop, ungestört weiterlaufende Restzeit vor/nach dem Klick (kein Reset, kein zweiter Timer).
+- Alle 3 responsiven Größenstufen erneut mit den neuen Maßen bestätigt, kein horizontaler Overflow. Konsole fehlerfrei. `node --check js/core/bkmp-site.js` sauber, CSS-Klammerbalance ausgeglichen (3538=3538), kein Stern-Schrägstrich-Kommentarbug (präventiv erneut geprüft).
+
+Cache-Busting `style.css?v=20260830-partnershops4` (alle 5 HTML-Dateien), `js/core/bkmp-site.js?v=20260830-partnershops3` (index.html).
+
+**Nicht verändert (wie gefordert):** Rotations-Engine (Warteschlange/No-Repeat/Pause-Resume/Fade) selbst, PartnerShop-Daten/Links/Filterlogik/Kategorien, das Shop-Grid-Kartendesign (nur um `data-shop-id` + die neue Highlight-Klasse ergänzt, sonst unverändert).
+
 ## Bestehende Konventionen (weiter gültig)
 
 - **Changelog, zweigleisig (ab 26.07.2026), IMMER automatisch, ohne dass der Nutzer danach fragen muss:**
