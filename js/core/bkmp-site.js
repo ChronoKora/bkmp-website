@@ -2778,7 +2778,13 @@
     const partnerHeroStatsEl = document.getElementById('partnerHeroStats');
     const partnerEmptyStateEl = document.getElementById('partnerEmptyState');
     const partnerSearchInput = document.getElementById('partnerSearch');
-    const partnerSpotlightEl = document.getElementById('partnerSpotlight');
+    /* Zeigt jetzt auf den GLOBALEN Spotlight im /sw-bk-Bannerkopf (lebt
+       einmalig in index.html ausserhalb von .panels-viewport, siehe dortiger
+       Kommentar) statt eines Seiten-lokalen Elements - dieselbe eine
+       Rotation ist dadurch auf JEDEM Tab sichtbar, ohne dass beim
+       Tab-Wechsel ein zweiter Timer entsteht (30.08.2026, Nutzerwunsch
+       "Spotlight global statt nur auf PartnerShops"). */
+    const partnerSpotlightEl = document.getElementById('globalPartnerSpotlight');
     let activePartnerCategory = 'Alle';
     let partnerSearchQuery = '';
 
@@ -2794,17 +2800,29 @@
       return haystack.includes(query);
     }
 
-    /* ---------------- Shop im Spotlight (Auftrag Abschnitt 2) ----------------
-       Eigener, von renderPartnerShops() bewusst entkoppelter Rotations-
-       Zyklus: nur EIN 200ms-Intervall aktualisiert ausschliesslich die
-       Fortschrittsleiste/den Countdown-Text (2 kleine DOM-Schreibvorgaenge),
-       ein voller Shop-Wechsel (Fade + Inhalt neu aufbauen) passiert nur alle
-       60s bzw. beim allerersten Laden - die grosse Shopliste/das Grid werden
-       davon nie beruehrt (Auftrag Abschnitt 11). Bewusst VOR renderPartner-
-       Shops() definiert (nicht nur textuell, sondern wirklich zuerst
-       AUSGEFUEHRT) - renderPartnerShops() ruft sich selbst weiter unten
-       sofort synchron auf und braucht diesen ganzen Block (inkl. der let-
-       Variablen, die sonst bis zu ihrer eigenen Zeile im "Temporal Dead
+    /* ---------------- Shop im Spotlight (jetzt GLOBAL, 30.08.2026 Nachbesserung) ----------------
+       Ursprünglich (erste Fassung desselben Tages) eine grosse Karte in der
+       PartnerShops-Hero - auf Nutzerwunsch stattdessen in den globalen
+       /sw-bk-Bannerkopf verschoben (index.html, `#globalPartnerSpotlight`,
+       lebt AUSSERHALB von .panels-viewport, also auf JEDEM Tab sichtbar).
+       Die Rotationslogik selbst ist UNVERAENDERT dieselbe wie vorher - nur
+       das Render-Ziel (`partnerSpotlightEl`) wurde umgehaengt. Eigener, von
+       renderPartnerShops() bewusst entkoppelter Rotations-Zyklus: nur EIN
+       200ms-Intervall aktualisiert ausschliesslich die Fortschrittsleiste/
+       den Countdown-Text (2 kleine DOM-Schreibvorgaenge), ein voller Shop-
+       Wechsel (Fade + Inhalt neu aufbauen) passiert nur alle 60s bzw. beim
+       allerersten Laden - die grosse Shopliste/das Grid werden davon nie
+       beruehrt (Auftrag Abschnitt 11). Da `#globalPartnerSpotlight` (wie das
+       gesamte `<header class="hero hero-banner-wrap">`) nur EIN EINZIGES Mal
+       im gesamten Dokument existiert (nicht pro Panel dupliziert - alle 10
+       Tabs teilen sich denselben, immer im DOM vorhandenen Bannerkopf), gibt
+       es strukturell auch nur EINEN Timer/EINE Rotation fuer die ganze
+       Seite - ein Tab-Wechsel kann dadurch nie einen zweiten Timer erzeugen,
+       ohne dass dafuer eine zusaetzliche Sicherung noetig waere. Bewusst VOR
+       renderPartnerShops() definiert (nicht nur textuell, sondern wirklich
+       zuerst AUSGEFUEHRT) - renderPartnerShops() ruft sich selbst weiter
+       unten sofort synchron auf und braucht diesen ganzen Block (inkl. der
+       let-Variablen, die sonst bis zu ihrer eigenen Zeile im "Temporal Dead
        Zone"-Zustand waeren) schon beim allerersten Durchlauf. */
     const BKMP_PARTNER_SPOTLIGHT_DURATION_MS = 60000;
     let bkmpPartnerSpotlightShops = [];
@@ -2842,6 +2860,12 @@
       const nextId = bkmpPartnerSpotlightQueue.shift();
       return bkmpPartnerSpotlightShops.find(s => s.id === nextId) || bkmpPartnerSpotlightShops[0];
     }
+    /* Kompaktes Anzeigen-Layout (Nachbesserung 30.08.2026 - Spotlight lebt
+       jetzt im /sw-bk-Bannerkopf statt einer grossen Seiten-Karte): Badge
+       oben, dann Bild+Name/Ort/Kategorie in einer Zeile, dann Link+Countdown
+       in einer Fusszeile, dann ein duenner Fortschrittsbalken - bewusst OHNE
+       Beschreibung/Kontakt (keine erfundenen Daten, nur nicht mehr gerendert
+       - beide Felder bleiben unveraendert in `shop` selbst erhalten). */
     function bkmpPartnerSpotlightPaint(shop) {
       const wrap = partnerSpotlightEl.querySelector('.partner-spotlight-inner');
       if (!wrap) return;
@@ -2851,19 +2875,21 @@
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.9 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l7.1-1.01L12 2Z"/></svg>
           Shop im Spotlight
         </div>
-        <div class="partner-spotlight-image-frame" data-bkmp-image-wrap data-empty-label="Kein Bild">
-          ${shop.image ? `<img data-bkmp-img src="${shop.image}" alt="${escapeHtml(shop.name)}" loading="eager" decoding="async">` : '<div class="partner-image-empty">Kein Bild</div>'}
+        <div class="partner-spotlight-main-row">
+          <div class="partner-spotlight-image-frame" data-bkmp-image-wrap data-empty-label="Kein Bild">
+            ${shop.image ? `<img data-bkmp-img src="${shop.image}" alt="${escapeHtml(shop.name)}" loading="eager" decoding="async">` : '<div class="partner-image-empty">Kein Bild</div>'}
+          </div>
+          <div class="partner-spotlight-body">
+            <h3>${escapeHtml(shop.name)}</h3>
+            ${shop.location ? `<div class="partner-location">${escapeHtml(shop.location)}</div>` : ''}
+            <span class="partner-category">${escapeHtml(shop.category || 'Partner')}</span>
+          </div>
         </div>
-        <div class="partner-spotlight-body">
-          <span class="partner-category">${escapeHtml(shop.category || 'Partner')}</span>
-          <h3>${escapeHtml(shop.name)}</h3>
-          ${shop.location ? `<div class="partner-location">${escapeHtml(shop.location)}</div>` : ''}
-          ${shop.description ? `<p>${escapeHtml(shop.description)}</p>` : ''}
-          ${shop.contact ? `<div class="partner-spotlight-contact">${escapeHtml(shop.contact)}</div>` : ''}
-          ${href ? `<a class="partner-spotlight-link" href="${href}" target="_blank" rel="noopener">Shop ansehen →</a>` : ''}
+        <div class="partner-spotlight-footer">
+          ${href ? `<a class="partner-spotlight-link" href="${href}" target="_blank" rel="noopener">Shop ansehen →</a>` : '<span></span>'}
+          <span class="partner-spotlight-countdown" id="partnerSpotlightCountdown"></span>
         </div>
-        <div class="partner-spotlight-progress"><div class="partner-spotlight-progress-fill" id="partnerSpotlightProgressFill"></div></div>
-        <div class="partner-spotlight-countdown" id="partnerSpotlightCountdown"></div>`;
+        <div class="partner-spotlight-progress"><div class="partner-spotlight-progress-fill" id="partnerSpotlightProgressFill"></div></div>`;
       if (window.bkmpEnhanceImages) window.bkmpEnhanceImages(wrap);
       wrap.classList.remove('is-fading');
     }
@@ -3022,13 +3048,18 @@
       });
       bkmpMarkAllSeen('partnershops', allShops.map(s => s.id));
 
-      /* Spotlight bewusst NICHT hier neu AUFGEBAUT, nur mit der aktuellen
-         Shopliste versorgt - er haengt an einem eigenen, von Filter/Suche
-         komplett unabhaengigen Rotations-Zyklus (Auftrag Abschnitt 2: soll
-         JEDEM Partner regelmaessig Sichtbarkeit geben, nicht nur den gerade
-         gefilterten; Abschnitt 11: "keine unnoetigen Re-Renders durch den
-         Timer" - ein Suche-Tastendruck darf die laufende Spotlight-Rotation
-         nicht unterbrechen). */
+      /* Der GLOBALE Spotlight im Bannerkopf wird bewusst NICHT hier neu
+         AUFGEBAUT, nur mit der aktuellen Shopliste versorgt - er haengt an
+         einem eigenen, von Filter/Suche komplett unabhaengigen Rotations-
+         Zyklus (soll JEDEM Partner regelmaessig Sichtbarkeit geben, nicht
+         nur den auf DIESER Seite gerade gefilterten; "keine unnoetigen
+         Re-Renders durch den Timer" - ein Suche-Tastendruck darf die
+         laufende Spotlight-Rotation nicht unterbrechen). Dieser Aufruf
+         laeuft unveraendert bei jedem Laden/Realtime-Sync von
+         data.partnerShops (auch wenn die PartnerShops-Seite gerade gar
+         nicht sichtbar ist - renderPartnerShops() selbst ist nicht an das
+         aktive Panel gebunden, laeuft immer im Hintergrund mit), haelt den
+         globalen Spotlight dadurch auf JEDEM Tab aktuell. */
       bkmpUpdatePartnerSpotlightShopList(allShops);
     }
     renderPartnerShops();

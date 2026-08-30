@@ -170,7 +170,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260830-partnershops2">
+<link rel="stylesheet" href="style.css?v=20260830-partnershops3">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 <!-- Jake's Feldfahrt (07.08.2026) - eigenstaendiges Website-Easter-Egg,
      komplett getrennt vom Idle-Dorf-Spiel, siehe js/easter-eggs/jakes-
@@ -1182,6 +1182,15 @@
       <img class="hero-banner" src="assets/top-banner.png" width="1983" height="527" fetchpriority="high" decoding="async" alt="Willkommen bei Bkmp">
       <div class="bkmp-sheep-easter-egg" id="bkmpSheepEgg" role="button" tabindex="0" aria-label="Schaf antippen"></div>
       <div class="bkmp-sheep-bubble" id="bkmpSheepBubble" aria-hidden="true"><span id="bkmpSheepBubbleText"></span></div>
+      <!-- Shop im Spotlight (global, 30.08.2026) - lebt bewusst HIER (einmalig
+           im globalen Banner-Header, ausserhalb von .panels-viewport) statt
+           auf der PartnerShops-Seite, damit auf JEDEM Tab dieselbe eine
+           Instanz + derselbe eine Rotations-Timer sichtbar ist, ohne pro
+           Panel dupliziert zu werden. Siehe js/core/bkmp-site.js fuer die
+           Rotationslogik (unveraendert wiederverwendet, nur das Render-Ziel
+           wurde von der alten Seiten-lokalen #partnerSpotlight hierher
+           umgehaengt). -->
+      <div class="global-partner-spotlight" id="globalPartnerSpotlight" hidden></div>
     </picture>
   </header>
 
@@ -1297,15 +1306,14 @@
 
       <!-- ================= PartnerShops ================= -->
       <section class="panel" id="panel-partners">
-        <div class="partner-hero">
-          <div class="partner-hero-main">
-            <span class="partner-hero-eyebrow">PartnerShops</span>
-            <h2 class="panel-title partner-hero-title">Entdecke Shops auf OPSucht</h2>
-            <p class="partner-hero-subtitle">Finde Shops, Projekte und Services der Community – von Kartenshops über Verleih bis hin zu Farms und Bauteams.</p>
+        <div class="partner-hero-full">
+          <span class="partner-hero-eyebrow">PartnerShops</span>
+          <h2 class="panel-title partner-hero-title">Entdecke Shops auf OPSucht</h2>
+          <p class="partner-hero-subtitle">Finde Shops, Projekte und Services der Community – von Kartenshops über Verleih bis hin zu Farms und Bauteams.</p>
+          <div class="partner-hero-row">
             <div class="partner-hero-stats" id="partnerHeroStats"></div>
             <button class="partner-btn-primary" id="openPartnerShopForm" type="button">Shop eintragen</button>
           </div>
-          <div class="partner-spotlight" id="partnerSpotlight"></div>
         </div>
         <div class="partner-toolbar">
           <div class="partner-filter" id="partnerFilter"></div>
@@ -1775,7 +1783,7 @@
        bkmp-idle-*.js ab, nur die REIHENFOLGE relativ zu bkmp-site.js zaehlt
        hier. -->
   <script src="js/easter-eggs/jakes-feldfahrt.js?v=20260807-jakesfeldfahrt8" defer></script>
-  <script src="js/core/bkmp-site.js?v=20260830-partnershops1" defer></script>
+  <script src="js/core/bkmp-site.js?v=20260830-partnershops2" defer></script>
   <!-- Feedback-/Status-Board Stufe 1 (20.07.2026) - eigenstaendig, reine
        lokale Testdaten, siehe Datei-Kopf-Kommentar. -->
   <script src="js/ui/bkmp-feedback-board.js?v=20260721-stufe34" defer></script>
