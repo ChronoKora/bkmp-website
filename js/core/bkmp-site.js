@@ -3149,6 +3149,273 @@
       });
     }
 
+    /* ============================================================
+       Shardhaendler - Heute (GLOBAL im /sw-bk-Bannerkopf, 31.08.2026)
+       Direkt unter dem PartnerShop-Spotlight (siehe oben) - gleiches
+       Architekturprinzip: lebt EINMAL im globalen Header
+       (#globalShardMerchant, index.html, Kind von
+       .global-header-side-stack), dadurch auf JEDEM Tab sichtbar, EIN
+       gemeinsamer Timer, keine Pro-Seiten-Duplizierung, komplett
+       unabhaengig von `data`/Supabase (eigene Server-Proxys).
+
+       Datenquelle: api/opsucht/merchant.js + api/opsucht/market.js -
+       lesen die OEFFENTLICHEN OPSUCHT-APIs server-seitig (CORS-sicher,
+       Vercel-Edge-Cache via Cache-Control: s-maxage=45). Client-seitig
+       zusaetzlich ein eigener `checkedAt`-Cache-Waechter (identisches
+       Muster wie refreshStreamerLiveStatus() weiter oben) - verhindert
+       echte Doppel-Anfragen, wenn die Funktion aus mehreren Stellen
+       (Erstladung + periodischer Timer) aufgerufen wird. ============================================================ */
+    const BKMP_SHARD_REFRESH_MS = 60000;
+    const shardMerchantEl = document.getElementById('globalShardMerchant');
+    const shardMerchantMobileSlot = document.getElementById('globalShardMerchantMobileSlot');
+    const shardMerchantHomeStack = document.querySelector('.global-header-side-stack');
+    /* Echter, per Live-Messung gefundener Bug (31.08.2026, siehe
+       CLAUDE.md fuer die volle Herleitung inkl. aller gemessenen Werte):
+       der Shardhaendler passt bei mittleren/schmalen Fensterbreiten -
+       selbst minimal komprimiert und sogar bei echten Handy-Breiten wie
+       320px - NICHT mehr als Banner-Overlay unter das Spotlight, ohne die
+       Tab-Navigation darunter zu ueberlappen (der Banner ist dort durch
+       sein festes Seitenverhaeltnis zu kurz, das Spotlight allein
+       beansprucht dort schon fast den gesamten verfuegbaren Platz). Ab
+       <=900px wird der Shardhaendler deshalb per JS aus dem Banner-Overlay
+       in #globalShardMerchantMobileSlot umgehaengt (echte volle
+       Blockbreite in normalem Dokumentfluss zwischen Banner und
+       Tab-Navigation) - identisches "Portal"-Prinzip wie bereits an
+       mehreren anderen Stellen in diesem Projekt fuer denselben Bugtyp
+       verwendet (z.B. bkmpProtoChudEscapeToOverlay). `appendChild()` auf
+       ein bereits im DOM vorhandenes Element VERSCHIEBT es nur (keine
+       Zerstoerung, keine verlorenen Event-Listener/keine Neuerzeugung -
+       `shardMerchantEl` bleibt dieselbe Referenz, jede andere Funktion in
+       diesem Block funktioniert dadurch unveraendert weiter, unabhaengig
+       davon, wo das Element gerade lebt). matchMedia() statt eines
+       eigenen resize-Listeners - feuert nur, wenn die 900px-Schwelle
+       tatsaechlich ueber-/unterschritten wird, nicht bei jedem Pixel. */
+    const bkmpShardMerchantMobileQuery = window.matchMedia('(max-width: 900px)');
+    function bkmpShardMerchantSyncPlacement() {
+      if (!shardMerchantEl || !shardMerchantMobileSlot || !shardMerchantHomeStack) return;
+      if (bkmpShardMerchantMobileQuery.matches) {
+        if (shardMerchantEl.parentElement !== shardMerchantMobileSlot) shardMerchantMobileSlot.appendChild(shardMerchantEl);
+      } else if (shardMerchantEl.parentElement !== shardMerchantHomeStack) {
+        shardMerchantHomeStack.appendChild(shardMerchantEl);
+      }
+    }
+    bkmpShardMerchantSyncPlacement();
+    if (bkmpShardMerchantMobileQuery.addEventListener) {
+      bkmpShardMerchantMobileQuery.addEventListener('change', bkmpShardMerchantSyncPlacement);
+    } else if (bkmpShardMerchantMobileQuery.addListener) {
+      bkmpShardMerchantMobileQuery.addListener(bkmpShardMerchantSyncPlacement); // aeltere Browser
+    }
+    /* Zusaetzliches, debounced resize-Sicherheitsnetz (identisches Prinzip
+       wie an mehreren anderen Stellen dieses Projekts fuer denselben
+       Bugtyp - z.B. bkmpIdleSyncTabOverflowForViewport) - matchMedia()s
+       eigenes change-Event ist in echten Browsern zuverlaessig, deckt
+       aber ab, falls es aus irgendeinem Grund doch nicht feuert.
+       bkmpShardMerchantSyncPlacement() selbst ist ein reines appendChild()
+       (keine DOM-Zerstoerung), daher jederzeit gefahrlos wiederholbar. */
+    let bkmpShardMerchantResizeTimer = null;
+    window.addEventListener('resize', () => {
+      clearTimeout(bkmpShardMerchantResizeTimer);
+      bkmpShardMerchantResizeTimer = setTimeout(bkmpShardMerchantSyncPlacement, 200);
+    });
+
+    let bkmpShardMerchantResources = [];
+    let bkmpShardMerchantPrices = {};
+    let bkmpShardMerchantExpandedId = null;
+    let bkmpShardMerchantLastError = null;
+    let bkmpShardMerchantCheckedAt = 0;
+    /* Zuletzt eingegebener Anzahl-Text je Ressourcen-Id - bleibt ueber
+       einen periodischen Neu-Aufbau der Liste (alle 60s) hinweg
+       erhalten, damit ein gerade offener Rechner nicht mitten in der
+       Eingabe zurueckgesetzt wird. */
+    const bkmpShardMerchantQtyDrafts = {};
+
+    function bkmpShardFormatShards(value) {
+      return new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+    }
+    function bkmpShardFormatMoney(value) {
+      return '$' + new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 }).format(value);
+    }
+    function bkmpShardFormatPct(value) {
+      const sign = value > 0 ? '+' : '';
+      return sign + new Intl.NumberFormat('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value) + ' %';
+    }
+
+    /* Reine Rechenfunktion, von Render UND Live-Update (Tastatureingabe)
+       gemeinsam genutzt - keine doppelte Formel. Leeres/ungueltiges Feld
+       liefert ueberall `null` statt NaN (Auftrag Abschnitt 7: "keine
+       kaputte NaN-Anzeige"). */
+    function bkmpShardMerchantComputeCalc(res) {
+      const draft = bkmpShardMerchantQtyDrafts[res.id] || '';
+      const qty = draft ? Number(String(draft).replace(',', '.')) : NaN;
+      const validQty = Number.isFinite(qty) && qty > 0;
+      const totalShards = validQty ? qty * res.exchangeRate : null;
+      const price = res.marketId ? bkmpShardMerchantPrices[res.marketId] : null;
+      const hasMarket = Boolean(price && typeof price.sellPrice === 'number');
+      const marketValue = validQty && hasMarket ? qty * price.sellPrice : null;
+      const perShardValue = totalShards && marketValue ? marketValue / totalShards : null;
+      return { totalShards, marketValue, perShardValue, hasMarket };
+    }
+
+    function bkmpShardMerchantResourceRowHtml(res) {
+      const isOpen = bkmpShardMerchantExpandedId === res.id;
+      const pctCls = res.changePct == null ? 'is-flat' : res.changePct > 0.05 ? 'is-pos' : res.changePct < -0.05 ? 'is-neg' : 'is-flat';
+      const pctText = res.changePct == null ? '–' : bkmpShardFormatPct(res.changePct);
+      const calc = bkmpShardMerchantComputeCalc(res);
+      const draft = bkmpShardMerchantQtyDrafts[res.id] || '';
+      return `
+        <div class="shard-merchant-row${isOpen ? ' is-open' : ''}" data-resource-id="${escapeHtml(res.id)}">
+          <button class="shard-merchant-row-head" type="button" data-shard-toggle="${escapeHtml(res.id)}" aria-expanded="${isOpen ? 'true' : 'false'}">
+            <span class="shard-merchant-row-name">${escapeHtml(res.name)}</span>
+            <span class="shard-merchant-row-rate">${bkmpShardFormatShards(res.exchangeRate)} Shards</span>
+            <span class="shard-merchant-row-pct ${pctCls}">${pctText}</span>
+          </button>
+          <div class="shard-merchant-row-body">
+            <div class="shard-merchant-row-body-inner">
+              <div class="shard-merchant-calc-title">${escapeHtml(res.name)}</div>
+              <div class="shard-merchant-calc-rate">${bkmpShardFormatShards(res.exchangeRate)} Shards / Stück</div>
+              <label class="shard-merchant-calc-label" for="shardQty-${escapeHtml(res.id)}">Anzahl</label>
+              <input class="shard-merchant-calc-input" type="number" min="1" step="1" inputmode="numeric" id="shardQty-${escapeHtml(res.id)}" data-shard-qty="${escapeHtml(res.id)}" value="${escapeHtml(draft)}" placeholder="0">
+              <div class="shard-merchant-calc-result">
+                <span>Gesamt</span>
+                <strong data-shard-total="${escapeHtml(res.id)}">${calc.totalShards != null ? bkmpShardFormatShards(calc.totalShards) + ' Shards' : '–'}</strong>
+              </div>
+              ${res.marketId ? `
+                <div class="shard-merchant-calc-result">
+                  <span>Marktwert</span>
+                  <strong data-shard-marketvalue="${escapeHtml(res.id)}">${calc.hasMarket ? (calc.marketValue != null ? bkmpShardFormatMoney(calc.marketValue) : '–') : 'nicht verfügbar'}</strong>
+                </div>
+                <div class="shard-merchant-calc-note" data-shard-pershare="${escapeHtml(res.id)}">${calc.perShardValue != null ? `1 Shard ≈ ${bkmpShardFormatMoney(calc.perShardValue)} Materialwert` : ''}</div>
+              ` : `
+                <div class="shard-merchant-calc-note">Kein Marktpreis verfügbar (Shardhändler-exklusiv)</div>
+              `}
+            </div>
+          </div>
+        </div>`;
+    }
+
+    function bkmpShardMerchantRender() {
+      if (!shardMerchantEl) return;
+      if (!bkmpShardMerchantResources.length) {
+        if (bkmpShardMerchantLastError) {
+          shardMerchantEl.hidden = false;
+          shardMerchantEl.innerHTML = `
+            <div class="shard-merchant-badge">Shardhändler · Heute</div>
+            <div class="shard-merchant-error">Shardkurse derzeit nicht verfügbar</div>`;
+        } else {
+          shardMerchantEl.hidden = true;
+          shardMerchantEl.innerHTML = '';
+        }
+        return;
+      }
+      shardMerchantEl.hidden = false;
+      shardMerchantEl.innerHTML = `
+        <div class="shard-merchant-badge">Shardhändler · Heute</div>
+        <div class="shard-merchant-list">
+          ${bkmpShardMerchantResources.map(bkmpShardMerchantResourceRowHtml).join('')}
+        </div>`;
+    }
+
+    /* Live-Neuberechnung waehrend der Eingabe (Auftrag Abschnitt 7/15:
+       "live waehrend der Eingabe", "darf nicht komplette Seite neu
+       rendern") - aktualisiert NUR die drei Ausgabe-Elemente der
+       betroffenen Zeile direkt per textContent, OHNE innerHTML neu
+       aufzubauen - das <input>-Element (inkl. Fokus/Cursor-Position)
+       bleibt dadurch waehrend des Tippens komplett unangetastet. */
+    function bkmpShardMerchantUpdateCalcOutputs(id) {
+      const res = bkmpShardMerchantResources.find(r => r.id === id);
+      if (!res || !shardMerchantEl) return;
+      const calc = bkmpShardMerchantComputeCalc(res);
+      const totalEl = shardMerchantEl.querySelector('[data-shard-total="' + id + '"]');
+      if (totalEl) totalEl.textContent = calc.totalShards != null ? bkmpShardFormatShards(calc.totalShards) + ' Shards' : '–';
+      const marketEl = shardMerchantEl.querySelector('[data-shard-marketvalue="' + id + '"]');
+      if (marketEl) marketEl.textContent = calc.hasMarket ? (calc.marketValue != null ? bkmpShardFormatMoney(calc.marketValue) : '–') : 'nicht verfügbar';
+      const noteEl = shardMerchantEl.querySelector('[data-shard-pershare="' + id + '"]');
+      if (noteEl) noteEl.textContent = calc.perShardValue != null ? `1 Shard ≈ ${bkmpShardFormatMoney(calc.perShardValue)} Materialwert` : '';
+    }
+
+    async function bkmpShardMerchantFetchMerchant() {
+      try {
+        const res = await fetch('/api/opsucht/merchant', { cache: 'no-store' });
+        const body = await res.json().catch(() => null);
+        if (!body || !body.ok || !Array.isArray(body.resources)) {
+          bkmpShardMerchantLastError = 'merchant';
+          return;
+        }
+        bkmpShardMerchantResources = body.resources;
+        bkmpShardMerchantLastError = null;
+      } catch (e) {
+        bkmpShardMerchantLastError = 'merchant';
+      }
+    }
+
+    async function bkmpShardMerchantFetchMarket() {
+      const ids = [...new Set(bkmpShardMerchantResources.map(r => r.marketId).filter(Boolean))];
+      if (!ids.length) return;
+      try {
+        const res = await fetch('/api/opsucht/market?ids=' + encodeURIComponent(ids.join(',')), { cache: 'no-store' });
+        const body = await res.json().catch(() => null);
+        if (body && body.ok && body.prices) bkmpShardMerchantPrices = body.prices;
+      } catch (e) {
+        /* Marktpreise sind ergaenzend (Auftrag Abschnitt 11: "Website darf
+           nicht kaputtgehen") - die Shardkurse selbst bleiben bei einem
+           Marktpreis-Fehler trotzdem sichtbar, nur ohne Marktwert-Zeile. */
+      }
+    }
+
+    async function bkmpShardMerchantRefresh(force) {
+      const now = Date.now();
+      if (!force && now - bkmpShardMerchantCheckedAt < BKMP_SHARD_REFRESH_MS) return;
+      bkmpShardMerchantCheckedAt = now;
+      await bkmpShardMerchantFetchMerchant();
+      await bkmpShardMerchantFetchMarket();
+      bkmpShardMerchantRender();
+    }
+
+    if (shardMerchantEl) {
+      /* Klick auf eine Ressourcenzeile -> Rechner auf-/zuklappen. Reiner
+         classList-Toggle (KEIN Neu-Rendern) - der Rechner-Inhalt jeder
+         Ressource lebt bereits unveraendert im DOM (siehe
+         .shard-merchant-row-body in style.css), dadurch funktioniert die
+         sanfte CSS-Auf-/Zuklapp-Animation und Eingaben bleiben beim
+         Wechseln der aktiven Ressource fuer die ANDEREN Ressourcen
+         erhalten. Immer nur EINE Ressource gleichzeitig offen (Auftrag
+         Abschnitt 5). */
+      shardMerchantEl.addEventListener('click', e => {
+        const toggleBtn = e.target.closest('[data-shard-toggle]');
+        if (!toggleBtn) return;
+        const id = toggleBtn.dataset.shardToggle;
+        const wasOpen = bkmpShardMerchantExpandedId === id;
+        if (bkmpShardMerchantExpandedId && bkmpShardMerchantExpandedId !== id) {
+          const prevRow = shardMerchantEl.querySelector('.shard-merchant-row[data-resource-id="' + bkmpShardMerchantExpandedId + '"]');
+          if (prevRow) {
+            prevRow.classList.remove('is-open');
+            const prevBtn = prevRow.querySelector('[data-shard-toggle]');
+            if (prevBtn) prevBtn.setAttribute('aria-expanded', 'false');
+          }
+        }
+        const row = toggleBtn.closest('.shard-merchant-row');
+        if (wasOpen) {
+          row.classList.remove('is-open');
+          toggleBtn.setAttribute('aria-expanded', 'false');
+          bkmpShardMerchantExpandedId = null;
+        } else {
+          row.classList.add('is-open');
+          toggleBtn.setAttribute('aria-expanded', 'true');
+          bkmpShardMerchantExpandedId = id;
+        }
+      });
+      shardMerchantEl.addEventListener('input', e => {
+        const qtyInput = e.target.closest('[data-shard-qty]');
+        if (!qtyInput) return;
+        const id = qtyInput.dataset.shardQty;
+        bkmpShardMerchantQtyDrafts[id] = qtyInput.value;
+        bkmpShardMerchantUpdateCalcOutputs(id);
+      });
+    }
+
+    bkmpShardMerchantRefresh(true);
+    window.setInterval(() => bkmpShardMerchantRefresh(false), BKMP_SHARD_REFRESH_MS);
+
     const cardsaleGrid = document.getElementById('cardsaleGrid');
     function renderCardSales() {
       if (!cardsaleGrid) return;

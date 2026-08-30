@@ -170,7 +170,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260830-partnershops4">
+<link rel="stylesheet" href="style.css?v=20260831-shardmerchant7">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 <!-- Jake's Feldfahrt (07.08.2026) - eigenstaendiges Website-Easter-Egg,
      komplett getrennt vom Idle-Dorf-Spiel, siehe js/easter-eggs/jakes-
@@ -1182,16 +1182,34 @@
       <img class="hero-banner" src="assets/top-banner.png" width="1983" height="527" fetchpriority="high" decoding="async" alt="Willkommen bei Bkmp">
       <div class="bkmp-sheep-easter-egg" id="bkmpSheepEgg" role="button" tabindex="0" aria-label="Schaf antippen"></div>
       <div class="bkmp-sheep-bubble" id="bkmpSheepBubble" aria-hidden="true"><span id="bkmpSheepBubbleText"></span></div>
-      <!-- Shop im Spotlight (global, 30.08.2026) - lebt bewusst HIER (einmalig
-           im globalen Banner-Header, ausserhalb von .panels-viewport) statt
-           auf der PartnerShops-Seite, damit auf JEDEM Tab dieselbe eine
-           Instanz + derselbe eine Rotations-Timer sichtbar ist, ohne pro
-           Panel dupliziert zu werden. Siehe js/core/bkmp-site.js fuer die
-           Rotationslogik (unveraendert wiederverwendet, nur das Render-Ziel
-           wurde von der alten Seiten-lokalen #partnerSpotlight hierher
-           umgehaengt). -->
-      <div class="global-partner-spotlight" id="globalPartnerSpotlight" hidden></div>
+      <!-- Rechte Kopfzeilen-Spalte (global, 30./31.08.2026) - lebt bewusst
+           HIER (einmalig im globalen Banner-Header, ausserhalb von
+           .panels-viewport), damit sie auf JEDEM Tab sichtbar ist, ohne pro
+           Panel dupliziert zu werden. Stapelt "Shop im Spotlight" (oben) +
+           "Shardhaendler - Heute" (direkt darunter, 31.08.2026) als
+           gemeinsame Flex-Spalte, damit sich beide unabhaengig von ihrer
+           tatsaechlichen Hoehe (Rechner klappt auf) korrekt stapeln, ohne
+           manuell berechnete top-Offsets. Siehe js/core/bkmp-site.js fuer
+           beide Rotations-/Ladelogiken. -->
+      <div class="global-header-side-stack">
+        <div class="global-partner-spotlight" id="globalPartnerSpotlight" hidden></div>
+        <div class="global-shard-merchant" id="globalShardMerchant" hidden></div>
+      </div>
     </picture>
+    <!-- Echter, per Live-Messung gefundener Bug (31.08.2026, siehe
+         CLAUDE.md): der Shardhaendler passt bei mittleren/schmalen
+         Fensterbreiten (bis hinunter zu echten Handy-Breiten) selbst
+         minimal komprimiert NICHT mehr als Banner-Overlay unter das
+         Spotlight - der Banner ist dort durch sein festes Seitenverhaeltnis
+         zu kurz, das Spotlight allein beansprucht dort schon fast den
+         gesamten verfuegbaren Platz. Ab <=900px wird der Shardhaendler
+         deshalb per JS (bkmpShardMerchantSyncPlacement(), bkmp-site.js -
+         identisches "Portal"-Prinzip wie bereits an mehreren Stellen in
+         diesem Projekt fuer denselben Bugtyp, z.B.
+         bkmpProtoChudEscapeToOverlay) aus dem Banner-Overlay HIERHER
+         umgehaengt - echte, volle Blockbreite in normalem Dokumentfluss
+         zwischen Banner und Tab-Navigation, kein Overlay-Zwang mehr. -->
+    <div class="global-shard-merchant-mobile-slot" id="globalShardMerchantMobileSlot"></div>
   </header>
 
   <nav class="topbar-wrap">
@@ -1783,7 +1801,7 @@
        bkmp-idle-*.js ab, nur die REIHENFOLGE relativ zu bkmp-site.js zaehlt
        hier. -->
   <script src="js/easter-eggs/jakes-feldfahrt.js?v=20260807-jakesfeldfahrt8" defer></script>
-  <script src="js/core/bkmp-site.js?v=20260830-partnershops4" defer></script>
+  <script src="js/core/bkmp-site.js?v=20260831-shardmerchant3" defer></script>
   <!-- Feedback-/Status-Board Stufe 1 (20.07.2026) - eigenstaendig, reine
        lokale Testdaten, siehe Datei-Kopf-Kommentar. -->
   <script src="js/ui/bkmp-feedback-board.js?v=20260721-stufe34" defer></script>
