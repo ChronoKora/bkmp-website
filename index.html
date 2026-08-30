@@ -95,6 +95,29 @@
       root.style.setProperty('--paper', 'color-mix(in srgb, ' + savedAccent + ' 14%, ' + paperBase.p + ')');
       root.style.setProperty('--paper-2', 'color-mix(in srgb, ' + savedAccent + ' 18%, ' + paperBase.p2 + ')');
       root.style.setProperty('--paper-3', 'color-mix(in srgb, ' + savedAccent + ' 22%, ' + paperBase.p3 + ')');
+      /* 30.08.2026 (Nutzer-Screenshot: Auszahlung-Prank-Knopf bei dunkler
+         Akzentfarbe fast unlesbar) - dieses Skript ist eine eigenstaendige,
+         VOR app.js laufende Kopie derselben Logik wie
+         bkmpApplyAccentForCurrentTheme() (Flash-Vermeidung: gespeicherte
+         Akzentfarbe muss VOR dem ersten Rendern stehen, app.js selbst laedt
+         defer/spaeter). app.js's Funktion bekam bereits ein dynamisches
+         --accent-ink (heller Text bei dunkler Akzentfarbe statt fest
+         dunklem Text) - WIRD ABER AUSSERHALB eines Theme-Wechsels NIE
+         automatisch erneut aufgerufen, der allererste (fuer die meisten
+         Besuche einzige) Seitenaufruf haengt deshalb komplett an DIESEM
+         fruehen Skript. Ohne dieselbe Berechnung auch hier bleibt
+         --accent-ink beim CSS-Standardwert (fest dunkel) haengen, obwohl
+         --gold bereits dunkel ist - dunkler Text auf dunkler Flaeche.
+         Dieselbe YIQ-Naeherung wie in app.js, absichtlich dupliziert (dieses
+         Skript muss lauffaehig sein, BEVOR app.js ueberhaupt geladen ist). */
+      var accentBrightness = (function (hex) {
+        var m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+        if (!m) return 255;
+        var n = parseInt(m[1], 16);
+        var r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+        return (r * 299 + g * 587 + b * 114) / 1000;
+      })(savedAccent);
+      root.style.setProperty('--accent-ink', accentBrightness < 128 ? '#F5F3ED' : '#0A0A0F');
     }
   })();
 </script>

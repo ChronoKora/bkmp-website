@@ -11,6 +11,10 @@ Automatisch von Claude Code gepflegt: **nach jeder Code-/SQL-Änderung kommt hie
 
 ---
 
+## 2026-08-30 (Echter zweiter Herd desselben Kontrast-Bugs gefunden)
+
+- **[Fix]** Nutzer-Screenshot: der "Auszahlung beantragen"-Prank-Knopf war bei dunkler Akzentfarbe erneut fast unlesbar - trotz des bereits gefixten `--accent-ink`. Root Cause: `index.html` hat eine EIGENSTÄNDIGE, VOR `app.js` laufende Kopie derselben Logik (verhindert einen Farb-Blitz beim Laden, da `app.js` erst später/deferred lädt) - diese frühe Kopie kannte die neue `--accent-ink`-Helligkeitsberechnung nicht, und `bkmpApplyAccentForCurrentTheme()` (app.js) wird außerhalb eines expliziten Theme-Wechsels NIE automatisch erneut aufgerufen. Der allererste (für die meisten Besuche einzige) Seitenaufruf hing dadurch komplett an der alten, unvollständigen frühen Kopie. Fix: dieselbe Helligkeitsberechnung dort dupliziert (muss eigenständig lauffähig sein, bevor app.js überhaupt lädt). Live per echtem Seiten-Neuladen (kein manueller Funktionsaufruf) bestätigt: `--accent-ink` löst jetzt bereits beim allerersten Rendern korrekt auf, Button zeigt hellen statt dunklen Text. — `index.html` — 🟡 lokal
+
 ## 2026-08-30 (Investoren-Seite: Nachbesserung)
 
 - **[Änderung]** "Du willst auch investieren?"-CTA auf Nutzerwunsch an den Anfang des Investoren-Bereichs verschoben (steht jetzt vor Titel/KPI-Zeile/Highlight, vorher zwischen Highlight und den Karten). Reine Reihenfolgen-Änderung im HTML, keine CSS-/JS-Logik geändert. — `index.html` — 🟡 lokal
