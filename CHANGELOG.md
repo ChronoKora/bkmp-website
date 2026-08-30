@@ -11,6 +11,10 @@ Automatisch von Claude Code gepflegt: **nach jeder Code-/SQL-Änderung kommt hie
 
 ---
 
+## 2026-08-30 (Investoren-Seite: Nachbesserung)
+
+- **[Änderung]** "Du willst auch investieren?"-CTA auf Nutzerwunsch an den Anfang des Investoren-Bereichs verschoben (steht jetzt vor Titel/KPI-Zeile/Highlight, vorher zwischen Highlight und den Karten). Reine Reihenfolgen-Änderung im HTML, keine CSS-/JS-Logik geändert. — `index.html` — 🟡 lokal
+
 ## 2026-08-30 (Investoren-Seite: visuelles Redesign)
 
 - **[Neu]** Investoren-Seite komplett visuell aufgewertet (rein Darstellung, keine Businesslogik/Datenquellen geändert): neuer Header ("Investoren" + Subheadline) mit KPI-Zeile (Aktive Investoren/Investiertes Kapital/Aktueller Gesamtanteil/Investorengewinn gesamt, dezente Inline-SVG-Icons statt Emoji), ein Highlight-Banner (höchster Investorengewinn, ein einzelner Wert), Trennung in "Aktive Investments" (großzügigere Karten) und "Investment-Historie" (kompaktere Karten, 3-spaltig auf Desktop). Aktive Karten: Status-Badge, Laufzeit-Fortschrittsbalken (aus Start-/Enddatum berechnet), größerer "Aktueller Anteil"-Fokus, optionaler ROI-Wert unter dem Zeitraum-Gewinn, sehr dezentes Beteiligungs-Wasserzeichen im Hintergrund. Abgeschlossene Karten: kompakte Kennzahlen-Übersicht statt langem Fließtext, dezente Danke-Notiz mit Icon statt eigener Box. Optionale, rein datengetriebene Investment-Timeline am Seitenende (keine hartkodierten Namen/Daten). Rickroll-Auszahlungs-Prank + Auszahlungsbeweis-Viewer bewusst unangetastet (dieselbe Klick-Delegation, live gegengeprüft). — `index.html`, `js/core/bkmp-site.js`, `style.css` — 🟡 lokal
