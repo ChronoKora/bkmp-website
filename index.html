@@ -170,7 +170,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260830-investorredesign1">
+<link rel="stylesheet" href="style.css?v=20260830-partnershops2">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 <!-- Jake's Feldfahrt (07.08.2026) - eigenstaendiges Website-Easter-Egg,
      komplett getrennt vom Idle-Dorf-Spiel, siehe js/easter-eggs/jakes-
@@ -1297,14 +1297,32 @@
 
       <!-- ================= PartnerShops ================= -->
       <section class="panel" id="panel-partners">
-        <h2 class="panel-title">PartnerShops</h2>
-        <button class="wish-cta cardcatalog-cta" id="openPartnerShopForm" type="button">
-          <span class="wish-cta-kicker">Kostenlos &middot; Mitmachen</span>
-          <strong>Betreibst du einen Shop auf dem Server?</strong>
-          <span>Trag ihn kostenlos ein — wir schalten ihn nach kurzer Prüfung frei</span>
-        </button>
-        <div class="partner-filter" id="partnerFilter"></div>
+        <div class="partner-hero">
+          <div class="partner-hero-main">
+            <span class="partner-hero-eyebrow">PartnerShops</span>
+            <h2 class="panel-title partner-hero-title">Entdecke Shops auf OPSucht</h2>
+            <p class="partner-hero-subtitle">Finde Shops, Projekte und Services der Community – von Kartenshops über Verleih bis hin zu Farms und Bauteams.</p>
+            <div class="partner-hero-stats" id="partnerHeroStats"></div>
+            <button class="partner-btn-primary" id="openPartnerShopForm" type="button">Shop eintragen</button>
+          </div>
+          <div class="partner-spotlight" id="partnerSpotlight"></div>
+        </div>
+        <div class="partner-toolbar">
+          <div class="partner-filter" id="partnerFilter"></div>
+          <div class="partner-search-wrap">
+            <svg class="partner-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <input type="search" class="partner-search" id="partnerSearch" placeholder="Shop suchen…" aria-label="PartnerShops durchsuchen">
+          </div>
+        </div>
         <div class="partner-grid" id="partnerGrid"></div>
+        <div class="partner-empty-state" id="partnerEmptyState" hidden></div>
+        <div class="partner-bottom-cta">
+          <div class="partner-bottom-cta-text">
+            <strong>Dein Shop fehlt noch?</strong>
+            <p>Trag deinen Shop kostenlos ein und werde Teil unserer PartnerShop-Seite.</p>
+          </div>
+          <button class="partner-btn-primary" id="partnerShopCtaBottom" type="button">Shop eintragen →</button>
+        </div>
       </section>
 
       <!-- ================= Karten Verkaufen ================= -->
@@ -1757,7 +1775,7 @@
        bkmp-idle-*.js ab, nur die REIHENFOLGE relativ zu bkmp-site.js zaehlt
        hier. -->
   <script src="js/easter-eggs/jakes-feldfahrt.js?v=20260807-jakesfeldfahrt8" defer></script>
-  <script src="js/core/bkmp-site.js?v=20260830-investorredesign1" defer></script>
+  <script src="js/core/bkmp-site.js?v=20260830-partnershops1" defer></script>
   <!-- Feedback-/Status-Board Stufe 1 (20.07.2026) - eigenstaendig, reine
        lokale Testdaten, siehe Datei-Kopf-Kommentar. -->
   <script src="js/ui/bkmp-feedback-board.js?v=20260721-stufe34" defer></script>

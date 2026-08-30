@@ -2768,37 +2768,239 @@
     }
     renderAboutBlocks();
 
+    /* PartnerShops (30.08.2026, visuelles Redesign - siehe CLAUDE.md fuer
+       die vollstaendige Auftragsdoku). Datenquelle/Kategorien-Logik/Karten-
+       Feldnutzung sind UNVERAENDERT dieselbe Businesslogik wie vorher - nur
+       Hero-Statistik, Suche, Empty-State und das neue "Shop im Spotlight"
+       kamen dazu. */
     const partnerFilter = document.getElementById('partnerFilter');
     const partnerGrid = document.getElementById('partnerGrid');
+    const partnerHeroStatsEl = document.getElementById('partnerHeroStats');
+    const partnerEmptyStateEl = document.getElementById('partnerEmptyState');
+    const partnerSearchInput = document.getElementById('partnerSearch');
+    const partnerSpotlightEl = document.getElementById('partnerSpotlight');
     let activePartnerCategory = 'Alle';
+    let partnerSearchQuery = '';
+
+    function bkmpPartnerShopHref(shop) {
+      return shop.link ? (String(shop.link).startsWith('http') ? shop.link : 'https://' + shop.link) : '';
+    }
+    /* Suche (Auftrag Abschnitt 5) - rein clientseitig ueber die bereits im
+       Frontend vorhandenen Felder, keine neue Datenbankfunktion. */
+    function bkmpPartnerShopMatchesSearch(shop, query) {
+      if (!query) return true;
+      const haystack = [shop.name, shop.location, shop.category, shop.contact, shop.description]
+        .filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(query);
+    }
+
+    /* ---------------- Shop im Spotlight (Auftrag Abschnitt 2) ----------------
+       Eigener, von renderPartnerShops() bewusst entkoppelter Rotations-
+       Zyklus: nur EIN 200ms-Intervall aktualisiert ausschliesslich die
+       Fortschrittsleiste/den Countdown-Text (2 kleine DOM-Schreibvorgaenge),
+       ein voller Shop-Wechsel (Fade + Inhalt neu aufbauen) passiert nur alle
+       60s bzw. beim allerersten Laden - die grosse Shopliste/das Grid werden
+       davon nie beruehrt (Auftrag Abschnitt 11). Bewusst VOR renderPartner-
+       Shops() definiert (nicht nur textuell, sondern wirklich zuerst
+       AUSGEFUEHRT) - renderPartnerShops() ruft sich selbst weiter unten
+       sofort synchron auf und braucht diesen ganzen Block (inkl. der let-
+       Variablen, die sonst bis zu ihrer eigenen Zeile im "Temporal Dead
+       Zone"-Zustand waeren) schon beim allerersten Durchlauf. */
+    const BKMP_PARTNER_SPOTLIGHT_DURATION_MS = 60000;
+    let bkmpPartnerSpotlightShops = [];
+    let bkmpPartnerSpotlightQueue = [];
+    let bkmpPartnerSpotlightCurrent = null;
+    let bkmpPartnerSpotlightRemainingMs = BKMP_PARTNER_SPOTLIGHT_DURATION_MS;
+    let bkmpPartnerSpotlightPaused = false;
+    let bkmpPartnerSpotlightTimerId = null;
+    let bkmpPartnerSpotlightLastTick = 0;
+
+    function bkmpPartnerSpotlightShuffle(arr) {
+      const out = arr.slice();
+      for (let i = out.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const tmp = out[i]; out[i] = out[j]; out[j] = tmp;
+      }
+      return out;
+    }
+    /* "Ein Shop soll innerhalb einer Rotation nicht mehrfach erscheinen. Erst
+       wenn alle verfuegbaren Shops einmal gezeigt wurden, beginnt eine neue
+       Rotation." - Warteschlange wird leer gezogen, bei Erschoepfung neu
+       gemischt; verhindert zusaetzlich denselben Shop zweimal HINTEREINANDER
+       am Rotationsuebergang. */
+    function bkmpPartnerSpotlightPickNext() {
+      if (bkmpPartnerSpotlightShops.length === 0) return null;
+      if (bkmpPartnerSpotlightQueue.length === 0) {
+        bkmpPartnerSpotlightQueue = bkmpPartnerSpotlightShuffle(bkmpPartnerSpotlightShops.map(s => s.id));
+        if (bkmpPartnerSpotlightQueue.length > 1 && bkmpPartnerSpotlightCurrent &&
+            bkmpPartnerSpotlightQueue[0] === bkmpPartnerSpotlightCurrent.id) {
+          const tmp = bkmpPartnerSpotlightQueue[0];
+          bkmpPartnerSpotlightQueue[0] = bkmpPartnerSpotlightQueue[1];
+          bkmpPartnerSpotlightQueue[1] = tmp;
+        }
+      }
+      const nextId = bkmpPartnerSpotlightQueue.shift();
+      return bkmpPartnerSpotlightShops.find(s => s.id === nextId) || bkmpPartnerSpotlightShops[0];
+    }
+    function bkmpPartnerSpotlightPaint(shop) {
+      const wrap = partnerSpotlightEl.querySelector('.partner-spotlight-inner');
+      if (!wrap) return;
+      const href = bkmpPartnerShopHref(shop);
+      wrap.innerHTML = `
+        <div class="partner-spotlight-badge">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.9 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l7.1-1.01L12 2Z"/></svg>
+          Shop im Spotlight
+        </div>
+        <div class="partner-spotlight-image-frame" data-bkmp-image-wrap data-empty-label="Kein Bild">
+          ${shop.image ? `<img data-bkmp-img src="${shop.image}" alt="${escapeHtml(shop.name)}" loading="eager" decoding="async">` : '<div class="partner-image-empty">Kein Bild</div>'}
+        </div>
+        <div class="partner-spotlight-body">
+          <span class="partner-category">${escapeHtml(shop.category || 'Partner')}</span>
+          <h3>${escapeHtml(shop.name)}</h3>
+          ${shop.location ? `<div class="partner-location">${escapeHtml(shop.location)}</div>` : ''}
+          ${shop.description ? `<p>${escapeHtml(shop.description)}</p>` : ''}
+          ${shop.contact ? `<div class="partner-spotlight-contact">${escapeHtml(shop.contact)}</div>` : ''}
+          ${href ? `<a class="partner-spotlight-link" href="${href}" target="_blank" rel="noopener">Shop ansehen →</a>` : ''}
+        </div>
+        <div class="partner-spotlight-progress"><div class="partner-spotlight-progress-fill" id="partnerSpotlightProgressFill"></div></div>
+        <div class="partner-spotlight-countdown" id="partnerSpotlightCountdown"></div>`;
+      if (window.bkmpEnhanceImages) window.bkmpEnhanceImages(wrap);
+      wrap.classList.remove('is-fading');
+    }
+    /* Sanfter Fade statt hartem Umschalten (Auftrag: "sanfter Fade/Slide,
+       keine wilden Animationen"). */
+    function bkmpPartnerSpotlightApplyShop(shop, immediate) {
+      bkmpPartnerSpotlightCurrent = shop;
+      bkmpPartnerSpotlightRemainingMs = BKMP_PARTNER_SPOTLIGHT_DURATION_MS;
+      if (!partnerSpotlightEl) return;
+      let wrap = partnerSpotlightEl.querySelector('.partner-spotlight-inner');
+      if (!wrap) {
+        partnerSpotlightEl.innerHTML = '<div class="partner-spotlight-inner"></div>';
+        wrap = partnerSpotlightEl.querySelector('.partner-spotlight-inner');
+      }
+      if (immediate) {
+        bkmpPartnerSpotlightPaint(shop);
+      } else {
+        wrap.classList.add('is-fading');
+        window.setTimeout(() => bkmpPartnerSpotlightPaint(shop), 260);
+      }
+    }
+    function bkmpPartnerSpotlightAdvance(immediate) {
+      const next = bkmpPartnerSpotlightPickNext();
+      if (next) bkmpPartnerSpotlightApplyShop(next, immediate);
+    }
+    function bkmpPartnerSpotlightUpdateProgressUi() {
+      if (!partnerSpotlightEl) return;
+      const fillEl = partnerSpotlightEl.querySelector('#partnerSpotlightProgressFill');
+      const countdownEl = partnerSpotlightEl.querySelector('#partnerSpotlightCountdown');
+      const pct = Math.max(0, Math.min(100, (1 - bkmpPartnerSpotlightRemainingMs / BKMP_PARTNER_SPOTLIGHT_DURATION_MS) * 100));
+      if (fillEl) fillEl.style.width = pct.toFixed(1) + '%';
+      if (countdownEl) countdownEl.textContent = `Nächster Shop in ${Math.max(0, Math.ceil(bkmpPartnerSpotlightRemainingMs / 1000))}s`;
+    }
+    function bkmpPartnerSpotlightTick() {
+      const now = Date.now();
+      const elapsed = bkmpPartnerSpotlightLastTick ? now - bkmpPartnerSpotlightLastTick : 0;
+      bkmpPartnerSpotlightLastTick = now;
+      if (!bkmpPartnerSpotlightPaused && bkmpPartnerSpotlightShops.length > 0) {
+        bkmpPartnerSpotlightRemainingMs -= elapsed;
+        if (bkmpPartnerSpotlightRemainingMs <= 0) bkmpPartnerSpotlightAdvance(false);
+      }
+      bkmpPartnerSpotlightUpdateProgressUi();
+    }
+    function bkmpUpdatePartnerSpotlightShopList(shops) {
+      bkmpPartnerSpotlightShops = shops;
+      if (!partnerSpotlightEl) return;
+      if (shops.length === 0) {
+        partnerSpotlightEl.innerHTML = '';
+        partnerSpotlightEl.hidden = true;
+        if (bkmpPartnerSpotlightTimerId) { window.clearInterval(bkmpPartnerSpotlightTimerId); bkmpPartnerSpotlightTimerId = null; }
+        return;
+      }
+      partnerSpotlightEl.hidden = false;
+      bkmpPartnerSpotlightQueue = bkmpPartnerSpotlightQueue.filter(id => shops.some(s => s.id === id));
+      if (bkmpPartnerSpotlightCurrent && !shops.some(s => s.id === bkmpPartnerSpotlightCurrent.id)) {
+        bkmpPartnerSpotlightCurrent = null;
+      }
+      if (!bkmpPartnerSpotlightTimerId) {
+        /* Erster Aufbau ueberhaupt - "beim ersten Laden darf direkt ein
+           zufaelliger Shop erscheinen" (unabhaengig von der Warteschlange). */
+        const initial = shops[Math.floor(Math.random() * shops.length)];
+        bkmpPartnerSpotlightApplyShop(initial, true);
+        bkmpPartnerSpotlightLastTick = Date.now();
+        bkmpPartnerSpotlightTimerId = window.setInterval(bkmpPartnerSpotlightTick, 200);
+        partnerSpotlightEl.addEventListener('mouseenter', () => { bkmpPartnerSpotlightPaused = true; });
+        partnerSpotlightEl.addEventListener('mouseleave', () => { bkmpPartnerSpotlightPaused = false; });
+      } else if (!bkmpPartnerSpotlightCurrent) {
+        bkmpPartnerSpotlightAdvance(true);
+      }
+      bkmpPartnerSpotlightUpdateProgressUi();
+    }
 
     function renderPartnerShops() {
       if (!partnerFilter || !partnerGrid) return;
-      const shops = (Array.isArray(data.partnerShops) ? data.partnerShops : []).filter(shop => !shop.status || shop.status === 'approved');
-      if (shops.length === 0) {
+      const allShops = (Array.isArray(data.partnerShops) ? data.partnerShops : []).filter(shop => !shop.status || shop.status === 'approved');
+
+      /* Hero-Statistik (Auftrag Abschnitt 1) - nur Werte, die sich sauber
+         aus echten Daten ergeben. Bewusst KEINE "X CityBuilds"-Kennzahl: es
+         gibt kein eigenes CB-Feld auf einem PartnerShop (nur das freie
+         "location"-Feld, Formular-Platzhalter "/sw Beispiel CB2" - eine
+         CB-Zahl daraus herauszuparsen waere Rateweg statt einer echten
+         Berechnung und haette leicht falsche Werte erzeugen koennen). */
+      if (partnerHeroStatsEl) {
+        if (allShops.length === 0) {
+          partnerHeroStatsEl.innerHTML = '';
+        } else {
+          const categoryCount = new Set(allShops.map(s => s.category || 'Sonstige')).size;
+          partnerHeroStatsEl.innerHTML = `
+            <div class="partner-hero-stat"><strong>${allShops.length}</strong><span>PartnerShop${allShops.length === 1 ? '' : 's'}</span></div>
+            <div class="partner-hero-stat"><strong>${categoryCount}</strong><span>Kategorie${categoryCount === 1 ? '' : 'n'}</span></div>`;
+        }
+      }
+
+      if (allShops.length === 0) {
         partnerFilter.innerHTML = '';
         partnerGrid.innerHTML = '<p class="empty-hint">Noch keine PartnerShops eingetragen.</p>';
+        if (partnerEmptyStateEl) partnerEmptyStateEl.hidden = true;
+        bkmpUpdatePartnerSpotlightShopList([]);
         return;
       }
 
-      const categories = ['Alle', ...new Set(shops.map(shop => shop.category || 'Sonstige'))];
+      const categories = ['Alle', ...new Set(allShops.map(shop => shop.category || 'Sonstige'))];
       if (!categories.includes(activePartnerCategory)) activePartnerCategory = 'Alle';
       partnerFilter.innerHTML = categories.map(category => `
         <button class="${category === activePartnerCategory ? 'active' : ''}" type="button" data-partner-category="${escapeHtml(category)}">${escapeHtml(category)}</button>
       `).join('');
 
-      const visible = activePartnerCategory === 'Alle'
-        ? shops
-        : shops.filter(shop => (shop.category || 'Sonstige') === activePartnerCategory);
+      const searchQuery = partnerSearchQuery.trim().toLowerCase();
+      const visible = allShops.filter(shop =>
+        (activePartnerCategory === 'Alle' || (shop.category || 'Sonstige') === activePartnerCategory) &&
+        bkmpPartnerShopMatchesSearch(shop, searchQuery)
+      );
+
+      /* Empty-State (Auftrag Abschnitt 9) - unterscheidet bewusst "gar keine
+         Shops eingetragen" (Zeile oben) von "Filter/Suche treffen nichts". */
+      if (visible.length === 0) {
+        partnerGrid.innerHTML = '';
+        if (partnerEmptyStateEl) {
+          partnerEmptyStateEl.hidden = false;
+          partnerEmptyStateEl.innerHTML = `
+            <p class="partner-empty-title">Keine Shops gefunden</p>
+            <p class="partner-empty-text">Versuche eine andere Kategorie oder einen anderen Suchbegriff.</p>
+            <button class="partner-empty-reset" id="partnerFilterReset" type="button">Filter zurücksetzen</button>`;
+        }
+        bkmpUpdatePartnerSpotlightShopList(allShops);
+        return;
+      }
+      if (partnerEmptyStateEl) { partnerEmptyStateEl.hidden = true; partnerEmptyStateEl.innerHTML = ''; }
 
       const newShopBadge = bkmpNewBadgeChecker('partnershops');
       partnerGrid.innerHTML = visible.map(shop => {
-        const href = shop.link ? (String(shop.link).startsWith('http') ? shop.link : 'https://' + shop.link) : '';
+        const href = bkmpPartnerShopHref(shop);
         return `
           <article class="partner-card">
             ${newShopBadge(shop.id)}
             <div class="partner-image-frame" data-bkmp-image-wrap data-empty-label="Kein Bild">
-              ${shop.image ? `<img data-bkmp-img src="${shop.image}" alt="${escapeHtml(shop.name)}" loading="eager" fetchpriority="low" decoding="async">` : '<div class="partner-image-empty">Kein Bild</div>'}
+              ${shop.image ? `<img data-bkmp-img src="${shop.image}" alt="${escapeHtml(shop.name)}" loading="lazy" fetchpriority="low" decoding="async">` : '<div class="partner-image-empty">Kein Bild</div>'}
             </div>
             <div class="partner-body">
               <span class="partner-category">${escapeHtml(shop.category || 'Partner')}</span>
@@ -2806,7 +3008,7 @@
               ${shop.location ? `<div class="partner-location">${escapeHtml(shop.location)}</div>` : ''}
               ${shop.description ? `<p>${escapeHtml(shop.description)}</p>` : ''}
               <div class="partner-actions">
-                ${href ? `<a href="${href}" target="_blank" rel="noopener">Link öffnen</a>` : ''}
+                ${href ? `<a href="${href}" target="_blank" rel="noopener">Shop öffnen →</a>` : ''}
                 ${shop.contact ? `<span>${escapeHtml(shop.contact)}</span>` : ''}
               </div>
             </div>
@@ -2818,7 +3020,16 @@
           if (!img.complete && img.dataset.originalSrc) img.src = img.dataset.originalSrc;
         });
       });
-      bkmpMarkAllSeen('partnershops', shops.map(s => s.id));
+      bkmpMarkAllSeen('partnershops', allShops.map(s => s.id));
+
+      /* Spotlight bewusst NICHT hier neu AUFGEBAUT, nur mit der aktuellen
+         Shopliste versorgt - er haengt an einem eigenen, von Filter/Suche
+         komplett unabhaengigen Rotations-Zyklus (Auftrag Abschnitt 2: soll
+         JEDEM Partner regelmaessig Sichtbarkeit geben, nicht nur den gerade
+         gefilterten; Abschnitt 11: "keine unnoetigen Re-Renders durch den
+         Timer" - ein Suche-Tastendruck darf die laufende Spotlight-Rotation
+         nicht unterbrechen). */
+      bkmpUpdatePartnerSpotlightShopList(allShops);
     }
     renderPartnerShops();
     if (partnerFilter) {
@@ -2826,6 +3037,21 @@
         const btn = e.target.closest('[data-partner-category]');
         if (!btn) return;
         activePartnerCategory = btn.dataset.partnerCategory;
+        renderPartnerShops();
+      });
+    }
+    if (partnerSearchInput) {
+      partnerSearchInput.addEventListener('input', () => {
+        partnerSearchQuery = partnerSearchInput.value;
+        renderPartnerShops();
+      });
+    }
+    if (partnerEmptyStateEl) {
+      partnerEmptyStateEl.addEventListener('click', e => {
+        if (!e.target.closest('#partnerFilterReset')) return;
+        activePartnerCategory = 'Alle';
+        partnerSearchQuery = '';
+        if (partnerSearchInput) partnerSearchInput.value = '';
         renderPartnerShops();
       });
     }
@@ -3193,12 +3419,17 @@
       showPartnerShopView(partnerShopFormView);
     }
 
-    if (openPartnerShopForm) {
-      openPartnerShopForm.addEventListener('click', () => {
-        clearPartnerShopForm();
-        partnerShopOverlay.classList.add('visible');
-      });
+    /* 30.08.2026 (PartnerShop-Redesign) - die Seite hat jetzt ZWEI "Shop
+       eintragen"-Knöpfe (Hero oben + CTA-Karte unten), beide sollen exakt
+       denselben, bereits bestehenden Ablauf öffnen - deshalb aus dem
+       ursprünglichen Klick-Handler herausgelöst statt dupliziert. */
+    function openPartnerShopModal() {
+      clearPartnerShopForm();
+      partnerShopOverlay.classList.add('visible');
     }
+    if (openPartnerShopForm) openPartnerShopForm.addEventListener('click', openPartnerShopModal);
+    const partnerShopCtaBottom = document.getElementById('partnerShopCtaBottom');
+    if (partnerShopCtaBottom) partnerShopCtaBottom.addEventListener('click', openPartnerShopModal);
     if (partnerShopCancel) partnerShopCancel.addEventListener('click', () => partnerShopOverlay.classList.remove('visible'));
 
     if (partnerShopSubmit) {
