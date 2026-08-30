@@ -2954,7 +2954,33 @@
       window.requestAnimationFrame(() => {
         const card = partnerGrid ? partnerGrid.querySelector(`[data-shop-id="${CSS.escape(String(shop.id))}"]`) : null;
         if (!card) return;
-        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        /* Echter, im Test gefundener Bug (Nutzer-Meldung 30.08.2026:
+           "alles verschiebt sich" nach mehrfachem Klicken): #panelsViewport
+           (overflow:hidden, seine Hoehe wird von goTo()/bkmpSyncPanelHeight()
+           staendig exakt auf die Hoehe des aktiven Panels synchronisiert -
+           u.a. per 400ms-verzoegerter Nachkorrektur) kann in einem kurzen
+           Zeitfenster direkt nach dem Tab-Wechsel (bevor diese Korrektur
+           gelaufen ist) eine zu NIEDRIGE Hoehe haben, waehrend der
+           Filter-Reset oben den Panel-Inhalt bereits verlaengert hat - ein
+           `card.scrollIntoView()` in genau diesem Moment erkennt diesen
+           kurzlebigen, echten internen Ueberlauf und scrollt STATTDESSEN
+           #panelsViewport selbst (setzt dessen .scrollTop), nicht die
+           Seite. Dieser Wert wird von goTo() nie zurueckgesetzt und bleibt
+           fuer den Rest der Sitzung "verschoben" haengen, auch nachdem sich
+           die Hoehe kurz danach korrigiert - jeder weitere Panel-Wechsel
+           zeigt seinen Inhalt dann um genau diesen Betrag nach oben
+           abgeschnitten. Fix: die Zielposition wird manuell berechnet und
+           NUR die echte Seite gescrollt (window.scrollTo), statt der
+           automatischen (und hier fehlanfaelligen) Ancestor-Suche von
+           scrollIntoView() - #panelsViewport.scrollTop bleibt dadurch
+           garantiert immer 0. Der Reset ganz am Anfang heilt zusaetzlich
+           eine bereits VOR diesem Fix in derselben Sitzung entstandene
+           Verschiebung wieder aus. */
+        const viewport = document.getElementById('panelsViewport');
+        if (viewport) viewport.scrollTop = 0;
+        const rect = card.getBoundingClientRect();
+        const targetY = Math.max(0, window.scrollY + rect.top - (window.innerHeight / 2) + (rect.height / 2));
+        window.scrollTo({ top: targetY, behavior: 'smooth' });
         card.classList.add('partner-card-highlight');
         window.setTimeout(() => card.classList.remove('partner-card-highlight'), 1700);
       });
