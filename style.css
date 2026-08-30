@@ -2171,7 +2171,45 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
 }
 
 /* ---------- Investoren ---------- */
-.investor-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(430px, 100%), 1fr)); gap: var(--space-3); }
+/* 30.08.2026 - Investoren-Seite Redesign (siehe CLAUDE.md). #investorGrid
+   ist seitdem nur noch ein Wrapper (Abschnittsueberschrift + Karten-Grids
+   darunter), kein Grid mehr selbst - die eigentlichen Grid-Regeln stehen
+   jetzt auf .investor-active-cards/.investor-history-cards. Bewusst
+   derselbe Wrapper-Knoten wie vorher (keine ID-Aenderung): die bestehende
+   Klick-Delegation fuer den Auszahlungsbeweis-Viewer UND den Auszahlungs-
+   Prank-Knopf haengt an #investorGrid selbst (js/core/bkmp-site.js) - beide
+   Karten-Grids bleiben Nachfahren davon, keine Aenderung an der Delegation
+   noetig. */
+.investor-hero-title { margin-bottom: 0.35rem; }
+.investor-hero-subtitle { color: var(--muted); font-size: 0.94rem; margin: 0 0 1.4rem; max-width: 640px; }
+.investor-kpi-card { position: relative; text-align: left; }
+.kpi-card-icon { color: var(--gold-fixed); opacity: 0.75; margin-bottom: 0.5rem; }
+.kpi-card-icon svg { width: 18px; height: 18px; display: block; }
+/* Highlight-Leiste (Auftrag Abschnitt 9) - bewusst EIN einzelner Wert statt
+   eines weiteren Rankings, dezent zwischen KPI-Zeile und Investoren-CTA. */
+.investor-highlight-banner {
+  display: flex; align-items: center; gap: 0.9rem;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--purple) 10%, var(--paper-2)), var(--paper-2));
+  border: 1px solid color-mix(in srgb, var(--purple) 22%, var(--line));
+  border-radius: 14px; padding: 0.85rem 1.1rem; margin-bottom: 1.6rem;
+}
+.investor-highlight-icon { color: var(--pos); flex-shrink: 0; }
+.investor-highlight-icon svg { width: 20px; height: 20px; display: block; }
+.investor-highlight-text { display: flex; flex-direction: column; gap: 0.15rem; flex: 1 1 auto; min-width: 0; }
+.investor-highlight-kicker { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.investor-highlight-text strong { font-family: 'Fraunces', serif; font-size: 1rem; }
+.investor-highlight-value { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.3rem; flex-shrink: 0; }
+.investor-highlight-value.pos { color: var(--pos); }
+.investor-section-title {
+  font-family: 'Fraunces', serif; font-size: 1.05rem; font-weight: 600;
+  margin: 0 0 0.9rem; color: var(--ink);
+}
+.investor-section-title-history { margin-top: 2.4rem; }
+.investor-active-cards, .investor-history-cards { display: grid; gap: var(--space-3); }
+.investor-active-cards { grid-template-columns: repeat(auto-fit, minmax(min(430px, 100%), 1fr)); }
+.investor-history-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 980px) { .investor-history-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .investor-active-cards, .investor-history-cards { grid-template-columns: 1fr; } }
 .investor-card {
   background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--mood-radius-panel, 16px); padding: 1.5rem;
   box-shadow: var(--shadow-1);
@@ -2186,7 +2224,21 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
   min-height: 280px;
   background: linear-gradient(180deg, var(--paper-2), var(--paper));
   width: 100%;
+  position: relative;
+  overflow: hidden;
 }
+/* Auftrag Abschnitt 6 (optional, "sehr subtiles Design-Detail") - grosse,
+   fast unsichtbare Beteiligungs-Prozentzahl im Hintergrund der Karte.
+   pointer-events:none + z-index:0 halten sie rein dekorativ, .investor-head
+   & Co. bekommen keinen eigenen z-index noetig, da sie im normalen
+   Dokumentfluss ohnehin ueber einem absolut positionierten Geschwister
+   liegen. */
+.investor-card-watermark {
+  position: absolute; right: -0.3rem; bottom: -1.1rem; z-index: 0;
+  font-family: 'Fraunces', serif; font-weight: 700; font-size: 6.5rem; line-height: 1;
+  color: var(--gold-fixed); opacity: 0.035; pointer-events: none; user-select: none;
+}
+.investor-head, .investor-period, .investor-progress, .investor-highlight, .investor-metrics, .investor-payout-request-btn { position: relative; z-index: 1; }
 .investor-head { display: flex; align-items: center; gap: 0.9rem; }
 .investor-avatar {
   width: 52px;
@@ -2207,8 +2259,26 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
   font-size: 1.35rem;
   font-weight: 600;
 }
+.investor-title-block { min-width: 0; flex: 1 1 auto; }
 .investor-name { font-family: 'Fraunces', serif; font-size: 1.2rem; font-weight: 600; }
 .investor-mc { color: var(--muted); font-size: 0.78rem; margin-top: 0.18rem; }
+/* Status-Badge (Auftrag Abschnitt 3) - kleiner Punkt + dezenter Text statt
+   einer aggressiven Neon-Pille. */
+.investor-status-badge {
+  display: inline-flex; align-items: center; gap: 0.35rem; flex-shrink: 0;
+  font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  padding: 0.28rem 0.6rem; border-radius: 999px; white-space: nowrap;
+}
+.investor-status-active { color: var(--pos); background: color-mix(in srgb, var(--pos) 12%, transparent); }
+.investor-status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--pos); flex-shrink: 0; }
+.investor-status-done { color: var(--pos); background: color-mix(in srgb, var(--pos) 12%, transparent); }
+.investor-status-done svg { width: 11px; height: 11px; display: block; }
+/* Laufzeit-Fortschrittsbalken (Auftrag Abschnitt 3) - dezent, keine
+   Neonoptik, nutzt dieselbe Positiv-Farbe wie der Rest der aktiven Karte. */
+.investor-progress { display: flex; flex-direction: column; gap: 0.35rem; margin-top: -0.35rem; }
+.investor-progress-track { height: 5px; border-radius: 999px; background: var(--paper-3); overflow: hidden; }
+.investor-progress-fill { height: 100%; border-radius: 999px; background: color-mix(in srgb, var(--pos) 65%, var(--gold-fixed)); transition: width 0.4s var(--ease-out, ease); }
+.investor-progress-label { font-size: 0.7rem; color: var(--muted); }
 .investor-period {
   width: fit-content;
   color: var(--gold-fixed);
@@ -2234,6 +2304,11 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
 .investor-metrics strong { display: block; font-size: clamp(0.78rem, 0.9vw, 0.9rem); line-height: 1.25; white-space: normal; overflow-wrap: anywhere; }
 .investor-metrics .pos { color: var(--pos); }
 .investor-metrics .neg { color: var(--neg); }
+/* ROI (Auftrag Abschnitt 5, optional) - kleiner Zusatzwert direkt unter dem
+   Zeitraum-Gewinn, keine eigene Kachel. */
+.investor-roi { display: block; margin-top: 0.2rem; font-size: 0.66rem; font-weight: 600; }
+.investor-roi.pos { color: var(--pos); }
+.investor-roi.neg { color: var(--neg); }
 /* Abgeschlossene Investition (28.07.2026, "Ausgezahlt"-Status) - ersetzt
    Aktueller-Anteil-Kachel + Metriken-Grid durch einen kurzen, in
    Vergangenheitsform formulierten Zusammenfassungssatz (siehe
@@ -2251,18 +2326,47 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
   color: var(--muted);
 }
 .investor-concluded-summary strong { color: var(--pos); font-weight: 700; }
+/* Kompakte abgeschlossene Karte + Danke-Notiz (30.08.2026, Auftrag
+   Abschnitt 7/8) - .investor-concluded-summary (Fliesstext-Box) bleibt
+   oben als CSS bestehen (wird von der neuen, kompakten Kartenstruktur
+   nicht mehr erzeugt, aber bewusst nicht geloescht - keine bestehende
+   Funktion entfernen). */
+.investor-card-compact { min-height: 0; gap: 0.75rem; }
+.investor-concluded-period { color: var(--muted); font-size: 0.78rem; }
+.investor-concluded-metrics { margin-top: 0; }
+/* Danke-Notiz: vorher eine eigene, dashed-umrandete Box - jetzt ein
+   dezenter Kartenabschluss (kleine Trennlinie, Icon, gedimmter kursiver
+   Text, deutlich weniger Padding), wirkt eher wie eine persoenliche Notiz. */
 .investor-thankyou-note {
-  margin-top: 0.6rem;
-  padding: 0.75rem 1rem;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--gold) 8%, var(--paper-2));
-  border: 1px dashed color-mix(in srgb, var(--gold) 35%, var(--line));
-  font-size: 0.84rem;
+  margin-top: 0.3rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.78rem;
   line-height: 1.5;
   font-style: italic;
-  color: var(--ink);
+  color: var(--muted);
 }
-@media (max-width: 560px) { .investor-grid { grid-template-columns: 1fr; } }
+.investor-thankyou-note svg { width: 14px; height: 14px; flex-shrink: 0; margin-top: 0.15rem; color: color-mix(in srgb, var(--pos) 60%, var(--gold-fixed)); }
+/* Investment-Timeline (Auftrag Abschnitt 11, optional, rein datengetrieben -
+   siehe js/core/bkmp-site.js, generiert ausschliesslich aus den
+   vorhandenen Investor-Datensaetzen, keine hartkodierten Namen/Daten). */
+.investor-timeline-title { margin-top: 2.6rem; }
+.investor-timeline {
+  display: flex; flex-direction: column; gap: 0;
+  border-left: 2px solid var(--line); margin-left: 0.4rem; padding-left: 1.2rem;
+}
+.investor-timeline-item { position: relative; padding: 0 0 1.1rem; }
+.investor-timeline-item:last-child { padding-bottom: 0; }
+.investor-timeline-item::before {
+  content: ''; position: absolute; left: -1.53rem; top: 0.3rem;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--paper); border: 2px solid var(--gold-fixed);
+}
+.investor-timeline-month { display: block; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--gold-fixed); margin-bottom: 0.2rem; }
+.investor-timeline-text { display: block; font-size: 0.86rem; color: var(--muted); }
 @media (max-width: 900px) { .investor-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .investor-metrics div:last-child { grid-column: 1 / -1; } }
 @media (max-width: 520px) { .investor-metrics { grid-template-columns: 1fr; } .investor-metrics div:last-child { grid-column: auto; } }
 /* Auszahlungs-Beantragen-Prank (23.08.2026) - admin-togglebarer Knopf pro

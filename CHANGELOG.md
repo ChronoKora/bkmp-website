@@ -11,6 +11,10 @@ Automatisch von Claude Code gepflegt: **nach jeder Code-/SQL-Änderung kommt hie
 
 ---
 
+## 2026-08-30 (Investoren-Seite: visuelles Redesign)
+
+- **[Neu]** Investoren-Seite komplett visuell aufgewertet (rein Darstellung, keine Businesslogik/Datenquellen geändert): neuer Header ("Investoren" + Subheadline) mit KPI-Zeile (Aktive Investoren/Investiertes Kapital/Aktueller Gesamtanteil/Investorengewinn gesamt, dezente Inline-SVG-Icons statt Emoji), ein Highlight-Banner (höchster Investorengewinn, ein einzelner Wert), Trennung in "Aktive Investments" (großzügigere Karten) und "Investment-Historie" (kompaktere Karten, 3-spaltig auf Desktop). Aktive Karten: Status-Badge, Laufzeit-Fortschrittsbalken (aus Start-/Enddatum berechnet), größerer "Aktueller Anteil"-Fokus, optionaler ROI-Wert unter dem Zeitraum-Gewinn, sehr dezentes Beteiligungs-Wasserzeichen im Hintergrund. Abgeschlossene Karten: kompakte Kennzahlen-Übersicht statt langem Fließtext, dezente Danke-Notiz mit Icon statt eigener Box. Optionale, rein datengetriebene Investment-Timeline am Seitenende (keine hartkodierten Namen/Daten). Rickroll-Auszahlungs-Prank + Auszahlungsbeweis-Viewer bewusst unangetastet (dieselbe Klick-Delegation, live gegengeprüft). — `index.html`, `js/core/bkmp-site.js`, `style.css` — 🟡 lokal
+
 ## 2026-08-30 (Site-weiter Akzentfarb-Kontrast-Audit)
 
 - **[Fix]** Nutzer-Screenshot (Investor-Karten "Zeitraum"-Pille erneut unlesbar) führte zu einem systematischen, workflow-gestützten Audit der GESAMTEN `style.css` (164 Fundstellen mit `color: var(--gold)`, 6 parallele Klassifizierungs-Durchläufe) - Ergebnis: 93 echte Fälle (informativer Lesetext: Namen, Werte, Daten, Labels, Status-Badges, Countdown-Timer, Prozentwerte, Links usw.) auf `--gold-fixed` umgestellt, chirurgisch nur die `color:`-Deklaration je Zeile (Border-/Hintergrundfarben derselben Regel bleiben bewusst weiter an `--gold` gekoppelt). — `style.css` — 🟡 lokal

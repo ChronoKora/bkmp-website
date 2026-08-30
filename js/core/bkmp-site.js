@@ -1846,8 +1846,15 @@
       bindRevenueModeButtons();
     }
 
-    /* Investoren */
+    /* Investoren (30.08.2026, visuelles Redesign - siehe CLAUDE.md fuer die
+       vollstaendige Auftragsdoku). isInInvestorPeriod/sumForInvestorPeriod/
+       formatInvestorPeriod sowie die payout-Formel (periodNet * sharePercent
+       / 100) sind UNVERAENDERT die bereits bestehende Businesslogik - nur
+       die Darstellung drumherum wurde neu strukturiert. */
     const investorGrid = document.getElementById('investorGrid');
+    const investorKpiRowEl = document.getElementById('investorKpiRow');
+    const investorHighlightEl = document.getElementById('investorHighlight');
+    const investorTimelineEl = document.getElementById('investorTimeline');
     function isInInvestorPeriod(item, inv) {
       if (!item.date) return false;
       if (inv.startDate && item.date < inv.startDate) return false;
@@ -1864,54 +1871,207 @@
       return 'Gesamter Zeitraum';
     }
 
-    if (data.investors.length === 0) {
-      investorGrid.innerHTML = '<p class="empty-hint">Noch keine Investoren eingetragen.</p>';
-    } else {
-      investorGrid.innerHTML = data.investors.map(inv => {
-        const periodIncome = sumForInvestorPeriod(data.income, inv);
-        const periodExpenses = sumForInvestorPeriod(data.expenses, inv);
-        const periodNet = periodIncome - periodExpenses;
-        const payout = periodNet > 0 ? (periodNet * Number(inv.sharePercent || 0)) / 100 : 0;
-        const isAnonymous = Boolean(inv.anonymous);
-        const mcName = isAnonymous ? '' : (inv.minecraftName || '').trim();
-        const avatar = mcName ? `https://minotar.net/helm/${encodeURIComponent(mcName)}/96.png` : '';
-        const invName = isAnonymous ? 'Anonym' : (inv.name || '');
-        /* Abgeschlossene Investition (28.07.2026, Nutzerwunsch nach dem
-           ersten echten Investor-Zeitraumende): sobald als "Ausgezahlt"
-           markiert, zeigt die Karte statt der auf laufenden Zahlen basierten
-           "Aktueller Anteil"-Kachel einen kurzen, in der Vergangenheit
-           formulierten Zusammenfassungssatz - derselbe payout-Wert (nur
-           anders praesentiert), keine neue Berechnung. */
-        const isConcluded = Boolean(inv.paidOut);
-        const bodyHtml = isConcluded ? `
-            <div class="investor-concluded-summary">
-              War Investor von <strong>${escapeHtml(formatDate(inv.startDate))}</strong> bis <strong>${inv.endDate ? escapeHtml(formatDate(inv.endDate)) : 'heute'}</strong> und hat in diesem Zeitraum <strong>${bkmpFormatCurrency(payout)}</strong> Anteil verdient, mit einer Investitionssumme von <strong>${bkmpFormatCurrency(inv.invested)}</strong> und einer Gewinnbeteiligung von <strong>${Number(inv.sharePercent || 0)}%</strong>.
+    /* Dezente Inline-SVG-Icons (Auftrag: "keine Emoji-Icons" fuer die neuen
+       KPI-/Status-/Highlight-Elemente) - schlichte, einheitliche 18x18-
+       Strichzeichnungen, erben ihre Farbe ueber currentColor per CSS. */
+    const BKMP_INVESTOR_ICONS = {
+      users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+      wallet: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-1"/><path d="M17 14a2 2 0 1 1 0-4h4v4h-4Z"/></svg>',
+      pie: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>',
+      trending: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>',
+      check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+      heart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z"/></svg>'
+    };
+
+    /* Leitet fuer einen Investor alle abgeleiteten Anzeigewerte EINMAL ab
+       (Zeitraum-Ergebnis/aktueller Anteil/ROI) - dieselbe payout-Formel wie
+       zuvor, nur zentral statt inline berechnet, damit KPI-Zeile/Highlight/
+       Karten/Timeline konsistent dieselben Zahlen wiederverwenden. */
+    function bkmpInvestorDerive(inv) {
+      const periodIncome = sumForInvestorPeriod(data.income, inv);
+      const periodExpenses = sumForInvestorPeriod(data.expenses, inv);
+      const periodNet = periodIncome - periodExpenses;
+      const payout = periodNet > 0 ? (periodNet * Number(inv.sharePercent || 0)) / 100 : 0;
+      const invested = Number(inv.invested || 0);
+      /* ROI (Auftrag Abschnitt 5, "nur wenn sauber aus vorhandenen Werten
+         berechenbar") = Zeitraum-Gewinn relativ zur Investitionssumme -
+         exakt dieselben zwei bereits angezeigten Werte, keine neue Kennzahl. */
+      const roi = invested > 0 ? (periodNet / invested) * 100 : null;
+      return { periodIncome, periodExpenses, periodNet, payout, invested, roi };
+    }
+    function investorDisplayName(inv) {
+      return Boolean(inv.anonymous) ? 'Anonym' : (inv.name || '');
+    }
+    function investorAvatarHtml(inv) {
+      const isAnonymous = Boolean(inv.anonymous);
+      const mcName = isAnonymous ? '' : (inv.minecraftName || '').trim();
+      const avatar = mcName ? `https://minotar.net/helm/${encodeURIComponent(mcName)}/96.png` : '';
+      const invName = investorDisplayName(inv);
+      return avatar
+        ? `<img class="investor-avatar" src="${avatar}" alt="Minecraft-Kopf von ${escapeHtml(mcName)}" loading="lazy" decoding="async">`
+        : `<div class="investor-avatar investor-avatar-fallback">${isAnonymous ? '?' : escapeHtml(invName.slice(0, 1).toUpperCase())}</div>`;
+    }
+    /* Laufzeit-Fortschritt (Auftrag Abschnitt 3) - rein visuelle Berechnung,
+       keine Businesslogik. Ohne Start+Ende kein Balken. Bei ueberschrittenem
+       Enddatum bleibt der Balken bei 100% stehen (Math.min). */
+    function investorProgress(inv) {
+      if (!inv.startDate || !inv.endDate) return null;
+      const start = new Date(inv.startDate + 'T00:00:00');
+      const end = new Date(inv.endDate + 'T00:00:00');
+      const now = new Date();
+      const totalMs = end - start;
+      if (!(totalMs > 0)) return null;
+      const pct = Math.max(0, Math.min(100, ((now - start) / totalMs) * 100));
+      const daysRemaining = Math.ceil((end - now) / 86400000);
+      return { pct, daysRemaining };
+    }
+
+    const investorList = data.investors || [];
+    const investorDerived = investorList.map(inv => ({ inv, ...bkmpInvestorDerive(inv) }));
+    const activeInvestors = investorDerived.filter(d => !d.inv.paidOut);
+    const concludedInvestors = investorDerived.filter(d => d.inv.paidOut);
+
+    /* ---------------- KPI-Zeile (Auftrag Abschnitt 1) ---------------- */
+    if (investorKpiRowEl) {
+      if (investorList.length === 0) {
+        investorKpiRowEl.innerHTML = '';
+      } else {
+        const totalInvested = investorDerived.reduce((sum, d) => sum + d.invested, 0);
+        const activeShareTotal = activeInvestors.reduce((sum, d) => sum + d.payout, 0);
+        const totalProfit = investorDerived.reduce((sum, d) => sum + d.payout, 0);
+        const investorKpiCard = (icon, label, value) =>
+          `<div class="kpi-card investor-kpi-card"><div class="kpi-card-icon">${icon}</div><div class="kpi-label">${escapeHtml(label)}</div><div class="kpi-value">${value}</div></div>`;
+        investorKpiRowEl.innerHTML = [
+          investorKpiCard(BKMP_INVESTOR_ICONS.users, 'Aktive Investoren', String(activeInvestors.length)),
+          investorKpiCard(BKMP_INVESTOR_ICONS.wallet, 'Investiertes Kapital', bkmpFormatCurrency(totalInvested)),
+          investorKpiCard(BKMP_INVESTOR_ICONS.pie, 'Aktueller Gesamtanteil', bkmpFormatCurrency(activeShareTotal)),
+          investorKpiCard(BKMP_INVESTOR_ICONS.trending, 'Investorengewinn gesamt', bkmpFormatCurrency(totalProfit))
+        ].join('');
+      }
+    }
+
+    /* ---------------- Highlight (Auftrag Abschnitt 9, EIN einzelner Wert) ---------------- */
+    if (investorHighlightEl) {
+      const best = activeInvestors.reduce((top, d) => (!top || d.payout > top.payout) ? d : top, null);
+      investorHighlightEl.innerHTML = (best && best.payout > 0) ? `
+        <div class="investor-highlight-banner">
+          <span class="investor-highlight-icon">${BKMP_INVESTOR_ICONS.trending}</span>
+          <div class="investor-highlight-text">
+            <span class="investor-highlight-kicker">Höchster Investorengewinn</span>
+            <strong>${escapeHtml(investorDisplayName(best.inv))}</strong>
+          </div>
+          <span class="investor-highlight-value pos">+${bkmpFormatCurrency(best.payout)}</span>
+        </div>` : '';
+    }
+
+    /* ---------------- Aktive Karten (Auftrag Abschnitt 3/4/5/6) ---------------- */
+    function renderActiveInvestorCard(d) {
+      const { inv, periodNet, payout, invested, roi } = d;
+      const invName = investorDisplayName(inv);
+      const mcName = Boolean(inv.anonymous) ? '' : (inv.minecraftName || '').trim();
+      const sharePercent = Number(inv.sharePercent || 0);
+      const progress = investorProgress(inv);
+      const progressHtml = progress ? `
+            <div class="investor-progress">
+              <div class="investor-progress-track"><div class="investor-progress-fill" style="width:${progress.pct.toFixed(1)}%"></div></div>
+              <span class="investor-progress-label">${progress.daysRemaining > 0 ? `Noch ${progress.daysRemaining} Tag${progress.daysRemaining === 1 ? '' : 'e'}` : `${progress.pct.toFixed(0)}% der Laufzeit abgeschlossen`}</span>
+            </div>` : '';
+      const roiHtml = roi !== null ? `<span class="investor-roi ${roi >= 0 ? 'pos' : 'neg'}">${roi >= 0 ? '+' : ''}${roi.toLocaleString('de-DE', { maximumFractionDigits: 2 })}% ROI</span>` : '';
+      return `
+          <div class="investor-card investor-card-rich">
+            <span class="investor-card-watermark" aria-hidden="true">${sharePercent}%</span>
+            <div class="investor-head">
+              ${investorAvatarHtml(inv)}
+              <div class="investor-title-block">
+                <div class="investor-name">${escapeHtml(invName)}</div>
+                ${mcName ? `<div class="investor-mc">${escapeHtml(mcName)}</div>` : ''}
+              </div>
+              <span class="investor-status-badge investor-status-active"><span class="investor-status-dot"></span>Aktiv</span>
+              ${inv.payoutProofUrl ? `<img class="investor-payout-thumb" src="${escapeHtml(inv.payoutProofUrl)}" data-full="${escapeHtml(inv.payoutProofUrl)}" data-investor-name="${escapeHtml(invName)}" alt="Auszahlungsbeweis von ${escapeHtml(invName)} - zum Vergrößern anklicken" title="Auszahlungsbeweis anzeigen" loading="lazy" decoding="async">` : ''}
             </div>
-            <div class="investor-thankyou-note">🙏 Vielen Dank für dein Vertrauen und deine Unterstützung – ohne Investoren wie dich wäre BKMP nicht das, was es heute ist.</div>` : `
             <div class="investor-period">${formatInvestorPeriod(inv)}</div>
+            ${progressHtml}
             <div class="investor-highlight">
               <span>Aktueller Anteil</span>
               <strong>${bkmpFormatCurrency(payout)}</strong>
             </div>
             <div class="investor-metrics">
-              <div><span>Investiert</span><strong>${bkmpFormatCurrency(inv.invested)}</strong></div>
-              <div><span>Beteiligung</span><strong>${Number(inv.sharePercent || 0)}%</strong></div>
-              <div><span>Zeitraum-Gewinn</span><strong class="${periodNet >= 0 ? 'pos' : 'neg'}">${bkmpFormatCurrency(periodNet)}</strong></div>
+              <div><span>Investiert</span><strong>${bkmpFormatCurrency(invested)}</strong></div>
+              <div><span>Beteiligung</span><strong>${sharePercent}%</strong></div>
+              <div><span>Zeitraum-Gewinn</span><strong class="${periodNet >= 0 ? 'pos' : 'neg'}">${bkmpFormatCurrency(periodNet)}</strong>${roiHtml}</div>
             </div>
-            ${inv.payoutButtonPrank ? `<button class="investor-payout-request-btn" type="button" data-investor-name="${escapeHtml(invName)}" data-payout-amount="${escapeHtml(bkmpFormatCurrency(Number(inv.invested || 0) + payout))}">💸 Auszahlung beantragen</button>` : ''}`;
-        return `
-          <div class="investor-card investor-card-rich${isConcluded ? ' investor-card-concluded' : ''}">
+            ${inv.payoutButtonPrank ? `<button class="investor-payout-request-btn" type="button" data-investor-name="${escapeHtml(invName)}" data-payout-amount="${escapeHtml(bkmpFormatCurrency(Number(inv.invested || 0) + payout))}">💸 Auszahlung beantragen</button>` : ''}
+          </div>`;
+    }
+
+    /* ---------------- Abgeschlossene Karten, kompakt (Auftrag Abschnitt 7/8) ---------------- */
+    function renderConcludedInvestorCard(d) {
+      const { inv, payout, invested } = d;
+      const invName = investorDisplayName(inv);
+      const mcName = Boolean(inv.anonymous) ? '' : (inv.minecraftName || '').trim();
+      const sharePercent = Number(inv.sharePercent || 0);
+      return `
+          <div class="investor-card investor-card-concluded investor-card-compact">
             <div class="investor-head">
-              ${avatar ? `<img class="investor-avatar" src="${avatar}" alt="Minecraft-Kopf von ${escapeHtml(mcName)}" loading="lazy" decoding="async">` : `<div class="investor-avatar investor-avatar-fallback">${isAnonymous ? '?' : escapeHtml(invName.slice(0, 1).toUpperCase())}</div>`}
+              ${investorAvatarHtml(inv)}
               <div class="investor-title-block">
                 <div class="investor-name">${escapeHtml(invName)}</div>
                 ${mcName ? `<div class="investor-mc">${escapeHtml(mcName)}</div>` : ''}
               </div>
+              <span class="investor-status-badge investor-status-done">${BKMP_INVESTOR_ICONS.check}Abgeschlossen</span>
               ${inv.payoutProofUrl ? `<img class="investor-payout-thumb" src="${escapeHtml(inv.payoutProofUrl)}" data-full="${escapeHtml(inv.payoutProofUrl)}" data-investor-name="${escapeHtml(invName)}" alt="Auszahlungsbeweis von ${escapeHtml(invName)} - zum Vergrößern anklicken" title="Auszahlungsbeweis anzeigen" loading="lazy" decoding="async">` : ''}
             </div>
-            ${bodyHtml}
+            <div class="investor-concluded-period">${formatInvestorPeriod(inv)}</div>
+            <div class="investor-metrics investor-concluded-metrics">
+              <div><span>Investiert</span><strong>${bkmpFormatCurrency(invested)}</strong></div>
+              <div><span>Gewinn</span><strong class="pos">${bkmpFormatCurrency(payout)}</strong></div>
+              <div><span>Beteiligung</span><strong>${sharePercent}%</strong></div>
+            </div>
+            <div class="investor-thankyou-note">${BKMP_INVESTOR_ICONS.heart}<em>Vielen Dank für dein Vertrauen und deine Unterstützung – ohne Investoren wie dich wäre BKMP nicht das, was es heute ist.</em></div>
           </div>`;
-      }).join('');
+    }
+
+    if (investorList.length === 0) {
+      investorGrid.innerHTML = '<p class="empty-hint">Noch keine Investoren eingetragen.</p>';
+    } else {
+      const activeHtml = activeInvestors.length
+        ? `<div class="investor-active-cards">${activeInvestors.map(renderActiveInvestorCard).join('')}</div>`
+        : '<p class="empty-hint">Aktuell keine laufenden Investments.</p>';
+      const historyHtml = concludedInvestors.length ? `
+        <h3 class="investor-section-title investor-section-title-history">Investment-Historie</h3>
+        <div class="investor-history-cards">${concludedInvestors.map(renderConcludedInvestorCard).join('')}</div>` : '';
+      investorGrid.innerHTML = `
+        <h3 class="investor-section-title">Aktive Investments</h3>
+        ${activeHtml}
+        ${historyHtml}`;
+    }
+
+    /* ---------------- Timeline (Auftrag Abschnitt 11, rein datengetrieben) ---------------- */
+    if (investorTimelineEl) {
+      const monthMap = new Map();
+      const ensureMonth = key => { if (!monthMap.has(key)) monthMap.set(key, { started: [], concluded: [] }); return monthMap.get(key); };
+      investorList.forEach(inv => {
+        const name = investorDisplayName(inv);
+        if (inv.startDate) ensureMonth(inv.startDate.slice(0, 7)).started.push(name);
+        if (inv.paidOut && inv.endDate) ensureMonth(inv.endDate.slice(0, 7)).concluded.push(name);
+      });
+      const months = [...monthMap.keys()].sort();
+      if (months.length >= 2) {
+        const MONTH_NAMES = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+        const itemsHtml = months.map(key => {
+          const [y, m] = key.split('-');
+          const entry = monthMap.get(key);
+          const lines = [];
+          if (entry.started.length === 1) lines.push(`${escapeHtml(entry.started[0])} startet ${entry.started[0] === 'Anonym' ? 'ein' : 'sein'} Investment`);
+          else if (entry.started.length > 1) lines.push(`${escapeHtml(entry.started.slice(0, -1).join(', '))} und ${escapeHtml(entry.started[entry.started.length - 1])} starten ihr Investment`);
+          if (entry.concluded.length === 1) lines.push(`Investment von ${escapeHtml(entry.concluded[0])} wird abgeschlossen`);
+          else if (entry.concluded.length > 1) lines.push(`${entry.concluded.length} Investments werden abgeschlossen`);
+          return `<div class="investor-timeline-item"><span class="investor-timeline-month">${MONTH_NAMES[Number(m) - 1]} ${y}</span><span class="investor-timeline-text">${lines.join(' · ')}</span></div>`;
+        }).join('');
+        investorTimelineEl.innerHTML = `<h3 class="investor-section-title investor-timeline-title">Investment-Timeline</h3><div class="investor-timeline">${itemsHtml}</div>`;
+      } else {
+        investorTimelineEl.innerHTML = '';
+      }
     }
 
     /* Alle Einträge (Ledger-Liste) — begrenzt auf die letzten 15 */

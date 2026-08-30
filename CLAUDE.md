@@ -1772,6 +1772,27 @@ Cache-Busting `app.js?v=20260830-goldcontrastaudit1` (index.html/admin.html), `s
 
 **Bewusst nicht angefasst (per Agenten-Einstufung als sicher, `SURFACE_FILL`/`leave` oder `DECORATIVE_SAFE`):** `.idle-clan-leaderboard-mine`/`.bkmp-guild-tech-node.state-maxed` (nutzen `--ink`, nicht vom Picker betroffen), `.idle-runen-fuse-check` (ebenfalls `--ink`-basiert, im dominanten Dark-Mode sicher), reine Icon-/Scrollbar-/Checkbox-/Hover-Rahmen-Fälle (kein Lesetext betroffen), 3 Sonderfälle mit ohnehin überwiegend `--ink`-dominiertem `color-mix()` (z.B. `.news-text em`, nur 20% Gold-Beimischung).
 
+## Investoren-Seite: visuelles Redesign (30.08.2026)
+
+Detaillierter 15-Abschnitte-Auftrag ("visuell deutlich aufwerten", explizit nur Layout/Struktur/Darstellung, Businesslogik/Supabase-Struktur/bestehende Werte unangetastet). **Nichts committed/gepusht.**
+
+**Analyse vor der Umsetzung:** bestehende Renderfunktion (`js/core/bkmp-site.js`, Investoren-Block) nutzt `isInInvestorPeriod`/`sumForInvestorPeriod`/`formatInvestorPeriod` + die payout-Formel (`periodNet * sharePercent / 100`) - alle drei UNVERÄNDERT übernommen, nur einmal pro Investor zentral über eine neue `bkmpInvestorDerive()`-Hilfsfunktion aufgerufen statt mehrfach inline dupliziert. `#investorGrid` traegt die bestehende Klick-Delegation für den Auszahlungsbeweis-Viewer UND den Rickroll-Auszahlungs-Prank (`investorGridEl.addEventListener('click', ...)`, zweimal) - bewusst als GLEICHER Wrapper-Knoten beibehalten (nur sein innerer Aufbau wurde reicher), damit beide Delegationen ohne jede JS-Änderung weiter funktionieren.
+
+**Neue Container** (`index.html`, `#panel-investors`): `#investorKpiRow` (wiederverwendet die bereits bestehende `.kpi-row`/`.kpi-card`-Komponente aus dem Finanz-Dashboard), `#investorHighlight`, `#investorTimeline` - alle vom bestehenden `#investorGrid` getrennt, keine Kollision mit der Klick-Delegation.
+
+**Berechnungen (alle rein clientseitig, alle aus bereits geladenen `data.investors`/`data.income`/`data.expenses` abgeleitet, keine neue Supabase-Abfrage):**
+- KPIs: Aktive Investoren (Anzahl `!paidOut`), Investiertes Kapital (Summe `invested` über ALLE), Aktueller Gesamtanteil (Summe `payout` nur AKTIVE), Investorengewinn gesamt (Summe `payout` über ALLE inkl. abgeschlossen).
+- Highlight: Investor mit dem höchsten `payout` unter den aktiven - bewusst nur EIN Wert, kein Ranking.
+- Laufzeit-Fortschritt: `(heute - start) / (ende - start)`, bei `start`/`ende` fehlend kein Balken, bei überschrittenem Ende gedeckelt bei 100% (`Math.min`).
+- ROI (Auftrag Abschnitt 5, optional): `periodNet / invested * 100` - dieselben zwei bereits angezeigten Werte, keine neue Kennzahl.
+- Timeline (Auftrag Abschnitt 11, optional): Investoren nach Start-Monat gruppiert (`startDate.slice(0,7)`) + abgeschlossene nach End-Monat, wenn `paidOut` - rein aus den vorhandenen Datensätzen generiert, keine hartkodierten Namen/Daten. **Zufälliger, aber starker Validierungsfund beim Testen mit echten Produktionsdaten:** die live generierte Ausgabe ("Mai 2026: CrazyMcNugget und Phil starten..." usw.) deckt sich fast wortgleich mit dem vom Nutzer im Auftrag selbst gegebenen Beispieltext - bestätigt, dass die Ableitung korrekt den tatsächlichen Datenstand widerspiegelt.
+
+**Verifiziert:** `node --check`/CSS-Klammerbalance sauber. Live mit injizierten Testdaten UND (durch einen zwischenzeitlichen Realtime-Resync im selben Testlauf) echten Produktionsdaten geprüft - KPI-Werte/Highlight/Fortschrittsbalken/ROI/Wasserzeichen/Timeline rechnerisch korrekt. Rickroll-Prank-Knopf per echtem Klick bestätigt: öffnet weiterhin korrekt den Bestätigungsdialog mit Name+Betrag, unverändertes Verhalten. Responsive 375/768/1400px geprüft: KPI-Zeile 2×2 auf Mobile (bereits bestehende `.kpi-row`-Breakpoints), Historie-Karten 2-spaltig auf Tablet/3-spaltig Desktop, aktive Karten 1-spaltig auf Mobile/Tablet (gleiches Auto-Fit-Verhalten wie das alte `.investor-grid` bereits hatte, keine Regression), kein horizontaler Überlauf. Konsole fehlerfrei (nur bekannte lokale `/api/*`-404s).
+
+Cache-Busting `style.css?v=20260830-investorredesign1` (alle 5 HTML-Dateien), `js/core/bkmp-site.js?v=20260830-investorredesign1` (index.html).
+
+**Nicht verändert (wie gefordert):** `supabase.js`, keine SQL-Migration, keine bestehenden Investor-Datensätze/-Berechnungen, `.investor-concluded-summary`-CSS (alte lange Fließtext-Box) bewusst nicht gelöscht obwohl nicht mehr erzeugt (kein Risiko, keine bestehende Funktionalität entfernt).
+
 ## Bestehende Konventionen (weiter gültig)
 
 - **Changelog, zweigleisig (ab 26.07.2026), IMMER automatisch, ohne dass der Nutzer danach fragen muss:**
