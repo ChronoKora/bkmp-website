@@ -369,9 +369,9 @@ a { color: inherit; text-decoration: none; }
   .mc-name-badge-icon, .mc-name-badge-plushie { width: 32px; height: 32px; }
   .mc-name-badge-icon { font-size: 1.1rem; }
 }
-#mcNameBadge.tier-1 { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); }
+#mcNameBadge.tier-1 { color: var(--gold-fixed); border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); }
 #mcNameBadge.tier-2 {
-  color: var(--gold);
+  color: var(--gold-fixed);
   border-color: color-mix(in srgb, var(--gold) 55%, var(--line));
   box-shadow: 0 0 14px color-mix(in srgb, var(--gold) 35%, transparent);
 }
@@ -522,7 +522,7 @@ body.modal-open .bkmp-easter > span {
 #mcAuthError { color: #ff6b6b; font-size: 0.85rem; text-align: center; margin: 0 0 0.9rem; }
 .auth-switch { text-align: center; margin: 0.9rem 0 0; }
 .auth-switch-link {
-  background: none; border: none; padding: 0; color: var(--gold); cursor: pointer;
+  background: none; border: none; padding: 0; color: var(--gold-fixed); cursor: pointer;
   font-family: 'Inter', sans-serif; font-size: 0.85rem; text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -1040,7 +1040,7 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
   opacity: 1;
   border-color: var(--gold);
   background: color-mix(in srgb, var(--gold) 16%, var(--paper));
-  color: var(--gold);
+  color: var(--gold-fixed);
 }
 .poll-banner-results { display: flex; flex-direction: column; gap: 0.45rem; }
 .poll-banner-result-row {
@@ -1202,7 +1202,7 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
 .stat-value { font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.9rem; }
 .stat-value.positive { color: var(--pos); }
 .stat-value.negative { color: var(--neg); }
-.stat-value.neutral { color: var(--gold); }
+.stat-value.neutral { color: var(--gold-fixed); }
 .stat-label, .stat-value { cursor: default; user-select: none; }
 
 /* ---------- Donut-Chart ---------- */
@@ -1870,7 +1870,7 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
 }
 .wish-like { color: var(--pos); }
 .wish-dislike { color: var(--neg); }
-.wish-mini-download:hover, .wish-vote:hover, .wish-download:hover { border-color: var(--gold); color: var(--gold); }
+.wish-mini-download:hover, .wish-vote:hover, .wish-download:hover { border-color: var(--gold); color: var(--gold-fixed); }
 .wish-vote:disabled { cursor: default; opacity: 0.55; }
 .wish-vote:disabled:hover { border-color: var(--line); }
 .wish-vote.is-voted { opacity: 1; border-color: currentColor; background: color-mix(in srgb, currentColor 12%, var(--paper)); }
@@ -1902,7 +1902,7 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
   color: var(--muted);
   line-height: 1.5;
 }
-.investor-request-hint strong { color: var(--gold); font-family: 'Fraunces', serif; }
+.investor-request-hint strong { color: var(--gold-fixed); font-family: 'Fraunces', serif; }
 .investor-request-visibility {
   display: flex;
   align-items: flex-start;
@@ -2202,7 +2202,7 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--gold);
+  color: var(--gold-fixed);
   font-family: 'Fraunces', serif;
   font-size: 1.35rem;
   font-weight: 600;
@@ -2211,7 +2211,7 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
 .investor-mc { color: var(--muted); font-size: 0.78rem; margin-top: 0.18rem; }
 .investor-period {
   width: fit-content;
-  color: var(--gold);
+  color: var(--gold-fixed);
   background: color-mix(in srgb, var(--gold) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--gold) 25%, transparent);
   border-radius: 999px;
@@ -2281,7 +2281,7 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
 .investor-row:last-child { border-bottom: none; }
 .investor-row .k { color: var(--muted); }
 .investor-row .v { font-weight: 500; }
-.investor-row .v.gold { color: var(--gold); }
+.investor-row .v.gold { color: var(--gold-fixed); }
 .investor-row .v.pos { color: var(--pos); }
 
 /* ---------- News ---------- */
@@ -2306,7 +2306,7 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
 .news-images.count-1 { display: block; }
 .news-images.count-1 img { height: 380px; }
 .news-body { padding: 1.45rem 1.7rem 1.7rem; }
-.news-date { font-size: 0.74rem; color: var(--gold); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.55rem; }
+.news-date { font-size: 0.74rem; color: var(--gold-fixed); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.55rem; }
 .news-title { font-family: 'Fraunces', serif; font-size: 1.35rem; font-weight: 600; margin-bottom: 0.65rem; }
 .news-text { font-size: 1.02rem; color: var(--muted); line-height: 1.65; white-space: pre-wrap; }
 @media (max-width: 720px) {
@@ -2325,7 +2325,7 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
   max-width: 780px; margin: 0 auto; padding: 1.4rem 1.2rem 0;
 }
 .legal-back { color: var(--muted); font-size: 0.85rem; transition: color 0.2s ease; }
-.legal-back:hover, .legal-back:focus-visible { color: var(--gold); }
+.legal-back:hover, .legal-back:focus-visible { color: var(--gold-fixed); }
 .legal-wrap { max-width: 780px; margin: 0 auto; padding: 1.6rem 1.2rem 5rem; position: relative; z-index: 1; }
 .legal-card {
   background: var(--paper-2); border: 1px solid var(--line); border-radius: 18px;
@@ -2339,7 +2339,7 @@ html[data-theme="light"] .bkmp-penguin-easter-egg { display: block; }
 .legal-card p { margin: 0 0 0.7rem; line-height: 1.65; color: var(--ink); font-size: 0.92rem; }
 .legal-card ul { margin: 0 0 0.9rem; padding-left: 1.3rem; line-height: 1.65; font-size: 0.92rem; }
 .legal-card li { margin-bottom: 0.3rem; }
-.legal-card a { color: var(--gold); text-decoration: underline; text-underline-offset: 2px; }
+.legal-card a { color: var(--gold-fixed); text-decoration: underline; text-underline-offset: 2px; }
 .legal-card strong { color: var(--ink); }
 .legal-card .legal-muted { color: var(--muted); font-size: 0.85rem; }
 .legal-card table { width: 100%; border-collapse: collapse; margin: 0.6rem 0 1rem; font-size: 0.88rem; }
@@ -2522,7 +2522,7 @@ label { display: block; font-size: 0.76rem; color: var(--muted); margin-bottom: 
   font-weight: 600;
   padding: 0.38rem 0.7rem;
 }
-.edit-btn:hover { border-color: var(--gold); color: var(--gold); }
+.edit-btn:hover { border-color: var(--gold); color: var(--gold-fixed); }
 
 #page-income .entry-table-wrapper {
   height: 430px;
@@ -2727,7 +2727,7 @@ body:has(.admin-wrap), body:has(.login-card) {
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--gold);
+  color: var(--gold-fixed);
 }
 .overview-activity-label {
   flex: 1;
@@ -2827,7 +2827,7 @@ body:has(.admin-wrap), body:has(.login-card) {
   border-radius: 50%;
   border: 1px solid color-mix(in srgb, var(--gold) 40%, var(--line));
   background: color-mix(in srgb, var(--gold) 12%, transparent);
-  color: var(--gold);
+  color: var(--gold-fixed);
   font-family: 'Fraunces', serif;
   font-style: italic;
   font-size: 0.78rem;
@@ -2887,7 +2887,7 @@ body:has(.admin-wrap), body:has(.login-card) {
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--gold);
+  color: var(--gold-fixed);
   margin-bottom: 0.3rem;
 }
 .payroll-hero-label {
@@ -3295,7 +3295,7 @@ label {
 .format-btn:hover { border-color: var(--gold); transform: translateY(-1px); background: var(--paper-2); }
 .format-btn.color-red { color: #F87171; }
 .format-btn.color-green { color: #4ADE80; }
-.format-btn.color-gold { color: var(--gold); }
+.format-btn.color-gold { color: var(--gold-fixed); }
 .format-btn.color-blue { color: #38BDF8; }
 .form-grid-2 { grid-template-columns: 1fr 1fr; }
 .news-text strong { color: var(--ink); font-weight: 800; }
@@ -3399,7 +3399,7 @@ label {
   border-radius: 999px;
   padding: 0.28rem 0.6rem;
   background: color-mix(in srgb, var(--gold) 18%, transparent);
-  color: var(--gold);
+  color: var(--gold-fixed);
   font-size: 0.68rem;
   font-weight: 800;
   text-transform: uppercase;
@@ -3437,7 +3437,7 @@ label {
 }
 .partner-actions a:hover {
   border-color: var(--gold);
-  color: var(--gold);
+  color: var(--gold-fixed);
 }
 
 /* ---------- Karten Verkaufen ---------- */
@@ -3495,7 +3495,7 @@ label {
 .cardsale-stats div { border: 1px solid var(--line); border-radius: 10px; padding: 0.55rem 0.6rem; background: var(--paper-2); }
 .cardsale-stats span { display: block; color: var(--muted); font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.25rem; }
 .cardsale-stats strong { font-family: 'Fraunces', serif; font-size: 1rem; }
-.cardsale-stats strong.gold { color: var(--gold); }
+.cardsale-stats strong.gold { color: var(--gold-fixed); }
 
 .cardsale-admin-row { align-items: center; }
 .cardsale-counter {
@@ -3517,7 +3517,7 @@ label {
   font-size: 1rem;
   line-height: 1;
 }
-.cardsale-count-btn:hover { border-color: var(--gold); color: var(--gold); }
+.cardsale-count-btn:hover { border-color: var(--gold); color: var(--gold-fixed); }
 .cardsale-count-value { min-width: 34px; text-align: center; font-weight: 700; font-size: 0.85rem; }
 
 /* ---------- Kartendatenbank ---------- */
@@ -3695,7 +3695,7 @@ input.cardcatalog-search:focus {
   border-radius: 999px;
   padding: 0.25rem 0.6rem;
   background: color-mix(in srgb, var(--gold) 18%, transparent);
-  color: var(--gold);
+  color: var(--gold-fixed);
   font-size: 0.66rem;
   font-weight: 800;
   text-transform: uppercase;
@@ -3756,7 +3756,7 @@ input.cardcatalog-search:focus {
   border: 1px solid var(--line);
 }
 .investor-request-status.status-pending {
-  color: var(--gold);
+  color: var(--gold-fixed);
   background: color-mix(in srgb, var(--gold) 14%, transparent);
   border-color: color-mix(in srgb, var(--gold) 30%, transparent);
 }
@@ -4061,7 +4061,7 @@ img[data-bkmp-img].bkmp-image-missing {
   border-radius: 999px;
   padding: 0.25rem 0.7rem;
   background: rgba(201, 165, 106, 0.18);
-  color: var(--gold);
+  color: var(--gold-fixed);
   font-size: 0.7rem;
   font-weight: 900;
   letter-spacing: 0.08em;
@@ -4457,7 +4457,7 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 .bkmp-footer-legal a:hover,
 .bkmp-footer-legal a:focus-visible {
   opacity: 1;
-  color: var(--gold);
+  color: var(--gold-fixed);
 }
 @media (max-width: 560px) {
   .bkmp-footer-legal { justify-content: center; }
@@ -4477,7 +4477,7 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   background: none;
   font: inherit;
   font-size: 0.82rem;
-  color: var(--gold);
+  color: var(--gold-fixed);
   opacity: 0;
   transform: translateY(4px);
   pointer-events: none;
@@ -4572,7 +4572,7 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 .bkmp-achievement-popup.visible { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
 .bkmp-achievement-popup-title { font-family: 'Fraunces', serif; font-size: 1.1rem; font-weight: 700; margin-bottom: 0.35rem; }
 .bkmp-achievement-popup-desc { font-size: 0.82rem; color: var(--muted); margin-bottom: 0.6rem; }
-.bkmp-achievement-popup-unlock { font-size: 0.78rem; font-weight: 800; color: var(--gold); text-transform: uppercase; letter-spacing: 0.03em; }
+.bkmp-achievement-popup-unlock { font-size: 0.78rem; font-weight: 800; color: var(--gold-fixed); text-transform: uppercase; letter-spacing: 0.03em; }
 .bkmp-achievement-popup-unlock strong { display: block; color: var(--ink); font-size: 0.92rem; text-transform: none; letter-spacing: 0; margin-top: 0.15rem; font-family: 'Fraunces', serif; }
 
 .bkmp-achievement-confetti {
@@ -4750,7 +4750,7 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   opacity: 0.5;
   transition: opacity 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
-.login-btn-corner:hover { opacity: 1; color: var(--gold); border-color: color-mix(in srgb, var(--gold) 45%, transparent); }
+.login-btn-corner:hover { opacity: 1; color: var(--gold-fixed); border-color: color-mix(in srgb, var(--gold) 45%, transparent); }
 @media (max-width: 640px) {
   .login-btn-corner { left: 0.7rem; bottom: 0.7rem; padding: 0.4rem 0.7rem; font-size: 0.68rem; }
 }
@@ -4824,7 +4824,7 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
    Erfolgs-Karte sichtbar. Gesperrt-Zustand bewusst gedaempft (opacity),
    nicht wie .achievement-desc komplett ausgegraut - der Bonuswert selbst
    bleibt lesbar, auch wenn er noch nicht aktiv ist. */
-.achievement-bonus { font-size: 0.75rem; color: var(--gold); margin-top: 0.2rem; font-weight: 600; }
+.achievement-bonus { font-size: 0.75rem; color: var(--gold-fixed); margin-top: 0.2rem; font-weight: 600; }
 .achievement-row.locked .achievement-bonus { opacity: 0.65; }
 .achievement-progress {
   margin-top: 0.4rem;
@@ -4888,7 +4888,7 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   font-weight: 700;
   white-space: nowrap;
   background: color-mix(in srgb, var(--gold) 18%, transparent);
-  color: var(--gold);
+  color: var(--gold-fixed);
   border: 1px solid color-mix(in srgb, var(--gold) 35%, var(--line));
 }
 .idle-title-bonus-hidden { background: transparent; color: var(--muted); border-color: var(--line); }
@@ -5201,14 +5201,14 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   padding: 0 4px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--gold) 25%, transparent);
-  color: var(--gold);
+  color: var(--gold-fixed);
   font-size: 0.62rem;
   line-height: 16px;
   text-align: center;
 }
 .idle-runen-slot-tab:hover { color: var(--ink); border-color: color-mix(in srgb, var(--gold) 40%, var(--line)); }
 .idle-runen-slot-tab.active {
-  color: var(--gold);
+  color: var(--gold-fixed);
   border-color: var(--gold);
   background: color-mix(in srgb, var(--gold) 14%, var(--paper));
 }
@@ -5254,7 +5254,7 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 .idle-runen-stat-head img { width: 42px; height: 42px; object-fit: contain; filter: drop-shadow(0 0 8px color-mix(in srgb, var(--rune-color) 55%, transparent)); }
 .idle-runen-equip-btn { margin-left: auto; flex-shrink: 0; padding: 0.45rem 0.9rem; font-size: 0.8rem; }
 .idle-runen-stat-name { font-weight: 700; font-size: 0.92rem; }
-.idle-runen-stat-level { color: var(--gold); font-weight: 800; font-size: 0.8rem; margin-left: 0.2rem; }
+.idle-runen-stat-level { color: var(--gold-fixed); font-weight: 800; font-size: 0.8rem; margin-left: 0.2rem; }
 .idle-runen-stat-rarity { font-size: 0.76rem; font-weight: 700; color: var(--rune-color); }
 .idle-runen-stat-line { margin: 0; font-size: 0.88rem; }
 .idle-runen-stat-primary { font-weight: 700; }
@@ -5379,7 +5379,7 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   line-height: 14px;
   text-align: center;
 }
-.idle-runen-level-badge { bottom: auto; top: 3px; left: 3px; right: auto; border-color: var(--gold); color: var(--gold); }
+.idle-runen-level-badge { bottom: auto; top: 3px; left: 3px; right: auto; border-color: var(--gold); color: var(--gold-fixed); }
 /* Feinschliff 07.08.2026 (Nutzerwunsch, im selben Zug wie die Spanne-Zeilen-
    Entfernung oben): 0.7rem -> 0.55rem, betrifft alle drei gestapelten
    .idle-runen-stat-actions-Bloecke (Aufwerten/Instant, ggf. Aufsteigen,
@@ -5551,7 +5551,7 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 .cosmetic-swatch.locked { cursor: not-allowed; background: color-mix(in srgb, var(--paper-2) 80%, transparent); }
 .cosmetic-swatch.locked .cosmetic-swatch-name,
 .cosmetic-swatch.locked .cosmetic-swatch-desc { color: color-mix(in srgb, var(--ink) 55%, transparent); }
-.cosmetic-swatch-name { font-weight: 700; font-size: 0.85rem; color: var(--gold); }
+.cosmetic-swatch-name { font-weight: 700; font-size: 0.85rem; color: var(--gold-fixed); }
 .cosmetic-swatch-desc { font-size: 0.72rem; color: var(--muted); }
 
 /* ---------- Pluschies ---------- */
@@ -5624,14 +5624,14 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
    passend zur fixen dunklen Vorschau (unabhaengig vom Seiten-Theme). */
 .mc-cosmetic-shadow .cosmetic-swatch-name { color: #e8e6ea; }
 .mc-cosmetic-shadow .cosmetic-swatch-desc { color: #b8b8c2; }
-.mc-cosmetic-gold { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 50%, var(--line)); }
+.mc-cosmetic-gold { color: var(--gold-fixed); border-color: color-mix(in srgb, var(--gold) 50%, var(--line)); }
 .mc-cosmetic-ice {
   color: #7dd3fc;
   border-color: color-mix(in srgb, #38bdf8 50%, var(--line));
   box-shadow: 0 0 12px color-mix(in srgb, #38bdf8 35%, transparent);
 }
 .mc-cosmetic-glow {
-  color: var(--gold);
+  color: var(--gold-fixed);
   border-color: color-mix(in srgb, var(--gold) 55%, var(--line));
   box-shadow: 0 0 16px color-mix(in srgb, var(--gold) 45%, transparent);
 }
@@ -6084,7 +6084,7 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   color: #ffd873;
 }
 
-.bkmp-daily-popup-countdown { font-size: 0.85rem; font-weight: 700; color: var(--gold); margin-bottom: 1rem; }
+.bkmp-daily-popup-countdown { font-size: 0.85rem; font-weight: 700; color: var(--gold-fixed); margin-bottom: 1rem; }
 
 .bkmp-daily-popup-claim {
   width: 100%;
@@ -6132,7 +6132,7 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   padding: 0.7rem 0.9rem;
   background: var(--paper-2);
 }
-.daily-stat-card .value { font-family: 'Fraunces', serif; font-size: 1.3rem; font-weight: 700; color: var(--gold); }
+.daily-stat-card .value { font-family: 'Fraunces', serif; font-size: 1.3rem; font-weight: 700; color: var(--gold-fixed); }
 .daily-stat-card .label { font-size: 0.72rem; color: var(--muted); margin-top: 0.15rem; }
 
 .admin-checkbox-label {
@@ -6542,7 +6542,7 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.idle-stage-label strong { color: var(--gold); }
+.idle-stage-label strong { color: var(--gold-fixed); }
 .idle-stage-buttons { display: flex; flex-wrap: wrap; flex-shrink: 0; gap: 0.4rem; }
 .idle-stage-btn { padding: 0.3rem 0.6rem; font-size: 0.72rem; white-space: nowrap; }
 .idle-stage-btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none !important; }
@@ -6631,7 +6631,7 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 }
 .idle-stagepicker-act-header:disabled { cursor: not-allowed; opacity: 0.6; }
 .idle-stagepicker-act-chevron { flex: none; color: var(--muted); font-size: 0.8rem; transition: transform 0.15s ease; }
-.idle-stagepicker-act-title { flex: none; font-family: 'Fraunces', serif; font-size: 0.95rem; color: var(--gold); }
+.idle-stagepicker-act-title { flex: none; font-family: 'Fraunces', serif; font-size: 0.95rem; color: var(--gold-fixed); }
 .idle-stagepicker-act.is-locked .idle-stagepicker-act-title { color: var(--muted); }
 .idle-stagepicker-act-badge {
   font-size: 0.68rem;
@@ -6639,7 +6639,7 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   padding: 0.15rem 0.5rem;
   border-radius: 999px;
   background: color-mix(in srgb, var(--gold) 16%, transparent);
-  color: var(--gold);
+  color: var(--gold-fixed);
 }
 .idle-stagepicker-act-badge.is-current { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
 .idle-stagepicker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 0.45rem; padding: 0 0.8rem 0.8rem; }
@@ -6663,8 +6663,8 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
    Ueberschneidung weiterhin gewinnt (die Krone im Text bleibt trotzdem
    sichtbar). */
 .idle-stagepicker-stage.is-boss { border-color: var(--purple); color: var(--purple); background: color-mix(in srgb, var(--purple) 10%, var(--paper)); }
-.idle-stagepicker-stage.is-current { background: var(--gold); color: #1a1408; border-color: var(--gold); }
-.idle-stagepicker-stage.is-highest:not(.is-current) { border-color: var(--gold); color: var(--gold); }
+.idle-stagepicker-stage.is-current { background: var(--gold); color: var(--accent-ink, #1a1408); border-color: var(--gold); }
+.idle-stagepicker-stage.is-highest:not(.is-current) { border-color: var(--gold); color: var(--gold-fixed); }
 @media (max-width: 640px) {
   .idle-stage-picker-card { width: 100vw; max-height: 100vh; height: 100vh; border-radius: 0; padding: 1.4rem 1rem 1rem; }
   .idle-stage-picker-body { max-height: 65vh; }
@@ -6681,7 +6681,7 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   background-size: 100% 100%, 220% 220%;
   animation: bkmpTierGlow 3.5s ease infinite;
 }
-.idle-event-dragon-card h3 { font-family: 'Fraunces', serif; font-size: 1.3rem; margin-bottom: 0.7rem; color: var(--gold); }
+.idle-event-dragon-card h3 { font-family: 'Fraunces', serif; font-size: 1.3rem; margin-bottom: 0.7rem; color: var(--gold-fixed); }
 .idle-event-dragon-card p { font-size: 1rem; }
 
 /* Grimbold-Dialogszene ("Meister"-Skilltree-Zweig) */
@@ -6759,7 +6759,7 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 /* ---- HUD ---- */
 .idle-dorf-hud { margin-bottom: 1rem; }
 .idle-hud-level { display: flex; align-items: center; justify-content: space-between; font-weight: 700; margin-bottom: 0.35rem; }
-.idle-hud-skillpoints { font-size: 0.78rem; color: var(--gold); font-weight: 700; }
+.idle-hud-skillpoints { font-size: 0.78rem; color: var(--gold-fixed); font-weight: 700; }
 .idle-xp-bar { height: 8px; border-radius: 999px; background: var(--paper); overflow: hidden; border: 1px solid var(--line); }
 .idle-xp-fill { height: 100%; background: linear-gradient(90deg, #38bdf8, #818cf8); transition: width 0.3s ease; }
 .idle-xp-label { font-size: 0.72rem; color: var(--muted); margin: 0.2rem 0 0.6rem; }
@@ -7309,7 +7309,7 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   font-size: 0.95em;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
 }
-.idle-reward-float .rf-gold { --rf-color: var(--gold); }
+.idle-reward-float .rf-gold { --rf-color: var(--gold-fixed); }
 .idle-reward-float .rf-xp { --rf-color: #7ee0ff; animation-delay: 0.09s; }
 /* Kleiner Glanz-Streifen nur ueber den Gold-Chip (Muenzen glaenzen,
    Erfahrung nicht) - reine Deko, laeuft einmal waehrend des Aufploppens
@@ -7393,7 +7393,7 @@ html[data-fx="aus"] .idle-dmg-float { animation: none; opacity: 1; transform: tr
   font-family: 'Fraunces', serif;
   font-weight: 800;
   font-size: clamp(0.95rem, 3.6vw, 1.3rem);
-  color: var(--gold);
+  color: var(--gold-fixed);
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
@@ -7540,8 +7540,8 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 .idle-upgrade-effect-line { overflow-wrap: break-word; }
 .idle-upgrade-effect-current { color: var(--ink); }
 .idle-upgrade-effect-arrow { color: var(--muted); }
-.idle-upgrade-effect-next { color: var(--gold); font-weight: 600; }
-.idle-upgrade-card.is-maxed .idle-upgrade-effect-current { color: var(--gold); font-weight: 600; }
+.idle-upgrade-effect-next { color: var(--gold-fixed); font-weight: 600; }
+.idle-upgrade-card.is-maxed .idle-upgrade-effect-current { color: var(--gold-fixed); font-weight: 600; }
 /* Bugfix (05.08.2026, Nutzer-Screenshot "Sieht schrecklich aus" zum
    Prestige-Baum-Knoten "Weitere Gefaehrten"): .idle-upgrade-desc (nutzt
    ausschliesslich bkmpPrestigeRenderBranchGridHtml() fuer die Prestige-
@@ -7560,10 +7560,10 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
    Hinweis - bewusst kleiner/gedaempfter als die Effekt-Zeilen (Zusatzinfo,
    nicht der Haupt-Blickfang der Karte). */
 .idle-upgrade-zone-note { font-size: 0.68rem; color: var(--muted); overflow-wrap: break-word; }
-.idle-upgrade-milestone-note { font-size: 0.68rem; color: var(--gold); overflow-wrap: break-word; }
+.idle-upgrade-milestone-note { font-size: 0.68rem; color: var(--gold-fixed); overflow-wrap: break-word; }
 /* Progression-Rebalance Phase 10 (26.07.2026): Gebaeude-Ueberladung. */
 .idle-building-overload-row { margin-bottom: 0.8rem; }
-.idle-building-overload-active { font-size: 0.78rem; color: var(--gold); font-weight: 600; margin-bottom: 0.4rem; }
+.idle-building-overload-active { font-size: 0.78rem; color: var(--gold-fixed); font-weight: 600; margin-bottom: 0.4rem; }
 .idle-building-overload-tiers { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .idle-building-overload-btn { padding: 0.35rem 0.6rem; font-size: 0.72rem; }
 .idle-building-overload-btn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -7738,7 +7738,7 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 .idle-dragon-companion-slot-label { font-size: 0.78rem; color: var(--muted); }
 .idle-dragon-companion-slot .idle-dragon-thumb { max-width: 78px; margin-bottom: 0.3rem; }
 .idle-dragon-companion-slot-name { font-size: 0.88rem; font-weight: 600; line-height: 1.2; }
-.idle-dragon-companion-slot-rank { font-size: 0.78rem; color: var(--gold); margin-top: 0.15rem; }
+.idle-dragon-companion-slot-rank { font-size: 0.78rem; color: var(--gold-fixed); margin-top: 0.15rem; }
 /* Anklickbare Plaetze (05.08.2026, oeffnen bkmpDragonOpenCompanionPicker) -
    dezente Hover-Anhebung, damit die Klickbarkeit spuerbar ist ohne die
    ruhige Kartenoptik zu stoeren. Gesperrte Plaetze bekommen bewusst NICHT
@@ -7759,7 +7759,7 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 /* Rang-Abzeichen auf der Drachenlager-Karte selbst (im Grid weiter unten) -
    zeigt an, MIT WELCHEM Gewicht (100%/50%/25%) ein bereits ausgeruesteter
    erwachsener Begleiter gerade tatsaechlich beitraegt. */
-.idle-dragon-companion-rank-badge { font-size: 0.72rem; color: var(--gold); margin: 0.15rem 0; }
+.idle-dragon-companion-rank-badge { font-size: 0.72rem; color: var(--gold-fixed); margin: 0.15rem 0; }
 .idle-dragon-companion-rank-badge.is-inactive { color: var(--muted); }
 /* Stats-Block (05.08.2026, Nutzerwunsch nach einem eigenen "nur Stats"-
    Block neben der Begleiter-Leiste, Vorbild Tactics-RPG-Stat-Panels: Icon +
@@ -7776,7 +7776,7 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 .idle-dragon-companion-stat-row + .idle-dragon-companion-stat-row { border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
 .idle-dragon-companion-stat-icon { font-size: 1rem; flex-shrink: 0; }
 .idle-dragon-companion-stat-label { flex: 1; color: var(--muted); }
-.idle-dragon-companion-stat-value { font-weight: 700; color: var(--gold); font-variant-numeric: tabular-nums; }
+.idle-dragon-companion-stat-value { font-weight: 700; color: var(--gold-fixed); font-variant-numeric: tabular-nums; }
 /* Vorraete-Hinweis hinter ein "i" versteckt (05.08.2026, Nutzerwunsch: "Diese
    Anleitung kann auch ganz nach unten. Oder irgendwo hinter einen 'I'
    versteckt als Hilfe Anleitung") - vorher permanent sichtbarer Hinweistext
@@ -7808,7 +7808,7 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 .idle-dragon-companion-picker-name { font-size: 0.85rem; font-weight: 600; }
 .idle-dragon-companion-picker-stats { font-size: 0.72rem; color: var(--muted); margin-top: 0.1rem; }
 .idle-dragon-companion-picker-status { font-size: 0.7rem; display: block; margin-top: 0.15rem; }
-.idle-dragon-companion-picker-status.is-active { color: var(--gold); }
+.idle-dragon-companion-picker-status.is-active { color: var(--gold-fixed); }
 .idle-dragon-companion-picker-status.is-inactive { color: var(--muted); }
 .idle-dragon-baby-card { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 14px; padding: 0.9rem; background: var(--paper); text-align: center; position: relative; }
 /* Bug-Fix 18.07. (Spieler-Screenshot: "Füttern"-Knöpfe außerhalb der
@@ -7992,12 +7992,12 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 .idle-prestige-section { border: 1px solid var(--line); border-radius: var(--mood-radius-panel, 14px); padding: 0.9rem 1rem; background: var(--paper); margin-bottom: 0.9rem; }
 .idle-prestige-section-gain { border-color: color-mix(in srgb, #a78bfa 40%, var(--line)); background: linear-gradient(135deg, color-mix(in srgb, #a78bfa 12%, var(--paper)), var(--paper)); }
 .idle-prestige-gain-highlight { font-family: 'Fraunces', serif; font-weight: 700; font-size: 1.15rem; color: #c4b5fd; }
-.idle-prestige-gain-highlight .idle-prestige-gain-arrow { display: block; font-family: 'Inter', sans-serif; font-weight: 600; font-size: 0.82rem; color: var(--gold); margin-top: 0.25rem; }
+.idle-prestige-gain-highlight .idle-prestige-gain-arrow { display: block; font-family: 'Inter', sans-serif; font-weight: 600; font-size: 0.82rem; color: var(--gold-fixed); margin-top: 0.25rem; }
 .idle-prestige-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; margin-bottom: 0.9rem; }
 .idle-prestige-section-reset { border-color: color-mix(in srgb, #f87171 30%, var(--line)); }
 .idle-prestige-section-keep { border-color: color-mix(in srgb, var(--gold) 35%, var(--line)); }
 .idle-upgrade-section-title-reset { color: #f87171; }
-.idle-upgrade-section-title-keep { color: var(--gold); }
+.idle-upgrade-section-title-keep { color: var(--gold-fixed); }
 .idle-prestige-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
 .idle-prestige-list li { display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.82rem; color: var(--muted); line-height: 1.4; }
 .idle-prestige-list-icon { flex: none; font-size: 0.9rem; line-height: 1.3; }
@@ -8012,7 +8012,7 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 .idle-prestige-milestone-summary { font-weight: 600; color: var(--ink); margin-bottom: 0.2rem; }
 .idle-prestige-branch-tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.5rem 0 0.8rem; }
 .idle-prestige-branch-tab { padding: 0.4rem 0.7rem; font-size: 0.78rem; border-radius: 999px; border: 1px solid var(--line); background: var(--paper); color: var(--muted); cursor: pointer; }
-.idle-prestige-branch-tab.active { border-color: var(--gold); color: var(--gold); font-weight: 600; }
+.idle-prestige-branch-tab.active { border-color: var(--gold); color: var(--gold-fixed); font-weight: 600; }
 .idle-prestige-branch-tab.is-locked { opacity: 0.55; cursor: not-allowed; }
 .idle-upgrade-card.idle-prestige-needs-sql { border-color: color-mix(in srgb, #f59e0b 35%, var(--line)); }
 .idle-prestige-paragon-row { display: flex; align-items: center; gap: 0.35rem; position: relative; font-size: 0.74rem; color: #c4b5fd; margin: -0.2rem 0 0.1rem; }
@@ -8042,7 +8042,7 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 .idle-prestige-priority-rank { color: var(--muted); width: 1.3rem; flex-shrink: 0; }
 .idle-prestige-priority-name { flex: 1; }
 .idle-prestige-priority-btn { width: 1.8rem; height: 1.8rem; padding: 0; border-radius: 8px; border: 1px solid var(--line); background: var(--paper-2); color: var(--ink); cursor: pointer; font-size: 0.7rem; flex-shrink: 0; }
-.idle-prestige-priority-btn:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
+.idle-prestige-priority-btn:hover:not(:disabled) { border-color: var(--gold); color: var(--gold-fixed); }
 .idle-prestige-priority-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .idle-prestige-section-ascension { border-color: color-mix(in srgb, #facc15 35%, var(--line)); }
 .idle-ascension-btn { width: 100%; margin-top: 0.4rem; }
@@ -8054,7 +8054,7 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
    permanent davor zu stehen - siehe bkmpPrestigeRenderInfoAccordionHtml(). */
 .idle-prestige-info-accordion { padding: 0; overflow: hidden; }
 .idle-prestige-info-toggle { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; width: 100%; padding: 0.9rem 1rem; border: none; background: transparent; color: var(--ink); font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
-.idle-prestige-info-toggle:hover, .idle-prestige-info-toggle:focus-visible { color: var(--gold); }
+.idle-prestige-info-toggle:hover, .idle-prestige-info-toggle:focus-visible { color: var(--gold-fixed); }
 .idle-prestige-info-toggle-chevron { flex-shrink: 0; opacity: 0.65; font-size: 0.75em; }
 .idle-prestige-info-body { padding: 0 1rem 1rem; }
 .idle-prestige-info-body .idle-prestige-section:last-child { margin-bottom: 0; }
@@ -8073,13 +8073,13 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 .idle-prestige-confirm-overlay[data-step="final"] .idle-prestige-confirm-step-final { display: block; }
 .idle-prestige-confirm-gain {
   text-align: center; font-family: 'Fraunces', serif; font-weight: 700; font-size: 1.05rem;
-  color: var(--gold); margin-bottom: 1rem; padding: 0.6rem; border-radius: 12px;
+  color: var(--gold-fixed); margin-bottom: 1rem; padding: 0.6rem; border-radius: 12px;
   background: color-mix(in srgb, var(--gold) 10%, transparent);
 }
 .idle-prestige-confirm-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 0.5rem; }
 .idle-prestige-confirm-col-title { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.5rem; }
 .idle-prestige-confirm-col-title-reset { color: #f87171; }
-.idle-prestige-confirm-col-title-keep { color: var(--gold); }
+.idle-prestige-confirm-col-title-keep { color: var(--gold-fixed); }
 .idle-prestige-confirm-columns .idle-prestige-list { max-height: 220px; overflow-y: auto; padding-right: 0.3rem; }
 .idle-prestige-confirm-next-btn, .idle-prestige-confirm-final-btn { background: linear-gradient(135deg, #a78bfa, #7c3aed) !important; border: none !important; color: #fff !important; box-shadow: 0 0 18px rgba(167, 139, 250, 0.4); }
 .idle-prestige-confirm-final-btn:disabled { opacity: 0.6; cursor: progress; box-shadow: none; }
@@ -8149,10 +8149,10 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
   transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .idle-prestige-ceremony-overlay.phase-result .idle-prestige-ceremony-result { opacity: 1; transform: translateY(0) scale(1); }
-.idle-prestige-ceremony-level { font-size: 0.78rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold); margin-bottom: 0.3rem; }
+.idle-prestige-ceremony-level { font-size: 0.78rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold-fixed); margin-bottom: 0.3rem; }
 .idle-prestige-ceremony-title { font-family: 'Fraunces', serif; font-size: 1.5rem; font-weight: 700; color: #fff; margin-bottom: 0.6rem; }
 .idle-prestige-ceremony-bonus { font-size: 0.95rem; line-height: 1.6; color: #e9e4f7; margin-bottom: 1.1rem; }
-.idle-prestige-ceremony-bonus-pct { display: block; color: var(--gold); font-weight: 700; margin-top: 0.2rem; }
+.idle-prestige-ceremony-bonus-pct { display: block; color: var(--gold-fixed); font-weight: 700; margin-top: 0.2rem; }
 .idle-prestige-ceremony-continue-btn { opacity: 0; pointer-events: none; transition: opacity 0.3s ease; background: linear-gradient(135deg, #a78bfa, #7c3aed) !important; border: none !important; color: #fff !important; }
 .idle-prestige-ceremony-overlay.phase-result .idle-prestige-ceremony-continue-btn { opacity: 1; pointer-events: auto; }
 
@@ -8408,7 +8408,7 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
    eine echte pro-Spieler-Farbe gibt es im Spiel nicht, deshalb stattdessen
    nach Rolle gefaerbt (gleiche Farbwerte wie die Rollen-Badges/Boni sonst
    im Spiel: Gold=Anführer, Lila=Stellvertreter/Level-Farbe, Blau=Veteran). */
-.idle-guild-chat-role-leader { color: var(--gold); }
+.idle-guild-chat-role-leader { color: var(--gold-fixed); }
 .idle-guild-chat-role-officer { color: var(--purple); }
 .idle-guild-chat-role-veteran { color: #38bdf8; }
 .idle-guild-chat-role-member { color: var(--ink); }
@@ -8746,7 +8746,7 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
   padding: 0.8rem;
 }
 .clan-arena-battle-badge-icon { font-size: clamp(2rem, 6vw, 3.2rem); line-height: 1; }
-.clan-arena-battle-badge-tag { font-family: 'Fraunces', serif; font-weight: 700; font-size: clamp(0.95rem, 2.6vw, 1.3rem); color: var(--gold); text-align: center; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.clan-arena-battle-badge-tag { font-family: 'Fraunces', serif; font-weight: 700; font-size: clamp(0.95rem, 2.6vw, 1.3rem); color: var(--gold-fixed); text-align: center; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .skillhelp-list {
   display: flex;
   flex-direction: column;
@@ -8762,7 +8762,7 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
   font-family: 'Fraunces', serif;
   font-size: 1rem;
   margin-bottom: 0.6rem;
-  color: var(--gold);
+  color: var(--gold-fixed);
 }
 .skillhelp-row {
   display: flex;
@@ -8785,7 +8785,7 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
   padding: 0.2rem 0.55rem;
   border-radius: 999px;
   background: color-mix(in srgb, var(--gold) 16%, transparent);
-  color: var(--gold);
+  color: var(--gold-fixed);
   border: 1px solid color-mix(in srgb, var(--gold) 35%, var(--line));
   white-space: nowrap;
 }
@@ -8832,7 +8832,7 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
   box-shadow: inset 0 0 20px color-mix(in srgb, var(--gold) 8%, transparent);
 }
 .idle-skill-branch.has-available .idle-skill-branch-header { border-color: color-mix(in srgb, var(--gold) 55%, var(--line)); }
-.idle-skill-branch-name { font-family: 'Fraunces', serif; font-size: 1.05rem; color: var(--gold); }
+.idle-skill-branch-name { font-family: 'Fraunces', serif; font-size: 1.05rem; color: var(--gold-fixed); }
 .idle-skill-branch-progress {
   margin-left: auto;
   font-size: 0.76rem;
@@ -8959,7 +8959,7 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 .idle-skill-node-desc { font-size: 0.68rem; color: var(--muted); margin: 0.3rem 0; min-height: 2.2em; overflow-wrap: break-word; }
 .idle-skill-node-requires { font-size: 0.64rem; color: color-mix(in srgb, var(--gold) 65%, var(--muted)); margin-bottom: 0.35rem; overflow-wrap: break-word; }
 .idle-skill-node-rank { font-size: 0.7rem; font-weight: 600; color: var(--muted); margin-bottom: 0.45rem; }
-.idle-skill-node.ranked .idle-skill-node-rank { color: var(--gold); }
+.idle-skill-node.ranked .idle-skill-node-rank { color: var(--gold-fixed); }
 .idle-skill-node-btn { width: 100%; padding: 0.4rem 0.5rem; font-size: 0.72rem; }
 .idle-skill-node-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -9150,9 +9150,9 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
   box-shadow: 0 0 16px color-mix(in srgb, var(--gold) 45%, transparent), inset 0 0 10px rgba(0, 0, 0, 0.35);
 }
 .idle-hud-level-num { font-family: 'Fraunces', serif; font-size: 1.25rem; font-weight: 700; line-height: 1; color: var(--ink); }
-.idle-hud-level-tag { font-size: 0.5rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold); margin-top: 0.1rem; }
+.idle-hud-level-tag { font-size: 0.5rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold-fixed); margin-top: 0.1rem; }
 .idle-hud-xp-wrap { flex: 1; min-width: 0; }
-.idle-hud-skillpoints { font-size: 0.78rem; color: var(--gold); font-weight: 700; margin-bottom: 0.3rem; }
+.idle-hud-skillpoints { font-size: 0.78rem; color: var(--gold-fixed); font-weight: 700; margin-bottom: 0.3rem; }
 .idle-xp-bar { height: 10px; border-radius: 999px; background: color-mix(in srgb, black 40%, var(--paper)); overflow: hidden; border: 1px solid var(--line); position: relative; }
 .idle-xp-fill { height: 100%; background: linear-gradient(90deg, #38bdf8, #a78bfa); position: relative; }
 .idle-xp-fill::after {
@@ -9236,7 +9236,7 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 .idle-dorf-tab:not(:disabled):hover { transform: translateY(-2px); color: var(--ink); border-color: color-mix(in srgb, var(--gold) 55%, var(--line)); }
 .idle-dorf-tab.active {
   background: linear-gradient(180deg, color-mix(in srgb, var(--gold) 28%, var(--paper-2)), var(--paper-2));
-  color: var(--gold);
+  color: var(--gold-fixed);
   border-color: var(--gold);
   transform: translateY(-2px);
   box-shadow: 0 4px 14px color-mix(in srgb, var(--gold) 30%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.08);
@@ -9569,7 +9569,7 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 
 .raid-participants-list { margin-top: 0.9rem; font-size: 0.78rem; }
 .raid-participant-row { display: flex; justify-content: space-between; padding: 0.3rem 0; border-bottom: 1px solid var(--line); }
-.raid-participant-row.is-me { color: var(--gold); font-weight: 700; }
+.raid-participant-row.is-me { color: var(--gold-fixed); font-weight: 700; }
 
 /* ---- Ergebnis-Screen ---- */
 .raid-result-card { text-align: center; padding: 1rem; }
@@ -9582,7 +9582,7 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 .raid-result-stat-value { font-size: 1.1rem; font-weight: 800; margin-top: 0.2rem; }
 .raid-result-rewards { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.6rem 1rem; font-weight: 700; margin-top: 0.8rem; }
 .raid-result-flawless { color: #facc15; font-weight: 700; font-size: 0.9rem; margin-bottom: 0.6rem; }
-.raid-result-mvp { color: var(--gold); font-size: 0.95rem; }
+.raid-result-mvp { color: var(--gold-fixed); font-size: 0.95rem; }
 
 /* Nutzerwunsch 19.07.: ausklappbare Schadensliste aller Teilnehmer im
    Raid-Ergebnis-Fenster (bkmpRaidResultParticipantsHTML), gleiches
@@ -9623,7 +9623,7 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
   border-bottom: 1px solid var(--line);
 }
 .raid-result-participant-row:last-child { border-bottom: none; }
-.raid-result-participant-row.is-me { color: var(--gold); font-weight: 700; }
+.raid-result-participant-row.is-me { color: var(--gold-fixed); font-weight: 700; }
 .raid-result-participant-rank { flex: none; width: 2.2rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .raid-result-participant-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .raid-result-participant-damage { flex: none; font-variant-numeric: tabular-nums; }
@@ -9639,7 +9639,7 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
   background-size: 100% 100%, 220% 220%;
   animation: bkmpTierGlow 3.5s ease infinite;
 }
-.raid-result-zerathor-title { font-weight: 800; color: var(--gold); margin-bottom: 0.5rem; }
+.raid-result-zerathor-title { font-weight: 800; color: var(--gold-fixed); margin-bottom: 0.5rem; }
 .raid-result-zerathor-code-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.6rem; }
 .raid-result-zerathor-code-value {
   font-family: 'Courier New', monospace;
@@ -10100,7 +10100,7 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
   .map-order-form { padding: 1.4rem 1.1rem 1.6rem; border-radius: 18px; }
 }
 
-.map-order-total-preview { margin-top: 0.6rem; font-size: 0.85rem; color: var(--gold); font-weight: 700; }
+.map-order-total-preview { margin-top: 0.6rem; font-size: 0.85rem; color: var(--gold-fixed); font-weight: 700; }
 .map-order-submit-msg { margin-top: 0.6rem; font-size: 0.85rem; font-weight: 700; min-height: 1.2em; }
 
 /* ---- Firmenbewerbung ("Bist du eine Kartenbaufirma? Bewirb dich hier") ---- */
@@ -10221,7 +10221,7 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 .map-company-logo-empty { display: flex; align-items: center; justify-content: center; margin: 0 auto 0.5rem; border: 1px solid var(--line); font-size: 1.6rem; }
 .map-company-detail-head .map-company-logo-empty { margin: 0; }
 .map-company-desc { font-size: 0.8rem; color: var(--muted); margin: 0.4rem 0; }
-.map-company-price { font-size: 0.8rem; color: var(--gold); font-weight: 700; }
+.map-company-price { font-size: 0.8rem; color: var(--gold-fixed); font-weight: 700; }
 
 .map-code-value {
   font-family: 'Fraunces', serif;
@@ -10233,7 +10233,7 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
   margin: 0.8rem 0;
   background: linear-gradient(120deg, rgba(255, 206, 51, 0.18), rgba(255, 157, 26, 0.1));
   border: 1px dashed rgba(255, 206, 51, 0.55);
-  color: var(--gold);
+  color: var(--gold-fixed);
   user-select: all;
   text-align: center;
 }
@@ -10304,7 +10304,7 @@ body.admin-mode-expenseseditor .admin-nav-btn[data-role="expenses_editor"] { dis
 .map-chat-msg-body { font-size: 0.85rem; white-space: pre-wrap; word-break: break-word; }
 .map-chat-msg-attachment { margin-top: 0.4rem; }
 .map-chat-msg-attachment img { max-width: 100%; max-height: 220px; border-radius: 8px; display: block; }
-.map-chat-msg-attachment a { font-size: 0.78rem; color: var(--gold); }
+.map-chat-msg-attachment a { font-size: 0.78rem; color: var(--gold-fixed); }
 
 .map-chat-composer { display: flex; flex-direction: column; gap: 0.5rem; }
 .map-chat-composer textarea {
@@ -10319,7 +10319,7 @@ body.admin-mode-expenseseditor .admin-nav-btn[data-role="expenses_editor"] { dis
 .map-workspace-details summary { cursor: pointer; font-weight: 700; font-size: 0.85rem; }
 .map-workspace-files-list, .map-workspace-history-list { margin-top: 0.6rem; display: flex; flex-direction: column; gap: 0.4rem; }
 .map-workspace-file-row { display: flex; justify-content: space-between; gap: 0.6rem; font-size: 0.8rem; padding: 0.4rem 0.5rem; border-radius: 8px; background: var(--paper-2); }
-.map-workspace-file-row a { color: var(--gold); }
+.map-workspace-file-row a { color: var(--gold-fixed); }
 .map-workspace-history-row { font-size: 0.76rem; color: var(--muted); padding: 0.25rem 0; border-bottom: 1px dashed var(--line); }
 .map-workspace-history-row:last-child { border-bottom: none; }
 
@@ -10329,7 +10329,7 @@ body.admin-mode-expenseseditor .admin-nav-btn[data-role="expenses_editor"] { dis
 .map-company-detail-head .map-company-logo { width: 56px; height: 56px; margin-bottom: 0; }
 .map-company-detail-head h3 { font-family: 'Fraunces', serif; font-size: 1.3rem; }
 .map-company-links { display: flex; gap: 0.8rem; margin: 0.8rem 0; }
-.map-company-links a { color: var(--gold); font-weight: 700; font-size: 0.85rem; }
+.map-company-links a { color: var(--gold-fixed); font-weight: 700; font-size: 0.85rem; }
 .map-company-showcase { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.6rem; margin-top: 0.8rem; }
 .map-company-showcase img { width: 100%; height: 110px; object-fit: cover; border-radius: 10px; }
 
@@ -12906,7 +12906,7 @@ html.bkmp-app-mode .idle-app-more-sheet-group-title:first-child {
   font-size: 0.72rem; font-weight: 600; cursor: pointer; white-space: nowrap;
 }
 .bkmp-proto-chud-fx-option:hover { background: color-mix(in srgb, var(--gold) 12%, transparent); }
-.bkmp-proto-chud-fx-option.active { color: var(--gold); font-weight: 700; border-color: var(--gold); }
+.bkmp-proto-chud-fx-option.active { color: var(--gold-fixed); font-weight: 700; border-color: var(--gold); }
 .bkmp-proto-chud-fx-divider { height: 1px; background: var(--line); margin: 0.5rem 0; }
 .bkmp-proto-chud-fx-title { font-size: 0.72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 0.35rem; }
 .bkmp-proto-chud-fx-toggles { display: flex; flex-direction: column; gap: 0.1rem; }
@@ -12933,7 +12933,7 @@ html.bkmp-app-mode .idle-app-more-sheet-group-title:first-child {
 .bkmp-proto-nav-btn svg { width: 16px; height: 16px; flex: none; }
 .bkmp-proto-nav-btn:hover { color: var(--ink); background: color-mix(in srgb, var(--paper-2) 70%, transparent); }
 .bkmp-proto-nav-btn.active {
-  color: var(--gold); background: color-mix(in srgb, var(--gold) 12%, transparent);
+  color: var(--gold-fixed); background: color-mix(in srgb, var(--gold) 12%, transparent);
   border-color: color-mix(in srgb, var(--gold) 35%, transparent);
 }
 .bkmp-proto-nav-more-wrap { position: relative; margin-left: auto; }
@@ -12961,7 +12961,7 @@ html.bkmp-app-mode .idle-app-more-sheet-group-title:first-child {
   border: none; background: transparent; color: var(--ink); font-size: 0.78rem; font-weight: 600; cursor: pointer;
 }
 .bkmp-proto-nav-more-item:hover { background: color-mix(in srgb, var(--gold) 12%, transparent); }
-.bkmp-proto-nav-more-item.active { color: var(--gold); }
+.bkmp-proto-nav-more-item.active { color: var(--gold-fixed); }
 .bkmp-proto-nav-more-item[disabled] { opacity: 0.5; cursor: not-allowed; }
 
 .bkmp-proto-stagebar {
@@ -13072,7 +13072,7 @@ html.bkmp-app-mode .idle-app-more-sheet-group-title:first-child {
     background: transparent; border-color: transparent;
     font-size: 0.62rem;
   }
-  .bkmp-proto-nav-more-btn.active { color: var(--gold); background: color-mix(in srgb, var(--gold) 12%, transparent); border-color: color-mix(in srgb, var(--gold) 35%, transparent); }
+  .bkmp-proto-nav-more-btn.active { color: var(--gold-fixed); background: color-mix(in srgb, var(--gold) 12%, transparent); border-color: color-mix(in srgb, var(--gold) 35%, transparent); }
   /* Content darf nicht hinter der jetzt fixierten Leiste enden - dieselbe
      Reservierung wie html.bkmp-app-mode .idle-dorf-overlay .idle-dorf-card
      (padding-bottom: calc(6rem + safe-area)) im selben Block weiter oben
@@ -13325,7 +13325,7 @@ html.bkmp-app-mode .idle-app-more-sheet-group-title:first-child {
   padding: 0.35rem 0.8rem;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--gold) 45%, var(--line));
-  background: transparent; color: var(--gold);
+  background: transparent; color: var(--gold-fixed);
   cursor: pointer;
   transition: transform 0.15s ease, background 0.15s ease;
 }
@@ -13370,7 +13370,7 @@ html.bkmp-app-mode .idle-app-more-sheet-group-title:first-child {
   background: var(--paper);
   text-align: center;
 }
-.fbb-summary-item strong { font-size: 1.3rem; font-weight: 800; color: var(--gold); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.fbb-summary-item strong { font-size: 1.3rem; font-weight: 800; color: var(--gold-fixed); font-variant-numeric: tabular-nums; line-height: 1.1; }
 .fbb-summary-item span { font-size: 0.68rem; color: var(--muted); }
 
 .fbb-controls { padding: 0 1.5rem 1rem; display: flex; flex-direction: column; gap: 0.6rem; flex-shrink: 0; border-bottom: 1px solid var(--line); }
@@ -13391,7 +13391,7 @@ html.bkmp-app-mode .idle-app-more-sheet-group-title:first-child {
 .fbb-filter-chip.active {
   border-color: color-mix(in srgb, var(--gold) 55%, var(--line));
   background: color-mix(in srgb, var(--gold) 14%, var(--paper));
-  color: var(--gold);
+  color: var(--gold-fixed);
 }
 .fbb-search {
   width: 100%; padding: 0.6rem 0.85rem;
@@ -13460,7 +13460,7 @@ html.bkmp-app-mode .idle-app-more-sheet-group-title:first-child {
 .fbb-impact-grid > div span:last-child { font-size: 0.84rem; color: var(--ink); }
 
 .fbb-response { padding: 0.75rem 0.85rem; border-radius: 10px; border-left: 3px solid var(--gold); background: color-mix(in srgb, var(--gold) 7%, var(--paper-2)); }
-.fbb-response-label { display: block; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--gold); margin-bottom: 0.3rem; }
+.fbb-response-label { display: block; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--gold-fixed); margin-bottom: 0.3rem; }
 .fbb-response p { margin: 0; font-size: 0.86rem; color: var(--ink); line-height: 1.55; }
 .fbb-history .fbb-response-label { color: var(--muted); }
 
@@ -13478,7 +13478,7 @@ html.bkmp-app-mode .idle-app-more-sheet-group-title:first-child {
 .fbb-tone-blue { color: #38BDF8; border-color: color-mix(in srgb, #38BDF8 40%, var(--line)); background: color-mix(in srgb, #38BDF8 12%, transparent); }
 .fbb-tone-orange { color: #F59E0B; border-color: color-mix(in srgb, #F59E0B 42%, var(--line)); background: color-mix(in srgb, #F59E0B 13%, transparent); }
 .fbb-tone-violet { color: #A78BFA; border-color: color-mix(in srgb, #A78BFA 42%, var(--line)); background: color-mix(in srgb, #A78BFA 13%, transparent); }
-.fbb-tone-gold { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); background: color-mix(in srgb, var(--gold) 14%, transparent); }
+.fbb-tone-gold { color: var(--gold-fixed); border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); background: color-mix(in srgb, var(--gold) 14%, transparent); }
 .fbb-tone-cyan { color: #67E8F9; border-color: color-mix(in srgb, #67E8F9 38%, var(--line)); background: color-mix(in srgb, #67E8F9 11%, transparent); }
 .fbb-tone-green { color: #4ADE80; border-color: color-mix(in srgb, #4ADE80 42%, var(--line)); background: color-mix(in srgb, #4ADE80 13%, transparent); }
 .fbb-tone-red { color: #F87171; border-color: color-mix(in srgb, #F87171 42%, var(--line)); background: color-mix(in srgb, #F87171 13%, transparent); }

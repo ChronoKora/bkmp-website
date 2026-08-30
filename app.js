@@ -799,6 +799,25 @@ const BKMP_PAPER_DEFAULT = {
   dark: { p: '#08070A', p2: '#121016', p3: '#1A1720' },
   light: { p: '#F6F3EC', p2: '#EFEADD', p3: '#E5DFCE' }
 };
+/* Nutzer-Screenshots 30.08.2026 ("Farbregler-Wörter nicht lesbar"): Knöpfe/
+   Badges wie .btn-primary/.btn-ja/.leaderboard-tab.active setzen background/
+   border auf var(--gold) und zeichnen ihren Text in --accent-ink - fest auf
+   ein dunkles #0A0A0F verdrahtet, in der Annahme, --gold sei immer hell/warm.
+   Waehlt der Nutzer eine dunkle/schwarze Akzentfarbe, wird die Flaeche
+   dunkel UND der Text bleibt dunkel -> praktisch unlesbar. Fix: --accent-ink
+   wird jetzt nach der wahrgenommenen Helligkeit der gewaehlten Farbe (YIQ-
+   Naeherung, das uebliche einfache Mass fuer "soll der Text hell oder dunkel
+   sein") dynamisch berechnet - bei einer hellen/warmen Wahl (der ueberwiegend
+   uebliche Fall) bleibt exakt das bisherige dunkle Ink erhalten (keine
+   sichtbare Aenderung), erst bei einer dunklen Wahl schaltet es auf ein
+   helles Ink um. */
+function bkmpPerceivedBrightness(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+  if (!m) return 255;
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  return (r * 299 + g * 587 + b * 114) / 1000;
+}
 /* Faerbt nicht nur --gold um, sondern mischt dieselbe Farbe auch leicht in
    den Seitenhintergrund (--paper/-2/-3) - Spieler-Wunsch: "die komplette
    Hintergrundfarbe soll mit dem Regler anpassbar sein", nicht nur Buttons/
@@ -813,6 +832,7 @@ function bkmpApplyAccentForCurrentTheme() {
     root.style.removeProperty('--paper');
     root.style.removeProperty('--paper-2');
     root.style.removeProperty('--paper-3');
+    root.style.removeProperty('--accent-ink');
     return;
   }
   const base = root.getAttribute('data-theme') === 'light' ? BKMP_PAPER_DEFAULT.light : BKMP_PAPER_DEFAULT.dark;
@@ -820,6 +840,7 @@ function bkmpApplyAccentForCurrentTheme() {
   root.style.setProperty('--paper', `color-mix(in srgb, ${saved} 14%, ${base.p})`);
   root.style.setProperty('--paper-2', `color-mix(in srgb, ${saved} 18%, ${base.p2})`);
   root.style.setProperty('--paper-3', `color-mix(in srgb, ${saved} 22%, ${base.p3})`);
+  root.style.setProperty('--accent-ink', bkmpPerceivedBrightness(saved) < 128 ? '#F5F3ED' : '#0A0A0F');
 }
 /* Von setTheme() bei JEDEM Theme-Wechsel aufgerufen (Toggle-Button UND der
    "Verdrückt"-Button im Spass-Popup, der setTheme() direkt aufruft, siehe
