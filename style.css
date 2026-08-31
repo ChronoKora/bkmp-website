@@ -3493,10 +3493,17 @@ label {
    weiter unten). */
 /* Gemeinsamer Positionierungs-Wrapper (31.08.2026) fuer BEIDE globalen
    Kopfzeilen-Kacheln (Spotlight oben, Shardhaendler direkt darunter) -
-   stapelt sie per Flex-Spalte, damit sich die Reihenfolge unabhaengig von
-   der tatsaechlichen Hoehe jeder Kachel (der Shardhaendler waechst beim
-   Aufklappen des Rechners) automatisch korrekt ergibt, ohne einen manuell
-   berechneten `top`-Versatz pflegen zu muessen. */
+   stapelt sie per Flex-Spalte. Nachbesserung 31.08.2026, Teil 2 (Nutzer-
+   Screenshot: "wenn ich den Rechner oeffne geht das komplette Fenster
+   tiefer"): eine fruehere Fassung liess diesen Wrapper beim Oeffnen eines
+   Rechners zusaetzlich breiter werden (`.has-open-shard-calc`) - der
+   Rechner selbst war zu dem Zeitpunkt noch ein INLINE aufklappender
+   Bereich, der die Karte auf bis zu ~580px Hoehe anwachsen liess, was
+   wiederum die gesamte Seite darunter verschob. Der Rechner ist seitdem
+   ein freischwebendes Popover (siehe .shard-merchant-calc-popover weiter
+   unten, `position:fixed`, komplett ausserhalb dieses Wrappers in
+   document.body) - die Karte SELBST aendert ihre Groesse dadurch nie
+   mehr, `.has-open-shard-calc` wurde ersatzlos entfernt. */
 .global-header-side-stack {
   position: absolute;
   top: 1rem;
@@ -3508,49 +3515,27 @@ label {
   width: min(480px, 46%);
   transition: width var(--duration-base) var(--ease-out);
 }
-/* Nachbesserung 31.08.2026 (Nutzerwunsch "wenn der Rechner geoeffnet wird,
-   darf der Bereich zusaetzlich etwas breiter werden"): `.has-open-shard-
-   calc` wird von bkmp-site.js gesetzt/entfernt, sobald irgendeine
-   Ressourcenzeile ihren Rechner auf-/zuklappt (bkmpShardMerchantExpandedId).
-   Weitet BEIDE Kacheln gemeinsam (Spotlight + Shardhaendler bleiben dadurch
-   immer exakt gleich breit - "ein zusammengehoeriges Modul", nicht nur den
-   Shardhaendler alleine verbreitern, das wuerde die Ausrichtung zueinander
-   sprengen). */
-.global-header-side-stack.has-open-shard-calc { width: min(560px, 50%); }
 @media (prefers-reduced-motion: reduce) { .global-header-side-stack { transition: none; } }
 /* Ziel-Container fuer den per JS "escape"-verschobenen Bereich (siehe
    bkmpShardMerchantSyncPlacement() in bkmp-site.js) - lebt als leerer,
    unsichtbarer Platzhalter direkt nach </picture> im normalen
    Dokumentfluss (zwischen Banner und Tab-Navigation), bekommt erst durch
-   den tatsaechlich hineinverschobenen Inhalt sichtbare Groesse.
-   Nachbesserung 31.08.2026 ("Nicht ueber den Banner hinausragen" +
-   "Spotlight und Shardhaendler sollen ... wie ein zusammengehoeriges
-   Modul wirken"): per Live-Messung bestaetigt, dass ein geoeffneter
-   Rechner die feste, seitenverhaeltnis-gebundene Bannerhoehe SELBST BEI
-   1920px Fensterbreite sprengt (Bannerhoehe bleibt ab .topbar-wraps
-   1760px-Deckel konstant bei ~468px, ein offener Rechner braucht mehr
-   Platz als das) - der Trigger fuer den Fluchtmechanismus ist deshalb
-   nicht mehr nur eine Breiten-Schwelle, sondern zusaetzlich "ist gerade
-   irgendein Rechner offen" (bkmpShardMerchantExpandedId). Verschoben
-   wird jetzt der GESAMTE .global-header-side-stack (Spotlight +
-   Shardhaendler zusammen, nicht nur Letzterer) - beide bleiben dadurch
-   in JEDEM Zustand exakt gleich breit/als ein Paar sichtbar, statt dass
-   der Shardhaendler allein unter den im Banner verbleibenden Spotlight
-   rutscht (siehe volle Herleitung + Messwerte in CLAUDE.md). */
+   den tatsaechlich hineinverschobenen Inhalt sichtbare Groesse. Trigger:
+   die feste, seitenverhaeltnis-gebundene Bannerhoehe (bleibt ab
+   .topbar-wraps 1760px-Deckel konstant bei ~468px) reicht ab ~1600px
+   Fensterbreite abwaerts nicht mehr fuer Spotlight+Shardhaendler
+   zusammen (siehe volle Herleitung + Messwerte in CLAUDE.md). Verschoben
+   wird der GESAMTE .global-header-side-stack (Spotlight+Shardhaendler
+   zusammen, nicht nur Letzterer) - beide bleiben dadurch in JEDEM
+   Zustand exakt gleich breit/als ein Paar sichtbar. */
 /* Echter, per Live-Messung gefundener Bug (31.08.2026): <header
    class="hero hero-banner-wrap"> ist display:flex; flex-direction:column;
    align-items:CENTER (nicht der Flex-Standard "stretch") - ohne eine
    explizite Gegenmassnahme schrumpft der Slot selbst (als Flex-Kind
    dieses Headers) auf die reine Inhaltsbreite seines Inhalts zusammen
-   und wird zentriert, statt die volle Headerbreite auszufuellen. Bei den
-   bisher einzig getesteten schmalen Handy-Breiten (<=900px) fiel das
-   nie auf, weil die geschrumpfte Inhaltsbreite dort zufaellig nah an der
-   verfuegbaren Breite lag - bei echten Desktop-Breiten (neu seit der
-   "Rechner-offen"-Fluchtbedingung, siehe bkmpShardMerchantSyncPlacement()
-   in bkmp-site.js) wurde der Slot dadurch nur ~300px statt der vollen
-   ~1760px breit. Fix: align-self:stretch macht den Slot selbst IMMER so
-   breit wie sein Elternelement, unabhaengig vom Cross-Axis-Verhalten des
-   Headers. */
+   und wird zentriert, statt die volle Headerbreite auszufuellen. Fix:
+   align-self:stretch macht den Slot selbst IMMER so breit wie sein
+   Elternelement, unabhaengig vom Cross-Axis-Verhalten des Headers. */
 .global-shard-merchant-mobile-slot {
   align-self: stretch;
   width: 100%;
@@ -3563,18 +3548,17 @@ label {
 @media (max-width: 720px) {
   .global-shard-merchant-mobile-slot .global-header-side-stack { margin: 0.6rem 0.7rem 0; }
 }
-/* Fluchtgrund "Rechner ist offen" (siehe Kommentar an
-   bkmpShardMerchantSyncPlacement() in bkmp-site.js) kann auch bei sehr
-   breiten Desktop-Fenstern greifen, wo die ungebremste volle Blockbreite
-   (bis zu ~1900px) absurd aussehen wuerde - anders als bei echten
+/* Auf sehr breiten Desktop-Fenstern waere die ungebremste volle
+   Blockbreite (bis zu ~1900px) absurd - anders als bei echten
    Handy-Breiten (<=900px, dort ist volle Breite genau richtig, siehe
-   Regel oben). Ab >900px deshalb zusaetzlich auf eine sinnvolle
-   Maximalbreite gedeckelt + rechtsbuendig verankert (margin-left:auto),
-   damit der Bereich optisch dort "landet", wo er vorher im Banner-Overlay
-   stand, statt ueber die ganze Seite zu ziehen. */
+   Regel oben). Ab >900px deshalb zusaetzlich auf dieselbe kompakte
+   Maximalbreite wie im nicht-escapten Zustand gedeckelt + rechtsbuendig
+   verankert (margin-left:auto), damit der Bereich optisch dort "landet",
+   wo er vorher im Banner-Overlay stand, statt ueber die ganze Seite zu
+   ziehen. */
 @media (min-width: 901px) {
   .global-shard-merchant-mobile-slot .global-header-side-stack {
-    max-width: 640px;
+    max-width: 480px;
     margin-left: auto;
   }
 }
@@ -3681,7 +3665,6 @@ label {
   .shard-merchant-row-name { font-size: 0.7rem; flex-basis: 100%; }
   .shard-merchant-row-rate { font-size: 0.66rem; }
   .shard-merchant-row-pct { font-size: 0.62rem; }
-  .shard-merchant-row-body-inner { padding: 0.55rem; }
 }
 
 /* ---------------- Shardhaendler - Heute (GLOBAL im /sw-bk-Bannerkopf, 31.08.2026) ----------------
@@ -3789,33 +3772,58 @@ label {
 .shard-merchant-row-pct.is-pos { color: var(--pos); }
 .shard-merchant-row-pct.is-neg { color: var(--neg); }
 .shard-merchant-row-pct.is-flat { color: var(--muted); }
-/* Sanftes Aufklappen/Zuklappen (Auftrag: "sanftes Expand/Collapse, keine
-   uebertriebene Animation") ueber den grid-template-rows 0fr<->1fr-Trick -
-   animiert echte Inhaltshoehe ohne JS-Hoehenmessung. Der Rechner-Inhalt
-   lebt dafuer IMMER im DOM (fuer jede der 5 Ressourcen), nur visuell
-   kollabiert - ein Klick toggelt ausschliesslich die `.is-open`-Klasse
-   (kein Neu-Rendern noetig, siehe bkmp-site.js). */
-.shard-merchant-row-body {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 0.28s var(--ease-out, ease);
+/* Frei schwebendes Rechner-Popover (Nutzerwunsch 31.08.2026, siehe
+   Kommentar an .global-header-side-stack weiter oben: ersetzt den
+   frueheren INLINE aufklappenden Bereich, der beim Oeffnen die ganze
+   Seite darunter verschoben hat). Portal in document.body (siehe
+   bkmpShardMerchantOpenCalcPopover(), bkmp-site.js), `position:fixed` -
+   beeinflusst dadurch nie Groesse/Layout von irgendetwas anderem auf der
+   Seite, egal wie hoch sein Inhalt wird. z-index:var(--z-modal) haelt es
+   sicher ueber Banner/Navigation/Seiteninhalt (die hoechsten sonst
+   verwendeten z-index-Werte auf dieser Seite liegen deutlich darunter,
+   z.B. .topbar-wrap:1, .global-header-side-stack:3). */
+.shard-merchant-calc-popover {
+  position: fixed;
+  z-index: var(--z-modal, 1000);
+  width: min(300px, 92vw);
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--purple) 55%, transparent);
+  background: color-mix(in srgb, #14101d 94%, transparent);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+  padding: 0.85rem 0.95rem 0.95rem;
+  opacity: 0;
+  transform: translateY(-6px) scale(0.98);
+  transition: opacity 0.16s var(--ease-out, ease), transform 0.16s var(--ease-out, ease);
 }
-.shard-merchant-row.is-open .shard-merchant-row-body { grid-template-rows: 1fr; }
-@media (prefers-reduced-motion: reduce) { .shard-merchant-row-body { transition: none; } }
-.shard-merchant-row-body-inner {
-  overflow: hidden;
-  min-height: 0;
-  padding: 0 0.95rem;
+.shard-merchant-calc-popover.is-visible { opacity: 1; transform: translateY(0) scale(1); }
+@media (prefers-reduced-motion: reduce) { .shard-merchant-calc-popover { transition: none; } }
+.shard-merchant-calc-popover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.5rem;
 }
-.shard-merchant-row.is-open .shard-merchant-row-body-inner { padding: 0.2rem 0.95rem 0.95rem; }
-.shard-merchant-calc-title {
-  font-size: 0.68rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+.shard-merchant-calc-popover-title { font-size: 0.9rem; font-weight: 800; color: #fff; }
+.shard-merchant-calc-popover-close {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--purple) 40%, transparent);
+  background: rgba(255, 255, 255, 0.05);
   color: #cbb8ec;
-  margin-bottom: 0.15rem;
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--duration-base) var(--ease-out), color var(--duration-base) var(--ease-out);
 }
+.shard-merchant-calc-popover-close:hover { background: color-mix(in srgb, var(--purple) 22%, transparent); color: #fff; }
 .shard-merchant-calc-rate { font-size: 0.76rem; color: var(--muted); margin-bottom: 0.55rem; }
 .shard-merchant-calc-label {
   display: block;

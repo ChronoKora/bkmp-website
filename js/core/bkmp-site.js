@@ -3174,76 +3174,60 @@
        gemerkt, damit der Stack jederzeit sicher wieder "nach Hause"
        verschoben werden kann, egal wo er gerade lebt. */
     const shardMerchantHomeStackParent = shardMerchantHomeStack ? shardMerchantHomeStack.parentElement : null;
-    /* bkmpShardMerchantExpandedId wird eigentlich erst weiter unten mit den
-       uebrigen Zustands-Variablen deklariert - fuer die Fluchtlogik hier
-       (siehe bkmpShardMerchantSyncPlacement()) wird die Deklaration
-       bewusst VORGEZOGEN, da der ERSTE Aufruf der Funktion bereits ein
-       paar Zeilen weiter unten in DIESEM Block passiert (also VOR der
-       urspruenglichen Deklarationsstelle) - ohne das Vorziehen wuerde der
-       Zugriff in der TDZ (Temporal Dead Zone) mit einem ReferenceError
-       scheitern. */
-    let bkmpShardMerchantExpandedId = null;
     /* Echter, per Live-Messung gefundener Bug (31.08.2026, siehe CLAUDE.md
        fuer die volle Herleitung inkl. aller gemessenen Werte): der Bereich
        passt bei mittleren/schmalen Fensterbreiten - selbst minimal
        komprimiert und sogar bei echten Handy-Breiten wie 320px - NICHT
        mehr als Banner-Overlay, ohne die Tab-Navigation darunter zu
        ueberlappen (der Banner ist dort durch sein festes Seitenverhaeltnis
-       zu kurz).
+       zu kurz). Sogar der GESCHLOSSENE Zustand (Spotlight + alle 5 Zeilen,
+       das ist seit der Popover-Umstellung weiter unten - siehe
+       bkmpShardMerchantOpenCalcPopover() - der EINZIGE Zustand, den die
+       Karte je annimmt) passt erst ab etwa ~1550px Fensterbreite sicher
+       in die Banner-Hoehe - bei 1024px waren es +92px Ueberlapp, bei
+       1366px nur noch +1px (praktisch die Kante), erst ab ~1440-1600px
+       echte Luft (18-61px, je nach Breite). Ursache: der Stack enthaelt
+       IMMER Spotlight+Shardhaendler ZUSAMMEN - beide zusammen brauchen
+       schlicht mehr Hoehe, als die meisten realistischen Desktop-/
+       Laptop-Breiten (1024-1440px) an Bannerhoehe hergeben. Die
+       Fluchtschwelle liegt deshalb grosszuegig (mit echter
+       Sicherheitsmarge, nicht nur exakt an der Kante) bei <=1600px. Der
+       Name "...MobileQuery" ist seit diesem Fund nicht mehr woertlich zu
+       nehmen (deckt laengst auch normale Laptop-/Desktop-Breiten ab,
+       nicht nur Handys) - bewusst NICHT umbenannt, um keine
+       grossflaechige, risikoreiche Umbenennung ueber CSS/HTML/Doku
+       hinweg fuer eine reine Namenskosmetik auszuloesen.
 
-       Nachbesserung 31.08.2026 (Nutzerwunsch "keine interne Scrollbar,
-       Card waechst dynamisch mit dem geoeffneten Rechner, deutlich
-       breiter/hoeher"): per erneuter Live-Messung ZWEI weitere, echte
-       Funde gemacht, nicht nur vermutet:
-       1) Ein geoeffneter Rechner sprengt die feste Bannerhoehe (bleibt ab
-          .topbar-wraps 1760px-Breitendeckel konstant bei ~468px, waechst
-          mit dem Fenster NICHT weiter) SELBST BEI VOLLER 1920px-
-          Fensterbreite (gemessener Ueberlapp: ~63px in die Tab-
-          Navigation) - eine reine Breiten-Schwelle reicht als Fluchtgrund
-          fuer den offenen Zustand also gar nicht mehr aus, unabhaengig
-          von der Fensterbreite.
-       2) Sogar der GESCHLOSSENE Zustand (Spotlight + alle 5 Zeilen
-          zugeklappt, kein Rechner offen) passt inzwischen erst ab etwa
-          ~1550px Fensterbreite sicher in die Banner-Hoehe - bei 1024px
-          waren es +92px Ueberlapp, bei 1366px nur noch +1px (praktisch
-          die Kante), erst ab ~1440-1600px echte Luft (18-61px, je nach
-          Breite). Ursache: der Stack enthaelt IMMER Spotlight+
-          Shardhaendler ZUSAMMEN (nicht nur Letzteren) - beide zusammen
-          brauchen schlicht mehr Hoehe, als die meisten realistischen
-          Desktop-/Laptop-Breiten (1024-1440px) an Bannerhoehe hergeben,
-          das ist keine Nebenwirkung der heutigen Aenderungen, sondern ein
-          bereits vorher bestehender, bisher nur nie mit einer echten
-          Messung geprueften Sachverhalt.
-       Der Fluchtmechanismus nutzt deshalb jetzt EINE einzige, grosszuegig
-       (mit echter Sicherheitsmarge, nicht nur exakt an der Kante)
-       bemessene Breiten-Schwelle bei <=1600px - deckt beide Funde
-       gleichzeitig ab, da sie bei jeder Breite unterhalb dieser Schwelle
-       ohnehin greift - ZUSAETZLICH greift die Flucht bei JEDER Breite,
-       sobald ein Rechner offen ist (bkmpShardMerchantExpandedId), auch
-       oberhalb von 1600px (der Bannerhoehen-Deckel gilt dort unveraendert
-       weiter, siehe Fund 1 oben). Der Name "...MobileQuery" ist seit
-       diesem Fund nicht mehr woertlich zu nehmen (deckt laengst auch
-       normale Laptop-/Desktop-Breiten ab, nicht nur Handys) - bewusst
-       NICHT umbenannt, um keine grossflaechige, risikoreiche Umbenennung
-       ueber CSS/HTML/Doku hinweg fuer eine reine Namenskosmetik
-       auszuloesen.
+       Nachbesserung 31.08.2026, Teil 2 (Nutzer-Screenshot: "wenn ich den
+       Rechner oeffne geht das komplette Fenster tiefer... die Spotlight/
+       Haendler rutschen nach unten"): eine fruehere Fassung liess die
+       Flucht ZUSAETZLICH bei JEDER Breite greifen, sobald ein Rechner
+       offen war (da ein inline aufklappender Rechner die Karte auf bis
+       zu ~580px Hoehe anwachsen liess) - das verschob dabei aber die
+       GESAMTE Seite (Navigation + kompletter Seiteninhalt darunter) um
+       genau diesen Betrag nach unten, ein grosser, verwirrender Sprung.
+       Der Rechner ist seitdem ein eigenstaendiges, frei schwebendes
+       Popover (siehe bkmpShardMerchantOpenCalcPopover() weiter unten,
+       `position:fixed`, ausserhalb des Dokumentflusses) - die Karte
+       SELBST wird durch das Oeffnen/Schliessen eines Rechners nicht mehr
+       hoeher/breiter, `bkmpShardMerchantExpandedId` beeinflusst diese
+       Fluchtlogik dadurch nicht mehr - Flucht haengt jetzt wieder
+       AUSSCHLIESSLICH von der Fensterbreite ab.
 
        Verschoben wird der GESAMTE .global-header-side-stack (Spotlight +
-       Shardhaendler zusammen, siehe .has-open-shard-calc/CSS-Kommentar)
-       statt nur des Shardhaendlers allein - beide bleiben dadurch in
-       jedem Zustand exakt gleich breit/als sichtbares Paar zusammen,
-       identisches "Portal"-Prinzip wie bereits an mehreren anderen
-       Stellen in diesem Projekt fuer denselben Bugtyp verwendet (z.B.
-       bkmpProtoChudEscapeToOverlay). `appendChild()` auf ein bereits im
-       DOM vorhandenes Element VERSCHIEBT es nur (keine Zerstoerung, keine
-       verlorenen Event-Listener/keine Neuerzeugung - jede Referenz in
-       diesem Block funktioniert dadurch unveraendert weiter, unabhaengig
-       davon, wo das Element gerade lebt). */
+       Shardhaendler zusammen), nicht nur der Shardhaendler allein - beide
+       bleiben dadurch in jedem Zustand exakt gleich breit/als sichtbares
+       Paar zusammen, identisches "Portal"-Prinzip wie bereits an
+       mehreren anderen Stellen in diesem Projekt fuer denselben Bugtyp
+       verwendet (z.B. bkmpProtoChudEscapeToOverlay). `appendChild()` auf
+       ein bereits im DOM vorhandenes Element VERSCHIEBT es nur (keine
+       Zerstoerung, keine verlorenen Event-Listener/keine Neuerzeugung -
+       jede Referenz in diesem Block funktioniert dadurch unveraendert
+       weiter, unabhaengig davon, wo das Element gerade lebt). */
     const bkmpShardMerchantMobileQuery = window.matchMedia('(max-width: 1600px)');
     function bkmpShardMerchantSyncPlacement() {
       if (!shardMerchantHomeStack || !shardMerchantMobileSlot || !shardMerchantHomeStackParent) return;
-      const shouldEscape = bkmpShardMerchantMobileQuery.matches || Boolean(bkmpShardMerchantExpandedId);
-      if (shouldEscape) {
+      if (bkmpShardMerchantMobileQuery.matches) {
         if (shardMerchantHomeStack.parentElement !== shardMerchantMobileSlot) shardMerchantMobileSlot.appendChild(shardMerchantHomeStack);
       } else if (shardMerchantHomeStack.parentElement !== shardMerchantHomeStackParent) {
         shardMerchantHomeStackParent.appendChild(shardMerchantHomeStack);
@@ -3261,17 +3245,20 @@
        eigenes change-Event ist in echten Browsern zuverlaessig, deckt
        aber ab, falls es aus irgendeinem Grund doch nicht feuert.
        bkmpShardMerchantSyncPlacement() selbst ist ein reines appendChild()
-       (keine DOM-Zerstoerung), daher jederzeit gefahrlos wiederholbar. */
+       (keine DOM-Zerstoerung), daher jederzeit gefahrlos wiederholbar. Ein
+       offenes Rechner-Popover wird bei einem Resize sicherheitshalber
+       geschlossen (position:fixed-Koordinaten waeren sonst relativ zur
+       verschobenen Ankerzeile falsch, siehe bkmpShardMerchantClosePopover()). */
     let bkmpShardMerchantResizeTimer = null;
     window.addEventListener('resize', () => {
+      bkmpShardMerchantCloseCalcPopover();
       clearTimeout(bkmpShardMerchantResizeTimer);
       bkmpShardMerchantResizeTimer = setTimeout(bkmpShardMerchantSyncPlacement, 200);
     });
 
     let bkmpShardMerchantResources = [];
     let bkmpShardMerchantPrices = {};
-    // bkmpShardMerchantExpandedId ist bereits weiter oben (vor der
-    // Fluchtlogik-Deklaration) deklariert - siehe Kommentar dort.
+    let bkmpShardMerchantExpandedId = null;
     let bkmpShardMerchantLastError = null;
     let bkmpShardMerchantCheckedAt = 0;
     /* Zuletzt eingegebener Anzahl-Text je Ressourcen-Id - bleibt ueber
@@ -3279,6 +3266,15 @@
        erhalten, damit ein gerade offener Rechner nicht mitten in der
        Eingabe zurueckgesetzt wird. */
     const bkmpShardMerchantQtyDrafts = {};
+    /* Das schwebende Rechner-Popover selbst (siehe
+       bkmpShardMerchantOpenCalcPopover() weiter unten) - lebt als eigenes,
+       bei jedem Oeffnen frisch erzeugtes Element in document.body (Portal-
+       Muster, identisches Prinzip wie das bereits bestehende Gilden-
+       Technologie-Beitrags-Modal), NICHT als Kind von #globalShardMerchant
+       - dadurch beeinflusst es weder dessen Breite/Hoehe noch die
+       .global-header-side-stack-Fluchtlogik oben. */
+    let bkmpShardMerchantPopoverEl = null;
+    let bkmpShardMerchantPopoverAnchor = null;
 
     function bkmpShardFormatShards(value) {
       return new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
@@ -3307,41 +3303,145 @@
       return { totalShards, marketValue, perShardValue, hasMarket };
     }
 
+    /* Reine Zeilen-Darstellung (Name/Kurs/Prozent) - der Rechner selbst
+       lebt seit der Popover-Umstellung NICHT mehr inline in der Zeile
+       (siehe bkmpShardMerchantOpenCalcPopover() weiter unten). */
     function bkmpShardMerchantResourceRowHtml(res) {
       const isOpen = bkmpShardMerchantExpandedId === res.id;
       const pctCls = res.changePct == null ? 'is-flat' : res.changePct > 0.05 ? 'is-pos' : res.changePct < -0.05 ? 'is-neg' : 'is-flat';
       const pctText = res.changePct == null ? '–' : bkmpShardFormatPct(res.changePct);
-      const calc = bkmpShardMerchantComputeCalc(res);
-      const draft = bkmpShardMerchantQtyDrafts[res.id] || '';
       return `
         <div class="shard-merchant-row${isOpen ? ' is-open' : ''}" data-resource-id="${escapeHtml(res.id)}">
-          <button class="shard-merchant-row-head" type="button" data-shard-toggle="${escapeHtml(res.id)}" aria-expanded="${isOpen ? 'true' : 'false'}">
+          <button class="shard-merchant-row-head" type="button" data-shard-toggle="${escapeHtml(res.id)}" aria-expanded="${isOpen ? 'true' : 'false'}" aria-haspopup="dialog">
             <span class="shard-merchant-row-name">${escapeHtml(res.name)}</span>
             <span class="shard-merchant-row-rate">${bkmpShardFormatShards(res.exchangeRate)} Shards</span>
             <span class="shard-merchant-row-pct ${pctCls}">${pctText}</span>
           </button>
-          <div class="shard-merchant-row-body">
-            <div class="shard-merchant-row-body-inner">
-              <div class="shard-merchant-calc-title">${escapeHtml(res.name)}</div>
-              <div class="shard-merchant-calc-rate">${bkmpShardFormatShards(res.exchangeRate)} Shards / Stück</div>
-              <label class="shard-merchant-calc-label" for="shardQty-${escapeHtml(res.id)}">Anzahl</label>
-              <input class="shard-merchant-calc-input" type="number" min="1" step="1" inputmode="numeric" id="shardQty-${escapeHtml(res.id)}" data-shard-qty="${escapeHtml(res.id)}" value="${escapeHtml(draft)}" placeholder="0">
-              <div class="shard-merchant-calc-result">
-                <span>Gesamt</span>
-                <strong data-shard-total="${escapeHtml(res.id)}">${calc.totalShards != null ? bkmpShardFormatShards(calc.totalShards) + ' Shards' : '–'}</strong>
-              </div>
-              ${res.marketId ? `
-                <div class="shard-merchant-calc-result">
-                  <span>Marktwert</span>
-                  <strong data-shard-marketvalue="${escapeHtml(res.id)}">${calc.hasMarket ? (calc.marketValue != null ? bkmpShardFormatMoney(calc.marketValue) : '–') : 'nicht verfügbar'}</strong>
-                </div>
-                <div class="shard-merchant-calc-note" data-shard-pershare="${escapeHtml(res.id)}">${calc.perShardValue != null ? `1 Shard ≈ ${bkmpShardFormatMoney(calc.perShardValue)} Materialwert` : ''}</div>
-              ` : `
-                <div class="shard-merchant-calc-note">Kein Marktpreis verfügbar (Shardhändler-exklusiv)</div>
-              `}
-            </div>
-          </div>
         </div>`;
+    }
+
+    /* Baut den Innenhalt des Rechner-Popovers auf (Titel+Schliessen-Knopf,
+       Kurs, Eingabefeld, Ergebniszeilen) - genutzt sowohl beim erstmaligen
+       Oeffnen als auch, um ein bereits offenes Popover nach einem
+       periodischen Datenabgleich (bkmpShardMerchantRender(), alle 60s) mit
+       frischen Werten neu zu befuellen, ohne es zu schliessen/neu zu
+       positionieren. */
+    function bkmpShardMerchantPaintPopoverContent(res) {
+      if (!bkmpShardMerchantPopoverEl) return;
+      const calc = bkmpShardMerchantComputeCalc(res);
+      const draft = bkmpShardMerchantQtyDrafts[res.id] || '';
+      bkmpShardMerchantPopoverEl.setAttribute('aria-label', 'Shard-Rechner: ' + res.name);
+      bkmpShardMerchantPopoverEl.innerHTML = `
+        <div class="shard-merchant-calc-popover-head">
+          <span class="shard-merchant-calc-popover-title">${escapeHtml(res.name)}</span>
+          <button type="button" class="shard-merchant-calc-popover-close" data-shard-calc-close aria-label="Rechner schließen">✕</button>
+        </div>
+        <div class="shard-merchant-calc-rate">${bkmpShardFormatShards(res.exchangeRate)} Shards / Stück</div>
+        <label class="shard-merchant-calc-label" for="shardQty-${escapeHtml(res.id)}">Anzahl</label>
+        <input class="shard-merchant-calc-input" type="number" min="1" step="1" inputmode="numeric" id="shardQty-${escapeHtml(res.id)}" data-shard-qty="${escapeHtml(res.id)}" value="${escapeHtml(draft)}" placeholder="0">
+        <div class="shard-merchant-calc-result">
+          <span>Gesamt</span>
+          <strong data-shard-total="${escapeHtml(res.id)}">${calc.totalShards != null ? bkmpShardFormatShards(calc.totalShards) + ' Shards' : '–'}</strong>
+        </div>
+        ${res.marketId ? `
+          <div class="shard-merchant-calc-result">
+            <span>Marktwert</span>
+            <strong data-shard-marketvalue="${escapeHtml(res.id)}">${calc.hasMarket ? (calc.marketValue != null ? bkmpShardFormatMoney(calc.marketValue) : '–') : 'nicht verfügbar'}</strong>
+          </div>
+          <div class="shard-merchant-calc-note" data-shard-pershare="${escapeHtml(res.id)}">${calc.perShardValue != null ? `1 Shard ≈ ${bkmpShardFormatMoney(calc.perShardValue)} Materialwert` : ''}</div>
+        ` : `
+          <div class="shard-merchant-calc-note">Kein Marktpreis verfügbar (Shardhändler-exklusiv)</div>
+        `}`;
+    }
+
+    /* Positioniert das (bereits befuellte, also korrekt vermessbare)
+       Popover relativ zur angeklickten Zeile: bevorzugt darunter,
+       rechtsbuendig zur Zeile - klappt bei zu wenig Platz nach oben um,
+       wird an allen vier Seiten innerhalb des sichtbaren Fensters
+       gehalten (kein Abschneiden am Bildschirmrand, kein horizontaler
+       Overflow). Rein geometrische Berechnung, `position:fixed` - daher
+       Koordinaten relativ zum Viewport, nicht zum Dokument. */
+    function bkmpShardMerchantPositionPopover(popoverEl, anchorEl) {
+      const anchorRect = anchorEl.getBoundingClientRect();
+      const popRect = popoverEl.getBoundingClientRect();
+      const gap = 8;
+      const edge = 8;
+      const viewportW = window.innerWidth;
+      const viewportH = window.innerHeight;
+      let top = anchorRect.bottom + gap;
+      if (top + popRect.height > viewportH - edge) {
+        const topAbove = anchorRect.top - gap - popRect.height;
+        top = topAbove >= edge ? topAbove : Math.max(edge, viewportH - popRect.height - edge);
+      }
+      let left = anchorRect.right - popRect.width;
+      left = Math.min(left, viewportW - popRect.width - edge);
+      left = Math.max(edge, left);
+      popoverEl.style.top = top + 'px';
+      popoverEl.style.left = left + 'px';
+    }
+
+    /* Oeffnet den Rechner fuer `id` als freischwebendes Popover (Portal in
+       document.body, `position:fixed`) - beeinflusst dadurch NIE die
+       Groesse/Position von #globalShardMerchant selbst oder den Rest der
+       Seite (siehe Kommentar an bkmpShardMerchantMobileQuery weiter oben:
+       genau das war der Grund fuer die Umstellung von einem inline
+       aufklappenden Bereich auf ein Popover). */
+    function bkmpShardMerchantOpenCalcPopover(id, anchorEl) {
+      const res = bkmpShardMerchantResources.find(r => r.id === id);
+      if (!res || !anchorEl) return;
+      bkmpShardMerchantExpandedId = id;
+      bkmpShardMerchantPopoverAnchor = anchorEl;
+      anchorEl.setAttribute('aria-expanded', 'true');
+      const row = anchorEl.closest('.shard-merchant-row');
+      if (row) row.classList.add('is-open');
+
+      const pop = document.createElement('div');
+      pop.className = 'shard-merchant-calc-popover';
+      pop.setAttribute('role', 'dialog');
+      document.body.appendChild(pop);
+      bkmpShardMerchantPopoverEl = pop;
+
+      pop.addEventListener('input', e => {
+        const qtyInput = e.target.closest('[data-shard-qty]');
+        if (!qtyInput) return;
+        const rid = qtyInput.dataset.shardQty;
+        bkmpShardMerchantQtyDrafts[rid] = qtyInput.value;
+        bkmpShardMerchantUpdateCalcOutputs(rid);
+      });
+      pop.addEventListener('click', e => {
+        if (e.target.closest('[data-shard-calc-close]')) bkmpShardMerchantCloseCalcPopover();
+      });
+
+      bkmpShardMerchantPaintPopoverContent(res);
+      bkmpShardMerchantPositionPopover(pop, anchorEl);
+      requestAnimationFrame(() => { if (bkmpShardMerchantPopoverEl === pop) pop.classList.add('is-visible'); });
+
+      const input = pop.querySelector('[data-shard-qty]');
+      if (input) input.focus({ preventScroll: true });
+    }
+
+    /* Schliesst ein offenes Popover sofort (kein Ausblend-Uebergang noetig
+       - anders als beim fruaeheren inline-Akkordeon ist ein Popover ein
+       kurzlebiges, temporaeres Element wie ein Dropdown/Tooltip, ein
+       hartes Schliessen ist dafuer ein etabliertes, akzeptiertes Muster).
+       Gibt den Fokus an die ausloesende Zeile zurueck (Tastatur-
+       Zugaenglichkeit - identisches Prinzip wie beim Schliessen eines
+       Dropdowns). */
+    function bkmpShardMerchantCloseCalcPopover() {
+      if (bkmpShardMerchantPopoverEl) {
+        bkmpShardMerchantPopoverEl.remove();
+        bkmpShardMerchantPopoverEl = null;
+      }
+      const anchor = bkmpShardMerchantPopoverAnchor;
+      if (anchor) {
+        anchor.setAttribute('aria-expanded', 'false');
+        const row = anchor.closest('.shard-merchant-row');
+        if (row) row.classList.remove('is-open');
+      }
+      const hadOpen = Boolean(bkmpShardMerchantExpandedId);
+      bkmpShardMerchantExpandedId = null;
+      bkmpShardMerchantPopoverAnchor = null;
+      if (hadOpen && anchor && document.body.contains(anchor)) anchor.focus({ preventScroll: true });
     }
 
     function bkmpShardMerchantRender() {
@@ -3356,6 +3456,7 @@
           shardMerchantEl.hidden = true;
           shardMerchantEl.innerHTML = '';
         }
+        bkmpShardMerchantCloseCalcPopover();
         return;
       }
       shardMerchantEl.hidden = false;
@@ -3364,23 +3465,41 @@
         <div class="shard-merchant-list">
           ${bkmpShardMerchantResources.map(bkmpShardMerchantResourceRowHtml).join('')}
         </div>`;
+      /* Der `innerHTML`-Neuaufbau oben ersetzt jede Zeile durch einen
+         frischen DOM-Knoten - ein bereits offenes Popover haette dadurch
+         eine tote `anchorEl`-Referenz auf einen entfernten Knoten. Neue
+         Ankerzeile fuer dieselbe Ressource erneut suchen, Popover-Inhalt
+         mit den frisch geladenen Werten neu befuellen + neu positionieren
+         (die Zeile selbst traegt dank `isOpen` in
+         bkmpShardMerchantResourceRowHtml() bereits korrekt `.is-open`). */
+      if (bkmpShardMerchantExpandedId) {
+        const res = bkmpShardMerchantResources.find(r => r.id === bkmpShardMerchantExpandedId);
+        const newAnchor = shardMerchantEl.querySelector('[data-shard-toggle="' + bkmpShardMerchantExpandedId + '"]');
+        if (res && newAnchor && bkmpShardMerchantPopoverEl) {
+          bkmpShardMerchantPopoverAnchor = newAnchor;
+          bkmpShardMerchantPaintPopoverContent(res);
+          bkmpShardMerchantPositionPopover(bkmpShardMerchantPopoverEl, newAnchor);
+        } else {
+          bkmpShardMerchantCloseCalcPopover();
+        }
+      }
     }
 
     /* Live-Neuberechnung waehrend der Eingabe (Auftrag Abschnitt 7/15:
        "live waehrend der Eingabe", "darf nicht komplette Seite neu
-       rendern") - aktualisiert NUR die drei Ausgabe-Elemente der
-       betroffenen Zeile direkt per textContent, OHNE innerHTML neu
-       aufzubauen - das <input>-Element (inkl. Fokus/Cursor-Position)
-       bleibt dadurch waehrend des Tippens komplett unangetastet. */
+       rendern") - aktualisiert NUR die drei Ausgabe-Elemente im
+       Popover direkt per textContent, OHNE innerHTML neu aufzubauen -
+       das <input>-Element (inkl. Fokus/Cursor-Position) bleibt dadurch
+       waehrend des Tippens komplett unangetastet. */
     function bkmpShardMerchantUpdateCalcOutputs(id) {
       const res = bkmpShardMerchantResources.find(r => r.id === id);
-      if (!res || !shardMerchantEl) return;
+      if (!res || !bkmpShardMerchantPopoverEl) return;
       const calc = bkmpShardMerchantComputeCalc(res);
-      const totalEl = shardMerchantEl.querySelector('[data-shard-total="' + id + '"]');
+      const totalEl = bkmpShardMerchantPopoverEl.querySelector('[data-shard-total="' + id + '"]');
       if (totalEl) totalEl.textContent = calc.totalShards != null ? bkmpShardFormatShards(calc.totalShards) + ' Shards' : '–';
-      const marketEl = shardMerchantEl.querySelector('[data-shard-marketvalue="' + id + '"]');
+      const marketEl = bkmpShardMerchantPopoverEl.querySelector('[data-shard-marketvalue="' + id + '"]');
       if (marketEl) marketEl.textContent = calc.hasMarket ? (calc.marketValue != null ? bkmpShardFormatMoney(calc.marketValue) : '–') : 'nicht verfügbar';
-      const noteEl = shardMerchantEl.querySelector('[data-shard-pershare="' + id + '"]');
+      const noteEl = bkmpShardMerchantPopoverEl.querySelector('[data-shard-pershare="' + id + '"]');
       if (noteEl) noteEl.textContent = calc.perShardValue != null ? `1 Shard ≈ ${bkmpShardFormatMoney(calc.perShardValue)} Materialwert` : '';
     }
 
@@ -3423,70 +3542,46 @@
     }
 
     if (shardMerchantEl) {
-      /* Klick auf eine Ressourcenzeile -> Rechner auf-/zuklappen. Reiner
-         classList-Toggle (KEIN Neu-Rendern) - der Rechner-Inhalt jeder
-         Ressource lebt bereits unveraendert im DOM (siehe
-         .shard-merchant-row-body in style.css), dadurch funktioniert die
-         sanfte CSS-Auf-/Zuklapp-Animation und Eingaben bleiben beim
-         Wechseln der aktiven Ressource fuer die ANDEREN Ressourcen
-         erhalten. Immer nur EINE Ressource gleichzeitig offen (Auftrag
-         Abschnitt 5). */
+      /* Klick auf eine Ressourcenzeile -> Rechner-Popover oeffnen/
+         schliessen (siehe bkmpShardMerchantOpenCalcPopover()/
+         -CloseCalcPopover() weiter oben). Immer nur EINE Ressource
+         gleichzeitig offen (Auftrag Abschnitt 5) - ein Klick auf eine
+         ANDERE Zeile schliesst automatisch das vorherige Popover, bevor
+         das neue oeffnet. */
       shardMerchantEl.addEventListener('click', e => {
         const toggleBtn = e.target.closest('[data-shard-toggle]');
         if (!toggleBtn) return;
         const id = toggleBtn.dataset.shardToggle;
-        const wasOpen = bkmpShardMerchantExpandedId === id;
-        if (bkmpShardMerchantExpandedId && bkmpShardMerchantExpandedId !== id) {
-          const prevRow = shardMerchantEl.querySelector('.shard-merchant-row[data-resource-id="' + bkmpShardMerchantExpandedId + '"]');
-          if (prevRow) {
-            prevRow.classList.remove('is-open');
-            const prevBtn = prevRow.querySelector('[data-shard-toggle]');
-            if (prevBtn) prevBtn.setAttribute('aria-expanded', 'false');
-          }
-        }
-        const row = toggleBtn.closest('.shard-merchant-row');
-        if (wasOpen) {
-          row.classList.remove('is-open');
-          toggleBtn.setAttribute('aria-expanded', 'false');
-          bkmpShardMerchantExpandedId = null;
+        if (bkmpShardMerchantExpandedId === id) {
+          bkmpShardMerchantCloseCalcPopover();
         } else {
-          row.classList.add('is-open');
-          toggleBtn.setAttribute('aria-expanded', 'true');
-          bkmpShardMerchantExpandedId = id;
+          bkmpShardMerchantCloseCalcPopover();
+          bkmpShardMerchantOpenCalcPopover(id, toggleBtn);
         }
-        /* Nachbesserung 31.08.2026 ("Wenn der Shard-Rechner geoeffnet
-           wird, darf der Bereich zusaetzlich etwas breiter... werden...
-           Spotlight und Shardhaendler sollen optisch wie ein
-           zusammengehoeriges Modul wirken") - die Klasse sitzt bewusst
-           auf shardMerchantHomeStack (.global-header-side-stack), NICHT
-           nur auf .global-shard-merchant selbst, damit das Spotlight
-           direkt darueber beim Verbreitern mitwaechst statt allein der
-           Shardhaendler schmaler/breiter als das Spotlight wirkt (siehe
-           .has-open-shard-calc in style.css). Im mobilen "escaped"-
-           Zustand (#globalShardMerchantMobileSlot) hat die Karte ohnehin
-           volle Blockbreite - die Klasse bleibt dort wirkungslos, wird
-           aber trotzdem gesetzt (einfacher als eine Fallunterscheidung,
-           kein Risiko). */
-        if (shardMerchantHomeStack) {
-          shardMerchantHomeStack.classList.toggle('has-open-shard-calc', Boolean(bkmpShardMerchantExpandedId));
-        }
-        /* Erneut abgleichen, sobald sich der Offen/Zu-Zustand aendert -
-           bkmpShardMerchantSyncPlacement() selbst prueft jetzt zusaetzlich
-           zur Breite auch bkmpShardMerchantExpandedId (siehe Kommentar an
-           der Deklaration weiter oben) und fluechtet den gesamten Stack in
-           den normalen Dokumentfluss, sobald ein Rechner offen ist - ohne
-           diesen Aufruf wuerde die Flucht erst beim naechsten resize/
-           Breiten-Wechsel nachgeholt, nicht sofort beim Aufklappen. */
-        bkmpShardMerchantSyncPlacement();
-      });
-      shardMerchantEl.addEventListener('input', e => {
-        const qtyInput = e.target.closest('[data-shard-qty]');
-        if (!qtyInput) return;
-        const id = qtyInput.dataset.shardQty;
-        bkmpShardMerchantQtyDrafts[id] = qtyInput.value;
-        bkmpShardMerchantUpdateCalcOutputs(id);
       });
     }
+    /* Popover schliessen bei Klick ausserhalb (nicht auf das Popover
+       selbst und nicht auf die aufrufende Zeile - letztere hat bereits
+       ihre eigene Toggle-Logik oben), bei Escape, und beim Scrollen
+       (identisches, bewusst einfaches Verhalten wie ein natives <select>-
+       Dropdown - `position:fixed`-Koordinaten wuerden beim Scrollen sonst
+       relativ zur Ankerzeile falsch, eine Nachverfolgung waere unnoetig
+       komplex fuer ein derart kurzlebiges Element). Beide Listener sind
+       IMMER aktiv (kein Hinzufuegen/Entfernen pro Oeffnen/Schliessen -
+       simpler, kein Leck-Risiko), pruefen aber selbst zuerst, ob ueberhaupt
+       ein Popover offen ist. */
+    document.addEventListener('click', e => {
+      if (!bkmpShardMerchantPopoverEl) return;
+      if (bkmpShardMerchantPopoverEl.contains(e.target)) return;
+      if (bkmpShardMerchantPopoverAnchor && bkmpShardMerchantPopoverAnchor.contains(e.target)) return;
+      bkmpShardMerchantCloseCalcPopover();
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && bkmpShardMerchantPopoverEl) bkmpShardMerchantCloseCalcPopover();
+    });
+    window.addEventListener('scroll', () => {
+      if (bkmpShardMerchantPopoverEl) bkmpShardMerchantCloseCalcPopover();
+    }, true);
 
     bkmpShardMerchantRefresh(true);
     window.setInterval(() => bkmpShardMerchantRefresh(false), BKMP_SHARD_REFRESH_MS);
