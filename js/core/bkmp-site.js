@@ -1250,6 +1250,8 @@
         if (typeof renderAboutBlocks === 'function') renderAboutBlocks();
         if (typeof renderPartnerShops === 'function') renderPartnerShops();
         if (typeof renderCardSales === 'function') renderCardSales();
+        if (typeof renderCardSaleStatsAndChart === 'function') renderCardSaleStatsAndChart();
+        if (typeof bkmpRefreshCardSaleSellerDash === 'function') bkmpRefreshCardSaleSellerDash();
         if (typeof renderCardCatalog === 'function') renderCardCatalog();
         if (typeof renderAchievementBadge === 'function') renderAchievementBadge();
         if (typeof renderLeaderboard === 'function') renderLeaderboard();
@@ -1300,7 +1302,11 @@
       streamer_links: () => syncStreamersFromSupabase(data, null).then(() => renderStreamers()),
       about_blocks: () => syncAboutBlocksFromSupabase(data, null).then(() => { if (typeof renderAboutBlocks === 'function') renderAboutBlocks(); }),
       partner_shops: () => syncPartnerShopsFromSupabase(data, null).then(() => { if (typeof renderPartnerShops === 'function') renderPartnerShops(); }),
-      card_sales: () => syncCardSalesFromSupabase(data, null).then(() => { if (typeof renderCardSales === 'function') renderCardSales(); }),
+      card_sales: () => syncCardSalesFromSupabase(data, null).then(() => {
+        if (typeof renderCardSales === 'function') renderCardSales();
+        if (typeof renderCardSaleStatsAndChart === 'function') renderCardSaleStatsAndChart();
+        if (typeof bkmpRefreshCardSaleSellerDash === 'function') bkmpRefreshCardSaleSellerDash();
+      }),
       card_catalog: () => syncCardCatalogFromSupabase(data, null).then(() => { if (typeof renderCardCatalog === 'function') renderCardCatalog(); })
     };
 
@@ -1348,6 +1354,8 @@
       if (typeof renderAboutBlocks === 'function') renderAboutBlocks();
       if (typeof renderPartnerShops === 'function') renderPartnerShops();
       if (typeof renderCardSales === 'function') renderCardSales();
+      if (typeof renderCardSaleStatsAndChart === 'function') renderCardSaleStatsAndChart();
+      if (typeof bkmpRefreshCardSaleSellerDash === 'function') bkmpRefreshCardSaleSellerDash();
       if (typeof renderCardCatalog === 'function') renderCardCatalog();
       if (typeof renderAchievementBadge === 'function') renderAchievementBadge();
       if (typeof renderLeaderboard === 'function') renderLeaderboard();
@@ -3587,32 +3595,207 @@
     window.setInterval(() => bkmpShardMerchantRefresh(false), BKMP_SHARD_REFRESH_MS);
 
     const cardsaleGrid = document.getElementById('cardsaleGrid');
+    const cardSaleGridCountEl = document.getElementById('cardSaleGridCount');
+    const cardSaleKpiRowEl = document.getElementById('cardSaleKpiRow');
+    const cardSaleChartCardEl = document.getElementById('cardSaleChartCard');
+    const cardSaleSellerDashEl = document.getElementById('cardSaleSellerDash');
+
+    /* Bekannt, sobald bkmpRefreshCardSaleSellerDash() einmal gelaufen ist
+       (Session-Wiederherstellung/Login-Erfolg, siehe Aufrufstellen weiter
+       unten im File) - steuert sowohl die "Deine Karte"-Hervorhebung im
+       oeffentlichen Grid als auch die Sichtbarkeit von #cardSaleSellerDash.
+       bkmpCardSaleMyStatus wird bewusst zwischengespeichert (nicht bei
+       jedem renderCardSales()-Aufruf neu per RPC geholt), damit ein
+       simpler card_sales-Realtime-Refresh nicht bei JEDEM Tick eine neue
+       Auszahlungs-RPC ausloest - siehe bkmpRefreshCardSaleSellerDash()
+       fuer die Stellen, an denen die RPC tatsaechlich neu aufgerufen wird. */
+    let bkmpCardSaleMyAuthUserId = null;
+    let bkmpCardSaleMyStatus = null;
+
     function renderCardSales() {
       if (!cardsaleGrid) return;
       const items = Array.isArray(data.cardSales) ? data.cardSales : [];
+      if (cardSaleGridCountEl) {
+        cardSaleGridCountEl.textContent = items.length ? `${items.length} Karte${items.length === 1 ? '' : 'n'} verfügbar` : '';
+      }
       if (items.length === 0) {
         cardsaleGrid.innerHTML = '<p class="empty-hint">Noch keine Karten im Verkauf.</p>';
-        return;
-      }
-      cardsaleGrid.innerHTML = items.map(item => {
-        const earned = Number(item.soldCount || 0) * BKMP_CARD_SALE_SELLER_SHARE;
-        return `
-          <article class="cardsale-card">
-            <div class="cardsale-image-frame" data-bkmp-image-wrap data-empty-label="Kein Bild">
-              ${item.image ? `<img data-bkmp-img src="${item.image}" alt="Karte von ${escapeHtml(item.playerName)}" loading="lazy" decoding="async">` : '<div class="cardsale-image-empty">Kein Bild</div>'}
-            </div>
-            <div class="cardsale-body">
-              <h3>${escapeHtml(item.playerName)}</h3>
-              <div class="cardsale-stats">
-                <div><span>Verkauft</span><strong>${Number(item.soldCount || 0)}x</strong></div>
-                <div><span>Bereits verdient</span><strong class="gold">${bkmpFormatCurrency(earned)}</strong></div>
+      } else {
+        cardsaleGrid.innerHTML = items.map(item => {
+          const earned = Number(item.soldCount || 0) * BKMP_CARD_SALE_SELLER_SHARE;
+          const isMine = Boolean(bkmpCardSaleMyAuthUserId) && item.authUserId === bkmpCardSaleMyAuthUserId;
+          return `
+            <article class="cardsale-card${isMine ? ' is-mine' : ''}">
+              ${isMine ? '<span class="cardsale-mine-badge">Deine Karte</span>' : ''}
+              <div class="cardsale-image-frame" data-bkmp-image-wrap data-empty-label="Kein Bild">
+                ${item.image ? `<img data-bkmp-img src="${item.image}" alt="Karte von ${escapeHtml(item.playerName)}" loading="lazy" decoding="async">` : '<div class="cardsale-image-empty">Kein Bild</div>'}
               </div>
-            </div>
-          </article>`;
-      }).join('');
-      if (window.bkmpEnhanceImages) window.bkmpEnhanceImages(cardsaleGrid);
+              <div class="cardsale-body">
+                <h3>${escapeHtml(item.playerName)}</h3>
+                <div class="cardsale-stats">
+                  <div><span>Verkauft</span><strong>${Number(item.soldCount || 0)}x</strong></div>
+                  <div><span>Bereits verdient</span><strong class="gold">${bkmpFormatCurrency(earned)}</strong></div>
+                </div>
+                <div class="cardsale-price-row"><span>Preis</span><strong>${bkmpFormatCurrency(150000)}</strong></div>
+              </div>
+            </article>`;
+        }).join('');
+        if (window.bkmpEnhanceImages) window.bkmpEnhanceImages(cardsaleGrid);
+      }
+      // Deine-Karten-Liste im Verkaeufer-Dashboard haengt ebenfalls an
+      // data.cardSales - bei jedem Grid-Refresh (Realtime/Deferred-Load)
+      // gleich mit mit-aktualisieren, ohne dafuer erneut die RPC zu rufen.
+      if (bkmpCardSaleMyStatus) bkmpPaintCardSaleSellerDash(bkmpCardSaleMyStatus);
     }
     renderCardSales();
+
+    /* ---------------- Kartenverkauf: oeffentliche KPIs + 30-Tage-Chart ---------------- */
+    async function renderCardSaleStatsAndChart() {
+      if (typeof getCardSalePublicStats !== 'function') return;
+      let stats = null;
+      try { stats = await getCardSalePublicStats(); } catch (e) { console.warn('Kartenverkauf-Statistiken konnten nicht geladen werden.', e); }
+      if (cardSaleKpiRowEl) {
+        if (!stats) {
+          cardSaleKpiRowEl.innerHTML = '';
+        } else {
+          const kpis = [
+            ['Von Verkäufern verdient', bkmpFormatCurrency(stats.totalEarned)],
+            ['Ausgezahlt', bkmpFormatCurrency(stats.totalPaidOut)],
+            ['Karten verkauft', String(stats.totalSoldCount)],
+            ['Aktuell im Verkauf', String(stats.activeListings)],
+            ['Diese Woche verdient', bkmpFormatCurrency(stats.earnedThisWeek)]
+          ];
+          cardSaleKpiRowEl.innerHTML = kpis.map(([label, value]) => `
+            <div class="cardsale-kpi">
+              <strong>${escapeHtml(value)}</strong>
+              <span>${escapeHtml(label)}</span>
+            </div>`).join('');
+        }
+      }
+      if (!cardSaleChartCardEl) return;
+      let rows = [];
+      try { rows = (typeof getCardSaleDailyEarnings === 'function' ? await getCardSaleDailyEarnings(30) : []) || []; } catch (e) { console.warn('Kartenverkauf-Chart konnte nicht geladen werden.', e); }
+      if (!rows.length) {
+        cardSaleChartCardEl.innerHTML = `
+          <div class="cardsale-chart-head"><h3>Verdienst der Kartenbesitzer</h3></div>
+          <p class="empty-hint">Noch keine Auszahlungen in diesem Zeitraum.</p>`;
+        return;
+      }
+      const max = Math.max.apply(null, rows.map(r => r.amount).concat([1]));
+      const weekLabel = stats ? bkmpFormatCurrency(stats.earnedThisWeek) : '';
+      cardSaleChartCardEl.innerHTML = `
+        <div class="cardsale-chart-head">
+          <h3>Verdienst der Kartenbesitzer</h3>
+          ${weekLabel ? `<span class="cardsale-chart-week">Diese Woche: ${weekLabel}</span>` : ''}
+        </div>
+        <div class="cardsale-chart-bars">
+          ${rows.map(r => `<div class="cardsale-chart-bar" style="--h:${Math.max(4, Math.round((r.amount / max) * 100))}%" title="${escapeHtml(r.day)}: ${bkmpFormatCurrency(r.amount)}"></div>`).join('')}
+        </div>`;
+    }
+    renderCardSaleStatsAndChart();
+
+    /* ---------------- Kartenverkauf: persönlicher Verkäuferbereich ---------------- */
+    function bkmpCardSalePayoutStatusHtml(st) {
+      if (!st || !st.latestStatus) return '';
+      const badges = { pending: ['is-pending', 'Ausstehend'], paid: ['is-paid', 'Ausgezahlt'], rejected: ['is-rejected', 'Abgelehnt'] };
+      const info = badges[st.latestStatus];
+      if (!info) return '';
+      const amountText = st.latestAmount != null ? bkmpFormatCurrency(st.latestAmount) : '';
+      let message = '';
+      if (st.latestStatus === 'pending') {
+        message = `${amountText} Auszahlung angefragt. Die Auszahlung wird von BK Investment geprüft und anschließend ingame ausgezahlt.`;
+      } else if (st.latestStatus === 'paid') {
+        const dateStr = st.latestProcessedAt ? new Date(st.latestProcessedAt).toLocaleDateString('de-DE') : '';
+        message = `${amountText} ausgezahlt${dateStr ? ' am ' + dateStr : ''}.`;
+      } else if (st.latestStatus === 'rejected') {
+        message = `Auszahlung abgelehnt${st.latestRejectReason ? ': ' + escapeHtml(st.latestRejectReason) : '.'}`;
+      }
+      return `<div class="cardsale-payout-status"><span class="cardsale-payout-badge ${info[0]}">${info[1]}</span><p>${message}</p></div>`;
+    }
+
+    function bkmpPaintCardSaleSellerDash(status) {
+      if (!cardSaleSellerDashEl) return;
+      const myCards = (Array.isArray(data.cardSales) ? data.cardSales : []).filter(c => c.authUserId === bkmpCardSaleMyAuthUserId);
+      const canRequest = status.available > 0;
+      cardSaleSellerDashEl.innerHTML = `
+        <div class="cardsale-seller-head"><h3>Deine Verkäufe</h3></div>
+        <div class="cardsale-seller-stats">
+          <div><span>Karten aktiv</span><strong>${myCards.length}</strong></div>
+          <div><span>Verkäufe</span><strong>${myCards.reduce((sum, c) => sum + Number(c.soldCount || 0), 0)}</strong></div>
+          <div><span>Verdient</span><strong class="gold">${bkmpFormatCurrency(status.totalEarned)}</strong></div>
+          <div><span>Ausgezahlt</span><strong>${bkmpFormatCurrency(status.totalPaid)}</strong></div>
+          <div><span>Verfügbar</span><strong class="gold">${bkmpFormatCurrency(status.available)}</strong></div>
+        </div>
+        ${bkmpCardSalePayoutStatusHtml(status)}
+        <button type="button" class="btn-ja cardsale-payout-btn" id="cardSalePayoutBtn" ${canRequest ? '' : 'disabled'}>
+          ${canRequest ? bkmpFormatCurrency(status.available) + ' Auszahlung anfordern' : 'Keine Auszahlung verfügbar'}
+        </button>
+        ${myCards.length ? `
+        <div class="cardsale-seller-cards">
+          <span class="cardsale-seller-cards-label">Deine Karten</span>
+          ${myCards.map(c => `
+            <div class="cardsale-seller-card-row">
+              <span>${escapeHtml(c.playerName)}</span>
+              <span>${Number(c.soldCount || 0)}× verkauft</span>
+              <span class="gold">${bkmpFormatCurrency(Number(c.soldCount || 0) * BKMP_CARD_SALE_SELLER_SHARE)} verdient</span>
+            </div>`).join('')}
+        </div>` : ''}
+      `;
+      const payoutBtn = document.getElementById('cardSalePayoutBtn');
+      if (payoutBtn && canRequest) {
+        payoutBtn.addEventListener('click', () => {
+          payoutBtn.disabled = true;
+          payoutBtn.textContent = 'Wird angefragt...';
+          requestCardSalePayout().then(() => {
+            bkmpRefreshCardSaleSellerDash();
+          }).catch(e => {
+            console.error('Auszahlung konnte nicht angefragt werden.', e);
+            alert('Die Auszahlung konnte nicht angefragt werden: ' + (e && e.message === 'nothing_available' ? 'Aktuell steht kein Betrag zur Auszahlung bereit.' : (e && e.message) || e));
+            bkmpRefreshCardSaleSellerDash();
+          });
+        });
+      }
+    }
+
+    // Zentrale Refresh-Funktion - siehe Aufrufstellen: Session-
+    // Wiederherstellung beim Laden, Login-Erfolg, und der bestehende
+    // card_sales-Realtime-Handler (ein neuer Verkauf soll auch den
+    // eigenen verfuegbaren Betrag zeitnah aktualisieren).
+    async function bkmpRefreshCardSaleSellerDash() {
+      if (!cardSaleSellerDashEl) return;
+      const client = typeof bkmpGetPlayerAuthClient === 'function' ? bkmpGetPlayerAuthClient() : null;
+      let userId = null;
+      if (client) {
+        try {
+          const { data: sessionData } = await client.auth.getSession();
+          userId = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
+        } catch (e) { userId = null; }
+      }
+      bkmpCardSaleMyAuthUserId = userId;
+      if (!userId) {
+        bkmpCardSaleMyStatus = null;
+        cardSaleSellerDashEl.hidden = true;
+        renderCardSales();
+        return;
+      }
+      try {
+        const status = typeof getMyCardSaleStatus === 'function' ? await getMyCardSaleStatus() : null;
+        if (!status || status.cardCount <= 0) {
+          bkmpCardSaleMyStatus = null;
+          cardSaleSellerDashEl.hidden = true;
+          renderCardSales();
+          return;
+        }
+        bkmpCardSaleMyStatus = status;
+        cardSaleSellerDashEl.hidden = false;
+        renderCardSales();
+      } catch (e) {
+        console.warn('Verkäufer-Status konnte nicht geladen werden.', e);
+        bkmpCardSaleMyStatus = null;
+        cardSaleSellerDashEl.hidden = true;
+        renderCardSales();
+      }
+    }
 
     /* ---------------- Kartendatenbank ---------------- */
     const cardCatalogGrid = document.getElementById('cardCatalogGrid');
@@ -3849,6 +4032,7 @@
     const cardSaleRequestFormView = document.getElementById('cardSaleRequestFormView');
     const cardSaleRequestSuccessView = document.getElementById('cardSaleRequestSuccessView');
     const cardSaleRequestSuccessClose = document.getElementById('cardSaleRequestSuccessClose');
+    const cardSaleRequestLoginHint = document.getElementById('cardSaleRequestLoginHint');
 
     function clearCardSaleRequestForm() {
       cardSaleRequestNameInput.value = typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : '';
@@ -3859,9 +4043,32 @@
       if (cardSaleRequestSuccessView) cardSaleRequestSuccessView.style.display = 'none';
     }
 
+    /* Nutzerwunsch (01.09.2026): Login bleibt optional, aber der Absender
+       soll klar sehen, ob seine Karte automatisch zugeordnet wird. Reine
+       Anzeige - die eigentliche Zuordnung passiert unabhaengig davon
+       serverseitig ueber den Access-Token im Submit-Handler weiter unten
+       (nie ueber diesen Text/eine Client-Behauptung). */
+    function updateCardSaleRequestLoginHint() {
+      if (!cardSaleRequestLoginHint) return;
+      const client = typeof bkmpGetPlayerAuthClient === 'function' ? bkmpGetPlayerAuthClient() : null;
+      if (!client) { cardSaleRequestLoginHint.textContent = ''; return; }
+      client.auth.getSession().then(({ data }) => {
+        const user = data && data.session && data.session.user;
+        if (user) {
+          const name = (typeof bkmpGetMcName === 'function' && bkmpGetMcName()) || 'dir';
+          cardSaleRequestLoginHint.innerHTML = `Du bist als <strong>${escapeHtml(name)}</strong> eingeloggt. Deine Karte wird automatisch deinem Verkäuferkonto zugeordnet.`;
+          cardSaleRequestLoginHint.classList.add('is-logged-in');
+        } else {
+          cardSaleRequestLoginHint.textContent = 'Du kannst die Karte auch ohne Login einreichen. Für das persönliche Verkäufer-Dashboard muss sie anschließend deinem Account zugeordnet werden.';
+          cardSaleRequestLoginHint.classList.remove('is-logged-in');
+        }
+      }).catch(() => { cardSaleRequestLoginHint.textContent = ''; });
+    }
+
     if (openCardSaleRequestForm) {
       openCardSaleRequestForm.addEventListener('click', () => {
         clearCardSaleRequestForm();
+        updateCardSaleRequestLoginHint();
         cardSaleRequestOverlay.classList.add('visible');
       });
     }
@@ -3887,16 +4094,28 @@
         }
 
         bkmpCompressImageFile(file).then(image => {
-          bkmpSubmitViaApi('card_sale_requests', { minecraft_name: name, discord }, image).then(row => {
-            bkmpStartSubmitCooldown('cardsalerequest');
-            resetBtn();
-            if (row && row.id && typeof bkmpAddPendingRequestId === 'function') bkmpAddPendingRequestId(BKMP_PENDING_CARD_SALE_KEY, row.id);
-            if (cardSaleRequestFormView) cardSaleRequestFormView.style.display = 'none';
-            if (cardSaleRequestSuccessView) cardSaleRequestSuccessView.style.display = '';
-          }).catch(e => {
-            console.error('Verkaufsanfrage konnte nicht gespeichert werden.', e);
-            resetBtn();
-            alert('Die Anfrage konnte nicht gesendet werden: ' + (e && e.message || e) + '\n\nBitte versuche es erneut oder mit einem anderen Bild.');
+          /* Login bleibt optional (Nutzerwunsch) - existiert eine Spieler-
+             Session, wird ihr Access-Token einfach mitgeschickt, damit
+             api/submit-entry.js die Karte serverseitig automatisch dem
+             richtigen Verkaeuferkonto zuordnen kann (verifyPlayerAccessToken()
+             dort). Ein fehlgeschlagener Token-Abruf blockiert die Einreichung
+             NIE - dann laeuft sie einfach wie bisher komplett anonym weiter. */
+          const authClient = typeof bkmpGetPlayerAuthClient === 'function' ? bkmpGetPlayerAuthClient() : null;
+          const tokenPromise = authClient
+            ? authClient.auth.getSession().then(({ data }) => (data && data.session && data.session.access_token) || null).catch(() => null)
+            : Promise.resolve(null);
+          tokenPromise.then(token => {
+            bkmpSubmitViaApi('card_sale_requests', { minecraft_name: name, discord }, image, token ? { playerAccessToken: token } : undefined).then(row => {
+              bkmpStartSubmitCooldown('cardsalerequest');
+              resetBtn();
+              if (row && row.id && typeof bkmpAddPendingRequestId === 'function') bkmpAddPendingRequestId(BKMP_PENDING_CARD_SALE_KEY, row.id);
+              if (cardSaleRequestFormView) cardSaleRequestFormView.style.display = 'none';
+              if (cardSaleRequestSuccessView) cardSaleRequestSuccessView.style.display = '';
+            }).catch(e => {
+              console.error('Verkaufsanfrage konnte nicht gespeichert werden.', e);
+              resetBtn();
+              alert('Die Anfrage konnte nicht gesendet werden: ' + (e && e.message || e) + '\n\nBitte versuche es erneut oder mit einem anderen Bild.');
+            });
           });
         }).catch(() => {
           resetBtn();
@@ -6353,6 +6572,7 @@
         renderAchievementBadge();
         bkmpRefreshOwnedPlushies();
         bkmpRefreshMyWishVotes();
+        if (typeof bkmpRefreshCardSaleSellerDash === 'function') bkmpRefreshCardSaleSellerDash();
         if (typeof bkmpSpawnDerLiberFigures === 'function') bkmpSpawnDerLiberFigures();
         window.setTimeout(() => {
           bkmpAchievementNotifyReady = true;
@@ -6811,6 +7031,7 @@
         renderAchievementBadge();
         bkmpRefreshOwnedPlushies();
         bkmpRefreshMyWishVotes();
+        if (typeof bkmpRefreshCardSaleSellerDash === 'function') bkmpRefreshCardSaleSellerDash();
         if (typeof bkmpSpawnDerLiberFigures === 'function') bkmpSpawnDerLiberFigures();
         if (!bkmpGetMcName()) {
           mcAuthResetForm();

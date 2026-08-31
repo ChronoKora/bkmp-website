@@ -170,7 +170,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260831-shardmerchant9">
+<link rel="stylesheet" href="style.css?v=20260901-cardsaleredesign1">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 <!-- Jake's Feldfahrt (07.08.2026) - eigenstaendiges Website-Easter-Egg,
      komplett getrennt vom Idle-Dorf-Spiel, siehe js/easter-eggs/jakes-
@@ -1354,11 +1354,34 @@
       <!-- ================= Karten Verkaufen ================= -->
       <section class="panel" id="panel-cardsales">
         <h2 class="panel-title">Karten Verkaufen</h2>
-        <div class="cardsale-banner">
-          <span class="cardsale-banner-kicker">Verkaufsservice</span>
-          <strong>Verkaufe deine 15er-Karte über uns</strong>
-          <p>Du bekommst <b>135.000 €</b> pro verkaufter Karte, wir behalten nur <b>15.000 €</b> Provision (bei einem Kartenpreis von 150.000 €). Gib uns 10 Bundles mit Kopien deiner Karte — dafür bekommst du Shop-Trust und kannst jederzeit selbst nachschauen, ob noch alles da ist.</p>
-          <button class="btn-ja cardsale-request-cta" id="openCardSaleRequestForm" type="button">Verkaufsanfrage stellen</button>
+
+        <div class="cardsale-hero">
+          <div class="cardsale-hero-main">
+            <span class="cardsale-hero-kicker">Verkaufsservice</span>
+            <h3>Verkaufe deine 15er-Karte über uns</h3>
+            <p>Gib uns 10 Bundles mit Kopien deiner Karte — dafür bekommst du Shop-Trust, wir übernehmen den Verkauf, du bekommst deinen Anteil ausgezahlt.</p>
+            <div class="cardsale-hero-split">
+              <div class="cardsale-hero-split-item is-you"><strong>135.000 $</strong><span>für dich pro Verkauf</span></div>
+              <div class="cardsale-hero-split-item"><strong>15.000 $</strong><span>BK-Provision</span></div>
+            </div>
+            <button class="btn-ja cardsale-request-cta" id="openCardSaleRequestForm" type="button">Verkaufsanfrage stellen</button>
+          </div>
+          <ol class="cardsale-hero-steps">
+            <li><span>1</span>Karte einreichen (Bild + Name)</li>
+            <li><span>2</span>10 Bundles an uns übergeben</li>
+            <li><span>3</span>Wir verkaufen für dich im Shop</li>
+            <li><span>4</span>Auszahlung anfordern</li>
+          </ol>
+        </div>
+
+        <div class="cardsale-kpi-row" id="cardSaleKpiRow"></div>
+        <div class="cardsale-chart-card" id="cardSaleChartCard"></div>
+
+        <div class="cardsale-seller-dash" id="cardSaleSellerDash" hidden></div>
+
+        <div class="cardsale-grid-head">
+          <h3>Aktuell im Verkauf</h3>
+          <span class="cardsale-grid-count" id="cardSaleGridCount"></span>
         </div>
         <div class="cardsale-grid" id="cardsaleGrid"></div>
       </section>
@@ -1735,6 +1758,7 @@
         <label for="cardSaleRequestImageFile">Bild deiner Karte (Pflicht)</label>
         <input type="file" id="cardSaleRequestImageFile" accept="image/*" required>
         <label class="admin-checkbox-label"><input type="checkbox" id="cardSaleRequestInfoRead" required> Ich habe die Infos oben (Ablauf, Auszahlung, 10 Bundles) gelesen und verstanden.</label>
+        <p class="cardsale-login-hint" id="cardSaleRequestLoginHint"></p>
         <div class="joke-buttons">
           <button class="btn-nein" id="cardSaleRequestCancel" type="button">Abbrechen</button>
           <button class="btn-ja" id="cardSaleRequestSubmit" type="button">Anfrage senden</button>
@@ -1756,8 +1780,8 @@
        liest. window.BKMP_QA_MODE selbst wird noch frueher gesetzt (Kopf-Skript
        oben, vor jedem <script src>). Reiner No-Op ausserhalb des QA-Modus. -->
   <script src="js/core/bkmp-game-clock.js?v=20260724-qafoundation1" defer></script>
-  <script src="supabase.js?v=20260829-swstats1" defer></script>
-  <script src="app.js?v=20260830-goldcontrastaudit1" defer></script>
+  <script src="supabase.js?v=20260901-cardsaleredesign1" defer></script>
+  <script src="app.js?v=20260901-cardsaleredesign1" defer></script>
   <!-- Redesign Phase 2a (17.07.): idledorf.js in geteilten Zustand + Subsysteme
        zerlegt. Ladereihenfolge ist bewusst fest: bkmp-idle-state.js zuerst
        (geteilte veraenderliche Variablen, TDZ-sicher), dann die Subsysteme in
@@ -1801,7 +1825,7 @@
        bkmp-idle-*.js ab, nur die REIHENFOLGE relativ zu bkmp-site.js zaehlt
        hier. -->
   <script src="js/easter-eggs/jakes-feldfahrt.js?v=20260807-jakesfeldfahrt8" defer></script>
-  <script src="js/core/bkmp-site.js?v=20260831-shardmerchant5" defer></script>
+  <script src="js/core/bkmp-site.js?v=20260901-cardsaleredesign1" defer></script>
   <!-- Feedback-/Status-Board Stufe 1 (20.07.2026) - eigenstaendig, reine
        lokale Testdaten, siehe Datei-Kopf-Kommentar. -->
   <script src="js/ui/bkmp-feedback-board.js?v=20260721-stufe34" defer></script>

@@ -20,7 +20,7 @@
 <title>BKMP — Admin</title>
 
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
-<link rel="stylesheet" href="style.css?v=20260831-shardmerchant9">
+<link rel="stylesheet" href="style.css?v=20260901-cardsaleredesign1">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 </head>
 <body>
@@ -594,12 +594,27 @@
             <div class="form-grid form-grid-3">
               <div><label for="cardSaleName">Spielername</label><input type="text" id="cardSaleName" placeholder="z. B. Steve" required></div>
               <div><label for="cardSaleImageFile">Bild der Karte</label><input type="file" id="cardSaleImageFile" accept="image/*"></div>
-              <div><label for="cardSaleCount">Bereits verkauft</label><input type="number" id="cardSaleCount" min="0" step="1" placeholder="0"></div>
+              <div><label for="cardSaleCount">Anfangs-Verkaufszahl (nur beim Neuanlegen)</label><input type="number" id="cardSaleCount" min="0" step="1" placeholder="0 (optional)"></div>
             </div>
             <div class="investor-form-actions">
               <button class="btn btn-primary" id="addCardSale">+ Verk&auml;ufer hinzuf&uuml;gen</button>
               <button class="btn" id="cancelCardSaleEdit" type="button" style="display:none;">Abbrechen</button>
             </div>
+          </div>
+
+          <div class="admin-section">
+            <h2>Kartenverkauf: Besitzer &amp; historische Auszahlungen</h2>
+            <p class="admin-help-text">Ordnet Verk&auml;ufer-Eintr&auml;ge einem echten Spielerkonto zu (stabile Kontonummer statt Namen) und pflegt den einmaligen historischen Auszahlungsstand von vor Einf&uuml;hrung dieses Systems.</p>
+            <h3 style="margin:1rem 0 0.5rem; font-size:0.92rem;">Noch nicht zugeordnete Verk&auml;ufer</h3>
+            <div class="entry-table-wrapper"><div class="entry-list" id="cardSaleOwnerUnassignedList"></div></div>
+            <h3 style="margin:1.4rem 0 0.5rem; font-size:0.92rem;">Zugeordnete Verk&auml;ufer &mdash; historischer Auszahlungsstand</h3>
+            <div class="entry-table-wrapper"><div class="entry-list" id="cardSaleSellersList"></div></div>
+          </div>
+
+          <div class="admin-section">
+            <h2>Auszahlungsanfragen <span class="cardcatalog-admin-count" id="cardSalePayoutRequestCount"></span></h2>
+            <p class="admin-help-text">Verk&auml;ufer fordern hier ihren verf&uuml;gbaren Betrag an (immer der volle verf&uuml;gbare Betrag). Zahle ingame aus und markiere die Anfrage anschlie&szlig;end als ausgezahlt.</p>
+            <div class="entry-table-wrapper"><div class="entry-list investor-request-list" id="cardSalePayoutRequestList"></div></div>
           </div>
         </section>
 
@@ -1140,8 +1155,8 @@
        da admin.html kein window.BKMP_QA_MODE-Gate setzt; macht nur
        bkmpGetGameNow() fuer bkmp-events.js verfuegbar (identisch Date.now()). -->
   <script src="js/core/bkmp-game-clock.js?v=20260724-qafoundation1"></script>
-  <script src="supabase.js?v=20260829-swstats1"></script>
-  <script src="app.js?v=20260830-goldcontrastaudit1"></script>
+  <script src="supabase.js?v=20260901-cardsaleredesign1"></script>
+  <script src="app.js?v=20260901-cardsaleredesign1"></script>
   <!-- Redesign Phase 2a (17.07.): siehe index.html fuer die Begruendung der
        festen Ladereihenfolge (bkmp-idle-state.js zuerst, bkmp-idle-
        bootstrap.js zuletzt vor mapart.js). -->
@@ -1438,7 +1453,7 @@
         if (page === 'streamers') refreshStreamersFromSupabase();
         if (page === 'about') refreshAboutBlocksFromSupabase();
         if (page === 'partners') refreshPartnerShopsFromSupabase();
-        if (page === 'cardsales') refreshCardSalesFromSupabase();
+        if (page === 'cardsales') { refreshCardSalesFromSupabase(); refreshCardSaleOwnersAndPayoutsFromSupabase(); }
         if (page === 'investorRequests') refreshInvestorRequestsFromSupabase();
         if (page === 'cardcatalog') refreshCardCatalogFromSupabase();
         if (page === 'feedback') refreshFeedbackList();
@@ -1976,6 +1991,11 @@
     }
 
     async function persistCardSale(item) {
+      // Gibt bewusst die gespeicherte Zeile zurueck (nicht nur `true`) -
+      // confirmCardSaleRequest() braucht die echte neue id, um danach ggf.
+      // assignCardSaleOwner() aufzurufen. Bleibt fuer bestehende Aufrufer,
+      // die nur die Wahrheitshaftigkeit pruefen (z.B. der Formular-Handler
+      // weiter unten), unveraendert kompatibel.
       if (typeof saveCardSale === 'function' && bkmpGetSupabaseClient()) {
         try {
           const saved = await saveCardSale(item);
@@ -1987,20 +2007,23 @@
           bkmpSaveData(data);
           renderAll();
           showAdminToast('Karten-Verkäufer gespeichert.', 'success');
-          return true;
+          return saved;
         } catch (e) {
           console.error('Supabase konnte Karten-Verkäufer nicht speichern.', e);
           showAdminToast('Konnte nicht gespeichert werden: ' + supabaseErrorText(e), 'error');
-          return false;
+          return null;
         }
       }
+      let localRow;
       if (item.id) {
         data.cardSales = data.cardSales.map(row => row.id === item.id ? item : row);
+        localRow = item;
       } else {
-        data.cardSales.push({ id: bkmpUid('cardsale'), ...item, createdAt: Date.now() });
+        localRow = { id: bkmpUid('cardsale'), ...item, createdAt: Date.now() };
+        data.cardSales.push(localRow);
       }
       persist();
-      return true;
+      return localRow;
     }
 
     async function removeCardSale(id) {
@@ -2022,12 +2045,32 @@
       removeEntry('cardSales', id);
     }
 
+    // Laeuft seit 01.09.2026 ueber die neuen Admin-RPCs statt einer rohen
+    // sold_count-Mutation (siehe sql/20260901-card-sale-ownership-and-
+    // payouts.sql, Nachbesserung 3 im Plan) - server-seitig gegen negative
+    // Verfuegbarkeit abgesichert, falls der Verdienst bereits (teilweise)
+    // ausgezahlt/reserviert ist. sold_count selbst ist seitdem trigger-
+    // abgeleitet aus card_sale_events, deshalb nach Erfolg ein echter
+    // Re-Sync statt einer rein lokalen Zahlen-Aenderung.
     async function incrementCardSale(id, delta) {
       const item = data.cardSales.find(row => String(row.id) === String(id));
       if (!item) return;
-      const nextCount = Math.max(0, Number(item.soldCount || 0) + delta);
-      if (nextCount === Number(item.soldCount || 0)) return;
-      await persistCardSale({ ...item, soldCount: nextCount });
+      try {
+        if (delta > 0) {
+          await adminAddCardSaleEvent(id, 1);
+        } else {
+          await adminRemoveLastCardSaleEvent(id);
+        }
+        await refreshCardSalesFromSupabase();
+      } catch (e) {
+        console.error('Verkaufszahl konnte nicht geändert werden.', e);
+        const msg = String((e && e.message) || e || '');
+        if (msg.includes('earnings_already_reserved_or_paid')) {
+          showAdminToast('Dieser Verkauf kann nicht entfernt werden, da der entsprechende Verdienst bereits ausgezahlt oder für eine Auszahlung reserviert wurde.', 'error');
+        } else {
+          showAdminToast('Verkaufszahl konnte nicht geändert werden: ' + supabaseErrorText(e), 'error');
+        }
+      }
     }
 
     async function confirmInvestorRequest(id) {
@@ -2227,10 +2270,32 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
     async function confirmCardSaleRequest(id) {
       const req = data.cardSaleRequests.find(r => r.id === id);
       if (!req) return;
-      const created = await persistCardSale({ playerName: req.minecraftName, image: req.image, soldCount: 0 });
+      const created = await persistCardSale({ playerName: req.minecraftName, image: req.image });
       if (!created) {
         showAdminToast('Verkäufer konnte nicht angelegt werden — Anfrage bleibt offen.', 'error');
         return;
+      }
+      // Besitzer-Zuordnung laeuft bewusst ueber den eigenen, engen
+      // assignCardSaleOwner()-Pfad (nie ueber saveCardSale()/persistCardSale(),
+      // siehe Kommentar bei bkmpMapCardSaleToSupabase() in supabase.js) - nur
+      // wenn die Anfrage selbst bereits einer echten Spieler-Session
+      // zugeordnet war (auth_user_id, server-seitig ueber
+      // verifyPlayerAccessToken() in api/submit-entry.js gesetzt, vom Client
+      // nie faelschbar). War der Einreicher nicht eingeloggt, bleibt die
+      // Karte wie bisher unzugeordnet und taucht in der neuen "Besitzer
+      // zuordnen"-Liste weiter unten auf.
+      if (req.authUserId && typeof assignCardSaleOwner === 'function' && bkmpGetSupabaseClient()) {
+        try {
+          const withOwner = await assignCardSaleOwner(created.id, req.authUserId);
+          if (withOwner) {
+            data.cardSales = data.cardSales.map(row => row.id === created.id ? withOwner : row);
+            bkmpSaveData(data);
+            renderAll();
+          }
+        } catch (e) {
+          console.error('Besitzer konnte nicht automatisch zugeordnet werden.', e);
+          showAdminToast('Verkäufer wurde angelegt, die automatische Besitzer-Zuordnung ist aber fehlgeschlagen — bitte manuell zuordnen: ' + supabaseErrorText(e), 'error');
+        }
       }
       if (typeof updateCardSaleRequestStatus === 'function' && bkmpGetSupabaseClient()) {
         try {
@@ -2327,6 +2392,210 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
           row.querySelector('.reject-btn').addEventListener('click', () => rejectCardSaleRequest(req.id));
         }
         row.querySelector('.del-btn').addEventListener('click', () => deleteCardSaleRequestEntry(req.id));
+        el.appendChild(row);
+      });
+    }
+
+    /* ---------------- Kartenverkauf: Besitzer & historische Auszahlungen +
+       Auszahlungsanfragen (01.09.2026, siehe Plan in
+       C:\Users\David\.claude\plans\wild-juggling-garden.md) ----------------
+       Alle drei Caches bewusst NICHT im data-Objekt/bkmpSaveData (gleiches
+       Prinzip wie bkmpFeedbackCache direkt darunter) - reine Admin-Ansicht,
+       kein Teil des oeffentlichen Offline-Snapshots. */
+    let cardSaleOwnerCandidates = []; // player_stats-Zeilen mit auth_user_id, fuer den Zuordnen-Picker
+    let cardSellersCache = [];        // card_sellers (historical_starting_paid_out/-_note je Besitzer)
+    let cardSalePayoutRequestsCache = []; // card_sale_payout_requests (admin-only lesbar)
+
+    async function refreshCardSaleOwnersAndPayoutsFromSupabase() {
+      if (!bkmpGetSupabaseClient()) return;
+      try {
+        const [candidates, sellers, payouts] = await Promise.all([
+          typeof loadPlayerStatsForOwnerPicker === 'function' ? loadPlayerStatsForOwnerPicker() : [],
+          typeof loadCardSellers === 'function' ? loadCardSellers() : [],
+          typeof loadCardSalePayoutRequests === 'function' ? loadCardSalePayoutRequests() : []
+        ]);
+        cardSaleOwnerCandidates = candidates || [];
+        cardSellersCache = sellers || [];
+        cardSalePayoutRequestsCache = payouts || [];
+        renderAll();
+      } catch (e) {
+        console.error('Besitzer-/Auszahlungsdaten konnten nicht geladen werden.', e);
+      }
+    }
+
+    function bkmpCardSaleOwnerDisplayName(authUserId) {
+      const found = cardSaleOwnerCandidates.find(c => c.authUserId === authUserId);
+      return found ? (found.displayName || found.nameKey) : `Konto ${String(authUserId || '').slice(0, 8)}…`;
+    }
+
+    async function bkmpAssignCardSaleOwnerFromPicker(cardSaleId, selectEl) {
+      const authUserId = selectEl.value;
+      if (!authUserId) { showAdminToast('Bitte zuerst einen Spieler auswählen.', 'error'); return; }
+      if (typeof assignCardSaleOwner !== 'function' || !bkmpGetSupabaseClient()) return;
+      try {
+        const updated = await assignCardSaleOwner(cardSaleId, authUserId);
+        if (updated) {
+          data.cardSales = data.cardSales.map(row => row.id === cardSaleId ? updated : row);
+          bkmpSaveData(data);
+          renderAll();
+          showAdminToast('Besitzer zugeordnet.', 'success');
+        }
+      } catch (e) {
+        console.error('Besitzer konnte nicht zugeordnet werden.', e);
+        showAdminToast('Besitzer konnte nicht zugeordnet werden: ' + supabaseErrorText(e), 'error');
+      }
+    }
+
+    function renderCardSaleOwnersSection() {
+      const unassignedEl = document.getElementById('cardSaleOwnerUnassignedList');
+      const sellersEl = document.getElementById('cardSaleSellersList');
+      if (!unassignedEl && !sellersEl) return;
+
+      if (unassignedEl) {
+        const unassigned = (data.cardSales || []).filter(c => !c.authUserId);
+        if (unassigned.length === 0) {
+          unassignedEl.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Alle Verkäufer sind einem Konto zugeordnet.</p>';
+        } else {
+          const options = cardSaleOwnerCandidates.map(c => `<option value="${escapeHtml(c.authUserId)}">${escapeHtml(c.displayName || c.nameKey)}</option>`).join('');
+          unassignedEl.innerHTML = '';
+          unassigned.forEach(card => {
+            const row = document.createElement('div');
+            row.className = 'entry-row';
+            row.innerHTML = `
+              <div class="desc">
+                <span class="name">${escapeHtml(card.playerName)}</span>
+                <span class="meta">${Number(card.soldCount || 0)}× verkauft — noch keinem Konto zugeordnet</span>
+              </div>
+              <div class="entry-actions" style="gap:0.5rem;">
+                <select style="min-width:180px;"><option value="">Spieler wählen…</option>${options}</select>
+                <button class="edit-btn assign-btn" type="button">Zuordnen</button>
+              </div>
+            `;
+            row.querySelector('.assign-btn').addEventListener('click', () => bkmpAssignCardSaleOwnerFromPicker(card.id, row.querySelector('select')));
+            unassignedEl.appendChild(row);
+          });
+        }
+      }
+
+      if (sellersEl) {
+        const ownerIds = Array.from(new Set((data.cardSales || []).filter(c => c.authUserId).map(c => c.authUserId)));
+        if (ownerIds.length === 0) {
+          sellersEl.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Noch keine zugeordneten Verkäufer.</p>';
+        } else {
+          sellersEl.innerHTML = '';
+          ownerIds.forEach(authUserId => {
+            const seller = cardSellersCache.find(s => s.authUserId === authUserId);
+            const row = document.createElement('div');
+            row.className = 'entry-row';
+            row.innerHTML = `
+              <div class="desc">
+                <span class="name">${escapeHtml(bkmpCardSaleOwnerDisplayName(authUserId))}</span>
+                <span class="meta">Historisch bereits ausgezahlt (vor Systemeinführung, einmalig)</span>
+              </div>
+              <div class="entry-actions" style="gap:0.5rem; flex-wrap:wrap;">
+                <input type="number" min="0" step="1" class="historical-amount-input" style="width:130px;" value="${seller ? seller.historicalStartingPaidOut : 0}" placeholder="0">
+                <input type="text" class="historical-note-input" style="width:220px;" value="${escapeHtml(seller ? seller.historicalNote : '')}" placeholder="Notiz (optional)">
+                <button class="edit-btn save-historical-btn" type="button">Speichern</button>
+              </div>
+            `;
+            row.querySelector('.save-historical-btn').addEventListener('click', async () => {
+              const amount = Number(row.querySelector('.historical-amount-input').value) || 0;
+              const note = row.querySelector('.historical-note-input').value.trim();
+              try {
+                const saved = await upsertCardSeller(authUserId, amount, note);
+                if (saved) {
+                  cardSellersCache = cardSellersCache.filter(s => s.authUserId !== authUserId).concat([saved]);
+                  showAdminToast('Historischer Auszahlungsstand gespeichert.', 'success');
+                }
+              } catch (e) {
+                console.error('Historischer Stand konnte nicht gespeichert werden.', e);
+                showAdminToast('Konnte nicht gespeichert werden: ' + supabaseErrorText(e), 'error');
+              }
+            });
+            sellersEl.appendChild(row);
+          });
+        }
+      }
+    }
+
+    function cardSalePayoutStatusLabel(status) {
+      return ({ pending: 'Ausstehend', paid: 'Ausgezahlt', rejected: 'Abgelehnt' })[status] || status;
+    }
+
+    // Statusaenderungen laufen ausschliesslich ueber process_card_sale_payout()
+    // (siehe Nachbesserung 4 im Plan) - kein direktes .update() auf
+    // card_sale_payout_requests moeglich, RLS liesse das fuer niemanden zu.
+    async function bkmpMarkCardSalePayoutPaid(id) {
+      if (typeof processCardSalePayout !== 'function' || !bkmpGetSupabaseClient()) return;
+      if (!window.confirm('Wurde der Betrag bereits ingame ausgezahlt? Erst danach als ausgezahlt markieren.')) return;
+      try {
+        await processCardSalePayout(id, 'paid');
+        cardSalePayoutRequestsCache = cardSalePayoutRequestsCache.map(r => r.id === id ? { ...r, status: 'paid', processedAt: Date.now() } : r);
+        renderAll();
+        showAdminToast('Auszahlung als ausgezahlt markiert.', 'success');
+      } catch (e) {
+        console.error('Auszahlung konnte nicht als ausgezahlt markiert werden.', e);
+        showAdminToast('Konnte nicht aktualisiert werden: ' + supabaseErrorText(e), 'error');
+      }
+    }
+
+    async function bkmpRejectCardSalePayout(id) {
+      if (typeof processCardSalePayout !== 'function' || !bkmpGetSupabaseClient()) return;
+      const reason = await bkmpAdminPromptTextModal({
+        titleText: 'Auszahlung ablehnen',
+        labelText: 'Begründung für die Ablehnung (optional, wird intern gespeichert):',
+        confirmText: 'Ablehnen',
+        placeholder: 'z. B. Karten wurden zurückgezogen'
+      });
+      if (reason === null) return;
+      try {
+        await processCardSalePayout(id, 'rejected', reason.trim());
+        cardSalePayoutRequestsCache = cardSalePayoutRequestsCache.map(r => r.id === id ? { ...r, status: 'rejected', rejectReason: reason.trim(), processedAt: Date.now() } : r);
+        renderAll();
+        showAdminToast('Auszahlung abgelehnt.', 'success');
+      } catch (e) {
+        console.error('Auszahlung konnte nicht abgelehnt werden.', e);
+        showAdminToast('Konnte nicht abgelehnt werden: ' + supabaseErrorText(e), 'error');
+      }
+    }
+
+    function renderCardSalePayoutRequestList() {
+      const el = document.getElementById('cardSalePayoutRequestList');
+      const countEl = document.getElementById('cardSalePayoutRequestCount');
+      if (!el) return;
+      const items = cardSalePayoutRequestsCache || [];
+      if (countEl) {
+        const pendingCount = items.filter(r => r.status === 'pending').length;
+        countEl.textContent = pendingCount ? `(${pendingCount} offen)` : '';
+      }
+      if (items.length === 0) {
+        el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Noch keine Auszahlungsanfragen.</p>';
+        return;
+      }
+      el.innerHTML = '';
+      const sorted = [...items].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      sorted.forEach(req => {
+        const row = document.createElement('div');
+        row.className = 'entry-row investor-request-row' + (!req.isRead ? ' is-unread' : '');
+        const dateLabel = req.createdAt ? formatDate(new Date(req.createdAt).toISOString().slice(0, 10)) : '';
+        row.innerHTML = `
+          <div class="desc">
+            ${!req.isRead ? '<span class="entry-row-unread-dot" aria-hidden="true"></span>' : ''}
+            <span class="name">${escapeHtml(req.displayName || bkmpCardSaleOwnerDisplayName(req.authUserId))}</span>
+            <span class="meta">${bkmpFormatCurrency(req.amount)} · ${escapeHtml(dateLabel)}${req.status === 'rejected' && req.rejectReason ? ' · ' + escapeHtml(req.rejectReason) : ''}</span>
+          </div>
+          <span class="investor-request-status status-${req.status === 'paid' ? 'confirmed' : req.status}">${cardSalePayoutStatusLabel(req.status)}</span>
+          <div class="entry-actions">
+            ${req.status === 'pending' ? `
+              <button class="edit-btn mark-paid-btn" type="button">Als ausgezahlt markieren</button>
+              <button class="edit-btn reject-payout-btn" type="button">Ablehnen</button>
+            ` : ''}
+          </div>
+        `;
+        if (req.status === 'pending') {
+          row.querySelector('.mark-paid-btn').addEventListener('click', () => bkmpMarkCardSalePayoutPaid(req.id));
+          row.querySelector('.reject-payout-btn').addEventListener('click', () => bkmpRejectCardSalePayout(req.id));
+        }
         el.appendChild(row);
       });
     }
@@ -3136,6 +3405,8 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       if (bkmpAdminSectionVisible('cardSaleList')) renderCardSaleList();
       if (bkmpAdminSectionVisible('investorRequestList')) renderInvestorRequestList();
       if (bkmpAdminSectionVisible('cardSaleRequestList')) renderCardSaleRequestList();
+      if (bkmpAdminSectionVisible('cardSaleOwnerUnassignedList')) renderCardSaleOwnersSection();
+      if (bkmpAdminSectionVisible('cardSalePayoutRequestList')) renderCardSalePayoutRequestList();
       if (bkmpAdminSectionVisible('cardCatalogPendingList')) renderCardCatalogList();
       if (bkmpAdminSectionVisible('employeePayoutSummary')) renderEmployeePayoutPage();
       if (window.bkmpEnhanceImages) window.bkmpEnhanceImages(document);
@@ -4541,9 +4812,18 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
     const cardSaleImageFileInput = document.getElementById('cardSaleImageFile');
     const cardSaleCountInput = document.getElementById('cardSaleCount');
 
+    // Verkaufszahl ist seit 01.09.2026 trigger-abgeleitet aus
+    // card_sale_events (siehe sql/20260901-card-sale-ownership-and-
+    // payouts.sql) - beim Bearbeiten eines bestehenden Verkaeufers nur noch
+    // schreibgeschuetzt anzeigen (Aenderungen laufen ausschliesslich ueber
+    // die +/--Knoepfe der Liste, also incrementCardSale()). Beim Neuanlegen
+    // bleibt das Feld eine optionale Anfangs-Verkaufszahl, die nach dem
+    // Anlegen einmalig ueber adminAddCardSaleEvent() nachgetragen wird -
+    // derselbe Schreibpfad wie der +-Knopf, keine zweite Kopie.
     function setCardSaleEditMode(isEditing) {
       addCardSaleBtn.textContent = isEditing ? 'Änderungen speichern' : '+ Verkäufer hinzufügen';
       cancelCardSaleEditBtn.style.display = isEditing ? 'inline-flex' : 'none';
+      cardSaleCountInput.disabled = isEditing;
     }
 
     function clearCardSaleForm() {
@@ -4571,20 +4851,25 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       if (addCardSaleBtn.disabled) return;
       const playerName = cardSaleNameInput.value.trim();
       if (!playerName) { cardSaleNameInput.reportValidity(); return; }
-      const currentItem = editingCardSaleId ? data.cardSales.find(row => row.id === editingCardSaleId) : null;
+      const wasEditing = Boolean(editingCardSaleId);
+      const currentItem = wasEditing ? data.cardSales.find(row => row.id === editingCardSaleId) : null;
       const file = cardSaleImageFileInput.files && cardSaleImageFileInput.files[0] ? cardSaleImageFileInput.files[0] : null;
       const readImage = file ? bkmpCompressImageFile(file) : Promise.resolve(currentItem ? currentItem.image || '' : '');
-      const soldCount = cardSaleCountInput.value === '' ? (currentItem ? Number(currentItem.soldCount || 0) : 0) : Math.max(0, Number(cardSaleCountInput.value));
+      // Nur beim Neuanlegen relevant - beim Bearbeiten ist das Feld
+      // deaktiviert (setCardSaleEditMode()), sein Wert wird hier ignoriert.
+      const initialCount = wasEditing ? 0 : Math.max(0, Number(cardSaleCountInput.value) || 0);
       addCardSaleBtn.disabled = true;
       readImage.then(image => {
-        const item = {
-          id: editingCardSaleId || '',
-          playerName,
-          image,
-          soldCount
-        };
+        const item = { id: editingCardSaleId || '', playerName, image };
         return persistCardSale(item).then(saved => {
-          if (saved) clearCardSaleForm();
+          if (!saved) return;
+          const applyInitialCount = (!wasEditing && initialCount > 0 && typeof adminAddCardSaleEvent === 'function')
+            ? adminAddCardSaleEvent(saved.id, initialCount).then(() => refreshCardSalesFromSupabase()).catch(e => {
+                console.error('Anfangs-Verkaufszahl konnte nicht gesetzt werden.', e);
+                showAdminToast('Verkäufer angelegt, Anfangs-Verkaufszahl konnte aber nicht gesetzt werden: ' + supabaseErrorText(e), 'error');
+              })
+            : Promise.resolve();
+          return applyInitialCount.then(() => clearCardSaleForm());
         });
       }).catch(e => {
         console.error('Bild konnte nicht gelesen werden.', e);

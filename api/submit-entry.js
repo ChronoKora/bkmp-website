@@ -18,6 +18,10 @@
    ============================================================ */
 
 const SUPABASE_URL = 'https://zgknyrwzpohvfdweomxf.supabase.co';
+// "Publishable"/anon Key - bewusst oeffentlich, identisch zu dem bereits im
+// Frontend (supabase.js) verwendeten Wert, nur fuer die Token-Verifikation
+// unten gebraucht (kein Geheimnis wie SUPABASE_SERVICE_ROLE_KEY).
+const SUPABASE_ANON_KEY = 'sb_publishable_RuiDW15_3cI0cQZ8WlzoWg_DhGU9r6f';
 const STORAGE_BUCKET = 'update-images';
 const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
 const MAX_FIELD_LENGTH = 2000;
@@ -54,7 +58,14 @@ const TABLE_CONFIG = {
     imageField: 'image_url',
     requiredFields: ['minecraft_name'],
     allowedFields: ['minecraft_name', 'discord'],
-    requireImage: true
+    requireImage: true,
+    // Nutzerwunsch (01.09.2026): eingeloggte Einreicher sollen ihrem
+    // Verkaeuferkonto automatisch zugeordnet werden, OHNE dass Login
+    // Pflicht wird. Siehe verifyPlayerAccessToken() weiter unten - der
+    // Client darf hier NIE direkt eine auth_user_id behaupten, nur einen
+    // Access-Token schicken, der server-seitig gegen Supabase Auth
+    // verifiziert wird.
+    acceptOwnerToken: true
   },
   feedback: {
     table: 'feedback',
@@ -75,6 +86,27 @@ const TABLE_CONFIG = {
     requireImage: true
   }
 };
+
+// Verifiziert einen vom Client mitgeschickten Supabase-Access-Token
+// server-seitig gegen Supabase Auth selbst (roher fetch, kein supabase-js-
+// Dependency - dieses Projekt spricht in api/*.js durchgehend rohes REST,
+// siehe uploadImage() oben). Liefert die ECHTE, vom Auth-Server bestaetigte
+// auth_user_id zurueck, oder null bei fehlendem/ungueltigem/abgelaufenem
+// Token - der Client kann sich hier NIEMALS als jemand anderes ausgeben,
+// ein erfundener/fremder Token wird von Supabase selbst zurueckgewiesen.
+async function verifyPlayerAccessToken(token) {
+  if (!token || typeof token !== 'string') return null;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) return null;
+    const user = await res.json().catch(() => null);
+    return user && user.id ? user.id : null;
+  } catch (e) {
+    return null;
+  }
+}
 
 function send(res, status, payload) {
   res.statusCode = status;
@@ -165,6 +197,10 @@ module.exports = async function handler(req, res) {
     });
     if (config.imageField) payload[config.imageField] = imageUrl;
     if (config.hasStatus !== false) payload.status = 'pending';
+    if (config.acceptOwnerToken) {
+      const verifiedUserId = await verifyPlayerAccessToken(body.playerAccessToken);
+      if (verifiedUserId) payload.auth_user_id = verifiedUserId;
+    }
 
     const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/${config.table}`, {
       method: 'POST',

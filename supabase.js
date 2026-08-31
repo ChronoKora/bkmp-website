@@ -2150,22 +2150,33 @@ async function importLocalPartnerShopsToSupabase() {
   return { imported: rows.length, skipped, total: refreshed.length };
 }
 
+const BKMP_CARD_SALES_SELECT = 'id, player_name, image_url, sold_count, auth_user_id, created_at';
+
 function bkmpMapCardSaleFromSupabase(row) {
   return {
     id: row.id,
     playerName: row.player_name || '',
     image: row.image_url || '',
     soldCount: Number(row.sold_count || 0),
+    authUserId: row.auth_user_id || null,
     createdAt: row.created_at ? Date.parse(row.created_at) : 0,
     source: 'supabase'
   };
 }
 
+// Bewusst OHNE sold_count/auth_user_id im Payload: seit der Umstellung auf
+// ein echtes Verkaufs-Log (card_sale_events, siehe sql/20260901-card-sale-
+// ownership-and-payouts.sql) ist sold_count trigger-abgeleitet und darf nie
+// mehr direkt beschrieben werden (sonst ueberschreibt der naechste echte
+// Verkauf/die naechste Admin-Korrektur den Wert wieder stillschweigend) -
+// Aenderungen laufen nur noch ueber adminAddCardSaleEvent()/
+// adminRemoveLastCardSaleEvent(). auth_user_id wird separat und bewusst nur
+// ueber assignCardSaleOwner() gesetzt, nie ueber diesen allgemeinen
+// Name/Bild-Editier-Pfad.
 function bkmpMapCardSaleToSupabase(item) {
   return {
     player_name: item.playerName || item.player_name || '',
-    image_url: item.image || item.image_url || '',
-    sold_count: Number(item.soldCount || item.sold_count || 0)
+    image_url: item.image || item.image_url || ''
   };
 }
 
@@ -2174,7 +2185,7 @@ async function loadCardSales() {
   if (!client) return null;
   const { data, error } = await client
     .from('card_sales')
-    .select('id, player_name, image_url, sold_count, created_at')
+    .select(BKMP_CARD_SALES_SELECT)
     .order('created_at', { ascending: false });
   if (error) throw error;
   return (data || []).map(bkmpMapCardSaleFromSupabase);
@@ -2191,19 +2202,106 @@ async function saveCardSale(item) {
       .from('card_sales')
       .update(payload)
       .eq('id', item.id)
-      .select('id, player_name, image_url, sold_count, created_at')
+      .select(BKMP_CARD_SALES_SELECT)
       .limit(1);
   } else {
     query = client
       .from('card_sales')
       .insert(payload)
-      .select('id, player_name, image_url, sold_count, created_at')
+      .select(BKMP_CARD_SALES_SELECT)
       .limit(1);
   }
   const { data, error } = await query;
   if (error) throw error;
   const row = Array.isArray(data) ? data[0] : null;
   return row ? bkmpMapCardSaleFromSupabase(row) : null;
+}
+
+// Reine Besitzer-Zuordnung (Admin-"Besitzer zuordnen"-Screen, sql-Abschnitt
+// 15 des Auftrags) - eigener, enger Schreibpfad statt ueber saveCardSale()/
+// bkmpMapCardSaleToSupabase(), damit ein normaler Name/Bild-Edit niemals
+// versehentlich auch die Besitzer-Zuordnung mit veraendern kann.
+async function assignCardSaleOwner(cardSaleId, authUserId) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('card_sales')
+    .update({ auth_user_id: authUserId })
+    .eq('id', cardSaleId)
+    .select(BKMP_CARD_SALES_SELECT)
+    .limit(1);
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : null;
+  return row ? bkmpMapCardSaleFromSupabase(row) : null;
+}
+
+// Fuer den Admin-Besitzer-Suchpicker ("Besitzer zuordnen") - player_stats
+// ist bereits oeffentlich lesbar (siehe idle-Bestenlisten etc.), hier nur
+// auf Zeilen mit einer echten auth_user_id begrenzt (nur solche Accounts
+// koennen ueberhaupt als Besitzer zugeordnet werden).
+async function loadPlayerStatsForOwnerPicker() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from('player_stats')
+    .select('auth_user_id, name_key, display_name')
+    .not('auth_user_id', 'is', null)
+    .order('display_name', { ascending: true });
+  if (error) throw error;
+  return (data || []).map(row => ({
+    authUserId: row.auth_user_id,
+    nameKey: row.name_key || '',
+    displayName: row.display_name || row.name_key || ''
+  }));
+}
+
+const BKMP_CARD_SELLERS_SELECT = 'auth_user_id, historical_starting_paid_out, historical_note, created_at, updated_at';
+
+function bkmpMapCardSellerFromSupabase(row) {
+  return {
+    authUserId: row.auth_user_id,
+    historicalStartingPaidOut: Number(row.historical_starting_paid_out || 0),
+    historicalNote: row.historical_note || '',
+    createdAt: row.created_at ? Date.parse(row.created_at) : 0,
+    updatedAt: row.updated_at ? Date.parse(row.updated_at) : 0
+  };
+}
+
+// Admin-only (RLS: nur is_active_admin() darf lesen) - fuer die "Besitzer &
+// historische Auszahlungen"-Verwaltungsseite.
+async function loadCardSellers() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from('card_sellers')
+    .select(BKMP_CARD_SELLERS_SELECT)
+    .order('updated_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(bkmpMapCardSellerFromSupabase);
+}
+
+// Upsert statt Insert-oder-Update-Unterscheidung: card_sellers-Zeilen
+// koennen bereits durch einen fruaeheren request_card_sale_payout()-Aufruf
+// des Spielers selbst existieren (siehe sql, insert...on conflict do
+// nothing) - der Admin muss trotzdem jederzeit den historischen Wert
+// nachtragen/korrigieren koennen, unabhaengig davon, ob die Zeile schon da
+// war.
+async function upsertCardSeller(authUserId, historicalStartingPaidOut, historicalNote) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('card_sellers')
+    .upsert({
+      auth_user_id: authUserId,
+      historical_starting_paid_out: Number(historicalStartingPaidOut || 0),
+      historical_note: historicalNote || null,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'auth_user_id' })
+    .select(BKMP_CARD_SELLERS_SELECT)
+    .limit(1);
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : null;
+  return row ? bkmpMapCardSellerFromSupabase(row) : null;
 }
 
 async function deleteCardSale(id) {
@@ -2383,6 +2481,8 @@ async function syncInvestorRequestsFromSupabase(targetData, onSynced, options = 
 
 /* ---------------- Kartenverkaufs-Anfragen (analog zu Investoren-Anfragen) ---------------- */
 
+const BKMP_CARD_SALE_REQUESTS_SELECT = 'id, minecraft_name, discord, image_url, status, is_read, auth_user_id, created_at';
+
 function bkmpMapCardSaleRequestFromSupabase(row) {
   return {
     id: row.id,
@@ -2391,6 +2491,7 @@ function bkmpMapCardSaleRequestFromSupabase(row) {
     image: row.image_url || '',
     status: row.status || 'pending',
     isRead: Boolean(row.is_read),
+    authUserId: row.auth_user_id || null,
     createdAt: row.created_at ? Date.parse(row.created_at) : 0,
     source: 'supabase'
   };
@@ -2401,7 +2502,7 @@ async function loadCardSaleRequests() {
   if (!client) return null;
   const { data, error } = await client
     .from('card_sale_requests')
-    .select('id, minecraft_name, discord, image_url, status, is_read, created_at')
+    .select(BKMP_CARD_SALE_REQUESTS_SELECT)
     .order('created_at', { ascending: false });
   if (error) throw error;
   return (data || []).map(bkmpMapCardSaleRequestFromSupabase);
@@ -2414,7 +2515,7 @@ async function updateCardSaleRequestStatus(id, status) {
     .from('card_sale_requests')
     .update({ status })
     .eq('id', id)
-    .select('id, minecraft_name, discord, image_url, status, is_read, created_at')
+    .select(BKMP_CARD_SALE_REQUESTS_SELECT)
     .limit(1);
   if (error) throw error;
   const row = Array.isArray(data) ? data[0] : null;
@@ -2428,7 +2529,7 @@ async function updateCardSaleRequestRead(id, isRead) {
     .from('card_sale_requests')
     .update({ is_read: isRead })
     .eq('id', id)
-    .select('id, minecraft_name, discord, image_url, status, is_read, created_at')
+    .select(BKMP_CARD_SALE_REQUESTS_SELECT)
     .limit(1);
   if (error) throw error;
   const row = Array.isArray(data) ? data[0] : null;
@@ -2441,6 +2542,153 @@ async function deleteCardSaleRequest(id) {
   const { error } = await client.from('card_sale_requests').delete().eq('id', id);
   if (error) throw error;
   return true;
+}
+
+/* ---------------- Kartenverkauf: Besitzer-Auszahlungssystem (01.09.2026) ----------------
+   Siehe sql/20260901-card-sale-ownership-and-payouts.sql fuer die volle
+   Herleitung. Jede mutierende Aktion (Auszahlung anfordern, Verkauf
+   hinzufuegen/entfernen, Auszahlung als bezahlt/abgelehnt markieren) laeuft
+   ausschliesslich ueber eine SECURITY-DEFINER-RPC mit interner Pruefung -
+   die zugrundeliegenden Tabellen (card_sale_events/card_sellers/
+   card_sale_payout_requests) haben bewusst KEINE Insert/Update-RLS-Policy
+   fuer normale Clients, direkte Client-Mutation ist dadurch strukturell
+   unmoeglich, nicht nur policy-verboten. */
+
+// Spieler-seitig: fordert den KOMPLETTEN aktuell verfuegbaren Betrag an
+// (kein Freitext-Betrag, siehe Auftrag "moeglichst simpel"). Der Betrag
+// wird ausschliesslich serverseitig berechnet.
+async function requestCardSalePayout() {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return null;
+  const { data, error } = await client.rpc('request_card_sale_payout');
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  return row ? {
+    payoutId: row.payout_id,
+    amount: Number(row.amount || 0),
+    newPendingTotal: Number(row.new_pending_total || 0)
+  } : null;
+}
+
+// Spieler-seitig: kompletter Stand fuer das "DEINE VERKAEUFE"-Dashboard in
+// einem Aufruf - liefert IMMER nur Daten des aufrufenden Nutzers
+// (auth.uid() wird ausschliesslich serverseitig verwendet, kein Parameter).
+async function getMyCardSaleStatus() {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return null;
+  const { data, error } = await client.rpc('get_my_card_sale_status');
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return null;
+  return {
+    totalEarned: Number(row.total_earned || 0),
+    totalPaid: Number(row.total_paid || 0),
+    totalPending: Number(row.total_pending || 0),
+    available: Number(row.available || 0),
+    cardCount: Number(row.card_count || 0),
+    latestStatus: row.latest_status || null,
+    latestAmount: row.latest_amount != null ? Number(row.latest_amount) : null,
+    latestCreatedAt: row.latest_created_at ? Date.parse(row.latest_created_at) : null,
+    latestProcessedAt: row.latest_processed_at ? Date.parse(row.latest_processed_at) : null,
+    latestRejectReason: row.latest_reject_reason || null
+  };
+}
+
+// Oeffentlich (anon + authenticated) - reine Aggregat-Zahlen, siehe
+// get_card_sale_public_stats() im SQL: "Verdient"/"Ausgezahlt" bleiben
+// strikt getrennte Werte, niemals vermischt.
+async function getCardSalePublicStats() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client.rpc('get_card_sale_public_stats');
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return null;
+  return {
+    totalEarned: Number(row.total_earned || 0),
+    totalPaidOut: Number(row.total_paid_out || 0),
+    totalSoldCount: Number(row.total_sold_count || 0),
+    activeListings: Number(row.active_listings || 0),
+    earnedThisWeek: Number(row.earned_this_week || 0)
+  };
+}
+
+// Oeffentlich - Tagesreihe fuer den 30-Tage-Chart.
+async function getCardSaleDailyEarnings(days = 30) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return [];
+  const { data, error } = await client.rpc('get_card_sale_daily_earnings', { p_days: days });
+  if (error) throw error;
+  return (data || []).map(row => ({ day: row.day, amount: Number(row.amount || 0) }));
+}
+
+// Admin-seitig: ersetzt den frueheren rohen "+"-Zaehler-Klick.
+async function adminAddCardSaleEvent(cardSaleId, count = 1) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client.rpc('admin_add_card_sale_event', { p_card_sale_id: cardSaleId, p_count: count });
+  if (error) throw error;
+  return Number(data || 0);
+}
+
+// Admin-seitig: ersetzt den frueheren rohen "-"-Zaehler-Klick. Kann mit
+// error.message === 'earnings_already_reserved_or_paid' fehlschlagen, wenn
+// der Verkauf bereits ausgezahlt/reserviert ist - siehe Aufrufstelle in
+// admin.html fuer die Nutzer-vorgegebene Fehlermeldung.
+async function adminRemoveLastCardSaleEvent(cardSaleId) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client.rpc('admin_remove_last_card_sale_event', { p_card_sale_id: cardSaleId });
+  if (error) throw error;
+  return Number(data || 0);
+}
+
+// Admin-seitig: ersetzt den urspruenglich geplanten rohen .update() auf
+// card_sale_payout_requests vollstaendig (das RLS laesst das ohnehin nicht
+// mehr zu, siehe SQL) - p_action ist 'paid' oder 'rejected'.
+async function processCardSalePayout(requestId, action, reason) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client.rpc('process_card_sale_payout', {
+    p_request_id: requestId,
+    p_action: action,
+    p_reason: reason || null
+  });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  return row ? { id: row.id, status: row.status, processedAt: row.processed_at ? Date.parse(row.processed_at) : null } : null;
+}
+
+const BKMP_CARD_SALE_PAYOUT_REQUESTS_SELECT = 'id, auth_user_id, name_key, display_name, amount, status, reject_reason, is_read, created_at, processed_at, processed_by';
+
+function bkmpMapCardSalePayoutRequestFromSupabase(row) {
+  return {
+    id: row.id,
+    authUserId: row.auth_user_id,
+    nameKey: row.name_key || '',
+    displayName: row.display_name || row.name_key || '',
+    amount: Number(row.amount || 0),
+    status: row.status || 'pending',
+    rejectReason: row.reject_reason || '',
+    isRead: Boolean(row.is_read),
+    createdAt: row.created_at ? Date.parse(row.created_at) : 0,
+    processedAt: row.processed_at ? Date.parse(row.processed_at) : null,
+    processedBy: row.processed_by || null,
+    source: 'supabase'
+  };
+}
+
+// Admin-only Liste (RLS: nur is_active_admin() darf select) fuer die neue
+// "Auszahlungsanfragen"-Sektion im Adminbereich.
+async function loadCardSalePayoutRequests() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from('card_sale_payout_requests')
+    .select(BKMP_CARD_SALE_PAYOUT_REQUESTS_SELECT)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(bkmpMapCardSalePayoutRequestFromSupabase);
 }
 
 /* ---------------- Anfrage-Status-Abfrage fuer anonyme Absender (23.07., 1x-Popup-Benachrichtigung) ----------------

@@ -4100,36 +4100,152 @@ label {
 }
 
 /* ---------- Karten Verkaufen ---------- */
-.cardsale-banner {
-  width: min(880px, 100%);
-  margin: 0 auto var(--space-6);
-  text-align: center;
-  color: #111018;
-  background: linear-gradient(135deg, #f7d678 0%, #ffb02e 48%, #f472b6 100%);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: var(--radius-lg);
-  padding: 2rem clamp(1.4rem, 4vw, 3rem);
-  box-shadow: 0 22px 65px rgba(245, 171, 42, calc(0.22 * var(--mood-glow-strength, 0.6) / 0.6)), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+/* Redesign 01.09.2026 (siehe CLAUDE.md) - kompakter dunkler Hero statt des
+   alten gelb/pinken Banners, angelehnt an die bereits bestehende dunkle
+   Plum/Amethyst-Optik von .global-partner-spotlight/.global-shard-merchant
+   auf derselben Seite (gleiche Hintergrund-/Rahmenfarbe, gleicher --purple-
+   Akzent) - kein zweites Designsystem, nur eine weitere Karte im selben Stil. */
+.cardsale-hero {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.4rem;
+  align-items: stretch;
+  width: min(980px, 100%);
+  margin: 0 auto var(--space-5);
+  padding: 1.3rem clamp(1.1rem, 3vw, 1.9rem);
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--purple) 45%, transparent);
+  background: color-mix(in srgb, #14101d 88%, transparent);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
 }
-.cardsale-banner-kicker {
+.cardsale-hero-main { flex: 1 1 320px; min-width: 0; }
+.cardsale-hero-kicker {
   display: inline-flex;
-  margin-bottom: 0.65rem;
+  margin-bottom: 0.5rem;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.18);
-  color: #fff;
-  padding: 0.35rem 0.7rem;
-  font-size: 0.72rem;
+  background: color-mix(in srgb, var(--purple) 35%, transparent);
+  color: #ecdfff;
+  padding: 0.32rem 0.7rem;
+  font-size: 0.68rem;
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-.cardsale-banner strong { display: block; font-family: 'Fraunces', serif; font-size: clamp(1.5rem, 3vw, 2.1rem); margin-bottom: 0.55rem; }
-.cardsale-banner p { color: rgba(17, 16, 24, 0.82); font-size: 0.94rem; font-weight: 600; line-height: 1.55; max-width: 60ch; margin: 0 auto; }
-.cardsale-banner p b { font-weight: 900; }
-.cardsale-request-cta { margin-top: 1.1rem; }
+.cardsale-hero-main h3 { font-family: 'Fraunces', serif; font-size: clamp(1.25rem, 2.4vw, 1.65rem); color: #fff; margin-bottom: 0.4rem; }
+.cardsale-hero-main p { color: #cbb8ec; font-size: 0.86rem; font-weight: 600; line-height: 1.5; max-width: 52ch; margin-bottom: 0.9rem; }
+.cardsale-hero-split { display: flex; gap: 0.7rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.cardsale-hero-split-item {
+  border: 1px solid color-mix(in srgb, var(--purple) 40%, transparent);
+  border-radius: 10px;
+  padding: 0.55rem 0.85rem;
+  background: rgba(255, 255, 255, 0.04);
+}
+.cardsale-hero-split-item strong { display: block; font-family: 'Fraunces', serif; font-size: 1.15rem; color: #fff; }
+.cardsale-hero-split-item.is-you strong { color: var(--gold-fixed); }
+.cardsale-hero-split-item span { display: block; font-size: 0.66rem; color: #cbb8ec; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.15rem; }
+.cardsale-hero-steps {
+  flex: 0 1 220px;
+  list-style: none;
+  margin: 0;
+  padding: 0.2rem 0 0.2rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  justify-content: center;
+  border-left: 1px solid color-mix(in srgb, var(--purple) 35%, transparent);
+  color: #ecdfff;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.cardsale-hero-steps li { display: flex; align-items: center; gap: 0.5rem; }
+.cardsale-hero-steps li span {
+  display: grid; place-items: center;
+  width: 20px; height: 20px; flex-shrink: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--purple) 45%, transparent);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+@media (max-width: 760px) { .cardsale-hero { flex-direction: column; } .cardsale-hero-steps { border-left: none; padding-left: 0; border-top: 1px solid color-mix(in srgb, var(--purple) 35%, transparent); padding-top: 0.8rem; } }
+
+/* -- Oeffentliche KPI-Reihe + Chart (aus get_card_sale_public_stats()/get_card_sale_daily_earnings(),
+      "verdient" und "ausgezahlt" bleiben immer getrennte Kacheln, nie eine Zahl) -- */
+.cardsale-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+  margin: 0 0 1.2rem;
+}
+.cardsale-kpi {
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.85rem 0.9rem;
+  text-align: center;
+}
+.cardsale-kpi strong { display: block; font-family: 'Fraunces', serif; font-weight: 600; font-size: 1.05rem; }
+.cardsale-kpi span { display: block; margin-top: 0.35rem; font-size: 0.66rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+@media (max-width: 520px) { .cardsale-kpi-row { grid-template-columns: repeat(2, 1fr); } }
+
+.cardsale-chart-card {
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1rem 1.1rem;
+  margin-bottom: 1.4rem;
+}
+.cardsale-chart-card:empty { display: none; }
+.cardsale-chart-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.7rem; }
+.cardsale-chart-head h3 { font-family: 'Fraunces', serif; font-size: 0.98rem; margin: 0; }
+.cardsale-chart-week { font-size: 0.72rem; color: var(--gold-fixed); font-weight: 700; }
+.cardsale-chart-bars { display: flex; align-items: flex-end; gap: 3px; height: 84px; }
+.cardsale-chart-bar {
+  flex: 1 1 0;
+  height: var(--h, 4%);
+  min-width: 2px;
+  border-radius: 3px 3px 0 0;
+  background: color-mix(in srgb, var(--purple) 65%, var(--gold-fixed) 15%);
+}
+
+/* -- Persoenliches Verkaeufer-Dashboard (nur sichtbar bei eigener Session +
+      get_my_card_sale_status().cardCount > 0, siehe bkmpRefreshCardSaleSellerDash()) -- */
+.cardsale-seller-dash {
+  width: min(980px, 100%);
+  margin: 0 auto 1.6rem;
+  padding: 1.1rem clamp(1rem, 3vw, 1.6rem);
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--purple) 45%, transparent);
+  background: color-mix(in srgb, #14101d 88%, transparent);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+}
+.cardsale-seller-dash[hidden] { display: none; }
+.cardsale-seller-head h3 { font-family: 'Fraunces', serif; color: #fff; font-size: 1.05rem; margin: 0 0 0.8rem; }
+.cardsale-seller-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0.6rem; margin-bottom: 0.9rem; }
+.cardsale-seller-stats div { border: 1px solid color-mix(in srgb, var(--purple) 35%, transparent); border-radius: 10px; padding: 0.55rem 0.6rem; background: rgba(255, 255, 255, 0.04); }
+.cardsale-seller-stats span { display: block; color: #cbb8ec; font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
+.cardsale-seller-stats strong { font-family: 'Fraunces', serif; font-size: 0.98rem; color: #fff; }
+.cardsale-seller-stats strong.gold { color: var(--gold-fixed); }
+.cardsale-payout-status { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.8rem; padding: 0.6rem 0.75rem; border-radius: 10px; background: rgba(255, 255, 255, 0.04); }
+.cardsale-payout-status p { margin: 0; font-size: 0.8rem; color: #ecdfff; }
+.cardsale-payout-badge { display: inline-flex; flex-shrink: 0; padding: 0.3rem 0.6rem; border-radius: 999px; font-size: 0.66rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; }
+.cardsale-payout-badge.is-pending { background: color-mix(in srgb, var(--gold) 30%, transparent); color: var(--gold-fixed); }
+.cardsale-payout-badge.is-paid { background: color-mix(in srgb, var(--pos) 30%, transparent); color: var(--pos); }
+.cardsale-payout-badge.is-rejected { background: color-mix(in srgb, var(--neg) 30%, transparent); color: var(--neg); }
+.cardsale-payout-btn { width: 100%; }
+.cardsale-payout-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.cardsale-seller-cards { margin-top: 1rem; padding-top: 0.9rem; border-top: 1px solid color-mix(in srgb, var(--purple) 30%, transparent); }
+.cardsale-seller-cards-label { display: block; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; color: #cbb8ec; margin-bottom: 0.5rem; }
+.cardsale-seller-card-row { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; padding: 0.4rem 0; font-size: 0.8rem; color: #ecdfff; flex-wrap: wrap; }
+.cardsale-seller-card-row .gold { color: var(--gold-fixed); font-weight: 700; }
+
+.cardsale-grid-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; margin-bottom: 0.8rem; }
+.cardsale-grid-head h3 { font-family: 'Fraunces', serif; font-size: 1.02rem; margin: 0; }
+.cardsale-grid-count { font-size: 0.76rem; color: var(--muted); }
 
 .cardsale-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: var(--space-3); }
 .cardsale-card {
+  position: relative;
   background: linear-gradient(180deg, var(--paper-2), color-mix(in srgb, var(--paper) 82%, transparent));
   border: 1px solid var(--line);
   border-radius: var(--mood-radius-panel, 16px);
@@ -4138,7 +4254,22 @@ label {
   transition: transform var(--duration-base) var(--ease-out), border-color var(--duration-base) var(--ease-out);
 }
 .cardsale-card:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); }
+.cardsale-card.is-mine { border-color: color-mix(in srgb, var(--purple) 60%, var(--line)); }
 @media (prefers-reduced-motion: reduce) { .cardsale-card { transition: none; } .cardsale-card:hover { transform: none; } }
+.cardsale-mine-badge {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  z-index: 1;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--purple) 55%, #14101d 45%);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
 .cardsale-image-frame, .cardsale-image-empty {
   width: 100%;
   aspect-ratio: 1 / 1;
@@ -4155,6 +4286,12 @@ label {
 .cardsale-stats span { display: block; color: var(--muted); font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.25rem; }
 .cardsale-stats strong { font-family: 'Fraunces', serif; font-size: 1rem; }
 .cardsale-stats strong.gold { color: var(--gold-fixed); }
+.cardsale-price-row { display: flex; align-items: center; justify-content: space-between; margin-top: 0.6rem; padding-top: 0.6rem; border-top: 1px dashed var(--line); font-size: 0.78rem; color: var(--muted); }
+.cardsale-price-row strong { font-family: 'Fraunces', serif; color: var(--ink); }
+
+.cardsale-login-hint { margin: 0.6rem 0 0; padding: 0.6rem 0.75rem; border-radius: 10px; background: var(--paper-3); border: 1px solid var(--line); font-size: 0.78rem; color: var(--muted); }
+.cardsale-login-hint:empty { display: none; }
+.cardsale-login-hint.is-logged-in { color: var(--ink); border-color: color-mix(in srgb, var(--purple) 40%, var(--line)); }
 
 .cardsale-admin-row { align-items: center; }
 .cardsale-counter {

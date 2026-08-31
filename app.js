@@ -270,13 +270,17 @@ function supabaseErrorText(e) {
    zufaellig an einer RLS-Policy-Pruefung scheiterten (vermutlich ein
    Supabase-seitiges Cache-Problem). Die Server-Funktion nutzt den
    Service-Role-Key und umgeht das Problem vollstaendig. */
-async function bkmpSubmitViaApi(type, fields, imageDataUrl) {
+// extraBody (optional): zusaetzliche Top-Level-Felder fuers Request-Body,
+// aktuell nur fuer { playerAccessToken } bei card_sale_requests genutzt
+// (01.09.2026) - bewusst additiv, aendert nichts am Verhalten fuer alle
+// anderen bestehenden Aufrufer dieser Funktion.
+async function bkmpSubmitViaApi(type, fields, imageDataUrl, extraBody) {
   let response;
   try {
     response = await fetch('/api/submit-entry', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type, fields, imageDataUrl: imageDataUrl || null })
+      body: JSON.stringify(Object.assign({ type, fields, imageDataUrl: imageDataUrl || null }, extraBody || {}))
     });
   } catch (e) {
     throw new Error('Keine Verbindung zum Server. Bitte prüfe deine Internetverbindung.');
