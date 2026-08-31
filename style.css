@@ -3505,26 +3505,78 @@ label {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
-  width: min(340px, 46%);
+  width: min(480px, 46%);
+  transition: width var(--duration-base) var(--ease-out);
 }
-/* Ziel-Container fuer den per JS "escape"-verschobenen Shardhaendler bei
-   <=900px (siehe bkmpShardMerchantSyncPlacement() in bkmp-site.js) - lebt
-   als leerer, unsichtbarer Platzhalter direkt nach </picture> im
-   normalen Dokumentfluss (zwischen Banner und Tab-Navigation), bekommt
-   erst durch das tatsaechlich hineinverschobene .global-shard-merchant
-   sichtbaren Inhalt. Kein position:absolute mehr - echte Blockbreite,
-   schiebt die Tab-Navigation bei Bedarf einfach nach unten, kein
-   Ueberlapp-Risiko mehr moeglich. */
-.global-shard-merchant-mobile-slot .global-shard-merchant {
+/* Nachbesserung 31.08.2026 (Nutzerwunsch "wenn der Rechner geoeffnet wird,
+   darf der Bereich zusaetzlich etwas breiter werden"): `.has-open-shard-
+   calc` wird von bkmp-site.js gesetzt/entfernt, sobald irgendeine
+   Ressourcenzeile ihren Rechner auf-/zuklappt (bkmpShardMerchantExpandedId).
+   Weitet BEIDE Kacheln gemeinsam (Spotlight + Shardhaendler bleiben dadurch
+   immer exakt gleich breit - "ein zusammengehoeriges Modul", nicht nur den
+   Shardhaendler alleine verbreitern, das wuerde die Ausrichtung zueinander
+   sprengen). */
+.global-header-side-stack.has-open-shard-calc { width: min(560px, 50%); }
+@media (prefers-reduced-motion: reduce) { .global-header-side-stack { transition: none; } }
+/* Ziel-Container fuer den per JS "escape"-verschobenen Bereich (siehe
+   bkmpShardMerchantSyncPlacement() in bkmp-site.js) - lebt als leerer,
+   unsichtbarer Platzhalter direkt nach </picture> im normalen
+   Dokumentfluss (zwischen Banner und Tab-Navigation), bekommt erst durch
+   den tatsaechlich hineinverschobenen Inhalt sichtbare Groesse.
+   Nachbesserung 31.08.2026 ("Nicht ueber den Banner hinausragen" +
+   "Spotlight und Shardhaendler sollen ... wie ein zusammengehoeriges
+   Modul wirken"): per Live-Messung bestaetigt, dass ein geoeffneter
+   Rechner die feste, seitenverhaeltnis-gebundene Bannerhoehe SELBST BEI
+   1920px Fensterbreite sprengt (Bannerhoehe bleibt ab .topbar-wraps
+   1760px-Deckel konstant bei ~468px, ein offener Rechner braucht mehr
+   Platz als das) - der Trigger fuer den Fluchtmechanismus ist deshalb
+   nicht mehr nur eine Breiten-Schwelle, sondern zusaetzlich "ist gerade
+   irgendein Rechner offen" (bkmpShardMerchantExpandedId). Verschoben
+   wird jetzt der GESAMTE .global-header-side-stack (Spotlight +
+   Shardhaendler zusammen, nicht nur Letzterer) - beide bleiben dadurch
+   in JEDEM Zustand exakt gleich breit/als ein Paar sichtbar, statt dass
+   der Shardhaendler allein unter den im Banner verbleibenden Spotlight
+   rutscht (siehe volle Herleitung + Messwerte in CLAUDE.md). */
+/* Echter, per Live-Messung gefundener Bug (31.08.2026): <header
+   class="hero hero-banner-wrap"> ist display:flex; flex-direction:column;
+   align-items:CENTER (nicht der Flex-Standard "stretch") - ohne eine
+   explizite Gegenmassnahme schrumpft der Slot selbst (als Flex-Kind
+   dieses Headers) auf die reine Inhaltsbreite seines Inhalts zusammen
+   und wird zentriert, statt die volle Headerbreite auszufuellen. Bei den
+   bisher einzig getesteten schmalen Handy-Breiten (<=900px) fiel das
+   nie auf, weil die geschrumpfte Inhaltsbreite dort zufaellig nah an der
+   verfuegbaren Breite lag - bei echten Desktop-Breiten (neu seit der
+   "Rechner-offen"-Fluchtbedingung, siehe bkmpShardMerchantSyncPlacement()
+   in bkmp-site.js) wurde der Slot dadurch nur ~300px statt der vollen
+   ~1760px breit. Fix: align-self:stretch macht den Slot selbst IMMER so
+   breit wie sein Elternelement, unabhaengig vom Cross-Axis-Verhalten des
+   Headers. */
+.global-shard-merchant-mobile-slot {
+  align-self: stretch;
+  width: 100%;
+}
+.global-shard-merchant-mobile-slot .global-header-side-stack {
   position: static;
   width: auto;
   margin: 0.7rem 0.9rem 0;
 }
-.global-shard-merchant-mobile-slot .shard-merchant-list {
-  max-height: min(46vh, 320px);
-}
 @media (max-width: 720px) {
-  .global-shard-merchant-mobile-slot .global-shard-merchant { margin: 0.6rem 0.7rem 0; }
+  .global-shard-merchant-mobile-slot .global-header-side-stack { margin: 0.6rem 0.7rem 0; }
+}
+/* Fluchtgrund "Rechner ist offen" (siehe Kommentar an
+   bkmpShardMerchantSyncPlacement() in bkmp-site.js) kann auch bei sehr
+   breiten Desktop-Fenstern greifen, wo die ungebremste volle Blockbreite
+   (bis zu ~1900px) absurd aussehen wuerde - anders als bei echten
+   Handy-Breiten (<=900px, dort ist volle Breite genau richtig, siehe
+   Regel oben). Ab >900px deshalb zusaetzlich auf eine sinnvolle
+   Maximalbreite gedeckelt + rechtsbuendig verankert (margin-left:auto),
+   damit der Bereich optisch dort "landet", wo er vorher im Banner-Overlay
+   stand, statt ueber die ganze Seite zu ziehen. */
+@media (min-width: 901px) {
+  .global-shard-merchant-mobile-slot .global-header-side-stack {
+    max-width: 640px;
+    margin-left: auto;
+  }
 }
 .global-partner-spotlight {
   position: relative;
@@ -3675,28 +3727,30 @@ label {
    in die Tab-Navigationsleiste darunter hineinragte, siehe CLAUDE.md fuer
    die volle Herleitung). `overscroll-behavior:contain` verhindert, dass
    ein Scroll-Ueberlauf am Kartenrand die ganze Seite mitscrollt. */
-.shard-merchant-list { display: flex; flex-direction: column; max-height: 190px; overflow-y: auto; overscroll-behavior: contain; }
-.shard-merchant-list::-webkit-scrollbar { width: 6px; }
-.shard-merchant-list::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--purple) 45%, transparent); border-radius: 999px; }
-/* Reiner Sicherheitsnetz-Wert fuer den (normalerweise nie eintretenden)
-   Fall, dass JS deaktiviert ist oder bkmpShardMerchantSyncPlacement() aus
-   irgendeinem Grund nicht laeuft - die eigentliche Loesung fuer <=900px
-   ist der JS-Umzug in #globalShardMerchantMobileSlot (siehe dort + die
-   .global-shard-merchant-mobile-slot-Regeln weiter oben), NICHT diese
-   Werte. WICHTIG: diese Ueberschreibungen MUESSEN nach der obigen
-   Basisregel stehen (gleiche Selektor-Spezifitaet - bei gleicher
-   Spezifitaet gewinnt die spaeter im Dokument stehende Regel, VOLLKOMMEN
-   unabhaengig davon, ob ihre Media-Query gerade zutrifft - echter, beim
-   eigenen Testen gefundener Bug, siehe CLAUDE.md). */
-@media (max-width: 900px) { .shard-merchant-list { max-height: 50px; } }
-@media (max-width: 640px) { .shard-merchant-list { max-height: 80px; } }
+/* Nachbesserung 31.08.2026 (Nutzerwunsch "KEINE interne vertikale
+   Scrollbar... Card soll ihre Hoehe dynamisch an den geoeffneten Rechner
+   anpassen"): die fruehere max-height+overflow-y:auto-Begrenzung (samt
+   eigener Scrollbar-Optik) ist komplett entfernt - die Liste waechst jetzt
+   IMMER auf ihre volle Inhaltshoehe. Das strukturelle Risiko, dass das bei
+   schmaleren/mittleren Fensterbreiten die Tab-Navigation ueberlappen
+   koennte, ist NICHT mehr ueber eine Scroll-Begrenzung geloest, sondern
+   ueber bkmpShardMerchantSyncPlacement() (bkmp-site.js) - der Bereich wird
+   dort per JS aus dem Banner-Overlay in echten Dokumentfluss verschoben,
+   sobald die Karte breiter+hoeher wird als sicher ins Banner-Overlay
+   passt (Schwellenwert per Live-Messung neu bestimmt, siehe CLAUDE.md). */
+.shard-merchant-list { display: flex; flex-direction: column; }
 .shard-merchant-row + .shard-merchant-row { border-top: 1px solid rgba(255, 255, 255, 0.08); }
 .shard-merchant-row-head {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  /* Nachbesserung 31.08.2026 ("Mehr horizontaler Abstand zwischen
+     Bezeichnung, Kurs und Prozentwert") - deutlich vergroesserter Gap,
+     macht bei der jetzt breiteren Karte (siehe .global-header-side-stack)
+     auch tatsaechlich einen sichtbaren Unterschied statt in der neu
+     gewonnenen Breite unterzugehen. */
+  gap: 1.15rem;
   width: 100%;
-  padding: 0.5rem 0.85rem;
+  padding: 0.55rem 0.95rem;
   border: none;
   background: transparent;
   color: #fff;
@@ -3751,9 +3805,9 @@ label {
 .shard-merchant-row-body-inner {
   overflow: hidden;
   min-height: 0;
-  padding: 0 0.85rem;
+  padding: 0 0.95rem;
 }
-.shard-merchant-row.is-open .shard-merchant-row-body-inner { padding: 0.15rem 0.85rem 0.85rem; }
+.shard-merchant-row.is-open .shard-merchant-row-body-inner { padding: 0.2rem 0.95rem 0.95rem; }
 .shard-merchant-calc-title {
   font-size: 0.68rem;
   font-weight: 800;
@@ -3773,17 +3827,22 @@ label {
   margin-bottom: 0.25rem;
 }
 .shard-merchant-calc-input {
+  /* Nachbesserung 31.08.2026 ("Eingabefeld deutlich breiter") - width:100%
+     wirkt durch die verbreiterte Karte bereits automatisch mit, aber Hoehe/
+     Schriftgroesse/Innenabstand wurden zusaetzlich spuerbar vergroessert,
+     damit das Feld auch optisch als das zentrale Bedienelement des
+     Rechners wirkt statt wie ein kleines Nebenfeld. */
   width: 100%;
-  min-height: 38px;
+  min-height: 46px;
   border-radius: 10px;
   border: 1px solid color-mix(in srgb, var(--purple) 40%, transparent);
   background: rgba(255, 255, 255, 0.05);
   color: #fff;
-  padding: 0.4rem 0.7rem;
+  padding: 0.55rem 0.9rem;
   font: inherit;
-  font-size: 0.9rem;
+  font-size: 1.02rem;
   font-weight: 700;
-  margin-bottom: 0.6rem;
+  margin-bottom: 0.65rem;
 }
 .shard-merchant-calc-input::placeholder { color: #7c7191; font-weight: 400; }
 .shard-merchant-calc-input:focus-visible { outline: none; border-color: var(--purple); box-shadow: 0 0 0 3px color-mix(in srgb, var(--purple) 28%, transparent); }
@@ -3794,8 +3853,18 @@ label {
   gap: 0.6rem;
   padding: 0.3rem 0;
 }
-.shard-merchant-calc-result span { font-size: 0.72rem; color: var(--muted); }
-.shard-merchant-calc-result strong { font-size: 0.94rem; font-weight: 800; color: #fff; white-space: nowrap; }
+.shard-merchant-calc-result span { font-size: 0.74rem; color: var(--muted); }
+.shard-merchant-calc-result strong {
+  /* Nachbesserung 31.08.2026 ("Ergebniswerte rechts sauber ausrichten") -
+     justify-content:space-between auf dem Elternelement platziert den Wert
+     bereits am rechten Rand, text-align:right zusaetzlich als explizite
+     Absicherung (z.B. falls ein einzelner Wert je einmal umbrechen sollte). */
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: #fff;
+  white-space: nowrap;
+  text-align: right;
+}
 .shard-merchant-calc-note { margin-top: 0.2rem; font-size: 0.68rem; color: #a89fc7; min-height: 1em; }
 /* Kurzes "Aufleuchten" der passenden Shopkarte im Grid, nachdem ueber den
    Spotlight-Klick dorthin gewechselt wurde (Nutzerwunsch 30.08.2026: "was

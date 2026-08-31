@@ -3169,34 +3169,84 @@
     const shardMerchantEl = document.getElementById('globalShardMerchant');
     const shardMerchantMobileSlot = document.getElementById('globalShardMerchantMobileSlot');
     const shardMerchantHomeStack = document.querySelector('.global-header-side-stack');
-    /* Echter, per Live-Messung gefundener Bug (31.08.2026, siehe
-       CLAUDE.md fuer die volle Herleitung inkl. aller gemessenen Werte):
-       der Shardhaendler passt bei mittleren/schmalen Fensterbreiten -
-       selbst minimal komprimiert und sogar bei echten Handy-Breiten wie
-       320px - NICHT mehr als Banner-Overlay unter das Spotlight, ohne die
-       Tab-Navigation darunter zu ueberlappen (der Banner ist dort durch
-       sein festes Seitenverhaeltnis zu kurz, das Spotlight allein
-       beansprucht dort schon fast den gesamten verfuegbaren Platz). Ab
-       <=900px wird der Shardhaendler deshalb per JS aus dem Banner-Overlay
-       in #globalShardMerchantMobileSlot umgehaengt (echte volle
-       Blockbreite in normalem Dokumentfluss zwischen Banner und
-       Tab-Navigation) - identisches "Portal"-Prinzip wie bereits an
-       mehreren anderen Stellen in diesem Projekt fuer denselben Bugtyp
-       verwendet (z.B. bkmpProtoChudEscapeToOverlay). `appendChild()` auf
-       ein bereits im DOM vorhandenes Element VERSCHIEBT es nur (keine
-       Zerstoerung, keine verlorenen Event-Listener/keine Neuerzeugung -
-       `shardMerchantEl` bleibt dieselbe Referenz, jede andere Funktion in
+    /* Natuerlicher Eltern-Knoten von .global-header-side-stack (die
+       .hero-banner-picture) - einmalig VOR jedem moeglichen appendChild()
+       gemerkt, damit der Stack jederzeit sicher wieder "nach Hause"
+       verschoben werden kann, egal wo er gerade lebt. */
+    const shardMerchantHomeStackParent = shardMerchantHomeStack ? shardMerchantHomeStack.parentElement : null;
+    /* bkmpShardMerchantExpandedId wird eigentlich erst weiter unten mit den
+       uebrigen Zustands-Variablen deklariert - fuer die Fluchtlogik hier
+       (siehe bkmpShardMerchantSyncPlacement()) wird die Deklaration
+       bewusst VORGEZOGEN, da der ERSTE Aufruf der Funktion bereits ein
+       paar Zeilen weiter unten in DIESEM Block passiert (also VOR der
+       urspruenglichen Deklarationsstelle) - ohne das Vorziehen wuerde der
+       Zugriff in der TDZ (Temporal Dead Zone) mit einem ReferenceError
+       scheitern. */
+    let bkmpShardMerchantExpandedId = null;
+    /* Echter, per Live-Messung gefundener Bug (31.08.2026, siehe CLAUDE.md
+       fuer die volle Herleitung inkl. aller gemessenen Werte): der Bereich
+       passt bei mittleren/schmalen Fensterbreiten - selbst minimal
+       komprimiert und sogar bei echten Handy-Breiten wie 320px - NICHT
+       mehr als Banner-Overlay, ohne die Tab-Navigation darunter zu
+       ueberlappen (der Banner ist dort durch sein festes Seitenverhaeltnis
+       zu kurz).
+
+       Nachbesserung 31.08.2026 (Nutzerwunsch "keine interne Scrollbar,
+       Card waechst dynamisch mit dem geoeffneten Rechner, deutlich
+       breiter/hoeher"): per erneuter Live-Messung ZWEI weitere, echte
+       Funde gemacht, nicht nur vermutet:
+       1) Ein geoeffneter Rechner sprengt die feste Bannerhoehe (bleibt ab
+          .topbar-wraps 1760px-Breitendeckel konstant bei ~468px, waechst
+          mit dem Fenster NICHT weiter) SELBST BEI VOLLER 1920px-
+          Fensterbreite (gemessener Ueberlapp: ~63px in die Tab-
+          Navigation) - eine reine Breiten-Schwelle reicht als Fluchtgrund
+          fuer den offenen Zustand also gar nicht mehr aus, unabhaengig
+          von der Fensterbreite.
+       2) Sogar der GESCHLOSSENE Zustand (Spotlight + alle 5 Zeilen
+          zugeklappt, kein Rechner offen) passt inzwischen erst ab etwa
+          ~1550px Fensterbreite sicher in die Banner-Hoehe - bei 1024px
+          waren es +92px Ueberlapp, bei 1366px nur noch +1px (praktisch
+          die Kante), erst ab ~1440-1600px echte Luft (18-61px, je nach
+          Breite). Ursache: der Stack enthaelt IMMER Spotlight+
+          Shardhaendler ZUSAMMEN (nicht nur Letzteren) - beide zusammen
+          brauchen schlicht mehr Hoehe, als die meisten realistischen
+          Desktop-/Laptop-Breiten (1024-1440px) an Bannerhoehe hergeben,
+          das ist keine Nebenwirkung der heutigen Aenderungen, sondern ein
+          bereits vorher bestehender, bisher nur nie mit einer echten
+          Messung geprueften Sachverhalt.
+       Der Fluchtmechanismus nutzt deshalb jetzt EINE einzige, grosszuegig
+       (mit echter Sicherheitsmarge, nicht nur exakt an der Kante)
+       bemessene Breiten-Schwelle bei <=1600px - deckt beide Funde
+       gleichzeitig ab, da sie bei jeder Breite unterhalb dieser Schwelle
+       ohnehin greift - ZUSAETZLICH greift die Flucht bei JEDER Breite,
+       sobald ein Rechner offen ist (bkmpShardMerchantExpandedId), auch
+       oberhalb von 1600px (der Bannerhoehen-Deckel gilt dort unveraendert
+       weiter, siehe Fund 1 oben). Der Name "...MobileQuery" ist seit
+       diesem Fund nicht mehr woertlich zu nehmen (deckt laengst auch
+       normale Laptop-/Desktop-Breiten ab, nicht nur Handys) - bewusst
+       NICHT umbenannt, um keine grossflaechige, risikoreiche Umbenennung
+       ueber CSS/HTML/Doku hinweg fuer eine reine Namenskosmetik
+       auszuloesen.
+
+       Verschoben wird der GESAMTE .global-header-side-stack (Spotlight +
+       Shardhaendler zusammen, siehe .has-open-shard-calc/CSS-Kommentar)
+       statt nur des Shardhaendlers allein - beide bleiben dadurch in
+       jedem Zustand exakt gleich breit/als sichtbares Paar zusammen,
+       identisches "Portal"-Prinzip wie bereits an mehreren anderen
+       Stellen in diesem Projekt fuer denselben Bugtyp verwendet (z.B.
+       bkmpProtoChudEscapeToOverlay). `appendChild()` auf ein bereits im
+       DOM vorhandenes Element VERSCHIEBT es nur (keine Zerstoerung, keine
+       verlorenen Event-Listener/keine Neuerzeugung - jede Referenz in
        diesem Block funktioniert dadurch unveraendert weiter, unabhaengig
-       davon, wo das Element gerade lebt). matchMedia() statt eines
-       eigenen resize-Listeners - feuert nur, wenn die 900px-Schwelle
-       tatsaechlich ueber-/unterschritten wird, nicht bei jedem Pixel. */
-    const bkmpShardMerchantMobileQuery = window.matchMedia('(max-width: 900px)');
+       davon, wo das Element gerade lebt). */
+    const bkmpShardMerchantMobileQuery = window.matchMedia('(max-width: 1600px)');
     function bkmpShardMerchantSyncPlacement() {
-      if (!shardMerchantEl || !shardMerchantMobileSlot || !shardMerchantHomeStack) return;
-      if (bkmpShardMerchantMobileQuery.matches) {
-        if (shardMerchantEl.parentElement !== shardMerchantMobileSlot) shardMerchantMobileSlot.appendChild(shardMerchantEl);
-      } else if (shardMerchantEl.parentElement !== shardMerchantHomeStack) {
-        shardMerchantHomeStack.appendChild(shardMerchantEl);
+      if (!shardMerchantHomeStack || !shardMerchantMobileSlot || !shardMerchantHomeStackParent) return;
+      const shouldEscape = bkmpShardMerchantMobileQuery.matches || Boolean(bkmpShardMerchantExpandedId);
+      if (shouldEscape) {
+        if (shardMerchantHomeStack.parentElement !== shardMerchantMobileSlot) shardMerchantMobileSlot.appendChild(shardMerchantHomeStack);
+      } else if (shardMerchantHomeStack.parentElement !== shardMerchantHomeStackParent) {
+        shardMerchantHomeStackParent.appendChild(shardMerchantHomeStack);
       }
     }
     bkmpShardMerchantSyncPlacement();
@@ -3220,7 +3270,8 @@
 
     let bkmpShardMerchantResources = [];
     let bkmpShardMerchantPrices = {};
-    let bkmpShardMerchantExpandedId = null;
+    // bkmpShardMerchantExpandedId ist bereits weiter oben (vor der
+    // Fluchtlogik-Deklaration) deklariert - siehe Kommentar dort.
     let bkmpShardMerchantLastError = null;
     let bkmpShardMerchantCheckedAt = 0;
     /* Zuletzt eingegebener Anzahl-Text je Ressourcen-Id - bleibt ueber
@@ -3403,6 +3454,30 @@
           toggleBtn.setAttribute('aria-expanded', 'true');
           bkmpShardMerchantExpandedId = id;
         }
+        /* Nachbesserung 31.08.2026 ("Wenn der Shard-Rechner geoeffnet
+           wird, darf der Bereich zusaetzlich etwas breiter... werden...
+           Spotlight und Shardhaendler sollen optisch wie ein
+           zusammengehoeriges Modul wirken") - die Klasse sitzt bewusst
+           auf shardMerchantHomeStack (.global-header-side-stack), NICHT
+           nur auf .global-shard-merchant selbst, damit das Spotlight
+           direkt darueber beim Verbreitern mitwaechst statt allein der
+           Shardhaendler schmaler/breiter als das Spotlight wirkt (siehe
+           .has-open-shard-calc in style.css). Im mobilen "escaped"-
+           Zustand (#globalShardMerchantMobileSlot) hat die Karte ohnehin
+           volle Blockbreite - die Klasse bleibt dort wirkungslos, wird
+           aber trotzdem gesetzt (einfacher als eine Fallunterscheidung,
+           kein Risiko). */
+        if (shardMerchantHomeStack) {
+          shardMerchantHomeStack.classList.toggle('has-open-shard-calc', Boolean(bkmpShardMerchantExpandedId));
+        }
+        /* Erneut abgleichen, sobald sich der Offen/Zu-Zustand aendert -
+           bkmpShardMerchantSyncPlacement() selbst prueft jetzt zusaetzlich
+           zur Breite auch bkmpShardMerchantExpandedId (siehe Kommentar an
+           der Deklaration weiter oben) und fluechtet den gesamten Stack in
+           den normalen Dokumentfluss, sobald ein Rechner offen ist - ohne
+           diesen Aufruf wuerde die Flucht erst beim naechsten resize/
+           Breiten-Wechsel nachgeholt, nicht sofort beim Aufklappen. */
+        bkmpShardMerchantSyncPlacement();
       });
       shardMerchantEl.addEventListener('input', e => {
         const qtyInput = e.target.closest('[data-shard-qty]');
