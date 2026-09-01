@@ -3597,7 +3597,6 @@
     const cardsaleGrid = document.getElementById('cardsaleGrid');
     const cardSaleGridCountEl = document.getElementById('cardSaleGridCount');
     const cardSaleKpiRowEl = document.getElementById('cardSaleKpiRow');
-    const cardSaleChartCardEl = document.getElementById('cardSaleChartCard');
     const cardSaleSellerDashEl = document.getElementById('cardSaleSellerDash');
 
     /* Bekannt, sobald bkmpRefreshCardSaleSellerDash() einmal gelaufen ist
@@ -3649,48 +3648,38 @@
     }
     renderCardSales();
 
-    /* ---------------- Kartenverkauf: oeffentliche KPIs + 30-Tage-Chart ---------------- */
+    /* ---------------- Kartenverkauf: oeffentliche KPIs ----------------
+       Zeigte bis 01.09.2026 zusaetzlich ein 30-Tage-Balkendiagramm
+       (#cardSaleChartCard) - auf Nutzerwunsch entfernt: mit nur wenigen
+       echten card_sale_events (der historische Bulk der Backfill-Migration
+       liegt alle auf einem einzigen Tag) ergab die Tages-Bucketierung
+       optisch nur 1-2 riesige, gleich hohe Balken ohne echte Aussagekraft -
+       kein Bug, aber solange nicht genug echte, ueber die Zeit verteilte
+       Verkaeufe vorliegen, nur verwirrend. getCardSaleDailyEarnings()/
+       get_card_sale_daily_earnings() bleiben unangetastet in supabase.js/
+       der Live-DB bestehen (harmlos ungenutzt) - falls der Chart spaeter,
+       mit mehr echten Datenpunkten, wieder gewuenscht wird, kann er ohne
+       neue SQL wieder angeschlossen werden. */
     async function renderCardSaleStatsAndChart() {
-      if (typeof getCardSalePublicStats !== 'function') return;
+      if (typeof getCardSalePublicStats !== 'function' || !cardSaleKpiRowEl) return;
       let stats = null;
       try { stats = await getCardSalePublicStats(); } catch (e) { console.warn('Kartenverkauf-Statistiken konnten nicht geladen werden.', e); }
-      if (cardSaleKpiRowEl) {
-        if (!stats) {
-          cardSaleKpiRowEl.innerHTML = '';
-        } else {
-          const kpis = [
-            ['Von Verkäufern verdient', bkmpFormatCurrency(stats.totalEarned)],
-            ['Ausgezahlt', bkmpFormatCurrency(stats.totalPaidOut)],
-            ['Karten verkauft', String(stats.totalSoldCount)],
-            ['Aktuell im Verkauf', String(stats.activeListings)],
-            ['Diese Woche verdient', bkmpFormatCurrency(stats.earnedThisWeek)]
-          ];
-          cardSaleKpiRowEl.innerHTML = kpis.map(([label, value]) => `
-            <div class="cardsale-kpi">
-              <strong>${escapeHtml(value)}</strong>
-              <span>${escapeHtml(label)}</span>
-            </div>`).join('');
-        }
-      }
-      if (!cardSaleChartCardEl) return;
-      let rows = [];
-      try { rows = (typeof getCardSaleDailyEarnings === 'function' ? await getCardSaleDailyEarnings(30) : []) || []; } catch (e) { console.warn('Kartenverkauf-Chart konnte nicht geladen werden.', e); }
-      if (!rows.length) {
-        cardSaleChartCardEl.innerHTML = `
-          <div class="cardsale-chart-head"><h3>Verdienst der Kartenbesitzer</h3></div>
-          <p class="empty-hint">Noch keine Auszahlungen in diesem Zeitraum.</p>`;
+      if (!stats) {
+        cardSaleKpiRowEl.innerHTML = '';
         return;
       }
-      const max = Math.max.apply(null, rows.map(r => r.amount).concat([1]));
-      const weekLabel = stats ? bkmpFormatCurrency(stats.earnedThisWeek) : '';
-      cardSaleChartCardEl.innerHTML = `
-        <div class="cardsale-chart-head">
-          <h3>Verdienst der Kartenbesitzer</h3>
-          ${weekLabel ? `<span class="cardsale-chart-week">Diese Woche: ${weekLabel}</span>` : ''}
-        </div>
-        <div class="cardsale-chart-bars">
-          ${rows.map(r => `<div class="cardsale-chart-bar" style="--h:${Math.max(4, Math.round((r.amount / max) * 100))}%" title="${escapeHtml(r.day)}: ${bkmpFormatCurrency(r.amount)}"></div>`).join('')}
-        </div>`;
+      const kpis = [
+        ['Von Verkäufern verdient', bkmpFormatCurrency(stats.totalEarned)],
+        ['Ausgezahlt', bkmpFormatCurrency(stats.totalPaidOut)],
+        ['Karten verkauft', String(stats.totalSoldCount)],
+        ['Aktuell im Verkauf', String(stats.activeListings)],
+        ['Diese Woche verdient', bkmpFormatCurrency(stats.earnedThisWeek)]
+      ];
+      cardSaleKpiRowEl.innerHTML = kpis.map(([label, value]) => `
+        <div class="cardsale-kpi">
+          <strong>${escapeHtml(value)}</strong>
+          <span>${escapeHtml(label)}</span>
+        </div>`).join('');
     }
     renderCardSaleStatsAndChart();
 
