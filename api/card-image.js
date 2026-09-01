@@ -48,7 +48,6 @@ const SIZES = {
 
 const FETCH_TIMEOUT_MS = 10000;
 const MAX_ORIGINAL_BYTES = 15 * 1024 * 1024; // grosszuegig ueber der realen Kartengroesse (~50-300 KB), reine Missbrauchsbremse
-const JPEG_QUALITY = 82;
 
 function isAllowedImageUrl(url) {
   return typeof url === 'string' && url.startsWith(ALLOWED_IMAGE_URL_PREFIX) && !url.includes('..');
@@ -110,18 +109,21 @@ async function fetchOriginalImage(url) {
 }
 
 async function convertForMinecraft(buffer, boxSize) {
-  const image = sharp(buffer, { failOn: 'none' });
-  const metadata = await image.metadata();
-  const resized = image
+  // IMMER PNG, nie JPEG - Minecrafts eigener Decoder (com.mojang.blaze3d.
+  // platform.NativeImage) kann laut Ground-Truth-Test (echter Client-
+  // seitiger Stacktrace, 01.09.2026, siehe CLAUDE.md) NUR PNG lesen; ein
+  // JPEG-Ergebnis schlaegt dort IMMER mit "IOException: Bad PNG
+  // Signature" fehl, unabhaengig davon wie gueltig das JPEG selbst ist.
+  // Das war der eigentliche Grund, warum die meisten (nicht-transparenten)
+  // Karten trotz funktionierendem Proxy nie im Mod ankamen - nur die
+  // seltenen Karten mit Alpha-Kanal wurden zufaellig schon als PNG
+  // ausgeliefert und haben deshalb funktioniert.
+  const out = await sharp(buffer, { failOn: 'none' })
     .rotate() // EXIF-Ausrichtung respektieren, bevor auf die Box skaliert wird
-    .resize({ width: boxSize, height: boxSize, fit: 'inside', withoutEnlargement: true });
-
-  if (metadata.hasAlpha) {
-    const out = await resized.png({ compressionLevel: 8 }).toBuffer();
-    return { buffer: out, contentType: 'image/png' };
-  }
-  const out = await resized.jpeg({ quality: JPEG_QUALITY }).toBuffer();
-  return { buffer: out, contentType: 'image/jpeg' };
+    .resize({ width: boxSize, height: boxSize, fit: 'inside', withoutEnlargement: true })
+    .png({ compressionLevel: 8 })
+    .toBuffer();
+  return { buffer: out, contentType: 'image/png' };
 }
 
 module.exports = async function handler(req, res) {
