@@ -86,7 +86,23 @@ function sanitizeFilterValue(raw) {
     .trim();
 }
 
+// Absolute Basis, nicht relativ - der Mod-Client (java.net.http.HttpClient)
+// braucht zwingend eine vollstaendige absolute URI (URI.create('/api/...')
+// waere zwar gueltiges URI-Syntax, aber HttpRequest.newBuilder() lehnt eine
+// relative URI mit "URI is not absolute" ab). Gleiche hartcodierte
+// Produktions-Domain wie BkmpCardBrowserConfig's Default apiBaseUrl im Mod.
+const SITE_ORIGIN = 'https://bkinvestment.de';
+
 function mapRow(row) {
+  // "image" bleibt unveraendert die rohe Original-URL (z.B. .webp) - falls
+  // je ein zweiter Konsument dieser API dazukommt, der das Original braucht,
+  // aendert sich hier nichts. "thumbnail"/"minecraftImage" zeigen seit dem
+  // WebP-Proxy (api/card-image.js, 2026-09-01) auf eine garantiert
+  // Minecraft-lesbare (PNG/JPEG) Variante - klein fuer die Galerie, groesser
+  // fuer die Detailansicht. Fehlt row.id (sollte nie passieren, id ist
+  // primary key), fallen beide defensiv auf die rohe Original-URL zurueck,
+  // statt eine kaputte Proxy-URL ohne id auszuliefern.
+  const proxyBase = row.id ? `${SITE_ORIGIN}/api/card-image?id=${encodeURIComponent(row.id)}` : '';
   return {
     id: row.id,
     name: row.name || '',
@@ -97,7 +113,8 @@ function mapRow(row) {
     submittedBy: row.submitted_by || '',
     description: row.description || '',
     image: row.image_url || '',
-    thumbnail: row.image_url || '',
+    thumbnail: proxyBase ? `${proxyBase}&size=thumb` : (row.image_url || ''),
+    minecraftImage: proxyBase ? `${proxyBase}&size=full` : (row.image_url || ''),
     createdAt: row.created_at || null
   };
 }
