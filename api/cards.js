@@ -44,7 +44,7 @@ const SUPABASE_URL = 'https://zgknyrwzpohvfdweomxf.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_RuiDW15_3cI0cQZ8WlzoWg_DhGU9r6f';
 
 const TABLE = 'card_catalog';
-const SELECT_COLUMNS = 'id,name,category,shop_name,cb,size,submitted_by,description,image_url,created_at';
+const SELECT_COLUMNS = 'id,name,category,shop_name,cb,size,submitted_by,description,image_url,created_at,series,price,seller,creator,width_maps,height_maps,total_maps';
 
 const DEFAULT_PAGE_SIZE = 30;
 const MAX_PAGE_SIZE = 50;
@@ -115,6 +115,19 @@ function mapRow(row) {
     image: row.image_url || '',
     thumbnail: proxyBase ? `${proxyBase}&size=thumb` : (row.image_url || ''),
     minecraftImage: proxyBase ? `${proxyBase}&size=full` : (row.image_url || ''),
+    // Additiv seit 02.09.2026 (Mod-Karteneinreichung-Feature, siehe
+    // sql/20260902-mod-account-linking-and-submissions.sql) - bei
+    // aelteren Karten meist null, Konsumenten muessen jedes Feld
+    // einzeln auf Vorhandensein pruefen statt "null"/"undefined"
+    // anzuzeigen (gleiche Konvention wie alle anderen optionalen Felder
+    // hier).
+    series: row.series || '',
+    price: row.price === null || row.price === undefined ? null : Number(row.price),
+    seller: row.seller || '',
+    creator: row.creator || '',
+    widthMaps: row.width_maps === null || row.width_maps === undefined ? null : Number(row.width_maps),
+    heightMaps: row.height_maps === null || row.height_maps === undefined ? null : Number(row.height_maps),
+    totalMaps: row.total_maps === null || row.total_maps === undefined ? null : Number(row.total_maps),
     createdAt: row.created_at || null
   };
 }

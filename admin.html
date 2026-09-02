@@ -20,7 +20,7 @@
 <title>BKMP — Admin</title>
 
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
-<link rel="stylesheet" href="style.css?v=20260901-cardsalechartremove1">
+<link rel="stylesheet" href="style.css?v=20260902-modaccountlink1">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 </head>
 <body>
@@ -175,6 +175,10 @@
         <button class="admin-nav-btn" data-page="cardsales">
           <svg viewBox="0 0 24 24"><rect x="3" y="6" width="14" height="10" rx="2"/><rect x="7" y="9" width="14" height="10" rx="2"/></svg>
           Karten Verkaufen
+        </button>
+        <button class="admin-nav-btn" data-page="cardsubmissions">
+          <svg viewBox="0 0 24 24"><path d="M4 4h16v13H8l-4 4V4z"/><path d="M8 9h8M8 13h5"/></svg>
+          Karteneinreichungen
         </button>
         <button class="admin-nav-btn" data-page="cardcatalog">
           <svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>
@@ -619,6 +623,30 @@
         </section>
 
         <!-- Kartendatenbank -->
+        <section class="admin-page" id="page-cardsubmissions">
+          <div class="admin-section">
+            <h2>Karteneinreichungen</h2>
+            <p class="admin-help-text">Einreichungen aus der Minecraft-Mod (BK Kartendatenbank, /opbk → Karte einreichen). Beim Annehmen wird automatisch eine echte Karte in der Kartendatenbank angelegt.</p>
+
+            <div class="cardcatalog-admin-group">
+              <h3>Offen <span class="cardcatalog-admin-count" id="cardSubmissionsPendingCount"></span></h3>
+              <div class="entry-table-wrapper"><div class="entry-list" id="cardSubmissionsPendingList"></div></div>
+            </div>
+            <div class="cardcatalog-admin-group">
+              <h3>Änderung nötig <span class="cardcatalog-admin-count" id="cardSubmissionsNeedsChangesCount"></span></h3>
+              <div class="entry-table-wrapper"><div class="entry-list" id="cardSubmissionsNeedsChangesList"></div></div>
+            </div>
+            <div class="cardcatalog-admin-group">
+              <h3>Angenommen <span class="cardcatalog-admin-count" id="cardSubmissionsApprovedCount"></span></h3>
+              <div class="entry-table-wrapper"><div class="entry-list" id="cardSubmissionsApprovedList"></div></div>
+            </div>
+            <div class="cardcatalog-admin-group">
+              <h3>Abgelehnt <span class="cardcatalog-admin-count" id="cardSubmissionsRejectedCount"></span></h3>
+              <div class="entry-table-wrapper"><div class="entry-list" id="cardSubmissionsRejectedList"></div></div>
+            </div>
+          </div>
+        </section>
+
         <section class="admin-page" id="page-cardcatalog">
           <div class="admin-section">
             <h2>Kartendatenbank</h2>
@@ -1155,7 +1183,7 @@
        da admin.html kein window.BKMP_QA_MODE-Gate setzt; macht nur
        bkmpGetGameNow() fuer bkmp-events.js verfuegbar (identisch Date.now()). -->
   <script src="js/core/bkmp-game-clock.js?v=20260724-qafoundation1"></script>
-  <script src="supabase.js?v=20260901-cardsaleredesign1"></script>
+  <script src="supabase.js?v=20260902-modaccountlink1"></script>
   <script src="app.js?v=20260901-cardsaleredesign1"></script>
   <!-- Redesign Phase 2a (17.07.): siehe index.html fuer die Begruendung der
        festen Ladereihenfolge (bkmp-idle-state.js zuerst, bkmp-idle-
@@ -1233,6 +1261,7 @@
         refreshCardSalesFromSupabase(),
         refreshInvestorRequestsFromSupabase(),
         refreshCardCatalogFromSupabase(),
+        refreshCardSubmissionsFromSupabase(),
         refreshCardSaleRequestsFromSupabase(),
         refreshFeedbackList(),
         refreshSheepSpeechAdmin()
@@ -1456,6 +1485,7 @@
         if (page === 'cardsales') { refreshCardSalesFromSupabase(); refreshCardSaleOwnersAndPayoutsFromSupabase(); }
         if (page === 'investorRequests') refreshInvestorRequestsFromSupabase();
         if (page === 'cardcatalog') refreshCardCatalogFromSupabase();
+        if (page === 'cardsubmissions') refreshCardSubmissionsFromSupabase();
         if (page === 'feedback') refreshFeedbackList();
         if (page === 'playermgmt') { refreshPlayerMgmtList(); refreshAnticheatFlagsList(); refreshLeaderboardHiddenList(); }
         if (page === 'plushies') { bkmpRefreshPlushieDefinitionsAdmin(); refreshPlushieCodesList(); }
@@ -1720,6 +1750,10 @@
 
     async function refreshCardCatalogFromSupabase() {
       await syncCardCatalogFromSupabase(data, function () { renderAll(); }, { force: true });
+    }
+
+    async function refreshCardSubmissionsFromSupabase() {
+      await syncCardSubmissionsFromSupabase(data, function () { renderAll(); }, { force: true });
     }
 
     async function refreshInvestorRequestsFromSupabase() {
@@ -3171,6 +3205,105 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
         (row, item) => row.querySelector('.confirm-btn').addEventListener('click', () => approveCardCatalogEntry(item.id)));
     }
 
+    /* Karteneinreichungen aus der Minecraft-Mod (02.09.2026). Grob am
+       cardcatalog-Muster oben orientiert (gleiche CSS-Klassen), aber
+       eigene Render-Funktion statt renderCardCatalogGroup() wiederzu-
+       verwenden - dessen Bearbeiten-/Loeschen-Aktionen sind fest an
+       card_catalog-Felder gekoppelt und passen nicht 1:1. */
+    function bkmpCardSubmissionDuplicateHint(item) {
+      const name = (item.name || '').trim().toLowerCase();
+      if (!name || !Array.isArray(data.cardCatalog)) return '';
+      const hit = data.cardCatalog.find(c => (c.name || '').trim().toLowerCase() === name);
+      return hit ? `<div class="entry-row-warning">⚠️ Möglicherweise bereits vorhanden: eine Karte namens "${escapeHtml(hit.name)}" existiert schon in der Kartendatenbank. Bitte vor dem Annehmen prüfen.</div>` : '';
+    }
+
+    function renderCardSubmissionGroup(listId, countId, items, actionsHtml, wireActions) {
+      const countEl = document.getElementById(countId);
+      if (countEl) countEl.textContent = items.length ? `(${items.length})` : '';
+      const el = document.getElementById(listId);
+      if (!el) return;
+      if (items.length === 0) { el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Keine Einträge.</p>'; return; }
+      el.innerHTML = '';
+      items.forEach(item => {
+        const dims = item.widthMaps && item.heightMaps ? `${item.widthMaps}×${item.heightMaps} · ${item.totalMaps || item.widthMaps * item.heightMaps} Karten · ` : '';
+        const row = document.createElement('div');
+        row.className = 'entry-row partner-admin-row' + (!item.isRead ? ' is-unread' : '');
+        row.innerHTML = `
+          ${item.image ? `<span class="partner-admin-thumb-wrap" data-bkmp-image-wrap data-empty-label="Karte"><img data-bkmp-img class="partner-admin-thumb" src="${item.image}" alt="" loading="lazy" decoding="async"></span>` : '<div class="partner-admin-thumb partner-admin-thumb-empty">Karte</div>'}
+          <div class="desc">
+            ${!item.isRead ? '<span class="entry-row-unread-dot" aria-hidden="true"></span>' : ''}
+            <span class="name">${escapeHtml(item.name)}</span>
+            <span class="meta">${item.category ? escapeHtml(item.category) + ' · ' : ''}${dims}${item.server ? escapeHtml(item.server) + ' · ' : ''}${item.minecraftName ? 'von ' + escapeHtml(item.minecraftName) : ''}</span>
+            ${item.status === 'rejected' && item.rejectionReason ? `<div class="entry-row-warning">Grund: ${escapeHtml(item.rejectionReason)}</div>` : ''}
+            ${item.status === 'needs_changes' && item.rejectionReason ? `<div class="entry-row-warning">Änderung nötig: ${escapeHtml(item.rejectionReason)}</div>` : ''}
+            ${item.status === 'pending' ? bkmpCardSubmissionDuplicateHint(item) : ''}
+          </div>
+          <div class="entry-actions">
+            ${!item.isRead ? '<button class="edit-btn read-btn" type="button">Gelesen</button>' : ''}
+            ${actionsHtml(item)}
+          </div>
+        `;
+        wireActions(row, item);
+        const readBtn = row.querySelector('.read-btn');
+        if (readBtn) readBtn.addEventListener('click', async () => {
+          try { await markCardSubmissionRead(item.id); item.isRead = true; renderCardSubmissionsPage(); } catch (e) { showAdminToast('Fehler: ' + supabaseErrorText(e), 'error'); }
+        });
+        el.appendChild(row);
+      });
+    }
+
+    async function bkmpApproveCardSubmission(id) {
+      try {
+        await approveCardSubmission(id);
+        data.cardSubmissions = data.cardSubmissions.map(i => String(i.id) === String(id) ? { ...i, status: 'approved', isRead: true } : i);
+        renderAll();
+        showAdminToast('Einreichung angenommen - Karte wurde angelegt.', 'success');
+      } catch (e) {
+        showAdminToast(e.message || 'Annehmen fehlgeschlagen.', 'error');
+      }
+    }
+
+    async function bkmpRejectCardSubmission(id, status) {
+      const reason = await bkmpAdminPromptTextModal({
+        titleText: status === 'needs_changes' ? 'Änderung anfordern' : 'Einreichung ablehnen',
+        labelText: 'Begründung (wird dem Einreicher in der Mod angezeigt)',
+        confirmText: status === 'needs_changes' ? 'Änderung anfordern' : 'Ablehnen',
+        placeholder: 'z. B. Bild unvollständig / falsche Kategorie / schlechte Qualität / Karte bereits vorhanden / Daten fehlen'
+      });
+      if (reason === null) return; // Abbrechen
+      try {
+        const updated = await setCardSubmissionStatus(id, status, reason.trim());
+        data.cardSubmissions = data.cardSubmissions.map(i => String(i.id) === String(id) ? (updated || { ...i, status, rejectionReason: reason.trim(), isRead: true }) : i);
+        renderAll();
+        showAdminToast(status === 'needs_changes' ? 'Änderung angefordert.' : 'Einreichung abgelehnt.', 'success');
+      } catch (e) {
+        showAdminToast('Fehler: ' + supabaseErrorText(e), 'error');
+      }
+    }
+
+    function renderCardSubmissionsPage() {
+      const all = Array.isArray(data.cardSubmissions) ? data.cardSubmissions : [];
+      const byDateDesc = (a, b) => (b.createdAt || 0) - (a.createdAt || 0);
+      const pending = all.filter(i => i.status === 'pending').sort(byDateDesc);
+      const needsChanges = all.filter(i => i.status === 'needs_changes').sort(byDateDesc);
+      const approved = all.filter(i => i.status === 'approved').sort(byDateDesc);
+      const rejected = all.filter(i => i.status === 'rejected').sort(byDateDesc);
+
+      const pendingActions = () => '<button class="edit-btn confirm-btn" type="button">Annehmen</button><button class="edit-btn reject-btn" type="button">Ablehnen</button><button class="edit-btn changes-btn" type="button">Änderung nötig</button>';
+      const pendingWire = (row, item) => {
+        row.querySelector('.confirm-btn').addEventListener('click', () => bkmpApproveCardSubmission(item.id));
+        row.querySelector('.reject-btn').addEventListener('click', () => bkmpRejectCardSubmission(item.id, 'rejected'));
+        row.querySelector('.changes-btn').addEventListener('click', () => bkmpRejectCardSubmission(item.id, 'needs_changes'));
+      };
+
+      renderCardSubmissionGroup('cardSubmissionsPendingList', 'cardSubmissionsPendingCount', pending, pendingActions, pendingWire);
+      renderCardSubmissionGroup('cardSubmissionsNeedsChangesList', 'cardSubmissionsNeedsChangesCount', needsChanges, pendingActions, pendingWire);
+      renderCardSubmissionGroup('cardSubmissionsApprovedList', 'cardSubmissionsApprovedCount', approved, () => '', () => {});
+      renderCardSubmissionGroup('cardSubmissionsRejectedList', 'cardSubmissionsRejectedCount', rejected,
+        () => '<button class="edit-btn confirm-btn" type="button">Doch annehmen</button>',
+        (row, item) => row.querySelector('.confirm-btn').addEventListener('click', () => bkmpApproveCardSubmission(item.id)));
+    }
+
     /* Bug-Fix (Spieler-Meldung ChronoKora, 20.07.: "läggt extrem kurz bis ich
        einen anderen Button drücken kann"): renderCardCatalogList() baut bei
        jedem Aufruf drei komplette Listen (Pending/Approved/Rejected) per
@@ -3408,6 +3541,7 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       if (bkmpAdminSectionVisible('cardSaleOwnerUnassignedList')) renderCardSaleOwnersSection();
       if (bkmpAdminSectionVisible('cardSalePayoutRequestList')) renderCardSalePayoutRequestList();
       if (bkmpAdminSectionVisible('cardCatalogPendingList')) renderCardCatalogList();
+      if (bkmpAdminSectionVisible('cardSubmissionsPendingList')) renderCardSubmissionsPage();
       if (bkmpAdminSectionVisible('employeePayoutSummary')) renderEmployeePayoutPage();
       if (window.bkmpEnhanceImages) window.bkmpEnhanceImages(document);
     }

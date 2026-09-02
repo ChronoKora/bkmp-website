@@ -5797,6 +5797,75 @@
       });
       bkmpMarkAllSeen('plushies', BKMP_PLUSHIES.map(p => p.id));
     }
+
+    /* Minecraft-Mod-Verknuepfung, siehe bkmpCreateModPairingCode() /
+       bkmpLoadMyModConnections() in supabase.js. */
+    let bkmpModLinkCountdownTimer = null;
+    function bkmpStopModLinkCountdown() {
+      if (bkmpModLinkCountdownTimer) { clearInterval(bkmpModLinkCountdownTimer); bkmpModLinkCountdownTimer = null; }
+    }
+    async function renderModLinkPanel() {
+      const listEl = document.getElementById('modLinkConnectionsList');
+      if (!listEl) return;
+      listEl.innerHTML = '<p class="plushie-panel-hint">Lädt…</p>';
+      const connections = await bkmpLoadMyModConnections();
+      const active = connections.filter(c => !c.revoked_at);
+      if (active.length === 0) {
+        listEl.innerHTML = '<p class="plushie-panel-hint">Noch keine Mod mit deinem Account verbunden.</p>';
+        return;
+      }
+      listEl.innerHTML = active.map(c => `
+        <div class="mod-link-connection-row">
+          <div>
+            <strong>${c.mc_name_at_link ? escapeHtml(c.mc_name_at_link) : 'Unbekannter Minecraft-Name'}</strong>
+            <span class="mod-link-connection-meta">Verbunden ${bkmpFormatRelativeTime(c.created_at)}${c.last_used_at ? ` · zuletzt genutzt ${bkmpFormatRelativeTime(c.last_used_at)}` : ''}</span>
+          </div>
+          <button type="button" class="btn-nein mod-link-disconnect-btn" data-connection-id="${escapeHtml(c.id)}">Trennen</button>
+        </div>`).join('');
+      listEl.querySelectorAll('.mod-link-disconnect-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          btn.disabled = true;
+          try {
+            await bkmpRevokeMyModConnection(btn.dataset.connectionId);
+            await renderModLinkPanel();
+          } catch (e) {
+            btn.disabled = false;
+            bkmpUiShowToast({ text: e.message, kind: 'error' });
+          }
+        });
+      });
+    }
+    const modLinkGenerateBtn = document.getElementById('modLinkGenerateBtn');
+    const modLinkCodeMsg = document.getElementById('modLinkCodeMsg');
+    if (modLinkGenerateBtn) {
+      modLinkGenerateBtn.addEventListener('click', async () => {
+        modLinkGenerateBtn.disabled = true;
+        bkmpStopModLinkCountdown();
+        try {
+          const result = await bkmpCreateModPairingCode();
+          if (!result) throw new Error('Der Code konnte nicht erzeugt werden.');
+          const updateCountdown = () => {
+            const secondsLeft = Math.max(0, Math.round((new Date(result.expiresAt).getTime() - Date.now()) / 1000));
+            if (secondsLeft <= 0) {
+              bkmpStopModLinkCountdown();
+              modLinkCodeMsg.textContent = 'Code abgelaufen. Bitte einen neuen erzeugen.';
+              modLinkGenerateBtn.disabled = false;
+              return;
+            }
+            const mm = String(Math.floor(secondsLeft / 60)).padStart(2, '0');
+            const ss = String(secondsLeft % 60).padStart(2, '0');
+            modLinkCodeMsg.innerHTML = `Dein Code: <strong>${escapeHtml(result.code)}</strong> · gültig noch ${mm}:${ss}`;
+          };
+          updateCountdown();
+          bkmpModLinkCountdownTimer = setInterval(updateCountdown, 1000);
+        } catch (e) {
+          modLinkCodeMsg.textContent = e.message;
+        } finally {
+          modLinkGenerateBtn.disabled = false;
+        }
+      });
+    }
+
     const plushieRedeemBtn = document.getElementById('plushieRedeemBtn');
     const plushieCodeInput = document.getElementById('plushieCodeInput');
     const plushieRedeemMsg = document.getElementById('plushieRedeemMsg');
@@ -6756,15 +6825,18 @@
     const achievementsSubtabCosmetics = document.getElementById('achievementsSubtabCosmetics');
     const achievementsSubtabTitles = document.getElementById('achievementsSubtabTitles');
     const achievementsSubtabPlushies = document.getElementById('achievementsSubtabPlushies');
+    const achievementsSubtabModLink = document.getElementById('achievementsSubtabModLink');
     const achievementsListEl = document.getElementById('achievementsList');
     const cosmeticsListEl = document.getElementById('cosmeticsList');
     const titlesListEl = document.getElementById('titlesList');
     const plushiesPanelEl = document.getElementById('plushiesPanel');
+    const modLinkPanelEl = document.getElementById('modLinkPanel');
     const bkmpAchievementSubtabs = [
       { btn: achievementsSubtabAchievements, panel: achievementsListEl, render: null },
       { btn: achievementsSubtabCosmetics, panel: cosmeticsListEl, render: renderCosmeticsPanel },
       { btn: achievementsSubtabTitles, panel: titlesListEl, render: renderTitlesPanel },
-      { btn: achievementsSubtabPlushies, panel: plushiesPanelEl, render: renderPlushiesPanel }
+      { btn: achievementsSubtabPlushies, panel: plushiesPanelEl, render: renderPlushiesPanel },
+      { btn: achievementsSubtabModLink, panel: modLinkPanelEl, render: renderModLinkPanel }
     ];
     bkmpAchievementSubtabs.forEach(({ btn, panel, render }) => {
       if (!btn) return;

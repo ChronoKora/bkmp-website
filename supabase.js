@@ -552,6 +552,43 @@ async function bkmpPlayerDeleteOwnAccount() {
   try { await client.auth.signOut(); } catch (e) { /* Account existiert eh nicht mehr */ }
 }
 
+/* Minecraft-Mod-Verknuepfung (02.09.2026, siehe
+   sql/20260902-mod-account-linking-and-submissions.sql fuer die volle
+   Architektur) - erzeugt einen 10 Minuten gueltigen Einmal-Code, den
+   der Spieler in der Mod unter /opbk -> Account eintippt. */
+async function bkmpCreateModPairingCode() {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Du bist nicht eingeloggt.');
+  const { data, error } = await client.rpc('create_mod_pairing_code');
+  if (error) {
+    if (String(error.message || '').includes('rate_limited')) throw new Error('Zu viele Codes angefordert. Bitte kurz warten.');
+    throw new Error('Der Code konnte nicht erzeugt werden.');
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  return row ? { code: row.code, expiresAt: row.expires_at } : null;
+}
+
+/* Liste der mit diesem Account verbundenen Mods (my_mod_connections-View,
+   zeigt absichtlich nie den Token/Hash selbst - der ist ohnehin nur in
+   der Mod-Konfigurationsdatei auf dem jeweiligen Client relevant). */
+async function bkmpLoadMyModConnections() {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from('my_mod_connections')
+    .select('id, mc_name_at_link, created_at, last_used_at, revoked_at')
+    .order('created_at', { ascending: false });
+  if (error) return [];
+  return Array.isArray(data) ? data : [];
+}
+
+async function bkmpRevokeMyModConnection(id) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Du bist nicht eingeloggt.');
+  const { error } = await client.rpc('revoke_my_mod_token', { p_token_id: id });
+  if (error) throw new Error('Die Verbindung konnte nicht getrennt werden.');
+}
+
 async function bkmpGetPlayerSession() {
   const client = bkmpGetPlayerAuthClient();
   if (!client) return null;
@@ -3040,6 +3077,105 @@ async function loadCardCatalog() {
     .order('created_at', { ascending: false });
   if (error) throw error;
   return (data || []).map(bkmpMapCardCatalogFromSupabase);
+}
+
+/* Karteneinreichungen aus der Minecraft-Mod (02.09.2026, siehe
+   sql/20260902-mod-account-linking-and-submissions.sql). Admin-Pfad -
+   liest/aendert die echte card_submissions-Tabelle direkt (RLS:
+   is_active_admin()), identisches Prinzip wie card_catalog oben. Die
+   Mod selbst nutzt diese Tabelle NIE direkt (kein Supabase-Client dort),
+   sondern ausschliesslich die RPCs create_card_submission()/
+   list_my_mod_submissions() mit ihrem eigenen Mod-Token. */
+function bkmpMapCardSubmissionFromSupabase(row) {
+  return {
+    id: row.id,
+    minecraftName: row.minecraft_name || '',
+    image: row.image_url || '',
+    name: row.card_name || '',
+    category: row.category || '',
+    series: row.series || '',
+    widthMaps: row.width_maps,
+    heightMaps: row.height_maps,
+    totalMaps: row.total_maps,
+    server: row.server || '',
+    warp: row.warp || '',
+    seller: row.seller || '',
+    price: row.price,
+    creator: row.creator || '',
+    description: row.description || '',
+    status: row.status || 'pending',
+    rejectionReason: row.rejection_reason || '',
+    approvedCardId: row.approved_card_id || null,
+    isRead: Boolean(row.is_read),
+    createdAt: row.created_at ? Date.parse(row.created_at) : 0,
+    reviewedAt: row.reviewed_at ? Date.parse(row.reviewed_at) : 0,
+    reviewedBy: row.reviewed_by || ''
+  };
+}
+
+async function loadCardSubmissions() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('card_submissions')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data || []).map(bkmpMapCardSubmissionFromSupabase);
+}
+
+async function markCardSubmissionRead(id) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { error } = await client.from('card_submissions').update({ is_read: true }).eq('id', id);
+  if (error) throw error;
+}
+
+/* Ablehnen/Aenderung anfordern - reines Status-Update (identisches
+   Muster wie investor_requests' reject_reason). Approval laeuft
+   bewusst NICHT hier, sondern ueber approveCardSubmission() unten (RPC,
+   legt atomar die echte card_catalog-Zeile an). */
+async function setCardSubmissionStatus(id, status, rejectionReason) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const payload = { status, is_read: true, reviewed_at: new Date().toISOString() };
+  if (status === 'rejected' || status === 'needs_changes') payload.rejection_reason = rejectionReason || null;
+  const { data, error } = await client
+    .from('card_submissions')
+    .update(payload)
+    .eq('id', id)
+    .select('*')
+    .limit(1);
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : null;
+  return row ? bkmpMapCardSubmissionFromSupabase(row) : null;
+}
+
+/* Annehmen - ruft approve_card_submission() (SECURITY DEFINER RPC),
+   legt atomar die echte card_catalog-Zeile an UND markiert die
+   Einreichung als approved. Siehe SQL-Datei fuer die volle Begruendung
+   ("keine rohen Inserts duplizieren, wenn Businesslogik existiert"). */
+async function approveCardSubmission(id) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) throw new Error('Nicht verbunden.');
+  const { data, error } = await client.rpc('approve_card_submission', { p_id: id });
+  if (error) throw new Error(error.message || 'Annehmen fehlgeschlagen.');
+  return data;
+}
+
+async function syncCardSubmissionsFromSupabase(targetData, onSynced, options = {}) {
+  if (typeof loadCardSubmissions !== 'function' || !bkmpGetSupabaseClient()) return false;
+  try {
+    const items = await loadCardSubmissions();
+    if (!items) return false;
+    targetData.cardSubmissions = items;
+    bkmpSaveData(targetData);
+    if (typeof onSynced === 'function') onSynced(targetData);
+    return true;
+  } catch (e) {
+    console.warn('Supabase konnte Karteneinreichungen nicht laden.', e);
+    return false;
+  }
 }
 
 async function updateCardCatalogStatus(id, status) {
