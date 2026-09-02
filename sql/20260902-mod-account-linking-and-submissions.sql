@@ -110,6 +110,12 @@ where auth_user_id = auth.uid();
 
 grant select on public.my_mod_connections to authenticated;
 
+-- "drop ... if exists" davor: create policy kennt kein "if not exists" in
+-- Postgres, ein zweiter Lauf dieser Datei (z.B. nach einem vorherigen,
+-- erst spaeter im Skript fehlgeschlagenen Versuch) wuerde sonst mit
+-- "policy already exists" abbrechen. Reine Zugriffsregel-Metadaten, kein
+-- Datenverlust moeglich durch Loeschen+Neuanlegen einer Policy.
+drop policy if exists "mod_tokens select own" on public.mod_tokens;
 create policy "mod_tokens select own" on public.mod_tokens
   for select to authenticated
   using (auth_user_id = auth.uid());
@@ -159,11 +165,13 @@ alter table public.card_submissions enable row level security;
 -- Supabase-Session und nutzt dafuer stattdessen api/card-submissions.js
 -- (GET), das den Mod-Token server-seitig verifiziert - diese Policy ist
 -- fuer den Mod-Pfad irrelevant, schadet aber nicht.
+drop policy if exists "card_submissions select own" on public.card_submissions;
 create policy "card_submissions select own" on public.card_submissions
   for select to authenticated
   using (auth_user_id = auth.uid());
 
 -- Admins sehen + aendern alles (Pruefbereich, admin.html).
+drop policy if exists "card_submissions admin select" on public.card_submissions;
 create policy "card_submissions admin select" on public.card_submissions
   for select to authenticated
   using (public.is_active_admin());
@@ -178,6 +186,7 @@ create policy "card_submissions admin select" on public.card_submissions
 -- Zwischenstand, das sich mit dieser einen Zeile strukturell
 -- ausschliessen laesst statt nur auf admin.html's eigene Disziplin zu
 -- vertrauen.
+drop policy if exists "card_submissions admin update" on public.card_submissions;
 create policy "card_submissions admin update" on public.card_submissions
   for update to authenticated
   using (public.is_active_admin())
@@ -214,6 +223,18 @@ alter table public.mod_rate_limit_events enable row level security;
 -- ============================================================
 -- Teil 6: Funktionen
 -- ============================================================
+
+-- pgcrypto liefert gen_random_bytes()/digest(), gebraucht fuer den
+-- Roh-Token/dessen Hash (siehe exchange_mod_pairing_code/_resolve_mod_token/
+-- get_my_mod_account/revoke_my_mod_token_by_raw unten). "if not exists" -
+-- reiner No-Op, falls die Extension (z.B. ueber das aeltere
+-- sql/supabase-schema.sql, dort ohne explizites Schema) bereits an anderer
+-- Stelle installiert ist; "with schema extensions" installiert sie sonst an
+-- der auf Supabase-Projekten ueblichen Stelle. Kombiniert mit dem unten
+-- jeweils auf "public, extensions" erweiterten search_path der vier
+-- betroffenen Funktionen findet sich gen_random_bytes()/digest() dadurch
+-- zuverlaessig, egal in welchem der beiden Schemas es tatsaechlich landet.
+create extension if not exists pgcrypto with schema extensions;
 
 -- Zeichensatz ohne verwechselbare Zeichen (0/O, 1/I) - identisches
 -- Prinzip wie api/generate-daily-events.js's CODE_CHARS/randomCode().
@@ -294,7 +315,15 @@ create or replace function public.exchange_mod_pairing_code(p_code text, p_mc_na
 returns table (raw_token text, bk_display_name text, mc_name text)
 language plpgsql
 security definer
-set search_path = public
+-- "public, extensions" statt nur "public": ruft gen_random_bytes()/digest()
+-- auf (pgcrypto) - auf Supabase-Projekten lebt die Extension ueblicherweise
+-- im "extensions"-Schema, nicht in "public". Ein reines "public" haette das
+-- unqualifizierte gen_random_bytes()/digest() dort nicht gefunden (live
+-- bestaetigt: "function gen_random_bytes(integer) does not exist"). Sicher,
+-- da "extensions" ein admin-verwaltetes, nicht Nutzer-beschreibbares Schema
+-- ist - kein erneutes Einfallstor fuer eine search_path-Injektion, genau
+-- das "set search_path" hier eigentlich verhindern soll.
+set search_path = public, extensions
 as $$
 declare
   v_row public.mod_pairing_codes%rowtype;
@@ -429,7 +458,9 @@ create or replace function public._resolve_mod_token(p_raw_token text)
 returns uuid
 language plpgsql
 security definer
-set search_path = public
+-- siehe Kommentar bei exchange_mod_pairing_code oben - digest() (pgcrypto)
+-- braucht "extensions" mit im search_path.
+set search_path = public, extensions
 as $$
 declare
   v_hash text;
@@ -468,7 +499,9 @@ create or replace function public.get_my_mod_account(p_raw_token text)
 returns table (bk_display_name text, mc_name_at_link text, connected_since timestamptz)
 language plpgsql
 security definer
-set search_path = public
+-- siehe Kommentar bei exchange_mod_pairing_code oben - digest() (pgcrypto)
+-- braucht "extensions" mit im search_path.
+set search_path = public, extensions
 as $$
 declare
   v_uid uuid := public._resolve_mod_token(p_raw_token);
@@ -491,7 +524,9 @@ create or replace function public.revoke_my_mod_token_by_raw(p_raw_token text)
 returns void
 language plpgsql
 security definer
-set search_path = public
+-- siehe Kommentar bei exchange_mod_pairing_code oben - digest() (pgcrypto)
+-- braucht "extensions" mit im search_path.
+set search_path = public, extensions
 as $$
 declare
   v_hash text := encode(digest(coalesce(p_raw_token, ''), 'sha256'), 'hex');
