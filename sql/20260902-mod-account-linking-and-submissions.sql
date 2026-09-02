@@ -1,40 +1,40 @@
-/* ============================================================
-   BKInvestment - Minecraft-Mod-Account-Verknuepfung + Karteneinreichungen
-
-   Neues Feature (02.09.2026): die Minecraft-Mod (bkmp-card-browser-mod)
-   bekommt vier Bereiche - Karten entdecken (bereits vorhanden, api/cards.js
-   unveraendert), Karte einreichen, Meine Einreichungen, Account/
-   Einstellungen. Dieses File deckt die komplette neue Datenbank-Seite ab.
-
-   ARCHITEKTUR-ENTSCHEIDUNG (siehe CLAUDE.md-Analyse vom 01./02.09.2026,
-   Recherche-Agent-Bericht): die Mod haelt NIEMALS einen Supabase-Service-
-   Role-Key oder eine echte Supabase-Auth-Session. Stattdessen:
-
-   1. Der Spieler generiert AUF DER WEBSITE (echter, eingeloggter
-      player_stats-Account) einen kurzlebigen Pairing-Code
-      (create_mod_pairing_code, SECURITY DEFINER, auth.uid()-gebunden).
-   2. Die Mod tauscht diesen Code EINMALIG gegen einen eigenen,
-      langlebigen Mod-Token (exchange_mod_pairing_code, anonym aufrufbar,
-      da die Mod keine Supabase-Session hat - die Sicherheit kommt aus
-      dem Code selbst: zufaellig, einmalig, 10 Minuten gueltig).
-   3. Server-seitig wird NUR der SHA-256-Hash des rohen Tokens
-      gespeichert (mod_tokens.token_hash) - der rohe Token existiert nur
-      einmal im Exchange-Response und danach ausschliesslich lokal in
-      der Mod-Konfigurationsdatei auf dem Client.
-   4. JEDE weitere Mod-Anfrage (Submission erstellen, Bild hochladen,
-      eigene Einreichungen lesen) verifiziert diesen Token server-seitig
-      in api/*.js (Hash-Lookup gegen mod_tokens, siehe dortige
-      verifyModToken()-Hilfsfunktion, identisches Muster zum bereits
-      bestehenden verifyPlayerAccessToken() in api/submit-entry.js) -
-      die auth_user_id kommt IMMER aus dieser Server-seitigen Ableitung,
-      NIE aus einem vom Client behaupteten Feld (IDOR-Schutz).
-
-   Der Mod-Token selbst ist nur fuer GENAU DIE drei oben genannten
-   Aktionen brauchbar - er ist kein Supabase-JWT, kann also strukturell
-   NIE fuer eine beliebige PostgREST-Anfrage missbraucht werden, selbst
-   wenn er geleakt wuerde (er wird von PostgREST/RLS gar nicht verstanden,
-   nur von den neuen api/*.js-Handlern unten).
-   ============================================================ */
+-- ============================================================
+-- BKInvestment - Minecraft-Mod-Account-Verknuepfung + Karteneinreichungen
+--
+-- Neues Feature (02.09.2026): die Minecraft-Mod (bkmp-card-browser-mod)
+-- bekommt vier Bereiche - Karten entdecken (bereits vorhanden, api/cards.js
+-- unveraendert), Karte einreichen, Meine Einreichungen, Account/
+-- Einstellungen. Dieses File deckt die komplette neue Datenbank-Seite ab.
+--
+-- ARCHITEKTUR-ENTSCHEIDUNG (siehe CLAUDE.md-Analyse vom 01./02.09.2026,
+-- Recherche-Agent-Bericht): die Mod haelt NIEMALS einen Supabase-Service-
+-- Role-Key oder eine echte Supabase-Auth-Session. Stattdessen:
+--
+-- 1. Der Spieler generiert AUF DER WEBSITE (echter, eingeloggter
+--    player_stats-Account) einen kurzlebigen Pairing-Code
+--    (create_mod_pairing_code, SECURITY DEFINER, auth.uid()-gebunden).
+-- 2. Die Mod tauscht diesen Code EINMALIG gegen einen eigenen,
+--    langlebigen Mod-Token (exchange_mod_pairing_code, anonym aufrufbar,
+--    da die Mod keine Supabase-Session hat - die Sicherheit kommt aus
+--    dem Code selbst: zufaellig, einmalig, 10 Minuten gueltig).
+-- 3. Server-seitig wird NUR der SHA-256-Hash des rohen Tokens
+--    gespeichert (mod_tokens.token_hash) - der rohe Token existiert nur
+--    einmal im Exchange-Response und danach ausschliesslich lokal in
+--    der Mod-Konfigurationsdatei auf dem Client.
+-- 4. JEDE weitere Mod-Anfrage (Submission erstellen, Bild hochladen,
+--    eigene Einreichungen lesen) verifiziert diesen Token server-seitig
+--    in api/*.js (Hash-Lookup gegen mod_tokens, siehe dortige
+--    verifyModToken()-Hilfsfunktion, identisches Muster zum bereits
+--    bestehenden verifyPlayerAccessToken() in api/submit-entry.js) -
+--    die auth_user_id kommt IMMER aus dieser Server-seitigen Ableitung,
+--    NIE aus einem vom Client behaupteten Feld (IDOR-Schutz).
+--
+-- Der Mod-Token selbst ist nur fuer GENAU DIE drei oben genannten
+-- Aktionen brauchbar - er ist kein Supabase-JWT, kann also strukturell
+-- NIE fuer eine beliebige PostgREST-Anfrage missbraucht werden, selbst
+-- wenn er geleakt wuerde (er wird von PostgREST/RLS gar nicht verstanden,
+-- nur von den neuen api/*.js-Handlern unten).
+-- ============================================================
 
 -- ============================================================
 -- Teil 1: card_catalog additiv erweitern
