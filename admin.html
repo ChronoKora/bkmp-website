@@ -295,6 +295,14 @@
               <div><label for="incomeQuantity">Anzahl</label><input type="number" id="incomeQuantity" min="0" step="1" placeholder="optional"></div>
               <div><label for="incomeDate">Datum</label><input type="date" id="incomeDate"></div>
             </div>
+            <!-- 01.09.2026, Nutzerwunsch: Grossbestellungen mit Mengenrabatt
+                 (z.B. 2000 Buecher fuer 4 Mio. statt regulaer 5 Mio.) lassen
+                 sich sonst nicht korrekt erfassen - entweder stimmt der Betrag
+                 (Einnahmen) oder die Anzahl (Verkaufsstatistik), nie beides.
+                 Der Haken loest die automatische Anzahl<->Betrag-Verknuepfung
+                 (updateIncomeCalculation()) - beide Felder werden dann
+                 unabhaengig voneinander so gespeichert, wie eingetragen. -->
+            <label class="admin-checkbox-label"><input type="checkbox" id="incomeDiscountOrder"> Rabatt-Bestellung (Betrag &amp; Anzahl unabh&auml;ngig eintragen)</label>
             <p class="income-calc-hint" id="incomeCalcHint">W&auml;hle eine Kategorie und gib optional eine Anzahl ein.</p>
             <button class="btn btn-primary" id="addIncome">+ Einnahme hinzufügen</button>
           </div>
@@ -1183,8 +1191,8 @@
        da admin.html kein window.BKMP_QA_MODE-Gate setzt; macht nur
        bkmpGetGameNow() fuer bkmp-events.js verfuegbar (identisch Date.now()). -->
   <script src="js/core/bkmp-game-clock.js?v=20260724-qafoundation1"></script>
-  <script src="supabase.js?v=20260902-modaccountlink1"></script>
-  <script src="app.js?v=20260901-cardsaleredesign1"></script>
+  <script src="supabase.js?v=20260901-bookqty1"></script>
+  <script src="app.js?v=20260901-bookqty1"></script>
   <!-- Redesign Phase 2a (17.07.): siehe index.html fuer die Begruendung der
        festen Ladereihenfolge (bkmp-idle-state.js zuerst, bkmp-idle-
        bootstrap.js zuletzt vor mapart.js). -->
@@ -1519,6 +1527,7 @@
     const incomeQuantityInput = document.getElementById('incomeQuantity');
     const incomeAmountInput = document.getElementById('incomeAmount');
     const incomeCalcHint = document.getElementById('incomeCalcHint');
+    const incomeDiscountOrderInput = document.getElementById('incomeDiscountOrder');
     const incomeUnitPrices = {
       'Bücher': 2500,
       'Raketen': 1000,
@@ -1558,21 +1567,34 @@
       const category = bkmpNormalizeCategoryName(incomeNameSelect.value);
       const quantity = Number(incomeQuantityInput.value);
       const unitPrice = getIncomeUnitPrice(category);
+      const isDiscountOrder = incomeDiscountOrderInput.checked;
       if (!unitPrice) {
         incomeCalcHint.textContent = category ? 'Für diese Kategorie gibt es keinen festen Stückpreis. Betrag direkt eintragen.' : 'Wähle eine Kategorie und gib optional eine Anzahl ein.';
         return;
       }
       if (incomeQuantityInput.value === '' || Number.isNaN(quantity) || quantity <= 0) {
-        incomeCalcHint.textContent = `${category}: 1 Stück = ${bkmpFormatCurrency(unitPrice)}. Anzahl eintragen oder Betrag direkt setzen.`;
+        incomeCalcHint.textContent = isDiscountOrder
+          ? `Rabatt-Bestellung: Betrag & Anzahl unabhängig eintragen (regulär 1 Stück = ${bkmpFormatCurrency(unitPrice)}).`
+          : `${category}: 1 Stück = ${bkmpFormatCurrency(unitPrice)}. Anzahl eintragen oder Betrag direkt setzen.`;
         return;
       }
-      const calculated = quantity * unitPrice;
-      incomeAmountInput.value = calculated;
-      incomeCalcHint.textContent = `${quantity} x ${bkmpFormatCurrency(unitPrice)} = ${bkmpFormatCurrency(calculated)}`;
+      const regularPrice = quantity * unitPrice;
+      // Rabatt-Bestellung (01.09.2026, Nutzerwunsch): Betrag NICHT mehr
+      // automatisch ueberschreiben - Anzahl und Betrag sollen unabhaengig
+      // voneinander genau so gespeichert werden, wie eingetragen (z.B. 2000
+      // Buecher fuer 4 Mio. statt regulaer 5 Mio.). Der Hinweistext zeigt
+      // trotzdem den regulaeren Preis zum Vergleich an.
+      if (isDiscountOrder) {
+        incomeCalcHint.textContent = `Rabatt-Bestellung: ${quantity} Stück, regulär ${bkmpFormatCurrency(regularPrice)} — tatsächlicher Betrag wird separat eingetragen.`;
+        return;
+      }
+      incomeAmountInput.value = regularPrice;
+      incomeCalcHint.textContent = `${quantity} x ${bkmpFormatCurrency(unitPrice)} = ${bkmpFormatCurrency(regularPrice)}`;
     }
 
     incomeNameSelect.addEventListener('change', updateIncomeCalculation);
     incomeQuantityInput.addEventListener('input', updateIncomeCalculation);
+    incomeDiscountOrderInput.addEventListener('change', updateIncomeCalculation);
 
     /* ---------------- SW-Besucher (/sw bk, 29.08.2026) ---------------- */
     let bkmpSwStatsData = [];
@@ -3524,7 +3546,7 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
     function renderAll() {
       repairMissingIds();
       renderOverview();
-      if (bkmpAdminSectionVisible('incomeList')) renderEntryList('incomeList', sortByDateDesc(data.income), item => escapeHtml(item.name), item => `${escapeHtml(formatDate(item.date))} · ${bkmpFormatCurrency(item.amount)}`, id => removeIncome(id));
+      if (bkmpAdminSectionVisible('incomeList')) renderEntryList('incomeList', sortByDateDesc(data.income), item => escapeHtml(item.name), item => `${escapeHtml(formatDate(item.date))} · ${bkmpFormatCurrency(item.amount)}${item.quantity ? ` · ${Number(item.quantity).toLocaleString('de-DE')} Stück` : ''}`, id => removeIncome(id));
       if (bkmpAdminSectionVisible('expenseList')) renderEntryList('expenseList', sortByDateDesc(data.expenses), item => escapeHtml(item.name), item => `${escapeHtml(formatDate(item.date))} · ${bkmpFormatCurrency(item.amount)}`, id => removeExpense(id));
       if (bkmpAdminSectionVisible('investorList')) renderInvestorList();
       if (bkmpAdminSectionVisible('newsList')) renderNewsList();
@@ -4448,11 +4470,19 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       const date = document.getElementById('incomeDate').value || todayStr;
       if (!name) { incomeNameSelect.reportValidity(); return; }
       if (amountInput === '' || Number.isNaN(amount)) { incomeAmountInput.reportValidity(); return; }
-      const income = { id: bkmpUid('inc'), name, category: name, amount, date, note: '', createdAt: Date.now() };
+      // Anzahl wird IMMER mitgespeichert, wenn eingetragen (nicht nur bei
+      // Rabatt-Bestellungen) - sie ist ohnehin schon bekannt, sobald der
+      // Rechner sie fuer den regulaeren Preis genutzt hat, siehe
+      // bkmpCalculateBookStats() in app.js fuer die genauere Auswertung, die
+      // dadurch moeglich wird.
+      const quantityInput = incomeQuantityInput.value;
+      const quantity = quantityInput === '' ? null : Number(quantityInput);
+      const income = { id: bkmpUid('inc'), name, category: name, amount, quantity: (quantity === null || Number.isNaN(quantity) || quantity <= 0) ? null : quantity, date, note: '', createdAt: Date.now() };
       const saved = await persistIncome(income);
       if (saved) {
         incomeAmountInput.value = '';
         incomeQuantityInput.value = '';
+        incomeDiscountOrderInput.checked = false;
         updateIncomeCalculation();
       }
     });

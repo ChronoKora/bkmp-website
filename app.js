@@ -469,42 +469,70 @@ function bkmpCalculateExpenseRatio(totalExpenses, totalIncome) {
   return (totalExpenses / totalIncome) * 100;
 }
 
-/* Bücher-Kennzahlen (Auftrag Abschnitt 6-8) - Stückzahl wird ausschließlich
-   RÜCKGERECHNET aus amount/BKMP_INCOME_UNIT_PRICES['Bücher'], da die
-   incomes-Tabelle selbst keine Stückzahl kennt. Explizit als Schätzung
-   markiert (kein garantiert historisch konstanter Preis). */
+/* Echte Stückzahl bevorzugt (01.09.2026, incomes.quantity - v.a. für
+   Mengenrabatt-Großbestellungen unverzichtbar: bei denen weicht die
+   tatsächlich verkaufte Menge bewusst von amount/Stückpreis ab, z.B. 2000
+   Bücher für 4 Mio. statt regulär 5 Mio.). Fällt NUR für ältere Einträge
+   ohne gespeicherte Stückzahl auf die reine amount/Stückpreis-Schätzung
+   zurück - siehe bkmpBookStatsHasEstimate() für die "geschätzt"-Kennzeichnung. */
+function bkmpBookEntryQty(item, unitPrice) {
+  const stored = Number(item.quantity);
+  if (item.quantity !== null && item.quantity !== undefined && item.quantity !== '' && !Number.isNaN(stored)) return stored;
+  return unitPrice ? (Number(item.amount) || 0) / unitPrice : 0;
+}
+
+function bkmpSumBookQty(entries, unitPrice) {
+  return (entries || []).reduce((sum, item) => sum + bkmpBookEntryQty(item, unitPrice), 0);
+}
+
+function bkmpBookStatsHasEstimate(entries) {
+  return (entries || []).some(item => item.quantity === null || item.quantity === undefined || item.quantity === '');
+}
+
+/* Bücher-Kennzahlen (Auftrag Abschnitt 6-8). Stückzahl kommt jetzt bevorzugt
+   aus der echten, gespeicherten incomes.quantity - nur wo die fehlt (ältere
+   Einträge vor 01.09.2026), wird weiterhin aus amount/BKMP_INCOME_UNIT_
+   PRICES['Bücher'] geschätzt (kein garantiert historisch konstanter Preis).
+   hasAnyEstimatedQty zeigt an, ob mindestens ein Eintrag im GESAMTEN
+   Buch-Bestand (nicht nur im aktuell betrachteten Zeitraum) noch auf der
+   Schätzung beruht - für den Disclaimer-Text auf der öffentlichen Seite. */
 function bkmpCalculateBookStats(incomeList, todayIso) {
   const unitPrice = BKMP_INCOME_UNIT_PRICES['Bücher'];
   const bookEntries = (incomeList || []).filter(item => item.name === 'Bücher' || item.category === 'Bücher');
-  const qty = amount => unitPrice ? amount / unitPrice : 0;
 
   const weekStart = bkmpAddDaysIso(todayIso, -6);
   const prevWeekEnd = bkmpAddDaysIso(todayIso, -7);
   const prevWeekStart = bkmpAddDaysIso(todayIso, -13);
   const monthStart = todayIso.slice(0, 7) + '-01';
 
-  const todayRevenue = bkmpSumInRange(bookEntries, todayIso, todayIso);
-  const weekRevenue = bkmpSumInRange(bookEntries, weekStart, todayIso);
-  const prevWeekRevenue = bkmpSumInRange(bookEntries, prevWeekStart, prevWeekEnd);
-  const monthRevenue = bkmpSumInRange(bookEntries, monthStart, todayIso);
-
+  const todayEntries = bkmpEntriesInRange(bookEntries, todayIso, todayIso);
   const weekEntries = bkmpEntriesInRange(bookEntries, weekStart, todayIso);
+  const prevWeekEntries = bkmpEntriesInRange(bookEntries, prevWeekStart, prevWeekEnd);
+  const monthEntries = bkmpEntriesInRange(bookEntries, monthStart, todayIso);
+
+  const todayRevenue = bkmpSum(todayEntries);
+  const weekRevenue = bkmpSum(weekEntries);
+  const prevWeekRevenue = bkmpSum(prevWeekEntries);
+  const monthRevenue = bkmpSum(monthEntries);
+
   const bestDayByAmount = bkmpCalculateBestDay(bookEntries);
+  const bestDayEntries = bestDayByAmount ? bkmpEntriesInRange(bookEntries, bestDayByAmount.date, bestDayByAmount.date) : null;
 
   const totalBookRevenueAllTime = bkmpSum(bookEntries);
 
   return {
     hasAnyBooks: bookEntries.length > 0,
+    hasAnyEstimatedQty: bkmpBookStatsHasEstimate(bookEntries),
     unitPrice,
-    todayQty: Math.round(qty(todayRevenue)),
+    todayQty: Math.round(bkmpSumBookQty(todayEntries, unitPrice)),
     todayRevenue,
-    weekQty: Math.round(qty(weekRevenue)),
+    weekQty: Math.round(bkmpSumBookQty(weekEntries, unitPrice)),
     weekRevenue,
-    prevWeekQty: Math.round(qty(prevWeekRevenue)),
+    prevWeekQty: Math.round(bkmpSumBookQty(prevWeekEntries, unitPrice)),
     weekChange: bkmpCalculatePeriodChange(weekRevenue, prevWeekRevenue),
-    avgPerDayQty: weekEntries.length ? qty(weekRevenue) / 7 : 0,
-    bestDay: bestDayByAmount ? { date: bestDayByAmount.date, qty: Math.round(qty(bestDayByAmount.amount)) } : null,
-    monthQty: Math.round(qty(monthRevenue)),
+    avgPerDayQty: weekEntries.length ? bkmpSumBookQty(weekEntries, unitPrice) / 7 : 0,
+    bestDay: bestDayByAmount ? { date: bestDayByAmount.date, qty: Math.round(bkmpSumBookQty(bestDayEntries, unitPrice)) } : null,
+    monthQty: Math.round(bkmpSumBookQty(monthEntries, unitPrice)),
     monthRevenue,
     totalRevenueAllTime: totalBookRevenueAllTime
   };

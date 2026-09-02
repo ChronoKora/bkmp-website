@@ -1532,14 +1532,14 @@
           const days30 = [];
           for (let i = 29; i >= 0; i--) days30.push(bkmpAddDaysIso(todayIso, -i));
           const bookEntries = data.income.filter(item => item.name === 'Bücher' || item.category === 'Bücher');
-          const dailyQty = days30.map(iso => {
-            const rev = bkmpSumInRange(bookEntries, iso, iso);
-            return bs.unitPrice ? Math.round(rev / bs.unitPrice) : 0;
-          });
+          // Echte Stückzahl bevorzugt (bkmpSumBookQty(), 01.09.2026) - fällt
+          // nur pro Tag zurück auf die amount/Stückpreis-Schätzung, wenn
+          // KEIN Eintrag an diesem Tag eine gespeicherte quantity hat.
+          const dailyQty = days30.map(iso => Math.round(bkmpSumBookQty(bkmpEntriesInRange(bookEntries, iso, iso), bs.unitPrice)));
           const maxQty = Math.max(...dailyQty, 1);
           const barsHtml = dailyQty.map((q, i) => {
             const h = Math.max(2, Math.round((q / maxQty) * 100));
-            return `<span class="book-trend-bar" style="height:${h}%" title="${escapeHtml(formatDate(days30[i]))}: ${q} Bücher (geschätzt)"></span>`;
+            return `<span class="book-trend-bar" style="height:${h}%" title="${escapeHtml(formatDate(days30[i]))}: ${q} Bücher"></span>`;
           }).join('');
 
           bookSection.innerHTML = `
@@ -1553,8 +1553,8 @@
                 <div class="book-stat"><span class="book-stat-label">Umsatz Bücher</span><span class="book-stat-value">${bkmpFormatCurrency(bs.totalRevenueAllTime)}</span></div>
                 <div class="book-stat"><span class="book-stat-label">Anteil am Umsatz</span><span class="book-stat-value">${shareOfRevenue === null ? '–' : bkmpFormatPercent(shareOfRevenue).replace(/^[+−±]/, '')}</span></div>
               </div>
-              <div class="book-trend-chart" aria-label="Bücher verkauft, letzte 30 Tage (geschätzt)">${barsHtml}</div>
-              <p class="book-stats-hint">Stückzahlen geschätzt aus dem hinterlegten Buchpreis (${bkmpFormatCurrency(bs.unitPrice)}) - die Datenbank speichert nur den Gesamtbetrag pro Buchung, keine Stückzahl.</p>
+              <div class="book-trend-chart" aria-label="Bücher verkauft, letzte 30 Tage">${barsHtml}</div>
+              <p class="book-stats-hint">${bs.hasAnyEstimatedQty ? `Stückzahlen werden bei der Erfassung gespeichert (auch unabhängig vom Betrag, z. B. bei Rabatt-Bestellungen) - ältere Einträge ohne gespeicherte Stückzahl werden weiterhin aus dem hinterlegten Buchpreis (${bkmpFormatCurrency(bs.unitPrice)}) geschätzt.` : 'Stückzahlen sind für alle Einträge exakt erfasst.'}</p>
             </div>`;
         }
       }

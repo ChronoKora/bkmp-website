@@ -717,6 +717,12 @@ function bkmpMapIncomeFromSupabase(row) {
     amount: Number(row.amount || 0),
     date: row.date,
     note: row.note || '',
+    // Echte Stueckzahl (01.09.2026, v.a. fuer Rabatt-Grossbestellungen bei
+    // Buechern - amount/Stueckpreis stimmt dort bewusst NICHT ueberein).
+    // null = keine gespeichert (aeltere Zeile) - bkmpCalculateBookStats()
+    // faellt in dem Fall weiterhin auf die amount/Stueckpreis-Schaetzung
+    // zurueck, siehe app.js.
+    quantity: row.quantity === null || row.quantity === undefined ? null : Number(row.quantity),
     createdAt: row.created_at ? Date.parse(row.created_at) : 0,
     source: 'supabase'
   };
@@ -742,6 +748,18 @@ function bkmpMapIncomeToSupabase(income, options = {}) {
     date: bkmpNormalizeIncomeDate(income),
     note: income.note || null
   };
+  // Bewusst NUR gesetzt, wenn wirklich eine Anzahl vorliegt (Schluessel
+  // komplett weggelassen statt "quantity: null" zu senden) - solange
+  // sql/20260901-incomes-quantity-column.sql noch nicht ausgefuehrt ist,
+  // wuerde ein "quantity"-Schluessel (auch mit dem Wert null) JEDE
+  // Einnahme-Speicherung mit "column incomes.quantity does not exist"
+  // scheitern lassen, nicht nur Buch-Eintraege mit echter Stueckzahl -
+  // PostgREST/Postgres lehnt einen INSERT mit einem unbekannten Spalten-
+  // Schluessel komplett ab, unabhaengig vom Wert. Ohne den Schluessel
+  // bleibt das Einfuegen fuer alle Kategorien OHNE Stueckzahl unveraendert
+  // funktionsfaehig, auch bevor die Migration laeuft.
+  const hasQuantity = income.quantity !== null && income.quantity !== undefined && income.quantity !== '' && !Number.isNaN(Number(income.quantity));
+  if (hasQuantity) payload.quantity = Number(income.quantity);
 
   if (options.keepCreatedAt && income.createdAt) {
     const createdDate = new Date(income.createdAt);
@@ -769,7 +787,7 @@ async function loadIncomes() {
 
   const { data, error } = await client
     .from('incomes')
-    .select('id, category, amount, date, note, created_at')
+    .select('id, category, amount, date, note, quantity, created_at')
     .order('date', { ascending: true })
     .order('created_at', { ascending: true });
 
@@ -784,7 +802,7 @@ async function saveIncome(income) {
   const { data, error } = await client
     .from('incomes')
     .insert(bkmpMapIncomeToSupabase(income))
-    .select('id, category, amount, date, note, created_at')
+    .select('id, category, amount, date, note, quantity, created_at')
     .single();
 
   if (error) throw error;
