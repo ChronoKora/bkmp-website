@@ -5798,72 +5798,242 @@
       bkmpMarkAllSeen('plushies', BKMP_PLUSHIES.map(p => p.id));
     }
 
-    /* Minecraft-Mod-Verknuepfung, siehe bkmpCreateModPairingCode() /
-       bkmpLoadMyModConnections() in supabase.js. */
+    /* Minecraft-Mod-"Connection Center" (Redesign 03.09.2026, siehe
+       Kommentar bei den Formular-IDs in index.html) - reines Frontend/UX,
+       Backend-/Token-/Sicherheitslogik bleibt bkmpCreateModPairingCode()/
+       bkmpLoadMyModConnections()/bkmpRevokeMyModConnection() in
+       supabase.js UNVERAENDERT (siehe dortige Kommentare zu
+       sql/20260902-mod-account-linking-and-submissions.sql). Drei
+       Bausteine, jeweils eine eigene render*-Funktion (ModConnectionStatus/
+       ModPairingCard.../ConnectedModsList), zusammengefuehrt von
+       renderModLinkPanel() als Einstiegspunkt beim Tab-Wechsel. */
     let bkmpModLinkCountdownTimer = null;
+    let bkmpModLinkPairing = { mode: 'idle' }; // idle | loading | code | error
     function bkmpStopModLinkCountdown() {
       if (bkmpModLinkCountdownTimer) { clearInterval(bkmpModLinkCountdownTimer); bkmpModLinkCountdownTimer = null; }
     }
-    async function renderModLinkPanel() {
+    function bkmpModLinkFormatCountdown(secondsLeft) {
+      const mm = Math.floor(secondsLeft / 60), ss = secondsLeft % 60;
+      return `${mm}:${String(ss).padStart(2, '0')} Minuten`;
+    }
+    function bkmpModLinkStepsHtml() {
+      return `
+        <div class="mod-link-steps">
+          <div class="mod-link-step"><span class="mod-link-step-num">1</span><span>Code erzeugen</span></div>
+          <span class="mod-link-step-arrow" aria-hidden="true">→</span>
+          <div class="mod-link-step"><span class="mod-link-step-num">2</span><span>OPBK öffnen</span></div>
+          <span class="mod-link-step-arrow" aria-hidden="true">→</span>
+          <div class="mod-link-step"><span class="mod-link-step-num">3</span><span>Code unter Account eingeben</span></div>
+        </div>`;
+    }
+
+    /* Baustein 1: ModConnectionStatus - "bin ich verbunden?" auf einen Blick. */
+    function bkmpModLinkRenderStatusCard(activeConnections) {
+      const el = document.getElementById('modLinkStatusCard');
+      if (!el) return;
+      if (!activeConnections.length) {
+        el.className = 'mod-link-status-card is-off';
+        el.innerHTML = `
+          <span class="mod-link-status-dot" aria-hidden="true"></span>
+          <div class="mod-link-status-body">
+            <span class="mod-link-status-eyebrow">Keine Mod verbunden</span>
+            <span class="mod-link-status-detail">Erzeuge unten einen Verbindungscode und gib ihn anschließend in der OPBK-Mod ein.</span>
+          </div>`;
+        return;
+      }
+      const newest = activeConnections.reduce((a, b) => new Date(a.last_used_at || a.created_at) > new Date(b.last_used_at || b.created_at) ? a : b);
+      const nameOrCount = activeConnections.length === 1
+        ? (newest.mc_name_at_link ? escapeHtml(newest.mc_name_at_link) : 'Unbekannter Minecraft-Name')
+        : `${activeConnections.length} Minecraft-Mods verbunden`;
+      const detail = newest.last_used_at ? `Zuletzt verwendet ${bkmpFormatRelativeTime(newest.last_used_at)}` : 'Noch nicht genutzt';
+      el.className = 'mod-link-status-card is-on';
+      el.innerHTML = `
+        <span class="mod-link-status-dot" aria-hidden="true"></span>
+        <div class="mod-link-status-body">
+          <span class="mod-link-status-eyebrow">Verbunden</span>
+          <span class="mod-link-status-name">${nameOrCount}</span>
+          <span class="mod-link-status-detail">${escapeHtml(detail)}</span>
+        </div>`;
+    }
+
+    /* Baustein 2: ModPairingCard/ModPairingCode - Zustandsautomat idle/loading/code/error. */
+    function bkmpModLinkRenderPairingCard() {
+      const el = document.getElementById('modLinkPairingCard');
+      if (!el) return;
+      const s = bkmpModLinkPairing;
+
+      if (s.mode === 'code') {
+        const secondsLeft = Math.max(0, Math.round((new Date(s.expiresAt).getTime() - Date.now()) / 1000));
+        el.className = 'mod-link-pairing-card has-code';
+        el.innerHTML = `
+          <p class="mod-link-code-label">Verbindungscode</p>
+          <div class="mod-link-code-box">${escapeHtml(s.code)}</div>
+          <button type="button" class="btn mod-link-copy-btn" id="modLinkCopyBtn">Code kopieren</button>
+          <p class="mod-link-code-hint">Gib diesen Code in der OPBK-Mod unter<br><strong>Account → Verbindungscode</strong> ein.</p>
+          <p class="mod-link-code-expiry" id="modLinkCodeExpiry">Gültig für noch ${bkmpModLinkFormatCountdown(secondsLeft)}</p>
+          <div class="mod-link-code-progress"><div class="mod-link-code-progress-bar" id="modLinkCodeProgressBar" style="width:${Math.max(0, secondsLeft / 600 * 100)}%"></div></div>
+          ${bkmpModLinkStepsHtml()}
+          <button type="button" class="auth-switch-link mod-link-new-code-btn" id="modLinkGenerateBtn">Neuen Code erzeugen</button>`;
+        bkmpModLinkWireGenerateBtn();
+        bkmpModLinkWireCopyBtn();
+        return;
+      }
+
+      if (s.mode === 'error') {
+        el.className = 'mod-link-pairing-card is-error';
+        el.innerHTML = `
+          <span class="mod-link-pairing-icon" aria-hidden="true">🔑</span>
+          <div class="mod-link-pairing-body">
+            <p class="mod-link-pairing-title">Verbindungscode konnte nicht erzeugt werden</p>
+            <p class="mod-link-pairing-error-text">${escapeHtml(s.message)}</p>
+          </div>
+          <button type="button" class="btn-ja" id="modLinkGenerateBtn">Erneut versuchen</button>`;
+        bkmpModLinkWireGenerateBtn();
+        return;
+      }
+
+      // idle oder loading - gleiche Struktur, Knopf wechselt nur Text/disabled (Abschnitt 28).
+      el.className = 'mod-link-pairing-card is-idle';
+      el.innerHTML = `
+        <span class="mod-link-pairing-icon" aria-hidden="true">🔑</span>
+        <div class="mod-link-pairing-body">
+          <p class="mod-link-pairing-title">Neue Mod verbinden</p>
+          <p class="mod-link-pairing-text">Erzeuge einen einmaligen Verbindungscode und gib ihn anschließend in der OPBK-Mod unter Account ein.</p>
+        </div>
+        <button type="button" class="btn-ja" id="modLinkGenerateBtn"${s.mode === 'loading' ? ' disabled' : ''}>${s.mode === 'loading' ? 'Code wird erzeugt…' : 'Verbindungscode erzeugen'}</button>
+        ${bkmpModLinkStepsHtml()}`;
+      bkmpModLinkWireGenerateBtn();
+    }
+
+    async function bkmpModLinkRequestNewCode() {
+      bkmpStopModLinkCountdown();
+      bkmpModLinkPairing = { mode: 'loading' };
+      bkmpModLinkRenderPairingCard();
+      try {
+        const result = await bkmpCreateModPairingCode();
+        if (!result) throw new Error('Der Code konnte nicht erzeugt werden.');
+        bkmpModLinkPairing = { mode: 'code', code: result.code, expiresAt: result.expiresAt };
+        bkmpModLinkRenderPairingCard();
+        bkmpModLinkStartCountdown();
+      } catch (e) {
+        bkmpModLinkPairing = { mode: 'error', message: e.message || 'Verbindungscode konnte nicht erzeugt werden.' };
+        bkmpModLinkRenderPairingCard();
+      }
+    }
+    function bkmpModLinkWireGenerateBtn() {
+      const btn = document.getElementById('modLinkGenerateBtn');
+      if (btn) btn.addEventListener('click', bkmpModLinkRequestNewCode);
+    }
+    function bkmpModLinkWireCopyBtn() {
+      const copyBtn = document.getElementById('modLinkCopyBtn');
+      if (!copyBtn) return;
+      copyBtn.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(bkmpModLinkPairing.code || '');
+          const original = copyBtn.textContent;
+          copyBtn.textContent = '✓ Kopiert';
+          copyBtn.classList.add('is-copied');
+          setTimeout(() => { copyBtn.textContent = original; copyBtn.classList.remove('is-copied'); }, 1600);
+        } catch (e) {
+          bkmpUiShowToast({ text: 'Kopieren fehlgeschlagen - bitte den Code manuell abschreiben.', kind: 'error' });
+        }
+      });
+    }
+    function bkmpModLinkStartCountdown() {
+      const tick = () => {
+        if (bkmpModLinkPairing.mode !== 'code') { bkmpStopModLinkCountdown(); return; }
+        const secondsLeft = Math.max(0, Math.round((new Date(bkmpModLinkPairing.expiresAt).getTime() - Date.now()) / 1000));
+        if (secondsLeft <= 0) {
+          bkmpStopModLinkCountdown();
+          bkmpModLinkPairing = { mode: 'error', message: 'Code abgelaufen. Bitte einen neuen erzeugen.' };
+          bkmpModLinkRenderPairingCard();
+          return;
+        }
+        const expiryEl = document.getElementById('modLinkCodeExpiry');
+        const barEl = document.getElementById('modLinkCodeProgressBar');
+        if (expiryEl) expiryEl.textContent = `Gültig für noch ${bkmpModLinkFormatCountdown(secondsLeft)}`;
+        if (barEl) barEl.style.width = Math.max(0, secondsLeft / 600 * 100) + '%';
+      };
+      tick();
+      bkmpModLinkCountdownTimer = setInterval(tick, 1000);
+    }
+
+    /* Baustein 3: ConnectedModCard/ConnectedModsList - mehrere Verbindungen
+       sind bewusst nicht auf einen einzelnen Account hartkodiert
+       (Abschnitt 15), "Trennen" ist bewusst sekundaer/destruktiv gestaltet
+       (Abschnitt 13) und fragt vorher ueber die bereits bestehende
+       bkmpConfirmDialog()-Komponente nach (Abschnitt 14) statt sofort zu
+       trennen. Zeigt NUR tatsaechlich vorhandene Felder aus
+       my_mod_connections (id/mc_name_at_link/created_at/last_used_at) -
+       kein erfundenes Client-/Geraete-/Versionsfeld (Abschnitt 12). */
+    function bkmpModLinkRenderConnectionsList(activeConnections) {
       const listEl = document.getElementById('modLinkConnectionsList');
       if (!listEl) return;
+      if (!activeConnections.length) {
+        listEl.innerHTML = `
+          <div class="mod-link-empty-state">
+            <span class="mod-link-empty-icon" aria-hidden="true">🎮</span>
+            <p class="mod-link-empty-title">Noch keine Mod verbunden</p>
+            <p class="mod-link-empty-text">Erzeuge oben einen Verbindungscode, um deinen Minecraft-Client zu verknüpfen.</p>
+          </div>`;
+        return;
+      }
+      listEl.innerHTML = activeConnections.map(c => {
+        const name = c.mc_name_at_link ? escapeHtml(c.mc_name_at_link) : 'Unbekannter Minecraft-Name';
+        const createdLine = `Verbunden ${bkmpFormatRelativeTime(c.created_at)}`;
+        const usedLine = c.last_used_at ? `Zuletzt verwendet ${bkmpFormatRelativeTime(c.last_used_at)}` : 'Noch nicht genutzt';
+        return `
+          <div class="mod-link-connection-card">
+            <div class="mod-link-connection-top">
+              <span class="mod-link-connection-icon" aria-hidden="true">🎮</span>
+              <strong class="mod-link-connection-name">${name}</strong>
+              <span class="mod-link-connection-badge">● Verbunden</span>
+            </div>
+            <p class="mod-link-connection-sub">Minecraft-Mod</p>
+            <p class="mod-link-connection-meta">${escapeHtml(createdLine)}</p>
+            <p class="mod-link-connection-meta">${escapeHtml(usedLine)}</p>
+            <button type="button" class="mod-link-disconnect-btn" data-connection-id="${escapeHtml(c.id)}" data-connection-name="${name}">Verbindung trennen</button>
+          </div>`;
+      }).join('');
+      listEl.querySelectorAll('.mod-link-disconnect-btn').forEach(btn => {
+        btn.addEventListener('click', () => bkmpModLinkConfirmDisconnect(btn));
+      });
+    }
+    async function bkmpModLinkConfirmDisconnect(btn) {
+      const name = btn.dataset.connectionName || 'diese Verbindung';
+      const ok = await bkmpConfirmDialog(`${name} wirklich trennen?`, 'Die Mod kann sich danach nicht mehr mit deinem Account verbinden, bis du sie erneut per Verbindungscode koppelst.', 'Verbindung trennen', 'Abbrechen');
+      if (!ok) return;
+      btn.disabled = true;
+      btn.textContent = 'Trenne…';
+      try {
+        await bkmpRevokeMyModConnection(btn.dataset.connectionId);
+        await renderModLinkPanel();
+      } catch (e) {
+        btn.disabled = false;
+        btn.textContent = 'Verbindung trennen';
+        bkmpUiShowToast({ text: e.message, kind: 'error' });
+      }
+    }
+
+    /* Einstiegspunkt (von den achievements-subtabs beim Tab-Wechsel
+       aufgerufen, siehe bkmpAchievementSubtabs weiter unten). Baut die
+       Pairing-Card nur beim allerersten Aufruf auf (idle) - ein bereits
+       angezeigter Code/Fehler/Ladezustand soll beim Wechsel zu einem
+       ANDEREN Account-Tab und zurueck nicht verloren gehen, da die Panels
+       nur per display:none versteckt, nie neu aufgebaut werden. Status
+       und Verbindungsliste werden dagegen IMMER neu geladen, da sich der
+       Verbindungsstatus zwischenzeitlich extern (in der Mod) geaendert
+       haben kann. */
+    async function renderModLinkPanel() {
+      const statusEl = document.getElementById('modLinkStatusCard');
+      const listEl = document.getElementById('modLinkConnectionsList');
+      if (!statusEl || !listEl) return;
+      if (bkmpModLinkPairing.mode === 'idle') bkmpModLinkRenderPairingCard();
       listEl.innerHTML = '<p class="plushie-panel-hint">Lädt…</p>';
       const connections = await bkmpLoadMyModConnections();
       const active = connections.filter(c => !c.revoked_at);
-      if (active.length === 0) {
-        listEl.innerHTML = '<p class="plushie-panel-hint">Noch keine Mod mit deinem Account verbunden.</p>';
-        return;
-      }
-      listEl.innerHTML = active.map(c => `
-        <div class="mod-link-connection-row">
-          <div>
-            <strong>${c.mc_name_at_link ? escapeHtml(c.mc_name_at_link) : 'Unbekannter Minecraft-Name'}</strong>
-            <span class="mod-link-connection-meta">Verbunden ${bkmpFormatRelativeTime(c.created_at)}${c.last_used_at ? ` · zuletzt genutzt ${bkmpFormatRelativeTime(c.last_used_at)}` : ''}</span>
-          </div>
-          <button type="button" class="btn-nein mod-link-disconnect-btn" data-connection-id="${escapeHtml(c.id)}">Trennen</button>
-        </div>`).join('');
-      listEl.querySelectorAll('.mod-link-disconnect-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          btn.disabled = true;
-          try {
-            await bkmpRevokeMyModConnection(btn.dataset.connectionId);
-            await renderModLinkPanel();
-          } catch (e) {
-            btn.disabled = false;
-            bkmpUiShowToast({ text: e.message, kind: 'error' });
-          }
-        });
-      });
-    }
-    const modLinkGenerateBtn = document.getElementById('modLinkGenerateBtn');
-    const modLinkCodeMsg = document.getElementById('modLinkCodeMsg');
-    if (modLinkGenerateBtn) {
-      modLinkGenerateBtn.addEventListener('click', async () => {
-        modLinkGenerateBtn.disabled = true;
-        bkmpStopModLinkCountdown();
-        try {
-          const result = await bkmpCreateModPairingCode();
-          if (!result) throw new Error('Der Code konnte nicht erzeugt werden.');
-          const updateCountdown = () => {
-            const secondsLeft = Math.max(0, Math.round((new Date(result.expiresAt).getTime() - Date.now()) / 1000));
-            if (secondsLeft <= 0) {
-              bkmpStopModLinkCountdown();
-              modLinkCodeMsg.textContent = 'Code abgelaufen. Bitte einen neuen erzeugen.';
-              modLinkGenerateBtn.disabled = false;
-              return;
-            }
-            const mm = String(Math.floor(secondsLeft / 60)).padStart(2, '0');
-            const ss = String(secondsLeft % 60).padStart(2, '0');
-            modLinkCodeMsg.innerHTML = `Dein Code: <strong>${escapeHtml(result.code)}</strong> · gültig noch ${mm}:${ss}`;
-          };
-          updateCountdown();
-          bkmpModLinkCountdownTimer = setInterval(updateCountdown, 1000);
-        } catch (e) {
-          modLinkCodeMsg.textContent = e.message;
-        } finally {
-          modLinkGenerateBtn.disabled = false;
-        }
-      });
+      bkmpModLinkRenderStatusCard(active);
+      bkmpModLinkRenderConnectionsList(active);
     }
 
     const plushieRedeemBtn = document.getElementById('plushieRedeemBtn');

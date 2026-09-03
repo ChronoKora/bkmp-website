@@ -5558,14 +5558,173 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 .achievements-card h3 { font-family: 'Fraunces', serif; font-size: 1.25rem; margin-bottom: 0.5rem; text-align: center; }
 .achievements-summary { color: var(--muted); font-size: 0.85rem; text-align: center; margin-bottom: 1rem; }
 .plushie-panel-hint { color: var(--muted); font-size: 0.82rem; text-align: center; margin: 0 0 0.6rem; }
-.mod-link-connections-title { font-size: 0.85rem; color: var(--muted); margin: 0.9rem 0 0.4rem; text-transform: uppercase; letter-spacing: 0.04em; }
-.mod-link-connection-row {
-  display: flex; align-items: center; justify-content: space-between; gap: 0.6rem;
-  padding: 0.55rem 0.7rem; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 0.4rem;
-  background: color-mix(in srgb, var(--paper) 92%, transparent);
+/* ---------- Minecraft-Mod "Connection Center" (Redesign 03.09.2026) ----------
+   Eigener kleiner Abschnitt statt Wiederverwendung der Plüshie-/Kosmetik-
+   Klassen (.plushie-panel-hint/.plushie-redeem-box/.cosmetics-list) - der
+   bisherige Tab teilte sich deren Klassen, wodurch er nie eine eigene
+   visuelle Identität hatte. Tokens wie vom Rest der Seite: --paper/--paper-2/
+   --line/--muted fürs Grundgerüst, --gold für Aktionen, --purple für
+   Mod/OPBK-Bezug, --pos für "verbunden", --neg für die Trennen-Aktion -
+   siehe Abschnitt 19 des Auftrags. Spacing durchgängig 24px zwischen
+   Abschnitten, 18-22px Card-Padding, 6-12px intern (Abschnitt 20). */
+/* Wie #plushiesPanel weiter unten: .achievements-card selbst scrollt bewusst
+   NICHT (siehe deren Kopfkommentar) - der neue, deutlich reichhaltigere
+   Inhalt dieses Tabs (Status-Card + Pairing-Card + Verbindungsliste) ist auf
+   normaler Fensterhoehe schon knapp, bei mehreren verbundenen Mods oder auf
+   kleinen Viewports uebersteigt er die Kartenhoehe klar (Abschnitt 23,
+   "interner Scrollbereich") - per echtem scrollHeight/clientHeight-Vergleich
+   bestaetigt (1715px Inhalt vs. 713px sichtbar), nicht nur vermutet. */
+.mod-link-panel { padding-top: 0.2rem; flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-anchor: none; }
+.mod-link-header { display: flex; align-items: flex-start; gap: 0.7rem; margin-bottom: 0.35rem; }
+.mod-link-header-icon {
+  flex-shrink: 0; width: 2.1rem; height: 2.1rem; display: flex; align-items: center; justify-content: center;
+  font-size: 1.15rem; border-radius: 50%;
+  background: color-mix(in srgb, var(--purple) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--purple) 40%, transparent);
 }
-.mod-link-connection-meta { display: block; color: var(--muted); font-size: 0.74rem; margin-top: 0.1rem; }
-.mod-link-disconnect-btn { padding: 0.35rem 0.7rem !important; font-size: 0.78rem !important; min-height: unset !important; flex-shrink: 0; }
+.mod-link-header-title { font-family: 'Fraunces', serif; font-size: 1.05rem; margin: 0 0 0.15rem; color: var(--ink); }
+.mod-link-header-sub { font-size: 0.82rem; color: var(--muted); margin: 0; line-height: 1.4; }
+.mod-link-header-hint { font-size: 0.76rem; color: var(--muted); opacity: 0.85; margin: 0 0 1.5rem; line-height: 1.4; }
+
+.mod-link-section-label {
+  font-size: 0.72rem; font-weight: 700; color: var(--muted); text-transform: uppercase;
+  letter-spacing: 0.06em; margin: 1.5rem 0 0.6rem;
+}
+.mod-link-status-card + .mod-link-section-label { margin-top: 1.5rem; }
+
+/* Baustein: ModConnectionStatus - beantwortet "bin ich verbunden?" auf einen Blick (Abschnitt 5). */
+.mod-link-status-card {
+  display: flex; align-items: center; gap: 0.7rem;
+  padding: 0.9rem 1.1rem; border-radius: 14px; border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--paper-2) 55%, transparent);
+}
+.mod-link-status-dot {
+  flex-shrink: 0; width: 0.6rem; height: 0.6rem; border-radius: 50%;
+  background: var(--muted);
+}
+.mod-link-status-card.is-on {
+  border-color: color-mix(in srgb, var(--pos) 35%, var(--line));
+  background: color-mix(in srgb, var(--pos) 7%, color-mix(in srgb, var(--paper-2) 55%, transparent));
+}
+.mod-link-status-card.is-on .mod-link-status-dot {
+  background: var(--pos);
+  /* Statisches, sehr dezentes Glow - kein pulsierendes/animiertes Leuchten (Abschnitt 32). */
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--pos) 20%, transparent);
+}
+.mod-link-status-body { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.mod-link-status-eyebrow { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.mod-link-status-card.is-on .mod-link-status-eyebrow { color: var(--pos); }
+.mod-link-status-name { font-size: 1rem; font-weight: 700; color: var(--ink); }
+.mod-link-status-detail { font-size: 0.8rem; color: var(--muted); }
+
+/* Baustein: ModPairingCard/ModPairingCode - idle/loading/code/error (Abschnitte 6-9/28/29). */
+.mod-link-pairing-card {
+  border-radius: 16px; border: 1px solid var(--line); padding: 1.1rem 1.2rem;
+  background: color-mix(in srgb, var(--paper-2) 45%, transparent);
+  transition: border-color 0.16s ease, background 0.16s ease;
+  /* Sanftes Einblenden bei jedem Zustandswechsel (Abschnitt 31) - reines CSS,
+     kein JS-Timing nötig, da innerHTML jedes Mal einen frischen Knoten anlegt. */
+  animation: modLinkCardFadeIn 0.18s ease;
+}
+@keyframes modLinkCardFadeIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
+.mod-link-pairing-card.is-idle, .mod-link-pairing-card.is-error {
+  display: flex; align-items: flex-start; gap: 0.8rem; flex-wrap: wrap;
+}
+.mod-link-pairing-icon {
+  flex-shrink: 0; width: 2.3rem; height: 2.3rem; display: flex; align-items: center; justify-content: center;
+  font-size: 1.2rem; border-radius: 10px;
+  background: color-mix(in srgb, var(--purple) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--purple) 35%, transparent);
+}
+.mod-link-pairing-card.is-error .mod-link-pairing-icon {
+  background: color-mix(in srgb, var(--neg) 14%, transparent);
+  border-color: color-mix(in srgb, var(--neg) 40%, transparent);
+}
+.mod-link-pairing-body { flex: 1 1 200px; min-width: 0; }
+.mod-link-pairing-title { font-size: 0.92rem; font-weight: 700; color: var(--ink); margin: 0 0 0.25rem; }
+.mod-link-pairing-text { font-size: 0.8rem; color: var(--muted); margin: 0; line-height: 1.45; }
+.mod-link-pairing-error-text { font-size: 0.82rem; color: var(--neg); margin: 0; line-height: 1.4; }
+.mod-link-pairing-card.is-idle .btn-ja,
+.mod-link-pairing-card.is-error .btn-ja { flex-shrink: 0; align-self: center; }
+.mod-link-pairing-card.is-idle .mod-link-steps { flex-basis: 100%; margin-top: 0.9rem; }
+
+/* Aktiver Code - klar im Mittelpunkt (Abschnitt 8), mit dezentem Gold-Glow (einzige Stelle neben Hauptaktion/aktivem Tab, Abschnitt 32). */
+.mod-link-pairing-card.has-code {
+  text-align: center;
+  border-color: color-mix(in srgb, var(--gold) 40%, var(--line));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--gold) 12%, transparent), 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+.mod-link-code-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 0.6rem; }
+.mod-link-code-box {
+  font-family: 'JetBrains Mono', 'Consolas', monospace;
+  font-size: 1.7rem; font-weight: 700; letter-spacing: 0.12em;
+  color: var(--gold-fixed);
+  background: color-mix(in srgb, var(--paper) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--gold) 30%, var(--line));
+  border-radius: 12px; padding: 0.7rem 1rem; margin: 0 auto 0.8rem; max-width: 320px;
+  user-select: all;
+}
+.mod-link-copy-btn { min-width: 160px; }
+.mod-link-copy-btn.is-copied { border-color: var(--pos) !important; color: var(--pos) !important; }
+.mod-link-code-hint { font-size: 0.78rem; color: var(--muted); line-height: 1.4; margin: 0.8rem 0 0.6rem; }
+.mod-link-code-expiry { font-size: 0.76rem; color: var(--muted); margin: 0 0 0.3rem; font-variant-numeric: tabular-nums; }
+.mod-link-code-progress { height: 4px; border-radius: 999px; background: var(--line); overflow: hidden; margin: 0 auto 0.9rem; max-width: 240px; }
+.mod-link-code-progress-bar { height: 100%; background: linear-gradient(90deg, var(--gold), var(--purple)); transition: width 1s linear; }
+.mod-link-new-code-btn { display: block; margin: 0.9rem auto 0; }
+
+/* Kompakter 3-Schritte-Ablauf (Abschnitt 10) - keine Tutorial-Blockwand, nur Orientierung. */
+.mod-link-steps { display: flex; align-items: center; justify-content: center; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem; }
+.mod-link-step { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; font-size: 0.68rem; color: var(--muted); width: 5.4rem; }
+.mod-link-step-num {
+  width: 1.4rem; height: 1.4rem; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 0.72rem; font-weight: 700; color: var(--muted); border: 1px solid var(--line);
+}
+.mod-link-pairing-card.has-code .mod-link-step-num { color: var(--gold-fixed); border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); }
+.mod-link-step-arrow { color: var(--line); font-size: 0.85rem; margin-top: -1.1rem; }
+
+/* Baustein: ConnectedModsList/ConnectedModCard (Abschnitte 11-13/15/16). */
+.mod-link-connections-list { display: grid; gap: 0.7rem; }
+.mod-link-connection-card {
+  border: 1px solid var(--line); border-radius: 14px; padding: 0.9rem 1.1rem;
+  background: color-mix(in srgb, var(--paper) 92%, transparent);
+  transition: background 0.16s ease, border-color 0.16s ease;
+}
+.mod-link-connection-card:hover { background: color-mix(in srgb, var(--paper-2) 40%, transparent); }
+.mod-link-connection-top { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.2rem; }
+.mod-link-connection-icon { font-size: 1rem; flex-shrink: 0; }
+.mod-link-connection-name { font-size: 0.95rem; color: var(--ink); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mod-link-connection-badge {
+  flex-shrink: 0; font-size: 0.68rem; font-weight: 700; padding: 0.18rem 0.55rem; border-radius: 999px;
+  color: var(--pos); background: color-mix(in srgb, var(--pos) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pos) 32%, transparent);
+}
+.mod-link-connection-sub { font-size: 0.74rem; color: var(--purple); margin: 0 0 0.4rem; font-weight: 600; }
+.mod-link-connection-meta { display: block; color: var(--muted); font-size: 0.78rem; margin-top: 0.15rem; line-height: 1.4; }
+.mod-link-disconnect-btn {
+  margin-top: 0.7rem; padding: 0.35rem 0.75rem; font-size: 0.76rem; font-weight: 600;
+  background: transparent; border: 1px solid color-mix(in srgb, var(--neg) 35%, var(--line));
+  color: var(--neg); border-radius: 999px; cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease;
+}
+.mod-link-disconnect-btn:hover { background: color-mix(in srgb, var(--neg) 12%, transparent); border-color: var(--neg); }
+.mod-link-disconnect-btn:disabled { opacity: 0.55; cursor: default; }
+
+.mod-link-empty-state {
+  text-align: center; padding: 1.6rem 1.2rem; border: 1px dashed var(--line); border-radius: 14px;
+  color: var(--muted);
+}
+.mod-link-empty-icon { display: block; font-size: 1.4rem; margin-bottom: 0.5rem; opacity: 0.6; }
+.mod-link-empty-title { font-size: 0.9rem; font-weight: 700; color: var(--ink); margin: 0 0 0.25rem; }
+.mod-link-empty-text { font-size: 0.8rem; margin: 0; line-height: 1.4; }
+
+@media (max-width: 640px) {
+  .mod-link-pairing-card.is-idle, .mod-link-pairing-card.is-error { flex-direction: column; align-items: center; text-align: center; }
+  .mod-link-pairing-card.is-idle .btn-ja, .mod-link-pairing-card.is-error .btn-ja { width: 100%; }
+  .mod-link-code-box { font-size: 1.35rem; max-width: 100%; }
+  .mod-link-copy-btn { width: 100%; }
+  .mod-link-steps { gap: 0.3rem; }
+  .mod-link-step { width: 4.6rem; }
+}
 .achievements-list {
   /* Bewusst display:flex statt display:grid: als Grid-Container INNERHALB
      eines flex:1 1 auto-Elements mit min-height:0 hat der Browser die
@@ -6238,6 +6397,9 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   color: var(--accent-ink);
   border-color: transparent;
 }
+/* Kleine Politur (Abschnitt 18) - nur ein dezentes Hover fuer inaktive Tabs,
+   keine Umgestaltung der Tab-Leiste selbst. */
+.achievements-subtab:not(.active):hover { background: var(--paper-2); color: var(--ink); }
 
 .achievement-category { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; flex-shrink: 0; }
 .achievement-category + .achievement-category { margin-top: 0.5rem; }
