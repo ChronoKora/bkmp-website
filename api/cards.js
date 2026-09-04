@@ -58,6 +58,21 @@ const SORT_OPTIONS = {
   name_desc: 'name.desc'
 };
 
+// Teleport-Tracking/Trending (05.09.2026, siehe
+// sql/20260905-card-teleport-tracking.sql) - "sort=trending_24h/_7d/_30d/_all"
+// ist KEIN normaler order-by auf card_catalog (siehe TRENDING_PERIODS unten:
+// wird VOR jeder normalen Sortierlogik abgefangen), sondern ruft stattdessen
+// die Aggregations-RPC get_trending_cards() auf und liefert deren Ergebnis
+// im EXAKT GLEICHEN Response-Umschlag ({ok,page,pageSize,total,totalPages,
+// cards}) zurueck wie eine normale Karten-Anfrage - sowohl die Website
+// (Highlight-/Trending-Bereich, js/core/bkmp-site.js) als auch die
+// Minecraft-Mod (AlbumBrowserScreen's "🔥 Trending"-Chip, ruft exakt
+// denselben Endpunkt ueber CardApiClient auf) teilen sich dadurch denselben
+// Lese-/Parse-Pfad, ohne eine zweite Antwortform einzufuehren (Auftrag
+// Abschnitt 75 - "Die Clients rechnen nicht selbst aus Rohdaten").
+const TRENDING_PERIODS = { trending_24h: '24h', trending_7d: '7d', trending_30d: '30d', trending_all: 'all' };
+const TRENDING_DEFAULT_LIMIT = 5;
+
 // Felder, ueber die "search" gleichzeitig sucht (per PostgREST or=(...)).
 const SEARCHABLE_COLUMNS = ['name', 'category', 'description', 'submitted_by', 'shop_name'];
 
@@ -128,7 +143,14 @@ function mapRow(row) {
     widthMaps: row.width_maps === null || row.width_maps === undefined ? null : Number(row.width_maps),
     heightMaps: row.height_maps === null || row.height_maps === undefined ? null : Number(row.height_maps),
     totalMaps: row.total_maps === null || row.total_maps === undefined ? null : Number(row.total_maps),
-    createdAt: row.created_at || null
+    createdAt: row.created_at || null,
+    // Additiv seit 05.09.2026 (Teleport-Tracking/Trending) - NUR vorhanden,
+    // wenn diese Zeile aus get_trending_cards() kam (siehe TRENDING_PERIODS
+    // oben), sonst immer null. Ein Momentaufnahme-Wert fuer GENAU DEN
+    // angefragten Zeitraum, nicht die immer-aktuellen 24h/7d/30d/All-Time-
+    // Werte einer einzelnen Karte (die liefert stattdessen
+    // api/card-teleport-stats.js).
+    teleportCount: row.teleport_count === null || row.teleport_count === undefined ? null : Number(row.teleport_count)
   };
 }
 
@@ -163,6 +185,48 @@ async function handleFacets(req, res) {
   }
 }
 
+// Teleport-Tracking/Trending (05.09.2026) - ruft public.get_trending_cards()
+// per PostgREST-RPC-Aufruf auf (identisches "roher fetch() mit dem
+// oeffentlichen Anon-Key" Prinzip wie handleFacets() oben), mappt jede Zeile
+// durch dieselbe mapRow() wie eine normale Karte (plus teleportCount, siehe
+// dort) und liefert denselben {ok,page,pageSize,total,totalPages,cards}-
+// Umschlag zurueck - "page=1/totalPages=1" ist hier absichtlich fest (eine
+// Trending-Liste ist ein fester Top-N-Ausschnitt, keine echte Seitenzahl-
+// Pagination, Auftrag Abschnitt 26/40).
+async function handleTrending(req, res, period) {
+  const query = req.query || {};
+  const limit = clampInt(query.limit ?? query.pageSize, TRENDING_DEFAULT_LIMIT, 1, MAX_PAGE_SIZE);
+  try {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_trending_cards`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ p_period: period, p_limit: limit })
+    });
+    if (!response.ok) {
+      const detail = await response.text().catch(() => '');
+      return send(res, 200, { ok: false, error: 'trending_unavailable', status: response.status, detail: detail.slice(0, 200), page: 1, pageSize: limit, total: 0, totalPages: 1, cards: [] });
+    }
+    const rows = await response.json();
+    const cards = (Array.isArray(rows) ? rows : []).map(mapRow);
+    return send(res, 200, { ok: true, page: 1, pageSize: limit, total: cards.length, totalPages: 1, cards });
+  } catch (error) {
+    return send(res, 200, {
+      ok: false,
+      error: 'unexpected',
+      detail: String((error && error.message) || error).slice(0, 200),
+      page: 1,
+      pageSize: limit,
+      total: 0,
+      totalPages: 1,
+      cards: []
+    });
+  }
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'GET') return send(res, 405, { ok: false, error: 'method_not_allowed' });
 
@@ -172,6 +236,15 @@ module.exports = async function handler(req, res) {
     if (query.facets === '1' || query.facets === 'true') {
       return await handleFacets(req, res);
     }
+    // Teleport-Tracking/Trending (05.09.2026): abgefangen VOR jeder
+    // normalen Sortier-/Filterlogik - siehe TRENDING_PERIODS' eigener
+    // Kommentar. Ignoriert bewusst category/shop/search/page (Auftrag
+    // Abschnitt 38: "darf Trending als eigener View umgesetzt werden" -
+    // eine Kombination mit Suche/Filtern ist fuer V1 explizit optional).
+    if (typeof query.sort === 'string' && TRENDING_PERIODS[query.sort]) {
+      return await handleTrending(req, res, TRENDING_PERIODS[query.sort]);
+    }
+
     const page = clampInt(query.page, 1, 1, MAX_PAGE);
     const pageSize = clampInt(query.limit ?? query.pageSize, DEFAULT_PAGE_SIZE, 1, MAX_PAGE_SIZE);
     const sortKey = typeof query.sort === 'string' && SORT_OPTIONS[query.sort] ? query.sort : 'newest';

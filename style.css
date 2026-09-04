@@ -4453,8 +4453,11 @@ input.cardcatalog-search:focus {
   overflow: hidden;
   box-shadow: var(--shadow-2);
   transition: transform var(--duration-base) var(--ease-out), border-color var(--duration-base) var(--ease-out);
+  /* 05.09.2026: jede Kartenkachel (normal UND Trending) ist seitdem klickbar (siehe [role="button"]/tabindex im HTML-Template) - oeffnet die neue Kartendetailansicht. */
+  cursor: pointer;
 }
 .cardcatalog-card:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); }
+.cardcatalog-card:focus-visible { outline: 2px solid var(--gold-fixed); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .cardcatalog-card { transition: none; } .cardcatalog-card:hover { transform: none; } }
 .cardcatalog-image-frame, .cardcatalog-image-empty {
   width: 100%;
@@ -4520,6 +4523,123 @@ input.cardcatalog-search:focus {
   text-align: right;
   overflow-wrap: anywhere;
 }
+
+/* ---------- Teleport-Tracking/Trending Highlight-Bereich (05.09.2026) ----------
+   Reuses .cardcatalog-card's own paper/ink palette (this section sits
+   directly INSIDE the same #panel-cardcatalog block those cards already
+   live in) rather than introducing a second design language - "passend
+   zum bestehenden Redesign" here means matching this panel's OWN already-
+   established look, not the separately-themed dark-plum components
+   elsewhere on the site (global spotlight/shard merchant etc.). */
+.cardcatalog-trending { margin: 0 0 1.5rem; }
+.cardcatalog-trending-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 0.8rem;
+}
+.cardcatalog-trending-head h3 {
+  font-family: 'Fraunces', serif;
+  font-size: 1.15rem;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.cardcatalog-trending-info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--gold) 16%, transparent);
+  color: var(--gold-fixed);
+  font-size: 0.7rem;
+  font-weight: 800;
+  cursor: help;
+}
+.cardcatalog-trending-tabs { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.cardcatalog-trending-tab {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  color: var(--muted);
+  padding: 0.32rem 0.75rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--duration-base) var(--ease-out), color var(--duration-base) var(--ease-out), border-color var(--duration-base) var(--ease-out);
+}
+.cardcatalog-trending-tab:hover { border-color: color-mix(in srgb, var(--gold) 40%, var(--line)); }
+.cardcatalog-trending-tab.active {
+  background: linear-gradient(135deg, #f5d58a, var(--gold));
+  color: var(--accent-ink);
+  border-color: transparent;
+}
+.cardcatalog-trending-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.9rem;
+}
+.cardcatalog-trending-skeleton {
+  aspect-ratio: 3 / 4;
+  border-radius: var(--mood-radius-panel, 16px);
+  background: linear-gradient(100deg, var(--paper-3) 30%, var(--paper-2) 50%, var(--paper-3) 70%);
+  background-size: 200% 100%;
+  animation: cardcatalogSkeletonShimmer 1.4s ease-in-out infinite;
+}
+@keyframes cardcatalogSkeletonShimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .cardcatalog-trending-skeleton { animation: none; } }
+.cardcatalog-trending-card { position: relative; }
+.cardcatalog-trending-rank {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 1;
+  border-radius: 999px;
+  padding: 0.22rem 0.6rem;
+  font-size: 0.66rem;
+  font-weight: 800;
+  background: color-mix(in srgb, #14101d 78%, transparent);
+  color: var(--gold-fixed);
+  backdrop-filter: blur(3px);
+}
+/* Abschnitt 70: Platz 1 etwas prominenter, weiterhin dezent (kein Neon-Leaderboard-Look). */
+.cardcatalog-trending-card.is-top { border-color: color-mix(in srgb, var(--gold) 55%, var(--line)); box-shadow: 0 0 18px color-mix(in srgb, var(--gold) 20%, transparent); }
+.cardcatalog-trending-card.is-top .cardcatalog-trending-rank { background: linear-gradient(135deg, #f5d58a, var(--gold)); color: var(--accent-ink); }
+.cardcatalog-trending-count { color: var(--gold-fixed); font-weight: 700; font-size: 0.78rem; }
+
+/* ---------- Kartendetailansicht (05.09.2026, Klick auf Highlight-/normale Kartenkachel) ---------- */
+.cardcatalog-detail-card { max-width: 460px; text-align: left; border-radius: 22px; position: relative; }
+.cardcatalog-detail-close {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.7rem;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--paper) 90%, transparent);
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.cardcatalog-detail-close:hover { color: var(--ink); border-color: color-mix(in srgb, var(--gold) 40%, var(--line)); }
+.cardcatalog-detail-image { border-radius: 14px; margin-bottom: 0.8rem; }
+.cardcatalog-detail-stats {
+  margin-top: 0.9rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--line);
+}
+.cardcatalog-detail-stats h4 { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 0 0 0.5rem; }
+.cardcatalog-detail-stats-row { display: flex; gap: 1.2rem; }
+.cardcatalog-detail-stats-row span { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.cardcatalog-detail-stats-row strong { font-size: 1.15rem; color: var(--gold-fixed); font-weight: 800; text-transform: none; letter-spacing: normal; }
+.cardcatalog-detail-stats-loading, .cardcatalog-detail-stats-empty { color: var(--muted); font-size: 0.8rem; margin: 0; }
 
 /* ---------- Investoren-Anfragen ---------- */
 .investor-request-status {

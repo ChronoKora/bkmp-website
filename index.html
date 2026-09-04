@@ -170,7 +170,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260903-modlinkredesign1">
+<link rel="stylesheet" href="style.css?v=20260905-teleporttracking1">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 <!-- Jake's Feldfahrt (07.08.2026) - eigenstaendiges Website-Easter-Egg,
      komplett getrennt vom Idle-Dorf-Spiel, siehe js/easter-eggs/jakes-
@@ -1413,6 +1413,25 @@
           <strong>Kennst du eine Karte, die hier fehlt?</strong>
           <span>Trag sie ein — Kategorie, Shop und Standort inklusive</span>
         </button>
+        <!-- Teleport-Tracking/Trending (05.09.2026, Auftrag "Teleport-Tracking
+             + Trending-/Highlight-System") - echte, aus tatsaechlichen
+             OPBK-Shop-Teleports berechnete Rangliste, siehe
+             js/core/bkmp-site.js's renderCardCatalogTrending(). Steht
+             bewusst oberhalb der normalen Kartenliste (Auftrag Abschnitt
+             25). -->
+        <div class="cardcatalog-trending" id="cardCatalogTrending">
+          <div class="cardcatalog-trending-head">
+            <h3>🔥 Gerade gefragt <span class="cardcatalog-trending-info" tabindex="0" role="button" title="Basierend auf Shop-Teleports über die OPBK-Mod.">ⓘ</span></h3>
+            <div class="cardcatalog-trending-tabs" id="cardCatalogTrendingTabs">
+              <button type="button" class="cardcatalog-trending-tab active" data-trending-period="24h">24h</button>
+              <button type="button" class="cardcatalog-trending-tab" data-trending-period="7d">7 Tage</button>
+              <button type="button" class="cardcatalog-trending-tab" data-trending-period="30d">30 Tage</button>
+              <button type="button" class="cardcatalog-trending-tab" data-trending-period="all">All-Time</button>
+            </div>
+          </div>
+          <div class="cardcatalog-trending-grid" id="cardCatalogTrendingGrid"></div>
+        </div>
+
         <div class="cardcatalog-search-wrap">
           <svg class="cardcatalog-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
           <input type="search" id="cardCatalogSearch" class="cardcatalog-search" placeholder="Suche nach Kartenname, z. B. Hunter...">
@@ -1765,6 +1784,19 @@
     </div>
   </div>
 
+  <!-- Teleport-Tracking/Trending (05.09.2026): schlanke Lese-Detailansicht
+       fuer eine Karte (Klick auf eine Highlight-Karte ODER eine normale
+       Kartenkachel) - reine Anzeige, keine Einreichung. Wiederverwendet
+       dasselbe .joke-overlay/.joke-card-Muster wie #cardCatalogOverlay
+       direkt darueber, statt eine neue Designsprache einzufuehren
+       (Auftrag Abschnitt 28/68). -->
+  <div class="joke-overlay cardcatalog-overlay" id="cardDetailOverlay">
+    <div class="joke-card cardcatalog-detail-card" id="cardDetailCard">
+      <button type="button" class="cardcatalog-detail-close" id="cardDetailClose" aria-label="Schlie&szlig;en">&times;</button>
+      <div id="cardDetailBody"></div>
+    </div>
+  </div>
+
   <div class="joke-overlay" id="cardSaleRequestOverlay">
     <div class="joke-card" id="cardSaleRequestCard">
       <div id="cardSaleRequestFormView">
@@ -1843,7 +1875,7 @@
        bkmp-idle-*.js ab, nur die REIHENFOLGE relativ zu bkmp-site.js zaehlt
        hier. -->
   <script src="js/easter-eggs/jakes-feldfahrt.js?v=20260807-jakesfeldfahrt8" defer></script>
-  <script src="js/core/bkmp-site.js?v=20260903-modlinkredesign1" defer></script>
+  <script src="js/core/bkmp-site.js?v=20260905-teleporttracking1" defer></script>
   <!-- Feedback-/Status-Board Stufe 1 (20.07.2026) - eigenstaendig, reine
        lokale Testdaten, siehe Datei-Kopf-Kommentar. -->
   <script src="js/ui/bkmp-feedback-board.js?v=20260721-stufe34" defer></script>

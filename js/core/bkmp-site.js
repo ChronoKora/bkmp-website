@@ -3838,7 +3838,7 @@
       }
 
       cardCatalogGrid.innerHTML = visible.map(item => `
-        <article class="cardcatalog-card">
+        <article class="cardcatalog-card" data-card-id="${escapeHtml(item.id || '')}" role="button" tabindex="0">
           <div class="cardcatalog-image-frame" data-bkmp-image-wrap data-empty-label="Kein Bild">
             ${item.image ? `<img data-bkmp-img src="${item.image}" alt="${escapeHtml(item.name)}" loading="lazy" decoding="async">` : '<div class="cardcatalog-image-empty">Kein Bild</div>'}
           </div>
@@ -3857,6 +3857,157 @@
       if (window.bkmpEnhanceImages) window.bkmpEnhanceImages(cardCatalogGrid);
     }
     renderCardCatalog();
+
+    /* ---------------- Teleport-Tracking/Trending (05.09.2026) ----------------
+       Echte, aus tatsaechlichen OPBK-Shop-Teleports berechnete Rangliste -
+       siehe api/cards.js's "sort=trending_*"-Sonderfall (ruft
+       public.get_trending_cards() auf, liefert denselben {cards:[...]}-
+       Umschlag wie eine normale Kartenanfrage) und
+       api/card-teleport-stats.js (Statistik EINER Karte, fuer die
+       Detailansicht unten). Client rechnet nirgends selbst aus Rohdaten
+       (Auftrag Abschnitt 75) - beide Werte kommen fertig aggregiert vom
+       Server. */
+    const cardCatalogTrendingGrid = document.getElementById('cardCatalogTrendingGrid');
+    const cardCatalogTrendingTabsEl = document.getElementById('cardCatalogTrendingTabs');
+    let activeTrendingPeriod = '24h';
+    let trendingRequestToken = 0;
+
+    function trendingPeriodLabel(period) {
+      return { '24h': 'heute', '7d': 'diese Woche', '30d': 'diese 30 Tage', all: 'insgesamt' }[period] || period;
+    }
+
+    async function renderCardCatalogTrending() {
+      if (!cardCatalogTrendingGrid) return;
+      const myToken = ++trendingRequestToken;
+      // Auftrag Abschnitt 30: dezente Skeletons statt "undefined Teleports".
+      cardCatalogTrendingGrid.innerHTML = Array.from({ length: 5 }).map(() => '<div class="cardcatalog-trending-skeleton"></div>').join('');
+      let items = [];
+      try {
+        const res = await fetch(`/api/cards?sort=trending_${activeTrendingPeriod}&limit=5`);
+        const json = await res.json();
+        if (json && json.ok && Array.isArray(json.cards)) items = json.cards;
+      } catch (e) {
+        // Netzwerkfehler -> bleibt bei items=[], zeigt unten den normalen Empty-State (Abschnitt 31), kein Fehlertext noetig.
+      }
+      if (myToken !== trendingRequestToken) return; // eine neuere Anfrage (Tab-Wechsel) ist inzwischen unterwegs - diese veraltete Antwort verwerfen
+
+      if (items.length === 0) {
+        cardCatalogTrendingGrid.innerHTML = '<p class="empty-hint">Noch keine Shop-Besuche erfasst.</p>';
+        return;
+      }
+
+      cardCatalogTrendingGrid.innerHTML = items.map((item, index) => `
+        <article class="cardcatalog-card cardcatalog-trending-card${index === 0 ? ' is-top' : ''}" data-card-id="${escapeHtml(item.id || '')}" role="button" tabindex="0">
+          ${index === 0 ? '<span class="cardcatalog-trending-rank">🔥 Aktuell meistbesucht</span>' : `<span class="cardcatalog-trending-rank">#${index + 1}</span>`}
+          <div class="cardcatalog-image-frame" data-bkmp-image-wrap data-empty-label="Kein Bild">
+            ${item.image ? `<img data-bkmp-img src="${item.image}" alt="${escapeHtml(item.name)}" loading="lazy" decoding="async">` : '<div class="cardcatalog-image-empty">Kein Bild</div>'}
+          </div>
+          <div class="cardcatalog-body">
+            ${item.category ? `<span class="cardcatalog-category">${escapeHtml(item.category)}</span>` : ''}
+            <h3>${escapeHtml(item.name)}</h3>
+            <div class="cardcatalog-trending-count">🔥 ${item.teleportCount || 0} Teleport${item.teleportCount === 1 ? '' : 's'} ${escapeHtml(trendingPeriodLabel(activeTrendingPeriod))}</div>
+          </div>
+        </article>
+      `).join('');
+      if (window.bkmpEnhanceImages) window.bkmpEnhanceImages(cardCatalogTrendingGrid);
+    }
+    renderCardCatalogTrending();
+
+    if (cardCatalogTrendingTabsEl) {
+      cardCatalogTrendingTabsEl.addEventListener('click', e => {
+        const btn = e.target.closest('[data-trending-period]');
+        if (!btn) return;
+        activeTrendingPeriod = btn.dataset.trendingPeriod;
+        cardCatalogTrendingTabsEl.querySelectorAll('[data-trending-period]').forEach(b => b.classList.toggle('active', b === btn));
+        renderCardCatalogTrending();
+      });
+    }
+
+    /* ---------------- Kartendetailansicht (Klick auf Highlight- ODER normale Kartenkachel, Auftrag Abschnitt 28/32) ---------------- */
+    const cardDetailOverlay = document.getElementById('cardDetailOverlay');
+    const cardDetailBody = document.getElementById('cardDetailBody');
+    const cardDetailClose = document.getElementById('cardDetailClose');
+
+    function closeCardDetail() {
+      if (cardDetailOverlay) cardDetailOverlay.classList.remove('visible');
+    }
+
+    async function openCardDetailById(cardId) {
+      if (!cardDetailOverlay || !cardDetailBody || !cardId) return;
+      // Aus bereits geladenen Daten suchen (normale Liste ODER die zuletzt
+      // gerenderte Trending-Kachel selbst traegt bereits alle Anzeigefelder
+      // im DOM - einfacher: einmal aus data.cardCatalog, das die normale
+      // Liste ohnehin schon vollstaendig im Speicher haelt).
+      const item = (Array.isArray(data.cardCatalog) ? data.cardCatalog : []).find(c => c.id === cardId);
+      const parts = item ? [item.shopName ? item.shopName.toUpperCase() : '', item.cb || '', item.size || ''].filter(Boolean) : [];
+      cardDetailBody.innerHTML = `
+        <div class="cardcatalog-image-frame cardcatalog-detail-image" data-bkmp-image-wrap data-empty-label="Kein Bild">
+          ${item && item.image ? `<img data-bkmp-img src="${item.image}" alt="${escapeHtml(item.name || '')}" loading="lazy" decoding="async">` : '<div class="cardcatalog-image-empty">Kein Bild</div>'}
+        </div>
+        ${item && item.category ? `<span class="cardcatalog-category">${escapeHtml(item.category)}</span>` : ''}
+        <h3>${escapeHtml(item ? item.name : 'Karte')}</h3>
+        ${parts.length ? `<div class="cardcatalog-shop">${parts.map(escapeHtml).join(' · ')}</div>` : ''}
+        ${item && item.description ? `<p>${escapeHtml(item.description)}</p>` : ''}
+        ${item && item.submittedBy ? `<div class="cardcatalog-submitter">Eingetragen von ${escapeHtml(item.submittedBy)}</div>` : ''}
+        <div class="cardcatalog-detail-stats" id="cardDetailStats">
+          <p class="cardcatalog-detail-stats-loading">Lädt Shop-Besuche…</p>
+        </div>
+      `;
+      if (window.bkmpEnhanceImages) window.bkmpEnhanceImages(cardDetailBody);
+      cardDetailOverlay.classList.add('visible');
+
+      // Auftrag Abschnitt 32: kleine Statistik ("Heute/7 Tage/Gesamt"),
+      // separat nachgeladen statt die ganze Detailansicht auf diese eine
+      // Anfrage warten zu lassen.
+      try {
+        const res = await fetch(`/api/card-teleport-stats?cardId=${encodeURIComponent(cardId)}`);
+        const stats = await res.json();
+        const statsEl = document.getElementById('cardDetailStats');
+        if (!statsEl) return; // Overlay inzwischen geschlossen/neu befuellt
+        const total = stats && stats.ok ? stats.teleportsAllTime : 0;
+        if (!stats || !stats.ok || total <= 0) {
+          // Auftrag Abschnitt 34: kein "0× meistbesucht" - entweder ehrlicher Hinweis oder ganz weglassen.
+          statsEl.innerHTML = '<p class="cardcatalog-detail-stats-empty">Noch keine Shop-Besuche erfasst.</p>';
+          return;
+        }
+        statsEl.innerHTML = `
+          <h4>Shop-Besuche</h4>
+          <div class="cardcatalog-detail-stats-row">
+            <span>Heute<strong>${stats.teleports24h}</strong></span>
+            <span>7 Tage<strong>${stats.teleports7d}</strong></span>
+            <span>Gesamt<strong>${stats.teleportsAllTime}</strong></span>
+          </div>
+        `;
+      } catch (e) {
+        const statsEl = document.getElementById('cardDetailStats');
+        if (statsEl) statsEl.innerHTML = '';
+      }
+    }
+
+    function wireCardGridClicks(gridEl) {
+      if (!gridEl) return;
+      gridEl.addEventListener('click', e => {
+        const card = e.target.closest('[data-card-id]');
+        if (!card || !card.dataset.cardId) return;
+        openCardDetailById(card.dataset.cardId);
+      });
+      gridEl.addEventListener('keydown', e => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        const card = e.target.closest('[data-card-id]');
+        if (!card || !card.dataset.cardId) return;
+        e.preventDefault();
+        openCardDetailById(card.dataset.cardId);
+      });
+    }
+    wireCardGridClicks(cardCatalogGrid);
+    wireCardGridClicks(cardCatalogTrendingGrid);
+
+    if (cardDetailClose) cardDetailClose.addEventListener('click', closeCardDetail);
+    if (cardDetailOverlay) {
+      cardDetailOverlay.addEventListener('click', e => {
+        if (e.target === cardDetailOverlay) closeCardDetail();
+      });
+    }
 
     if (cardCatalogCategoryFilterEl) {
       cardCatalogCategoryFilterEl.addEventListener('click', e => {
