@@ -34,10 +34,28 @@ const sharp = require('sharp');
 const SUPABASE_URL = 'https://zgknyrwzpohvfdweomxf.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_RuiDW15_3cI0cQZ8WlzoWg_DhGU9r6f';
 
-// Einziger erlaubter Praefix fuer Kartenbilder - deckt Hostname UND
-// Bucket UND Pfad in einem einzigen, sehr enge gefassten String-Vergleich
-// ab (siehe Modul-Kommentar oben zur Architektur-Begruendung).
-const ALLOWED_IMAGE_URL_PREFIX = 'https://zgknyrwzpohvfdweomxf.supabase.co/storage/v1/object/public/update-images/card-catalog/';
+// Erlaubte Praefixe fuer Kartenbilder - deckt Hostname UND Bucket UND
+// Pfad in einem sehr eng gefassten String-Vergleich ab (siehe Modul-
+// Kommentar oben zur Architektur-Begruendung). ZWEI Praefixe, nicht nur
+// einer (04.09.2026-Fund, live per Discord-Bot-Test entdeckt: "Bild
+// nicht erreichbar" im Mod fuer jede ueber die Mod eingereichte und
+// angenommene Karte) - approve_card_submission() (siehe
+// sql/20260902-mod-account-linking-and-submissions.sql) kopiert
+// card_submissions.image_url UNVERAENDERT nach card_catalog.image_url,
+// verschiebt die Datei selbst nie in den card-catalog/-Ordner. Jede ueber
+// die Mod eingereichte, dann angenommene Karte zeigte dadurch strukturell
+// IMMER auf .../card-submissions/..., was der bisherige Einzel-Praefix
+// (nur .../card-catalog/...) ablehnte - unabhaengig davon, ob die
+// Annahme ueber admin.html oder den lokalen Discord-Bot ausgeloest wurde
+// (beide rufen dieselbe RPC auf). create_card_submission() (dieselbe
+// SQL-Datei) erzwingt bereits serverseitig, dass eine Einreichung nur
+// unter genau diesem card-submissions/-Praefix angelegt werden kann -
+// die Erweiterung hier oeffnet also kein neues Ziel, sondern erkennt nur
+// einen bereits durch die DB selbst abgesicherten, laengst realen Pfad an.
+const ALLOWED_IMAGE_URL_PREFIXES = [
+  'https://zgknyrwzpohvfdweomxf.supabase.co/storage/v1/object/public/update-images/card-catalog/',
+  'https://zgknyrwzpohvfdweomxf.supabase.co/storage/v1/object/public/update-images/card-submissions/'
+];
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -50,7 +68,7 @@ const FETCH_TIMEOUT_MS = 10000;
 const MAX_ORIGINAL_BYTES = 15 * 1024 * 1024; // grosszuegig ueber der realen Kartengroesse (~50-300 KB), reine Missbrauchsbremse
 
 function isAllowedImageUrl(url) {
-  return typeof url === 'string' && url.startsWith(ALLOWED_IMAGE_URL_PREFIX) && !url.includes('..');
+  return typeof url === 'string' && !url.includes('..') && ALLOWED_IMAGE_URL_PREFIXES.some((prefix) => url.startsWith(prefix));
 }
 
 function sendError(res, status, message) {
@@ -169,4 +187,4 @@ module.exports = async function handler(req, res) {
   }
 };
 
-module.exports._internal = { isAllowedImageUrl, UUID_RE, SIZES, ALLOWED_IMAGE_URL_PREFIX };
+module.exports._internal = { isAllowedImageUrl, UUID_RE, SIZES, ALLOWED_IMAGE_URL_PREFIXES };
