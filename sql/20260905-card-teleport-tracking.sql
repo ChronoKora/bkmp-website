@@ -119,6 +119,15 @@ begin
 end;
 $$;
 
+-- Haertung (05.09.2026, Nachpruefung vor dem Produktiv-Lauf): Postgres
+-- vergibt EXECUTE auf eine neue Funktion standardmaessig automatisch an
+-- PUBLIC - bei "security definer" ist das ein unnoetig breiter impliziter
+-- Zugriffsweg (jede aktuelle UND jede kuenftige Rolle in dieser DB koennte
+-- sie sonst aufrufen, auch ohne einen der beiden folgenden Grants).
+-- Identisches Muster wie bereits bei _resolve_mod_token/
+-- check_and_record_rate_limit in 20260902-mod-account-linking-and-
+-- submissions.sql - hier fuer Konsistenz nachgezogen.
+revoke execute on function public.record_card_teleport(text, uuid) from public;
 -- Abschnitt 11: anonym aufrufbar (die Mod hat keine Supabase-Session,
 -- identisches Prinzip wie create_card_submission/get_my_mod_account) -
 -- die Sicherheit kommt aus dem p_raw_token-Parameter selbst.
@@ -192,6 +201,9 @@ begin
 end;
 $$;
 
+-- Haertung (05.09.2026): siehe Kommentar bei record_card_teleport oben -
+-- impliziten PUBLIC-Standardzugriff entziehen, danach gezielt freigeben.
+revoke execute on function public.get_trending_cards(text, integer) from public;
 -- Abschnitt 17: oeffentliche Trending-Abfragen geben ausschliesslich
 -- aggregierte Zahlen aus (nie "User X hat Karte Y besucht") - anon-Grant
 -- ist hier unbedenklich, weil die Funktion selbst nie einzelne Events
@@ -226,4 +238,7 @@ as $$
   where card_id = p_card_id;
 $$;
 
+-- Haertung (05.09.2026): siehe Kommentar bei record_card_teleport oben -
+-- impliziten PUBLIC-Standardzugriff entziehen, danach gezielt freigeben.
+revoke execute on function public.get_card_teleport_stats(uuid) from public;
 grant execute on function public.get_card_teleport_stats(uuid) to anon, authenticated;
