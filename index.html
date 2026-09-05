@@ -170,7 +170,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260906-modctaclip1">
+<link rel="stylesheet" href="style.css?v=20260906-modrinthprep1">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 <!-- Jake's Feldfahrt (07.08.2026) - eigenstaendiges Website-Easter-Egg,
      komplett getrennt vom Idle-Dorf-Spiel, siehe js/easter-eggs/jakes-
@@ -359,9 +359,17 @@
 
         <!-- 06.09.2026 (Nutzerwunsch: "Ich meinte den Discord Invite Link
              für die Mod auf der Website. In dem Minecraft Mod Token
-             Fenster.") - derselbe Invite wie im Mod-eigenen "Discord
-             beitreten"-Knopf (BkmpCardBrowserMod.DISCORD_INVITE_URL). -->
-        <a class="mod-link-discord-link" href="https://discord.gg/WGuDqz7x96" target="_blank" rel="noopener noreferrer">💬 Fragen zur Mod? Tritt unserem Discord bei</a>
+             Fenster.", danach: "Es soll später links Discord (Die Mod
+             kriegst du hier) und später rechts modrinth sobald die
+             Prüfung durch ist.") - zweispaltige Reihe, links Discord
+             (aktuell die einzige echte Bezugsquelle der Mod, daher der
+             Label-Text), rechts absichtlich noch LEER: der Modrinth-Link
+             wird erst ergänzt, sobald die Modrinth-Pruefung tatsaechlich
+             durch ist (kein toter/verfrueher Link vorab). -->
+        <div class="mod-link-external-links">
+          <a class="mod-link-discord-link" href="https://discord.gg/WGuDqz7x96" target="_blank" rel="noopener noreferrer">💬 Discord — hier bekommst du die Mod</a>
+          <!-- Modrinth-Link folgt hier (rechts daneben), sobald die Pruefung durch ist. -->
+        </div>
 
         <div class="mod-link-status-card" id="modLinkStatusCard"></div>
 

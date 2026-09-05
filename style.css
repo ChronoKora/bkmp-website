@@ -5796,8 +5796,18 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 .mod-link-header-sub { font-size: 0.82rem; color: var(--muted); margin: 0; line-height: 1.4; }
 .mod-link-header-hint { font-size: 0.76rem; color: var(--muted); opacity: 0.85; margin: 0 0 1.5rem; line-height: 1.4; }
 
-/* Discord-Einladung im Minecraft-Mod-Verbindungsfenster (06.09.2026) - derselbe
-   Invite wie der Mod-eigene "Discord beitreten"-Knopf. */
+/* Externe Bezugsquellen der Mod im Minecraft-Mod-Verbindungsfenster
+   (06.09.2026) - links Discord (aktuell die einzige Quelle), rechts kommt
+   spaeter Modrinth dazu (siehe Kommentar in index.html) - deshalb links-
+   buendig statt zentriert, damit ein spaeter ergaenzter zweiter Link
+   rechts danebenstehen kann statt das ganze Layout neu ausrichten zu
+   muessen. */
+.mod-link-external-links {
+  display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: flex-start;
+  gap: 0.6rem;
+  margin: 0 0 1.1rem;
+}
 .mod-link-discord-link {
   display: inline-flex; align-items: center; gap: 0.45rem;
   font-size: 0.78rem; font-weight: 600; color: var(--ink);
@@ -5806,7 +5816,6 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--purple) 40%, transparent);
   background: color-mix(in srgb, var(--purple) 12%, transparent);
-  margin: 0 0 1.1rem;
   transition: background 0.2s ease, border-color 0.2s ease;
 }
 .mod-link-discord-link:hover { background: color-mix(in srgb, var(--purple) 20%, transparent); }
