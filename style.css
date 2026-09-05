@@ -206,7 +206,14 @@ a { color: inherit; text-decoration: none; }
 .mod-cta-row {
   display: flex;
   justify-content: center;
-  margin: 0 0 1.1rem;
+  /* 06.09.2026 (Nutzer-Screenshot: Button oben leicht von der fixierten
+     Kopfleiste abgeschnitten) - .hero-banner-wraps padding-top:5.5rem
+     raeumt die fixierten Ecken-Gruppen (top:1.5rem + volle Pillenhoehe)
+     rechnerisch nur um ~6-8px frei, ein in echten Browsern (andere
+     Schriftmetriken/Zoom/Geraet als im hier verwendeten Test-Browser)
+     leicht negativ werden kann. Deutlich groesserer eigener Puffer statt
+     der knappen Reserve aus dem Banner-Padding allein. */
+  margin: 1.4rem 0 1.1rem;
 }
 .mod-cta-btn {
   display: inline-flex;
@@ -5788,6 +5795,21 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 .mod-link-header-title { font-family: 'Fraunces', serif; font-size: 1.05rem; margin: 0 0 0.15rem; color: var(--ink); }
 .mod-link-header-sub { font-size: 0.82rem; color: var(--muted); margin: 0; line-height: 1.4; }
 .mod-link-header-hint { font-size: 0.76rem; color: var(--muted); opacity: 0.85; margin: 0 0 1.5rem; line-height: 1.4; }
+
+/* Discord-Einladung im Minecraft-Mod-Verbindungsfenster (06.09.2026) - derselbe
+   Invite wie der Mod-eigene "Discord beitreten"-Knopf. */
+.mod-link-discord-link {
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  font-size: 0.78rem; font-weight: 600; color: var(--ink);
+  text-decoration: none;
+  padding: 0.5rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--purple) 40%, transparent);
+  background: color-mix(in srgb, var(--purple) 12%, transparent);
+  margin: 0 0 1.1rem;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+.mod-link-discord-link:hover { background: color-mix(in srgb, var(--purple) 20%, transparent); }
 
 .mod-link-section-label {
   font-size: 0.72rem; font-weight: 700; color: var(--muted); text-transform: uppercase;
