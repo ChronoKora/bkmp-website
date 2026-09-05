@@ -6995,6 +6995,37 @@
         }
       });
     }
+    /* Oben-mittig-Werbe-Pille fuer die Mod-Verbindung (06.09.2026) - oeffnet
+       das Erfolge-Panel direkt auf dem "Minecraft-Mod"-Tab statt erst ueber
+       das Profil-Badge -> Erfolge -> Minecraft-Mod klicken zu muessen.
+       Direkte getElementById-Manipulation statt ueber das erst weiter unten
+       deklarierte bkmpAchievementSubtabs-Array, identisches Muster wie der
+       mcNameBadge-Handler direkt darueber. */
+    const modCtaTopButton = document.getElementById('modCtaTopButton');
+    if (modCtaTopButton) {
+      modCtaTopButton.addEventListener('click', () => {
+        if (bkmpGetMcName()) {
+          bkmpTrackPanelOpen();
+          document.getElementById('achievementsSubtabAchievements').classList.remove('active');
+          document.getElementById('achievementsSubtabCosmetics').classList.remove('active');
+          document.getElementById('achievementsSubtabTitles').classList.remove('active');
+          document.getElementById('achievementsSubtabPlushies').classList.remove('active');
+          document.getElementById('achievementsSubtabModLink').classList.add('active');
+          document.getElementById('achievementsList').style.display = 'none';
+          document.getElementById('cosmeticsList').style.display = 'none';
+          document.getElementById('titlesList').style.display = 'none';
+          document.getElementById('plushiesPanel').style.display = 'none';
+          document.getElementById('modLinkPanel').style.display = '';
+          renderModLinkPanel();
+          achievementsOverlay.classList.add('visible');
+        } else {
+          mcAuthResetForm();
+          mcNameOverlay.classList.add('visible');
+          mcAuthName.focus();
+        }
+      });
+    }
+
     const mcNameSkipBtn = document.getElementById('mcNameSkip');
     if (mcNameSkipBtn) mcNameSkipBtn.addEventListener('click', () => mcNameOverlay.classList.remove('visible'));
 

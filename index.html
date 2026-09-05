@@ -170,7 +170,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260906-cardbulkdelete1">
+<link rel="stylesheet" href="style.css?v=20260906-modctatop1">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 <!-- Jake's Feldfahrt (07.08.2026) - eigenstaendiges Website-Easter-Egg,
      komplett getrennt vom Idle-Dorf-Spiel, siehe js/easter-eggs/jakes-
@@ -1187,6 +1187,27 @@
   </div>
 
   <header class="hero hero-banner-wrap">
+    <!-- 06.09.2026 (Nutzerwunsch "können wir das oben mittig an die Website
+         tackern?"): oben MITTIG platzierte Werbe-Pille fuer die OPBK-
+         Kartendatenbank-Mod-Verbindung (schon laenger im Erfolge-Panel
+         eingebaut, siehe #modLinkPanel, aber ohne diesen Button nirgends
+         direkt erreichbar). Klick oeffnet direkt den Minecraft-Mod-Tab statt
+         erst ueber Erfolge -> Minecraft-Mod klicken zu muessen, siehe
+         Klick-Handler in bkmp-site.js. Bewusst NICHT als vierte fixierte
+         Kopfzeilen-Gruppe neben .top-actions-left/.top-actions gebaut: bei
+         gemessenen ~950-1090px Fensterbreite beruehren sich die beiden
+         BESTEHENDEN Gruppen bereits gegenseitig (0px Puffer), ein dritter
+         fixierter Block in derselben Zeile waere dort garantiert kollidiert.
+         Stattdessen normaler Dokumentfluss ganz oben im Banner (das bereits
+         bestehende .hero-banner-wrap-padding-top raeumt hier zuverlaessig
+         den fixierten 96px-Kopfleisten-Balken frei) - horizontale Kollision
+         mit den fixierten Ecken-Gruppen ist dadurch bei JEDER Breite
+         strukturell ausgeschlossen, nicht nur bei den getesteten. -->
+    <div class="mod-cta-row">
+      <button class="mod-cta-btn" id="modCtaTopButton" type="button" aria-label="OPBK-Kartendatenbank-Mod mit deinem Account verbinden">
+        <span aria-hidden="true">🎮</span><span class="mod-cta-btn-label">OPBK-Kartendatenbank-Mod verbinden</span>
+      </button>
+    </div>
     <div class="streamer-strip" id="streamerStrip">
       <div class="streamer-strip-title">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h16v11l-4 4h-4l-3 3H8v-3H3V7l2-4z"/><path d="M9 8v5M15 8v5"/></svg>
@@ -1875,7 +1896,7 @@
        bkmp-idle-*.js ab, nur die REIHENFOLGE relativ zu bkmp-site.js zaehlt
        hier. -->
   <script src="js/easter-eggs/jakes-feldfahrt.js?v=20260807-jakesfeldfahrt8" defer></script>
-  <script src="js/core/bkmp-site.js?v=20260905-teleporttracking1" defer></script>
+  <script src="js/core/bkmp-site.js?v=20260906-modctatop1" defer></script>
   <!-- Feedback-/Status-Board Stufe 1 (20.07.2026) - eigenstaendig, reine
        lokale Testdaten, siehe Datei-Kopf-Kommentar. -->
   <script src="js/ui/bkmp-feedback-board.js?v=20260721-stufe34" defer></script>
