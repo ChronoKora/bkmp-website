@@ -3374,6 +3374,18 @@ label {
   background: linear-gradient(135deg, #f4d188, var(--gold));
   box-shadow: 0 12px 28px color-mix(in srgb, var(--gold) 18%, transparent);
 }
+/* 06.09.2026 - erster echter Button-Einsatz von --color-danger/-ink
+   (design-tokens.css, seit Phase 3 vorbereitet, siehe Kommentar bei
+   .chl-unread-dot weiter unten - dort nur ein kleiner Punkt, kein
+   Button). Fuer die neue Bulk-Loeschen-Aktion im Kartendatenbank-Admin
+   (Auftrag "Karten aussortieren"). */
+.btn-danger {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  color: var(--color-danger-ink);
+  font-weight: 600;
+}
+.btn-danger:hover { filter: brightness(1.08); }
 .login-card {
   max-width: 430px;
   margin-top: 12vh;
@@ -4815,6 +4827,44 @@ input.cardcatalog-search:focus {
   margin-bottom: 0.6rem;
 }
 .cardcatalog-admin-count { color: var(--muted); font-size: 0.78rem; font-weight: 400; }
+
+/* 06.09.2026 (Nutzerwunsch: "Karten aussortieren... mehrere klickbar...
+   oder alles aufräumen") - Mehrfachauswahl-Leiste + Checkbox pro Zeile,
+   reiner Aufsatz auf die bestehende Einzel-Loeschen-Aktion. */
+.cardcatalog-bulk-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 0.9rem;
+  margin-bottom: 1rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 35%, var(--line));
+  background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+}
+.cardcatalog-bulk-bar span { font-size: 0.82rem; font-weight: 700; color: var(--ink); margin-right: 0.2rem; }
+.cardcatalog-admin-select-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--muted);
+  cursor: pointer;
+}
+.cardcatalog-row-select {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--color-danger);
+}
+.partner-admin-row.is-selected {
+  background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+  border-color: color-mix(in srgb, var(--color-danger) 30%, var(--line));
+}
 .cardcatalog-edit-form {
   border: 1px solid color-mix(in srgb, var(--gold) 40%, var(--line));
   border-radius: 16px;

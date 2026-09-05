@@ -515,7 +515,7 @@
 
     var lanes = [];
     for (var i = 0; i < LANE_COUNT; i++) lanes.push(i);
-    for (var i = lanes.length - 1; i > 0; i--) {
+    for (let i = lanes.length - 1; i > 0; i--) {
       var j = Math.floor(Math.random() * (i + 1));
       var tmp = lanes[i]; lanes[i] = lanes[j]; lanes[j] = tmp;
     }
@@ -664,7 +664,7 @@
       checkCollision(e, now);
     }
 
-    for (var i = entities.length - 1; i >= 0; i--) {
+    for (let i = entities.length - 1; i >= 0; i--) {
       if (entities[i].dead) entities.splice(i, 1);
     }
 
@@ -739,8 +739,8 @@
       p.y += p.vy * (dt / 1000);
       p.vy += 6 * (dt / 1000);
     }
-    for (var i = sparkleParticles.length - 1; i >= 0; i--) {
-      var p = sparkleParticles[i];
+    for (let i = sparkleParticles.length - 1; i >= 0; i--) {
+      let p = sparkleParticles[i];
       p.life += dt;
       if (p.life >= p.maxLife) { sparkleParticles.splice(i, 1); continue; }
       p.x += p.vx * (dt / 1000);

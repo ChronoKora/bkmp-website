@@ -103,8 +103,15 @@ async function assertCoreTabButtonsVisible(page, context) {
     const rect = el.getBoundingClientRect();
     return cs.display !== 'none' && rect.width > 0 && rect.height > 0;
   });
+  // 06.09.2026 (Testfund, kein App-Bug): compactActive-Liste war veraltet -
+  // BKMP_PROTO_NAV_PRIMARY (bkmp-proto-compact-hud.js) und das damit
+  // bewusst uebereinstimmende BKMP_TAB_OVERFLOW_PRIMARY_IDS (bkmp-app-mode-
+  // bootstrap.js) fuehren seit Phase 7.0 (20.07.2026) 'kampf/upgrades/
+  // prestige/drachen' als die 4 echten Kompakt-Haupt-Tabs - 'skilltree'
+  // liegt bewusst in der Gruppe "Fortschritt" im "Mehr"-Sheet, war in der
+  // kompakten Primaer-Reihe nie erreichbar.
   const checks = compactActive
-    ? { selector: '#bkmpProtoNavPrimary [data-proto-tab]', ids: ['kampf', 'upgrades', 'skilltree', 'prestige'] }
+    ? { selector: '#bkmpProtoNavPrimary [data-proto-tab]', ids: ['kampf', 'upgrades', 'drachen', 'prestige'] }
     : { selector: null, ids: ['idleTabBtnKampf', 'idleTabBtnUpgrades', 'idleTabBtnSkilltree', 'idleTabBtnPrestige', 'idleTabBtnRunen'] };
   for (const id of checks.ids) {
     const visible = await page.evaluate(({ id: btnId, compact }) => {

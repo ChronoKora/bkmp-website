@@ -544,14 +544,39 @@ function bkmpIdlePlaySpriteAttack() {
    nach Ablauf der 0.4s-Animation wieder, damit .idle-village-sprite direkt
    danach wieder normal auf sein Inline-Skin-Style zurueckfaellt. */
 let bkmpVillagePulseRemoveTimer = null;
+let bkmpVillagePulseRemoveListener = null;
 function bkmpIdleSpawnHitFlash(targetId) {
   const el = document.getElementById(targetId);
   if (!el) return;
   bkmpIdleRestartAnimClass(el, 'idle-hit-flash');
   if (targetId === 'idleVillage') {
     bkmpIdleRestartAnimClass(el, 'idle-village-damage-pulse');
+    /* Echte Race gefunden+bewiesen (06.09.2026, per Diagnose-Test mit
+       kuenstlich verzoegertem requestAnimationFrame deterministisch
+       reproduziert): ein fixer setTimeout(420) fuer die Entfernung lief
+       bisher UNABHAENGIG vom (in bkmpIdleRestartAnimClass ueber einen
+       doppelten requestAnimationFrame verzoegerten) Hinzufuegen der Klasse -
+       verzoegert sich rAF ueber 420ms hinaus (gedrosselter/Hintergrund-Tab,
+       langsames Geraet, unter WebKit/Playwright-Testlast beobachtet), feuert
+       die Entfernung VOR der eigentlichen Zufuegung - die spaeter
+       ankommende Zufuegung ueberschreibt die Entfernung dann, ohne dass
+       je wieder aufgeraeumt wird (Klasse bleibt sichtbar fuer immer
+       haengen, bis zum naechsten Treffer). Fix: Entfernung ueber
+       animationend (kann strukturell erst NACH einem tatsaechlich
+       gestarteten Animationslauf feuern, kein Race mehr moeglich) + ein
+       grosszuegiger 2000ms-Fallback als Sicherheitsnetz, falls animationend
+       aus irgendeinem Grund nie feuert - identisches Muster wie bereits bei
+       bkmpIdleTriggerDragonSpawnAnim (Event-Trigger + Timeout-Fallback). */
+    if (bkmpVillagePulseRemoveListener) el.removeEventListener('animationend', bkmpVillagePulseRemoveListener);
     window.clearTimeout(bkmpVillagePulseRemoveTimer);
-    bkmpVillagePulseRemoveTimer = window.setTimeout(() => el.classList.remove('idle-village-damage-pulse'), 420);
+    const removePulse = () => {
+      el.classList.remove('idle-village-damage-pulse');
+      window.clearTimeout(bkmpVillagePulseRemoveTimer);
+      if (bkmpVillagePulseRemoveListener) { el.removeEventListener('animationend', bkmpVillagePulseRemoveListener); bkmpVillagePulseRemoveListener = null; }
+    };
+    bkmpVillagePulseRemoveListener = (ev) => { if (ev.animationName === 'idleVillageDamagePulse') removePulse(); };
+    el.addEventListener('animationend', bkmpVillagePulseRemoveListener);
+    bkmpVillagePulseRemoveTimer = window.setTimeout(removePulse, 2000);
     const hpFill = document.getElementById('idleVillageHpFill');
     const hpBar = hpFill ? hpFill.parentElement : null;
     if (hpBar) bkmpIdleRestartAnimClass(hpBar, 'idle-hp-bar-flash');

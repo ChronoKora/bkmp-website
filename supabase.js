@@ -3258,6 +3258,23 @@ async function deleteCardCatalogEntry(id) {
   return true;
 }
 
+/**
+ * 06.09.2026 (Nutzerwunsch: "Karten aussortieren... mehrere klickbar...
+ * oder alles aufräumen") - Bulk-Variante von deleteCardCatalogEntry() fürs
+ * neue Mehrfachauswahl-Werkzeug im Kartendatenbank-Admin: EIN Request
+ * (.in('id', ids)) statt N Einzel-Requests, damit z.B. 50 markierte
+ * Duplikate/Test-Karten nicht 50 separate Roundtrips brauchen. RLS/
+ * Berechtigungen sind identisch zu deleteCardCatalogEntry() (dieselbe
+ * Tabelle, derselbe eingeloggte Admin-Client) - kein neuer Zugriffspfad.
+ */
+async function deleteCardCatalogEntries(ids) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !Array.isArray(ids) || !ids.length) return false;
+  const { error } = await client.from('card_catalog').delete().in('id', ids);
+  if (error) throw error;
+  return true;
+}
+
 async function syncCardCatalogFromSupabase(targetData, onSynced, options = {}) {
   if (typeof loadCardCatalog !== 'function' || !bkmpGetSupabaseClient()) return false;
   try {

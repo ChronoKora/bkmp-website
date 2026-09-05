@@ -48,7 +48,19 @@ const REPO_ROOT = path.join(__dirname, '..', '..');
    instead of needing an "ignore these known 404s" allowlist in every spec. */
 const GET_API_ROUTES = {
   '/api/active-daily-event': path.join(REPO_ROOT, 'api', 'active-daily-event.js'),
-  '/api/twitch-live': path.join(REPO_ROOT, 'api', 'twitch-live.js')
+  '/api/twitch-live': path.join(REPO_ROOT, 'api', 'twitch-live.js'),
+  // 06.09.2026 (56 Idle-Dorf-Testfehlschlaege durch echte "Failed to load
+  // resource"-Konsolenfehler zurueckverfolgt, siehe CLAUDE.md) - dieselbe
+  // Begruendung wie die zwei Eintraege oben: der globale Seitenkopf
+  // (Shardhaendler/Kartendatenbank-Trending) feuert diese Aufrufe auf JEDEM
+  // Seitenaufruf, auch waehrend ein Idle-Dorf-Test im Hintergrund laeuft -
+  // ohne Mock-Route 404en sie hier lokal (der Query-String von
+  // "/api/cards?sort=trending_24h..." wird separat geparst, siehe unten,
+  // der Pfad-Schluessel bleibt deshalb ohne Query).
+  '/api/cards': path.join(REPO_ROOT, 'api', 'cards.js'),
+  '/api/card-teleport-stats': path.join(REPO_ROOT, 'api', 'card-teleport-stats.js'),
+  '/api/opsucht/merchant': path.join(REPO_ROOT, 'api', 'opsucht', 'merchant.js'),
+  '/api/opsucht/market': path.join(REPO_ROOT, 'api', 'opsucht', 'market.js')
 };
 
 const MIME_TYPES = {

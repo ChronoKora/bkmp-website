@@ -82,13 +82,27 @@ test.describe('Kampf-Feinschliff (visuell)', () => {
     await page.locator('#idleDragon').click();
     await page.waitForTimeout(250);
 
+    // 06.09.2026 (Testfund, kein App-Bug - auf mobile-large/WebKit unter
+    // Volllast in 23 von 128 Wiederholungen reproduziert, chromium-desktop/
+    // mobile-small nie betroffen): bkmpIdleRestartAnimClass()s doppelter
+    // requestAnimationFrame (siehe Commit 96861cd, 07.08.2026) braucht in
+    // echten Browsern nur 1-2 Frames - WebKit unter Playwright-Headless-Last
+    // kann rAF aber deutlich staerker verzoegern/drosseln als Chromium
+    // (bekannte, bereits fuer combat.spec.js dokumentierte WebKit-Eigenheit
+    // dieses Projekts). Ein fixer 250ms-waitForTimeout reicht dafuer nicht
+    // immer - .idle-dragon-spawn-in gepollt statt synchron nach der festen
+    // Wartezeit gelesen, alle anderen (nicht-rAF-abhaengigen) Felder bleiben
+    // unveraendert ein einmaliger Snapshot.
+    await expect.poll(() => page.evaluate(() =>
+      document.getElementById('idleDragonSprite').classList.contains('idle-dragon-spawn-in')
+    ), { timeout: 5000 }).toBe(true);
+
     const after = await page.evaluate(() => ({
       killIndex: bkmpIdleState.current_dragon_index,
       kills: bkmpIdleState.dragon_kills,
       dragonHp: bkmpIdleCurrentDragon ? bkmpIdleCurrentDragon.hp : null,
       dragonMaxHp: bkmpIdleCurrentDragon ? bkmpIdleCurrentDragon.maxHp : null,
       villageHp: bkmpIdleVillageHp,
-      spawnInClass: document.getElementById('idleDragonSprite').classList.contains('idle-dragon-spawn-in'),
       dragonElementCount: document.querySelectorAll('#idleDragon').length,
       villageElementCount: document.querySelectorAll('#idleVillage').length
     }));
@@ -104,7 +118,6 @@ test.describe('Kampf-Feinschliff (visuell)', () => {
     // Dorf-HP wurde nicht durch den toten Drachen weiter reduziert (bleibt
     // korrekt bei voller HP nach einem Sieg).
     expect(after.villageHp).toBeGreaterThan(0);
-    expect(after.spawnInClass).toBe(true);
 
     // Der neue Drache ist sofort normal angreifbar (Daten korrekt geladen).
     const dmgAfterClick = await page.evaluate(() => {
@@ -125,7 +138,17 @@ test.describe('Kampf-Feinschliff (visuell)', () => {
      diesem Bugfix eigenstaendige, benannte) Funktion deshalb direkt mit
      einem echten <video>-Element auf, dessen Netzwerkanfrage gezielt
      verzoegert wird - testet exakt denselben Produktionscode wie
-     bkmpIdleSpawnDragon(), unabhaengig von der Mock-Rotation. */
+     bkmpIdleSpawnDragon(), unabhaengig von der Mock-Rotation.
+
+     06.09.2026 Testfund (kein App-Bug, siehe CLAUDE.md "56 Idle-Dorf-
+     Testfehlschlaege"): alle 4 Tests hier hielten ihr Test-Sprite bisher
+     bewusst AUSSERHALB des DOM ("am Leben halten"). bkmpIdleRestartAnimClass()
+     (js/ui/bkmp-hud.js) prueft aber `el.isConnected`, bevor sie die Klasse
+     ueberhaupt setzt - ein echtes Drachen-Sprite ist im Spiel immer im DOM,
+     ein bewusst losgeloestes Test-Double besteht diese Pruefung nie. Alle 4
+     Tests haengen ihr Sprite jetzt (unsichtbar, off-screen) an document.body
+     an, bevor bkmpIdleTriggerDragonSpawnAnim() aufgerufen wird - reine
+     Testkorrektur, keine Aenderung an der gepruften Produktionsfunktion. */
   test.describe('REGRESSION: Gegnerwechsel-Animation wartet auf ein echtes Video-Bild statt eine leere Box zu animieren', () => {
     test('Video noch nicht geladen: Animation startet NICHT sofort, sondern erst beim ersten darstellbaren Bild (loadeddata)', async ({ page, qaBaseURL, fixtureData }) => {
       let releaseVideo;
@@ -144,7 +167,9 @@ test.describe('Kampf-Feinschliff (visuell)', () => {
         video.muted = true;
         video.src = 'assets/dragons/feuerdrache.mp4';
         sprite.appendChild(video);
-        window.__qaTestSprite = sprite; // ausserhalb des DOM, aber am Leben halten
+        sprite.style.cssText = 'position:fixed;top:-9999px;left:-9999px;';
+        document.body.appendChild(sprite); // 06.09.2026 (Testfund, kein App-Bug): bkmpIdleRestartAnimClass() setzt die Klasse nur bei el.isConnected - ein rein losgeloestes Element (wie zuvor) besteht diesen Schutz nie, ein echtes Sprite ist im Spiel aber immer im DOM.
+        window.__qaTestSprite = sprite;
         bkmpIdleTriggerDragonSpawnAnim(sprite);
         return { spawnInClass: sprite.classList.contains('idle-dragon-spawn-in'), readyState: video.readyState };
       });
@@ -161,32 +186,47 @@ test.describe('Kampf-Feinschliff (visuell)', () => {
       await openAndLogin(page, qaBaseURL, fixtureData);
       await waitForDragonReady(page);
 
-      const result = await page.evaluate(async () => {
+      const readyState = await page.evaluate(async () => {
         const sprite = document.createElement('div');
         const video = document.createElement('video');
         video.className = 'idle-dragon-sprite-video';
         video.muted = true;
         video.src = 'assets/dragons/feuerdrache.mp4';
         sprite.appendChild(video);
+        sprite.style.cssText = 'position:fixed;top:-9999px;left:-9999px;';
+        document.body.appendChild(sprite); // siehe Kommentar beim ersten Test dieser Gruppe (isConnected)
         await new Promise(resolve => { video.addEventListener('loadeddata', resolve, { once: true }); });
+        window.__qaTestSpriteLoaded = sprite;
         bkmpIdleTriggerDragonSpawnAnim(sprite);
-        return { spawnInClass: sprite.classList.contains('idle-dragon-spawn-in'), readyState: video.readyState };
+        return video.readyState;
       });
-      expect(result.readyState).toBeGreaterThanOrEqual(2);
-      expect(result.spawnInClass).toBe(true);
+      expect(readyState).toBeGreaterThanOrEqual(2);
+      // 06.09.2026 (Testfund, kein App-Bug - siehe Kommentar/Commit 96861cd
+      // vom 07.08.2026 bei bkmpIdleRestartAnimClass()): der Klassen-Neustart
+      // laeuft bewusst ueber einen doppelten requestAnimationFrame statt
+      // eines synchronen Reflows (Performance-Fix) - braucht dadurch
+      // mindestens 2 Frames, bevor die Klasse tatsaechlich gesetzt ist. Ein
+      // synchroner Check direkt im selben evaluate()-Aufruf (wie zuvor)
+      // liest immer VOR diesem Punkt, unabhaengig vom isConnected-Fix oben.
+      await expect.poll(() => page.evaluate(() => window.__qaTestSpriteLoaded.classList.contains('idle-dragon-spawn-in'))).toBe(true);
     });
 
     test('PNG-Sprite-Drache (kein <video>): Animation startet unveraendert sofort', async ({ page, qaBaseURL, fixtureData }) => {
       await openAndLogin(page, qaBaseURL, fixtureData);
       await waitForDragonReady(page);
 
-      const spawnInClass = await page.evaluate(() => {
+      await page.evaluate(() => {
         const sprite = document.createElement('div');
         sprite.classList.add('idle-sprite-erddrache'); // reine PNG-Klasse, kein <video>-Kind
+        sprite.style.cssText = 'position:fixed;top:-9999px;left:-9999px;';
+        document.body.appendChild(sprite); // siehe Kommentar beim ersten Test dieser Gruppe (isConnected)
+        window.__qaTestSpritePng = sprite;
         bkmpIdleTriggerDragonSpawnAnim(sprite);
-        return sprite.classList.contains('idle-dragon-spawn-in');
       });
-      expect(spawnInClass).toBe(true);
+      // 06.09.2026: siehe Kommentar beim vorigen Test - doppelter
+      // requestAnimationFrame braucht mindestens 2 Frames, kein synchroner
+      // Check im selben evaluate()-Aufruf moeglich.
+      await expect.poll(() => page.evaluate(() => window.__qaTestSpritePng.classList.contains('idle-dragon-spawn-in'))).toBe(true);
     });
 
     test('Fallback: feuert das loadeddata-Ereignis nie (z.B. Netzwerkfehler), startet die Animation trotzdem nach dem 600ms-Zeitfenster', async ({ page, qaBaseURL, fixtureData }) => {
@@ -203,15 +243,24 @@ test.describe('Kampf-Feinschliff (visuell)', () => {
         video.muted = true;
         video.src = 'assets/dragons/feuerdrache.mp4';
         sprite.appendChild(video);
+        sprite.style.cssText = 'position:fixed;top:-9999px;left:-9999px;';
+        document.body.appendChild(sprite); // siehe Kommentar beim ersten Test dieser Gruppe (isConnected)
         window.__qaTestSpriteFallback = sprite;
         bkmpIdleTriggerDragonSpawnAnim(sprite);
         return sprite.classList.contains('idle-dragon-spawn-in');
       });
       expect(immediatelyAfter).toBe(false); // noch nicht - Video haengt weiterhin fest
 
+      // 06.09.2026 (Testfund, kein App-Bug - siehe Kommentar beim
+      // "Gegnerwechsel"-Test oben): auf mobile-large/WebKit unter Last kann
+      // der 600ms-Fallback-Timer + die anschliessenden 2 rAF-Frames das
+      // urspruengliche 2000ms-Zeitfenster gelegentlich ueberschreiten - der
+      // Timer feuert nachweislich trotzdem zuverlaessig (siehe die anderen
+      // >80% erfolgreichen Wiederholungen), braucht auf WebKit nur mehr
+      // reale Zeit als auf Chromium.
       await expect.poll(
         () => page.evaluate(() => window.__qaTestSpriteFallback.classList.contains('idle-dragon-spawn-in')),
-        { timeout: 2000 }
+        { timeout: 8000 }
       ).toBe(true); // der 600ms-Fallback-Timer greift trotzdem
     });
   });
@@ -221,8 +270,17 @@ test.describe('Kampf-Feinschliff (visuell)', () => {
     await waitForDragonReady(page);
     await page.evaluate(() => bkmpIdleStopLoop());
 
+    await page.evaluate(() => bkmpIdleSpawnHitFlash('idleVillage'));
+    // 06.09.2026 (Testfund, kein App-Bug - siehe Kommentar/Commit 96861cd
+    // vom 07.08.2026 bei bkmpIdleRestartAnimClass()): bkmpIdleSpawnHitFlash()
+    // setzt die Klassen ueber denselben doppelten requestAnimationFrame-
+    // Neustart-Trick (bewusster Performance-Fix, kein synchroner Reflow
+    // mehr) - ein Check direkt im selben evaluate()-Aufruf wie der Trigger
+    // (wie zuvor) liest immer VOR den 2 Frames, die der Trick braucht.
+    await expect.poll(() => page.evaluate(() =>
+      document.getElementById('idleVillage').classList.contains('idle-village-damage-pulse')
+    )).toBe(true);
     const during = await page.evaluate(() => {
-      bkmpIdleSpawnHitFlash('idleVillage');
       const villageEl = document.getElementById('idleVillage');
       const sprite = villageEl.querySelector('.idle-village-sprite');
       const hpBar = document.getElementById('idleVillageHpFill').parentElement;
@@ -241,9 +299,14 @@ test.describe('Kampf-Feinschliff (visuell)', () => {
 
     // Raeumt sich nach der 0.4s-Animation selbst auf (kein dauerhaftes
     // Ueberschreiben einer echten Dorf-Skin-Ambiente-Animation).
-    await page.waitForTimeout(600);
-    const after = await page.evaluate(() => document.getElementById('idleVillage').classList.contains('idle-village-damage-pulse'));
-    expect(after).toBe(false);
+    // 06.09.2026 (Testfund, kein App-Bug - siehe Kommentar oben): der
+    // 420ms-setTimeout kann auf mobile-large/WebKit unter Last ebenfalls
+    // ueber die feste 600ms-Wartezeit hinausreichen - gepollt statt eines
+    // festen Timeouts, damit ein tatsaechlich (nur spaeter) feuerndes
+    // Aufraeumen nicht faelschlich als "raeumt nie auf" durchfaellt.
+    await expect.poll(() => page.evaluate(() =>
+      document.getElementById('idleVillage').classList.contains('idle-village-damage-pulse')
+    ), { timeout: 5000 }).toBe(false);
   });
 
   test('Trefferfeedback: animierte Dorf-Skin-Animation ueberlebt einen Treffer (kein dauerhaftes Ueberschreiben)', async ({ page, qaBaseURL, fixtureData }) => {

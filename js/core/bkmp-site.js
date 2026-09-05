@@ -1908,7 +1908,7 @@
       return { periodIncome, periodExpenses, periodNet, payout, invested, roi };
     }
     function investorDisplayName(inv) {
-      return Boolean(inv.anonymous) ? 'Anonym' : (inv.name || '');
+      return inv.anonymous ? 'Anonym' : (inv.name || '');
     }
     function investorAvatarHtml(inv) {
       const isAnonymous = Boolean(inv.anonymous);
@@ -1976,7 +1976,7 @@
     function renderActiveInvestorCard(d) {
       const { inv, periodNet, payout, invested, roi } = d;
       const invName = investorDisplayName(inv);
-      const mcName = Boolean(inv.anonymous) ? '' : (inv.minecraftName || '').trim();
+      const mcName = inv.anonymous ? '' : (inv.minecraftName || '').trim();
       const sharePercent = Number(inv.sharePercent || 0);
       const progress = investorProgress(inv);
       const progressHtml = progress ? `
@@ -2016,7 +2016,7 @@
     function renderConcludedInvestorCard(d) {
       const { inv, payout, invested } = d;
       const invName = investorDisplayName(inv);
-      const mcName = Boolean(inv.anonymous) ? '' : (inv.minecraftName || '').trim();
+      const mcName = inv.anonymous ? '' : (inv.minecraftName || '').trim();
       const sharePercent = Number(inv.sharePercent || 0);
       return `
           <div class="investor-card investor-card-concluded investor-card-compact">
@@ -6708,7 +6708,11 @@
        Regressionstest in tests/e2e/achievements.spec.js prueft seitdem,
        dass JEDE in BKMP_ACHIEVEMENTS vorkommende category auch hier
        gelistet ist. */
-    const BKMP_ACHIEVEMENT_CATEGORY_ORDER = ['Karten', 'Kartenideen', 'Zeit & Treue', 'Vielfalt', 'Bonk', 'Idle Dorf', 'Runen', 'Weltboss', 'Arena', 'Gilde', 'Drachenzucht', 'Plüshies', 'Meilensteine', 'Easter Eggs', 'Feedback', 'Sonstiges'];
+    // 06.09.2026 (per Regressionstest gefunden, siehe Kommentar oben - exakt
+    // dieselbe Bugklasse wie am 25.07.2026: "Jake's Feldfahrt" wird von
+    // echten Erfolgen als category genutzt, war aber nie hier eingetragen -
+    // die betroffenen Erfolge liessen sich dadurch im Panel nie einsehen.
+    const BKMP_ACHIEVEMENT_CATEGORY_ORDER = ['Karten', 'Kartenideen', 'Zeit & Treue', 'Vielfalt', 'Bonk', "Jake's Feldfahrt", 'Idle Dorf', 'Runen', 'Weltboss', 'Arena', 'Gilde', 'Drachenzucht', 'Plüshies', 'Meilensteine', 'Easter Eggs', 'Feedback', 'Sonstiges'];
     const bkmpAchievementCategoryOpen = {};
 
     function bkmpFormatRelativeTime(iso) {

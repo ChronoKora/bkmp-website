@@ -108,7 +108,22 @@ test.describe('QA-Modus Smoke-Test @qa-smoke', () => {
     page.on('pageerror', err => consoleErrors.push(String(err)));
     page.on('console', msg => { if (msg.type() === 'error') consoleErrors.push(msg.text()); });
     page.on('requestfailed', req => {
-      failedRequests.push(`${req.method()} ${req.url()} :: ${req.failure() && req.failure().errorText}`);
+      const url = req.url();
+      const errorText = req.failure() && req.failure().errorText;
+      // 06.09.2026 (Testfund, kein App-Bug - gleiche Ursachenklasse wie das
+      // bereits in soak.spec.js dokumentierte "reload mitten in einer
+      // laufenden Anfrage bricht sie ab"-Verhalten): der Dorf-Skins-Tab
+      // (siehe IDLE_TABS-Durchquerung unten) rendert fuer JEDEN Katalog-
+      // Skin eine Live-Vorschau-Kachel (bkmpApplyVillageSkinToElement(),
+      // 04.08.2026), die fuer Video-Skins sofort mit dem Laden beginnt.
+      // Wechselt die Schleife weiter zum naechsten Tab, BEVOR so ein
+      // Vorschau-Video fertig geladen hat, entfernt der naechste Panel-
+      // Rebuild das <video>-Element - der Browser bricht dessen noch
+      // offene Anfrage dann ganz normal mit net::ERR_ABORTED ab, kein
+      // echter Fehler. Eng gefasst nur fuer genau diesen Pfad/Fehlertyp,
+      // damit ein echter Netzwerkfehler anderswo weiterhin auffaellt.
+      if (errorText === 'net::ERR_ABORTED' && /\/assets\/village\/.*\.mp4/.test(url)) return;
+      failedRequests.push(`${req.method()} ${url} :: ${errorText}`);
     });
 
     // 1+2+3: Seite oeffnen, QA-Modus aktivieren (?qa=1), Testspielstand laden (&stand=B)

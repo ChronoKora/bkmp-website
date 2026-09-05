@@ -302,6 +302,14 @@ test.describe('Endloser Turm - Reload/Nutzertrennung/Grenzfaelle', () => {
   test('Reload waehrend eines laufenden Turmlaufs verliert die Wellen-Position, aber nicht bereits gebankte Belohnungen', async ({ page, qaBaseURL, fixtureData }) => {
     await openAndLogin(page, qaBaseURL, fixtureData);
     await waitForDragonReady(page);
+    // 06.09.2026 (Testfund, kein App-Bug - identisches, bereits mehrfach in
+    // CLAUDE.md dokumentiertes Muster wie bei prestige.spec.js/combat.spec.js):
+    // der Hintergrund-Kampf-Loop laeuft ohne diesen Stop unveraendert weiter,
+    // waehrend der Test "goldBeforeReload" als exakten, unveraenderlichen
+    // Referenzwert nimmt - ein einzelner Tick zwischen Snapshot und Reload
+    // kann Gold legitim erhoehen (Gebaeude-Trickle/ein weiterer Kill), was
+    // die Assertion faelschlich als Datenverlust-Bug erscheinen laesst.
+    await page.evaluate(() => bkmpIdleStopLoop());
     await page.locator('#idleTabBtnTurm').click();
     await page.evaluate(() => bkmpIdleRenderTurmPanel());
     await page.locator('#idleTurmStartBtn').click();
@@ -316,7 +324,18 @@ test.describe('Endloser Turm - Reload/Nutzertrennung/Grenzfaelle', () => {
 
     const after = await page.evaluate(() => ({ active: bkmpTowerActive, gold: bkmpIdleState.gold, best: bkmpIdleState.turm_highest_wave }));
     expect(after.active).toBe(false); // kein "Wellenposition ueberlebt Reload"-Mechanismus vorhanden
-    expect(after.gold).toBe(goldBeforeReload); // bereits gebankte Welle-1-Beute bleibt erhalten
+    // 06.09.2026 (Testfund, kein App-Bug - identische, bereits am 25.07.2026
+    // fuer prestige.spec.js dokumentierte und dort geloeste Ursache): der
+    // Reload laesst bkmpIdleAccrueProductionBuildings() beim Neuladen
+    // erneut ueber die tatsaechlich verstrichene WANDUHRZEIT abrechnen
+    // (Teststand A hat goldmine_level:8, produziert spuerbar) - komplett
+    // unabhaengig vom (oben bereits gestoppten) Kampf-Tick-Loop. Ein exakter
+    // Gleichheits-Check ist damit zu strikt fuer ein Idle-Spiel, das laut
+    // Design nie total stillsteht - toleriert bewusst eine kleine, aus
+    // echter Zeit resultierende Grundproduktion, waehrend ein echter
+    // Datenverlust (gold < goldBeforeReload) weiterhin zuverlaessig auffiele.
+    expect(after.gold).toBeGreaterThanOrEqual(goldBeforeReload);
+    expect(after.gold).toBeLessThan(goldBeforeReload + 50);
     expect(after.best).toBe(0); // Welle 2 wurde nie fertig gekaempft, zaehlt nicht als Rekord
   });
 

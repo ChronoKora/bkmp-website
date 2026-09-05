@@ -20,7 +20,7 @@
 <title>BKMP — Admin</title>
 
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
-<link rel="stylesheet" href="style.css?v=20260905-teleporttracking1">
+<link rel="stylesheet" href="style.css?v=20260906-cardbulkdelete1">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 </head>
 <body>
@@ -662,6 +662,18 @@
 
             <input type="text" id="cardCatalogSearch" class="cardcatalog-admin-search" placeholder="Suche nach Name, Shop, Kategorie oder Eintrager...">
 
+            <!-- 06.09.2026 (Nutzerwunsch: "Karten aussortieren... mehrere klickbar... oder alles aufräumen") -
+                 Mehrfachauswahl + Bulk-Löschen ueber alle drei Gruppen (Offen/Angenommen/Abgelehnt) hinweg,
+                 damit z.B. Duplikate/Test-Karten in einem Rutsch bereinigt werden koennen statt einzeln.
+                 Reiner Aufsatz auf die bereits bestehende Einzel-Loeschen-Funktion (removeCardCatalogEntry/
+                 deleteCardCatalogEntry) - keine neue Loeschsemantik. -->
+            <div class="cardcatalog-bulk-bar" id="cardCatalogBulkBar" style="display:none;">
+              <span id="cardCatalogBulkCount"></span>
+              <button class="btn" type="button" id="cardCatalogSelectAllVisible">Alle sichtbaren auswählen</button>
+              <button class="btn" type="button" id="cardCatalogClearSelection">Auswahl aufheben</button>
+              <button class="btn btn-danger" type="button" id="cardCatalogBulkDelete">🗑️ Ausgewählte löschen</button>
+            </div>
+
             <div class="cardcatalog-edit-form" id="cardCatalogEditForm" style="display:none;">
               <h3>Karte bearbeiten</h3>
               <div class="form-grid form-grid-3">
@@ -683,15 +695,21 @@
             </div>
 
             <div class="cardcatalog-admin-group">
-              <h3>Offene Anfragen <span class="cardcatalog-admin-count" id="cardCatalogPendingCount"></span></h3>
+              <h3>Offene Anfragen <span class="cardcatalog-admin-count" id="cardCatalogPendingCount"></span>
+                <label class="cardcatalog-admin-select-all"><input type="checkbox" data-select-all-group="pending"> Alle auswählen</label>
+              </h3>
               <div class="entry-table-wrapper"><div class="entry-list" id="cardCatalogPendingList"></div></div>
             </div>
             <div class="cardcatalog-admin-group">
-              <h3>Angenommen <span class="cardcatalog-admin-count" id="cardCatalogApprovedCount"></span></h3>
+              <h3>Angenommen <span class="cardcatalog-admin-count" id="cardCatalogApprovedCount"></span>
+                <label class="cardcatalog-admin-select-all"><input type="checkbox" data-select-all-group="approved"> Alle auswählen</label>
+              </h3>
               <div class="entry-table-wrapper"><div class="entry-list" id="cardCatalogApprovedList"></div></div>
             </div>
             <div class="cardcatalog-admin-group">
-              <h3>Abgelehnt <span class="cardcatalog-admin-count" id="cardCatalogRejectedCount"></span></h3>
+              <h3>Abgelehnt <span class="cardcatalog-admin-count" id="cardCatalogRejectedCount"></span>
+                <label class="cardcatalog-admin-select-all"><input type="checkbox" data-select-all-group="rejected"> Alle auswählen</label>
+              </h3>
               <div class="entry-table-wrapper"><div class="entry-list" id="cardCatalogRejectedList"></div></div>
             </div>
 
@@ -1191,7 +1209,7 @@
        da admin.html kein window.BKMP_QA_MODE-Gate setzt; macht nur
        bkmpGetGameNow() fuer bkmp-events.js verfuegbar (identisch Date.now()). -->
   <script src="js/core/bkmp-game-clock.js?v=20260724-qafoundation1"></script>
-  <script src="supabase.js?v=20260901-bookqty1"></script>
+  <script src="supabase.js?v=20260906-cardbulkdelete1"></script>
   <script src="app.js?v=20260901-bookqty1"></script>
   <!-- Redesign Phase 2a (17.07.): siehe index.html fuer die Begruendung der
        festen Ladereihenfolge (bkmp-idle-state.js zuerst, bkmp-idle-
@@ -1211,7 +1229,7 @@
   <script src="js/systems/bkmp-skilltree.js?v=20260717-p2bfoundation"></script>
   <script src="js/systems/bkmp-cosmetics.js?v=20260804-skinpreview2"></script>
   <script src="js/systems/bkmp-events.js?v=20260726-guildtechext1"></script>
-  <script src="js/ui/bkmp-hud.js?v=20260806-perfaudit1"></script>
+  <script src="js/ui/bkmp-hud.js?v=20260906-pulseracefix1"></script>
   <script src="js/systems/bkmp-leaderboard.js?v=20260717-p2cfoundation"></script>
   <script src="js/ui/bkmp-ui-components.js?v=20260731-guildtechtreev3"></script>
   <!-- Feedback-/Status-Board Stufe 1 (20.07.2026) - speist hier nur die
@@ -3017,6 +3035,55 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       } catch (e) { showAdminToast('Konnte nicht gespeichert werden: ' + supabaseErrorText(e), 'error'); }
     });
 
+    // 06.09.2026 (Nutzerwunsch: "Karten aussortieren... mehrere klickbar...
+    // oder alles aufräumen") - EIN gemeinsames Auswahl-Set ueber alle drei
+    // Gruppen (Offen/Angenommen/Abgelehnt) hinweg, damit z.B. Duplikate
+    // gruppenuebergreifend in einem Rutsch geloescht werden koennen. Ueberlebt
+    // renderCardCatalogList()-Neuaufbauten (Suche/Statuswechsel) bewusst,
+    // wird aber bei jedem Render um inzwischen geloeschte IDs bereinigt
+    // (siehe pruneCardCatalogSelection unten).
+    const cardCatalogSelectedIds = new Set();
+
+    function pruneCardCatalogSelection() {
+      const validIds = new Set((data.cardCatalog || []).map(i => String(i.id)));
+      for (const id of [...cardCatalogSelectedIds]) if (!validIds.has(id)) cardCatalogSelectedIds.delete(id);
+    }
+
+    function updateCardCatalogBulkBar() {
+      const bar = document.getElementById('cardCatalogBulkBar');
+      const countEl = document.getElementById('cardCatalogBulkCount');
+      if (!bar) return;
+      const n = cardCatalogSelectedIds.size;
+      bar.style.display = n > 0 ? 'flex' : 'none';
+      if (countEl) countEl.textContent = n === 1 ? '1 Karte ausgewählt' : `${n} Karten ausgewählt`;
+    }
+
+    function toggleCardCatalogSelection(id, selected) {
+      if (selected) cardCatalogSelectedIds.add(String(id)); else cardCatalogSelectedIds.delete(String(id));
+      updateCardCatalogBulkBar();
+    }
+
+    async function bulkDeleteCardCatalogEntries() {
+      const ids = [...cardCatalogSelectedIds];
+      if (!ids.length) return;
+      if (!window.confirm(`${ids.length} Karte${ids.length === 1 ? '' : 'n'} wirklich endgültig löschen? Das kann nicht rückgängig gemacht werden.`)) return;
+      if (typeof deleteCardCatalogEntries === 'function' && bkmpGetSupabaseClient()) {
+        try {
+          await deleteCardCatalogEntries(ids);
+        } catch (e) {
+          console.error('Karten konnten nicht gelöscht werden.', e);
+          showAdminToast('Karten konnten nicht gelöscht werden: ' + supabaseErrorText(e), 'error');
+          return;
+        }
+      }
+      const idSet = new Set(ids.map(String));
+      data.cardCatalog = data.cardCatalog.filter(item => !idSet.has(String(item.id)));
+      cardCatalogSelectedIds.clear();
+      bkmpSaveData(data);
+      renderAll();
+      showAdminToast(`${ids.length} Karte${ids.length === 1 ? '' : 'n'} gelöscht.`, 'success');
+    }
+
     async function removeCardCatalogEntry(id) {
       if (!window.confirm('Diese Karte wirklich endgültig löschen?')) return;
       if (typeof deleteCardCatalogEntry === 'function' && bkmpGetSupabaseClient()) {
@@ -3155,9 +3222,11 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       }
       el.innerHTML = '';
       items.forEach(item => {
+        const isSelected = cardCatalogSelectedIds.has(String(item.id));
         const row = document.createElement('div');
-        row.className = 'entry-row partner-admin-row' + (!item.isRead ? ' is-unread' : '');
+        row.className = 'entry-row partner-admin-row' + (!item.isRead ? ' is-unread' : '') + (isSelected ? ' is-selected' : '');
         row.innerHTML = `
+          <input type="checkbox" class="cardcatalog-row-select" aria-label="Karte auswählen" ${isSelected ? 'checked' : ''}>
           ${item.image ? `<span class="partner-admin-thumb-wrap" data-bkmp-image-wrap data-empty-label="Karte"><img data-bkmp-img class="partner-admin-thumb" src="${item.image}" alt="" loading="lazy" decoding="async"></span>` : '<div class="partner-admin-thumb partner-admin-thumb-empty">Karte</div>'}
           <div class="desc">
             ${!item.isRead ? '<span class="entry-row-unread-dot" aria-hidden="true"></span>' : ''}
@@ -3176,6 +3245,10 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
         if (readBtn) readBtn.addEventListener('click', () => markCardCatalogRead(item.id));
         row.querySelector('.edit-cardcatalog').addEventListener('click', () => startEditCardCatalogEntry(item.id));
         row.querySelector('.del-btn').addEventListener('click', () => removeCardCatalogEntry(item.id));
+        row.querySelector('.cardcatalog-row-select').addEventListener('change', (e) => {
+          row.classList.toggle('is-selected', e.target.checked);
+          toggleCardCatalogSelection(item.id, e.target.checked);
+        });
         el.appendChild(row);
       });
     }
@@ -3202,14 +3275,31 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       `).join('');
     }
 
+    // 06.09.2026 - je Gruppe die aktuell (nach Suche gefilterten) sichtbaren
+    // IDs, damit "Alle sichtbaren auswählen" UND die einzelnen "Alle
+    // auswählen"-Checkboxen pro Gruppe wissen, was ueberhaupt zur Auswahl
+    // steht (ohne verborgene/andere Gruppen versehentlich mitzunehmen).
+    const cardCatalogVisibleIdsByGroup = { pending: [], approved: [], rejected: [] };
+
+    function refreshCardCatalogSelectAllCheckboxes() {
+      document.querySelectorAll('[data-select-all-group]').forEach(cb => {
+        const ids = cardCatalogVisibleIdsByGroup[cb.dataset.selectAllGroup] || [];
+        cb.checked = ids.length > 0 && ids.every(id => cardCatalogSelectedIds.has(String(id)));
+      });
+    }
+
     function renderCardCatalogList() {
       renderCardCatalogCategoryChecklist();
+      pruneCardCatalogSelection();
       const query = (cardCatalogSearchInput ? cardCatalogSearchInput.value.trim().toLowerCase() : '');
       const all = (Array.isArray(data.cardCatalog) ? data.cardCatalog : []).filter(item => cardCatalogMatchesSearch(item, query));
       const byDateDesc = (a, b) => (b.createdAt || 0) - (a.createdAt || 0);
       const pending = all.filter(item => item.status === 'pending').sort(byDateDesc);
       const approved = all.filter(item => item.status !== 'pending' && item.status !== 'rejected').sort(byDateDesc);
       const rejected = all.filter(item => item.status === 'rejected').sort(byDateDesc);
+      cardCatalogVisibleIdsByGroup.pending = pending.map(i => i.id);
+      cardCatalogVisibleIdsByGroup.approved = approved.map(i => i.id);
+      cardCatalogVisibleIdsByGroup.rejected = rejected.map(i => i.id);
 
       renderCardCatalogGroup('cardCatalogPendingList', 'cardCatalogPendingCount', pending,
         () => '<button class="edit-btn confirm-btn" type="button">Freigeben</button><button class="edit-btn reject-btn" type="button">Ablehnen</button>',
@@ -3225,6 +3315,9 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       renderCardCatalogGroup('cardCatalogRejectedList', 'cardCatalogRejectedCount', rejected,
         () => '<button class="edit-btn confirm-btn" type="button">Freigeben</button>',
         (row, item) => row.querySelector('.confirm-btn').addEventListener('click', () => approveCardCatalogEntry(item.id)));
+
+      updateCardCatalogBulkBar();
+      refreshCardCatalogSelectAllCheckboxes();
     }
 
     /* Karteneinreichungen aus der Minecraft-Mod (02.09.2026). Grob am
@@ -3340,6 +3433,32 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       window.clearTimeout(bkmpCardCatalogSearchDebounce);
       bkmpCardCatalogSearchDebounce = window.setTimeout(renderCardCatalogList, 200);
     });
+
+    // 06.09.2026 (Nutzerwunsch: "Karten aussortieren... mehrere klickbar...
+    // oder alles aufräumen") - Bulk-Auswahl-Leiste + "Alle auswählen" pro
+    // Gruppe. Wird EINMAL verdrahtet (nicht bei jedem Render neu, die
+    // Checkboxen selbst liegen fest im HTML, nur ihr "checked"-Zustand
+    // wird bei jedem Render aktualisiert, siehe refreshCardCatalogSelectAllCheckboxes).
+    document.querySelectorAll('[data-select-all-group]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const ids = cardCatalogVisibleIdsByGroup[cb.dataset.selectAllGroup] || [];
+        if (cb.checked) ids.forEach(id => cardCatalogSelectedIds.add(String(id)));
+        else ids.forEach(id => cardCatalogSelectedIds.delete(String(id)));
+        renderCardCatalogList();
+      });
+    });
+    const cardCatalogSelectAllVisibleBtn = document.getElementById('cardCatalogSelectAllVisible');
+    if (cardCatalogSelectAllVisibleBtn) cardCatalogSelectAllVisibleBtn.addEventListener('click', () => {
+      Object.values(cardCatalogVisibleIdsByGroup).flat().forEach(id => cardCatalogSelectedIds.add(String(id)));
+      renderCardCatalogList();
+    });
+    const cardCatalogClearSelectionBtn = document.getElementById('cardCatalogClearSelection');
+    if (cardCatalogClearSelectionBtn) cardCatalogClearSelectionBtn.addEventListener('click', () => {
+      cardCatalogSelectedIds.clear();
+      renderCardCatalogList();
+    });
+    const cardCatalogBulkDeleteBtn = document.getElementById('cardCatalogBulkDelete');
+    if (cardCatalogBulkDeleteBtn) cardCatalogBulkDeleteBtn.addEventListener('click', bulkDeleteCardCatalogEntries);
 
     const cardCatalogMergeApplyBtn = document.getElementById('cardCatalogMergeApply');
     if (cardCatalogMergeApplyBtn) {
