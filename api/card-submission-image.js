@@ -114,7 +114,20 @@ module.exports = async function handler(req, res) {
     return send(res, 401, { error: 'invalid_token' });
   }
 
-  const rateOk = await checkRateLimit(serviceKey, 'submission_image:' + authUserId, 'submission_image', 15, 3600);
+  // 06.09.2026: war urspruenglich "15 pro Stunde" - eine ZWEITE, von
+  // create_card_submission()'s Tageslimit (siehe
+  // sql/20260906-mod-submission-daily-limit-200.sql) komplett unabhaengige
+  // Bremse. Da jede Einreichung GENAU einen Bild-Upload braucht, war dieser
+  // engere stuendliche Deckel in der Praxis die tatsaechlich bindende
+  // Grenze (ein Spieler, der mehrere Karten am Stueck einreicht - z.B.
+  // mehrere MapArt-Waende nacheinander - lief nach ~15 Stueck in dieselbe
+  // Stunde und wurde blockiert, lange bevor das eigentliche 200er-
+  // Tageslimit je erreicht wurde: Nutzer-Meldung "immernoch nur 10-20 pro
+  // Tag" trotz bereits vorbereitetem 200er-Limit). Fix: identisches
+  // Fenster/identischer Wert wie create_card_submission() - beide Limits
+  // koennen sich dadurch strukturell nie mehr gegenseitig unterlaufen,
+  // das Bild-Upload-Limit ist nie enger als das eigentliche Tageslimit.
+  const rateOk = await checkRateLimit(serviceKey, 'submission_image:' + authUserId, 'submission_image', 200, 86400);
   if (!rateOk) {
     return send(res, 429, { error: 'rate_limited' });
   }
