@@ -2376,6 +2376,25 @@
       let prankPendingPlay = false;
       const PRANK_VIDEO_ID = 'dQw4w9WgXcQ';
 
+      /* Fake-Sicherheitspruefung (06.09.2026, Nutzerauftrag "erweitern wir
+         das bereits bestehende Feature") - läuft NACH dem Ja/Nein-Dialog
+         und VOR dem obigen Rickroll-Reveal, als eigene, komplett getrennte
+         Ueberlagerung (#investorSecurityCheckOverlay). Ruft am Ende
+         AUSSCHLIESSLICH die bestehende triggerPrankReveal() (siehe unten,
+         aus dem bisherigen Inline-setTimeout-Koerper von
+         openInvestorPayoutPrank extrahiert, Verhalten unveraendert) auf -
+         kein zweiter/neuer Rickroll, keine geänderte Video-ID/URL. */
+      const investorSecurityCheckOverlay = document.getElementById('investorSecurityCheckOverlay');
+      const investorSecurityStageEl = document.getElementById('investorSecurityStage');
+      const investorSecurityStepLabelEl = document.getElementById('investorSecurityStepLabel');
+      const investorSecurityProgressFillEl = document.getElementById('investorSecurityProgressFill');
+      /* Hier laesst sich das Stufe-1-Bild jederzeit austauschen - einfach
+         einen anderen Pfad unter assets/ eintragen. */
+      const INVESTOR_SECURITY_STAGE1_IMAGE = 'assets/plushies/Opphil.png';
+      let secActive = false; // Doppel-Start-Schutz (schnelles Mehrfach-Klicken) - bleibt bis unmittelbar vor dem eigentlichen Reveal true
+      let secOnComplete = null;
+      let secTimers = []; // saemtliche setTimeout/setInterval-IDs der aktuell laufenden Stufe(n) - IMMER vor jedem Stufenwechsel/Abschluss geleert
+
       /* Nutzer-Meldung 23.08.2026 ("bis das Video laedt ist so ein 5
          Sekunden Ladezeit... kriegen wir das schon vorher geladen"): das
          iframe bekam seine src bisher erst GENAU beim Reveal (kalter Start -
@@ -2451,6 +2470,529 @@
          Funktion geht, statt sie zu ignorieren. */
       window.bkmpCloseInvestorPayoutPrank = closeInvestorPayoutPrank;
 
+      /* Aus dem urspruenglichen Inline-setTimeout-Koerper von
+         openInvestorPayoutPrank extrahiert (Verhalten 1:1 unveraendert) -
+         damit sowohl der normale Weg (nach den 7 Sicherheitsstufen) als
+         auch ein Notfall-Fallback (falls das neue Overlay aus irgendeinem
+         Grund fehlt, siehe openInvestorPayoutPrank unten) dieselbe,
+         einzige Reveal-Logik nutzen - kein zweiter Rickroll-Codepfad. */
+      function triggerPrankReveal() {
+        prankCloseAllowed = false;
+        prankCloseBtn.hidden = true;
+        prankProcessing.hidden = true;
+        prankReveal.hidden = false;
+        document.body.classList.add('modal-open');
+        investorPayoutPrankOverlay.classList.add('visible');
+        if (prankPlayer && prankPlayerReady) {
+          prankPlayer.playVideo(); // bereits geladen+bereit -> startet sofort, kein Neuladen
+        } else if (prankPlayer) {
+          prankPendingPlay = true; // Player existiert, onReady ist nur noch nicht durch - wird dort nachgeholt
+        } else {
+          // Sicherheitsnetz, falls das Vorladen aus irgendeinem Grund nie
+          // griff (z.B. YouTube-IFrame-API blockiert/nicht erreichbar) -
+          // dann eben doch der alte, etwas langsamere Kaltstart statt
+          // gar kein Video.
+          prankIframe.src = `https://www.youtube.com/embed/${PRANK_VIDEO_ID}?autoplay=1&rel=0`;
+        }
+        prankCloseUnlockTimer = setTimeout(() => {
+          prankCloseAllowed = true;
+          prankCloseBtn.hidden = false;
+        }, 10000);
+      }
+
+      /* ====================================================================
+         Fake-Sicherheitspruefung, 7 Stufen (06.09.2026) - siehe Datei-
+         kopf-Kommentar oben bei investorSecurityCheckOverlay fuer die
+         Architektur-Begruendung. Jede Stufe ist eine reine Render-Funktion
+         (baut HTML + verdrahtet ihre eigenen, stufenlokalen Listener ueber
+         Closures - keine globalen Stufen-spezifischen Variablen noetig).
+         goToSecStage() raeumt VOR jedem Wechsel saemtliche Timer der
+         vorherigen Stufe auf (clearSecTimers) - erfuellt Punkt 8 der
+         Anforderung ("alle Timer beim Unmount sauber entfernen") ohne ein
+         echtes Komponenten-Framework. ==================================== */
+
+      function clearSecTimers() {
+        secTimers.forEach(id => { clearTimeout(id); clearInterval(id); });
+        secTimers = [];
+      }
+
+      function secSetProgress(stage) {
+        investorSecurityStepLabelEl.textContent = `Schritt ${stage} von 7`;
+        investorSecurityProgressFillEl.style.width = `${Math.round(((stage - 1) / 7) * 100)}%`;
+      }
+
+      /* Kurzes Fade+Slide beim Stufenwechsel (Anforderung "schoene kleine
+         Uebergaenge") - blendet die aktuelle Stufe aus, tauscht danach den
+         Inhalt aus und blendet wieder ein. */
+      function secRenderTransition(html, setup) {
+        investorSecurityStageEl.classList.add('is-transitioning');
+        const t = setTimeout(() => {
+          investorSecurityStageEl.innerHTML = html;
+          investorSecurityStageEl.classList.remove('is-transitioning');
+          if (typeof setup === 'function') setup();
+        }, 170);
+        secTimers.push(t);
+      }
+
+      /* ---- Stufe 1: Bild drehen ---- */
+      function renderSecStage1() {
+        const startRotations = [90, 180, 270];
+        let rotation = startRotations[Math.floor(Math.random() * startRotations.length)];
+        let aligned = false;
+        const html = `
+          <h3>Identitätsprüfung 1/7</h3>
+          <p class="investor-security-lead">Bitte richte das Bild korrekt aus, um fortzufahren.</p>
+          <div class="investor-security-rotate-frame">
+            <img id="investorSecurityRotateImg" src="${INVESTOR_SECURITY_STAGE1_IMAGE}" alt="Identitätsbild" draggable="false">
+          </div>
+          <p class="investor-security-feedback" id="investorSecurityRotateFeedback" hidden></p>
+          <div class="joke-buttons investor-security-rotate-controls">
+            <button type="button" class="btn-nein" id="investorSecurityRotateLeft">↺ Links drehen</button>
+            <button type="button" class="btn-nein" id="investorSecurityRotateRight">↻ Rechts drehen</button>
+          </div>
+          <div class="joke-buttons">
+            <button type="button" class="btn-ja" id="investorSecurityRotateConfirm">Bestätigen</button>
+          </div>
+        `;
+        secRenderTransition(html, () => {
+          const img = document.getElementById('investorSecurityRotateImg');
+          const feedback = document.getElementById('investorSecurityRotateFeedback');
+          const leftBtn = document.getElementById('investorSecurityRotateLeft');
+          const rightBtn = document.getElementById('investorSecurityRotateRight');
+          const confirmBtn = document.getElementById('investorSecurityRotateConfirm');
+          img.style.transform = `rotate(${rotation}deg)`;
+          leftBtn.addEventListener('click', () => {
+            if (aligned) return;
+            rotation = (rotation - 90 + 360) % 360;
+            img.style.transform = `rotate(${rotation}deg)`;
+          });
+          rightBtn.addEventListener('click', () => {
+            if (aligned) return;
+            rotation = (rotation + 90) % 360;
+            img.style.transform = `rotate(${rotation}deg)`;
+          });
+          confirmBtn.addEventListener('click', () => {
+            if (!aligned) {
+              if (rotation !== 0) {
+                feedback.hidden = false;
+                feedback.className = 'investor-security-feedback is-error';
+                feedback.textContent = 'Das Bild ist noch nicht korrekt ausgerichtet.';
+                return;
+              }
+              aligned = true;
+              feedback.hidden = false;
+              feedback.className = 'investor-security-feedback is-success';
+              feedback.textContent = 'Bild erfolgreich ausgerichtet. Identität teilweise bestätigt.';
+              leftBtn.hidden = true;
+              rightBtn.hidden = true;
+              confirmBtn.textContent = 'Weiter';
+              return;
+            }
+            goToSecStage(2);
+          });
+        });
+      }
+
+      /* ---- Stufe 2: Button gedrueckt halten ---- */
+      function renderSecStage2() {
+        const html = `
+          <h3>Sicherheitsprüfung 2/7</h3>
+          <p class="investor-security-lead">Halte den Button gedrückt, bis die Verifizierung abgeschlossen ist.</p>
+          <div class="investor-security-progress2-track"><div class="investor-security-progress2-fill" id="investorSecurityHoldFill"></div></div>
+          <p class="investor-security-progress2-pct" id="investorSecurityHoldPct">0%</p>
+          <p class="investor-security-feedback" id="investorSecurityHoldFeedback" hidden></p>
+          <button type="button" class="btn-ja investor-security-hold-btn" id="investorSecurityHoldBtn">Zur Verifizierung gedrückt halten</button>
+        `;
+        secRenderTransition(html, () => {
+          const fill = document.getElementById('investorSecurityHoldFill');
+          const pct = document.getElementById('investorSecurityHoldPct');
+          const feedback = document.getElementById('investorSecurityHoldFeedback');
+          const btn = document.getElementById('investorSecurityHoldBtn');
+          let value = 0;
+          let phase = 1; // 1 = 0 -> ~98 (dann Ruecksprung auf 71), 2 = 71 -> 100
+          let paused = false; // waehrend der kurzen "Zusatz-Scan"-Pause
+          let pointerDown = false;
+          let completed = false;
+
+          function setValue(v) {
+            value = v;
+            fill.style.width = `${value}%`;
+            pct.textContent = `${Math.round(value)}%`;
+          }
+
+          function tick() {
+            if (completed || paused || !pointerDown) return;
+            if (phase === 1) {
+              if (value < 98) setValue(Math.min(98, value + (98 - value) * 0.16 + 1.5));
+              if (value >= 97.5) {
+                setValue(98);
+                paused = true;
+                feedback.hidden = false;
+                feedback.className = 'investor-security-feedback is-error';
+                feedback.textContent = 'Ungewöhnliche Phil-Aura erkannt. Zusätzlicher Scan erforderlich.';
+                const t = setTimeout(() => {
+                  setValue(71);
+                  phase = 2;
+                  paused = false;
+                  feedback.hidden = true;
+                }, 1100);
+                secTimers.push(t);
+              }
+            } else {
+              if (value < 100) setValue(Math.min(100, value + (100 - value) * 0.18 + 1.8));
+              if (value >= 99.5) {
+                setValue(100);
+                completed = true;
+                feedback.hidden = false;
+                feedback.className = 'investor-security-feedback is-success';
+                feedback.textContent = 'Zweitscan erfolgreich.';
+                btn.textContent = 'Weiter';
+              }
+            }
+          }
+          const intervalId = setInterval(tick, 90);
+          secTimers.push(intervalId);
+
+          function onDown(e) {
+            e.preventDefault();
+            if (completed) { goToSecStage(3); return; }
+            pointerDown = true;
+            try { btn.setPointerCapture(e.pointerId); } catch (err) { /* nicht jeder Browser unterstuetzt das - unkritisch */ }
+          }
+          function onUp() { pointerDown = false; }
+          btn.addEventListener('pointerdown', onDown);
+          ['pointerup', 'pointercancel', 'pointerleave'].forEach(evt => btn.addEventListener(evt, onUp));
+        });
+      }
+
+      /* ---- Stufe 3: Custom Sicherheitsfrage ---- */
+      function renderSecStage3() {
+        const html = `
+          <h3>Wissensprüfung 3/7</h3>
+          <p class="investor-security-lead">Bitte beantworte die Sicherheitsfrage korrekt.</p>
+          <p class="investor-security-question">Wer ist dir wichtiger? Dayman oder Lukas?</p>
+          <div class="joke-buttons investor-security-answer-row">
+            <button type="button" class="btn-ja investor-security-answer-btn" id="investorSecurityAnswerDayman">Dayman</button>
+            <button type="button" class="btn-ja investor-security-answer-btn" id="investorSecurityAnswerLukas">Lukas</button>
+          </div>
+          <p class="investor-security-feedback" id="investorSecurityAnswerFeedback" hidden></p>
+          <div class="joke-buttons" id="investorSecurityAnswerContinueWrap" hidden>
+            <button type="button" class="btn-ja" id="investorSecurityAnswerContinue">Weiter</button>
+          </div>
+        `;
+        secRenderTransition(html, () => {
+          const daymanBtn = document.getElementById('investorSecurityAnswerDayman');
+          const lukasBtn = document.getElementById('investorSecurityAnswerLukas');
+          const feedback = document.getElementById('investorSecurityAnswerFeedback');
+          const continueWrap = document.getElementById('investorSecurityAnswerContinueWrap');
+          function answer(text) {
+            daymanBtn.disabled = true;
+            lukasBtn.disabled = true;
+            feedback.hidden = false;
+            feedback.className = 'investor-security-feedback is-success';
+            feedback.textContent = text;
+            const t = setTimeout(() => {
+              feedback.textContent = `${text} Menschlichkeit weiterhin wahrscheinlich.`;
+              continueWrap.hidden = false;
+            }, 900);
+            secTimers.push(t);
+          }
+          daymanBtn.addEventListener('click', () => answer('Antwort registriert. Lukas wird darüber informiert.'));
+          lukasBtn.addEventListener('click', () => answer('Antwort registriert. Dayman wird darüber informiert.'));
+          document.getElementById('investorSecurityAnswerContinue').addEventListener('click', () => goToSecStage(4));
+        });
+      }
+
+      /* ---- Stufe 4: Vertrauens-Slider ---- */
+      function renderSecStage4() {
+        const startValue = 50;
+        const html = `
+          <h3>Vertrauensabgleich 4/7</h3>
+          <p class="investor-security-lead">Wie sehr vertraust du Kora bei dieser Auszahlung?</p>
+          <p class="investor-security-trust-value" id="investorSecurityTrustValue">Vertrauen: ${startValue}%</p>
+          <input type="range" min="0" max="100" value="${startValue}" class="investor-security-slider" id="investorSecurityTrustSlider">
+          <p class="investor-security-feedback" id="investorSecurityTrustFeedback" hidden></p>
+          <div class="joke-buttons">
+            <button type="button" class="btn-ja" id="investorSecurityTrustContinue">Weiter</button>
+          </div>
+        `;
+        secRenderTransition(html, () => {
+          const slider = document.getElementById('investorSecurityTrustSlider');
+          const valueLabel = document.getElementById('investorSecurityTrustValue');
+          const feedback = document.getElementById('investorSecurityTrustFeedback');
+          const continueBtn = document.getElementById('investorSecurityTrustContinue');
+          let locked = false;
+          slider.addEventListener('input', () => { valueLabel.textContent = `Vertrauen: ${slider.value}%`; });
+          continueBtn.addEventListener('click', () => {
+            if (locked) return;
+            if (Number(slider.value) < 100) {
+              feedback.hidden = false;
+              feedback.className = 'investor-security-feedback is-error';
+              feedback.textContent = 'Zu wenig Vertrauen. Bitte erneut bewerten.';
+              return;
+            }
+            locked = true;
+            slider.disabled = true;
+            feedback.hidden = false;
+            feedback.className = 'investor-security-feedback is-error';
+            feedback.textContent = 'Verdächtig hohe Zustimmung erkannt.';
+            const t = setTimeout(() => {
+              feedback.className = 'investor-security-feedback is-success';
+              feedback.textContent = 'Trotzdem akzeptiert.';
+              const t2 = setTimeout(() => goToSecStage(5), 900);
+              secTimers.push(t2);
+            }, 1000);
+            secTimers.push(t);
+          });
+        });
+      }
+
+      /* ---- Stufe 5: Auszahlungsvoraussetzungen (Checkboxen) ---- */
+      function renderSecStage5() {
+        const items = [
+          'Ich bin wirklich Phil',
+          'Ich bin kein Bot',
+          'Ich fordere mein Investment aus freiem Willen an',
+          'Ich akzeptiere die psychischen Nebenwirkungen dieses Auszahlungsprozesses',
+          'Ich erkenne Kora als absolut seriöse Auszahlungsinstanz an'
+        ];
+        const html = `
+          <h3>Rechtliche Bestätigung 5/7</h3>
+          <p class="investor-security-lead">Bitte bestätige alle Auszahlungsvoraussetzungen.</p>
+          <div class="investor-security-checklist">
+            ${items.map((label, i) => `
+              <label class="investor-security-check-row">
+                <input type="checkbox" class="investor-security-checkbox" data-idx="${i}">
+                <span>${escapeHtml(label)}</span>
+              </label>
+            `).join('')}
+          </div>
+          <p class="investor-security-feedback" id="investorSecurityLegalFeedback" hidden></p>
+          <div class="joke-buttons">
+            <button type="button" class="btn-ja" id="investorSecurityLegalContinue" disabled>Bedingungen akzeptieren</button>
+          </div>
+        `;
+        secRenderTransition(html, () => {
+          const boxes = Array.from(investorSecurityStageEl.querySelectorAll('.investor-security-checkbox'));
+          const continueBtn = document.getElementById('investorSecurityLegalContinue');
+          const feedback = document.getElementById('investorSecurityLegalFeedback');
+          function sync() { continueBtn.disabled = !boxes.every(b => b.checked); }
+          boxes.forEach(b => b.addEventListener('change', sync));
+          continueBtn.addEventListener('click', () => {
+            if (continueBtn.disabled) return;
+            continueBtn.disabled = true;
+            feedback.hidden = false;
+            feedback.className = 'investor-security-feedback is-success';
+            feedback.textContent = 'Rechtliche Zustimmung erfolgreich dokumentiert.';
+            const t = setTimeout(() => goToSecStage(6), 1000);
+            secTimers.push(t);
+          });
+        });
+      }
+
+      /* ---- Stufe 6: Fake-Fingerabdruckscanner ---- */
+      function renderSecStage6() {
+        const html = `
+          <h3>Biometrische Prüfung 6/7</h3>
+          <p class="investor-security-lead">Lege deinen Finger auf den Scanner und halte still.</p>
+          <button type="button" class="investor-security-fp-scanner" id="investorSecurityFpScanner" aria-label="Fingerabdruckscanner">
+            <span class="investor-security-fp-ring" id="investorSecurityFpRing">
+              <svg class="investor-security-fp-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+                <path d="M12 3c4 0 7 2.5 7 6.5 0 2-.5 3.5-1 5"/>
+                <path d="M12 3C8 3 5 5.5 5 9.5c0 4 1 7 3 9.5"/>
+                <path d="M12 6.2c2.6 0 4.6 1.7 4.6 4.6 0 2.5-.6 4.2-1.4 5.8"/>
+                <path d="M12 6.2c-2.6 0-4.6 1.7-4.6 4.6 0 3.4 1 5.7 2.6 7.6"/>
+                <path d="M12 9.4c1.3 0 2.3.9 2.3 2.4 0 1.6-.3 2.9-.9 4"/>
+                <path d="M12 9.4c-1.3 0-2.3.9-2.3 2.4 0 2.3.8 3.9 2 5.4"/>
+                <path d="M9.5 20.5c1 .6 1.9 1 2.5 1"/>
+              </svg>
+              <span class="investor-security-fp-scanline" id="investorSecurityFpScanline" hidden></span>
+            </span>
+          </button>
+          <p class="investor-security-fp-pct" id="investorSecurityFpPct">0%</p>
+          <p class="investor-security-feedback" id="investorSecurityFpFeedback" hidden></p>
+          <div class="joke-buttons" id="investorSecurityFpActionWrap" hidden>
+            <button type="button" class="btn-ja" id="investorSecurityFpAction">Erneut scannen</button>
+          </div>
+        `;
+        secRenderTransition(html, () => {
+          const scanner = document.getElementById('investorSecurityFpScanner');
+          const ring = document.getElementById('investorSecurityFpRing');
+          const scanline = document.getElementById('investorSecurityFpScanline');
+          const pctEl = document.getElementById('investorSecurityFpPct');
+          const feedback = document.getElementById('investorSecurityFpFeedback');
+          const actionWrap = document.getElementById('investorSecurityFpActionWrap');
+          const actionBtn = document.getElementById('investorSecurityFpAction');
+
+          const ATTEMPTS = [
+            { steps: [13, 39, 67, 91], success: false },
+            { steps: [22, 58, 81, 100], success: true }
+          ];
+          let attemptIndex = 0;
+          let stepIndex = 0;
+          let pointerDown = false;
+          let busy = false; // waehrend der Erfolg-/Fehlschlag-Meldungen ablaufen
+
+          function setPct(v) {
+            pctEl.textContent = `${v}%`;
+            ring.style.setProperty('--fp-pct', v);
+          }
+          setPct(0);
+
+          function stepTick() {
+            if (busy || !pointerDown) return;
+            const attempt = ATTEMPTS[attemptIndex];
+            if (stepIndex >= attempt.steps.length) return;
+            setPct(attempt.steps[stepIndex]);
+            stepIndex++;
+            if (stepIndex >= attempt.steps.length) {
+              busy = true;
+              scanline.hidden = true;
+              if (attempt.success) {
+                const t = setTimeout(() => {
+                  feedback.hidden = false;
+                  feedback.className = 'investor-security-feedback is-success';
+                  feedback.textContent = 'Biometrische Signatur erfolgreich erkannt.';
+                  actionBtn.textContent = 'Weiter zur Endprüfung';
+                  actionWrap.hidden = false;
+                }, 500);
+                secTimers.push(t);
+              } else {
+                const t1 = setTimeout(() => {
+                  feedback.hidden = false;
+                  feedback.className = 'investor-security-feedback is-error';
+                  feedback.textContent = 'Scan fehlgeschlagen.';
+                  const t2 = setTimeout(() => {
+                    feedback.textContent = 'Finger zu philartig.';
+                    actionBtn.textContent = 'Erneut scannen';
+                    actionWrap.hidden = false;
+                  }, 700);
+                  secTimers.push(t2);
+                }, 500);
+                secTimers.push(t1);
+              }
+            }
+          }
+          const intervalId = setInterval(stepTick, 420);
+          secTimers.push(intervalId);
+
+          function onDown(e) {
+            e.preventDefault();
+            if (busy) return;
+            pointerDown = true;
+            scanline.hidden = false;
+            try { scanner.setPointerCapture(e.pointerId); } catch (err) { /* unkritisch */ }
+          }
+          function onUp() { pointerDown = false; scanline.hidden = true; }
+          scanner.addEventListener('pointerdown', onDown);
+          ['pointerup', 'pointercancel', 'pointerleave'].forEach(evt => scanner.addEventListener(evt, onUp));
+
+          actionBtn.addEventListener('click', () => {
+            if (attemptIndex === 0) {
+              attemptIndex = 1;
+              stepIndex = 0;
+              busy = false;
+              setPct(0);
+              feedback.hidden = true;
+              actionWrap.hidden = true;
+            } else {
+              goToSecStage(7);
+            }
+          });
+        });
+      }
+
+      /* ---- Stufe 7: Fake Auszahlung wird bearbeitet -> bestehender Rickroll ---- */
+      function renderSecStage7() {
+        const messages = [
+          'Bankverbindung wird überprüft…',
+          'Investmenthistorie wird geladen…',
+          'Meme-Schutz wird initialisiert…',
+          'Phil-Authentizität wird final geprüft…',
+          'Kontostand wird gezählt…',
+          'Serverhamster wird motiviert…',
+          'Sicherheitsstufe erhöht…',
+          'Auszahlungspaket wird freigegeben…',
+          'Letzte Verbindung wird hergestellt…',
+          'Videomodul wird geladen…'
+        ];
+        const html = `
+          <h3>Auszahlung wird vorbereitet 7/7</h3>
+          <div class="investor-payout-prank-spinner" aria-hidden="true"></div>
+          <p class="investor-security-stage7-headline">Bitte warten. Auszahlung wird bearbeitet…</p>
+          <div class="investor-security-stage7-track"><div class="investor-security-stage7-fill" id="investorSecurityStage7Fill"></div></div>
+          <ul class="investor-security-stage7-log" id="investorSecurityStage7Log"></ul>
+        `;
+        secRenderTransition(html, () => {
+          const fill = document.getElementById('investorSecurityStage7Fill');
+          const log = document.getElementById('investorSecurityStage7Log');
+          let i = 0;
+          function playNext() {
+            if (i >= messages.length) {
+              const t = setTimeout(() => finishInvestorSecurityCheck(), 500);
+              secTimers.push(t);
+              return;
+            }
+            const prevCurrent = log.querySelector('.is-current');
+            if (prevCurrent) { prevCurrent.classList.remove('is-current'); prevCurrent.classList.add('is-done'); }
+            const li = document.createElement('li');
+            li.className = 'is-current';
+            li.textContent = messages[i];
+            log.appendChild(li);
+            log.scrollTop = log.scrollHeight;
+            i++;
+            fill.style.width = `${Math.round((i / messages.length) * 100)}%`;
+            const delay = i >= messages.length ? 480 : 560 + Math.random() * 260;
+            const t = setTimeout(playNext, delay);
+            secTimers.push(t);
+          }
+          const startTimer = setTimeout(playNext, 300);
+          secTimers.push(startTimer);
+        });
+      }
+
+      const SEC_STAGE_RENDERERS = {
+        1: renderSecStage1, 2: renderSecStage2, 3: renderSecStage3, 4: renderSecStage4,
+        5: renderSecStage5, 6: renderSecStage6, 7: renderSecStage7
+      };
+
+      function goToSecStage(stage) {
+        clearSecTimers();
+        secSetProgress(stage);
+        const renderer = SEC_STAGE_RENDERERS[stage];
+        if (renderer) renderer();
+      }
+
+      /* Startet die 7-stufige Pruefung - Doppel-Start-Schutz (Punkt 10 der
+         Anforderung) über secActive, bleibt bis UNMITTELBAR vor dem
+         eigentlichen Reveal-Aufruf true (nicht schon beim Schliessen dieses
+         Overlays), damit ein sehr schnelles zweites Klicken genau in der
+         kurzen Ausblend-Pause danach ebenfalls sicher ignoriert wird. */
+      function startInvestorSecurityCheck(name, amountLabel, onComplete) {
+        if (secActive) return;
+        secActive = true;
+        secOnComplete = onComplete;
+        document.body.classList.add('modal-open');
+        investorSecurityCheckOverlay.classList.add('visible');
+        goToSecStage(1);
+      }
+
+      function finishInvestorSecurityCheck() {
+        clearSecTimers();
+        investorSecurityCheckOverlay.classList.remove('visible');
+        document.body.classList.remove('modal-open');
+        const onComplete = secOnComplete;
+        secOnComplete = null;
+        // Kurze Pause auf dunklem Grund fuer einen sauberen Uebergang zum
+        // bestehenden Rickroll-Overlay, das direkt danach selbst wieder
+        // "modal-open" setzt - bewusst NICHT in secTimers verfolgt (die
+        // Liste ist gerade geleert worden), aber unkritisch kurzlebig.
+        setTimeout(() => {
+          secActive = false;
+          if (typeof onComplete === 'function') onComplete();
+        }, 220);
+      }
+
       async function openInvestorPayoutPrank(name, amountLabel) {
         preloadInvestorPayoutPrankVideo(); // startet sofort, laeuft waehrend der Ja/Nein-Entscheidung im Hintergrund weiter
         const ok = await bkmpConfirmDialog(
@@ -2460,31 +3002,15 @@
           'Abbrechen'
         );
         if (!ok) return;
-        prankCloseAllowed = false;
-        prankCloseBtn.hidden = true;
-        prankProcessing.hidden = false;
-        prankReveal.hidden = true;
-        document.body.classList.add('modal-open');
-        investorPayoutPrankOverlay.classList.add('visible');
-        prankRevealTimer = setTimeout(() => {
-          prankProcessing.hidden = true;
-          prankReveal.hidden = false;
-          if (prankPlayer && prankPlayerReady) {
-            prankPlayer.playVideo(); // bereits geladen+bereit -> startet sofort, kein Neuladen
-          } else if (prankPlayer) {
-            prankPendingPlay = true; // Player existiert, onReady ist nur noch nicht durch - wird dort nachgeholt
-          } else {
-            // Sicherheitsnetz, falls das Vorladen aus irgendeinem Grund nie
-            // griff (z.B. YouTube-IFrame-API blockiert/nicht erreichbar) -
-            // dann eben doch der alte, etwas langsamere Kaltstart statt
-            // gar kein Video.
-            prankIframe.src = `https://www.youtube.com/embed/${PRANK_VIDEO_ID}?autoplay=1&rel=0`;
-          }
-          prankCloseUnlockTimer = setTimeout(() => {
-            prankCloseAllowed = true;
-            prankCloseBtn.hidden = false;
-          }, 10000);
-        }, 1400);
+        if (investorSecurityCheckOverlay) {
+          startInvestorSecurityCheck(name, amountLabel, triggerPrankReveal);
+        } else {
+          // Notfall-Fallback, falls das neue Overlay aus irgendeinem Grund
+          // fehlt (z.B. noch nicht ausgeliefertes HTML) - direkt der alte,
+          // unveraenderte Rickroll, damit der Knopf nie komplett ins Leere
+          // laeuft.
+          triggerPrankReveal();
+        }
       }
 
       investorGridEl.addEventListener('click', e => {
@@ -7615,7 +8141,13 @@
          selbst und ist ein No-op, solange sie noch aktiv ist. */
       investorPayoutPrankOverlay: () => {
         if (typeof window.bkmpCloseInvestorPayoutPrank === 'function') window.bkmpCloseInvestorPayoutPrank();
-      }
+      },
+      /* Fake-Sicherheitspruefung (06.09.2026): bewusster No-op - "der
+         Nutzer darf nicht einfach auf eine spaetere Stufe springen" gilt
+         auch fuer ESC, das den generischen Sweep sonst die "visible"-
+         Klasse einfach entfernen wuerde (Overlay verschwaende mitten in
+         der Sequenz, laufende Timer blieben unbereinigt haengen). */
+      investorSecurityCheckOverlay: () => {}
     };
     document.addEventListener('keydown', e => {
       if (e.key !== 'Escape') return;

@@ -170,7 +170,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20260906-modrinthprep1">
+<link rel="stylesheet" href="style.css?v=20260906-investorsecuritycheck1">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 <!-- Jake's Feldfahrt (07.08.2026) - eigenstaendiges Website-Easter-Egg,
      komplett getrennt vom Idle-Dorf-Spiel, siehe js/easter-eggs/jakes-
@@ -485,6 +485,24 @@
           <button class="btn-ja" id="investorPayoutPrankCloseBtn" type="button">Schließen</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Investoren-Auszahlung: Fake-Sicherheitspruefung (7 Stufen, 06.09.2026)
+       - laeuft NACH dem Ja/Nein-Dialog und VOR dem bereits bestehenden
+       Rickroll-Reveal (investorPayoutPrankOverlay oben) - triggert am Ende
+       ausschliesslich die bestehende triggerPrankReveal(), kein zweiter/
+       neuer Rickroll. Siehe startInvestorSecurityCheck() in bkmp-site.js. -->
+  <div class="joke-overlay" id="investorSecurityCheckOverlay">
+    <div class="joke-card investor-security-card">
+      <div class="investor-security-header">
+        <div class="investor-security-eyebrow">Sicherheitsprüfung</div>
+        <div class="investor-security-step" id="investorSecurityStepLabel">Schritt 1 von 7</div>
+        <div class="investor-security-progress-track">
+          <div class="investor-security-progress-fill" id="investorSecurityProgressFill" style="width:0%"></div>
+        </div>
+      </div>
+      <div class="investor-security-stage" id="investorSecurityStage"></div>
     </div>
   </div>
 
@@ -1910,7 +1928,7 @@
        bkmp-idle-*.js ab, nur die REIHENFOLGE relativ zu bkmp-site.js zaehlt
        hier. -->
   <script src="js/easter-eggs/jakes-feldfahrt.js?v=20260807-jakesfeldfahrt8" defer></script>
-  <script src="js/core/bkmp-site.js?v=20260906-modctatop1" defer></script>
+  <script src="js/core/bkmp-site.js?v=20260906-investorsecuritycheck1" defer></script>
   <!-- Feedback-/Status-Board Stufe 1 (20.07.2026) - eigenstaendig, reine
        lokale Testdaten, siehe Datei-Kopf-Kommentar. -->
   <script src="js/ui/bkmp-feedback-board.js?v=20260721-stufe34" defer></script>

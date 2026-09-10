@@ -4787,6 +4787,133 @@ input.cardcatalog-search:focus {
 }
 .investor-payout-prank-video-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 
+/* ---------- Investoren-Auszahlung: Fake-Sicherheitspruefung (7 Stufen,
+   06.09.2026) - eigene, getrennte Ueberlagerung VOR dem bestehenden
+   investor-payout-prank-Rickroll oben, ersetzt/dupliziert ihn nicht
+   (siehe startInvestorSecurityCheck()/triggerPrankReveal() in
+   bkmp-site.js). Bewusst auf den bereits etablierten Tokens (--purple,
+   --gold-fixed, --paper, --line, --pos, --neg) statt einer neuen Palette.
+   ACHTUNG bei kuenftigen Aenderungen an diesem Block: niemals Stern
+   direkt gefolgt von Schraegstrich als Kurzschreibweise in einem
+   Kommentar verwenden (schliesst den Kommentar hier vorzeitig, bereits
+   mehrfach in diesem Projekt als echter Bug aufgetreten, siehe
+   CLAUDE.md) - immer ausschreiben statt abkuerzen. */
+.investor-security-card { width: 100%; max-width: min(480px, 92vw); text-align: center; padding: 1.9rem 1.8rem 1.7rem; }
+.investor-security-header { margin-bottom: 1.1rem; }
+.investor-security-eyebrow { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: var(--purple); margin-bottom: 0.3rem; }
+.investor-security-step { font-size: 0.78rem; color: var(--muted); margin-bottom: 0.55rem; }
+.investor-security-progress-track { height: 6px; border-radius: 999px; background: color-mix(in srgb, var(--purple) 14%, var(--line)); overflow: hidden; }
+.investor-security-progress-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, color-mix(in srgb, var(--purple) 70%, white), var(--purple)); transition: width 0.35s var(--ease-out, ease); }
+
+/* Weicher Uebergang zwischen den Stufen (Fade+leichtes Slide) -
+   .is-transitioning wird kurz VOR dem Inhalts-Austausch gesetzt, direkt
+   danach wieder entfernt, siehe secRenderTransition() in bkmp-site.js. */
+.investor-security-stage { transition: opacity 0.18s ease, transform 0.18s ease; opacity: 1; transform: translateY(0); }
+.investor-security-stage.is-transitioning { opacity: 0; transform: translateY(6px); }
+.investor-security-stage h3 { font-family: 'Fraunces', serif; font-size: 1.2rem; margin: 0 0 0.6rem; }
+/* Eigene Klasse statt eines generischen "> p"-Selektors: eine gemeinsame
+   Regel fuer JEDEN direkten Absatz haette staerkere Spezifitaet als die
+   gezielten Ein-Klassen-Ueberschreibungen weiter unten (.investor-security-
+   question/-trust-value/-stage7-headline) und wuerde sie stumm ausser
+   Kraft setzen - identische Spezifitaets-Falle wie an mehreren anderen
+   Stellen dieses Projekts bereits dokumentiert (siehe CLAUDE.md). */
+.investor-security-lead { font-size: 0.92rem; color: var(--muted); margin: 0 0 1.1rem; }
+
+.investor-security-feedback { font-size: 0.86rem; font-weight: 600; margin: 0.7rem 0; padding: 0.5rem 0.8rem; border-radius: 10px; }
+.investor-security-feedback.is-error { color: var(--neg); background: color-mix(in srgb, var(--neg) 14%, transparent); }
+.investor-security-feedback.is-success { color: var(--pos); background: color-mix(in srgb, var(--pos) 14%, transparent); }
+
+/* [hidden] muss hier explizit erzwungen werden - .joke-buttons' eigene
+   "display:flex"-Regel (Autor-Styles) schlaegt sonst die UA-Standardregel
+   [hidden]{display:none} und die beiden "Weiter"-Wrapper waeren trotz
+   hidden-Attribut immer sichtbar (identischer, bereits einmal in diesem
+   Projekt gefundener Bug, siehe .fbb-card-body[hidden] weiter unten in
+   dieser Datei - hier selbst beim eigenen Testen live gefunden+gefixt,
+   nicht blind uebernommen). */
+#investorSecurityAnswerContinueWrap[hidden],
+#investorSecurityFpActionWrap[hidden] { display: none; }
+
+/* Stufe 1 - Bild drehen. Bild-Asset: siehe INVESTOR_SECURITY_STAGE1_IMAGE
+   in bkmp-site.js - dort einfach austauschen. */
+.investor-security-rotate-frame {
+  width: 148px; height: 148px; margin: 0 auto 1rem;
+  border-radius: 16px; overflow: hidden;
+  background: var(--paper); border: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: center;
+}
+.investor-security-rotate-frame img { width: 82%; height: 82%; object-fit: contain; transition: transform 0.3s ease; user-select: none; -webkit-user-drag: none; }
+.investor-security-rotate-controls { margin-bottom: 0.8rem; }
+
+/* Stufe 2 - Button gedrueckt halten */
+.investor-security-progress2-track { height: 14px; border-radius: 999px; background: color-mix(in srgb, var(--purple) 12%, var(--line)); overflow: hidden; margin-bottom: 0.4rem; }
+.investor-security-progress2-fill { height: 100%; width: 0%; border-radius: 999px; background: linear-gradient(90deg, color-mix(in srgb, var(--purple) 70%, white), var(--purple)); }
+.investor-security-progress2-pct { font-weight: 700; color: var(--gold-fixed); margin: 0 0 0.8rem; }
+.investor-security-hold-btn { width: 100%; padding: 1rem; font-size: 0.95rem; touch-action: none; user-select: none; }
+
+/* Stufe 3 - Sicherheitsfrage */
+.investor-security-question { font-weight: 600; font-size: 1rem; color: var(--ink); margin: 0 0 1rem; }
+.investor-security-answer-row { margin-bottom: 0.6rem; }
+.investor-security-answer-btn { min-width: 110px; }
+.investor-security-answer-btn:disabled { opacity: 0.6; cursor: default; transform: none; }
+
+/* Stufe 4 - Vertrauens-Slider */
+.investor-security-trust-value { font-family: 'Fraunces', serif; font-size: 1.4rem; color: var(--gold-fixed); margin: 0 0 0.9rem; }
+.investor-security-slider {
+  width: 100%; margin: 0 0 0.8rem; appearance: none; -webkit-appearance: none;
+  height: 6px; border-radius: 999px; background: color-mix(in srgb, var(--purple) 16%, var(--line)); outline: none;
+}
+.investor-security-slider::-webkit-slider-thumb {
+  appearance: none; -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--purple); border: 2px solid var(--paper-2); box-shadow: 0 2px 8px color-mix(in srgb, var(--purple) 50%, transparent);
+  cursor: pointer;
+}
+.investor-security-slider::-moz-range-thumb {
+  width: 20px; height: 20px; border-radius: 50%; background: var(--purple); border: 2px solid var(--paper-2);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--purple) 50%, transparent); cursor: pointer;
+}
+
+/* Stufe 5 - Checkboxen (keine Tricks: bleiben an Ort und Stelle) */
+.investor-security-checklist { display: flex; flex-direction: column; gap: 0.6rem; text-align: left; margin: 0 0 0.6rem; }
+.investor-security-check-row { display: flex; align-items: flex-start; gap: 0.6rem; font-size: 0.86rem; cursor: pointer; }
+.investor-security-check-row input { margin-top: 0.2rem; width: 16px; height: 16px; accent-color: var(--purple); flex-shrink: 0; cursor: pointer; }
+
+/* Stufe 6 - Fake-Fingerabdruckscanner */
+.investor-security-fp-scanner { background: none; border: none; padding: 0; cursor: pointer; display: block; margin: 0 auto; touch-action: none; }
+.investor-security-fp-ring {
+  position: relative; width: 128px; height: 128px; margin: 0 auto;
+  border-radius: 50%;
+  background: conic-gradient(var(--purple) calc(var(--fp-pct, 0) * 1%), color-mix(in srgb, var(--line) 65%, transparent) 0);
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.1s linear;
+}
+.investor-security-fp-ring::before { content: ''; position: absolute; inset: 9px; border-radius: 50%; background: var(--paper-2); }
+.investor-security-fp-icon { position: relative; z-index: 1; width: 50px; height: 50px; color: var(--gold-fixed); }
+.investor-security-fp-scanline {
+  position: absolute; left: 14px; right: 14px; top: 18px; height: 2px; z-index: 2;
+  background: linear-gradient(90deg, transparent, var(--purple), transparent);
+  animation: investorSecurityFpScan 1.3s ease-in-out infinite;
+}
+@keyframes investorSecurityFpScan { 0%, 100% { top: 18px; } 50% { top: calc(100% - 20px); } }
+.investor-security-fp-pct { font-weight: 700; color: var(--gold-fixed); margin: 0.7rem 0 0.3rem; }
+
+/* Stufe 7 - bewusst wieder "seriöser": echter Wiedereinsatz des bereits
+   bestehenden Rickroll-Spinners (.investor-payout-prank-spinner). */
+.investor-security-stage7-headline { color: var(--ink); font-weight: 600; margin: 0 0 1rem; }
+.investor-security-stage7-track { height: 8px; border-radius: 999px; background: color-mix(in srgb, var(--purple) 14%, var(--line)); overflow: hidden; margin-bottom: 1rem; }
+.investor-security-stage7-fill { height: 100%; width: 0%; border-radius: 999px; background: linear-gradient(90deg, color-mix(in srgb, var(--purple) 70%, white), var(--purple)); transition: width 0.5s ease; }
+.investor-security-stage7-log { list-style: none; margin: 0; padding: 0; text-align: left; font-size: 0.8rem; max-height: 132px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.35rem; }
+.investor-security-stage7-log li { color: var(--muted); opacity: 0.55; transition: opacity 0.2s ease, color 0.2s ease; }
+.investor-security-stage7-log li.is-current { color: var(--ink); opacity: 1; font-weight: 600; }
+.investor-security-stage7-log li.is-done { opacity: 0.45; }
+.investor-security-stage7-log li.is-current::before { content: '⏳ '; }
+.investor-security-stage7-log li.is-done::before { content: '✅ '; }
+
+@media (max-width: 560px) {
+  .investor-security-card { padding: 1.6rem 1.2rem 1.4rem; }
+  .investor-security-rotate-frame { width: 128px; height: 128px; }
+  .investor-security-fp-ring { width: 112px; height: 112px; }
+}
+
 .feedback-list { display: flex; flex-direction: column; gap: 0.75rem; }
 .feedback-card {
   border: 1px solid var(--line);
