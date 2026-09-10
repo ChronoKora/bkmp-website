@@ -2904,14 +2904,31 @@
 
       /* ---- Stufe 7: Fake Auszahlung wird bearbeitet -> bestehender Rickroll ---- */
       function renderSecStage7() {
+        /* 10.09.2026 (Nutzerwunsch, Nachbesserung) - zusaetzliche Meme-Zeilen
+           zwischen die urspruenglich "seriösen" Statusmeldungen gemischt.
+           Bewusst NICHT alle ans Ende gehaengt, sondern verteilt - haelt
+           den vom Auftrag gewuenschten Rhythmus (erst offiziell wirkend,
+           danach zunehmend absurd) aufrecht, waehrend "Auszahlungspaket
+           wird freigegeben…"/"Letzte Verbindung wird hergestellt…"/
+           "Videomodul wird geladen…" bewusst als letzte drei Zeilen
+           stehen bleiben - genau die ruhigere Landung kurz vor dem
+           Rickroll-Uebergang, die der urspruengliche Auftrag fuer Stufe 7
+           wollte. */
         const messages = [
           'Bankverbindung wird überprüft…',
           'Investmenthistorie wird geladen…',
+          'Dayman Chicken Nuggets Verbrennen.',
           'Meme-Schutz wird initialisiert…',
+          'Lukas Hobby Horse Pferd heißt Charlie.',
+          'Byte ist der wahre Präsident.',
           'Phil-Authentizität wird final geprüft…',
+          'Errrooorr.. Joke lädt noch.',
           'Kontostand wird gezählt…',
+          'Phil vergisst niemals Giveaway Auszahlungen..',
           'Serverhamster wird motiviert…',
+          'Letzte Task Fehlgeschlagen..',
           'Sicherheitsstufe erhöht…',
+          '64/65 Giveaway vergessen auszahlen.',
           'Auszahlungspaket wird freigegeben…',
           'Letzte Verbindung wird hergestellt…',
           'Videomodul wird geladen…'
