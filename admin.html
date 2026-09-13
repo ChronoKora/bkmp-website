@@ -20,7 +20,7 @@
 <title>BKMP — Admin</title>
 
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
-<link rel="stylesheet" href="style.css?v=20260913-partnershopsv1">
+<link rel="stylesheet" href="style.css?v=20260913-wagepayout1">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 </head>
 <body>
@@ -1181,11 +1181,34 @@
                    jeden unbedenkliche Variante (Sicherheitsnetz). -->
               <p class="admin-help-text" id="employeePayoutHelpText">Deine Auszahlung basiert auf 50% des tatsächlichen Gewinns deiner Geschäftsbereiche und wird automatisch live aktualisiert.</p>
               <button type="button" class="payroll-info-btn" id="employeePayoutInfoBtn" aria-label="Wie wird der Lohn berechnet?">i</button>
-              <span class="bkmp-ui-tooltip" id="employeePayoutFormulaTooltip" role="tooltip">Einnahmen &minus; Geschäftsausgaben = Gewinn. Davon erhältst du 50%.</span>
+              <span class="bkmp-ui-tooltip" id="employeePayoutFormulaTooltip" role="tooltip">Einnahmen &minus; Geschäftsausgaben = Gewinn. Davon erhältst du 50%. Bereits erhaltene Auszahlungen werden vom offenen Betrag abgezogen.</span>
             </div>
             <div class="payroll-hero-card" id="employeePayoutHero"></div>
             <div class="payroll-kpi-grid" id="employeePayoutSummary"></div>
             <div class="payroll-flow" id="employeePayoutFlow"></div>
+          </div>
+          <!-- 13.09.2026, Nutzerwunsch "Mitarbeiter will Auszahlung abheben,
+               soll als Ausgabe zaehlen": admin-only (CSS-Regel in style.css,
+               body.admin-mode-expenseseditor blendet die Sektion aus - der
+               Mitarbeiter sieht seinen Stand, aber nur der Admin traegt eine
+               tatsaechlich ingame erfolgte Auszahlung ein, gleiches Prinzip
+               wie bei Investoren-/Kartenverkauf-Auszahlungen an anderer
+               Stelle im Projekt). Legt beim Speichern eine ganz normale Zeile
+               in "expenses" an (zaehlt dadurch automatisch in Uebersicht/
+               Finanzseite/Netto-Gewinn) - siehe BKMP_WAGE_PAYOUT_CATEGORY
+               weiter oben im Script fuer die Rechenlogik dahinter. -->
+          <div class="admin-section payroll-section" id="employeePayoutRecordSection">
+            <h2>Auszahlung eintragen</h2>
+            <p class="admin-help-text">Hast du dem Mitarbeiter den Lohn bereits ingame ausgezahlt? Trag den Betrag hier ein &ndash; er z&auml;hlt automatisch als Gesch&auml;ftsausgabe (Übersicht/Finanzseite), verringert aber nicht doppelt den k&uuml;nftig berechneten Lohnanspruch.</p>
+            <p class="admin-help-text" id="employeePayoutRecordStillOwedHint" style="font-weight:700;"></p>
+            <div class="form-grid form-grid-3">
+              <div><label for="employeePayoutRecordAmount">Betrag (€)</label><input type="number" id="employeePayoutRecordAmount" placeholder="z. B. 40000000" min="0" required></div>
+              <div><label for="employeePayoutRecordDate">Datum</label><input type="date" id="employeePayoutRecordDate"></div>
+              <div><label for="employeePayoutRecordNote">Notiz (optional)</label><input type="text" id="employeePayoutRecordNote" placeholder="z. B. an Jannik, erste Rate"></div>
+            </div>
+            <button type="button" class="btn btn-primary" id="employeePayoutRecordBtn">Auszahlung als Ausgabe eintragen</button>
+            <h3 style="margin-top:1.4rem; font-size:0.95rem;">Bisherige Auszahlungen</h3>
+            <div class="payroll-expense-list" id="employeePayoutHistoryList"></div>
           </div>
           <div class="admin-section payroll-section">
             <h2>Umsatz nach Kategorie</h2>
@@ -1623,6 +1646,25 @@
     const BKMP_EMPLOYEE_WAGE_START_DATE = '2026-08-15';
     const BKMP_EMPLOYEE_WAGE_SHARE = 0.5;
     const BKMP_EMPLOYEE_WAGE_ROLE = 'expenses_editor';
+    /* 13.09.2026 (Nutzerwunsch "Mitarbeiter will die ersten 40 Mio. abheben...
+       soll als Ausgabe zaehlen"): eine tatsaechliche Lohn-Auszahlung MUSS als
+       normale Geschaeftsausgabe zaehlen (Uebersicht/Finanzseite/Netto-Gewinn -
+       echtes Geld hat die Kasse verlassen). Wuerde sie aber wie jede andere
+       Ausgabe ungefiltert in bkmpEmployeeWageExpenses() einfliessen, wuerde
+       sie den GEWINN (die Berechnungsgrundlage des Lohns) ein zweites Mal
+       senken - der Mitarbeiter bekaeme dadurch bei JEDER kuenftigen Berechnung
+       nur noch 50% von dem zurueckgerechnet, was er eigentlich schon voll
+       erhalten hat (er haette 40 Mio. bekommen, sein kuenftiger Anspruch waere
+       aber nur um 20 Mio. gesunken - stille Unterbezahlung). Diese Sentinel-
+       Kategorie markiert genau diese eine Ausgabenart: bkmpEmployeeWageExpenses()
+       schliesst sie explizit von der Gewinn-Grundlage aus, bkmpEmployeeWage
+       PayoutsRecorded() summiert stattdessen NUR sie und zieht sie 1:1 (nicht
+       ×50%) vom bereits verdienten Gesamtlohn ab - siehe bkmpEmployeeWage
+       ComputeState(). Bewusst KEINE neue DB-Spalte/SQL-Migration - "category"
+       existiert bereits, wird fuer normale Ausgaben nur zufaellig identisch
+       zu "name" gesetzt (siehe addExpense-Handler), nichts sonst im Projekt
+       verlangt diese Gleichheit. */
+    const BKMP_WAGE_PAYOUT_CATEGORY = 'Mitarbeiter-Auszahlung';
     let bkmpEmployeeAccessProfiles = [];
 
     function getIncomeUnitPrice(category) {
@@ -1794,6 +1836,7 @@
     document.getElementById('incomeDate').value = todayStr;
     document.getElementById('expenseDate').value = todayStr;
     document.getElementById('newsDate').value = todayStr;
+    document.getElementById('employeePayoutRecordDate').value = todayStr;
 
     function persist() {
       bkmpSaveData(data);
@@ -3847,9 +3890,27 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
        UND unabhaengig davon, wer sie eingetragen hat (Admin oder Mitarbeiter,
        beide zaehlen gemeinsam in denselben Topf). entered_by_auth_user_id
        (weiterhin faelschungssicher server-seitig gesetzt) dient nur noch der
-       Anzeige, siehe bkmpEmployeeExpenseEnteredByLabel(). */
+       Anzeige, siehe bkmpEmployeeExpenseEnteredByLabel().
+       13.09.2026: eine Ausnahme dazugekommen - echte Lohn-Auszahlungen
+       (BKMP_WAGE_PAYOUT_CATEGORY) zaehlen bewusst NICHT mehr in diese
+       Gewinn-Grundlage, sonst wuerde eine Auszahlung den kuenftigen Lohn-
+       anspruch ein zweites Mal (um die Haelfte des ausgezahlten Betrags)
+       senken - siehe ausfuehrlicher Kommentar bei der Konstante weiter oben
+       und bkmpEmployeeWageComputeState() weiter unten. */
     function bkmpEmployeeWageExpenses() {
       return (data.expenses || []).filter(item =>
+        item.date && item.date >= BKMP_EMPLOYEE_WAGE_START_DATE &&
+        item.category !== BKMP_WAGE_PAYOUT_CATEGORY
+      );
+    }
+
+    /* Gegenstueck zu bkmpEmployeeWageExpenses() - liefert AUSSCHLIESSLICH die
+       bereits erfassten Lohn-Auszahlungen (dieselbe Sentinel-Kategorie), die
+       dort bewusst ausgeschlossen werden. Wird 1:1 (nicht ×50%) vom bereits
+       verdienten Gesamtlohn abgezogen, siehe bkmpEmployeeWageComputeState(). */
+    function bkmpEmployeeWagePayoutsRecorded() {
+      return (data.expenses || []).filter(item =>
+        item.category === BKMP_WAGE_PAYOUT_CATEGORY &&
         item.date && item.date >= BKMP_EMPLOYEE_WAGE_START_DATE
       );
     }
@@ -3858,6 +3919,25 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       if (!item.enteredByAuthUserId) return null;
       const isEmployee = bkmpEmployeeAccessProfiles.some(p => p.auth_user_id === item.enteredByAuthUserId);
       return isEmployee ? 'Mitarbeiter' : 'Admin';
+    }
+
+    /* Eine einzige, gemeinsam genutzte Berechnung (13.09.2026) - sowohl
+       renderEmployeePayoutPage() als auch der neue "Auszahlung eintragen"-
+       Klick-Handler rufen genau diese Funktion auf, damit beide garantiert
+       dieselbe Zahl sehen (kein zweites, potenziell abweichendes Rechen-
+       Duplikat - genau die Bugklasse, die in diesem Projekt bereits mehrfach
+       durch auseinanderlaufende Kopien derselben Formel entstanden ist). */
+    function bkmpEmployeeWageComputeState() {
+      const qualifying = bkmpEmployeeWageQualifyingIncomes();
+      const totalIncome = bkmpSum(qualifying);
+      const wageExpenses = bkmpEmployeeWageExpenses();
+      const totalExpenses = bkmpSum(wageExpenses);
+      const netProfit = totalIncome - totalExpenses;
+      const totalWageEarned = Math.max(0, netProfit * BKMP_EMPLOYEE_WAGE_SHARE);
+      const payoutsRecorded = bkmpEmployeeWagePayoutsRecorded();
+      const totalPaidOut = bkmpSum(payoutsRecorded);
+      const stillOwed = Math.max(0, totalWageEarned - totalPaidOut);
+      return { qualifying, totalIncome, wageExpenses, totalExpenses, netProfit, totalWageEarned, payoutsRecorded, totalPaidOut, stillOwed };
     }
 
     function bkmpPayrollKpiCardHtml(icon, accent, label, value, sub) {
@@ -3890,11 +3970,11 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
          formelfreie Fassung. Statischer HTML-Default ist bereits die kurze
          Fassung (Sicherheitsnetz, falls das Skript verzoegert startet). */
       const helpEl = document.getElementById('employeePayoutHelpText');
+      const isRealAdminViewer = !document.body.classList.contains('admin-mode-expenseseditor');
       if (helpEl) {
-        const isRealAdminViewer = !document.body.classList.contains('admin-mode-expenseseditor');
         helpEl.textContent = isRealAdminViewer
-          ? 'Errechnet sich automatisch als 50% des tatsächlichen Gewinns: relevante Einnahmen aus Bücher/Werkzeug/Netherite/Schmiede Vorlagen/Tränke/Raketen/Elytra seit 15.08.2026, minus ALLE seitdem getrackten Geschäftsausgaben – unabhängig davon, ob Admin oder Mitarbeiter sie einträgt.'
-          : 'Deine Auszahlung basiert auf 50% des tatsächlichen Gewinns deiner Geschäftsbereiche und wird automatisch live aktualisiert.';
+          ? 'Errechnet sich automatisch als 50% des tatsächlichen Gewinns: relevante Einnahmen aus Bücher/Werkzeug/Netherite/Schmiede Vorlagen/Tränke/Raketen/Elytra seit 15.08.2026, minus ALLE seitdem getrackten Geschäftsausgaben – unabhängig davon, ob Admin oder Mitarbeiter sie einträgt. Bereits ausgezahlte Beträge werden abgezogen.'
+          : 'Dein offener Lohn basiert auf 50% des tatsächlichen Gewinns deiner Geschäftsbereiche, abzüglich bereits erhaltener Auszahlungen, und wird automatisch live aktualisiert.';
       }
 
       const heroEl = document.getElementById('employeePayoutHero');
@@ -3902,16 +3982,12 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       const flowEl = document.getElementById('employeePayoutFlow');
       const breakdownEl = document.getElementById('employeePayoutBreakdown');
       const ownExpensesEl = document.getElementById('employeePayoutOwnExpenses');
-      if (!heroEl && !summaryEl && !flowEl && !breakdownEl && !ownExpensesEl) return;
+      const historyEl = document.getElementById('employeePayoutHistoryList');
+      const stillOwedHintEl = document.getElementById('employeePayoutRecordStillOwedHint');
+      if (!heroEl && !summaryEl && !flowEl && !breakdownEl && !ownExpensesEl && !historyEl && !stillOwedHintEl) return;
 
-      const qualifying = bkmpEmployeeWageQualifyingIncomes();
-      const totalIncome = bkmpSum(qualifying);
-      const wageExpenses = bkmpEmployeeWageExpenses();
-      const totalExpenses = bkmpSum(wageExpenses);
-      const netProfit = totalIncome - totalExpenses;
-      /* Punkt 21 "Negativer Gewinn": Lohn darf nie negativ werden, die
-         Gewinn-KPI-Karte selbst zeigt den echten (ggf. negativen) Wert. */
-      const netPayout = Math.max(0, netProfit * BKMP_EMPLOYEE_WAGE_SHARE);
+      const state = bkmpEmployeeWageComputeState();
+      const { qualifying, totalIncome, wageExpenses, totalExpenses, netProfit, totalWageEarned, payoutsRecorded, totalPaidOut, stillOwed } = state;
 
       const names = bkmpEmployeeAccessProfiles.map(p => p.display_name || p.login_name).filter(Boolean);
       let heroName = '';
@@ -3920,9 +3996,14 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
         heroSub = 'Noch kein Mitarbeiter-Zugang vorhanden';
       } else {
         heroName = names.join(' + ');
-        heroSub = netProfit < 0
-          ? 'Aktuell besteht noch kein ausschüttbarer Gewinn.'
-          : (names.length > 1 ? 'Gemeinsamer Lohn · 50% vom tatsächlichen Gewinn' : '50% vom tatsächlichen Gewinn');
+        if (netProfit < 0 && totalPaidOut === 0) {
+          heroSub = 'Aktuell besteht noch kein ausschüttbarer Gewinn.';
+        } else if (stillOwed <= 0 && totalPaidOut > 0) {
+          heroSub = `Vollständig ausgezahlt (${bkmpFormatCurrency(totalPaidOut)} bisher).`;
+        } else {
+          heroSub = (names.length > 1 ? 'Gemeinsamer Lohn · 50% vom tatsächlichen Gewinn' : '50% vom tatsächlichen Gewinn')
+            + (totalPaidOut > 0 ? ` · ${bkmpFormatCurrency(totalPaidOut)} bereits ausgezahlt` : '');
+        }
       }
 
       if (heroEl) {
@@ -3931,8 +4012,8 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
           <div class="payroll-hero-icon">${BKMP_PAYROLL_ICONS.wallet}</div>
           <div class="payroll-hero-body">
             ${heroName ? `<div class="payroll-hero-name">${escapeHtml(heroName)}</div>` : ''}
-            <div class="payroll-hero-label">Aktuelle Auszahlung</div>
-            <div class="payroll-hero-value">${bkmpFormatCurrency(netPayout)}</div>
+            <div class="payroll-hero-label">Noch offener Lohn</div>
+            <div class="payroll-hero-value">${bkmpFormatCurrency(stillOwed)}</div>
             <div class="payroll-hero-sub">${escapeHtml(heroSub)}</div>
           </div>`;
       }
@@ -3940,17 +4021,22 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       if (summaryEl) {
         summaryEl.innerHTML = [
           bkmpPayrollKpiCardHtml(BKMP_PAYROLL_ICONS.trendUp, 'gold', 'Einnahmen', bkmpFormatCurrency(totalIncome), 'Brutto vor Geschäftsausgaben'),
-          bkmpPayrollKpiCardHtml(BKMP_PAYROLL_ICONS.receipt, 'cyan', 'Geschäftsausgaben', bkmpFormatCurrency(totalExpenses > 0 ? totalExpenses * -1 : 0), 'Admin + Mitarbeiter'),
+          bkmpPayrollKpiCardHtml(BKMP_PAYROLL_ICONS.receipt, 'cyan', 'Geschäftsausgaben', bkmpFormatCurrency(totalExpenses > 0 ? totalExpenses * -1 : 0), 'Ohne Lohn-Auszahlungen'),
           bkmpPayrollKpiCardHtml(BKMP_PAYROLL_ICONS.chart, netProfit < 0 ? 'danger' : 'violet', 'Gewinn', bkmpFormatCurrency(netProfit), 'Nach allen Geschäftsausgaben seit 15.08.2026'),
-          bkmpPayrollKpiCardHtml(BKMP_PAYROLL_ICONS.percent, 'gold', 'Gewinnbeteiligung', Math.round(BKMP_EMPLOYEE_WAGE_SHARE * 100) + '%', 'Vom tatsächlichen Gewinn')
+          bkmpPayrollKpiCardHtml(BKMP_PAYROLL_ICONS.percent, 'gold', 'Gewinnbeteiligung', Math.round(BKMP_EMPLOYEE_WAGE_SHARE * 100) + '%', 'Vom tatsächlichen Gewinn'),
+          bkmpPayrollKpiCardHtml(BKMP_PAYROLL_ICONS.wallet, 'cyan', 'Bereits ausgezahlt', bkmpFormatCurrency(totalPaidOut), `${payoutsRecorded.length} Auszahlung${payoutsRecorded.length === 1 ? '' : 'en'} seit 15.08.2026`)
         ].join('');
       }
 
       /* Punkt 6 "Berechnungs-Flow": keine neue Berechnung, nur die bereits
-         oben berechneten Werte visuell nacheinander dargestellt. */
+         oben berechneten Werte visuell nacheinander dargestellt. 13.09.2026
+         um zwei Schritte erweitert ("Gesamtlohn" statt "Auszahlung" +
+         "−Ausgezahlt"/"=Noch offen"), damit der Flow weiterhin exakt zeigt,
+         wie sich stillOwed zusammensetzt, statt die neue Auszahlungs-
+         Verrechnung zu verschweigen. */
       if (flowEl) {
         flowEl.innerHTML = `
-          <div class="payroll-flow-title">So entsteht deine Auszahlung</div>
+          <div class="payroll-flow-title">So entsteht dein offener Lohn</div>
           <div class="payroll-flow-track">
             <div class="payroll-flow-step"><div class="payroll-flow-value">${bkmpFormatCurrency(totalIncome)}</div><div class="payroll-flow-label">Einnahmen</div></div>
             <div class="payroll-flow-arrow" aria-hidden="true">→</div>
@@ -3960,8 +4046,40 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
             <div class="payroll-flow-arrow" aria-hidden="true">×</div>
             <div class="payroll-flow-step"><div class="payroll-flow-value">${Math.round(BKMP_EMPLOYEE_WAGE_SHARE * 100)}%</div><div class="payroll-flow-label">Anteil</div></div>
             <div class="payroll-flow-arrow" aria-hidden="true">→</div>
-            <div class="payroll-flow-step highlight"><div class="payroll-flow-value">${bkmpFormatCurrency(netPayout)}</div><div class="payroll-flow-label">Auszahlung</div></div>
+            <div class="payroll-flow-step"><div class="payroll-flow-value">${bkmpFormatCurrency(totalWageEarned)}</div><div class="payroll-flow-label">Gesamtlohn</div></div>
+            <div class="payroll-flow-arrow" aria-hidden="true">−</div>
+            <div class="payroll-flow-step neg"><div class="payroll-flow-value">${bkmpFormatCurrency(totalPaidOut > 0 ? totalPaidOut * -1 : 0)}</div><div class="payroll-flow-label">Ausgezahlt</div></div>
+            <div class="payroll-flow-arrow" aria-hidden="true">→</div>
+            <div class="payroll-flow-step highlight"><div class="payroll-flow-value">${bkmpFormatCurrency(stillOwed)}</div><div class="payroll-flow-label">Noch offen</div></div>
           </div>`;
+      }
+
+      /* Neue "Auszahlung eintragen"-Sektion (13.09.2026, admin-only per CSS
+         siehe style.css) - zeigt den aktuellen Stand direkt ueber dem
+         Formular, damit der Admin vor dem Eintragen weiss, wie viel
+         tatsaechlich offen ist. */
+      if (stillOwedHintEl) {
+        stillOwedHintEl.textContent = `Aktuell offen: ${bkmpFormatCurrency(stillOwed)} (insgesamt ${bkmpFormatCurrency(totalWageEarned)} verdient, ${bkmpFormatCurrency(totalPaidOut)} bereits ausgezahlt).`;
+      }
+
+      if (historyEl) {
+        if (payoutsRecorded.length === 0) {
+          historyEl.innerHTML = bkmpPayrollEmptyStateHtml(BKMP_PAYROLL_ICONS.wallet, 'Noch keine Auszahlung erfasst', 'Sobald du eine Auszahlung einträgst, erscheint sie hier.');
+        } else {
+          historyEl.innerHTML = sortByDateDesc(payoutsRecorded).map(item => {
+            const enteredBy = bkmpEmployeeExpenseEnteredByLabel(item);
+            return `
+              <div class="payroll-expense-row">
+                <div class="payroll-expense-icon payroll-accent-cyan">${BKMP_PAYROLL_ICONS.wallet}</div>
+                <div class="payroll-expense-info">
+                  <div class="payroll-expense-name">${escapeHtml(item.name || 'Mitarbeiter-Auszahlung')}</div>
+                  <div class="payroll-expense-meta">${escapeHtml(formatDate(item.date))}</div>
+                </div>
+                ${enteredBy ? `<span class="payroll-badge payroll-badge-${enteredBy === 'Admin' ? 'admin' : 'employee'}">${enteredBy}</span>` : ''}
+                <div class="payroll-expense-amount">−${bkmpFormatCurrency(item.amount)}</div>
+              </div>`;
+          }).join('');
+        }
       }
 
       if (breakdownEl) {
@@ -4866,6 +4984,42 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
         expenseDateInput.value = todayStr;
       }
     });
+
+    /* Mitarbeiter-Lohn-Auszahlung eintragen (13.09.2026) - legt eine ganz
+       normale expenses-Zeile an (zaehlt dadurch automatisch in Uebersicht/
+       Finanzseite/Netto-Gewinn), nur mit der Sentinel-Kategorie
+       BKMP_WAGE_PAYOUT_CATEGORY, damit renderEmployeePayoutPage() sie beim
+       Lohn-Gewinn korrekt ausschliesst statt doppelt zu verrechnen (siehe
+       ausfuehrlicher Kommentar bei der Konstante). */
+    const employeePayoutRecordBtn = document.getElementById('employeePayoutRecordBtn');
+    if (employeePayoutRecordBtn) {
+      employeePayoutRecordBtn.addEventListener('click', async () => {
+        const amountInput = document.getElementById('employeePayoutRecordAmount');
+        const dateInput = document.getElementById('employeePayoutRecordDate');
+        const noteInput = document.getElementById('employeePayoutRecordNote');
+        const amount = Number(amountInput.value);
+        const date = dateInput.value || todayStr;
+        const note = noteInput.value.trim();
+        if (!amount || amount <= 0) { amountInput.reportValidity(); return; }
+
+        const { stillOwed } = bkmpEmployeeWageComputeState();
+        if (amount > stillOwed + 0.01) {
+          const proceed = window.confirm(`Aktuell sind nur ${bkmpFormatCurrency(stillOwed)} als Lohn offen. Trotzdem ${bkmpFormatCurrency(amount)} als Auszahlung eintragen?`);
+          if (!proceed) return;
+        }
+
+        const name = note ? `Mitarbeiter-Auszahlung – ${note}` : 'Mitarbeiter-Auszahlung';
+        const expense = { id: bkmpUid('exp'), name, category: BKMP_WAGE_PAYOUT_CATEGORY, amount, date, note: '', createdAt: Date.now() };
+        employeePayoutRecordBtn.disabled = true;
+        const saved = await persistExpense(expense);
+        employeePayoutRecordBtn.disabled = false;
+        if (saved) {
+          amountInput.value = '';
+          noteInput.value = '';
+          dateInput.value = todayStr;
+        }
+      });
+    }
 
     /* Investoren */
     const addInvestorBtn = document.getElementById('addInvestor');

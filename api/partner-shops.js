@@ -61,14 +61,29 @@ function sanitizeFilterValue(raw) {
     .trim();
 }
 
+// 13.09.2026 (OPBK 1.1 "PARTNERSHOPS UPDATE", Live-Fund: "Bild nicht
+// erreichbar" fuer mehrere Legacy-Shops im echten Mod) - identisches
+// Prinzip wie api/cards.js's proxyBase (siehe dortiger Kommentar):
+// Minecrafts NativeImage kann nur PNG lesen, mehrere der 27 bestehenden
+// Shops haben ihr Bild aber als .webp gespeichert (echt erreichbar, aber
+// vom Mod nie decodierbar - per curl+Node-Test bestaetigt, kein Datenfehler).
+// Absolute URL noetig, siehe api/cards.js's SITE_ORIGIN-Kommentar fuer die
+// volle Begruendung (java.net.http.HttpClient lehnt relative URIs ab).
+const SITE_ORIGIN = 'https://bkinvestment.de';
+
 function mapRow(row) {
   const locations = Array.isArray(row.partner_shop_locations)
     ? row.partner_shop_locations.map(loc => ({ id: loc.id, citybuild: loc.citybuild, shopWarp: loc.shop_warp }))
     : [];
+  const proxyBase = row.id ? `${SITE_ORIGIN}/api/partner-shop-image?id=${encodeURIComponent(row.id)}` : '';
   return {
     id: row.id,
     name: row.shop_name || '',
-    imageUrl: row.image_url || '',
+    // Garantiert Minecraft-lesbare (PNG) Variante statt der rohen
+    // Original-URL (die z.B. .webp sein kann) - siehe Kommentar oben.
+    // Faellt defensiv auf die rohe URL zurueck, falls row.id je fehlen
+    // sollte (sollte nie passieren, id ist Primary Key).
+    imageUrl: proxyBase ? `${proxyBase}&size=full` : (row.image_url || ''),
     description: row.description || '',
     category: row.category || '',
     verified: Boolean(row.verified),

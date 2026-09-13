@@ -11628,6 +11628,12 @@ body.admin-mode-sheepeditor .admin-nav-btn[data-role="sheep_editor"] { display: 
 body.admin-mode-expenseseditor .admin-nav-btn:not([data-role="expenses_editor"]) { display: none; }
 body.admin-mode-expenseseditor .admin-nav-btn[data-role="expenses_editor"] { display: flex; }
 
+/* 13.09.2026: "Auszahlung eintragen" auf der Mitarbeiter-Lohn-Seite ist
+   admin-only - der Mitarbeiter sieht seinen offenen Lohn weiterhin, aber nur
+   der Admin traegt eine tatsaechlich ingame erfolgte Auszahlung ein (gleiches
+   Prinzip wie bei Investoren-/Kartenverkauf-Auszahlungen). */
+body.admin-mode-expenseseditor #employeePayoutRecordSection { display: none; }
+
 .map-order-card .map-order-claim-btn { width: 100%; margin-top: 0.6rem; }
 .map-order-card { cursor: pointer; }
 
