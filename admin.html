@@ -1281,7 +1281,7 @@
        bkmpGetGameNow() fuer bkmp-events.js verfuegbar (identisch Date.now()). -->
   <script src="js/core/bkmp-game-clock.js?v=20260724-qafoundation1"></script>
   <script src="supabase.js?v=20260913-partnershopsv1"></script>
-  <script src="app.js?v=20260913-partnershopsv1"></script>
+  <script src="app.js?v=20260913-wagepayout2"></script>
   <!-- Redesign Phase 2a (17.07.): siehe index.html fuer die Begruendung der
        festen Ladereihenfolge (bkmp-idle-state.js zuerst, bkmp-idle-
        bootstrap.js zuletzt vor mapart.js). -->
@@ -1663,8 +1663,13 @@
        ComputeState(). Bewusst KEINE neue DB-Spalte/SQL-Migration - "category"
        existiert bereits, wird fuer normale Ausgaben nur zufaellig identisch
        zu "name" gesetzt (siehe addExpense-Handler), nichts sonst im Projekt
-       verlangt diese Gleichheit. */
-    const BKMP_WAGE_PAYOUT_CATEGORY = 'Mitarbeiter-Auszahlung';
+       verlangt diese Gleichheit.
+       BKMP_WAGE_PAYOUT_CATEGORY selbst steht seit demselben Tag in app.js
+       (bereits vor diesem Script-Block geladen) statt hier lokal - wird
+       zusaetzlich von js/core/bkmp-site.js (Investoren-Berechnung) gebraucht,
+       siehe dortiger Kommentar bei bkmpInvestorDerive(). Eine gemeinsame
+       Konstante statt zweier Kopien, damit beide Ausschluesse nie
+       auseinanderlaufen koennen. */
     let bkmpEmployeeAccessProfiles = [];
 
     function getIncomeUnitPrice(category) {

@@ -1894,10 +1894,19 @@
     /* Leitet fuer einen Investor alle abgeleiteten Anzeigewerte EINMAL ab
        (Zeitraum-Ergebnis/aktueller Anteil/ROI) - dieselbe payout-Formel wie
        zuvor, nur zentral statt inline berechnet, damit KPI-Zeile/Highlight/
-       Karten/Timeline konsistent dieselben Zahlen wiederverwenden. */
+       Karten/Timeline konsistent dieselben Zahlen wiederverwenden.
+       13.09.2026 (Nutzerentscheidung nach echtem Live-Vorfall): Mitarbeiter-
+       Lohn-Auszahlungen (BKMP_WAGE_PAYOUT_CATEGORY, siehe app.js) zaehlen
+       bewusst NICHT in periodExpenses - eine echte 40-Mio.-Auszahlung hatte
+       sonst am selben Tag ALLE gerade aktiven Investoren-Anteile proportional
+       mitgesenkt (z.B. bei 15% Beteiligung -6 Mio., obwohl der Investor mit
+       der Lohnzahlung selbst nichts zu tun hat). Lohn bleibt trotzdem eine
+       ganz normale Ausgabe fuer Uebersicht/Finanzseite/Netto-Gewinn - nur
+       die Investoren-Gewinnbeteiligung rechnet ihn nicht mit ein. */
     function bkmpInvestorDerive(inv) {
       const periodIncome = sumForInvestorPeriod(data.income, inv);
-      const periodExpenses = sumForInvestorPeriod(data.expenses, inv);
+      const investorRelevantExpenses = (data.expenses || []).filter(item => item.category !== BKMP_WAGE_PAYOUT_CATEGORY);
+      const periodExpenses = sumForInvestorPeriod(investorRelevantExpenses, inv);
       const periodNet = periodIncome - periodExpenses;
       const payout = periodNet > 0 ? (periodNet * Number(inv.sharePercent || 0)) / 100 : 0;
       const invested = Number(inv.invested || 0);

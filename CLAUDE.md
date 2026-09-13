@@ -2127,6 +2127,22 @@ Cache-Busting `style.css?v=20260913-wagepayout1` (alle 5 HTML-Dateien) — `admi
 
 **Nicht geprüft/offen:** der eigentliche Schreibvorgang gegen die echte Produktions-DB (bewusst nicht ausgelöst, siehe Verifikation oben) — der Nutzer sollte einmal selbst eine echte, kleine Test-Auszahlung eintragen und im "Ausgaben"-Reiter + auf der öffentlichen Finanzseite bestätigen, dass sie dort korrekt als Ausgabe erscheint, bevor die vollen 40 Mio. eingetragen werden.
 
+### Nachtrag (gleicher Tag): Auszahlung senkte auch die Investoren-Gewinnbeteiligung — auf Nutzerwunsch ausgenommen
+
+Der Nutzer hatte die Funktion bereits echt genutzt — per Anon-Key-`curl` gegen die echte Produktions-DB bestätigt: eine Zeile `category:"Mitarbeiter-Auszahlung", amount:40000000, date:"2026-09-13"` existiert live. Screenshot-Meldung direkt danach: "alle Investoren wurden jetzt auch stark verringert."
+
+**Root Cause (bereits bestehende, unveränderte Businesslogik — keine Regression durch die neue Funktion, nur ein bis dahin unbedachter Seiteneffekt):** `bkmpInvestorDerive()`/`sumForInvestorPeriod()` (`js/core/bkmp-site.js`, Investoren-Redesign 30.08.2026) berechnen den Investoren-Gewinnanteil als `(Einnahmen − ALLE Ausgaben im Investitionszeitraum) × Beteiligung%` — ohne jede Kategorie-Filterung, exakt wie bei der Mitarbeiter-Lohn-Formel vor deren eigenem Fix. Die neue 40-Mio.-Auszahlung (datiert auf heute) fiel damit in den Zeitraum JEDES gerade aktiven Investors (DerJannikHase/Sebi/Danny/Auswechseler/Darky, deren Zeiträume alle den 13.09. einschließen — Phil war unbetroffen, sein Zeitraum endete bereits am 11.09.) und senkte deren Gewinn-Anteil proportional zur jeweiligen Beteiligung (z. B. 15% → −6 Mio. €).
+
+**Entscheidung dem Nutzer vorgelegt statt einseitig getroffen** (`AskUserQuestion`, echte Geschäftsentscheidung: soll Mitarbeiter-Lohn den für Investoren maßgeblichen Gewinn schmälern, wie jede andere Ausgabe auch, oder nicht?) — Antwort: **"Nein, Investoren ausnehmen."**
+
+**Fix:** `BKMP_WAGE_PAYOUT_CATEGORY` von admin.html nach `app.js` verschoben (dort bereits vor dem Inline-Skript geladen, admin.html referenziert sie seitdem statt einer eigenen lokalen Kopie) — jetzt EINE gemeinsame Konstante statt zweier potenziell auseinanderlaufender Kopien, da sie jetzt von zwei unabhängigen Ausschlüssen gebraucht wird (Mitarbeiter-Lohn-Formel in admin.html, Investoren-Formel in bkmp-site.js). `bkmpInvestorDerive()` filtert `data.expenses` jetzt vor `sumForInvestorPeriod()` um diese Kategorie heraus — Lohn-Auszahlungen bleiben dadurch weiterhin eine ganz normale Ausgabe für Übersicht/Finanzseite/Netto-Gewinn (unverändert, wie ursprünglich gewünscht), zählen aber nicht mehr gegen die Investoren-Gewinnbeteiligung.
+
+**Verifiziert (Browser, injizierte Testdaten über die echten Funktionen — `bkmpInvestorDerive()` selbst ist innerhalb einer geschachtelten Funktion in `js/core/bkmp-site.js` nicht direkt von außen aufrufbar, deshalb über die tatsächliche Einstiegsfunktion `renderFinancialSections()` + Auslesen des gerenderten DOM geprüft, kein Testkopie-Code):** 100 Mio. Einnahmen + 10 Mio. normale Ausgabe + 40 Mio. Auszahlung, alle im selben Investoren-Zeitraum → Investoren-Karte zeigt korrekt "Zeitraum-Gewinn 90.000.000 €" / "Aktueller Anteil 13.500.000 €" (90 Mio. × 15%, die Auszahlung fließt NICHT ein), während die allgemeine Übersicht (`#statExpenses`/`#statNet`) weiterhin korrekt 50.000.000 €/50.000.000 € zeigt (beide Ausgaben zusammen, unverändert). **Beim Verifizieren einen eigenen Fehler gefunden und korrigiert, bevor er ausgeliefert wurde:** die neue Konstante in `app.js` war zunächst nicht per Cache-Busting-Versionsbump sichtbar (Browser lud noch die alte `app.js`-Version aus einer früheren Sitzung) — `?v=20260913-wagepayout2` nachgezogen, danach live bestätigt.
+
+Cache-Busting `app.js?v=20260913-wagepayout2` (index.html + admin.html), `js/core/bkmp-site.js?v=20260913-wagepayout1` (index.html).
+
+**Nicht geprüft/offen:** die bereits live existierende 40-Mio.-Zeile selbst wurde nicht angefasst (reine Berechnungslogik-Korrektur, kein Dateneingriff) — sobald dieser Fix deployed ist, zeigen die Investoren-Karten automatisch wieder die korrekten (höheren) Werte, da die Anzeige ohnehin bei jedem Aufruf live neu berechnet wird, nichts ist separat gespeichert.
+
 ## Bestehende Konventionen (weiter gültig)
 
 - **Changelog, zweigleisig (ab 26.07.2026), IMMER automatisch, ohne dass der Nutzer danach fragen muss:**

@@ -24,6 +24,19 @@ const BKMP_INVESTOR_REQUEST_MAX = 150000000;
 const BKMP_INVESTOR_REQUEST_MIN_SHARE = 5;
 const BKMP_INVESTOR_REQUEST_MAX_SHARE = 15;
 
+/* Sentinel-Kategorie für Mitarbeiter-Lohn-Auszahlungen (13.09.2026, siehe
+   admin.html für die Formel-Herleitung). Bewusst hier in app.js statt lokal
+   nur in admin.html deklariert - wird von BEIDEN Seiten gebraucht:
+   admin.html schließt sie aus der Lohn-Gewinn-Grundlage aus, js/core/
+   bkmp-site.js (index.html) schließt sie zusätzlich aus der Investoren-
+   Gewinnbeteiligung aus (Nutzerentscheidung 13.09.2026, nach Live-Vorfall:
+   eine echte Auszahlung hatte sonst alle aktiven Investoren-Anteile
+   proportional mitgesenkt - Lohn ist zwar eine normale Geschäftsausgabe für
+   Übersicht/Finanzseite/Netto-Gewinn, soll aber NICHT den für Investoren
+   maßgeblichen Gewinn schmälern). EINE gemeinsame Konstante statt zweier
+   Kopien, damit beide Ausschlüsse nie auseinanderlaufen können. */
+const BKMP_WAGE_PAYOUT_CATEGORY = 'Mitarbeiter-Auszahlung';
+
 const BKMP_SUBMIT_COOLDOWN_MS = 15000;
 
 /* Pluschie-Definitionen: gemeinsam fuer index.html (Anzeige/Auswahl) und
