@@ -26,6 +26,14 @@ const STORAGE_BUCKET = 'update-images';
 const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
 const MAX_FIELD_LENGTH = 2000;
 
+// OPBK 1.1 PartnerShops-Update (13.09.2026): dieselbe Allowlist wie die
+// CHECK-Constraints in sql/20260913-partnershops-update-v1.sql - zwei
+// getrennte Pruefungen derselben Regel (Client-Endpunkt + DB), bewusst
+// kein gemeinsamer Code moeglich (Node vs. Postgres), aber inhaltlich
+// identisch gehalten.
+const PARTNER_SHOP_CITYBUILDS = ['CB1', 'CB2', 'CB3', 'CB4', 'CB5', 'CB6'];
+const PARTNER_SHOP_WARP_PATTERN = /^[A-Za-z0-9_]{1,32}$/;
+
 const TABLE_CONFIG = {
   card_catalog: {
     table: 'card_catalog',
@@ -50,7 +58,26 @@ const TABLE_CONFIG = {
     requiredFields: ['name'],
     allowedFields: ['name', 'location', 'category', 'description', 'link', 'contact'],
     requireImage: false,
-    fieldMap: { name: 'shop_name' }
+    fieldMap: { name: 'shop_name' },
+    // OPBK 1.1 PartnerShops-Update (13.09.2026): eingeloggte Website-
+    // Nutzer sollen ihrem Shop automatisch zugeordnet werden, OHNE dass
+    // Login Pflicht wird - identisches Prinzip wie card_sale_requests
+    // oben. Der Client sendet NIE direkt eine owner_auth_user_id, nur
+    // einen Access-Token, der unten server-seitig gegen Supabase Auth
+    // verifiziert wird.
+    acceptOwnerToken: true,
+    ownerField: 'owner_auth_user_id',
+    // source ist IMMER 'website' fuer diesen Einreichweg, unabhaengig
+    // davon, was der Client schickt (das Feld steht bewusst nicht in
+    // allowedFields - es kann vom Client also ohnehin nicht ueberschrieben
+    // werden, dieser Eintrag macht das nur explizit dokumentiert).
+    fixedFields: { source: 'website' },
+    // Optionale strukturierte Standorte (Abschnitt 22) - siehe eigener
+    // Block unten im Handler. Max. 3 Standorte pro Website-Einreichung
+    // (die Mod erlaubt bis zu 6, die Website-UI ist bewusst einfacher
+    // gehalten - siehe index.html).
+    supportsLocations: true,
+    maxLocations: 3
   },
   card_sale_requests: {
     table: 'card_sale_requests',
@@ -197,9 +224,39 @@ module.exports = async function handler(req, res) {
     });
     if (config.imageField) payload[config.imageField] = imageUrl;
     if (config.hasStatus !== false) payload.status = 'pending';
+    if (config.fixedFields) Object.assign(payload, config.fixedFields);
     if (config.acceptOwnerToken) {
       const verifiedUserId = await verifyPlayerAccessToken(body.playerAccessToken);
-      if (verifiedUserId) payload.auth_user_id = verifiedUserId;
+      if (verifiedUserId) payload[config.ownerField || 'auth_user_id'] = verifiedUserId;
+    }
+
+    // OPBK 1.1 PartnerShops-Update: optionale strukturierte Standorte
+    // (CityBuild + Shop-Warp), VOR dem Haupt-Insert validiert - eine
+    // ungueltige Angabe soll einen klaren 400 liefern, nicht erst beim
+    // (ohnehin durch die DB-CHECK-Constraints abgesicherten) Location-
+    // Insert scheitern.
+    let pendingLocations = [];
+    if (config.supportsLocations) {
+      const rawCbs = Array.isArray(fields.citybuilds) ? fields.citybuilds : [];
+      const rawWarps = Array.isArray(fields.shopWarps) ? fields.shopWarps : [];
+      if (rawCbs.length !== rawWarps.length) {
+        return send(res, 400, { error: 'locations_mismatch' });
+      }
+      if (rawCbs.length > (config.maxLocations || 6)) {
+        return send(res, 400, { error: 'too_many_locations' });
+      }
+      for (let i = 0; i < rawCbs.length; i++) {
+        const cb = String(rawCbs[i] || '').trim().toUpperCase();
+        const warp = String(rawWarps[i] || '').trim();
+        if (!cb && !warp) continue; // leere Zeile, vom Client einfach ignoriert statt abgelehnt
+        if (!PARTNER_SHOP_CITYBUILDS.includes(cb)) {
+          return send(res, 400, { error: 'invalid_citybuild' });
+        }
+        if (!PARTNER_SHOP_WARP_PATTERN.test(warp)) {
+          return send(res, 400, { error: 'invalid_shop_warp' });
+        }
+        pendingLocations.push({ citybuild: cb, shop_warp: warp });
+      }
     }
 
     const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/${config.table}`, {
@@ -218,7 +275,32 @@ module.exports = async function handler(req, res) {
       return send(res, 502, { error: 'insert_failed', detail: detail.slice(0, 300) });
     }
     const rows = await insertRes.json();
-    return send(res, 201, { ok: true, row: Array.isArray(rows) ? rows[0] : rows });
+    const row = Array.isArray(rows) ? rows[0] : rows;
+
+    if (pendingLocations.length > 0 && row && row.id) {
+      const locationRows = pendingLocations.map(loc => ({ partner_shop_id: row.id, citybuild: loc.citybuild, shop_warp: loc.shop_warp, active: true }));
+      const locationRes = await fetch(`${SUPABASE_URL}/rest/v1/partner_shop_locations`, {
+        method: 'POST',
+        headers: {
+          apikey: serviceKey,
+          Authorization: `Bearer ${serviceKey}`,
+          'Content-Type': 'application/json',
+          Prefer: 'return=minimal'
+        },
+        body: JSON.stringify(locationRows)
+      });
+      // Bewusst fail-open fuer die Standorte: der Shop selbst wurde
+      // bereits erfolgreich angelegt (status=pending) - ein fehlgeschlagener
+      // Location-Insert (z.B. Doppel-Eintrag) darf die Einreichung selbst
+      // nicht als Ganzes scheitern lassen, der Admin sieht im Zweifel
+      // einfach "keine strukturierten Standorte" und kann sie im
+      // Admin-Panel nachtragen.
+      if (!locationRes.ok) {
+        console.warn('partner_shop_locations Insert fehlgeschlagen fuer Shop', row.id);
+      }
+    }
+
+    return send(res, 201, { ok: true, row });
   } catch (error) {
     return send(res, error.code === 'invalid_image' || error.code === 'image_too_large' ? 400 : 502, {
       error: error.code || 'unexpected',

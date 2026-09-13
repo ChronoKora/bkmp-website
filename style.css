@@ -4071,6 +4071,45 @@ label {
   margin-bottom: 0.6rem;
   font-size: 0.86rem;
 }
+/* OPBK 1.1 PartnerShops-Update (13.09.2026) - strukturierte CityBuild-
+   Chips (nur sichtbar, wenn der Admin bereits mindestens einen Standort
+   gepflegt hat, Abschnitt 20/37) + Verifiziert-Badge (Abschnitt 10). */
+.partner-cb-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.5rem; }
+.partner-cb-chip {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 0.18rem 0.55rem;
+  background: color-mix(in srgb, var(--gold-fixed) 16%, transparent);
+  color: var(--gold-fixed);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+.partner-verified-badge {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.7rem;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 999px;
+  padding: 0.22rem 0.6rem;
+  background: color-mix(in srgb, var(--pos) 85%, var(--paper));
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--pos) 30%, transparent);
+}
+.partner-spotlight-body .partner-verified-badge {
+  position: static;
+  box-shadow: none;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.6rem;
+  vertical-align: middle;
+}
 .partner-card p {
   color: var(--muted);
   line-height: 1.5;
@@ -4979,6 +5018,26 @@ input.cardcatalog-search:focus {
   font-weight: 800;
   text-transform: uppercase;
 }
+/* OPBK 1.1 PartnerShops-Update (13.09.2026) - generische kleine Status-
+   Pille fuer admin.html-Listenzeilen (Mod/Verifiziert/Inaktiv/Besitzer),
+   angelehnt an die bereits bestehenden .investor-*-badge-Klassen, aber
+   absichtlich als generische Basisklasse statt einer weiteren
+   Einzelfall-Klasse. */
+.badge-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.14rem 0.5rem;
+  font-size: 0.64rem;
+  font-weight: 700;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--line) 60%, transparent);
+  border: 1px solid var(--line);
+}
+.badge-pill-ok { color: #22c55e; background: color-mix(in srgb, #22c55e 16%, transparent); border-color: color-mix(in srgb, #22c55e 40%, var(--line)); }
+.badge-pill-off { color: #f59e0b; background: color-mix(in srgb, #f59e0b 16%, transparent); border-color: color-mix(in srgb, #f59e0b 40%, var(--line)); }
+.partner-admin-badges { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.3rem; }
+.partner-admin-review-msg { margin-top: 0.3rem; font-size: 0.78rem; color: var(--muted); font-style: italic; }
 
 /* ---------- Kartendatenbank: Admin-Moderation ---------- */
 .cardcatalog-admin-search {

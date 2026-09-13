@@ -1901,6 +1901,22 @@ async function syncAboutBlocksFromSupabase(targetData, onSynced, options = {}) {
   }
 }
 
+// OPBK 1.1 PartnerShops-Update (13.09.2026): kontrollierte Kategorie-
+// Auswahl fuer NEUE Shops (Abschnitt 9) - Legacy-Kategorien auf
+// Bestandsshops bleiben davon unberuehrt (freier Text, siehe Admin-Panel).
+// Identische Liste wie die serverseitige Allowlist in
+// create_partner_shop_submission()/submit_partner_shop_revision()
+// (sql/20260913-partnershops-update-v1.sql) und api/submit-entry.js.
+const BKMP_PARTNER_SHOP_CATEGORIES = ['Karten', 'Bücher', 'Baumaterialien', 'Werkzeuge', 'Deko', 'Ankauf', 'Sonstiges'];
+const BKMP_PARTNER_SHOP_CITYBUILDS = ['CB1', 'CB2', 'CB3', 'CB4', 'CB5', 'CB6'];
+// "partner_shop_locations(...)" ist eine eingebettete PostgREST-Relation
+// (FK-Join) - liefert die strukturierten Standorte direkt mit, ohne einen
+// zweiten Request je Shop (N+1 vermieden). Zeigt bewusst nur AKTIVE
+// Standorte fuer die oeffentliche Kartenanzeige/Spotlight - admin.html
+// verwaltet ALLE Standorte (auch inaktive) ueber die eigene
+// loadPartnerShopLocations()-Funktion weiter unten.
+const PARTNER_SHOP_SELECT_COLUMNS = 'id, shop_name, image_url, location, category, description, link, contact, status, is_read, created_at, owner_auth_user_id, source, review_message, verified, active, spotlight_enabled, updated_at, partner_shop_locations(citybuild, shop_warp, active)';
+
 function bkmpMapPartnerShopFromSupabase(row) {
   return {
     id: row.id,
@@ -1914,6 +1930,23 @@ function bkmpMapPartnerShopFromSupabase(row) {
     status: row.status || 'approved',
     isRead: Boolean(row.is_read),
     createdAt: row.created_at ? Date.parse(row.created_at) : 0,
+    // OPBK 1.1 PartnerShops-Update (13.09.2026, additiv) - bei aelteren,
+    // vor der Migration geladenen Zeilen schlicht undefined/Default,
+    // kein Fehler (siehe defensive Defaults unten).
+    ownerAuthUserId: row.owner_auth_user_id || null,
+    shopSource: row.source || 'website',
+    reviewMessage: row.review_message || '',
+    verified: Boolean(row.verified),
+    active: row.active === undefined || row.active === null ? true : Boolean(row.active),
+    spotlightEnabled: row.spotlight_enabled === undefined || row.spotlight_enabled === null ? true : Boolean(row.spotlight_enabled),
+    updatedAt: row.updated_at ? Date.parse(row.updated_at) : 0,
+    // Eingebettete Standorte (siehe PARTNER_SHOP_SELECT_COLUMNS oben) - nur
+    // aktive, fuer die oeffentliche Karten-/Spotlight-Anzeige. Fehlt die
+    // Spalte (Migration noch nicht gelaufen), bleibt es defensiv ein
+    // leeres Array statt eines Fehlers.
+    locations: Array.isArray(row.partner_shop_locations)
+      ? row.partner_shop_locations.filter(l => l.active !== false).map(l => ({ citybuild: l.citybuild, shopWarp: l.shop_warp }))
+      : [],
     source: 'supabase'
   };
 }
@@ -1929,6 +1962,13 @@ function bkmpMapPartnerShopToSupabase(shop) {
     contact: shop.contact || ''
   };
   if (shop.status) payload.status = shop.status;
+  // Nur mitsenden, wenn das Admin-Formular sie tatsaechlich gesetzt hat -
+  // ein Fehlen soll nie versehentlich einen bestehenden Wert auf
+  // false/leer zuruecksetzen (siehe persistPartnerShop()/addPartnerShopBtn
+  // in admin.html, setzt diese Felder explizit).
+  if (shop.verified !== undefined) payload.verified = Boolean(shop.verified);
+  if (shop.active !== undefined) payload.active = Boolean(shop.active);
+  if (shop.spotlightEnabled !== undefined) payload.spotlight_enabled = Boolean(shop.spotlightEnabled);
   return payload;
 }
 
@@ -1937,7 +1977,7 @@ async function loadPartnerShops() {
   if (!client) return null;
   const { data, error } = await client
     .from('partner_shops')
-    .select('id, shop_name, image_url, location, category, description, link, contact, status, is_read, created_at')
+    .select(PARTNER_SHOP_SELECT_COLUMNS)
     .order('created_at', { ascending: false });
   if (error) throw error;
   return (data || []).map(bkmpMapPartnerShopFromSupabase);
@@ -1954,13 +1994,13 @@ async function savePartnerShop(shop) {
       .from('partner_shops')
       .update(payload)
       .eq('id', shop.id)
-      .select('id, shop_name, image_url, location, category, description, link, contact, status, created_at')
+      .select(PARTNER_SHOP_SELECT_COLUMNS)
       .limit(1);
   } else {
     query = client
       .from('partner_shops')
       .insert(payload)
-      .select('id, shop_name, image_url, location, category, description, link, contact, status, created_at')
+      .select(PARTNER_SHOP_SELECT_COLUMNS)
       .limit(1);
   }
   const { data, error } = await query;
@@ -1969,18 +2009,180 @@ async function savePartnerShop(shop) {
   return row ? bkmpMapPartnerShopFromSupabase(row) : null;
 }
 
-async function updatePartnerShopStatus(id, status) {
+// reviewMessage (optional, 13.09.2026): wird in DERSELBEN Anfrage mit
+// gesetzt - identisches Muster wie updateInvestorRequestStatus(id, status,
+// rejectReason). Besonders fuer status='needs_changes' gedacht (der Shop-
+// Besitzer sieht den Grund dann in der Mod, Abschnitt 56).
+async function updatePartnerShopStatus(id, status, reviewMessage) {
   const client = bkmpGetSupabaseClient();
   if (!client) return null;
+  const payload = { status };
+  if (reviewMessage !== undefined) payload.review_message = reviewMessage || null;
   const { data, error } = await client
     .from('partner_shops')
-    .update({ status })
+    .update(payload)
     .eq('id', id)
-    .select('id, shop_name, image_url, location, category, description, link, contact, status, is_read, created_at')
+    .select(PARTNER_SHOP_SELECT_COLUMNS)
     .limit(1);
   if (error) throw error;
   const row = Array.isArray(data) ? data[0] : null;
   return row ? bkmpMapPartnerShopFromSupabase(row) : null;
+}
+
+// OPBK 1.1 PartnerShops-Update (13.09.2026): generisches Patch fuer die
+// Moderations-Flags (verified/active/spotlightEnabled/reviewMessage) -
+// admin.html nutzt das fuer einzelne Umschalt-Knoepfe, ohne jedes Mal den
+// kompletten savePartnerShop()-Formularweg durchlaufen zu muessen.
+async function updatePartnerShopFlags(id, patch) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const payload = {};
+  if (patch.verified !== undefined) payload.verified = Boolean(patch.verified);
+  if (patch.active !== undefined) payload.active = Boolean(patch.active);
+  if (patch.spotlightEnabled !== undefined) payload.spotlight_enabled = Boolean(patch.spotlightEnabled);
+  if (patch.reviewMessage !== undefined) payload.review_message = patch.reviewMessage || null;
+  if (Object.keys(payload).length === 0) return null;
+  const { data, error } = await client
+    .from('partner_shops')
+    .update(payload)
+    .eq('id', id)
+    .select(PARTNER_SHOP_SELECT_COLUMNS)
+    .limit(1);
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : null;
+  return row ? bkmpMapPartnerShopFromSupabase(row) : null;
+}
+
+// Best-Effort-Anzeigenamen fuer Shop-Besitzer im Admin-Panel (Abschnitt 23:
+// "Besitzer" in der Uebersicht). Liefert nur die angefragten IDs, die
+// tatsaechlich einen player_stats-Eintrag haben - fehlende IDs bleiben im
+// Admin-Panel einfach als rohe ID sichtbar statt einen Fehler zu werfen.
+async function loadPartnerShopOwnerNames(authUserIds) {
+  const client = bkmpGetSupabaseClient();
+  const ids = [...new Set((authUserIds || []).filter(Boolean))];
+  if (!client || ids.length === 0) return {};
+  const { data, error } = await client
+    .from('player_stats')
+    .select('auth_user_id, display_name')
+    .in('auth_user_id', ids);
+  if (error) { console.warn('PartnerShop-Besitzernamen konnten nicht geladen werden.', error); return {}; }
+  const map = {};
+  (data || []).forEach(row => { if (row.auth_user_id) map[row.auth_user_id] = row.display_name || ''; });
+  return map;
+}
+
+// ---------------- PartnerShop-Standorte (partner_shop_locations) ----------------
+async function loadPartnerShopLocations(partnerShopId) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from('partner_shop_locations')
+    .select('id, partner_shop_id, citybuild, shop_warp, active, created_at, updated_at')
+    .eq('partner_shop_id', partnerShopId)
+    .order('citybuild', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+async function addPartnerShopLocation(partnerShopId, citybuild, shopWarp) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('partner_shop_locations')
+    .insert({ partner_shop_id: partnerShopId, citybuild, shop_warp: shopWarp, active: true })
+    .select('id, partner_shop_id, citybuild, shop_warp, active')
+    .limit(1);
+  if (error) throw error;
+  return Array.isArray(data) ? data[0] : null;
+}
+
+async function updatePartnerShopLocation(id, patch) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const payload = {};
+  if (patch.citybuild !== undefined) payload.citybuild = patch.citybuild;
+  if (patch.shopWarp !== undefined) payload.shop_warp = patch.shopWarp;
+  if (patch.active !== undefined) payload.active = Boolean(patch.active);
+  const { data, error } = await client
+    .from('partner_shop_locations')
+    .update(payload)
+    .eq('id', id)
+    .select('id, partner_shop_id, citybuild, shop_warp, active')
+    .limit(1);
+  if (error) throw error;
+  return Array.isArray(data) ? data[0] : null;
+}
+
+async function deletePartnerShopLocation(id) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return false;
+  const { error } = await client.from('partner_shop_locations').delete().eq('id', id);
+  if (error) throw error;
+  return true;
+}
+
+// ---------------- PartnerShop-Revisionen (Aenderungsantraege) ----------------
+async function loadPartnerShopRevisions() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from('partner_shop_revisions')
+    .select('id, partner_shop_id, submitted_by, name, description, category, image_url, locations_changed, status, review_message, created_at, reviewed_at, reviewed_by')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+async function loadPartnerShopRevisionLocations(revisionId) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from('partner_shop_revision_locations')
+    .select('id, revision_id, citybuild, shop_warp')
+    .eq('revision_id', revisionId);
+  if (error) throw error;
+  return data || [];
+}
+
+// action: 'approve' | 'reject'. Laeuft ueber review_partner_shop_revision()
+// (SECURITY DEFINER, prueft is_active_admin() selbst noch einmal
+// serverseitig) statt einem rohen Update - siehe SQL-Migration fuer die
+// volle Begruendung (atomarer Uebernahme-Vorgang inkl. Standort-Austausch).
+async function reviewPartnerShopRevision(revisionId, action, reviewMessage) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return false;
+  const { error } = await client.rpc('review_partner_shop_revision', {
+    p_revision_id: revisionId,
+    p_action: action,
+    p_review_message: reviewMessage || null
+  });
+  if (error) throw error;
+  return true;
+}
+
+// ---------------- PartnerShop-Meldungen (Shop melden) ----------------
+async function loadPartnerShopReports() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from('partner_shop_reports')
+    .select('id, partner_shop_id, auth_user_id, report_type, message, status, created_at')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+async function updatePartnerShopReportStatus(id, status) {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('partner_shop_reports')
+    .update({ status })
+    .eq('id', id)
+    .select('id, status')
+    .limit(1);
+  if (error) throw error;
+  return Array.isArray(data) ? data[0] : null;
 }
 
 async function updatePartnerShopRead(id, isRead) {
@@ -1990,7 +2192,7 @@ async function updatePartnerShopRead(id, isRead) {
     .from('partner_shops')
     .update({ is_read: isRead })
     .eq('id', id)
-    .select('id, shop_name, image_url, location, category, description, link, contact, status, is_read, created_at')
+    .select(PARTNER_SHOP_SELECT_COLUMNS)
     .limit(1);
   if (error) throw error;
   const row = Array.isArray(data) ? data[0] : null;

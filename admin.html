@@ -20,7 +20,7 @@
 <title>BKMP — Admin</title>
 
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
-<link rel="stylesheet" href="style.css?v=20260906-investorsecuritycheck1">
+<link rel="stylesheet" href="style.css?v=20260913-partnershopsv1">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 </head>
 <body>
@@ -558,11 +558,15 @@
         <section class="admin-page" id="page-partners">
           <div class="admin-section">
             <h2>PartnerShops</h2>
-            <p class="admin-help-text">Shop-Betreiber können ihren Shop selbst einreichen. Hier kannst du ihn freigeben, ablehnen oder bearbeiten.</p>
+            <p class="admin-help-text">Shop-Betreiber können ihren Shop selbst einreichen (Website oder Mod). Hier kannst du ihn freigeben, ablehnen, Änderungen anfordern oder bearbeiten.</p>
 
             <div class="cardcatalog-admin-group">
               <h3>Offene Anfragen <span class="cardcatalog-admin-count" id="partnerShopPendingCount"></span></h3>
               <div class="entry-table-wrapper"><div class="entry-list" id="partnerShopPendingList"></div></div>
+            </div>
+            <div class="cardcatalog-admin-group">
+              <h3>Änderung erforderlich <span class="cardcatalog-admin-count" id="partnerShopNeedsChangesCount"></span></h3>
+              <div class="entry-table-wrapper"><div class="entry-list" id="partnerShopNeedsChangesList"></div></div>
             </div>
             <div class="cardcatalog-admin-group">
               <h3>Angenommen <span class="cardcatalog-admin-count" id="partnerShopApprovedCount"></span></h3>
@@ -575,8 +579,8 @@
 
             <div class="form-grid form-grid-3">
               <div><label for="partnerName">Shopname</label><input type="text" id="partnerName" placeholder="z. B. Karten-Paradies" required></div>
-              <div><label for="partnerLocation">Server / Warp</label><input type="text" id="partnerLocation" placeholder="/sw Beispiel CB2"></div>
-              <div><label for="partnerCategory">Kategorie</label><input type="text" id="partnerCategory" placeholder="z. B. Anime Karten"></div>
+              <div><label for="partnerLocation">Server / Warp (Legacy-Freitext)</label><input type="text" id="partnerLocation" placeholder="/sw Beispiel CB2"></div>
+              <div><label for="partnerCategory">Kategorie (Freitext, Legacy bleibt erhalten)</label><input type="text" id="partnerCategory" placeholder="z. B. Anime Karten"></div>
             </div>
             <label for="partnerDescription">Beschreibung</label>
             <textarea id="partnerDescription" placeholder="Kurze Beschreibung des Shops"></textarea>
@@ -585,10 +589,54 @@
               <div><label for="partnerContact">Ansprechpartner</label><input type="text" id="partnerContact" placeholder="Minecraft- oder Discord-Name"></div>
               <div><label for="partnerImageFile">Logo / Bild</label><input type="file" id="partnerImageFile" accept="image/*"></div>
             </div>
+            <!-- OPBK 1.1 PartnerShops-Update (13.09.2026): Moderations-Flags,
+                 nur per Checkbox im Admin-Formular setzbar (verified darf
+                 NIE vom Client/Shop-Besitzer selbst gesetzt werden, siehe
+                 RLS-Haertung in der SQL-Migration). -->
+            <div class="form-grid form-grid-3" style="align-items:center;">
+              <div><label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;"><input type="checkbox" id="partnerVerified" style="width:auto;"> Verifiziert</label></div>
+              <div><label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;"><input type="checkbox" id="partnerActive" checked style="width:auto;"> Aktiv (öffentlich sichtbar)</label></div>
+              <div><label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer;"><input type="checkbox" id="partnerSpotlightEnabled" checked style="width:auto;"> Im Spotlight</label></div>
+            </div>
             <div class="investor-form-actions">
               <button class="btn btn-primary" id="addPartnerShop">+ PartnerShop speichern</button>
               <button class="btn" id="cancelPartnerShopEdit" type="button" style="display:none;">Abbrechen</button>
             </div>
+
+            <!-- OPBK 1.1 PartnerShops-Update (13.09.2026): strukturierte
+                 Standorte des GERADE bearbeiteten Shops - nur sichtbar,
+                 solange editingPartnerShopId gesetzt ist (Abschnitt 24). -->
+            <div id="partnerLocationsEditor" style="display:none; margin-top:1.4rem; padding-top:1.2rem; border-top:1px solid var(--line);">
+              <h3 style="margin-bottom:0.4rem;">Standorte pflegen</h3>
+              <p class="admin-help-text" id="partnerLocationsLegacyHint"></p>
+              <div id="partnerLocationsList" class="entry-list" style="margin-bottom:0.8rem;"></div>
+              <div class="form-grid form-grid-3" style="align-items:end;">
+                <div><label for="partnerLocationCbInput">CityBuild</label>
+                  <select id="partnerLocationCbInput">
+                    <option value="CB1">CB1</option><option value="CB2">CB2</option><option value="CB3">CB3</option>
+                    <option value="CB4">CB4</option><option value="CB5">CB5</option><option value="CB6">CB6</option>
+                  </select>
+                </div>
+                <div><label for="partnerLocationWarpInput">Shop-Warp</label><input type="text" id="partnerLocationWarpInput" maxlength="32" placeholder="z. B. karten_paradies"></div>
+                <div><button class="btn" id="partnerLocationAddBtn" type="button">+ Standort hinzufügen</button></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- OPBK 1.1 PartnerShops-Update: Änderungsanträge an bereits
+               genehmigte Shops (Abschnitt 57/58) - der Live-Shop bleibt
+               dabei unveraendert online, bis hier entschieden wird. -->
+          <div class="admin-section">
+            <h2>PartnerShop-Änderungsanträge <span class="cardcatalog-admin-count" id="partnerShopRevisionCount"></span></h2>
+            <p class="admin-help-text">Shop-Besitzer reichen Änderungen über die Mod ein. Der bereits genehmigte Shop bleibt dabei unverändert online sichtbar, bis du hier entscheidest.</p>
+            <div class="entry-table-wrapper"><div class="entry-list" id="partnerShopRevisionList"></div></div>
+          </div>
+
+          <!-- OPBK 1.1 PartnerShops-Update: "Shop melden" (Abschnitt 61). -->
+          <div class="admin-section">
+            <h2>PartnerShop-Meldungen <span class="cardcatalog-admin-count" id="partnerShopReportCount"></span></h2>
+            <p class="admin-help-text">Meldungen aus der Mod ("Shop melden") - z. B. ein kaputter Warp oder falsche Angaben.</p>
+            <div class="entry-table-wrapper"><div class="entry-list" id="partnerShopReportList"></div></div>
           </div>
         </section>
 
@@ -1209,8 +1257,8 @@
        da admin.html kein window.BKMP_QA_MODE-Gate setzt; macht nur
        bkmpGetGameNow() fuer bkmp-events.js verfuegbar (identisch Date.now()). -->
   <script src="js/core/bkmp-game-clock.js?v=20260724-qafoundation1"></script>
-  <script src="supabase.js?v=20260906-cardbulkdelete1"></script>
-  <script src="app.js?v=20260901-bookqty1"></script>
+  <script src="supabase.js?v=20260913-partnershopsv1"></script>
+  <script src="app.js?v=20260913-partnershopsv1"></script>
   <!-- Redesign Phase 2a (17.07.): siehe index.html fuer die Begruendung der
        festen Ladereihenfolge (bkmp-idle-state.js zuerst, bkmp-idle-
        bootstrap.js zuletzt vor mapart.js). -->
@@ -3675,7 +3723,11 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
         renderAboutBlockList();
         if (typeof renderAboutPreview === 'function') renderAboutPreview();
       }
-      if (bkmpAdminSectionVisible('partnerShopPendingList')) renderPartnerShopList();
+      if (bkmpAdminSectionVisible('partnerShopPendingList')) {
+        renderPartnerShopList();
+        if (typeof renderPartnerShopRevisionList === 'function') renderPartnerShopRevisionList();
+        if (typeof renderPartnerShopReportList === 'function') renderPartnerShopReportList();
+      }
       if (bkmpAdminSectionVisible('cardSaleList')) renderCardSaleList();
       if (bkmpAdminSectionVisible('investorRequestList')) renderInvestorRequestList();
       if (bkmpAdminSectionVisible('cardSaleRequestList')) renderCardSaleRequestList();
@@ -4194,14 +4246,14 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       });
     }
 
-    async function setPartnerShopStatus(id, status, successMessage) {
+    async function setPartnerShopStatus(id, status, successMessage, reviewMessage) {
       if (typeof updatePartnerShopStatus !== 'function' || !bkmpGetSupabaseClient()) {
         showAdminToast('Supabase ist gerade nicht verbunden.', 'error');
         return;
       }
       try {
-        const updated = await updatePartnerShopStatus(id, status);
-        data.partnerShops = data.partnerShops.map(item => String(item.id) === String(id) ? (updated || { ...item, status }) : item);
+        const updated = await updatePartnerShopStatus(id, status, reviewMessage);
+        data.partnerShops = data.partnerShops.map(item => String(item.id) === String(id) ? (updated || { ...item, status, reviewMessage: reviewMessage !== undefined ? reviewMessage : item.reviewMessage }) : item);
         bkmpSaveData(data);
         renderAll();
         showAdminToast(successMessage, 'success');
@@ -4212,6 +4264,19 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
     }
     const approvePartnerShop = id => setPartnerShopStatus(id, 'approved', 'PartnerShop freigegeben.');
     const rejectPartnerShop = id => setPartnerShopStatus(id, 'rejected', 'PartnerShop abgelehnt.');
+    // OPBK 1.1 PartnerShops-Update (13.09.2026): "Änderung erforderlich" -
+    // identisches Begruendungs-Prompt-Muster wie rejectInvestorRequest()
+    // oben (bkmpAdminPromptTextModal).
+    async function needsChangesPartnerShop(id) {
+      const reason = await bkmpAdminPromptTextModal({
+        titleText: 'Änderung anfordern',
+        labelText: 'Was muss der Shop-Besitzer ändern? (wird ihm in der Mod angezeigt)',
+        confirmText: 'Änderung anfordern',
+        placeholder: 'z. B. Bitte ein echtes Shoplogo statt eines Screenshots hochladen'
+      });
+      if (reason === null) return;
+      await setPartnerShopStatus(id, 'needs_changes', 'Änderung angefordert.', reason.trim());
+    }
 
     async function markPartnerShopRead(id) {
       if (typeof updatePartnerShopRead !== 'function' || !bkmpGetSupabaseClient()) return;
@@ -4223,6 +4288,23 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       } catch (e) {
         showAdminToast('Konnte nicht als gelesen markiert werden: ' + supabaseErrorText(e), 'error');
       }
+    }
+
+    // OPBK 1.1 PartnerShops-Update (13.09.2026): Best-Effort-Anzeigenamen
+    // fuer owner_auth_user_id (Abschnitt 23). Ein einfacher Modul-Cache +
+    // "wird gerade geladen"-Schutz verhindert eine Endlosschleife aus
+    // Render->Fetch->Render.
+    const bkmpPartnerShopOwnerNameCache = {};
+    let bkmpPartnerShopOwnerNamesLoading = false;
+    function bkmpPartnerShopEnsureOwnerNamesLoaded(items) {
+      const missing = [...new Set(items.map(i => i.ownerAuthUserId).filter(id => id && !(id in bkmpPartnerShopOwnerNameCache)))];
+      if (missing.length === 0 || bkmpPartnerShopOwnerNamesLoading || typeof loadPartnerShopOwnerNames !== 'function') return;
+      bkmpPartnerShopOwnerNamesLoading = true;
+      loadPartnerShopOwnerNames(missing).then(map => {
+        missing.forEach(id => { bkmpPartnerShopOwnerNameCache[id] = map[id] || null; });
+        bkmpPartnerShopOwnerNamesLoading = false;
+        renderPartnerShopList();
+      }).catch(() => { bkmpPartnerShopOwnerNamesLoading = false; });
     }
 
     function renderPartnerShopGroup(listId, countId, items, actionsHtml, wireActions) {
@@ -4238,12 +4320,24 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       items.forEach(item => {
         const row = document.createElement('div');
         row.className = 'entry-row partner-admin-row' + (!item.isRead ? ' is-unread' : '');
+        const ownerLabel = item.ownerAuthUserId
+          ? (bkmpPartnerShopOwnerNameCache[item.ownerAuthUserId] || item.ownerAuthUserId.slice(0, 8) + '…')
+          : '';
+        const badges = [
+          item.shopSource === 'mod' ? '<span class="badge-pill">📱 Mod</span>' : '',
+          item.verified ? '<span class="badge-pill badge-pill-ok">✔ Verifiziert</span>' : '',
+          item.active === false ? '<span class="badge-pill badge-pill-off">Inaktiv</span>' : '',
+          item.spotlightEnabled === false ? '<span class="badge-pill badge-pill-off">Kein Spotlight</span>' : '',
+          ownerLabel ? `<span class="badge-pill">👤 ${escapeHtml(ownerLabel)}</span>` : ''
+        ].filter(Boolean).join(' ');
         row.innerHTML = `
           ${item.image ? `<span class="partner-admin-thumb-wrap" data-bkmp-image-wrap data-empty-label="Shop"><img data-bkmp-img class="partner-admin-thumb" src="${item.image}" alt="" loading="lazy" decoding="async"></span>` : '<div class="partner-admin-thumb partner-admin-thumb-empty">Shop</div>'}
           <div class="desc">
             ${!item.isRead ? '<span class="entry-row-unread-dot" aria-hidden="true"></span>' : ''}
             <span class="name">${escapeHtml(item.name)}</span>
             <span class="meta">${escapeHtml(item.category || 'Partner')}${item.location ? ' &middot; ' + escapeHtml(item.location) : ''}${item.contact ? ' &middot; ' + escapeHtml(item.contact) : ''}</span>
+            ${badges ? `<div class="partner-admin-badges">${badges}</div>` : ''}
+            ${item.reviewMessage ? `<div class="partner-admin-review-msg">💬 ${escapeHtml(item.reviewMessage)}</div>` : ''}
           </div>
           <div class="entry-actions">
             ${!item.isRead ? '<button class="edit-btn read-btn" type="button">Gelesen</button>' : ''}
@@ -4275,11 +4369,26 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
 
       const byDateDesc = (a, b) => (b.createdAt || 0) - (a.createdAt || 0);
       const all = data.partnerShops;
+      // OPBK 1.1 PartnerShops-Update (13.09.2026): "needs_changes" ist jetzt
+      // eine eigene, vierte Gruppe - vorher fiel ALLES, was nicht
+      // pending/rejected war, in "approved" (hier haette ein needs_changes-
+      // Shop also faelschlich als "Angenommen" gelistet gestanden).
       const pending = all.filter(item => item.status === 'pending').sort(byDateDesc);
-      const approved = all.filter(item => item.status !== 'pending' && item.status !== 'rejected').sort(byDateDesc);
+      const needsChanges = all.filter(item => item.status === 'needs_changes').sort(byDateDesc);
+      const approved = all.filter(item => item.status === 'approved' || !item.status).sort(byDateDesc);
       const rejected = all.filter(item => item.status === 'rejected').sort(byDateDesc);
 
+      bkmpPartnerShopEnsureOwnerNamesLoaded(all);
+
       renderPartnerShopGroup('partnerShopPendingList', 'partnerShopPendingCount', pending,
+        () => '<button class="edit-btn confirm-btn" type="button">Freigeben</button><button class="edit-btn changes-btn" type="button">Änderung nötig</button><button class="edit-btn reject-btn" type="button">Ablehnen</button>',
+        (row, item) => {
+          row.querySelector('.confirm-btn').addEventListener('click', () => approvePartnerShop(item.id));
+          row.querySelector('.changes-btn').addEventListener('click', () => needsChangesPartnerShop(item.id));
+          row.querySelector('.reject-btn').addEventListener('click', () => rejectPartnerShop(item.id));
+        });
+
+      renderPartnerShopGroup('partnerShopNeedsChangesList', 'partnerShopNeedsChangesCount', needsChanges,
         () => '<button class="edit-btn confirm-btn" type="button">Freigeben</button><button class="edit-btn reject-btn" type="button">Ablehnen</button>',
         (row, item) => {
           row.querySelector('.confirm-btn').addEventListener('click', () => approvePartnerShop(item.id));
@@ -4293,6 +4402,136 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       renderPartnerShopGroup('partnerShopRejectedList', 'partnerShopRejectedCount', rejected,
         () => '<button class="edit-btn confirm-btn" type="button">Freigeben</button>',
         (row, item) => row.querySelector('.confirm-btn').addEventListener('click', () => approvePartnerShop(item.id)));
+    }
+
+    // OPBK 1.1 PartnerShops-Update (13.09.2026): Änderungsanträge
+    // (partner_shop_revisions, Abschnitt 57/58) - der Live-Shop bleibt bei
+    // "pending" unveraendert online, erst "approve" uebernimmt die
+    // Aenderung atomar (siehe review_partner_shop_revision() in der
+    // SQL-Migration).
+    async function renderPartnerShopRevisionList() {
+      const el = document.getElementById('partnerShopRevisionList');
+      const countEl = document.getElementById('partnerShopRevisionCount');
+      if (!el || typeof loadPartnerShopRevisions !== 'function' || !bkmpGetSupabaseClient()) return;
+      let revisions;
+      try {
+        revisions = (await loadPartnerShopRevisions()).filter(r => r.status === 'pending');
+      } catch (e) {
+        el.innerHTML = '<p style="color:var(--neg); font-size:0.85rem;">Änderungsanträge konnten nicht geladen werden: ' + escapeHtml(supabaseErrorText(e)) + '</p>';
+        return;
+      }
+      if (countEl) countEl.textContent = revisions.length ? `(${revisions.length})` : '';
+      if (revisions.length === 0) {
+        el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem; padding:0.6rem 0.2rem;">Keine offenen Änderungsanträge.</p>';
+        return;
+      }
+      el.innerHTML = '';
+      for (const rev of revisions) {
+        const shop = data.partnerShops.find(s => String(s.id) === String(rev.partner_shop_id));
+        const row = document.createElement('div');
+        row.className = 'entry-row';
+        const changedFields = [
+          rev.name ? `Name → ${escapeHtml(rev.name)}` : '',
+          rev.description ? 'Beschreibung geändert' : '',
+          rev.category ? `Kategorie → ${escapeHtml(rev.category)}` : '',
+          rev.image_url ? 'Logo geändert' : '',
+          rev.locations_changed ? 'Standorte geändert' : ''
+        ].filter(Boolean).join(' · ') || '(keine erkennbaren Feldänderungen)';
+        row.innerHTML = `
+          <div class="desc">
+            <span class="name">${escapeHtml(shop ? shop.name : 'Unbekannter Shop')}</span>
+            <span class="meta">${changedFields}</span>
+            <span class="meta" style="display:block; color:var(--muted); font-size:0.76rem;">Eingereicht: ${formatDate(rev.created_at)}</span>
+          </div>
+          <div class="entry-actions">
+            <button class="edit-btn view-rev-btn" type="button">Details</button>
+            <button class="edit-btn confirm-btn" type="button">Übernehmen</button>
+            <button class="edit-btn reject-btn" type="button">Ablehnen</button>
+          </div>`;
+        row.querySelector('.view-rev-btn').addEventListener('click', async () => {
+          const locs = rev.locations_changed && typeof loadPartnerShopRevisionLocations === 'function' ? await loadPartnerShopRevisionLocations(rev.id) : [];
+          const locsText = locs.length ? locs.map(l => `${l.citybuild}/${l.shop_warp}`).join(', ') : (rev.locations_changed ? '(keine)' : '– unverändert –');
+          alert(
+            `Name: ${rev.name || '– unverändert –'}\n` +
+            `Kategorie: ${rev.category || '– unverändert –'}\n` +
+            `Beschreibung: ${rev.description || '– unverändert –'}\n` +
+            `Logo: ${rev.image_url ? 'neu hochgeladen' : '– unverändert –'}\n` +
+            `Standorte: ${locsText}`
+          );
+        });
+        row.querySelector('.confirm-btn').addEventListener('click', async () => {
+          try {
+            await reviewPartnerShopRevision(rev.id, 'approve', null);
+            showAdminToast('Änderung übernommen.', 'success');
+            await refreshPartnerShopsFromSupabase();
+            renderAll();
+          } catch (e) {
+            showAdminToast('Änderung konnte nicht übernommen werden: ' + supabaseErrorText(e), 'error');
+          }
+        });
+        row.querySelector('.reject-btn').addEventListener('click', async () => {
+          const reason = await bkmpAdminPromptTextModal({
+            titleText: 'Änderungsantrag ablehnen',
+            labelText: 'Begründung (optional, wird dem Shop-Besitzer angezeigt):',
+            confirmText: 'Ablehnen'
+          });
+          if (reason === null) return;
+          try {
+            await reviewPartnerShopRevision(rev.id, 'reject', reason.trim() || null);
+            showAdminToast('Änderungsantrag abgelehnt.', 'success');
+            renderAll();
+          } catch (e) {
+            showAdminToast('Änderungsantrag konnte nicht abgelehnt werden: ' + supabaseErrorText(e), 'error');
+          }
+        });
+        el.appendChild(row);
+      }
+    }
+
+    // OPBK 1.1 PartnerShops-Update: Shop-Meldungen (partner_shop_reports,
+    // Abschnitt 61/62).
+    const BKMP_PARTNER_SHOP_REPORT_LABELS = { broken_warp: 'Warp funktioniert nicht', wrong_information: 'Falsche Angaben', other: 'Sonstiges' };
+    async function renderPartnerShopReportList() {
+      const el = document.getElementById('partnerShopReportList');
+      const countEl = document.getElementById('partnerShopReportCount');
+      if (!el || typeof loadPartnerShopReports !== 'function' || !bkmpGetSupabaseClient()) return;
+      let reports;
+      try {
+        reports = (await loadPartnerShopReports()).filter(r => r.status === 'open');
+      } catch (e) {
+        el.innerHTML = '<p style="color:var(--neg); font-size:0.85rem;">Meldungen konnten nicht geladen werden: ' + escapeHtml(supabaseErrorText(e)) + '</p>';
+        return;
+      }
+      if (countEl) countEl.textContent = reports.length ? `(${reports.length})` : '';
+      if (reports.length === 0) {
+        el.innerHTML = '<p style="color:var(--muted); font-size:0.85rem; padding:0.6rem 0.2rem;">Keine offenen Meldungen.</p>';
+        return;
+      }
+      el.innerHTML = '';
+      reports.forEach(report => {
+        const shop = data.partnerShops.find(s => String(s.id) === String(report.partner_shop_id));
+        const row = document.createElement('div');
+        row.className = 'entry-row';
+        row.innerHTML = `
+          <div class="desc">
+            <span class="name">${escapeHtml(shop ? shop.name : 'Unbekannter Shop')}</span>
+            <span class="meta">${escapeHtml(BKMP_PARTNER_SHOP_REPORT_LABELS[report.report_type] || report.report_type)}${report.message ? ' · ' + escapeHtml(report.message) : ''}</span>
+            <span class="meta" style="display:block; color:var(--muted); font-size:0.76rem;">${formatDate(report.created_at)}</span>
+          </div>
+          <div class="entry-actions">
+            <button class="edit-btn resolve-btn" type="button">Erledigt</button>
+            <button class="edit-btn dismiss-btn" type="button">Verwerfen</button>
+          </div>`;
+        row.querySelector('.resolve-btn').addEventListener('click', async () => {
+          try { await updatePartnerShopReportStatus(report.id, 'resolved'); renderAll(); }
+          catch (e) { showAdminToast('Meldung konnte nicht aktualisiert werden: ' + supabaseErrorText(e), 'error'); }
+        });
+        row.querySelector('.dismiss-btn').addEventListener('click', async () => {
+          try { await updatePartnerShopReportStatus(report.id, 'dismissed'); renderAll(); }
+          catch (e) { showAdminToast('Meldung konnte nicht aktualisiert werden: ' + supabaseErrorText(e), 'error'); }
+        });
+        el.appendChild(row);
+      });
     }
 
     function renderCardSaleList() {
@@ -5024,10 +5263,22 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
     const partnerLinkInput = document.getElementById('partnerLink');
     const partnerContactInput = document.getElementById('partnerContact');
     const partnerImageFileInput = document.getElementById('partnerImageFile');
+    // OPBK 1.1 PartnerShops-Update (13.09.2026): Moderations-Flags +
+    // Standorte-Editor (Abschnitt 10/11/12/24).
+    const partnerVerifiedInput = document.getElementById('partnerVerified');
+    const partnerActiveInput = document.getElementById('partnerActive');
+    const partnerSpotlightEnabledInput = document.getElementById('partnerSpotlightEnabled');
+    const partnerLocationsEditorEl = document.getElementById('partnerLocationsEditor');
+    const partnerLocationsLegacyHintEl = document.getElementById('partnerLocationsLegacyHint');
+    const partnerLocationsListEl = document.getElementById('partnerLocationsList');
+    const partnerLocationCbInputEl = document.getElementById('partnerLocationCbInput');
+    const partnerLocationWarpInputEl = document.getElementById('partnerLocationWarpInput');
+    const partnerLocationAddBtnEl = document.getElementById('partnerLocationAddBtn');
 
     function setPartnerShopEditMode(isEditing) {
       addPartnerShopBtn.textContent = isEditing ? 'Aenderungen speichern' : '+ PartnerShop speichern';
       cancelPartnerShopEditBtn.style.display = isEditing ? 'inline-flex' : 'none';
+      if (partnerLocationsEditorEl) partnerLocationsEditorEl.style.display = isEditing ? '' : 'none';
     }
 
     function clearPartnerShopForm() {
@@ -5039,7 +5290,81 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       partnerLinkInput.value = '';
       partnerContactInput.value = '';
       partnerImageFileInput.value = '';
+      if (partnerVerifiedInput) partnerVerifiedInput.checked = false;
+      if (partnerActiveInput) partnerActiveInput.checked = true;
+      if (partnerSpotlightEnabledInput) partnerSpotlightEnabledInput.checked = true;
       setPartnerShopEditMode(false);
+    }
+
+    // Abschnitt 25 (Best-Effort-Vorschlag): rein eine Anzeige-Hilfe, speichert
+    // NICHTS automatisch - der Admin muss "+ Standort hinzufügen" explizit
+    // selbst klicken (und darf die vorgeschlagenen Werte vorher aendern).
+    function bkmpPartnerShopParseLegacyLocation(text) {
+      const raw = String(text || '');
+      const cbMatch = raw.match(/\bcb\s*0*([1-6])\b/i);
+      const citybuild = cbMatch ? ('CB' + cbMatch[1]) : '';
+      const swMatch = raw.match(/\/sw\s+([A-Za-z0-9_]+)/i);
+      let shopWarp = swMatch ? swMatch[1] : '';
+      if (!shopWarp) {
+        const tokens = raw.match(/[A-Za-z0-9_]+/g) || [];
+        shopWarp = tokens.find(t => !/^cb0*[1-6]$/i.test(t) && t.toLowerCase() !== 'sw') || '';
+      }
+      return { citybuild, shopWarp: shopWarp.slice(0, 32) };
+    }
+
+    async function bkmpRenderPartnerShopLocationsEditor(shopId) {
+      if (!partnerLocationsListEl) return;
+      partnerLocationsListEl.innerHTML = '<p style="color:var(--muted); font-size:0.8rem;">Lädt…</p>';
+      try {
+        const locations = typeof loadPartnerShopLocations === 'function' ? await loadPartnerShopLocations(shopId) : [];
+        if (locations.length === 0) {
+          partnerLocationsListEl.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Noch keine strukturierten Standorte – nur der Legacy-Text oben. „Zum Shop teleportieren" bleibt in der Mod deaktiviert, bis mindestens einer hinzugefügt wird.</p>';
+          return;
+        }
+        partnerLocationsListEl.innerHTML = '';
+        locations.forEach(loc => {
+          const row = document.createElement('div');
+          row.className = 'entry-row';
+          row.innerHTML = `
+            <div class="desc"><span class="name">${escapeHtml(loc.citybuild)}</span> <span class="meta">/sw ${escapeHtml(loc.shop_warp)}${loc.active === false ? ' &middot; inaktiv' : ''}</span></div>
+            <div class="entry-actions">
+              <button class="edit-btn toggle-loc-btn" type="button">${loc.active === false ? 'Aktivieren' : 'Deaktivieren'}</button>
+              <button class="del-btn" type="button" aria-label="Standort löschen"><svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>
+            </div>`;
+          row.querySelector('.toggle-loc-btn').addEventListener('click', async () => {
+            try { await updatePartnerShopLocation(loc.id, { active: loc.active === false }); bkmpRenderPartnerShopLocationsEditor(shopId); }
+            catch (e) { showAdminToast('Standort konnte nicht geändert werden: ' + supabaseErrorText(e), 'error'); }
+          });
+          row.querySelector('.del-btn').addEventListener('click', async () => {
+            if (!window.confirm('Diesen Standort wirklich löschen?')) return;
+            try { await deletePartnerShopLocation(loc.id); bkmpRenderPartnerShopLocationsEditor(shopId); }
+            catch (e) { showAdminToast('Standort konnte nicht gelöscht werden: ' + supabaseErrorText(e), 'error'); }
+          });
+          partnerLocationsListEl.appendChild(row);
+        });
+      } catch (e) {
+        partnerLocationsListEl.innerHTML = '<p style="color:var(--neg); font-size:0.85rem;">Standorte konnten nicht geladen werden.</p>';
+      }
+    }
+
+    if (partnerLocationAddBtnEl) {
+      partnerLocationAddBtnEl.addEventListener('click', async () => {
+        if (!editingPartnerShopId) { showAdminToast('Bitte zuerst einen Shop zum Bearbeiten auswählen.', 'error'); return; }
+        const cb = partnerLocationCbInputEl.value;
+        const warp = partnerLocationWarpInputEl.value.trim();
+        if (!/^[A-Za-z0-9_]{1,32}$/.test(warp)) {
+          showAdminToast('Ungültiger Shop-Warp (nur Buchstaben/Ziffern/Unterstrich, 1-32 Zeichen).', 'error');
+          return;
+        }
+        try {
+          await addPartnerShopLocation(editingPartnerShopId, cb, warp);
+          partnerLocationWarpInputEl.value = '';
+          bkmpRenderPartnerShopLocationsEditor(editingPartnerShopId);
+          showAdminToast('Standort hinzugefügt.', 'success');
+        } catch (e) {
+          showAdminToast('Standort konnte nicht hinzugefügt werden: ' + supabaseErrorText(e), 'error');
+        }
+      });
     }
 
     function startEditPartnerShop(id) {
@@ -5053,7 +5378,24 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       partnerLinkInput.value = shop.link || '';
       partnerContactInput.value = shop.contact || '';
       partnerImageFileInput.value = '';
+      if (partnerVerifiedInput) partnerVerifiedInput.checked = Boolean(shop.verified);
+      if (partnerActiveInput) partnerActiveInput.checked = shop.active !== false;
+      if (partnerSpotlightEnabledInput) partnerSpotlightEnabledInput.checked = shop.spotlightEnabled !== false;
       setPartnerShopEditMode(true);
+      if (partnerLocationsLegacyHintEl) {
+        if (shop.location) {
+          const suggestion = bkmpPartnerShopParseLegacyLocation(shop.location);
+          partnerLocationsLegacyHintEl.textContent = suggestion.citybuild && suggestion.shopWarp
+            ? `Legacy-Text: "${shop.location}" – Vorschlag: ${suggestion.citybuild} / ${suggestion.shopWarp} (bitte unten prüfen und selbst hinzufügen, wird NICHT automatisch übernommen)`
+            : `Legacy-Text: "${shop.location}" (konnte nicht automatisch erkannt werden - bitte manuell pflegen)`;
+          if (suggestion.citybuild) partnerLocationCbInputEl.value = suggestion.citybuild;
+          partnerLocationWarpInputEl.value = suggestion.shopWarp || '';
+        } else {
+          partnerLocationsLegacyHintEl.textContent = 'Kein Legacy-Text hinterlegt.';
+          partnerLocationWarpInputEl.value = '';
+        }
+      }
+      bkmpRenderPartnerShopLocationsEditor(id);
       partnerNameInput.focus();
     }
 
@@ -5077,7 +5419,10 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
           link: partnerLinkInput.value.trim(),
           contact: partnerContactInput.value.trim(),
           image,
-          status: 'approved'
+          status: currentShop ? currentShop.status : 'approved',
+          verified: partnerVerifiedInput ? partnerVerifiedInput.checked : undefined,
+          active: partnerActiveInput ? partnerActiveInput.checked : undefined,
+          spotlightEnabled: partnerSpotlightEnabledInput ? partnerSpotlightEnabledInput.checked : undefined
         };
         return persistPartnerShop(shop).then(saved => {
           if (saved) clearPartnerShopForm();

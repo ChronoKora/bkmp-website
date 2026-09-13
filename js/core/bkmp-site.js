@@ -3346,7 +3346,12 @@
        Frontend vorhandenen Felder, keine neue Datenbankfunktion. */
     function bkmpPartnerShopMatchesSearch(shop, query) {
       if (!query) return true;
-      const haystack = [shop.name, shop.location, shop.category, shop.contact, shop.description]
+      // Abschnitt 29: durchsucht zusaetzlich die strukturierten CB/Warp-
+      // Standorte, falls bereits vom Admin gepflegt (Array leer, solange
+      // nur der Legacy-location-Text existiert - haengt sich einfach
+      // nichts an den Haystack).
+      const locationTokens = Array.isArray(shop.locations) ? shop.locations.map(l => `${l.citybuild} ${l.shopWarp}`) : [];
+      const haystack = [shop.name, shop.location, shop.category, shop.contact, shop.description, ...locationTokens]
         .filter(Boolean).join(' ').toLowerCase();
       return haystack.includes(query);
     }
@@ -3434,7 +3439,8 @@
             ${shop.image ? `<img data-bkmp-img src="${shop.image}" alt="${escapeHtml(shop.name)}" loading="eager" decoding="async">` : '<div class="partner-image-empty">Kein Bild</div>'}
           </div>
           <div class="partner-spotlight-body">
-            <h3>${escapeHtml(shop.name)}</h3>
+            <h3>${escapeHtml(shop.name)}${shop.verified ? ' <span class="partner-verified-badge" title="Verifizierter PartnerShop">✔</span>' : ''}</h3>
+            ${Array.isArray(shop.locations) && shop.locations.length ? `<div class="partner-cb-chips">${shop.locations.map(loc => `<span class="partner-cb-chip">${escapeHtml(loc.citybuild)}</span>`).join('')}</div>` : ''}
             ${shop.location ? `<div class="partner-location">${escapeHtml(shop.location)}</div>` : ''}
             <span class="partner-category">${escapeHtml(shop.category || 'Partner')}</span>
           </div>
@@ -3536,7 +3542,14 @@
         window.setTimeout(() => card.classList.remove('partner-card-highlight'), 1700);
       });
     }
-    function bkmpUpdatePartnerSpotlightShopList(shops) {
+    function bkmpUpdatePartnerSpotlightShopList(allShops) {
+      // OPBK 1.1 PartnerShops-Update (13.09.2026, Abschnitt 21): der
+      // Spotlight-Teilnehmerkreis ist ein STRENGERER Filter als die normale
+      // Shop-Liste - ein Shop kann `spotlightEnabled=false` haben und
+      // trotzdem normal im Grid durchsuchbar bleiben, nimmt dann aber nicht
+      // an der Rotation teil. Die Filterung sitzt bewusst HIER (nicht an
+      // jeder Aufrufstelle einzeln), damit kein Aufrufer das vergessen kann.
+      const shops = (Array.isArray(allShops) ? allShops : []).filter(s => s.spotlightEnabled !== false);
       bkmpPartnerSpotlightShops = shops;
       if (!partnerSpotlightEl) return;
       if (shops.length === 0) {
@@ -3577,7 +3590,9 @@
 
     function renderPartnerShops() {
       if (!partnerFilter || !partnerGrid) return;
-      const allShops = (Array.isArray(data.partnerShops) ? data.partnerShops : []).filter(shop => !shop.status || shop.status === 'approved');
+      const allShops = (Array.isArray(data.partnerShops) ? data.partnerShops : []).filter(shop =>
+        (!shop.status || shop.status === 'approved') && shop.active !== false
+      );
 
       /* Hero-Statistik (Auftrag Abschnitt 1) - nur Werte, die sich sauber
          aus echten Daten ergeben. Bewusst KEINE "X CityBuilds"-Kennzahl: es
@@ -3635,15 +3650,27 @@
       const newShopBadge = bkmpNewBadgeChecker('partnershops');
       partnerGrid.innerHTML = visible.map(shop => {
         const href = bkmpPartnerShopHref(shop);
+        // OPBK 1.1 PartnerShops-Update (13.09.2026): strukturierte
+        // Standorte (falls bereits vom Admin gepflegt) als kleine CB-
+        // Chips, NEBEN dem unveraenderten Legacy-location-Freitext (wird
+        // absichtlich nie ersetzt, siehe Abschnitt 20 - ein Shop ohne
+        // strukturierte Standorte bleibt weiterhin nur ueber den Text
+        // sichtbar).
+        const locations = Array.isArray(shop.locations) ? shop.locations : [];
+        const cbChips = locations.length
+          ? `<div class="partner-cb-chips">${locations.map(loc => `<span class="partner-cb-chip">${escapeHtml(loc.citybuild)}</span>`).join('')}</div>`
+          : '';
         return `
           <article class="partner-card" data-shop-id="${escapeHtml(String(shop.id))}">
             ${newShopBadge(shop.id)}
+            ${shop.verified ? '<span class="partner-verified-badge" title="Verifizierter PartnerShop">✔ Verifiziert</span>' : ''}
             <div class="partner-image-frame" data-bkmp-image-wrap data-empty-label="Kein Bild">
               ${shop.image ? `<img data-bkmp-img src="${shop.image}" alt="${escapeHtml(shop.name)}" loading="lazy" fetchpriority="low" decoding="async">` : '<div class="partner-image-empty">Kein Bild</div>'}
             </div>
             <div class="partner-body">
               <span class="partner-category">${escapeHtml(shop.category || 'Partner')}</span>
               <h3>${escapeHtml(shop.name)}</h3>
+              ${cbChips}
               ${shop.location ? `<div class="partner-location">${escapeHtml(shop.location)}</div>` : ''}
               ${shop.description ? `<p>${escapeHtml(shop.description)}</p>` : ''}
               <div class="partner-actions">
@@ -4815,6 +4842,8 @@
     const partnerShopNameInput = document.getElementById('partnerShopName');
     const partnerShopLocationInput = document.getElementById('partnerShopLocation');
     const partnerShopCategoryInput = document.getElementById('partnerShopCategory');
+    const partnerShopCbInput = document.getElementById('partnerShopCb');
+    const partnerShopWarpInput = document.getElementById('partnerShopWarp');
     const partnerShopDescriptionInput = document.getElementById('partnerShopDescription');
     const partnerShopLinkInput = document.getElementById('partnerShopLink');
     const partnerShopContactInput = document.getElementById('partnerShopContact');
@@ -4839,6 +4868,8 @@
       partnerShopNameInput.value = '';
       partnerShopLocationInput.value = '';
       partnerShopCategoryInput.value = '';
+      if (partnerShopCbInput) partnerShopCbInput.value = '';
+      if (partnerShopWarpInput) partnerShopWarpInput.value = '';
       partnerShopDescriptionInput.value = '';
       partnerShopLinkInput.value = '';
       partnerShopContactInput.value = '';
@@ -4871,17 +4902,22 @@
 
         const location = partnerShopLocationInput.value.trim();
         const category = partnerShopCategoryInput.value.trim();
+        const citybuild = partnerShopCbInput ? partnerShopCbInput.value.trim() : '';
+        const shopWarp = partnerShopWarpInput ? partnerShopWarpInput.value.trim() : '';
+        if (citybuild && !shopWarp) { partnerShopWarpInput.reportValidity(); return; }
+        if (shopWarp && !citybuild) { partnerShopCbInput.reportValidity(); return; }
         const description = partnerShopDescriptionInput.value.trim();
         const link = partnerShopLinkInput.value.trim();
         const contact = partnerShopContactInput.value.trim();
         const file = partnerShopImageFileInput.files && partnerShopImageFileInput.files[0];
-        partnerShopPendingEntry = { name, location, category, description, link, contact, file };
+        partnerShopPendingEntry = { name, location, category, citybuild, shopWarp, description, link, contact, file };
 
         if (partnerShopConfirmPreviewUrl) URL.revokeObjectURL(partnerShopConfirmPreviewUrl);
         const rows = [
           ['Shopname', name],
           ['Server / Warp', location],
           ['Kategorie', category],
+          ['Strukturierter Standort', citybuild && shopWarp ? `${citybuild} · ${shopWarp}` : ''],
           ['Beschreibung', description],
           ['Link', link],
           ['Kontakt', contact]
@@ -4906,7 +4942,7 @@
         if (!partnerShopPendingEntry) return;
         const cooldown = bkmpSubmitCooldownSecondsLeft('partnershop');
         if (cooldown > 0) { alert(`Bitte warte noch ${cooldown} Sekunde(n), bevor du erneut einreichst.`); return; }
-        const { name, location, category, description, link, contact, file } = partnerShopPendingEntry;
+        const { name, location, category, citybuild, shopWarp, description, link, contact, file } = partnerShopPendingEntry;
 
         partnerShopConfirmYes.disabled = true;
         partnerShopConfirmYes.textContent = 'Wird gespeichert...';
@@ -4918,15 +4954,28 @@
 
         const readImage = file ? bkmpCompressImageFile(file) : Promise.resolve('');
         readImage.then(image => {
-          bkmpSubmitViaApi('partner_shops', { name, location, category, description, link, contact }, image || null).then(() => {
-            bkmpStartSubmitCooldown('partnershop');
-            resetBtn();
-            clearPartnerShopForm();
-            showPartnerShopView(partnerShopSuccessView);
-          }).catch(e => {
-            console.error('PartnerShop konnte nicht gespeichert werden.', e);
-            resetBtn();
-            alert('Der Shop konnte nicht gespeichert werden: ' + (e && e.message || e) + '\n\nBitte versuche es erneut.');
+          // OPBK 1.1 PartnerShops-Update (13.09.2026): Login bleibt optional
+          // (Abschnitt 22) - existiert eine Spieler-Session, wird ihr
+          // Access-Token mitgeschickt, damit api/submit-entry.js die
+          // owner_auth_user_id server-seitig setzen kann, identisches
+          // Muster wie bei card_sale_requests oben.
+          const authClient = typeof bkmpGetPlayerAuthClient === 'function' ? bkmpGetPlayerAuthClient() : null;
+          const tokenPromise = authClient
+            ? authClient.auth.getSession().then(({ data }) => (data && data.session && data.session.access_token) || null).catch(() => null)
+            : Promise.resolve(null);
+          const fields = { name, location, category, description, link, contact };
+          if (citybuild && shopWarp) { fields.citybuilds = [citybuild]; fields.shopWarps = [shopWarp]; }
+          tokenPromise.then(token => {
+            bkmpSubmitViaApi('partner_shops', fields, image || null, token ? { playerAccessToken: token } : undefined).then(() => {
+              bkmpStartSubmitCooldown('partnershop');
+              resetBtn();
+              clearPartnerShopForm();
+              showPartnerShopView(partnerShopSuccessView);
+            }).catch(e => {
+              console.error('PartnerShop konnte nicht gespeichert werden.', e);
+              resetBtn();
+              alert('Der Shop konnte nicht gespeichert werden: ' + (e && e.message || e) + '\n\nBitte versuche es erneut.');
+            });
           });
         }).catch(() => {
           resetBtn();
