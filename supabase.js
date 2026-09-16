@@ -3255,6 +3255,19 @@ async function importLocalInvestorRequestsToSupabase() {
   return { imported: rows.length, skipped, total: refreshed.length };
 }
 
+// 16.09.2026 (Nutzerwunsch: "im Admin Panel auch alles bearbeiten zu
+// koennen... in der Kartendatenbank kann ich nicht soviel bearbeiten wie
+// man in der Mod eingeben kann") - Root Cause: sql/20260902-mod-account-
+// linking-and-submissions.sql hat card_catalog bereits um series/price/
+// seller/creator/width_maps/height_maps/total_maps erweitert UND
+// approve_card_submission() schreibt diese Felder bei jeder ueber die Mod
+// angenommenen Karte bereits live in die DB - nur DIESE Datei hat die
+// Spalten nie mitgelesen/mitgeschrieben, die Werte lagen fuer jede seit
+// dem 02.09.2026 angenommene Karte unsichtbar in der DB. Eine gemeinsame
+// Spaltenliste (identisches Prinzip wie PARTNER_SHOP_SELECT_COLUMNS oben)
+// haelt alle Lese-/Schreibstellen synchron.
+const CARD_CATALOG_SELECT_COLUMNS = 'id, name, category, shop_name, cb, size, submitted_by, description, image_url, status, is_read, created_at, series, price, seller, creator, width_maps, height_maps, total_maps';
+
 function bkmpMapCardCatalogFromSupabase(row) {
   return {
     id: row.id,
@@ -3269,6 +3282,16 @@ function bkmpMapCardCatalogFromSupabase(row) {
     status: row.status || 'approved',
     isRead: Boolean(row.is_read),
     createdAt: row.created_at ? Date.parse(row.created_at) : 0,
+    // 16.09.2026 - siehe Kommentar bei CARD_CATALOG_SELECT_COLUMNS. Bei
+    // aelteren, direkt in der Website angelegten Karten (nie ueber die
+    // Mod-Einreichung gelaufen) schlicht leer/undefined, kein Fehler.
+    series: row.series || '',
+    price: row.price === undefined || row.price === null ? null : row.price,
+    seller: row.seller || '',
+    creator: row.creator || '',
+    widthMaps: row.width_maps === undefined || row.width_maps === null ? null : row.width_maps,
+    heightMaps: row.height_maps === undefined || row.height_maps === null ? null : row.height_maps,
+    totalMaps: row.total_maps === undefined || row.total_maps === null ? null : row.total_maps,
     source: 'supabase'
   };
 }
@@ -3282,7 +3305,19 @@ function bkmpMapCardCatalogToSupabase(item) {
     size: item.size || '',
     submitted_by: item.submittedBy || '',
     description: item.description || '',
-    image_url: item.image || ''
+    image_url: item.image || '',
+    // 16.09.2026 - siehe Kommentar bei CARD_CATALOG_SELECT_COLUMNS. Leere
+    // Strings/leeres Zahlenfeld raeumen einen zuvor per Mod-Einreichung
+    // gesetzten Wert bewusst mit auf (das Admin-Formular zeigt den
+    // aktuellen Stand ja vollstaendig an, ein leeres Feld ist damit ein
+    // echtes "loeschen", kein versehentliches Ueberschreiben).
+    series: item.series || '',
+    price: item.price === '' || item.price === undefined || item.price === null ? null : Number(item.price),
+    seller: item.seller || '',
+    creator: item.creator || '',
+    width_maps: item.widthMaps === '' || item.widthMaps === undefined || item.widthMaps === null ? null : Number(item.widthMaps),
+    height_maps: item.heightMaps === '' || item.heightMaps === undefined || item.heightMaps === null ? null : Number(item.heightMaps),
+    total_maps: item.totalMaps === '' || item.totalMaps === undefined || item.totalMaps === null ? null : Number(item.totalMaps)
   };
   if (item.status) payload.status = item.status;
   return payload;
@@ -3293,7 +3328,7 @@ async function loadCardCatalog() {
   if (!client) return null;
   const { data, error } = await client
     .from('card_catalog')
-    .select('id, name, category, shop_name, cb, size, submitted_by, description, image_url, status, is_read, created_at')
+    .select(CARD_CATALOG_SELECT_COLUMNS)
     .order('created_at', { ascending: false });
   if (error) throw error;
   return (data || []).map(bkmpMapCardCatalogFromSupabase);
@@ -3405,7 +3440,7 @@ async function updateCardCatalogStatus(id, status) {
     .from('card_catalog')
     .update({ status })
     .eq('id', id)
-    .select('id, name, category, shop_name, cb, size, submitted_by, description, image_url, status, is_read, created_at')
+    .select(CARD_CATALOG_SELECT_COLUMNS)
     .limit(1);
   if (error) throw error;
   const row = Array.isArray(data) ? data[0] : null;
@@ -3419,7 +3454,7 @@ async function updateCardCatalogRead(id, isRead) {
     .from('card_catalog')
     .update({ is_read: isRead })
     .eq('id', id)
-    .select('id, name, category, shop_name, cb, size, submitted_by, description, image_url, status, is_read, created_at')
+    .select(CARD_CATALOG_SELECT_COLUMNS)
     .limit(1);
   if (error) throw error;
   const row = Array.isArray(data) ? data[0] : null;
@@ -3437,13 +3472,13 @@ async function saveCardCatalogEntry(item) {
       .from('card_catalog')
       .update(payload)
       .eq('id', item.id)
-      .select('id, name, category, shop_name, cb, size, submitted_by, description, image_url, status, created_at')
+      .select(CARD_CATALOG_SELECT_COLUMNS)
       .limit(1);
   } else {
     query = client
       .from('card_catalog')
       .insert(payload)
-      .select('id, name, category, shop_name, cb, size, submitted_by, description, image_url, status, created_at')
+      .select(CARD_CATALOG_SELECT_COLUMNS)
       .limit(1);
   }
   const { data, error } = await query;

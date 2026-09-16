@@ -734,6 +734,26 @@
                 <div><label for="cardCatalogEditSize">Wie groß ist die Karte?</label><input type="text" id="cardCatalogEditSize" placeholder="z. B. 15er"></div>
                 <div><label for="cardCatalogEditWho">Eingetragen von</label><input type="text" id="cardCatalogEditWho"></div>
               </div>
+              <!-- 16.09.2026 (Nutzerwunsch "im Admin Panel auch alles
+                   bearbeiten zu koennen wie man in der Mod eingeben kann"):
+                   series/seller/price/creator/width_maps/height_maps/
+                   total_maps existieren bereits laenger in card_catalog
+                   (sql/20260902-mod-account-linking-and-submissions.sql,
+                   approve_card_submission() befuellt sie bei jeder ueber
+                   die Mod angenommenen Karte automatisch) - nur diese
+                   Formularfelder fehlten bisher komplett, siehe
+                   supabase.js's CARD_CATALOG_SELECT_COLUMNS-Kommentar fuer
+                   die volle Herleitung. -->
+              <div class="form-grid form-grid-3">
+                <div><label for="cardCatalogEditSeries">Serie / Franchise</label><input type="text" id="cardCatalogEditSeries" placeholder="z. B. One Piece"></div>
+                <div><label for="cardCatalogEditSeller">Verkäufer</label><input type="text" id="cardCatalogEditSeller"></div>
+                <div><label for="cardCatalogEditPrice">Preis (€)</label><input type="number" id="cardCatalogEditPrice" min="0" step="1"></div>
+              </div>
+              <div class="form-grid form-grid-3">
+                <div><label for="cardCatalogEditCreator">Ersteller</label><input type="text" id="cardCatalogEditCreator"></div>
+                <div><label for="cardCatalogEditWidthMaps">Breite (Karten)</label><input type="number" id="cardCatalogEditWidthMaps" min="0" step="1"></div>
+                <div><label for="cardCatalogEditHeightMaps">Höhe (Karten)</label><input type="number" id="cardCatalogEditHeightMaps" min="0" step="1"></div>
+              </div>
               <label for="cardCatalogEditDescription">Beschreibung</label>
               <textarea id="cardCatalogEditDescription"></textarea>
               <div class="investor-form-actions">
@@ -3242,6 +3262,13 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
     const cardCatalogEditSize = document.getElementById('cardCatalogEditSize');
     const cardCatalogEditWho = document.getElementById('cardCatalogEditWho');
     const cardCatalogEditDescription = document.getElementById('cardCatalogEditDescription');
+    // 16.09.2026 - siehe Kommentar bei CARD_CATALOG_SELECT_COLUMNS (supabase.js).
+    const cardCatalogEditSeries = document.getElementById('cardCatalogEditSeries');
+    const cardCatalogEditSeller = document.getElementById('cardCatalogEditSeller');
+    const cardCatalogEditPrice = document.getElementById('cardCatalogEditPrice');
+    const cardCatalogEditCreator = document.getElementById('cardCatalogEditCreator');
+    const cardCatalogEditWidthMaps = document.getElementById('cardCatalogEditWidthMaps');
+    const cardCatalogEditHeightMaps = document.getElementById('cardCatalogEditHeightMaps');
 
     function startEditCardCatalogEntry(id) {
       const item = data.cardCatalog.find(i => String(i.id) === String(id));
@@ -3254,6 +3281,12 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       cardCatalogEditSize.value = item.size || '';
       cardCatalogEditWho.value = item.submittedBy || '';
       cardCatalogEditDescription.value = item.description || '';
+      cardCatalogEditSeries.value = item.series || '';
+      cardCatalogEditSeller.value = item.seller || '';
+      cardCatalogEditPrice.value = item.price === null || item.price === undefined ? '' : item.price;
+      cardCatalogEditCreator.value = item.creator || '';
+      cardCatalogEditWidthMaps.value = item.widthMaps === null || item.widthMaps === undefined ? '' : item.widthMaps;
+      cardCatalogEditHeightMaps.value = item.heightMaps === null || item.heightMaps === undefined ? '' : item.heightMaps;
       cardCatalogEditForm.style.display = '';
       cardCatalogEditForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
@@ -3271,6 +3304,17 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
         if (!editingCardCatalogId) return;
         const current = data.cardCatalog.find(i => String(i.id) === String(editingCardCatalogId));
         if (!current) return;
+        // 16.09.2026 - siehe Kommentar bei CARD_CATALOG_SELECT_COLUMNS
+        // (supabase.js). totalMaps wird bewusst NICHT als eigenes Feld
+        // abgefragt, sondern aus Breite*Hoehe abgeleitet (identisch zur
+        // approve_card_submission()-RPC, die width_maps*height_maps schon
+        // beim Anlegen kennt) - verhindert, dass ein drittes, manuell
+        // eingetragenes "Gesamt"-Feld der Breite/Hoehe widerspricht.
+        const widthMapsVal = cardCatalogEditWidthMaps.value.trim();
+        const heightMapsVal = cardCatalogEditHeightMaps.value.trim();
+        const widthMaps = widthMapsVal === '' ? null : Number(widthMapsVal);
+        const heightMaps = heightMapsVal === '' ? null : Number(heightMapsVal);
+        const priceVal = cardCatalogEditPrice.value.trim();
         const updatedItem = {
           ...current,
           name: cardCatalogEditName.value.trim() || current.name,
@@ -3279,7 +3323,14 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
           cb: cardCatalogEditCb.value.trim(),
           size: cardCatalogEditSize.value.trim(),
           submittedBy: cardCatalogEditWho.value.trim(),
-          description: cardCatalogEditDescription.value.trim()
+          description: cardCatalogEditDescription.value.trim(),
+          series: cardCatalogEditSeries.value.trim(),
+          seller: cardCatalogEditSeller.value.trim(),
+          price: priceVal === '' ? null : Number(priceVal),
+          creator: cardCatalogEditCreator.value.trim(),
+          widthMaps,
+          heightMaps,
+          totalMaps: widthMaps !== null && heightMaps !== null ? widthMaps * heightMaps : current.totalMaps
         };
         if (typeof saveCardCatalogEntry === 'function' && bkmpGetSupabaseClient()) {
           try {
@@ -3327,7 +3378,7 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
           <div class="desc">
             ${!item.isRead ? '<span class="entry-row-unread-dot" aria-hidden="true"></span>' : ''}
             <span class="name">${escapeHtml(item.name)}</span>
-            <span class="meta">${item.category ? escapeHtml(item.category) + ' · ' : ''}${item.shopName ? escapeHtml(item.shopName.toUpperCase()) + ' · ' : ''}${item.cb ? escapeHtml(item.cb) + ' · ' : ''}${item.size ? escapeHtml(item.size) + ' · ' : ''}${item.submittedBy ? 'von ' + escapeHtml(item.submittedBy) : ''}</span>
+            <span class="meta">${item.category ? escapeHtml(item.category) + ' · ' : ''}${item.series ? escapeHtml(item.series) + ' · ' : ''}${item.shopName ? escapeHtml(item.shopName.toUpperCase()) + ' · ' : ''}${item.cb ? escapeHtml(item.cb) + ' · ' : ''}${item.size ? escapeHtml(item.size) + ' · ' : ''}${item.submittedBy ? 'von ' + escapeHtml(item.submittedBy) : ''}</span>
           </div>
           <div class="entry-actions">
             ${!item.isRead ? '<button class="edit-btn read-btn" type="button">Gelesen</button>' : ''}
@@ -4451,6 +4502,15 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
           item.verified ? '<span class="badge-pill badge-pill-ok">✔ Verifiziert</span>' : '',
           item.active === false ? '<span class="badge-pill badge-pill-off">Inaktiv</span>' : '',
           item.spotlightEnabled === false ? '<span class="badge-pill badge-pill-off">Kein Spotlight</span>' : '',
+          // 16.09.2026 (Nutzerwunsch: "alle alten eingetragene Shops haben
+          // sowas wie cb oder sw nicht eingetragen komplett") - der
+          // Standorte-Editor (CB-Dropdown + Warp, inkl. Legacy-Text-
+          // Vorschlag) existierte bereits, war aber nur sichtbar, solange
+          // man einen Shop schon bearbeitet - ohne diesen Badge musste man
+          // jeden der (aktuell 27) Shops einzeln oeffnen, um zu sehen, ob
+          // er betroffen ist. `item.locations` enthaelt nur AKTIVE
+          // strukturierte Standorte (siehe bkmpMapPartnerShopFromSupabase).
+          (item.locations || []).length === 0 ? '<span class="badge-pill badge-pill-off">📍 Kein Standort</span>' : '',
           ownerLabel ? `<span class="badge-pill">👤 ${escapeHtml(ownerLabel)}</span>` : ''
         ].filter(Boolean).join(' ');
         row.innerHTML = `
