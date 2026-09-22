@@ -4896,7 +4896,7 @@ input.cardcatalog-search:focus {
 .investor-security-answer-btn { min-width: 110px; }
 .investor-security-answer-btn:disabled { opacity: 0.6; cursor: default; transform: none; }
 
-/* Stufe 7 (22.09.2026, zuletzt auf Position 7/8 statt 4/8 verschoben,
+/* Stufe 6 (22.09.2026, zuletzt von Position 4/8 -> 7/8 -> 6/8 verschoben,
    siehe JS-Kommentar bei renderSecStageYaksha) - ChronoYaksha-Frage, teilt
    sich .investor-security-question/-answer-row/-answer-btn mit Stufe 3
    (identisches Frage/Antwort-Layout), nur der Spoiler-Aufklapper ist neu.
@@ -4938,7 +4938,7 @@ input.cardcatalog-search:focus {
 .investor-security-check-row { display: flex; align-items: flex-start; gap: 0.6rem; font-size: 0.86rem; cursor: pointer; }
 .investor-security-check-row input { margin-top: 0.2rem; width: 16px; height: 16px; accent-color: var(--purple); flex-shrink: 0; cursor: pointer; }
 
-/* Stufe 6 - Fake-Fingerabdruckscanner */
+/* Stufe 7 - Fake-Fingerabdruckscanner */
 .investor-security-fp-scanner { background: none; border: none; padding: 0; cursor: pointer; display: block; margin: 0 auto; touch-action: none; }
 .investor-security-fp-ring {
   position: relative; width: 128px; height: 128px; margin: 0 auto;
