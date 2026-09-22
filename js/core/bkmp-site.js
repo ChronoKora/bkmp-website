@@ -2719,61 +2719,11 @@
         });
       }
 
-      /* ---- Stufe 4 (22.09.2026, Nutzerwunsch "eine weitere Frage
-         hinzufuegen"): ChronoYaksha-Texturwunsch-Frage ---- Beide Antwort-
-         Knoepfe sagen bewusst dasselbe ("Ja") - identischer Witz wie
-         Stufe 3 (Dayman/Lukas): egal was man klickt, die "richtige"
-         Antwort ist ohnehin vorgegeben. Bild-Asset: siehe
-         INVESTOR_SECURITY_YAKSHA_IMAGE unten - dort einfach austauschen,
-         sobald Yaksha ein neueres WIP-Bild hat. */
-      function renderSecStageYaksha() {
-        const html = `
-          <h3>Zustimmungsprüfung 4/8</h3>
-          <p class="investor-security-lead">Bitte beantworte die Sicherheitsfrage korrekt.</p>
-          <p class="investor-security-question">Darf deine Creatorin ChronoYaksha ihren Texturwunsch-Drachen einlösen, mit deiner Erlaubnis?</p>
-          <div class="joke-buttons investor-security-answer-row">
-            <button type="button" class="btn-ja investor-security-answer-btn" id="investorSecurityYakshaYes1">Ja</button>
-            <button type="button" class="btn-ja investor-security-answer-btn" id="investorSecurityYakshaYes2">Ja</button>
-          </div>
-          <p class="investor-security-feedback" id="investorSecurityYakshaFeedback" hidden></p>
-          <details class="investor-security-spoiler" id="investorSecurityYakshaSpoiler" hidden>
-            <summary>🔍 Spoiler: Yakshas Arbeit bereits ansehen</summary>
-            <img class="investor-security-spoiler-img" src="${INVESTOR_SECURITY_YAKSHA_IMAGE}" alt="Yakshas Texturwunsch-Drache (Work in Progress)">
-          </details>
-          <div class="joke-buttons" id="investorSecurityYakshaContinueWrap" hidden>
-            <button type="button" class="btn-ja" id="investorSecurityYakshaContinue">Weiter</button>
-          </div>
-        `;
-        secRenderTransition(html, () => {
-          const yes1 = document.getElementById('investorSecurityYakshaYes1');
-          const yes2 = document.getElementById('investorSecurityYakshaYes2');
-          const feedback = document.getElementById('investorSecurityYakshaFeedback');
-          const spoiler = document.getElementById('investorSecurityYakshaSpoiler');
-          const continueWrap = document.getElementById('investorSecurityYakshaContinueWrap');
-          function answer() {
-            yes1.disabled = true;
-            yes2.disabled = true;
-            feedback.hidden = false;
-            feedback.className = 'investor-security-feedback is-success';
-            feedback.textContent = 'Erlaubnis erteilt. Yaksha wird informiert.';
-            spoiler.hidden = false;
-            const t = setTimeout(() => { continueWrap.hidden = false; }, 900);
-            secTimers.push(t);
-          }
-          yes1.addEventListener('click', answer);
-          yes2.addEventListener('click', answer);
-          document.getElementById('investorSecurityYakshaContinue').addEventListener('click', () => goToSecStage(5));
-        });
-      }
-
-      /* ---- Stufe 5 (Funktionsname weiterhin "Stage4" aus der Zeit vor der
-         Yaksha-Frage - nur die Aufruf-Position in SEC_STAGE_RENDERERS
-         wurde verschoben, um keine unnoetigen Umbenennungen quer durch
-         die Datei zu riskieren): Vertrauens-Slider ---- */
+      /* ---- Stufe 4: Vertrauens-Slider ---- */
       function renderSecStage4() {
         const startValue = 50;
         const html = `
-          <h3>Vertrauensabgleich 5/8</h3>
+          <h3>Vertrauensabgleich 4/8</h3>
           <p class="investor-security-lead">Wie sehr vertraust du Kora bei dieser Auszahlung?</p>
           <p class="investor-security-trust-value" id="investorSecurityTrustValue">Vertrauen: ${startValue}%</p>
           <input type="range" min="0" max="100" value="${startValue}" class="investor-security-slider" id="investorSecurityTrustSlider">
@@ -2805,7 +2755,7 @@
             const t = setTimeout(() => {
               feedback.className = 'investor-security-feedback is-success';
               feedback.textContent = 'Trotzdem akzeptiert.';
-              const t2 = setTimeout(() => goToSecStage(6), 900);
+              const t2 = setTimeout(() => goToSecStage(5), 900);
               secTimers.push(t2);
             }, 1000);
             secTimers.push(t);
@@ -2823,7 +2773,7 @@
           'Ich erkenne Kora als absolut seriöse Auszahlungsinstanz an'
         ];
         const html = `
-          <h3>Rechtliche Bestätigung 6/8</h3>
+          <h3>Rechtliche Bestätigung 5/8</h3>
           <p class="investor-security-lead">Bitte bestätige alle Auszahlungsvoraussetzungen.</p>
           <div class="investor-security-checklist">
             ${items.map((label, i) => `
@@ -2850,7 +2800,7 @@
             feedback.hidden = false;
             feedback.className = 'investor-security-feedback is-success';
             feedback.textContent = 'Rechtliche Zustimmung erfolgreich dokumentiert.';
-            const t = setTimeout(() => goToSecStage(7), 1000);
+            const t = setTimeout(() => goToSecStage(6), 1000);
             secTimers.push(t);
           });
         });
@@ -2859,7 +2809,7 @@
       /* ---- Stufe 6: Fake-Fingerabdruckscanner ---- */
       function renderSecStage6() {
         const html = `
-          <h3>Biometrische Prüfung 7/8</h3>
+          <h3>Biometrische Prüfung 6/8</h3>
           <p class="investor-security-lead">Lege deinen Finger auf den Scanner und halte still.</p>
           <button type="button" class="investor-security-fp-scanner" id="investorSecurityFpScanner" aria-label="Fingerabdruckscanner">
             <span class="investor-security-fp-ring" id="investorSecurityFpRing">
@@ -2962,13 +2912,64 @@
               feedback.hidden = true;
               actionWrap.hidden = true;
             } else {
-              goToSecStage(8);
+              goToSecStage(7);
             }
           });
         });
       }
 
-      /* ---- Stufe 7: Fake Auszahlung wird bearbeitet -> bestehender Rickroll ---- */
+      /* ---- Stufe 7 (22.09.2026, Nutzerwunsch "eine weitere Frage
+         hinzufuegen", zuletzt auf Position 7/8 statt 4/8 verschoben):
+         ChronoYaksha-Texturwunsch-Frage ---- Beide Antwort-Knoepfe sagen
+         bewusst dasselbe ("Ja") - identischer Witz wie Stufe 3 (Dayman/
+         Lukas): egal was man klickt, die "richtige" Antwort ist ohnehin
+         vorgegeben. Bild-Asset: siehe INVESTOR_SECURITY_YAKSHA_IMAGE
+         weiter oben - dort einfach austauschen, sobald Yaksha ein
+         neueres WIP-Bild hat. */
+      function renderSecStageYaksha() {
+        const html = `
+          <h3>Zustimmungsprüfung 7/8</h3>
+          <p class="investor-security-lead">Bitte beantworte die Sicherheitsfrage korrekt.</p>
+          <p class="investor-security-question">Darf deine Creatorin ChronoYaksha ihren selbst designten Texturwunsch-Drachen einlösen, mit deiner Erlaubnis?</p>
+          <div class="joke-buttons investor-security-answer-row">
+            <button type="button" class="btn-ja investor-security-answer-btn" id="investorSecurityYakshaYes1">Ja</button>
+            <button type="button" class="btn-ja investor-security-answer-btn" id="investorSecurityYakshaYes2">Ja</button>
+          </div>
+          <p class="investor-security-feedback" id="investorSecurityYakshaFeedback" hidden></p>
+          <details class="investor-security-spoiler" id="investorSecurityYakshaSpoiler" hidden>
+            <summary>🔍 Spoiler: Yakshas Arbeit bereits ansehen</summary>
+            <img class="investor-security-spoiler-img" src="${INVESTOR_SECURITY_YAKSHA_IMAGE}" alt="Yakshas Texturwunsch-Drache (Work in Progress)">
+          </details>
+          <div class="joke-buttons" id="investorSecurityYakshaContinueWrap" hidden>
+            <button type="button" class="btn-ja" id="investorSecurityYakshaContinue">Weiter</button>
+          </div>
+        `;
+        secRenderTransition(html, () => {
+          const yes1 = document.getElementById('investorSecurityYakshaYes1');
+          const yes2 = document.getElementById('investorSecurityYakshaYes2');
+          const feedback = document.getElementById('investorSecurityYakshaFeedback');
+          const spoiler = document.getElementById('investorSecurityYakshaSpoiler');
+          const continueWrap = document.getElementById('investorSecurityYakshaContinueWrap');
+          function answer() {
+            yes1.disabled = true;
+            yes2.disabled = true;
+            feedback.hidden = false;
+            feedback.className = 'investor-security-feedback is-success';
+            feedback.textContent = 'Erlaubnis erteilt. Yaksha wird informiert.';
+            spoiler.hidden = false;
+            const t = setTimeout(() => { continueWrap.hidden = false; }, 900);
+            secTimers.push(t);
+          }
+          yes1.addEventListener('click', answer);
+          yes2.addEventListener('click', answer);
+          document.getElementById('investorSecurityYakshaContinue').addEventListener('click', () => goToSecStage(8));
+        });
+      }
+
+      /* ---- Stufe 8 (Funktionsname weiterhin "Stage7" aus der Zeit vor der
+         Yaksha-Frage - nur die Aufruf-Position in SEC_STAGE_RENDERERS
+         wurde verschoben): Fake Auszahlung wird bearbeitet -> bestehender
+         Rickroll ---- */
       function renderSecStage7() {
         /* 10.09.2026 (Nutzerwunsch, Nachbesserung) - zusaetzliche Meme-Zeilen
            zwischen die urspruenglich "seriösen" Statusmeldungen gemischt.
@@ -3035,8 +3036,8 @@
       }
 
       const SEC_STAGE_RENDERERS = {
-        1: renderSecStage1, 2: renderSecStage2, 3: renderSecStage3, 4: renderSecStageYaksha,
-        5: renderSecStage4, 6: renderSecStage5, 7: renderSecStage6, 8: renderSecStage7
+        1: renderSecStage1, 2: renderSecStage2, 3: renderSecStage3, 4: renderSecStage4,
+        5: renderSecStage5, 6: renderSecStage6, 7: renderSecStageYaksha, 8: renderSecStage7
       };
 
       function goToSecStage(stage) {
