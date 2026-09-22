@@ -2806,12 +2806,10 @@
         });
       }
 
-      /* ---- Stufe 7 (Funktionsname im JS weiterhin "Stage6" - nur die
-         Aufruf-Position wurde verschoben, siehe Kommentar bei
-         renderSecStageYaksha): Fake-Fingerabdruckscanner ---- */
+      /* ---- Stufe 6: Fake-Fingerabdruckscanner ---- */
       function renderSecStage6() {
         const html = `
-          <h3>Biometrische Prüfung 7/8</h3>
+          <h3>Biometrische Prüfung 6/8</h3>
           <p class="investor-security-lead">Lege deinen Finger auf den Scanner und halte still.</p>
           <button type="button" class="investor-security-fp-scanner" id="investorSecurityFpScanner" aria-label="Fingerabdruckscanner">
             <span class="investor-security-fp-ring" id="investorSecurityFpRing">
@@ -2914,16 +2912,16 @@
               feedback.hidden = true;
               actionWrap.hidden = true;
             } else {
-              goToSecStage(8);
+              goToSecStage(7);
             }
           });
         });
       }
 
-      /* ---- Stufe 6 (22.09.2026, Nutzerwunsch "eine weitere Frage
-         hinzufuegen", zuletzt von Position 4/8 -> 7/8 -> 6/8 verschoben,
-         direkt vor der Fingerabdruck-Stufe): ChronoYaksha-Texturwunsch-
-         Frage ---- Beide Antwort-Knoepfe sagen
+      /* ---- Stufe 7 (22.09.2026, Nutzerwunsch "eine weitere Frage
+         hinzufuegen", zuletzt von Position 4/8 -> 7/8 -> 6/8 -> 7/8
+         verschoben, direkt nach der Fingerabdruck-Stufe):
+         ChronoYaksha-Texturwunsch-Frage ---- Beide Antwort-Knoepfe sagen
          bewusst dasselbe ("Ja") - identischer Witz wie Stufe 3 (Dayman/
          Lukas): egal was man klickt, die "richtige" Antwort ist ohnehin
          vorgegeben. Bild-Asset: siehe INVESTOR_SECURITY_YAKSHA_IMAGE
@@ -2931,7 +2929,7 @@
          neueres WIP-Bild hat. */
       function renderSecStageYaksha() {
         const html = `
-          <h3>Zustimmungsprüfung 6/8</h3>
+          <h3>Zustimmungsprüfung 7/8</h3>
           <p class="investor-security-lead">Bitte beantworte die Sicherheitsfrage korrekt.</p>
           <p class="investor-security-question">Darf deine Creatorin ChronoYaksha ihren selbst designten Texturwunsch-Drachen einlösen, mit deiner Erlaubnis?</p>
           <div class="joke-buttons investor-security-answer-row">
@@ -2965,7 +2963,7 @@
           }
           yes1.addEventListener('click', answer);
           yes2.addEventListener('click', answer);
-          document.getElementById('investorSecurityYakshaContinue').addEventListener('click', () => goToSecStage(7));
+          document.getElementById('investorSecurityYakshaContinue').addEventListener('click', () => goToSecStage(8));
         });
       }
 
@@ -3040,7 +3038,7 @@
 
       const SEC_STAGE_RENDERERS = {
         1: renderSecStage1, 2: renderSecStage2, 3: renderSecStage3, 4: renderSecStage4,
-        5: renderSecStage5, 6: renderSecStageYaksha, 7: renderSecStage6, 8: renderSecStage7
+        5: renderSecStage5, 6: renderSecStage6, 7: renderSecStageYaksha, 8: renderSecStage7
       };
 
       function goToSecStage(stage) {
