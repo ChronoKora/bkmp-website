@@ -2405,8 +2405,17 @@
          Bild hat. Bewusst in einem eigenen assets/dragons/wip/-Unterordner,
          nicht neben den echten, live genutzten Drachen-Arten-Assets, um
          eine spaetere Verwechslung mit einer tatsaechlichen Spielart
-         auszuschliessen. */
-      const INVESTOR_SECURITY_YAKSHA_IMAGE = 'assets/dragons/wip/yaksha-texturwunsch.png';
+         auszuschliessen.
+         WICHTIG (Live-Fund, Nutzer-Meldung "Immernoch das alte Bild" trotz
+         per curl bestaetigtem, korrekt ausgeliefertem neuen Bild): der
+         Server erlaubt Browsern, dieses Bild bis zu 24h ungeprueft aus dem
+         eigenen Cache zu zeigen (Cache-Control: max-age=86400) - OHNE
+         Versions-Kennung im Pfad bleibt ein Browser, der die Datei schon
+         einmal geladen hatte, bei der alten Version haengen, obwohl der
+         Server laengst die neue ausliefert. Bei JEDEM kuenftigen Bild-
+         Tausch hier zwingend den ?v=-Wert hochzaehlen (gleiches Prinzip
+         wie das etablierte Cache-Busting fuer CSS/JS in diesem Projekt). */
+      const INVESTOR_SECURITY_YAKSHA_IMAGE = 'assets/dragons/wip/yaksha-texturwunsch.png?v=20260922-2';
       let secActive = false; // Doppel-Start-Schutz (schnelles Mehrfach-Klicken) - bleibt bis unmittelbar vor dem eigentlichen Reveal true
       let secOnComplete = null;
       let secTimers = []; // saemtliche setTimeout/setInterval-IDs der aktuell laufenden Stufe(n) - IMMER vor jedem Stufenwechsel/Abschluss geleert
