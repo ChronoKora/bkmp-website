@@ -9,7 +9,28 @@
 
    Braucht SUPABASE_SERVICE_ROLE_KEY (liest ueber RLS hinweg, da die
    Tabelle bewusst keine anonyme Lese-Policy hat).
-   ============================================================ */
+
+   Vercel-Traffic-Audit 26.09.2026: dieser Endpunkt war (Cache-Control:
+   no-store) der mit Abstand groesste Treiber der Vercel-Function-
+   Invocations - jeder offene Tab pollt einzeln alle 10s
+   (js/core/bkmp-site.js, bkmpDailyEventPollTimer), OHNE dass sich
+   mehrere gleichzeitig offene Tabs eine Antwort teilen (anders als
+   z.B. api/twitch-live.js/api/opsucht/*.js, die laengst s-maxage
+   nutzen). Live-Logs zeigten an einem Abend-Peak ~85 gleichzeitig
+   offene Tabs -> ~8,5 echte Funktionsausfuehrungen/Sekunde, ~91-99%
+   aller tatsaechlich abgerechneten Invocations in diesem Projekt.
+   Fix: kurzer geteilter Edge-Cache (s-maxage=2) statt no-store - alle
+   gleichzeitig pollenden Tabs bekommen fuer bis zu 2s dieselbe,
+   gemeinsam gecachte Antwort statt je eine eigene Server-Ausfuehrung
+   auszuloesen (rechnerisch ca. Faktor 15-20 weniger Invocations bei
+   der beobachteten Tab-Zahl). Die Geheimhaltung/Fairness bleibt dabei
+   VOLLSTAENDIG erhalten: es werden weiterhin nie zukuenftige Events
+   ausgeliefert, und alle Clients sehen wegen der geteilten Cache-
+   Antwort exakt denselben Stand zur exakt selben Zeit - kein Client
+   bekommt dadurch einen zeitlichen Vorteil. Absichtlich SEHR kurz
+   gehalten (2s, nicht z.B. 45s wie bei twitch-live/opsucht) - das
+   Event dauert nur 3 Minuten, eine laengere Cache-Zeit wuerde den
+   tatsaechlichen Start/das Ende spuerbar verzoegert sichtbar machen. */
 
 const SUPABASE_URL = 'https://zgknyrwzpohvfdweomxf.supabase.co';
 const EVENT_DURATION_MS = 3 * 60 * 1000;
@@ -17,7 +38,7 @@ const EVENT_DURATION_MS = 3 * 60 * 1000;
 function send(res, status, payload) {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Cache-Control', 's-maxage=2, stale-while-revalidate=3');
   res.end(JSON.stringify(payload));
 }
 
