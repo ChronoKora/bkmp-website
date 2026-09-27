@@ -20,7 +20,7 @@
 <title>BKMP — Admin</title>
 
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
-<link rel="stylesheet" href="style.css?v=20260913-wagepayout1">
+<link rel="stylesheet" href="style.css?v=20260927-dailyeventremoval1">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 </head>
 <body>
@@ -187,10 +187,6 @@
         <button class="admin-nav-btn" data-page="plushies">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M9 10h.01M15 10h.01M9 15c1 1 5 1 6 0"/></svg>
           Pl&uuml;shie Codes
-        </button>
-        <button class="admin-nav-btn" data-page="dailyevents">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
-          Daily Events
         </button>
         <button class="admin-nav-btn" data-page="polls">
           <svg viewBox="0 0 24 24"><path d="M7 20V10M12 20V4M17 20v-7"/></svg>
@@ -852,29 +848,6 @@
           </div>
         </section>
 
-        <!-- Daily Code Events -->
-        <section class="admin-page" id="page-dailyevents">
-          <div class="admin-section">
-            <h2>Daily Code Events</h2>
-            <p class="admin-help-text">Jeden Tag werden automatisch 20 Events zu zuf&auml;lligen Uhrzeiten erzeugt (eins davon Golden Hour). Wer als Erstes einl&ouml;st, gewinnt das Pl&uuml;shie.</p>
-
-            <div class="daily-stats-grid" id="dailyStatsToday"></div>
-            <h3 style="margin-top:1.2rem;">Gesamt</h3>
-            <div class="daily-stats-grid" id="dailyStatsAll"></div>
-
-            <div class="joke-buttons" style="margin:1.2rem 0; flex-wrap:wrap;">
-              <button class="btn" id="dailyTestPopup" type="button">Test Popup</button>
-              <button class="btn" id="dailyStartNext" type="button">N&auml;chstes Popup sofort starten</button>
-              <button class="btn" id="dailyCancelActive" type="button">Aktives Popup abbrechen</button>
-              <button class="btn" id="dailyRerollCode" type="button">Zuf&auml;lligen Code neu w&auml;hlen</button>
-              <button class="btn btn-primary" id="dailyStartGolden" type="button">Golden Hour manuell starten</button>
-            </div>
-
-            <h3>Heutige Events <span class="cardcatalog-admin-count" id="dailyEventsCount"></span></h3>
-            <div class="entry-table-wrapper"><div class="entry-list" id="dailyEventsList"></div></div>
-          </div>
-        </section>
-
         <!-- Umfragen -->
         <section class="admin-page" id="page-polls">
           <div class="admin-section">
@@ -1300,7 +1273,7 @@
        da admin.html kein window.BKMP_QA_MODE-Gate setzt; macht nur
        bkmpGetGameNow() fuer bkmp-events.js verfuegbar (identisch Date.now()). -->
   <script src="js/core/bkmp-game-clock.js?v=20260724-qafoundation1"></script>
-  <script src="supabase.js?v=20260913-partnershopsv1"></script>
+  <script src="supabase.js?v=20260927-dailyeventremoval1"></script>
   <script src="app.js?v=20260913-wagepayout2"></script>
   <!-- Redesign Phase 2a (17.07.): siehe index.html fuer die Begruendung der
        festen Ladereihenfolge (bkmp-idle-state.js zuerst, bkmp-idle-
@@ -1310,9 +1283,9 @@
   <script src="js/core/bkmp-combat-math.js?v=20260801-guildlvlcap1"></script>
   <script src="js/systems/bkmp-dungeon.js?v=20260731-dungeonkeyfix1"></script>
   <script src="js/systems/bkmp-breeding.js?v=20260806-dragonstoragesync1"></script>
-  <script src="js/systems/bkmp-guild.js?v=20260820-titlecontextfix1"></script>
+  <script src="js/systems/bkmp-guild.js?v=20260927-dailyeventremoval1"></script>
   <script src="js/systems/bkmp-runes.js?v=20260807-rerollspacing1"></script>
-  <script src="js/systems/bkmp-raid.js?v=20260820-titlecontextfix1"></script>
+  <script src="js/systems/bkmp-raid.js?v=20260927-dailyeventremoval1"></script>
   <script src="js/systems/bkmp-tower.js?v=20260726-stagebarvisfix1"></script>
   <script src="js/systems/bkmp-prestige.js?v=20260805-multicompanion7"></script>
   <script src="js/systems/bkmp-arena.js?v=20260820-titlecontextfix1"></script>
@@ -1606,7 +1579,6 @@
         if (page === 'feedback') refreshFeedbackList();
         if (page === 'playermgmt') { refreshPlayerMgmtList(); refreshAnticheatFlagsList(); refreshLeaderboardHiddenList(); }
         if (page === 'plushies') { bkmpRefreshPlushieDefinitionsAdmin(); refreshPlushieCodesList(); }
-        if (page === 'dailyevents') { bkmpRefreshPlushieDefinitionsAdmin(); refreshDailyEventsPage(); }
         if (page === 'polls') refreshPollsAdmin();
         if (page === 'idledorf') refreshIdleDorfAdmin();
         if (page === 'access') refreshAdminAccessList();
@@ -5819,9 +5791,9 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
     }
     /* Dorf-Skin-Variante (23.07., "Pluschie-Code-System auf Dorf-Skins
        erweitern") - eigene Funktion statt bkmpGeneratePlushieCode() zu
-       veraendern, damit die bestehende Daily-Events-Wiederverwendung
-       weiter unten (dailyRerollCodeBtn, laeuft ausschliesslich gegen
-       Pluschies) unangetastet bleibt. */
+       veraendern, damit dessen andere Aufrufstellen (manuelle
+       Code-Erzeugung weiter unten, laeuft ausschliesslich gegen
+       Pluschies) unangetastet bleiben. */
     function bkmpGenerateSkinCode(skinId) {
       const skin = bkmpAdminVillageSkins.find(s => s.id === skinId);
       const prefix = (skin ? skin.name.split(' ')[0] : skinId).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8) || 'SKIN';
@@ -6061,73 +6033,6 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
     if (plushieCodesFilterPlushieEl) plushieCodesFilterPlushieEl.addEventListener('change', renderPlushieCodesList);
     if (plushieCodesFilterStatusEl) plushieCodesFilterStatusEl.addEventListener('change', renderPlushieCodesList);
 
-    /* ---------------- Daily Code Events (Admin) ---------------- */
-    function bkmpTodayDateString() {
-      return new Date().toISOString().slice(0, 10);
-    }
-    let dailyEventsCache = [];
-    let dailyEventsAllCache = [];
-
-    function bkmpEventStatus(ev) {
-      const scheduled = new Date(ev.scheduled_at).getTime();
-      const now = Date.now();
-      const expires = scheduled + 3 * 60000;
-      if (ev.winner_display_name) return 'Gewonnen';
-      if (now < scheduled) return 'Ausstehend';
-      if (now <= expires) return 'Aktiv';
-      return 'Abgelaufen';
-    }
-
-    async function refreshDailyEventsPage() {
-      const list = document.getElementById('dailyEventsList');
-      if (list) list.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Events werden geladen...</p>';
-      try {
-        const [today, all] = await Promise.all([
-          loadDailyEvents(bkmpTodayDateString()),
-          loadDailyEvents()
-        ]);
-        dailyEventsCache = today || [];
-        dailyEventsAllCache = all || [];
-      } catch (e) {
-        console.warn('Daily Events konnten nicht geladen werden.', e);
-        dailyEventsCache = [];
-        dailyEventsAllCache = [];
-        if (list) list.innerHTML = '<p style="color:var(--neg); font-size:0.85rem;">Events konnten nicht geladen werden. Bitte SQL ausf&uuml;hren.</p>';
-        return;
-      }
-      renderDailyEventsList();
-      await renderDailyStats();
-    }
-
-    function renderDailyEventsList() {
-      const list = document.getElementById('dailyEventsList');
-      const countEl = document.getElementById('dailyEventsCount');
-      if (!list) return;
-      if (countEl) countEl.textContent = `(${dailyEventsCache.length})`;
-      if (dailyEventsCache.length === 0) {
-        list.innerHTML = '<p style="color:var(--muted); font-size:0.85rem;">Noch keine Events f&uuml;r heute. Der t&auml;gliche Cron-Job legt sie automatisch an (oder per "N&auml;chstes Popup sofort starten" testen).</p>';
-        return;
-      }
-      list.innerHTML = '';
-      dailyEventsCache.forEach(ev => {
-        const plushie = BKMP_PLUSHIES.find(p => p.id === ev.plushie_id);
-        const time = new Date(ev.scheduled_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-        const status = bkmpEventStatus(ev);
-        const meta = [
-          plushie ? plushie.name : ev.plushie_id,
-          status,
-          ev.is_golden_hour ? '⭐ Golden Hour' : '',
-          ev.winner_display_name ? `Gewinner: ${ev.winner_display_name} um ${new Date(ev.redeemed_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}` : ''
-        ].filter(Boolean).join(' · ');
-        const div = document.createElement('div');
-        div.className = 'entry-row';
-        div.innerHTML = `
-          <div class="desc"><span class="name">${time} Uhr &middot; ${escapeHtml(ev.code)}</span><span class="meta">${escapeHtml(meta)}</span></div>
-        `;
-        list.appendChild(div);
-      });
-    }
-
     /* ---------------- Umfragen ---------------- */
     let pollsCache = [];
     async function refreshPollsAdmin() {
@@ -6218,140 +6123,6 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       }
       pollCreateBtn.disabled = false;
     });
-
-    async function renderDailyStats() {
-      const todayRedeemed = dailyEventsCache.filter(e => e.redeemed_at);
-      const todayTimes = todayRedeemed.map(e => (new Date(e.redeemed_at) - new Date(e.scheduled_at)) / 1000);
-      const fastest = todayTimes.length ? Math.min(...todayTimes) : null;
-      const avg = todayTimes.length ? (todayTimes.reduce((a, b) => a + b, 0) / todayTimes.length) : null;
-      const todayPlushieCounts = {};
-      todayRedeemed.forEach(e => { todayPlushieCounts[e.plushie_id] = (todayPlushieCounts[e.plushie_id] || 0) + 1; });
-      const topTodayPlushieId = Object.keys(todayPlushieCounts).sort((a, b) => todayPlushieCounts[b] - todayPlushieCounts[a])[0];
-      const topTodayPlushie = topTodayPlushieId ? (BKMP_PLUSHIES.find(p => p.id === topTodayPlushieId) || {}).name : '–';
-      const goldenToday = todayRedeemed.filter(e => e.is_golden_hour).length;
-
-      const todayEl = document.getElementById('dailyStatsToday');
-      if (todayEl) {
-        todayEl.innerHTML = [
-          ['Eingel&ouml;ste Codes', todayRedeemed.length],
-          ['Schnellste Einl&ouml;sung', fastest !== null ? `${fastest.toFixed(0)}s` : '–'],
-          ['&Oslash; Einl&ouml;sezeit', avg !== null ? `${avg.toFixed(0)}s` : '–'],
-          ['Beliebtestes Pl&uuml;shie', topTodayPlushie || '–'],
-          ['Golden Hours eingel&ouml;st', goldenToday]
-        ].map(([label, value]) => `<div class="daily-stat-card"><div class="value">${value}</div><div class="label">${label}</div></div>`).join('');
-      }
-
-      const allRedeemed = dailyEventsAllCache.filter(e => e.redeemed_at);
-      const winnerCounts = {};
-      allRedeemed.forEach(e => { winnerCounts[e.winner_display_name] = (winnerCounts[e.winner_display_name] || 0) + 1; });
-      const topWinner = Object.keys(winnerCounts).sort((a, b) => winnerCounts[b] - winnerCounts[a])[0];
-      const allPlushieCounts = {};
-      allRedeemed.forEach(e => { allPlushieCounts[e.plushie_id] = (allPlushieCounts[e.plushie_id] || 0) + 1; });
-      const topAllPlushieId = Object.keys(allPlushieCounts).sort((a, b) => allPlushieCounts[b] - allPlushieCounts[a])[0];
-      const topAllPlushie = topAllPlushieId ? (BKMP_PLUSHIES.find(p => p.id === topAllPlushieId) || {}).name : '–';
-      const distinctWinners = new Set(allRedeemed.map(e => e.winner_name_key)).size;
-
-      let topCollector = '–';
-      try {
-        const client = bkmpGetSupabaseClient();
-        if (client) {
-          const { data } = await client.from('user_plushies').select('display_name, name_key');
-          if (Array.isArray(data)) {
-            const counts = {};
-            data.forEach(row => { counts[row.display_name] = (counts[row.display_name] || 0) + 1; });
-            const top = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0];
-            if (top) topCollector = `${top} (${counts[top]})`;
-          }
-        }
-      } catch (e) { /* optional, still zeigt der Rest der Stats */ }
-
-      const allEl = document.getElementById('dailyStatsAll');
-      if (allEl) {
-        allEl.innerHTML = [
-          ['Alle Gewinner', distinctWinners],
-          ['Beliebtestes Pl&uuml;shie', topAllPlushie || '–'],
-          ['H&auml;ufigster Gewinner', topWinner ? `${topWinner} (${winnerCounts[topWinner]})` : '–'],
-          ['Aktivster Sammler', topCollector]
-        ].map(([label, value]) => `<div class="daily-stat-card"><div class="value" style="font-size:1rem;">${value}</div><div class="label">${label}</div></div>`).join('');
-      }
-    }
-
-    const dailyTestPopupBtn = document.getElementById('dailyTestPopup');
-    if (dailyTestPopupBtn) dailyTestPopupBtn.addEventListener('click', () => window.open('/?testDailyPopup=1', '_blank'));
-
-    const dailyStartNextBtn = document.getElementById('dailyStartNext');
-    if (dailyStartNextBtn) {
-      dailyStartNextBtn.addEventListener('click', async () => {
-        dailyStartNextBtn.disabled = true;
-        try {
-          const events = await loadDailyEvents(bkmpTodayDateString());
-          const next = (events || []).filter(e => !e.winner_display_name && new Date(e.scheduled_at) > new Date()).sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at))[0];
-          if (!next) { showAdminToast('Kein ausstehendes Event mehr f&uuml;r heute gefunden.', 'error'); return; }
-          await updateDailyEvent(next.id, { scheduled_at: new Date().toISOString() });
-          showAdminToast('N&auml;chstes Popup wurde gestartet.', 'success');
-          refreshDailyEventsPage();
-        } catch (e) {
-          showAdminToast('Konnte Popup nicht starten: ' + supabaseErrorText(e), 'error');
-        }
-        dailyStartNextBtn.disabled = false;
-      });
-    }
-
-    const dailyCancelActiveBtn = document.getElementById('dailyCancelActive');
-    if (dailyCancelActiveBtn) {
-      dailyCancelActiveBtn.addEventListener('click', async () => {
-        dailyCancelActiveBtn.disabled = true;
-        try {
-          const events = await loadDailyEvents(bkmpTodayDateString());
-          const active = (events || []).find(e => !e.winner_display_name && bkmpEventStatus(e) === 'Aktiv');
-          if (!active) { showAdminToast('Gerade l&auml;uft kein Popup.', 'error'); return; }
-          await updateDailyEvent(active.id, { scheduled_at: new Date(Date.now() - 10 * 60000).toISOString() });
-          showAdminToast('Aktives Popup abgebrochen.', 'success');
-          refreshDailyEventsPage();
-        } catch (e) {
-          showAdminToast('Konnte Popup nicht abbrechen: ' + supabaseErrorText(e), 'error');
-        }
-        dailyCancelActiveBtn.disabled = false;
-      });
-    }
-
-    const dailyRerollCodeBtn = document.getElementById('dailyRerollCode');
-    if (dailyRerollCodeBtn) {
-      dailyRerollCodeBtn.addEventListener('click', async () => {
-        dailyRerollCodeBtn.disabled = true;
-        try {
-          const events = await loadDailyEvents(bkmpTodayDateString());
-          const target = (events || []).filter(e => !e.winner_display_name).sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at))[0];
-          if (!target) { showAdminToast('Kein offenes Event gefunden.', 'error'); return; }
-          const plushie = BKMP_PLUSHIES.find(p => p.id === target.plushie_id);
-          const newCode = bkmpGeneratePlushieCode(target.plushie_id) || (plushie ? plushie.id.toUpperCase() : 'BKMP');
-          await updateDailyEvent(target.id, { code: newCode });
-          showAdminToast('Neuer Code gew&auml;hlt: ' + newCode, 'success');
-          refreshDailyEventsPage();
-        } catch (e) {
-          showAdminToast('Konnte Code nicht neu w&auml;hlen: ' + supabaseErrorText(e), 'error');
-        }
-        dailyRerollCodeBtn.disabled = false;
-      });
-    }
-
-    const dailyStartGoldenBtn = document.getElementById('dailyStartGolden');
-    if (dailyStartGoldenBtn) {
-      dailyStartGoldenBtn.addEventListener('click', async () => {
-        dailyStartGoldenBtn.disabled = true;
-        try {
-          const events = await loadDailyEvents(bkmpTodayDateString());
-          const next = (events || []).filter(e => !e.winner_display_name && new Date(e.scheduled_at) > new Date()).sort((a, b) => new Date(a.scheduled_at) - new Date(b.scheduled_at))[0];
-          if (!next) { showAdminToast('Kein ausstehendes Event mehr f&uuml;r heute gefunden.', 'error'); return; }
-          await updateDailyEvent(next.id, { scheduled_at: new Date().toISOString(), is_golden_hour: true });
-          showAdminToast('Golden Hour manuell gestartet! ⭐', 'success');
-          refreshDailyEventsPage();
-        } catch (e) {
-          showAdminToast('Konnte Golden Hour nicht starten: ' + supabaseErrorText(e), 'error');
-        }
-        dailyStartGoldenBtn.disabled = false;
-      });
-    }
 
     /* Backup */
     const exportBackupBtn = document.getElementById('exportBackup');

@@ -5,12 +5,6 @@
       "includeFiles": "assets/plushies/**"
     }
   },
-  "crons": [
-    {
-      "path": "/api/generate-daily-events",
-      "schedule": "5 0 * * *"
-    }
-  ],
   "headers": [
     {
       "source": "/",

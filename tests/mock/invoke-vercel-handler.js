@@ -1,9 +1,9 @@
 /* Generic helper to invoke a REAL, unmodified api/*.js Vercel handler
    in-process against the mock backend, instead of hand-writing a second
    copy of its logic. Used for every /api/* route the static+mock server
-   needs to serve (claim-idle-offline-progress, active-daily-event,
-   twitch-live, ...) - see offline-progress-handler.js's header comment for
-   the full rationale (route interception, not modification). */
+   needs to serve (claim-idle-offline-progress, twitch-live, ...) - see
+   offline-progress-handler.js's header comment for the full rationale
+   (route interception, not modification). */
 
 const { route } = require('./router');
 

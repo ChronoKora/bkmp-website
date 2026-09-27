@@ -7,17 +7,16 @@
    only-Schreibzugriff wieder her) - diese Funktion war deshalb bisher
    kein hartes Sicherheitsnetz gegen manipulierte Werte, sondern
    verhinderte nur, dass "wie lange war ich weg" vom Client selbst
-   behauptet werden kann. Genau wie in api/active-daily-event.js wird
-   die Zeitspanne serverseitig aus last_seen_at berechnet, nie aus
-   einem vom Client gesendeten Wert.
+   behauptet werden kann. Die Zeitspanne wird serverseitig aus
+   last_seen_at berechnet, nie aus einem vom Client gesendeten Wert.
 
    Atomarer Claim per PATCH ... WHERE last_seen_at = eq.<gelesener
    Wert>: klappt nur fuer die Anfrage, die den zuletzt gelesenen
-   Stand noch unveraendert vorfindet (gleiches Prinzip wie
-   winner_name_key is.null in api/redeem-daily-event.js). Bei
-   gleichzeitigem Oeffnen in zwei Tabs bekommt nur eine Anfrage
-   die Gutschrift, die andere erhaelt den bereits aktualisierten
-   Stand zurueck statt doppelt gutzuschreiben.
+   Stand noch unveraendert vorfindet (gleiches "nur die erste passende
+   Zeile gewinnt"-Prinzip wie beim atomaren Sieg-Claim in raid_finish()/
+   guild_boss_finish()). Bei gleichzeitigem Oeffnen in zwei Tabs bekommt
+   nur eine Anfrage die Gutschrift, die andere erhaelt den bereits
+   aktualisierten Stand zurueck statt doppelt gutzuschreiben.
 
    ============================================================
    UMBAU 21.08.2026 - fester Wert statt Kampf-Simulation

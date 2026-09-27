@@ -42,12 +42,15 @@ const REPO_ROOT = path.join(__dirname, '..', '..');
 
 /* GET-only /api/*.js routes served via the real (unmodified) handler file -
    see invoke-vercel-handler.js. Not part of Stage-1's own test scope
-   (marketing-site daily-code-event/Twitch-live widgets, unrelated to the
-   idle-dorf) but real background polling the app performs on every page
-   load regardless - mocking them too keeps the console/network log clean
-   instead of needing an "ignore these known 404s" allowlist in every spec. */
+   (marketing-site Twitch-live widget, unrelated to the idle-dorf) but real
+   background polling the app performs on every page load regardless -
+   mocking it too keeps the console/network log clean instead of needing an
+   "ignore these known 404s" allowlist in every spec.
+   27.09.2026: the '/api/active-daily-event' entry that used to live here
+   was removed together with the daily-code-event feature itself (see
+   CHANGELOG.md, Vercel-Traffic-Audit) - the client no longer polls it at
+   all, so mocking it would just be dead config. */
 const GET_API_ROUTES = {
-  '/api/active-daily-event': path.join(REPO_ROOT, 'api', 'active-daily-event.js'),
   '/api/twitch-live': path.join(REPO_ROOT, 'api', 'twitch-live.js'),
   // 06.09.2026 (56 Idle-Dorf-Testfehlschlaege durch echte "Failed to load
   // resource"-Konsolenfehler zurueckverfolgt, siehe CLAUDE.md) - dieselbe

@@ -3787,32 +3787,11 @@ async function createPlushies(rows) {
   return data || [];
 }
 
-/* ---------------- Daily Code Events (Admin) ---------------- */
-async function loadDailyEvents(eventDate) {
-  const client = bkmpGetSupabaseClient();
-  if (!client) return null;
-  let query = client
-    .from('daily_code_events')
-    .select('id, event_date, scheduled_at, plushie_id, code, is_golden_hour, winner_name_key, winner_display_name, redeemed_at, created_at')
-    .order('scheduled_at', { ascending: true });
-  if (eventDate) query = query.eq('event_date', eventDate);
-  const { data, error } = await query;
-  if (error) throw error;
-  return data || [];
-}
-
-async function updateDailyEvent(id, patch) {
-  const client = bkmpGetSupabaseClient();
-  if (!client) throw new Error('Supabase ist nicht verbunden.');
-  const { data, error } = await client
-    .from('daily_code_events')
-    .update(patch)
-    .eq('id', id)
-    .select('id, scheduled_at, plushie_id, code, is_golden_hour, winner_display_name')
-    .limit(1);
-  if (error) throw error;
-  return Array.isArray(data) ? data[0] : null;
-}
+/* loadDailyEvents()/updateDailyEvent() (Admin-Verwaltung fuer
+   daily_code_events) wurden am 27.09.2026 zusammen mit dem kompletten
+   Daily-Code-Event-Feature entfernt (siehe CHANGELOG.md) - keine
+   Aufrufstelle mehr, die Tabelle selbst bleibt unangetastet in der DB
+   liegen (Historie, nie oeffentlich lesbar gewesen). */
 
 async function loadOwnedPlushies(name) {
   const client = bkmpGetSupabaseClient();
@@ -3987,22 +3966,40 @@ async function idleClaimEventDragonVictory(name, dragonKey) {
   return row || { already_defeated: false, newly_defeated: false };
 }
 
-/* Persoenlicher Zerator-Belohnungscode nach einem gewonnenen Raid (siehe
-   raid_finish() in supabase-idle-event-dragons.sql) - reine Abfrage, der
-   Code wird ausschliesslich serverseitig erzeugt. Gibt null zurueck, wenn
-   dieser Spieler bei diesem Raid keinen Code bekommen hat (kein Treffer
-   bei der 5%-Chance bzw. Pluschie schon im Besitz). */
-async function loadRaidRewardCode(raidId, name) {
+/* Persoenliche Belohnungscodes nach einem gewonnenen Raid (siehe
+   raid_finish() in sql/20260927-remove-daily-event-add-boss-plushie-
+   drops.sql) - reine Abfrage, Codes werden ausschliesslich serverseitig
+   erzeugt. Liefert ein ARRAY (nicht mehr nur einen einzelnen Code, siehe
+   Umbenennung 27.09.2026): seit dem generischen Pluschie-Wurf kann ein
+   Spieler theoretisch sowohl den Zerathor- ALS AUCH den generischen
+   5%-Wurf im selben Raid treffen (0,25% Chance) - beide muessen
+   angezeigt werden koennen, nicht nur der erste gefundene. Leeres Array,
+   wenn dieser Spieler bei diesem Raid keinen einzigen Code bekommen hat. */
+async function loadRaidRewardCodes(raidId, name) {
   const client = bkmpGetSupabaseClient();
-  if (!client || !raidId || !name) return null;
+  if (!client || !raidId || !name) return [];
   const { data, error } = await client
     .from('raid_reward_codes')
     .select('code, plushie_id, created_at')
     .eq('raid_id', raidId)
-    .eq('name_key', String(name).trim().toLowerCase())
-    .limit(1);
+    .eq('name_key', String(name).trim().toLowerCase());
   if (error) throw error;
-  return Array.isArray(data) && data[0] ? data[0] : null;
+  return Array.isArray(data) ? data : [];
+}
+
+/* Gildenboss-Gegenstueck zu loadRaidRewardCodes() - identisches Prinzip,
+   eigene Tabelle (guild_boss_reward_codes), da guild_boss_instances.id
+   kein Fremdschluessel auf raid_instances ist. */
+async function loadGuildBossRewardCodes(instanceId, name) {
+  const client = bkmpGetSupabaseClient();
+  if (!client || !instanceId || !name) return [];
+  const { data, error } = await client
+    .from('guild_boss_reward_codes')
+    .select('code, plushie_id, created_at')
+    .eq('instance_id', instanceId)
+    .eq('name_key', String(name).trim().toLowerCase());
+  if (error) throw error;
+  return Array.isArray(data) ? data : [];
 }
 
 async function loadIdlePlayerState(name) {

@@ -575,6 +575,25 @@ function bkmpGuildBossCheckOutcome() {
     bkmpGuildBossState.gemReward = info.gemReward;
     bkmpGuildBossUpdateCombatUI();
   }).catch(() => {});
+  /* Pluschie-Beute (NEU 27.09.2026, Ersatz fuer das entfernte Daily-Code-
+     Event, siehe sql/20260927-remove-daily-event-add-boss-plushie-
+     drops.sql): guild_boss_finish() wuerfelt bei einem echten Sieg pro
+     Teilnehmer mit echtem Schaden 5% Chance auf ein zufaelliges,
+     generisches Pluschie - reine Abfrage einer bereits fertig erzeugten
+     Zeile, identisches Prinzip wie der Raid-Zerathor-Wurf
+     (bkmpRaidShowResult() in bkmp-raid.js, dort auch die geteilte
+     Render-/Kopier-Helferfunktion bkmpRenderPlushieRewardCodesHtml()/
+     bkmpWirePlushieRewardCodeCopyButtons()). */
+  if (bkmpGuildBossState.status === 'won') {
+    const myName = (typeof bkmpGetMcName === 'function' ? bkmpGetMcName() : '').trim().toLowerCase();
+    if (myName) {
+      loadGuildBossRewardCodes(bkmpGuildBossState.instanceId, myName).then(codes => {
+        if (!bkmpGuildBossState) return;
+        bkmpGuildBossState.rewardCodes = codes;
+        bkmpGuildBossUpdateCombatUI();
+      }).catch(() => {});
+    }
+  }
 }
 
 let bkmpGuildBossPanelRenderedForKey = null;
@@ -666,6 +685,15 @@ function bkmpGuildBossUpdateCombatUI() {
       if (goldEl) goldEl.textContent = bkmpIdleFormatNumber(Math.round((g.goldReward || 0) * myShare));
       const gemsEl = document.getElementById('guildBossResultGems');
       if (gemsEl) gemsEl.textContent = bkmpIdleFormatNumber(Math.round((g.gemReward || 0) * myShare));
+      /* Pluschie-Beute, siehe bkmpGuildBossCheckOutcome() - eigener,
+         zielgerichteter Container statt vollem Panel-Rebuild (gleiches
+         Drosselungs-Prinzip wie der Rest dieser Funktion, siehe
+         Kommentar am Funktionsanfang). */
+      const codesEl = document.getElementById('guildBossRewardCodes');
+      if (codesEl) {
+        codesEl.innerHTML = bkmpRenderPlushieRewardCodesHtml(g.rewardCodes || []);
+        bkmpWirePlushieRewardCodeCopyButtons(codesEl);
+      }
     }
   }
   bkmpGuildBossRequestParticipantsRender();
@@ -1577,7 +1605,7 @@ async function bkmpIdleRenderGildeBossPanel() {
           <div class="raid-result-stat"><div class="raid-result-stat-label">Teilnehmer</div><div class="raid-result-stat-value" id="guildBossResultParticipantCount">${g.participantCount || bkmpGuildBossParticipants.length}</div></div>
           <div class="raid-result-stat"><div class="raid-result-stat-label">MVP</div><div class="raid-result-stat-value raid-result-mvp" id="guildBossResultMvp">-</div></div>
         </div>
-        ${g.status === 'won' ? '<div class="raid-result-rewards"><span>💰 +<span id="guildBossResultGold">0</span></span><span>💎 +<span id="guildBossResultGems">0</span></span></div>' : ''}
+        ${g.status === 'won' ? '<div class="raid-result-rewards"><span>💰 +<span id="guildBossResultGold">0</span></span><span>💎 +<span id="guildBossResultGems">0</span></span></div><div id="guildBossRewardCodes"></div>' : ''}
         <div class="idle-arena-history">
           <h4 style="margin-top:1rem;">🏆 Schadensrangliste</h4>
           <div id="guildBossParticipantsList"></div>

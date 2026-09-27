@@ -7335,197 +7335,55 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   outline-offset: 2px;
 }
 
-/* ---------- Daily Code Event / Golden Hour Popup ---------- */
-.bkmp-daily-popup-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 200;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-  background: rgba(5, 4, 8, 0.72);
-  backdrop-filter: blur(4px);
-  opacity: 0;
-  transition: opacity 0.35s ease;
-  pointer-events: none;
-}
-.bkmp-daily-popup-backdrop.visible { opacity: 1; pointer-events: auto; }
-
-.bkmp-daily-popup-card {
-  position: relative;
-  width: min(400px, 100%);
-  padding: 1.8rem 1.6rem 1.6rem;
-  border-radius: 22px;
+/* ---------- Raid/Gildenboss: Beute-Plüshie-Code-Anzeige ----------
+   Nutzt dieselben Klassen wie der bereits bestehende Raid-Ergebnis-
+   bildschirm (bkmpRaidShowResult() in js/systems/bkmp-raid.js, seit
+   18.07. fuer den Zerathor-5%-Wurf) - echter, beim Auditieren am
+   27.09.2026 gefundener Bestandsbug: diese Klassen (raid-result-
+   zerator-*) hatten seit ihrer Einfuehrung NIE eine eigene CSS-Regel,
+   die Anzeige rendere dadurch bisher als voellig unformatierter Text
+   (nur der Kopieren-Button traegt bereits die geteilte .btn-nein-Klasse).
+   Fiel bisher praktisch nie auf, weil der Zerathor-Wurf nur 5% Chance
+   hatte UND nie ausserhalb dieser einen Stelle wiederverwendet wurde -
+   mit dem neuen, viel haeufiger auftretenden generischen Pluschie-Wurf
+   (Raid UND Gildenboss, siehe
+   sql/20260927-remove-daily-event-add-boss-plushie-drops.sql) waere die
+   Luecke deutlich sichtbarer geworden, deshalb hier direkt mitgefixt. */
+.raid-result-zerator-code {
+  margin: 0.9rem 0;
+  padding: 0.9rem 1rem;
+  border-radius: 14px;
   text-align: center;
-  overflow: hidden;
-  background: linear-gradient(160deg, #14101f, #0a0810 60%);
-  border: 1px solid transparent;
-  background-clip: padding-box;
-  box-shadow: 0 0 0 1.5px rgba(167, 139, 250, 0.55), 0 30px 90px rgba(0, 0, 0, 0.55), 0 0 60px rgba(124, 58, 237, 0.45);
-  transform: scale(0.85) translateY(10px);
-  transition: transform 0.4s cubic-bezier(.2, 1.4, .4, 1);
-  animation: bkmpDailyPulse 2.6s ease-in-out infinite;
+  background: linear-gradient(120deg, rgba(167, 139, 250, 0.14), rgba(124, 58, 237, 0.08));
+  border: 1px solid rgba(167, 139, 250, 0.4);
 }
-.bkmp-daily-popup-backdrop.visible .bkmp-daily-popup-card { transform: scale(1) translateY(0); }
-@keyframes bkmpDailyPulse {
-  0%, 100% { box-shadow: 0 0 0 1.5px rgba(167, 139, 250, 0.55), 0 30px 90px rgba(0, 0, 0, 0.55), 0 0 45px rgba(124, 58, 237, 0.35); }
-  50% { box-shadow: 0 0 0 1.5px rgba(167, 139, 250, 0.85), 0 30px 90px rgba(0, 0, 0, 0.55), 0 0 75px rgba(124, 58, 237, 0.65); }
-}
-
-.bkmp-daily-popup-card.golden-hour {
-  box-shadow: 0 0 0 1.5px rgba(255, 206, 51, 0.65), 0 30px 90px rgba(0, 0, 0, 0.55), 0 0 60px rgba(255, 190, 20, 0.5);
-  background: linear-gradient(160deg, #241a08, #120d05 60%);
-  animation: bkmpDailyPulseGold 2.2s ease-in-out infinite;
-}
-@keyframes bkmpDailyPulseGold {
-  0%, 100% { box-shadow: 0 0 0 1.5px rgba(255, 206, 51, 0.6), 0 30px 90px rgba(0, 0, 0, 0.55), 0 0 45px rgba(255, 190, 20, 0.4); }
-  50% { box-shadow: 0 0 0 1.5px rgba(255, 206, 51, 0.95), 0 30px 90px rgba(0, 0, 0, 0.55), 0 0 85px rgba(255, 190, 20, 0.75); }
-}
-
-.bkmp-daily-popup-ribbon {
-  display: inline-block;
-  margin-bottom: 0.6rem;
-  padding: 0.3rem 0.9rem;
-  border-radius: 999px;
-  background: linear-gradient(120deg, #ffce33, #ff9d1a);
-  color: #1a1206;
-  font-weight: 800;
-  font-size: 0.75rem;
-  letter-spacing: 0.05em;
-  box-shadow: 0 0 18px rgba(255, 190, 20, 0.6);
-}
-
-.bkmp-daily-popup-particles { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
-.bkmp-daily-popup-particles span {
-  position: absolute;
-  bottom: -10px;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: #c4b5fd;
-  box-shadow: 0 0 8px 2px rgba(196, 181, 253, 0.8);
-  animation: bkmpDailyParticleRise linear infinite;
-}
-.golden-hour .bkmp-daily-popup-particles span { background: #ffd873; box-shadow: 0 0 8px 2px rgba(255, 216, 115, 0.85); }
-@keyframes bkmpDailyParticleRise {
-  0% { transform: translateY(0) scale(0.6); opacity: 0; }
-  15% { opacity: 1; }
-  100% { transform: translateY(-380px) scale(1.1); opacity: 0; }
-}
-
-.bkmp-daily-popup-close {
-  position: absolute;
-  top: 0.7rem;
-  right: 0.9rem;
-  background: none;
-  border: none;
-  color: #c9c2dd;
-  font-size: 1.4rem;
-  line-height: 1;
-  cursor: pointer;
-}
-.bkmp-daily-popup-close:hover { color: #f3ecff; }
-
-.bkmp-daily-popup-icon { font-size: 2.4rem; margin-bottom: 0.3rem; filter: drop-shadow(0 0 12px rgba(167, 139, 250, 0.6)); }
-.golden-hour .bkmp-daily-popup-icon { filter: drop-shadow(0 0 14px rgba(255, 190, 20, 0.75)); }
-
-/* Feste helle Textfarben statt var(--ink)/var(--muted): die Karte hat
-   IMMER einen fest dunklen Verlauf-Hintergrund (siehe .bkmp-daily-popup-
-   card oben, bewusst unabhaengig vom Hell-/Dunkelmodus - mystisches
-   Event-Design). --ink/--muted werden im Hellmodus aber dunkel (fuer die
-   sonst helle Seite gedacht) - auf diesem immer-dunklen Hintergrund wurde
-   der Text dadurch im Hellmodus fast unlesbar (dunkler Text auf dunklem
-   Grund). Gleicher Fehlertyp wie bei --gold vs. --gold-fixed. */
-.bkmp-daily-popup-card h3 { font-family: 'Fraunces', serif; font-size: 1.25rem; margin: 0 0 0.4rem; color: #f3ecff; }
-.bkmp-daily-popup-sub { font-size: 0.85rem; color: #c9c2dd; margin: 0 0 0.9rem; }
-
-.bkmp-daily-popup-plushie {
+.raid-result-zerator-title { font-weight: 800; font-size: 0.95rem; margin-bottom: 0.6rem; color: #f3ecff; }
+.raid-result-zerator-code-row {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.6rem;
-  margin-bottom: 0.9rem;
+  flex-wrap: wrap;
 }
-.bkmp-daily-popup-plushie img {
-  width: 52px;
-  height: 52px;
-  object-fit: contain;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--paper) 70%, transparent);
-  box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--gold) 45%, transparent);
-}
-.bkmp-daily-popup-plushie span { font-weight: 700; font-size: 0.9rem; }
-
-.bkmp-daily-popup-code {
+.raid-result-zerator-code-value {
   font-family: 'Fraunces', serif;
-  font-size: 1.35rem;
+  font-size: 1.15rem;
   font-weight: 700;
   letter-spacing: 0.04em;
-  padding: 0.6rem 1rem;
-  border-radius: 12px;
-  margin-bottom: 0.8rem;
-  background: linear-gradient(120deg, rgba(167, 139, 250, 0.18), rgba(124, 58, 237, 0.1));
+  padding: 0.45rem 0.8rem;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
   border: 1px dashed rgba(167, 139, 250, 0.55);
   color: #c4b5fd;
   user-select: all;
 }
-.golden-hour .bkmp-daily-popup-code {
-  background: linear-gradient(120deg, rgba(255, 206, 51, 0.2), rgba(255, 157, 26, 0.12));
-  border-color: rgba(255, 206, 51, 0.6);
-  color: #ffd873;
-}
-
-.bkmp-daily-popup-countdown { font-size: 0.85rem; font-weight: 700; color: var(--gold-fixed); margin-bottom: 1rem; }
-
-.bkmp-daily-popup-claim {
-  width: 100%;
-  padding: 0.75rem 1rem;
-  border: none;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #a78bfa, #7c3aed);
-  color: #fff;
-  font-weight: 800;
-  font-size: 0.95rem;
-  cursor: pointer;
-  box-shadow: 0 12px 30px rgba(124, 58, 237, 0.45);
-  transition: transform 0.15s ease, filter 0.15s ease;
-}
-.bkmp-daily-popup-claim:hover { filter: brightness(1.08); transform: translateY(-1px); }
-.bkmp-daily-popup-claim:active { transform: scale(0.97); }
-.golden-hour .bkmp-daily-popup-claim {
-  background: linear-gradient(135deg, #ffd873, #ff9d1a);
-  color: #1a1206;
-  box-shadow: 0 12px 30px rgba(255, 157, 26, 0.5);
-}
-
-/* Fest helle Grundfarbe (nicht var(--muted)) noetig, falls textContent
-   OHNE .success/.error gesetzt wird (z.B. Test-Vorschau-Pfad
-   ?testDailyPopup=1) - Hintergrund der Karte ist immer dunkel, gleicher
-   Bug-Typ wie bei h3/sub oben, hier per Audit am 17.07. gefunden. */
-.bkmp-daily-popup-msg { min-height: 1.4em; margin: 0.7rem 0 0; font-size: 0.85rem; font-weight: 700; white-space: pre-line; color: #c9c2dd; }
-.bkmp-daily-popup-msg.success { color: #4ade80; }
-.bkmp-daily-popup-msg.error { color: #f87171; }
-
-@media (prefers-reduced-motion: reduce) {
-  .bkmp-daily-popup-card, .bkmp-daily-popup-card.golden-hour { animation: none; }
-  .bkmp-daily-popup-particles span { animation: none; opacity: 0; }
-}
-
-/* ---------- Admin: Daily-Events Statistik-Karten ---------- */
-.daily-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 0.7rem;
-}
-.daily-stat-card {
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 0.7rem 0.9rem;
-  background: var(--paper-2);
-}
-.daily-stat-card .value { font-family: 'Fraunces', serif; font-size: 1.3rem; font-weight: 700; color: var(--gold-fixed); }
-.daily-stat-card .label { font-size: 0.72rem; color: var(--muted); margin-top: 0.15rem; }
+/* Fest helle Grundfarbe (nicht var(--muted)) - der Hintergrund dieser
+   Karte ist immer dunkel violett, unabhaengig vom Hell-/Dunkelmodus des
+   restlichen Panels (identischer Fehlertyp wie bei --gold vs.
+   --gold-fixed, an mehreren anderen Stellen in dieser Datei bereits
+   dokumentiert). */
+.raid-result-zerator-hint { margin: 0.5rem 0 0; font-size: 0.78rem; color: #c9c2dd; }
+.raid-result-zerator-code + .raid-result-zerator-code { margin-top: 0.6rem; }
 
 .admin-checkbox-label {
   display: flex;

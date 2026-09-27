@@ -6919,221 +6919,36 @@
       plushieCodeInput.addEventListener('keydown', e => { if (e.key === 'Enter') plushieRedeemBtn.click(); });
     }
 
-    /* ---------------- Daily Code Events + Golden Hour ---------------- */
-    let bkmpDailyEventPollTimer = null;
-    let bkmpDailyEventCountdownTimer = null;
-    let bkmpCurrentDailyEvent = null;
-    let bkmpDismissedDailyEventId = null;
+    /* ---------------- Daily Code Events + Golden Hour (ENTFERNT 27.09.2026) ----------------
+       Nutzerwunsch, im Rahmen des Vercel-Traffic-Audits vom selben Tag: der
+       10s-Client-Poll gegen /api/active-daily-event (siehe Git-Historie fuer
+       den vollen frueheren Code) war der mit Abstand groesste Treiber der
+       Vercel-Function-Invocations dieses Projekts (~91% in Live-Messungen,
+       siehe CHANGELOG.md) - jeder offene Tab pollte einzeln, unbegrenzt,
+       auch im Hintergrund, ohne dass sich mehrere Tabs eine Antwort teilen
+       konnten (Cache-Control musste aus Fairness-Gruenden zwingend no-store
+       bleiben - kuenftige Codes durften nie vorab sichtbar sein).
 
-    function bkmpStartDailyEventPolling() {
-      bkmpPollDailyEvent();
-      clearInterval(bkmpDailyEventPollTimer);
-      /* Spieler-Meldung 20.07. ("Der ist erst 30 Sekunden spaeter aufgetaucht,
-         obwohl Fenster offen war"): dieses Event ist ein "wer zuerst"-Rennen
-         mit nur 3 Minuten Laufzeit (siehe api/active-daily-event.js) - im
-         30s-Takt (Egress-Fix vom 17.07., davor 15s) verliert man das Rennen
-         im schlimmsten Fall rein durch Polling-Timing, nicht durch
-         tatsaechliche Reaktionsgeschwindigkeit. Echtzeit-Push (Supabase
-         Realtime) geht hier bewusst NICHT - daily_code_events hat absichtlich
-         KEINE anonyme Lese-Policy, damit niemand kuenftige Codes/Zeiten vorab
-         sieht (siehe Kommentar dort); ein Realtime-Abo wuerde genau diesen
-         Schutz aushebeln. Einzige verbleibende Stellschraube ist das
-         Intervall selbst - Nutzer-Entscheidung 20.07.: 10s als Mittelweg
-         (verdreifacht die Lesezugriffe ggue. 30s, bleibt aber unter dem
-         alten 15s-Stand). */
-      bkmpDailyEventPollTimer = setInterval(bkmpPollDailyEvent, 10000);
-    }
+       Ersatz: dieselben 22 generischen Plüshies (alle ausser den 4 fest
+       exklusiv woanders erhaeltlichen) fallen jetzt mit 5% Chance pro
+       siegendem Teilnehmer beim Weltboss-Raid UND beim Gildenboss (siehe
+       raid_finish()/guild_boss_finish() in
+       sql/20260927-remove-daily-event-add-boss-plushie-drops.sql) - komplett
+       ohne Client-Polling, da beide Systeme ihre Belohnungen ohnehin schon
+       einmalig serverseitig beim Boss-Kill vergeben.
 
-    async function bkmpPollDailyEvent() {
-      try {
-        const res = await fetch('/api/active-daily-event');
-        if (!res.ok) return;
-        const body = await res.json();
-        if (body.active) {
-          bkmpHandleActiveDailyEvent(body.event);
-        } else {
-          bkmpCloseDailyEventPopup();
-        }
-      } catch (e) { /* still offline/unreachable - einfach beim naechsten Poll erneut versuchen */ }
-    }
-
-    function bkmpHandleActiveDailyEvent(event) {
-      const already = document.getElementById('bkmpDailyPopup');
-      if (already && bkmpCurrentDailyEvent && bkmpCurrentDailyEvent.id === event.id) {
-        bkmpCurrentDailyEvent = event;
-        bkmpUpdateDailyEventWinState(event);
-        return;
-      }
-      if (event.id === bkmpDismissedDailyEventId) return;
-      bkmpCurrentDailyEvent = event;
-      bkmpShowDailyEventPopup(event);
-    }
-
-    function bkmpCloseDailyEventPopup() {
-      const popup = document.getElementById('bkmpDailyPopup');
-      if (popup) popup.remove();
-      clearInterval(bkmpDailyEventCountdownTimer);
-      bkmpCurrentDailyEvent = null;
-    }
-
-    function bkmpDismissDailyEventPopup() {
-      if (bkmpCurrentDailyEvent) bkmpDismissedDailyEventId = bkmpCurrentDailyEvent.id;
-      bkmpCloseDailyEventPopup();
-    }
-
-    function bkmpShowDailyEventPopup(event) {
-      bkmpCloseDailyEventPopup();
-      bkmpCurrentDailyEvent = event;
-      const plushie = BKMP_PLUSHIES.find(p => p.id === event.plushieId);
-      const popup = document.createElement('div');
-      popup.id = 'bkmpDailyPopup';
-      popup.className = 'bkmp-daily-popup-backdrop';
-      popup.innerHTML = `
-        <div class="bkmp-daily-popup-card${event.isGoldenHour ? ' golden-hour' : ''}">
-          <div class="bkmp-daily-popup-particles"></div>
-          ${event.isGoldenHour ? '<div class="bkmp-daily-popup-ribbon">⭐ GOLDEN HOUR ⭐</div>' : ''}
-          <button type="button" class="bkmp-daily-popup-close" id="bkmpDailyPopupClose" aria-label="Schließen">&times;</button>
-          <div class="bkmp-daily-popup-icon">${event.isGoldenHour ? '👑' : '✨'}</div>
-          <h3>Ein geheimer Creator-Code wurde entdeckt!</h3>
-          <p class="bkmp-daily-popup-sub">Nur der ALLERERSTE Spieler erhält dieses Plüshie!</p>
-          ${plushie ? `<div class="bkmp-daily-popup-plushie"><img src="${escapeHtml(plushie.image)}" alt=""><span>${escapeHtml(plushie.name)}</span></div>` : ''}
-          <div class="bkmp-daily-popup-code">${escapeHtml(event.code)}</div>
-          <div class="bkmp-daily-popup-countdown">⏳ Noch <span id="bkmpDailyCountdown">03:00</span> verfügbar!</div>
-          <button type="button" class="bkmp-daily-popup-claim" id="bkmpDailyClaimBtn">Jetzt sichern!</button>
-          <p class="bkmp-daily-popup-msg" id="bkmpDailyPopupMsg"></p>
-        </div>
-      `;
-      document.body.appendChild(popup);
-      requestAnimationFrame(() => popup.classList.add('visible'));
-
-      const particles = popup.querySelector('.bkmp-daily-popup-particles');
-      if (particles) {
-        particles.innerHTML = Array.from({ length: 18 }, () => {
-          const left = Math.round(Math.random() * 100);
-          const delay = (Math.random() * 3).toFixed(2);
-          const duration = (2.4 + Math.random() * 2).toFixed(2);
-          return `<span style="left:${left}%; animation-delay:${delay}s; animation-duration:${duration}s;"></span>`;
-        }).join('');
-      }
-
-      document.getElementById('bkmpDailyPopupClose').addEventListener('click', bkmpDismissDailyEventPopup);
-      document.getElementById('bkmpDailyClaimBtn').addEventListener('click', bkmpClaimDailyEvent);
-
-      bkmpUpdateDailyEventWinState(event);
-      bkmpTickDailyEventCountdown();
-      clearInterval(bkmpDailyEventCountdownTimer);
-      bkmpDailyEventCountdownTimer = setInterval(bkmpTickDailyEventCountdown, 1000);
-    }
-
-    function bkmpTickDailyEventCountdown() {
-      if (!bkmpCurrentDailyEvent) return;
-      const remainingMs = new Date(bkmpCurrentDailyEvent.expiresAt).getTime() - Date.now();
-      const label = document.getElementById('bkmpDailyCountdown');
-      if (remainingMs <= 0) {
-        bkmpCloseDailyEventPopup();
-        return;
-      }
-      const totalSeconds = Math.ceil(remainingMs / 1000);
-      const mm = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
-      const ss = String(totalSeconds % 60).padStart(2, '0');
-      if (label) label.textContent = `${mm}:${ss}`;
-    }
-
-    function bkmpUpdateDailyEventWinState(event) {
-      const claimBtn = document.getElementById('bkmpDailyClaimBtn');
-      const msg = document.getElementById('bkmpDailyPopupMsg');
-      if (!claimBtn || !msg) return;
-      if (event.won) {
-        claimBtn.style.display = 'none';
-        const isMe = bkmpGetMcName() && event.winnerDisplayName && bkmpGetMcName().trim().toLowerCase() === event.winnerDisplayName.trim().toLowerCase();
-        msg.textContent = isMe
-          ? 'Glückwunsch! Du warst der Erste und hast das Plüshie erhalten! 🎉'
-          : `Leider war jemand schneller. (${event.winnerDisplayName} hat gewonnen)`;
-        msg.classList.toggle('success', Boolean(isMe));
-        msg.classList.toggle('error', !isMe);
-      } else {
-        claimBtn.style.display = '';
-        msg.textContent = '';
-        msg.classList.remove('success', 'error');
-      }
-    }
-
-    async function bkmpClaimDailyEvent() {
-      if (!bkmpCurrentDailyEvent) return;
-      const name = bkmpGetMcName();
-      const msg = document.getElementById('bkmpDailyPopupMsg');
-      if (!name) {
-        if (msg) { msg.textContent = 'Bitte trag zuerst deinen Minecraft-Namen ein.'; msg.classList.add('error'); }
-        return;
-      }
-      const btn = document.getElementById('bkmpDailyClaimBtn');
-      btn.disabled = true;
-      btn.textContent = 'Wird gesichert...';
-      try {
-        /* Sicherheits-Nachtrag (Audit 15.07.): api/redeem-daily-event.js
-           prueft den Aufrufer jetzt serverseitig ueber dieses Access-
-           Token - verhindert, dass jemand einen fremden Sieg unter dem
-           Namen eines anderen Spielers eintraegt. */
-        const session = typeof bkmpGetPlayerSession === 'function' ? await bkmpGetPlayerSession() : null;
-        const accessToken = session ? session.access_token : null;
-        if (!accessToken) {
-          if (msg) { msg.textContent = 'Bitte melde dich zuerst mit deinem Account an.'; msg.classList.add('error'); }
-          btn.disabled = false;
-          btn.textContent = 'Jetzt sichern!';
-          return;
-        }
-        const res = await fetch('/api/redeem-daily-event', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-          body: JSON.stringify({ eventId: bkmpCurrentDailyEvent.id, playerName: name })
-        });
-        const body = await res.json();
-        if (res.ok && body.ok) {
-          const wins = bkmpGetDailyEventWins() + 1;
-          try { localStorage.setItem('bkmp-daily-event-wins', String(wins)); } catch (e) {}
-          if (body.isGoldenHour) { try { localStorage.setItem('bkmp-won-golden-hour', '1'); } catch (e) {} }
-          await bkmpRefreshOwnedPlushies();
-          renderAchievementBadge();
-          bkmpCurrentDailyEvent.won = true;
-          bkmpCurrentDailyEvent.winnerDisplayName = name;
-          bkmpUpdateDailyEventWinState(bkmpCurrentDailyEvent);
-        } else if (body.error === 'already_won') {
-          bkmpCurrentDailyEvent.won = true;
-          bkmpCurrentDailyEvent.winnerDisplayName = body.winnerDisplayName || '???';
-          bkmpUpdateDailyEventWinState(bkmpCurrentDailyEvent);
-        } else if (body.error === 'expired') {
-          if (msg) { msg.textContent = 'Das Event ist leider schon abgelaufen.'; msg.classList.add('error'); }
-        } else {
-          if (msg) { msg.textContent = 'Etwas ist schiefgelaufen. Versuch es erneut.'; msg.classList.add('error'); }
-        }
-      } catch (e) {
-        if (msg) { msg.textContent = 'Verbindungsfehler. Versuch es erneut.'; msg.classList.add('error'); }
-      }
-      btn.disabled = false;
-      btn.textContent = 'Jetzt sichern!';
-    }
-
-    bkmpStartDailyEventPolling();
-
-    /* Test-Vorschau fuers Admin-Panel: /?testDailyPopup=1 oeffnet das Popup
-       mit Beispieldaten, ganz ohne echtes Event/DB-Zugriff. */
-    if (new URLSearchParams(window.location.search).get('testDailyPopup') === '1') {
-      const testPlushie = BKMP_PLUSHIES[0];
-      bkmpShowDailyEventPopup({
-        id: 'test-preview',
-        code: 'BKMP-TEST-DEMO',
-        plushieId: testPlushie ? testPlushie.id : '',
-        isGoldenHour: new URLSearchParams(window.location.search).get('golden') === '1',
-        expiresAt: new Date(Date.now() + 3 * 60000).toISOString(),
-        won: false
-      });
-      const claimBtn = document.getElementById('bkmpDailyClaimBtn');
-      if (claimBtn) claimBtn.addEventListener('click', e => {
-        e.stopImmediatePropagation();
-        const msg = document.getElementById('bkmpDailyPopupMsg');
-        if (msg) { msg.textContent = 'Das ist nur eine Vorschau – hier passiert nichts Echtes.'; }
-      }, true);
-    }
+       BEWUSST NICHT ENTFERNT: die "daily_event_1/5/15"-Erfolge weiter unten
+       sowie die Titel "lucky_one"/"gluecksritter"/"der_erste"/
+       "der_schnellste"/"golden_hour_win"/"goldjaeger" - Spieler, die diese
+       vor dem 27.09.2026 bereits erspielt haben, behalten ihr Abzeichen
+       (ueblich bei einem befristet entfernten Event: Bestandsgewinner
+       behalten den Titel, koennen ihn ab jetzt aber nicht mehr NEU
+       erspielen). bkmpGetDailyEventWins()/bkmpGetWonGoldenHour() (weiter
+       oben in dieser Datei) bleiben deshalb ebenfalls bestehen - sie lesen
+       nur noch den zuletzt erreichten, eingefrorenen Stand aus localStorage,
+       schreiben ihn aber nirgends mehr neu. Die Tabelle daily_code_events
+       bleibt in der DB liegen (Historie, hatte ohnehin nie eine oeffentliche
+       Lese-Policy) - kein Sicherheitsrisiko, einfach ungenutzt. */
 
     /* ---------------- Bestenliste ---------------- */
     let bkmpLeaderboardStats = [];

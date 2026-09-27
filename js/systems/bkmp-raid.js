@@ -951,6 +951,48 @@ function bkmpRaidResultParticipantsHTML(participants, totalDamage, mine) {
     </div>`;
 }
 
+/* Gemeinsamer Baustein fuer "Belohnungs-Pluschie-Code(s) nach einem Sieg" -
+   von Raid (Zerathor + generischer 5%-Wurf) UND Gildenboss (generischer
+   5%-Wurf) genutzt, siehe raid_finish()/guild_boss_finish() in
+   sql/20260927-remove-daily-event-add-boss-plushie-drops.sql (27.09.2026).
+   Mehrere Codes gleichzeitig moeglich (z.B. Zerathor UND ein generisches
+   Pluschie im selben Raid) - deshalb ein Array statt eines einzelnen
+   Codes. Definiert hier (nicht in bkmp-guild.js), aber von beiden Dateien
+   aufgerufen - identisches, bereits bestehendes Muster wie
+   bkmpRaidFormatCountdown() (in bkmp-raid.js definiert, von bkmp-guild.js
+   verwendet): beide Dateien sind zum Zeitpunkt eines echten Boss-Endes
+   laengst vollstaendig geladen, die Datei-Reihenfolge der beiden
+   Subsystem-Skripte untereinander spielt fuer global deklarierte
+   Funktionen keine Rolle. */
+function bkmpRenderPlushieRewardCodesHtml(codes) {
+  if (!Array.isArray(codes) || !codes.length) return '';
+  return codes.map(rc => {
+    const plushie = (typeof BKMP_PLUSHIES !== 'undefined' ? BKMP_PLUSHIES : []).find(p => p.id === rc.plushie_id);
+    const name = plushie ? plushie.name : rc.plushie_id;
+    return `
+    <div class="raid-result-zerator-code">
+      <div class="raid-result-zerator-title">🎁 ${escapeHtml(name)}! Hier ist dein Code:</div>
+      <div class="raid-result-zerator-code-row">
+        <span class="raid-result-zerator-code-value">${escapeHtml(rc.code)}</span>
+        <button type="button" class="btn-nein raid-result-zerator-copy-btn" data-code="${escapeHtml(rc.code)}">Kopieren</button>
+      </div>
+      <p class="raid-result-zerator-hint">Dieser Code kann nur einmal eingelöst werden – am besten gleich sichern.</p>
+    </div>`;
+  }).join('');
+}
+
+function bkmpWirePlushieRewardCodeCopyButtons(root) {
+  if (!root) return;
+  root.querySelectorAll('.raid-result-zerator-copy-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const text = btn.dataset.code || '';
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => { btn.textContent = 'Kopiert!'; window.setTimeout(() => { btn.textContent = 'Kopieren'; }, 1800); }).catch(() => {});
+      }
+    });
+  });
+}
+
 async function bkmpRaidShowResult() {
   const resultCard = document.getElementById('raidResultCard');
   const battlefield = document.getElementById('raidBattlefield');
@@ -965,15 +1007,18 @@ async function bkmpRaidShowResult() {
   const won = bkmpRaidState.status === 'won';
   const flawless = won && bkmpRaidState.cityMaxHp > 0 && bkmpRaidState.cityHp >= bkmpRaidState.cityMaxHp;
   const totalDamage = participants.reduce((sum, p) => sum + p.damageDealt, 0);
-  /* Persoenlicher Zerator-Belohnungscode: reine Abfrage einer serverseitig
-     (raid_finish(), 5%-Wurf NUR bei echtem Sieg) bereits fertig erzeugten
-     Zeile - der Client erzeugt hier nichts selbst, ein erneutes Aufrufen
-     dieser Funktion (z.B. durch Neuladen der Seite waehrend das
-     Ergebnis-Fenster noch offen ist) liefert daher zuverlaessig denselben
-     Code statt einen neuen zu erzeugen. */
-  let rewardCode = null;
+  /* Persoenliche Belohnungscodes: reine Abfrage bereits serverseitig
+     (raid_finish(), zwei unabhaengige 5%-Wuerfe NUR bei echtem Sieg -
+     Zerathor + generisches Pluschie aus dem 27.09.2026 hinzugefuegten
+     Pool, siehe sql/20260927-remove-daily-event-add-boss-plushie-
+     drops.sql) fertig erzeugter Zeilen - der Client erzeugt hier nichts
+     selbst, ein erneutes Aufrufen dieser Funktion (z.B. durch Neuladen
+     der Seite waehrend das Ergebnis-Fenster noch offen ist) liefert
+     daher zuverlaessig dieselben Codes statt neue zu erzeugen. Kann 0,
+     1 oder (selten, beide Wuerfe getroffen) 2 Eintraege liefern. */
+  let rewardCodes = [];
   if (won && myName) {
-    try { rewardCode = await loadRaidRewardCode(bkmpRaidState.id, myName); } catch (e) { console.warn('Raid: Belohnungscode konnte nicht geladen werden.', e); }
+    try { rewardCodes = await loadRaidRewardCodes(bkmpRaidState.id, myName); } catch (e) { console.warn('Raid: Belohnungscodes konnten nicht geladen werden.', e); }
   }
   /* Zerathor-Dorf-Skin: kein Einloese-Code wie beim Pluschie (Dorf-Skins
      sind nicht handelbar) - raid_finish() hat den 1%-Wurf serverseitig
@@ -1011,15 +1056,7 @@ async function bkmpRaidShowResult() {
     </div>
     ${won ? `<div class="raid-result-rewards">${bkmpRaidRewardSpans(bkmpRaidState, mine, totalDamage)}</div><p class="admin-help-text" style="margin-top:-0.3rem;">Belohnung nach Schadensanteil (${totalDamage > 0 && mine ? ((mine.damageDealt / totalDamage) * 100).toFixed(1) : '0'}% des Gesamtschadens).</p>` : ''}
     ${bkmpRaidResultParticipantsHTML(participants, totalDamage, mine)}
-    ${rewardCode ? `
-    <div class="raid-result-zerator-code">
-      <div class="raid-result-zerator-title">🎁 Plushie! Hier ist dein Code:</div>
-      <div class="raid-result-zerator-code-row">
-        <span class="raid-result-zerator-code-value" id="raidZeratorCodeValue">${escapeHtml(rewardCode.code)}</span>
-        <button type="button" class="btn-nein" id="raidZeratorCodeCopyBtn">Kopieren</button>
-      </div>
-      <p class="raid-result-zerator-hint">Dieser Code kann nur einmal eingelöst werden – am besten gleich sichern.</p>
-    </div>` : ''}
+    ${bkmpRenderPlushieRewardCodesHtml(rewardCodes)}
     ${newVillageSkin ? `
     <div class="raid-result-zerator-code">
       <div class="raid-result-zerator-title">🏘️ Seltene Beute! Du hast das Zerathor Dorf freigeschaltet.</div>
@@ -1027,13 +1064,7 @@ async function bkmpRaidShowResult() {
     </div>` : ''}
     <button type="button" class="btn-ja" id="raidResultCloseBtn">Schließen</button>
   `;
-  const copyBtn = document.getElementById('raidZeratorCodeCopyBtn');
-  if (copyBtn) copyBtn.addEventListener('click', () => {
-    const text = rewardCode ? rewardCode.code : '';
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(() => { copyBtn.textContent = 'Kopiert!'; window.setTimeout(() => { copyBtn.textContent = 'Kopieren'; }, 1800); }).catch(() => {});
-    }
-  });
+  bkmpWirePlushieRewardCodeCopyButtons(resultCard);
   const closeBtn = document.getElementById('raidResultCloseBtn');
   if (closeBtn) closeBtn.addEventListener('click', () => {
     bkmpRaidStopCombatView();
