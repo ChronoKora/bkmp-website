@@ -4916,7 +4916,16 @@ input.cardcatalog-search:focus {
 .investor-security-spoiler summary::-webkit-details-marker { display: none; }
 .investor-security-spoiler summary::before { content: '▸ '; }
 .investor-security-spoiler[open] summary::before { content: '▾ '; }
-.investor-security-spoiler-img { display: block; width: 100%; border-radius: 8px; margin-top: 0.7rem; }
+/* 01.10.2026: zwei WIP-Ansichten statt einer einzelnen - nebeneinander ab
+   genuegend Platz, darunter gestapelt (keine Verzerrung durch erzwungene
+   gleiche Breite bei sehr unterschiedlichen Seitenverhaeltnissen). */
+.investor-security-spoiler-gallery {
+  display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.7rem;
+}
+.investor-security-spoiler-img {
+  display: block; flex: 1 1 220px; min-width: 0; max-width: 100%;
+  border-radius: 8px; margin-top: 0;
+}
 
 /* Stufe 4 - Vertrauens-Slider */
 .investor-security-trust-value { font-family: 'Fraunces', serif; font-size: 1.4rem; color: var(--gold-fixed); margin: 0 0 0.9rem; }

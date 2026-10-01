@@ -2415,7 +2415,15 @@
          Server laengst die neue ausliefert. Bei JEDEM kuenftigen Bild-
          Tausch hier zwingend den ?v=-Wert hochzaehlen (gleiches Prinzip
          wie das etablierte Cache-Busting fuer CSS/JS in diesem Projekt). */
-      const INVESTOR_SECURITY_YAKSHA_IMAGE = 'assets/dragons/wip/yaksha-texturwunsch.png?v=20260922-2';
+      // 01.10.2026: zwei neue WIP-Ansichten ersetzen das bisherige einzelne
+      // Bild - Array statt einer einzelnen Konstante, Render-Stelle baut
+      // daraus mehrere <img>-Tags (siehe renderSecStageYaksha()). Bei jedem
+      // kuenftigen Bild-Tausch hier zwingend den ?v=-Wert JEDES Eintrags
+      // hochzaehlen (gleiches Cache-Busting-Prinzip wie bei CSS/JS).
+      const INVESTOR_SECURITY_YAKSHA_IMAGES = [
+        'assets/dragons/wip/yaksha-texturwunsch-top.png?v=20261001-1',
+        'assets/dragons/wip/yaksha-texturwunsch-head.png?v=20261001-1',
+      ];
       let secActive = false; // Doppel-Start-Schutz (schnelles Mehrfach-Klicken) - bleibt bis unmittelbar vor dem eigentlichen Reveal true
       let secOnComplete = null;
       let secTimers = []; // saemtliche setTimeout/setInterval-IDs der aktuell laufenden Stufe(n) - IMMER vor jedem Stufenwechsel/Abschluss geleert
@@ -2933,9 +2941,9 @@
          ChronoYaksha-Texturwunsch-Frage ---- Beide Antwort-Knoepfe sagen
          bewusst dasselbe ("Ja") - identischer Witz wie Stufe 3 (Dayman/
          Lukas): egal was man klickt, die "richtige" Antwort ist ohnehin
-         vorgegeben. Bild-Asset: siehe INVESTOR_SECURITY_YAKSHA_IMAGE
-         weiter oben - dort einfach austauschen, sobald Yaksha ein
-         neueres WIP-Bild hat. */
+         vorgegeben. Bild-Assets: siehe INVESTOR_SECURITY_YAKSHA_IMAGES
+         weiter oben - dort einfach austauschen/ergaenzen, sobald Yaksha
+         neuere WIP-Bilder hat. */
       function renderSecStageYaksha() {
         const html = `
           <h3>Zustimmungsprüfung 7/8</h3>
@@ -2948,7 +2956,9 @@
           <p class="investor-security-feedback" id="investorSecurityYakshaFeedback" hidden></p>
           <details class="investor-security-spoiler" id="investorSecurityYakshaSpoiler" hidden>
             <summary>🔍 Spoiler: Yakshas Arbeit bereits ansehen</summary>
-            <img class="investor-security-spoiler-img" src="${INVESTOR_SECURITY_YAKSHA_IMAGE}" alt="Yakshas Texturwunsch-Drache (Work in Progress)">
+            <div class="investor-security-spoiler-gallery">
+              ${INVESTOR_SECURITY_YAKSHA_IMAGES.map(src => `<img class="investor-security-spoiler-img" src="${src}" alt="Yakshas Texturwunsch-Drache (Work in Progress)">`).join('')}
+            </div>
           </details>
           <div class="joke-buttons" id="investorSecurityYakshaContinueWrap" hidden>
             <button type="button" class="btn-ja" id="investorSecurityYakshaContinue">Weiter</button>
