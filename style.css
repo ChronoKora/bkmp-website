@@ -5400,6 +5400,42 @@ input.cardcatalog-search:focus {
 .bkb-chat-options { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4rem; margin-top: 0.7rem; }
 .bkb-phone { min-height: 1.5rem; margin: 0.3rem 0; }
 
+/* 03.10.2026: Passbild mit echtem Foto (4 "aufbereitete" Varianten),
+   echte Creeper-Gesichter im Raster, neue Captcha-Elemente. */
+.bkb-avatar .bkb-photo {
+  position: relative; display: block; width: 72px; height: 72px; border-radius: 10px; overflow: hidden;
+  font-size: 0; background: #e7e5e4;
+}
+.bkb-photo img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+.bkb-photo.is-upside img { transform: rotate(180deg); }
+.bkb-photo.is-vintage img { filter: grayscale(1) sepia(0.55) contrast(1.15) blur(0.4px); transform: scale(1.6); transform-origin: 50% 40%; }
+.bkb-photo-hat { position: absolute; left: 50%; top: -9px; transform: translateX(-50%); font-size: 2.1rem; font-style: normal; line-height: 1; }
+.bkb-creeper-tile { padding: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.bkb-creeper-tile img { width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; pointer-events: none; }
+.bkb-mirror {
+  display: inline-block; transform: scaleX(-1); margin: 0.2rem 0 0.6rem; padding: 0.4rem 1rem; border-radius: 10px;
+  font: 800 1.7rem 'Courier New', monospace; letter-spacing: 0.12em; color: var(--gold-fixed);
+  background: color-mix(in srgb, var(--line) 45%, transparent);
+}
+.bkb-number-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.4rem; margin: 0.3rem 0 0.6rem; }
+.bkb-number-grid .bkb-choice { padding: 0.65rem 0; }
+.bkb-unlock { margin: 0.8rem 0 0.6rem; height: 40px; border-radius: 999px; }
+.bkb-unlock::-webkit-slider-thumb { width: 36px; height: 36px; }
+.bkb-unlock::-moz-range-thumb { width: 36px; height: 36px; }
+.bkb-wide-btn { min-width: 180px; }
+.investor-security-card .bkb-stroop { font: 900 2.4rem 'Inter', sans-serif; letter-spacing: 0.06em; margin: 0.2rem 0 0.7rem; }
+.investor-security-card .bkb-emoji-row { font-size: 2.2rem; letter-spacing: 0.25em; margin: 0.2rem 0 0.7rem; }
+.bkb-short-input { max-width: 160px; text-align: center; letter-spacing: 0.2em; font-weight: 700; }
+.investor-security-card .bkb-legal-text {
+  text-align: left; font-size: 0.86rem; line-height: 1.6; color: var(--muted); margin: 0 0 0.6rem;
+  padding: 0.7rem 0.9rem; border-left: 3px solid color-mix(in srgb, var(--purple) 50%, var(--line)); background: var(--paper);
+}
+.bkb-inline-link {
+  display: inline; padding: 0; margin: 0; border: none; background: none; font: inherit; color: inherit;
+  cursor: pointer; text-decoration: none;
+}
+.bkb-inline-link:hover, .bkb-inline-link:focus-visible { color: var(--gold-fixed); text-decoration: underline; }
+
 /* Nachbemerkung unter dem Rickroll */
 .investor-payout-prank-caption { margin: 0.9rem 0 0.2rem; font-weight: 600; color: var(--gold-fixed); font-size: 0.95rem; }
 .investor-payout-prank-caption[hidden] { display: none; }

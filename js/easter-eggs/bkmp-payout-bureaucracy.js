@@ -504,7 +504,11 @@
     if (state.phase === 'final') return 'finalPayout';
     if (state.phase === 'last3') {
       if (!state.flags.last3Intro) return 'last3Intro';
-      return state.remaining <= 1 ? 'areYouDone' : pickCaptcha(true);
+      if (state.remaining <= 1) return 'areYouDone';
+      const endMods = [...MODULES.values()].filter(m => m.endOnly && (state.counts[m.id] || 0) === 0);
+      if (endMods.length) return pick(endMods).id;
+      const easy = pickCaptcha(true);
+      return easy;
     }
     const pending = pendingMandatory();
     if (state.remaining <= 3) {
@@ -763,6 +767,7 @@
      hat ihre eigene Reaktion (Text/Strafe). */
   function choiceModule(api, o) {
     api.render(api.screen({ title: o.title, lead: o.lead, kicker: o.kicker, body: `
+      ${o.pre || ''}
       ${o.question ? `<p class="investor-security-question">${esc(o.question)}</p>` : ''}
       <div class="bkb-choices ${o.grid ? 'is-grid' : ''}">
         ${o.options.map((opt, i) => `<button type="button" class="bkb-choice" data-i="${i}">${esc(opt.label)}</button>`).join('')}
@@ -809,11 +814,88 @@
     }
   });
 
+  /* Ausweich-Captcha, falls der Zufallspool wirklich einmal leer ist.
+     Nutzer-Meldung 03.10.2026 ("das komplette Ende waren 6-8 das gleiche
+     Captcha mit klicke zum fortfahren"): statt einer einzigen Seite jetzt
+     viele kleine, unterschiedliche Formalitaeten - jede hoechstens einmal
+     (state.flags.fallbackUsed), erst wenn ALLE verbraucht sind, beginnt
+     die Liste von vorn. */
+  const FALLBACK_VARIANTS = [
+    { title: 'Verfahrensfortgang', lead: 'Bitte bestätige den Fortgang des Verfahrens.', btn: 'Fortgang bestätigen', reply: 'Fortgang bestätigt.' },
+    { title: 'Anwesenheitsprüfung', lead: 'Bitte bestätige, dass du noch da bist.', btn: 'Ich bin noch da', reply: 'Anwesenheit vermerkt.' },
+    { title: 'Zwischenspeicherung', lead: 'Dein Fortschritt muss zwischengespeichert werden.', btn: 'Zwischenspeichern', reply: 'Zwischengespeichert. Wo genau, wissen wir nicht.' },
+    { title: 'Atemprüfung', lead: 'Bitte atme einmal tief durch.', btn: 'Erledigt', reply: 'Atmung im normalen Bereich.' },
+    { title: 'Richtigkeitserklärung', lead: 'Bitte bestätige die Richtigkeit aller bisherigen Angaben.', btn: 'Alles korrekt', reply: 'Danke. Wir haben sie nicht geprüft.' },
+    { title: 'Nickprüfung', lead: 'Bitte nicke einmal zustimmend.', btn: 'Genickt', reply: 'Nicken erkannt.' },
+    { title: 'Aktenfoto', lead: 'Bitte lächle für die Akte.', btn: 'Gelächelt', reply: 'Lächeln abgelegt unter: Sonstiges.' },
+    { title: 'Vollständigkeitsprüfung', lead: 'Bitte bestätige, dass du kein Formular vergessen hast.', btn: 'Keins vergessen', reply: 'Das sagen alle.' },
+    { title: 'Klopfprüfung', lead: 'Bitte klopfe zweimal an.', btn: 'Klopf', reply: 'Herein.', clicks: 2 },
+    { title: 'Empfangsbestätigung', lead: 'Bitte bestätige den Empfang dieser Bestätigungsanfrage.', btn: 'Empfang bestätigen', reply: 'Empfang des Empfangs bestätigt.' },
+    { title: 'Konzentrationsprüfung', lead: 'Bitte denke 3 Sekunden lang an nichts.', btn: 'An nichts gedacht', reply: 'Du hast an die Auszahlung gedacht. Akzeptiert.' },
+    { title: 'Geduldsquittung', lead: 'Bitte quittiere deine bisherige Geduld.', btn: 'Quittieren', reply: 'Geduld quittiert. Restgeduld wird später abgerechnet.' },
+    { title: 'Sitzhaltung', lead: 'Bitte setze dich gerade hin.', btn: 'Sitze gerade', reply: 'Haltung dokumentiert.' },
+    { title: 'Ablagevermerk', lead: 'Bitte lege diesen Vorgang gedanklich ab.', btn: 'Abgelegt', reply: 'Vorgang gedanklich abgelegt. Physisch nicht.' }
+  ];
   register({
-    id: 'continueFallback', type: 'captcha', random: false, maxCount: 999, title: 'Verfahrensfortgang',
+    id: 'continueFallback', type: 'captcha', random: false, maxCount: 999, title: 'Formalität',
     run(api) {
-      api.render(api.screen({ title: 'Verfahrensfortgang', lead: 'Bitte bestätige den Fortgang des Verfahrens.' }), () => {
-        api.actions([{ label: 'Fortgang bestätigen', onClick: () => { api.feedback('Fortgang bestätigt.', 'ok'); api.after(600, () => api.done()); } }]);
+      if (!Array.isArray(state.flags.fallbackUsed)) state.flags.fallbackUsed = [];
+      let free = FALLBACK_VARIANTS.map((_, i) => i).filter(i => !state.flags.fallbackUsed.includes(i));
+      if (!free.length) { state.flags.fallbackUsed = []; free = FALLBACK_VARIANTS.map((_, i) => i); }
+      const idx = pick(free);
+      state.flags.fallbackUsed.push(idx);
+      save();
+      const v = FALLBACK_VARIANTS[idx];
+      let clicks = 0;
+      api.render(api.screen({ title: v.title, lead: v.lead }), () => {
+        api.actions([{ label: v.btn, onClick: b => {
+          clicks++;
+          if (v.clicks && clicks < v.clicks) { api.feedback('Einmal noch.', null); return; }
+          b.disabled = true;
+          api.feedback(v.reply, 'ok');
+          api.after(800, () => api.done());
+        } }]);
+      });
+    }
+  });
+
+  /* Reserviert fuer die "letzten Drei" (vor "Bist du fertig?") - werden
+     nie vorher vom Zufall gezogen, damit das Ende nie aus Resten besteht. */
+  register({
+    id: 'endSignHere', type: 'captcha', random: false, endOnly: true, title: 'Letzte Formalität',
+    run(api) {
+      api.render(api.screen({
+        title: 'Letzte Formalität',
+        lead: 'Bitte setze hier deinen letzten Haken.',
+        body: '<label class="investor-security-check-row bkb-center-row"><input type="checkbox" class="investor-security-checkbox" data-box><span>Ich bin bereit für meine Auszahlung.</span></label>'
+      }), () => {
+        const box = api.q('[data-box]');
+        box.addEventListener('change', () => {
+          if (!box.checked) return;
+          box.disabled = true;
+          api.seq([{ t: 'Bereitschaft dokumentiert.', k: 'ok' }], () => api.continueBtn());
+        });
+      });
+    }
+  });
+  register({
+    id: 'endAlmost', type: 'captcha', random: false, endOnly: true, title: 'Fast fertig',
+    run(api) {
+      choiceModule(api, {
+        title: 'Zwischenstand',
+        question: 'Bitte bestätige, dass du gleich fertig bist.',
+        options: [
+          { label: 'Gleich fertig', reply: 'Wir auch.' },
+          { label: 'Hoffentlich', reply: 'Hoffnung wurde zur Akte genommen.' }
+        ]
+      });
+    }
+  });
+  register({
+    id: 'endLastStamp', type: 'captcha', random: false, endOnly: true, title: 'Schlussvermerk',
+    run(api) {
+      api.render(api.screen({ title: 'Schlussvermerk', lead: 'Die Finanzabteilung setzt den Schlussvermerk.' }), () => {
+        api.seq([{ stamp: 'GEPRÜFT', kind: 'ok', w: 500 }, { t: 'Schlussvermerk gesetzt.', k: 'official' }], () => api.continueBtn());
       });
     }
   });
@@ -1004,7 +1086,7 @@
      CAPTCHAS - absurd, einfach, Buerokratie
      ------------------------------------------------------------------ */
   register({
-    id: 'shape', type: 'captcha', difficulty: 0, maxCount: 3, penalty: 1, title: 'Formerkennung',
+    id: 'shape', type: 'captcha', difficulty: 0, maxCount: 1, penalty: 1, title: 'Formerkennung',
     run(api) {
       const shapes = [['square', 'Quadrat'], ['circle', 'Kreis'], ['triangle', 'Dreieck']];
       const target = pick(shapes);
@@ -1061,7 +1143,7 @@
   });
 
   register({
-    id: 'weiter4', type: 'captcha', difficulty: 1, maxCount: 2, title: 'Fortfahren',
+    id: 'weiter4', type: 'captcha', difficulty: 1, maxCount: 1, title: 'Fortfahren',
     run(api) {
       const working = Math.floor(Math.random() * 4);
       api.render(api.screen({
@@ -1086,7 +1168,7 @@
   });
 
   register({
-    id: 'trustworthy', type: 'captcha', difficulty: 0, maxCount: 2, easy: true, title: 'Vertrauensprüfung',
+    id: 'trustworthy', type: 'captcha', difficulty: 0, maxCount: 1, easy: true, title: 'Vertrauensprüfung',
     run(api) {
       choiceModule(api, {
         title: 'Vertrauensprüfung',
@@ -1097,7 +1179,7 @@
   });
 
   register({
-    id: 'confirmConfirm', type: 'captcha', difficulty: 0, maxCount: 2, easy: true, title: 'Bestätigung',
+    id: 'confirmConfirm', type: 'captcha', difficulty: 0, maxCount: 1, easy: true, title: 'Bestätigung',
     run(api) {
       choiceModule(api, {
         title: 'Bestätigung',
@@ -1179,7 +1261,7 @@
   });
 
   register({
-    id: 'reaction', type: 'miniGame', difficulty: 1, maxCount: 2, title: 'Reaktionstest',
+    id: 'reaction', type: 'miniGame', difficulty: 1, maxCount: 1, title: 'Reaktionstest',
     run(api) {
       api.render(api.screen({
         title: 'Reaktionstest',
@@ -1274,7 +1356,7 @@
   });
 
   register({
-    id: 'holdButton', type: 'miniGame', difficulty: 1, maxCount: 2, title: 'Haltetest',
+    id: 'holdButton', type: 'miniGame', difficulty: 1, maxCount: 1, title: 'Haltetest',
     run(api) {
       api.render(api.screen({
         title: 'Haltetest',
@@ -1394,7 +1476,7 @@
   });
 
   register({
-    id: 'hugeContinue', type: 'captcha', difficulty: 0, maxCount: 3, easy: true, title: 'Fortfahren',
+    id: 'hugeContinue', type: 'captcha', difficulty: 0, maxCount: 1, easy: true, title: 'Fortfahren',
     run(api) {
       api.render(api.screen({ title: '', body: '<button type="button" class="bkb-huge" data-go>WEITER</button>' }), () => {
         api.q('[data-go]').addEventListener('click', e => {
@@ -1537,11 +1619,23 @@
   register({
     id: 'passportPhoto', type: 'captcha', difficulty: 1, maxCount: 1, title: 'Passbild',
     run(api) {
-      const avatars = [['🧛', 'Variante A'], ['🥸', 'Variante B'], ['🤖', 'Variante C'], ['🐸', 'Variante D']];
+      // Alle vier Varianten zeigen dasselbe echte Foto (assets/prank/passbild.png,
+      // Nutzerwunsch 03.10.2026) - nur unterschiedlich "aufbereitet".
+      const photo = 'assets/prank/passbild.png?v=20261003-1';
+      const avatars = [
+        ['is-normal', 'Variante A', ''],
+        ['is-upside', 'Variante B', ''],
+        ['is-hat', 'Variante C', '<i class="bkb-photo-hat">🎩</i>'],
+        ['is-vintage', 'Variante D (1987)', '']
+      ];
       api.render(api.screen({
         title: 'Passbild',
         lead: 'Bitte wähle dein offizielles Auszahlungsfoto.',
-        body: `<div class="bkb-avatars">${avatars.map(([e, n], i) => `<button type="button" class="bkb-avatar" data-i="${i}" aria-label="${n}"><span>${e}</span><small>${n}</small></button>`).join('')}</div>`
+        body: `<div class="bkb-avatars">${avatars.map(([cls, n, extra], i) => `
+          <button type="button" class="bkb-avatar" data-i="${i}" aria-label="${n}">
+            <span class="bkb-photo ${cls}"><img src="${photo}" alt="" draggable="false">${extra}</span>
+            <small>${n}</small>
+          </button>`).join('')}</div>`
       }), () => {
         let tries = 0;
         api.qa('[data-i]').forEach(b => b.addEventListener('click', () => {
@@ -1659,6 +1753,644 @@
   });
 
   /* ------------------------------------------------------------------
+     NEUE CAPTCHAS (03.10.2026) - Nutzer-Meldung "viele Captchas waren
+     doppelt, sogar dreifach": jedes Modul laeuft hoechstens einmal pro
+     Durchlauf, dafuer deutlich mehr verschiedene Aufgaben.
+     ------------------------------------------------------------------ */
+  register({
+    id: 'oddOneOut', type: 'captcha', difficulty: 0, easy: true, title: 'Logikprüfung',
+    run(api) {
+      choiceModule(api, {
+        title: 'Logikprüfung',
+        question: 'Welches Wort gehört nicht dazu?',
+        grid: true,
+        options: [0, 1, 2, 3].map(() => ({ label: 'Auszahlung', steps: [{ t: 'Korrekt.', k: 'ok' }, { t: 'Keines davon gehört dazu.', k: 'muted' }] }))
+      });
+    }
+  });
+
+  register({
+    id: 'sortDocs', type: 'captcha', difficulty: 1, title: 'Aktensortierung',
+    run(api) {
+      const order = ['14A', '14B', '14B-2', '14C'];
+      api.render(api.screen({
+        title: 'Aktensortierung',
+        lead: 'Sortiere die Formulare aufsteigend (klicke sie der Reihe nach an).',
+        body: `<div class="bkb-choices is-grid">${shuffle(order).map(f => `<button type="button" class="bkb-choice" data-f="${f}">Formular ${f}</button>`).join('')}</div>`
+      }), () => {
+        let next = 0;
+        const btns = api.qa('[data-f]');
+        btns.forEach(b => b.addEventListener('click', () => {
+          if (b.dataset.f !== order[next]) {
+            next = 0;
+            btns.forEach(x => { x.disabled = false; x.classList.remove('is-picked'); });
+            api.feedback('Falsche Reihenfolge. Sortierung zurückgesetzt.', 'err');
+            api.fail('Reihenfolge: 14A → 14B → 14B-2 → 14C.');
+            return;
+          }
+          b.disabled = true;
+          b.classList.add('is-picked');
+          next++;
+          if (next < order.length) { api.feedback(`${next} von ${order.length} einsortiert.`, null); return; }
+          api.feedback('', null);
+          api.seq([{ t: 'Sortierung korrekt.', k: 'ok' }, { t: 'Die Formulare wurden anschließend zufällig neu gemischt.', k: 'muted' }], () => api.continueBtn());
+        }));
+      });
+    }
+  });
+
+  register({
+    id: 'countBananas', type: 'captcha', difficulty: 0, title: 'Zählprüfung',
+    run(api) {
+      choiceModule(api, {
+        title: 'Zählprüfung',
+        lead: 'Wie viele Bananen siehst du?',
+        pre: '<p class="bkb-emoji-row">🍌 🍌 🍌</p>',
+        grid: true,
+        hint: 'Es sind drei.',
+        options: [
+          { label: '2', retry: 'Nochmal zählen.' },
+          { label: '3', steps: [{ t: 'Korrekt.', k: 'ok' }, { t: 'Eine davon war ein Steuerberater.', k: 'muted' }] },
+          { label: '4', retry: 'Nochmal zählen.' },
+          { label: 'Ich sehe keine Bananen', reply: 'Ehrliche Antwort. Augenprüfung wird empfohlen. Akzeptiert.' }
+        ]
+      });
+    }
+  });
+
+  register({
+    id: 'mirrorText', type: 'captcha', difficulty: 1, title: 'Spiegelschrift',
+    run(api) {
+      const word = pick(['GELD', 'AKTE', 'STEMPEL', 'KAFFEE']);
+      api.render(api.screen({
+        title: 'Spiegelschrift',
+        lead: 'Lies den gespiegelten Text und tippe ihn ab.',
+        body: `<div class="bkb-mirror" aria-label="${word}">${word}</div>
+               <input type="text" class="bkb-input" data-answer placeholder="Text eingeben" autocomplete="off" autocapitalize="characters">`
+      }), () => {
+        const input = api.q('[data-answer]');
+        api.actions([{ label: 'Prüfen', onClick: b => {
+          if (input.value.trim().toUpperCase() !== word) { api.feedback('Text stimmt nicht überein.', 'err'); api.fail(`Der Text lautet ${word}.`); return; }
+          b.disabled = true;
+          input.disabled = true;
+          api.feedback('Korrekt. Du kannst rückwärts denken. Vermerkt.', 'ok');
+          api.after(900, () => api.done());
+        } }]);
+      });
+    }
+  });
+
+  register({
+    id: 'dontClick', type: 'captcha', difficulty: 0, title: 'Zurückhaltungsprüfung',
+    run(api) {
+      api.render(api.screen({ title: 'Zurückhaltungsprüfung', lead: 'Klicke NICHT auf den folgenden Button.' }), () => {
+        let resolved = false;
+        const finish = (clicked) => {
+          if (resolved) return;
+          resolved = true;
+          api.actions([]);
+          api.seq(clicked
+            ? [{ t: 'Du hast geklickt.', k: 'err' }, { t: 'Das war zu erwarten. Vermerkt.', k: 'muted' }]
+            : [{ t: 'Danke für deine Zurückhaltung.', k: 'ok' }],
+          () => api.continueBtn());
+        };
+        api.actions([{ label: 'Nicht klicken', cls: 'btn-nein', onClick: () => finish(true) }]);
+        api.after(4500, () => finish(false));
+      });
+    }
+  });
+
+  register({
+    id: 'coinFlip', type: 'captcha', difficulty: 0, easy: true, title: 'Münzwurf',
+    run(api) {
+      const steps = [{ t: 'Münze wird geworfen…', k: 'muted' }, { t: 'Ergebnis: Kante.', k: 'official', w: 1300 }, { t: 'Unentschieden zugunsten von BKInvestment.', k: 'muted' }];
+      choiceModule(api, {
+        title: 'Münzwurf',
+        question: 'Wähle Kopf oder Zahl.',
+        options: [{ label: 'Kopf', steps }, { label: 'Zahl', steps }]
+      });
+    }
+  });
+
+  register({
+    id: 'emotionScale', type: 'captcha', difficulty: 0, easy: true, title: 'Stimmungserfassung',
+    run(api) {
+      const steps = [{ t: 'Stimmung erfasst.', k: 'ok' }, { t: 'Sie wird bei der Bearbeitung nicht berücksichtigt.', k: 'muted' }];
+      choiceModule(api, {
+        title: 'Stimmungserfassung',
+        question: 'Wie fühlst du dich gerade?',
+        grid: true,
+        options: ['😀 Super', '🙂 Gut', '😐 Geht so', '🙁 Müde', '😡 Captcha-müde'].map(label => ({ label, steps }))
+      });
+    }
+  });
+
+  register({
+    id: 'pickNumber', type: 'captcha', difficulty: 0, title: 'Zahlenwahl',
+    run(api) {
+      api.render(api.screen({
+        title: 'Zahlenwahl',
+        lead: 'Wähle eine Zahl zwischen 1 und 10.',
+        body: `<div class="bkb-number-grid">${Array.from({ length: 10 }, (_, i) => `<button type="button" class="bkb-choice" data-n="${i + 1}">${i + 1}</button>`).join('')}</div>`
+      }), () => {
+        api.qa('[data-n]').forEach(b => b.addEventListener('click', () => {
+          const n = Number(b.dataset.n);
+          api.qa('[data-n]').forEach(x => { x.disabled = true; });
+          b.classList.add('is-picked');
+          api.seq([{ t: `Falsch. Die richtige Zahl war ${n === 10 ? 1 : n + 1}.`, k: 'err' }, { t: 'Trotzdem akzeptiert.', k: 'muted' }], () => api.continueBtn());
+        }));
+      });
+    }
+  });
+
+  register({
+    id: 'unlockSlider', type: 'miniGame', difficulty: 0, title: 'Entsperren',
+    run(api) {
+      api.render(api.screen({
+        title: 'Entsperren',
+        lead: 'Zum Entsperren ganz nach rechts schieben.',
+        body: '<input type="range" min="0" max="100" value="0" class="investor-security-slider bkb-unlock" data-slider aria-label="Zum Entsperren schieben">'
+      }), () => {
+        const slider = api.q('[data-slider]');
+        let unlocked = false;
+        slider.addEventListener('input', () => {
+          if (unlocked || Number(slider.value) < 100) return;
+          unlocked = true;
+          slider.disabled = true;
+          api.seq([{ t: 'Entsperrt.', k: 'ok' }, { t: 'Es gab nichts zu entsperren.', k: 'muted' }], () => api.continueBtn());
+        });
+        slider.addEventListener('change', () => { if (!unlocked) { slider.value = '0'; api.feedback('Bitte ganz nach rechts schieben.', null); } });
+      });
+    }
+  });
+
+  register({
+    id: 'typingSentence', type: 'captcha', difficulty: 1, title: 'Höflichkeitsprüfung',
+    run(api) {
+      const sentence = 'Ich möchte meine Auszahlung höflich.';
+      const norm = s => s.toLowerCase().replace(/[.!]+$/, '').replace(/\s+/g, ' ').trim();
+      api.render(api.screen({
+        title: 'Höflichkeitsprüfung',
+        lead: 'Bitte tippe den folgenden Satz exakt ab.',
+        body: `<p class="investor-security-question">„${esc(sentence)}“</p>
+               <input type="text" class="bkb-input" data-answer placeholder="Satz eingeben" autocomplete="off">`
+      }), () => {
+        const input = api.q('[data-answer]');
+        api.actions([{ label: 'Absenden', onClick: b => {
+          if (norm(input.value) !== norm(sentence)) { api.feedback('Nicht höflich genug.', 'err'); api.fail(`Exakt so: ${sentence}`); return; }
+          b.disabled = true;
+          input.disabled = true;
+          api.seq([{ t: 'Höflichkeit bestätigt.', k: 'ok' }, { t: 'Höflichkeit beschleunigt die Bearbeitung nicht.', k: 'muted' }], () => api.continueBtn());
+        } }]);
+      });
+    }
+  });
+
+  register({
+    id: 'clickCounter', type: 'miniGame', difficulty: 1, title: 'Klickprüfung',
+    run(api) {
+      api.render(api.screen({ title: 'Klickprüfung', lead: 'Klicke genau 7 Mal auf den Button.' }), () => {
+        let count = 0;
+        let timer = null;
+        let finished = false;
+        const box = api.actions([{ label: 'Klick (0)', onClick: b => {
+          if (finished) return;
+          count++;
+          b.textContent = `Klick (${count})`;
+          clearTimeout(timer);
+          timer = api.after(1200, () => {
+            if (count === 7) {
+              finished = true;
+              b.disabled = true;
+              api.seq([{ t: 'Sieben Klicks registriert.', k: 'ok' }, { t: 'Wir hatten acht erwartet. Akzeptiert.', k: 'muted' }], () => api.continueBtn());
+            } else if (count > 7) {
+              count = 0;
+              b.textContent = 'Klick (0)';
+              api.feedback('Zu viele Klicks. Zähler zurückgesetzt.', 'err');
+              api.fail('Genau sieben, dann kurz warten.');
+            }
+          });
+        } }]);
+        if (box) box.querySelector('button').classList.add('bkb-wide-btn');
+      });
+    }
+  });
+
+  register({
+    id: 'stroop', type: 'captcha', difficulty: 1, title: 'Farbprüfung',
+    run(api) {
+      const colors = [['Rot', '#ef4444'], ['Blau', '#3b82f6'], ['Grün', '#22c55e'], ['Gelb', '#eab308']];
+      const word = pick(colors);
+      const ink = pick(colors.filter(c => c !== word));
+      choiceModule(api, {
+        title: 'Farbprüfung',
+        lead: 'Klicke auf die Farbe, in der das Wort GESCHRIEBEN ist.',
+        pre: `<p class="bkb-stroop" style="color:${ink[1]}">${word[0].toUpperCase()}</p>`,
+        grid: true,
+        hint: 'Gemeint ist die Schriftfarbe, nicht das Wort.',
+        options: colors.map(([name]) => name === ink[0]
+          ? { label: name, steps: [{ t: 'Korrekt.', k: 'ok' }, { t: 'Farbsehen bestätigt. Geldsehen wird separat geprüft.', k: 'muted' }] }
+          : { label: name, retry: 'Das ist nicht die Schriftfarbe.' })
+      });
+    }
+  });
+
+  register({
+    id: 'todayDate', type: 'captcha', difficulty: 0, title: 'Datumsprüfung',
+    run(api) {
+      const fmt = d => d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      const now = new Date();
+      const day = 24 * 60 * 60 * 1000;
+      const today = fmt(now);
+      choiceModule(api, {
+        title: 'Datumsprüfung',
+        question: 'Welches Datum haben wir heute?',
+        grid: true,
+        options: shuffle([
+          { label: today, steps: [{ t: 'Korrekt.', k: 'ok' }, { t: 'Zeitreisende werden gesondert geprüft.', k: 'muted' }] },
+          { label: fmt(new Date(now.getTime() - day)), reply: 'Das war gestern. Die Finanzabteilung lebt auch noch in gestern. Akzeptiert.' },
+          { label: fmt(new Date(now.getTime() + day)), reply: 'Das ist morgen. Optimistisch. Akzeptiert.' },
+          { label: '29.02.2032', reply: 'Das ist dein Termin bei Bagon. Antwort trotzdem gewertet.' }
+        ])
+      });
+    }
+  });
+
+  register({
+    id: 'teaOrCoffee', type: 'captcha', difficulty: 0, easy: true, title: 'Getränkewahl',
+    run(api) {
+      choiceModule(api, {
+        title: 'Getränkewahl',
+        question: 'Was darf die Finanzabteilung dir anbieten?',
+        options: [
+          { label: 'Kaffee', reply: 'Lukas bedankt sich. Er trinkt deinen.' },
+          { label: 'Tee', reply: 'Tee ist in der Finanzabteilung nicht vorgesehen. Akzeptiert.' },
+          { label: 'Wasser', reply: 'Wasser wurde wegen Papierstau-Gefahr abgelehnt. Akzeptiert.' }
+        ]
+      });
+    }
+  });
+
+  register({
+    id: 'pen', type: 'captcha', difficulty: 0, easy: true, title: 'Schreibgeräteprüfung',
+    run(api) {
+      choiceModule(api, {
+        title: 'Schreibgeräteprüfung',
+        question: 'Mit welchem Stift möchtest du die Auszahlung unterschreiben?',
+        grid: true,
+        options: [
+          { label: 'Kugelschreiber', reply: 'Klassisch. Akzeptiert.' },
+          { label: 'Füller', reply: 'Elegant. Bitte nicht klecksen.' },
+          { label: 'Bleistift', reply: 'Nicht dokumentenecht. Ausnahmsweise akzeptiert.' },
+          { label: 'Wachsmalstift', reply: 'Mutig. Akzeptiert.' }
+        ]
+      });
+    }
+  });
+
+  register({
+    id: 'weather', type: 'captcha', difficulty: 0, easy: true, title: 'Wetterabgleich',
+    run(api) {
+      const steps = [{ t: 'Wetter stimmt nicht mit unseren Daten überein.', k: 'err' }, { t: 'Laut Finanzabteilung ist es bei dir gerade Mittwoch. Akzeptiert.', k: 'muted' }];
+      choiceModule(api, {
+        title: 'Wetterabgleich',
+        question: 'Welches Wetter herrscht gerade bei dir?',
+        grid: true,
+        options: ['☀️ Sonne', '🌧️ Regen', '❄️ Schnee', '🌩️ Gewitter'].map(label => ({ label, steps }))
+      });
+    }
+  });
+
+  register({
+    id: 'reverseHuman', type: 'captcha', difficulty: 0, easy: true, title: 'Gegenprüfung',
+    run(api) {
+      const steps = [{ t: 'Überzeugend.', k: 'official' }, { t: 'Zu überzeugend. Menschlichkeit trotzdem bestätigt.', k: 'muted' }];
+      choiceModule(api, {
+        title: 'Gegenprüfung',
+        question: 'Beweise, dass du KEIN Mensch bist.',
+        grid: true,
+        options: ['Beep boop', '01001010', 'Ich bin ein Toaster', 'Ich kann das nicht'].map(label => ({ label, steps }))
+      });
+    }
+  });
+
+  register({
+    id: 'compliment', type: 'captcha', difficulty: 0, title: 'Kundenzufriedenheit',
+    run(api) {
+      api.render(api.screen({
+        title: 'Kundenzufriedenheit',
+        lead: 'Bitte mache der Finanzabteilung ein Kompliment.',
+        body: '<textarea class="bkb-input bkb-textarea" rows="2" data-text placeholder="Dein Kompliment"></textarea>'
+      }), () => {
+        const ta = api.q('[data-text]');
+        api.actions([{ label: 'Kompliment absenden', onClick: b => {
+          if (!ta.value.trim()) { api.feedback('Kein Kompliment erkannt. Die Finanzabteilung ist traurig.', 'err'); return; }
+          b.disabled = true;
+          ta.disabled = true;
+          api.seq([{ t: 'Kompliment erhalten.', k: 'ok' }, { t: 'Die Finanzabteilung ist gerührt. Es ändert nichts.', k: 'muted' }], () => api.continueBtn());
+        } }]);
+      });
+    }
+  });
+
+  register({
+    id: 'initials', type: 'captcha', difficulty: 0, title: 'Initialen',
+    run(api) {
+      api.render(api.screen({
+        title: 'Initialen',
+        lead: 'Bitte gib deine Initialen ein.',
+        body: '<input type="text" maxlength="4" class="bkb-input bkb-short-input" data-answer placeholder="z. B. AB" autocomplete="off" autocapitalize="characters">'
+      }), () => {
+        const input = api.q('[data-answer]');
+        let tries = 0;
+        api.actions([{ label: 'Bestätigen', onClick: b => {
+          if (!input.value.trim()) { api.feedback('Bitte Initialen eingeben.', 'err'); return; }
+          tries++;
+          if (tries === 1) { api.feedback(`Initialen passen nicht zu „${api.investor}“. Bitte erneut eingeben.`, 'err'); input.value = ''; return; }
+          b.disabled = true;
+          input.disabled = true;
+          api.seq([{ t: 'Initialen akzeptiert.', k: 'ok' }, { t: 'Sie passen immer noch nicht.', k: 'muted' }], () => api.continueBtn());
+        } }]);
+      });
+    }
+  });
+
+  register({
+    id: 'country', type: 'captcha', difficulty: 0, title: 'Herkunft',
+    run(api) {
+      api.render(api.screen({
+        title: 'Herkunft',
+        lead: 'Bitte wähle dein Herkunftsland.',
+        body: `<select class="bkb-input" data-c>
+          <option value="">Bitte wählen</option>
+          ${['Deutschland', 'Österreich', 'Schweiz', 'Oberwelt', 'Nether', 'Das Ende', 'Sonstiges'].map(c => `<option>${c}</option>`).join('')}
+        </select>`
+      }), () => {
+        const sel = api.q('[data-c]');
+        api.actions([{ label: 'Speichern', onClick: b => {
+          if (!sel.value) { api.feedback('Bitte wähle ein Land.', 'err'); return; }
+          b.disabled = true;
+          sel.disabled = true;
+          const reply = sel.value === 'Nether' ? 'Erhöhte Temperatur erkannt. Akzeptiert.'
+            : sel.value === 'Das Ende' ? 'Drachengefahr erkannt. Akzeptiert.'
+            : sel.value === 'Oberwelt' ? 'Sehr allgemein. Akzeptiert.'
+            : 'Herkunft gespeichert. Auszahlungen erfolgen ausschließlich in die Oberwelt.';
+          api.seq([{ t: reply, k: 'official' }], () => api.continueBtn());
+        } }]);
+      });
+    }
+  });
+
+  register({
+    id: 'memory', type: 'captcha', difficulty: 1, title: 'Gedächtnisprüfung',
+    run(api) {
+      const num = String(1000 + Math.floor(Math.random() * 9000));
+      api.render(api.screen({
+        title: 'Gedächtnisprüfung',
+        lead: 'Merke dir diese Zahl.',
+        body: `<div class="bkb-risk" data-num>${num}</div>
+               <input type="text" inputmode="numeric" maxlength="4" class="bkb-input bkb-short-input" data-answer placeholder="____" autocomplete="off" hidden>`
+      }), () => {
+        const numEl = api.q('[data-num]');
+        const input = api.q('[data-answer]');
+        const hide = () => { numEl.textContent = '••••'; input.hidden = false; input.focus(); };
+        api.after(2600, () => {
+          hide();
+          api.actions([
+            { label: 'Prüfen', onClick: b => {
+              if (input.value.trim() !== num) { api.feedback('Nicht korrekt.', 'err'); api.fail(); return; }
+              b.disabled = true;
+              input.disabled = true;
+              api.seq([{ t: 'Korrekt.', k: 'ok' }, { t: 'Wir haben sie inzwischen vergessen.', k: 'muted' }], () => api.continueBtn());
+            } },
+            { label: 'Nochmal anzeigen', cls: 'btn-nein', onClick: () => { numEl.textContent = num; api.after(2000, hide); } }
+          ]);
+        });
+      });
+    }
+  });
+
+  register({
+    id: 'ticket', type: 'captcha', difficulty: 0, title: 'Wartenummer',
+    run(api) {
+      api.render(api.screen({ title: 'Wartenummer', lead: 'Bitte ziehe eine Wartenummer.', body: '<div class="bkb-queue" data-t hidden><small>Deine Nummer</small><strong>000</strong></div>' }), () => {
+        api.actions([{ label: 'Wartenummer ziehen', onClick: () => {
+          api.actions([]);
+          api.q('[data-t]').hidden = false;
+          api.seq([
+            { t: 'Aktuell aufgerufen: 001.', k: 'official', w: 900 },
+            { t: 'Deine Nummer wird aufgerufen, sobald sie aufgerufen wird.', k: 'muted' },
+            { t: 'Wartenummer 000 akzeptiert.', k: 'ok' }
+          ], () => api.continueBtn());
+        } }]);
+      });
+    }
+  });
+
+  register({
+    id: 'hiddenWeiter', type: 'captcha', difficulty: 1, title: 'Lesepflicht',
+    run(api) {
+      api.render(api.screen({
+        title: 'Lesepflicht',
+        lead: 'Bitte lies den folgenden Absatz aufmerksam.',
+        body: `<p class="bkb-legal-text">Gemäß Abschnitt 14B der Auszahlungsordnung ist jede antragstellende Person verpflichtet,
+          den Vorgang eigenständig <button type="button" class="bkb-inline-link" data-go>weiter</button>zuführen, sofern keine
+          Einwände der Finanzabteilung, der Abteilung für Zuständigkeiten oder des Faxgeräts vorliegen.</p>`
+      }), () => {
+        api.q('[data-go]').addEventListener('click', e => {
+          e.currentTarget.disabled = true;
+          api.seq([{ t: 'Gefunden. Aufmerksam gelesen.', k: 'ok' }], () => api.after(500, () => api.done()));
+        });
+        api.after(9000, () => { if (!api.q('[data-go]').disabled) api.line('Tipp: Ein Wort im Text ist anklickbar.', 'muted'); });
+      });
+    }
+  });
+
+  register({
+    id: 'loadingBar', type: 'captcha', difficulty: 0, title: 'Ladebalken-Qualität',
+    run(api) {
+      api.render(api.screen({
+        title: 'Ladebalken-Qualitätsprüfung',
+        lead: 'Bitte beobachte den Ladebalken.',
+        body: '<div class="investor-security-stage7-track"><div class="investor-security-stage7-fill" data-fill></div></div>'
+      }), () => {
+        const fill = api.q('[data-fill]');
+        [12, 31, 47, 48, 49, 83, 100].forEach((v, i) => api.after(250 + i * 520, () => { fill.style.width = v + '%'; }));
+        api.after(4000, () => {
+          api.line('War der Ladebalken flüssig?', 'question');
+          api.actions([
+            { label: 'Ja', onClick: () => { api.actions([]); api.seq([{ t: 'Danke. Wir geben das an den Ladebalken weiter.', k: 'ok' }], () => api.continueBtn()); } },
+            { label: 'Nein', cls: 'btn-nein', onClick: () => { api.actions([]); api.seq([{ t: 'Beschwerde an den Ladebalken weitergeleitet.', k: 'official' }], () => api.continueBtn()); } }
+          ]);
+        });
+      });
+    }
+  });
+
+  register({
+    id: 'cookieRating', type: 'captcha', difficulty: 0, title: 'Cookie-Bewertung',
+    run(api) {
+      api.render(api.screen({
+        title: 'Cookie-Bewertung',
+        lead: 'Wie bewertest du unsere Cookies?',
+        body: `<div class="bkb-stars">${[1, 2, 3, 4, 5].map(i => `<button type="button" data-star="${i}" aria-label="${i} Sterne">★</button>`).join('')}</div>`
+      }), () => {
+        api.qa('[data-star]').forEach(b => b.addEventListener('click', () => {
+          const n = Number(b.dataset.star);
+          api.qa('[data-star]').forEach(x => { x.disabled = true; x.classList.toggle('is-on', Number(x.dataset.star) <= n); });
+          api.seq([{ t: 'Bewertung gespeichert.', k: 'ok' }, { t: 'Cookies wurden unabhängig davon gesetzt.', k: 'muted' }], () => api.continueBtn());
+        }));
+      });
+    }
+  });
+
+  register({
+    id: 'koraQuiz', type: 'captcha', difficulty: 0, easy: true, title: 'Organisationsprüfung',
+    run(api) {
+      const steps = [{ t: 'Antwort an Kora weitergeleitet.', k: 'official' }, { t: 'Kora antwortet: „Später.“', k: 'muted', w: 1400 }];
+      choiceModule(api, {
+        title: 'Organisationsprüfung',
+        question: 'Wer ist Kora?',
+        grid: true,
+        options: ['Der Chef', 'Die Finanzabteilung', 'Ein Gerücht', 'Alles davon'].map(label => ({ label, steps }))
+      });
+    }
+  });
+
+  register({
+    id: 'department', type: 'captcha', difficulty: 0, easy: true, title: 'Zuständigkeit',
+    run(api) {
+      const steps = [{ t: 'Falsch.', k: 'err' }, { t: 'Zuständig ist die Abteilung für Zuständigkeiten.', k: 'official' }, { t: 'Diese ist derzeit nicht besetzt.', k: 'muted' }];
+      choiceModule(api, {
+        title: 'Zuständigkeit',
+        question: 'Welche Abteilung ist für deine Auszahlung zuständig?',
+        options: ['Finanzabteilung', 'Support (Micha)', 'Telefonzentrale (Ronja)', 'Faxabteilung (Obsi)'].map(label => ({ label, steps }))
+      });
+    }
+  });
+
+  register({
+    id: 'bagonTermin', type: 'captcha', difficulty: 0, easy: true, title: 'Terminabfrage',
+    run(api) {
+      choiceModule(api, {
+        title: 'Terminabfrage',
+        question: 'Bagon fragt: Hast du bereits einen Termin?',
+        options: [
+          { label: 'Ja', reply: 'Bagon findet ihn nicht. Akzeptiert.' },
+          { label: 'Nein', reply: 'Bagon hat leider auch keinen. Akzeptiert.' }
+        ]
+      });
+    }
+  });
+
+  register({
+    id: 'sheepColor', type: 'captcha', difficulty: 0, easy: true, title: 'Ortskenntnis',
+    run(api) {
+      choiceModule(api, {
+        title: 'Ortskenntnis',
+        question: 'Welche Farbe hat das Schaf auf dieser Website?',
+        grid: true,
+        options: [
+          { label: 'Weiß', reply: 'Das Schaf lässt grüßen. Antwort gewertet.' },
+          { label: 'Pink', reply: 'Interessant. Das Schaf ist geschmeichelt.' },
+          { label: 'Gold', reply: 'Goldschafe werden gesondert besteuert. Akzeptiert.' },
+          { label: 'Welches Schaf?', reply: 'Es versteckt sich im Banner. Antwort trotzdem gewertet.' }
+        ]
+      });
+    }
+  });
+
+  register({
+    id: 'craftDiamond', type: 'captcha', difficulty: 0, title: 'Werkbankprüfung', minecraft: true,
+    run(api) {
+      choiceModule(api, {
+        title: 'Werkbankprüfung',
+        question: 'Was ergeben 9 Diamanten in der Werkbank?',
+        grid: true,
+        hint: 'Es ist ein Block.',
+        options: [
+          { label: 'Diamantblock', steps: [{ t: 'Korrekt.', k: 'ok' }, { t: 'Der Diamantblock wurde als Bearbeitungsgebühr einbehalten.', k: 'muted' }] },
+          { label: 'Diamantschwert', retry: 'Dafür reichen zwei.' },
+          { label: 'Eine Auszahlung', reply: 'Leider nein. Netter Versuch. Akzeptiert.' },
+          { label: 'Nichts', retry: 'Doch, da kommt etwas raus.' }
+        ]
+      });
+    }
+  });
+
+  register({
+    id: 'creeperSound', type: 'captcha', difficulty: 0, title: 'Geräuschprüfung', minecraft: true,
+    run(api) {
+      choiceModule(api, {
+        title: 'Geräuschprüfung',
+        question: 'Welches Geräusch macht ein Creeper kurz vor der Explosion?',
+        grid: true,
+        hint: 'Es zischt.',
+        options: [
+          { label: 'Ssssss…', steps: [{ t: 'Korrekt.', k: 'ok' }, { t: 'Bitte jetzt nicht bewegen.', k: 'muted' }] },
+          { label: 'Muh', retry: 'Das ist eine Kuh.' },
+          { label: 'Määh', retry: 'Das ist das Schaf.' },
+          { label: 'KABOOM', reply: 'Das ist danach. Akzeptiert.' }
+        ]
+      });
+    }
+  });
+
+  register({
+    id: 'obsidian', type: 'captcha', difficulty: 0, title: 'Materialprüfung', minecraft: true,
+    run(api) {
+      choiceModule(api, {
+        title: 'Materialprüfung',
+        question: 'Welcher Block ist am widerstandsfähigsten?',
+        grid: true,
+        hint: 'Er ist schwarz-lila.',
+        options: [
+          { label: 'Obsidian', steps: [{ t: 'Korrekt.', k: 'ok' }, { t: 'Obsi wurde informiert.', k: 'muted' }] },
+          { label: 'Holz', retry: 'Holz brennt.' },
+          { label: 'Wolle', retry: 'Wolle ist weich.' },
+          { label: 'Formular BK-AUSZ-14B', reply: 'Fast. Formulare sind nahezu unzerstörbar. Akzeptiert.' }
+        ]
+      });
+    }
+  });
+
+  register({
+    id: 'netherPortal', type: 'captcha', difficulty: 1, title: 'Bauprüfung', minecraft: true,
+    run(api) {
+      choiceModule(api, {
+        title: 'Bauprüfung',
+        question: 'Wie viele Obsidianblöcke braucht ein Netherportal mindestens?',
+        grid: true,
+        hint: 'Ohne die Ecken.',
+        options: [
+          { label: '10', steps: [{ t: 'Korrekt.', k: 'ok' }, { t: 'Ein Portal zur Auszahlung wird trotzdem nicht geöffnet.', k: 'muted' }] },
+          { label: '14', reply: 'Mit Ecken. Großzügig. Gewertet.' },
+          { label: '12', retry: 'Nicht ganz.' },
+          { label: '1 Formular', retry: 'Formulare öffnen keine Portale. Leider.' }
+        ]
+      });
+    }
+  });
+
+  register({
+    id: 'dayLength', type: 'captcha', difficulty: 0, title: 'Zeitprüfung', minecraft: true,
+    run(api) {
+      choiceModule(api, {
+        title: 'Zeitprüfung',
+        question: 'Wie lange dauert ein Minecraft-Tag (Tag und Nacht)?',
+        grid: true,
+        hint: 'Kürzer als eine Mittagspause.',
+        options: [
+          { label: '20 Minuten', steps: [{ t: 'Korrekt.', k: 'ok' }, { t: 'Deine Bearbeitung dauert voraussichtlich 3 Minecraft-Tage.', k: 'muted' }] },
+          { label: '24 Stunden', retry: 'Das ist ein echter Tag.' },
+          { label: '10 Minuten', retry: 'Das ist nur der helle Teil.' },
+          { label: 'Bis zur Auszahlung', reply: 'Gefühlt korrekt. Akzeptiert.' }
+        ]
+      });
+    }
+  });
+
+  /* ------------------------------------------------------------------
      CAPTCHAS - Community (Creator)
      ------------------------------------------------------------------ */
   register({
@@ -1740,21 +2472,29 @@
   register({
     id: 'creeper', type: 'captcha', difficulty: 0, maxCount: 1, title: 'Bilderkennung', minecraft: true,
     run(api) {
+      // 3-4 echte Creeper-Gesichter (assets/prank/creeper-face.png) zwischen
+      // einfarbig gruenen Feldern - aehnlich genug, um kurz zu zoegern.
+      const creeperCount = 3 + Math.floor(Math.random() * 2);
+      const creeperSet = new Set(shuffle([0, 1, 2, 3, 4, 5, 6, 7, 8]).slice(0, creeperCount));
       api.render(api.screen({
         title: 'Bilderkennung',
         lead: 'Wähle alle Felder mit einem Creeper.',
-        body: `<div class="bkb-creeper-grid">${Array.from({ length: 9 }, (_, i) => `<button type="button" class="bkb-creeper-tile" data-i="${i}" aria-label="Feld ${i + 1}"></button>`).join('')}</div>`
+        body: `<div class="bkb-creeper-grid">${Array.from({ length: 9 }, (_, i) => `
+          <button type="button" class="bkb-creeper-tile${creeperSet.has(i) ? ' has-creeper' : ''}" data-i="${i}" aria-label="Feld ${i + 1}">
+            ${creeperSet.has(i) ? '<img src="assets/prank/creeper-face.png?v=20261003-1" alt="" draggable="false">' : ''}
+          </button>`).join('')}</div>`
       }), () => {
         api.qa('[data-i]').forEach(b => b.addEventListener('click', () => b.classList.toggle('is-picked')));
         api.actions([{ label: 'Bestätigen', onClick: btn => {
+          const picked = api.qa('.bkb-creeper-tile.is-picked').map(x => Number(x.dataset.i));
+          if (!picked.length) { api.feedback('Bitte wähle mindestens ein Feld aus.', 'err'); return; }
           btn.disabled = true;
-          const n = api.qa('.bkb-creeper-tile.is-picked').length;
           api.qa('[data-i]').forEach(x => { x.disabled = true; });
-          api.seq([
-            { t: 'Auswahl wird geprüft…', k: 'muted' },
-            { t: n === 0 ? 'Keine Auswahl. Mutig.' : `${n} Felder ausgewählt.`, k: 'official' },
-            { t: 'Alle Felder enthielten Creeper. Oder keins. Wir sind uns nicht sicher.', k: 'ok' }
-          ], () => api.continueBtn());
+          const correct = picked.length === creeperSet.size && picked.every(i => creeperSet.has(i));
+          api.seq(correct
+            ? [{ t: 'Auswahl wird geprüft…', k: 'muted' }, { t: 'Korrekt.', k: 'ok' }, { t: 'Verdächtig korrekt. Creeper-Kontakt wird vermerkt.', k: 'official' }]
+            : [{ t: 'Auswahl wird geprüft…', k: 'muted' }, { t: 'Nicht ganz.', k: 'err' }, { t: 'Creeper sind schwer zu erkennen, bevor es zu spät ist. Akzeptiert.', k: 'muted' }],
+          () => api.continueBtn());
         } }]);
       });
     }
