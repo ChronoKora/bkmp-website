@@ -582,6 +582,31 @@ async function bkmpLoadMyModConnections() {
   return Array.isArray(data) ? data : [];
 }
 
+/* Website-Erfolge "BK-Mod & Shops" (02.10.2026): zaehlt die EIGENEN Mod-
+   Karteneinreichungen nach Status. Laeuft ueber die Spieler-Session -
+   RLS "card_submissions select own" (sql/20260902-mod-account-linking-and-
+   submissions.sql) liefert ohnehin nur eigene Zeilen, der zusaetzliche
+   auth_user_id-Filter ist reine Verteidigung in der Tiefe. Rein lesend,
+   nur die status-Spalte (keine Bilder/Texte). null = nicht eingeloggt. */
+async function bkmpLoadMyCardSubmissionCounts() {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return null;
+  const { data: sessionData } = await client.auth.getSession();
+  const uid = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
+  if (!uid) return null;
+  const { data, error } = await client
+    .from('card_submissions')
+    .select('status')
+    .eq('auth_user_id', uid);
+  if (error) throw error;
+  const counts = { total: 0, approved: 0 };
+  (Array.isArray(data) ? data : []).forEach(row => {
+    counts.total += 1;
+    if (row && row.status === 'approved') counts.approved += 1;
+  });
+  return counts;
+}
+
 async function bkmpRevokeMyModConnection(id) {
   const client = bkmpGetPlayerAuthClient();
   if (!client) throw new Error('Du bist nicht eingeloggt.');

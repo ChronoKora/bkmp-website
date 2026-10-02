@@ -27,6 +27,79 @@ const BKMP_IDLE_VIDEO_DRAGON_SPRITES = {
   wasserdrache: 'assets/dragons/wasserdrache.mp4?v=20260718-lastdragons1'
 };
 
+/* Vercel-Traffic-Fix (02.10.2026, per `vercel metrics` belegt): die
+   Drachen-Videos waren mit ~137.000 Anfragen/Tag (~84% ALLER CDN-Requests,
+   jede davon ein kostenpflichtiges Observability-Event) der mit Abstand
+   groesste Traffic-Posten - zu 99% "304 Not Modified": der Browser fragt
+   bei JEDEM neuen video.src (also fast jedem Kill) beim Server nach, ob
+   sich die Datei geaendert hat, obwohl sie laengst im Cache liegt.
+   Fix: jedes Drachen-Video wird pro Seitensitzung genau EINMAL per fetch()
+   geholt und als Blob-URL (blob:, rein im Arbeitsspeicher, null Netzwerk)
+   wiederverwendet. Groesse: ~2-3 MB je Art, nur Arten, die wirklich
+   erscheinen. Faellt fetch()/Blob aus irgendeinem Grund aus, bleibt es
+   beim bisherigen direkten Pfad (kein Ausfall moeglich), ein
+   fehlgeschlagener Key wird nicht bei jedem Kill erneut versucht. */
+const bkmpIdleDragonVideoBlobUrls = new Map();
+const bkmpIdleDragonVideoBlobPending = new Map();
+const bkmpIdleDragonVideoBlobFailed = new Set();
+function bkmpIdleLoadDragonVideoBlob(spriteKey, url) {
+  if (bkmpIdleDragonVideoBlobUrls.has(spriteKey)) return Promise.resolve(bkmpIdleDragonVideoBlobUrls.get(spriteKey));
+  if (bkmpIdleDragonVideoBlobFailed.has(spriteKey)) return Promise.resolve(null);
+  if (bkmpIdleDragonVideoBlobPending.has(spriteKey)) return bkmpIdleDragonVideoBlobPending.get(spriteKey);
+  if (typeof fetch !== 'function' || typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') {
+    bkmpIdleDragonVideoBlobFailed.add(spriteKey);
+    return Promise.resolve(null);
+  }
+  const promise = fetch(url, { cache: 'force-cache' })
+    .then(res => {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.blob();
+    })
+    .then(blob => {
+      const blobUrl = URL.createObjectURL(blob);
+      bkmpIdleDragonVideoBlobUrls.set(spriteKey, blobUrl);
+      return blobUrl;
+    })
+    .catch(() => {
+      bkmpIdleDragonVideoBlobFailed.add(spriteKey);
+      return null;
+    })
+    .finally(() => bkmpIdleDragonVideoBlobPending.delete(spriteKey));
+  bkmpIdleDragonVideoBlobPending.set(spriteKey, promise);
+  return promise;
+}
+
+/* Setzt die Quelle fuer den Drachen auf dem wiederverwendeten <video>.
+   Schon geladen -> Blob-URL sofort (synchron, Verhalten wie bisher).
+   Erstes Erscheinen dieser Art -> Blob laden und dann setzen; dauert
+   das laenger als 1,5s (langsames Netz), wird zur Sicherheit doch der
+   direkte Pfad genommen, damit der Drache nie lange fehlt. Wechselt der
+   Drache waehrenddessen erneut, wird nichts Veraltetes mehr gesetzt. */
+function bkmpIdleSetDragonVideoSource(video, spriteKey, url) {
+  const applySrc = src => {
+    if (video.dataset.spriteKey !== spriteKey) return false;
+    video.src = src;
+    if (typeof bkmpFxDragonVideoOff === 'function' && bkmpFxDragonVideoOff()) video.pause();
+    else video.play().catch(() => {});
+    return true;
+  };
+  const cached = bkmpIdleDragonVideoBlobUrls.get(spriteKey);
+  if (cached) { applySrc(cached); return; }
+  if (bkmpIdleDragonVideoBlobFailed.has(spriteKey)) { applySrc(url); return; }
+  let settled = false;
+  const fallbackTimer = setTimeout(() => {
+    if (settled) return;
+    settled = true;
+    applySrc(url);
+  }, 1500);
+  bkmpIdleLoadDragonVideoBlob(spriteKey, url).then(blobUrl => {
+    if (settled) return; // direkter Pfad laeuft schon - kein Neustart, ab dem naechsten Mal Blob
+    settled = true;
+    clearTimeout(fallbackTimer);
+    applySrc(blobUrl || url);
+  });
+}
+
 /* Gemeinsame Sprite-Zuweisung fuer #idleDragonSprite - vorher an zwei
    Stellen (bkmpIdleSpawnDragon, bkmpDungeonApplyDragonVisuals) fast
    identisch dupliziert. Entscheidet pro Drache, ob ein Video
@@ -64,11 +137,11 @@ function bkmpIdleApplyDragonSprite(sprite, spriteKey) {
          Endlosschleife) - reiner Anzeige-Unterschied, keine Kampfwerte
          betroffen (siehe bkmpFxDragonVideoOff/bkmpFxApplyMode/
          bkmpIdleSyncDragonVideoPlayback fuer den Live-Umschalt-Fall). */
-      const paused = typeof bkmpFxDragonVideoOff === 'function' && bkmpFxDragonVideoOff();
       video.dataset.spriteKey = spriteKey;
-      video.src = videoSrc;
-      if (paused) video.pause();
-      else video.play().catch(() => {});
+      /* Quelle inkl. Pause/Play-Entscheidung (Effektmodus) jetzt ueber
+         bkmpIdleSetDragonVideoSource() - einmal laden, danach Blob-URL
+         (siehe Traffic-Fix-Kommentar oben). */
+      bkmpIdleSetDragonVideoSource(video, spriteKey, videoSrc);
     }
   } else {
     sprite.innerHTML = '';

@@ -110,6 +110,8 @@
     let matrixBuffer = '';
     const zerathorTarget = 'zerathor';
     let zerathorBuffer = '';
+    const swbkTarget = '/sw bk';
+    let swbkBuffer = '';
     let konamiBuffer = [];
     const konamiCode = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
 
@@ -273,6 +275,73 @@
       } else {
         setTimeout(fadeOutZerathor, 1500);
       }
+    }
+
+    /* Easter Egg (02.10.2026): "/sw bk" tippen - genau der Befehl, mit dem man
+       ingame zu unserem Shop warpt. Lila Nether-Portal-Wirbel, Minecraft-Chat-
+       Zeilen ("Teleportiere..."), danach sanfter Sprung nach ganz oben und
+       ein Titel wie nach einem echten Warp. Portal-Rauschen per WebAudio
+       (kein neues Audio-Asset noetig), Ablauf ~3,4s, reduzierte Bewegung
+       respektiert (siehe style.css .bkmp-swbk-*). */
+    function bkmpPlayPortalWhoosh() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const duration = 1.6;
+        const bufferSize = Math.floor(ctx.sampleRate * duration);
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const samples = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) samples[i] = (Math.random() * 2 - 1) * Math.sin(Math.PI * i / bufferSize);
+        const noise = ctx.createBufferSource();
+        noise.buffer = buffer;
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.Q.value = 6;
+        filter.frequency.setValueAtTime(180, ctx.currentTime);
+        filter.frequency.exponentialRampToValueAtTime(1400, ctx.currentTime + duration * 0.7);
+        filter.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + duration);
+        const gain = ctx.createGain();
+        gain.gain.value = 0.5;
+        noise.connect(filter).connect(gain).connect(ctx.destination);
+        noise.start();
+        noise.onended = () => ctx.close();
+      } catch (e) {}
+    }
+
+    function triggerBkmpSwbkTeleport() {
+      if (document.getElementById('bkmpSwbkOverlay')) return;
+      bkmpPlayPortalWhoosh();
+      const overlay = document.createElement('div');
+      overlay.id = 'bkmpSwbkOverlay';
+      overlay.className = 'bkmp-swbk';
+      overlay.setAttribute('aria-hidden', 'true');
+      const particles = Array.from({ length: 24 }, () => {
+        const left = Math.round(Math.random() * 100);
+        const top = Math.round(40 + Math.random() * 60);
+        const duration = (1.4 + Math.random() * 1.2).toFixed(2);
+        const delay = (Math.random() * 0.8).toFixed(2);
+        return `<span style="left:${left}%; top:${top}%; animation-duration:${duration}s; animation-delay:${delay}s;"></span>`;
+      }).join('');
+      overlay.innerHTML = `
+        <div class="bkmp-swbk-portal"></div>
+        <div class="bkmp-swbk-particles">${particles}</div>
+        <div class="bkmp-swbk-chat">
+          <p><span class="bkmp-swbk-chat-me">&gt;</span> /sw bk</p>
+          <p class="bkmp-swbk-chat-sys">Teleportiere zu <strong>bk</strong>...</p>
+        </div>
+        <div class="bkmp-swbk-title">
+          <strong>BK Investment</strong>
+          <small>Warp erfolgreich – willkommen im Shop!</small>
+        </div>`;
+      document.body.appendChild(overlay);
+      requestAnimationFrame(() => overlay.classList.add('visible'));
+      setTimeout(() => {
+        overlay.classList.add('arrived');
+        try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { window.scrollTo(0, 0); }
+      }, 1300);
+      setTimeout(() => {
+        overlay.classList.remove('visible');
+        setTimeout(() => overlay.remove(), 500);
+      }, 3400);
     }
 
     /* Easter Egg: 7x aufs Banner klicken - Diamanten-Regen + Cha-Ching */
@@ -717,6 +786,15 @@
        Ladevorgaengen (Pluschies/Idle-Dorf/Raid) Zeit zum Fertigwerden gegeben
        hat. */
     let bkmpAchievementNotifyReady = false;
+    /* Erfolge "BK-Mod & Shops" (02.10.2026): eingeloggte auth_user_id +
+       per Spieler-Session nachgeladene Mod-Zahlen. Bewusst HIER oben
+       deklariert (nicht beim Kartenverkauf-Block weiter unten, wo die
+       Werte gesetzt werden), weil bkmpBuildAchievementContext() schon beim
+       allerersten renderAchievementBadge() laeuft - eine erst spaeter im
+       Skript deklarierte let-Variable wuerde dort mit einem TDZ-
+       ReferenceError abbrechen. Befuellt von bkmpRefreshMyModAchievementStats(). */
+    let bkmpMyAchievementAuthUserId = null;
+    let bkmpMyModAchievementStats = { modCardsApproved: 0, modLinked: false };
     const BKMP_ACHIEVEMENTS_NOTIFIED_KEY = 'bkmp-achievements-notified';
     function bkmpGetNotifiedAchievements() {
       try { return JSON.parse(localStorage.getItem(BKMP_ACHIEVEMENTS_NOTIFIED_KEY) || 'null'); } catch (e) { return null; }
@@ -1117,6 +1195,11 @@
       creeperBuffer = (creeperBuffer + key).slice(-creeperTarget.length);
       matrixBuffer = (matrixBuffer + key).slice(-matrixTarget.length);
       zerathorBuffer = (zerathorBuffer + key).slice(-zerathorTarget.length);
+      swbkBuffer = (swbkBuffer + key).slice(-swbkTarget.length);
+      /* Leertaste mitten in "/sw bk" wuerde sonst die Seite ein Stueck
+         runterscrollen bzw. einen fokussierten Knopf ausloesen - nur genau
+         an dieser Stelle unterbinden, jede andere Leertaste bleibt normal. */
+      if (key === ' ' && swbkBuffer.endsWith('/sw ')) e.preventDefault();
       konamiBuffer.push(key);
       konamiBuffer = konamiBuffer.slice(-konamiCode.length);
       if (easterBuffer === easterTarget) {
@@ -1148,6 +1231,11 @@
         triggerBkmpZerathorEasterEgg();
         if (typeof bkmpMarkEggFound === 'function') bkmpMarkEggFound('zerathor');
         zerathorBuffer = '';
+      }
+      if (swbkBuffer === swbkTarget) {
+        triggerBkmpSwbkTeleport();
+        if (typeof bkmpMarkEggFound === 'function') bkmpMarkEggFound('swbk');
+        swbkBuffer = '';
       }
       if (konamiBuffer.join('|') === konamiCode.join('|')) {
         triggerBkmpLootRain();
@@ -2376,6 +2464,8 @@
       const prankReveal = document.getElementById('investorPayoutPrankReveal');
       const prankIframe = document.getElementById('investorPayoutPrankIframe');
       const prankCloseBtn = document.getElementById('investorPayoutPrankCloseBtn');
+      const prankCaption = document.getElementById('investorPayoutPrankCaption');
+      let prankCaptionTimer = null;
       let prankRevealTimer = null;
       let prankCloseUnlockTimer = null;
       let prankCloseAllowed = false;
@@ -2427,6 +2517,36 @@
       let secActive = false; // Doppel-Start-Schutz (schnelles Mehrfach-Klicken) - bleibt bis unmittelbar vor dem eigentlichen Reveal true
       let secOnComplete = null;
       let secTimers = []; // saemtliche setTimeout/setInterval-IDs der aktuell laufenden Stufe(n) - IMMER vor jedem Stufenwechsel/Abschluss geleert
+      /* Auszahlungs-Buerokratie (02.10.2026, js/easter-eggs/bkmp-payout-
+         bureaucracy.js): solange die Engine laeuft, ist secEngineActive true.
+         Die bestehenden Stufen-Renderer bleiben unveraendert - ihr eigener
+         "naechste Stufe"-Aufruf (goToSecStage) meldet dann nur noch "fertig"
+         an die Engine zurueck (secEngineLegacyDone), statt selbst weiter-
+         zuschalten. Ohne Engine (Datei fehlt) laeuft alles exakt wie bisher. */
+      let secEngineActive = false;
+      let secEngineLegacyDone = null;
+      /* Statusmeldungen der Abschluss-Stufe - aus renderSecStage7() hierher
+         gezogen, damit die Engine dieselben Zeilen im neuen Finale
+         wiederverwendet (eine Quelle statt zwei Kopien). */
+      const INVESTOR_SECURITY_PROCESSING_MESSAGES = [
+        'Bankverbindung wird überprüft…',
+        'Investmenthistorie wird geladen…',
+        'Dayman Chicken Nuggets Verbrennen.',
+        'Meme-Schutz wird initialisiert…',
+        'Lukas Hobby Horse Pferd heißt Charlie.',
+        'Byte ist der wahre Präsident.',
+        'Phil-Authentizität wird final geprüft…',
+        'Errrooorr.. Joke lädt noch.',
+        'Kontostand wird gezählt…',
+        'Phil vergisst niemals Giveaway Auszahlungen..',
+        'Serverhamster wird motiviert…',
+        'Letzte Task Fehlgeschlagen..',
+        'Sicherheitsstufe erhöht…',
+        '64/65 Giveaway vergessen auszahlen.',
+        'Auszahlungspaket wird freigegeben…',
+        'Letzte Verbindung wird hergestellt…',
+        'Videomodul wird geladen…'
+      ];
 
       /* Nutzer-Meldung 23.08.2026 ("bis das Video laedt ist so ein 5
          Sekunden Ladezeit... kriegen wir das schon vorher geladen"): das
@@ -2489,6 +2609,8 @@
         document.body.classList.remove('modal-open');
         clearTimeout(prankRevealTimer);
         clearTimeout(prankCloseUnlockTimer);
+        clearTimeout(prankCaptionTimer);
+        if (prankCaption) { prankCaption.hidden = true; prankCaption.textContent = ''; }
         prankIframe.src = ''; // stoppt Ton/Wiedergabe sofort beim Schliessen
         prankPreloaded = false; // beim naechsten Mal wieder frisch vorladen
         prankPlayer = null;
@@ -2531,6 +2653,20 @@
           prankCloseAllowed = true;
           prankCloseBtn.hidden = false;
         }, 10000);
+        /* 02.10.2026 (Auszahlungs-Buerokratie, Auftrag Abschnitt 57):
+           trockene Nachbemerkung unter dem Video, rein textlich. */
+        if (prankCaption) {
+          prankCaption.hidden = true;
+          prankCaption.textContent = '';
+          clearTimeout(prankCaptionTimer);
+          prankCaptionTimer = setTimeout(() => {
+            prankCaption.hidden = false;
+            prankCaption.textContent = 'Auszahlung erfolgreich.';
+            prankCaptionTimer = setTimeout(() => {
+              prankCaption.textContent = 'Auszahlung erfolgreich. Also theoretisch.';
+            }, 1800);
+          }, 6000);
+        }
       }
 
       /* ====================================================================
@@ -2558,6 +2694,10 @@
          Uebergaenge") - blendet die aktuelle Stufe aus, tauscht danach den
          Inhalt aus und blendet wieder ein. */
       function secRenderTransition(html, setup) {
+        // Im Engine-Betrieb passt "X/8" in den Ueberschriften der alten
+        // Stufen nicht mehr zur dynamischen Gesamtzahl - nur die Zaehlung
+        // entfernen, der Stufen-Inhalt bleibt unveraendert.
+        if (secEngineActive) html = html.replace(/(<h3>[^<]*?)\s+\d+\/8(<\/h3>)/, '$1$2');
         investorSecurityStageEl.classList.add('is-transitioning');
         const t = setTimeout(() => {
           investorSecurityStageEl.innerHTML = html;
@@ -3001,25 +3141,7 @@
            stehen bleiben - genau die ruhigere Landung kurz vor dem
            Rickroll-Uebergang, die der urspruengliche Auftrag fuer Stufe 7
            wollte. */
-        const messages = [
-          'Bankverbindung wird überprüft…',
-          'Investmenthistorie wird geladen…',
-          'Dayman Chicken Nuggets Verbrennen.',
-          'Meme-Schutz wird initialisiert…',
-          'Lukas Hobby Horse Pferd heißt Charlie.',
-          'Byte ist der wahre Präsident.',
-          'Phil-Authentizität wird final geprüft…',
-          'Errrooorr.. Joke lädt noch.',
-          'Kontostand wird gezählt…',
-          'Phil vergisst niemals Giveaway Auszahlungen..',
-          'Serverhamster wird motiviert…',
-          'Letzte Task Fehlgeschlagen..',
-          'Sicherheitsstufe erhöht…',
-          '64/65 Giveaway vergessen auszahlen.',
-          'Auszahlungspaket wird freigegeben…',
-          'Letzte Verbindung wird hergestellt…',
-          'Videomodul wird geladen…'
-        ];
+        const messages = INVESTOR_SECURITY_PROCESSING_MESSAGES;
         const html = `
           <h3>Auszahlung wird vorbereitet 8/8</h3>
           <div class="investor-payout-prank-spinner" aria-hidden="true"></div>
@@ -3061,6 +3183,14 @@
       };
 
       function goToSecStage(stage) {
+        if (secEngineActive) {
+          // Alte Stufe meldet "fertig" -> Engine entscheidet, was als
+          // Naechstes kommt (siehe Kommentar bei secEngineActive).
+          const done = secEngineLegacyDone;
+          secEngineLegacyDone = null;
+          if (typeof done === 'function') done();
+          return;
+        }
         clearSecTimers();
         secSetProgress(stage);
         const renderer = SEC_STAGE_RENDERERS[stage];
@@ -3078,6 +3208,60 @@
         secOnComplete = onComplete;
         document.body.classList.add('modal-open');
         investorSecurityCheckOverlay.classList.add('visible');
+        const engine = window.BkmpPayoutBureaucracy;
+        if (engine && typeof engine.start === 'function') {
+          secEngineActive = true;
+          secEngineLegacyDone = null;
+          const legacyRenderers = {
+            rotate: renderSecStage1, hold: renderSecStage2, daymanLukas: renderSecStage3,
+            trust: renderSecStage4, legal: renderSecStage5, fingerprint: renderSecStage6
+          };
+          try {
+            engine.start({
+              investorName: name,
+              amountLabel,
+              overlayEl: investorSecurityCheckOverlay,
+              cardEl: investorSecurityCheckOverlay.querySelector('.investor-security-card'),
+              headerEl: investorSecurityCheckOverlay.querySelector('.investor-security-header'),
+              eyebrowEl: investorSecurityCheckOverlay.querySelector('.investor-security-eyebrow'),
+              stageEl: investorSecurityStageEl,
+              stepLabelEl: investorSecurityStepLabelEl,
+              progressFillEl: investorSecurityProgressFillEl,
+              render: secRenderTransition,
+              addTimer: id => secTimers.push(id),
+              clearTimers: clearSecTimers,
+              runLegacy: (key, onDone) => {
+                const renderer = legacyRenderers[key];
+                if (!renderer) { onDone(); return; }
+                secEngineLegacyDone = onDone;
+                renderer();
+              },
+              yakshaImages: INVESTOR_SECURITY_YAKSHA_IMAGES,
+              processingMessages: INVESTOR_SECURITY_PROCESSING_MESSAGES,
+              // Einziger Ausgang zum Rickroll - unveraenderte bestehende Logik.
+              finish: () => {
+                secEngineActive = false;
+                secEngineLegacyDone = null;
+                finishInvestorSecurityCheck();
+              },
+              // Echte Pause (Anti-Frust), Stand bleibt in der Engine gespeichert.
+              pause: () => {
+                secEngineActive = false;
+                secEngineLegacyDone = null;
+                clearSecTimers();
+                investorSecurityCheckOverlay.classList.remove('visible');
+                document.body.classList.remove('modal-open');
+                secOnComplete = null;
+                secActive = false;
+              }
+            });
+            return;
+          } catch (e) {
+            console.error('Auszahlungs-Buerokratie konnte nicht starten - Rueckfall auf die 8 Stufen.', e);
+            secEngineActive = false;
+            secEngineLegacyDone = null;
+          }
+        }
         goToSecStage(1);
       }
 
@@ -4249,7 +4433,14 @@
     }, true);
 
     bkmpShardMerchantRefresh(true);
-    window.setInterval(() => bkmpShardMerchantRefresh(false), BKMP_SHARD_REFRESH_MS);
+    /* Vercel-Traffic-Fix (02.10.2026, per `vercel metrics` belegt: ~10.000
+       Aufrufe/Tag JE Endpunkt merchant+market): im Hintergrund-Tab (andere
+       Registerkarte, minimiert) sieht niemand die Kurse - dort NICHT mehr
+       abfragen. Beim Zurueckkehren sofort nachholen, falls der letzte Stand
+       aelter als das normale Intervall ist (bkmpShardMerchantRefresh()
+       prueft das selbst ueber bkmpShardMerchantCheckedAt). */
+    window.setInterval(() => { if (!document.hidden) bkmpShardMerchantRefresh(false); }, BKMP_SHARD_REFRESH_MS);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) bkmpShardMerchantRefresh(false); });
 
     const cardsaleGrid = document.getElementById('cardsaleGrid');
     const cardSaleGridCountEl = document.getElementById('cardSaleGridCount');
@@ -4403,6 +4594,36 @@
       }
     }
 
+    /* Erfolge "BK-Mod & Shops" (02.10.2026): eigene angenommene Mod-
+       Karteneinreichungen + ob mindestens eine Mod verbunden ist. Beide
+       Abfragen laufen ueber die Spieler-Session (RLS: nur eigene Zeilen).
+       Ein Fehler in einer der beiden laesst den jeweils anderen Wert
+       unangetastet, nichts davon blockiert die Seite. Bereits erreichte
+       Erfolge bleiben ohnehin dauerhaft (bkmpAchievementUnlocked - sticky). */
+    let bkmpModAchievementStatsSeq = 0;
+    async function bkmpRefreshMyModAchievementStats(userId) {
+      const seq = ++bkmpModAchievementStatsSeq;
+      bkmpMyAchievementAuthUserId = userId || null;
+      if (!userId) {
+        bkmpMyModAchievementStats = { modCardsApproved: 0, modLinked: false };
+        if (typeof renderAchievementBadge === 'function') renderAchievementBadge();
+        return;
+      }
+      const next = { ...bkmpMyModAchievementStats };
+      try {
+        const counts = typeof bkmpLoadMyCardSubmissionCounts === 'function' ? await bkmpLoadMyCardSubmissionCounts() : null;
+        if (counts) next.modCardsApproved = counts.approved;
+      } catch (e) { console.warn('Mod-Einreichungen fuer Erfolge konnten nicht geladen werden.', e); }
+      try {
+        const connections = typeof bkmpLoadMyModConnections === 'function' ? await bkmpLoadMyModConnections() : [];
+        next.modLinked = connections.some(c => !c.revoked_at);
+      } catch (e) { console.warn('Mod-Verbindungen fuer Erfolge konnten nicht geladen werden.', e); }
+      // Ueberholt (z.B. Logout waehrend des Ladens)? Dann nichts mehr anwenden.
+      if (seq !== bkmpModAchievementStatsSeq) return;
+      bkmpMyModAchievementStats = next;
+      if (typeof renderAchievementBadge === 'function') renderAchievementBadge();
+    }
+
     // Zentrale Refresh-Funktion - siehe Aufrufstellen: Session-
     // Wiederherstellung beim Laden, Login-Erfolg, und der bestehende
     // card_sales-Realtime-Handler (ein neuer Verkauf soll auch den
@@ -4418,6 +4639,11 @@
         } catch (e) { userId = null; }
       }
       bkmpCardSaleMyAuthUserId = userId;
+      /* Mitgenutzt fuer die "BK-Mod & Shops"-Erfolge: diese Funktion ist
+         bereits DER zentrale Haken fuer jeden Login-Zustandswechsel (Login,
+         Session-Restore, Logout, Realtime, Seitenload) - eigener, vom
+         Verkaeufer-Dashboard unabhaengiger Fehlerpfad (fire-and-forget). */
+      bkmpRefreshMyModAchievementStats(userId);
       if (!userId) {
         bkmpCardSaleMyStatus = null;
         cardSaleSellerDashEl.hidden = true;
@@ -5969,9 +6195,19 @@
       const categoryDiversity = new Set(myCards.map(item => (item.category || '').trim().toLowerCase()).filter(Boolean)).size;
       const isInvestor = name ? (data.investors || []).some(inv => (inv.name || '').trim().toLowerCase() === name || (inv.minecraftName || '').trim().toLowerCase() === name) : false;
       const flags = bkmpGetFlags();
+      /* Eigene, angenommene PartnerShops: owner_auth_user_id wird seit dem
+         PartnerShops-Update (13.09.) bei Mod- UND eingeloggter Website-
+         Einreichung serverseitig gesetzt (nie vom Client behauptet), die
+         oeffentliche Liste enthaelt ohnehin nur angenommene Shops. */
+      const ownShopsApproved = bkmpMyAchievementAuthUserId
+        ? (Array.isArray(data.partnerShops) ? data.partnerShops : []).filter(s => s && s.ownerAuthUserId === bkmpMyAchievementAuthUserId && (s.status || 'approved') === 'approved').length
+        : 0;
       return {
         hasName: Boolean(name),
         cardCount,
+        modCardsApproved: bkmpMyModAchievementStats.modCardsApproved,
+        modLinked: bkmpMyModAchievementStats.modLinked,
+        ownShopsApproved,
         wishCount,
         categoryDiversity,
         minutesSpent: bkmpGetTimeSpentMinutes(),
@@ -6092,6 +6328,13 @@
       [15, 'Anderthalb Wochen wollig'], [30, 'Monats-Määhster'], [60, 'Zwei-Monats-Zottel'],
       [120, 'Vier-Monats-Fellnase'], [240, 'Achtmonatiger Wollversteher'], [365, 'Schafsweisheit des Jahres']
     ];
+    /* Mod-Karteneinreichungen (02.10.2026): gezaehlt werden nur vom Team
+       ANGENOMMENE Einreichungen aus der BK-Mod (card_submissions.status =
+       'approved') - verhindert, dass reine Spam-Einreichungen Erfolge
+       freischalten. */
+    const BKMP_MOD_CARD_TIERS = [
+      [1, 'Mod-Pionier'], [3, 'Kartenscout'], [10, 'Kartograf'], [25, 'Mod-Archivar'], [50, 'Weltvermesser']
+    ];
     const BKMP_DIVERSITY_TIERS = [
       [1, 'Erste Kategorie'], [2, 'Zwei Kategorien'], [3, 'Drei Kategorien'], [4, 'Vier Kategorien'],
       [5, 'Fünf Kategorien'], [6, 'Sechs Kategorien'], [7, 'Sieben Kategorien'], [8, 'Alleskönner']
@@ -6156,9 +6399,19 @@
          triggerBkmpPositivmodus() weiter unten. Gleiches Muster wie
          egg_diamond (bkmpBannerClickCount/triggerBkmpDiamondRain). */
       { id: 'egg_positivmodus', category: 'Easter Eggs', title: '???', revealName: 'Realitätsverweigerer', desc: 'Finde ein verstecktes Easter Egg.', revealDesc: 'Rote Zahlen? Kenn ich nicht. 🙈', hint: 'Manche Zahlen auf der Investoren-Seite sind einfach zu rot. Klick fünfmal schnell drauf.', check: ctx => ctx.eggsFound.includes('positivmodus') },
+      /* 02.10.2026: "/sw bk" tippen - siehe triggerBkmpSwbkTeleport(). */
+      { id: 'egg_swbk', category: 'Easter Eggs', title: '???', revealName: 'Warp-Reisender', desc: 'Finde ein verstecktes Easter Egg.', revealDesc: 'Teleportation erfolgreich. Der Shop wartet schon auf dich. 🌀', hint: 'Wie kommt man ingame eigentlich zu uns? Probier den Befehl doch mal hier auf der Seite.', check: ctx => ctx.eggsFound.includes('swbk') },
       ...bkmpTieredAchievements('sheepstreak', 'Zeit & Treue', 'sheepStreak', BKMP_SHEEP_STREAK_TIERS, n => `Klicke ${n} Tag${n === 1 ? '' : 'e'} in Folge ab 12 Uhr auf unser Schaf für das Zitat des Tages.`),
-      { id: 'egg_all', category: 'Easter Eggs', title: 'Osterhase', desc: 'Finde alle 19 versteckten Easter Eggs.', progress: ctx => [ctx.eggsFound.length, 19], check: ctx => ctx.eggsFound.length >= 19 },
+      /* Zaehler 19 -> 20 (02.10.2026, egg_swbk dazu). Wer "Osterhase" schon
+         hatte, behaelt ihn (sticky, bkmpAchievementUnlocked). */
+      { id: 'egg_all', category: 'Easter Eggs', title: 'Osterhase', desc: 'Finde alle 20 versteckten Easter Eggs.', progress: ctx => [ctx.eggsFound.length, 20], check: ctx => ctx.eggsFound.length >= 20 },
       { id: 'combo_card_wish', category: 'Sonstiges', title: 'Vielseitig', desc: 'Reiche mindestens 1 Karte und 1 Kartenidee ein.', check: ctx => ctx.cardCount >= 1 && ctx.wishCount >= 1 },
+      /* BK-Mod & Shops (02.10.2026, Nutzerwunsch "Mod Karten Einreichung ..
+         und 1 Erfolg mit Reiche deinen Shop ein"). Alle drei brauchen einen
+         Website-Login (Spieler-Session), siehe bkmpRefreshMyModAchievementStats(). */
+      { id: 'mod_linked', category: 'BK-Mod & Shops', title: 'Verbunden', desc: 'Verbinde die BK-Mod mit deinem Website-Konto (Knopf „OPBK-Kartendatenbank-Mod verbinden“ oben auf der Seite).', check: ctx => ctx.modLinked },
+      ...bkmpTieredAchievements('modcard', 'BK-Mod & Shops', 'modCardsApproved', BKMP_MOD_CARD_TIERS, n => `Reiche ${n} Karte${n === 1 ? '' : 'n'} direkt im Spiel über die BK-Mod ein, die vom Team angenommen ${n === 1 ? 'wird' : 'werden'}.`),
+      { id: 'partnershop_own', category: 'BK-Mod & Shops', title: 'Ladenbesitzer', desc: 'Reiche deinen eigenen Shop als PartnerShop ein (eingeloggt auf der Website oder über die Mod) – sobald er angenommen ist, gehört der Erfolg dir.', check: ctx => ctx.ownShopsApproved >= 1 },
       { id: 'night_owl', category: 'Sonstiges', title: 'Nachteule', desc: 'Besuche die Seite zwischen 0 und 5 Uhr nachts.', check: ctx => ctx.nightOwl },
       { id: 'early_bird', category: 'Sonstiges', title: 'Frühaufsteher', desc: 'Besuche die Seite zwischen 5 und 7 Uhr morgens.', check: ctx => ctx.earlyBird },
       { id: 'weekend_warrior', category: 'Sonstiges', title: 'Wochenend-Grinder', desc: 'Besuche die Seite an einem Samstag und einem Sonntag.', check: ctx => ctx.weekendBoth },
@@ -6248,6 +6501,14 @@
       { id: 'neonpink', name: 'Neon-Pink', desc: 'Leuchtendes Pink.', unlockAt: 70 },
       { id: 'galaxy', name: 'Galaxy', desc: 'Schimmernder Sternenverlauf.', unlockAt: 80 },
       { id: 'mitternacht', name: 'Mitternacht', desc: 'Tiefes Nachtblau.', unlockAt: 90 },
+      /* BK-Mod & Shops (02.10.2026) - Minecraft-thematische Namens-Effekte
+         mit kleinem Emoji-Praefix (gleiches ::before/::after-Muster wie der
+         Geld-Rahmen), siehe .mc-cosmetic-redstone/-kartograf/-smaragd_haendler
+         in style.css. */
+      { id: 'redstone', name: 'Redstone-Signal', desc: '⚡ Pulsiert wie ein Redstone-Signal – für verbundene Mods.', unlockAchievement: 'mod_linked' },
+      { id: 'kartograf', name: 'Kartografen-Tinte', desc: '🗺️ Pergament & Tinte – für Karten-Einreicher aus der Mod.', unlockAchievement: 'modcard_1' },
+      { id: 'smaragd_haendler', name: 'Smaragd-Händler', desc: '🏪 Smaragdgrün wie ein echter Villager-Handel – für Shop-Besitzer.', unlockAchievement: 'partnershop_own' },
+      { id: 'netherportal', name: 'Nether-Portal', desc: '🌀 Lila Portal-Wirbel – nur für Warp-Reisende.', unlockEgg: 'swbk' },
       ...(Array.isArray(window.BKMP_IDLE_COSMETICS) ? window.BKMP_IDLE_COSMETICS : [])
     ];
     function bkmpGetActiveCosmetic() {
@@ -6281,6 +6542,16 @@
         badge.classList.add('mc-cosmetic-' + cosmetic.id);
       }
     }
+    /* Gesperrte Titel/Namens-Effekte sagten bisher nur "Erst diesen Erfolg
+       freischalten." - ohne WELCHEN. Jetzt mit konkretem Erfolgsnamen
+       (02.10.2026). Versteckte Erfolge (Titel "???", z.B. Easter Eggs)
+       bleiben bewusst geheim, sonst waere das Raetsel verraten. Rueckgabe
+       ist bereits HTML-escaped. */
+    function bkmpUnlockAchievementHint(achievementId) {
+      const ach = BKMP_ACHIEVEMENTS.find(a => a.id === achievementId);
+      if (!ach || !ach.title || ach.title.includes('???')) return 'Erst diesen Erfolg freischalten.';
+      return `Erfolg „${escapeHtml(ach.title)}“ freischalten.`;
+    }
     function renderCosmeticsPanel() {
       const ctx = bkmpAchievementContextWithMeta();
       const unlockedCount = BKMP_ACHIEVEMENTS.filter(a => bkmpAchievementUnlocked(a, ctx)).length;
@@ -6289,7 +6560,7 @@
       el.innerHTML = BKMP_COSMETICS.map(c => {
         const unlocked = bkmpCosmeticUnlocked(c, unlockedCount, ctx);
         const isActive = active === c.id;
-        const lockedHint = c.unlockEgg ? 'Finde das passende Easter Egg.' : (c.unlockAchievement ? 'Erst diesen Erfolg freischalten.' : (c.unlockCustom ? 'Noch nicht freigeschaltet.' : `Ab ${c.unlockAt} Erfolgen`));
+        const lockedHint = c.unlockEgg ? 'Finde das passende Easter Egg.' : (c.unlockAchievement ? bkmpUnlockAchievementHint(c.unlockAchievement) : (c.unlockCustom ? 'Noch nicht freigeschaltet.' : `Ab ${c.unlockAt} Erfolgen`));
         /* Redesign Phase 3 (17.07.): c.rarity wird seit BKMP_IDLE_COSMETICS
            (idledorf.js) berechnet, war aber bisher NIRGENDS gerendert (siehe
            Audit-Fund) - bkmpUiRarityBadge() macht sie hier erstmals sichtbar.
@@ -6406,6 +6677,16 @@
       { id: 'stammkommentator', name: 'Stammkommentator', desc: 'Meldet sich regelmäßig zu Wort.', unlockAchievement: 'feedback_sonstiges_5' },
       { id: 'wortgewaltig', name: 'Wortgewaltig', desc: 'Findet für alles die richtigen Worte.', unlockAchievement: 'feedback_sonstiges_10' },
       { id: 'feedback_legende', name: 'Feedback-Legende', desc: 'Der treueste Feedback-Geber überhaupt.', unlockAchievement: 'feedback_sonstiges_20' },
+      /* BK-Mod & Shops (02.10.2026) - je ein Titel fuer die neuen Erfolge,
+         die beiden "grossen" mit eigenem Farbverlauf (titleGradient). */
+      { id: 'verbunden', name: 'Verbunden', desc: 'Website und Mod sind eins.', unlockAchievement: 'mod_linked' },
+      { id: 'mod_pionier', name: 'Mod-Pionier', desc: 'Hat die erste Karte direkt im Spiel eingereicht.', unlockAchievement: 'modcard_1' },
+      { id: 'kartenscout', name: 'Kartenscout', desc: 'Findet Karten, bevor andere sie sehen.', unlockAchievement: 'modcard_3' },
+      { id: 'kartograf', name: 'Kartograf', desc: 'Vermisst die Welt Karte für Karte.', unlockAchievement: 'modcard_10' },
+      { id: 'mod_archivar', name: 'Mod-Archivar', desc: 'Hat die Kartendatenbank ein ganzes Stück wachsen lassen.', unlockAchievement: 'modcard_25' },
+      { id: 'weltvermesser', name: 'Weltvermesser', desc: '50 Karten per Mod – die Welt ist kartiert.', unlockAchievement: 'modcard_50', titleGradient: 'parchment' },
+      { id: 'ladenbesitzer', name: 'Ladenbesitzer', desc: 'Betreibt einen eigenen PartnerShop.', unlockAchievement: 'partnershop_own', titleGradient: 'emerald' },
+      { id: 'warp_reisender', name: 'Warp-Reisender', desc: 'Kennt den kürzesten Weg zum Shop.', unlockAchievement: 'egg_swbk' },
       ...BKMP_PLUSHIES.map(p => ({
         id: `plushie_fanboy_${p.id}`,
         name: `Maximaler ${p.name.replace(/\s*Plüshie$/i, '')} Fan`,
@@ -6470,7 +6751,7 @@
       el.innerHTML = BKMP_TITLES.map(t => {
         const unlocked = bkmpTitleUnlocked(t, unlockedCount, ctx);
         const isActive = active === t.id;
-        const lockedHint = t.unlockAchievement ? 'Erst diesen Erfolg freischalten.' : (t.unlockCustom ? 'Noch nicht freigeschaltet.' : `Ab ${t.unlockAt} Erfolgen`);
+        const lockedHint = t.unlockAchievement ? bkmpUnlockAchievementHint(t.unlockAchievement) : (t.unlockCustom ? 'Noch nicht freigeschaltet.' : `Ab ${t.unlockAt} Erfolgen`);
         const gradientClass = unlocked && t.titleGradient ? ` title-gradient-${t.titleGradient}` : '';
         return `
           <button type="button" class="cosmetic-swatch ${unlocked ? '' : 'locked'} ${isActive ? 'active' : ''}" data-title-id="${escapeHtml(t.id)}" ${unlocked ? '' : 'disabled'}>
@@ -6559,7 +6840,7 @@
             bkmpRewardPresent({
               tier: 'card',
               rarity: 'episch',
-              icon: p.image ? `<img src="${escapeHtml(p.image)}" alt="" style="width:64px;height:64px;object-fit:contain;">` : '🧸',
+              icon: p.image ? bkmpPlushieImgHtml(p, 'style="width:64px;height:64px;object-fit:contain;"') : '🧸',
               title: `Plüschie freigeschaltet: ${p.name}`,
               description: p.desc || '',
               source: 'Sammlung',
@@ -6613,7 +6894,7 @@
         return `
           <button type="button" class="cosmetic-swatch plushie-swatch ${unlocked ? '' : 'locked'} ${isActive ? 'active' : ''}" data-plushie-id="${escapeHtml(p.id)}" ${unlocked ? '' : 'disabled'}>
             ${newBadge(p.id)}
-            ${unlocked ? `<img class="plushie-swatch-img" src="${escapeHtml(p.image)}" alt="" loading="lazy">` : '<span class="plushie-swatch-lock">🔒</span>'}
+            ${unlocked ? bkmpPlushieImgHtml(p, 'class="plushie-swatch-img"') : '<span class="plushie-swatch-lock">🔒</span>'}
             <span class="cosmetic-swatch-name">${unlocked ? escapeHtml(p.name) : '???'}</span>
             <span class="cosmetic-swatch-desc">${unlocked ? escapeHtml(p.desc) : escapeHtml(lockedHint)}</span>
           </button>`;
@@ -6864,6 +7145,13 @@
       const active = connections.filter(c => !c.revoked_at);
       bkmpModLinkRenderStatusCard(active);
       bkmpModLinkRenderConnectionsList(active);
+      /* Gleiche Daten direkt fuer den Erfolg "Verbunden" mitnutzen - wer
+         gerade frisch verbunden hat und das Panel neu oeffnet, soll nicht
+         erst auf den naechsten Seitenaufruf warten muessen. */
+      if (active.length > 0 && !bkmpMyModAchievementStats.modLinked) {
+        bkmpMyModAchievementStats = { ...bkmpMyModAchievementStats, modLinked: true };
+        if (typeof renderAchievementBadge === 'function') renderAchievementBadge();
+      }
     }
 
     const plushieRedeemBtn = document.getElementById('plushieRedeemBtn');
@@ -7024,7 +7312,7 @@
           : null;
         const cosmeticCls = knownCosmetic ? ` mc-cosmetic-${knownCosmetic.id}` : '';
         const plushie = stat && stat.activePlushie ? BKMP_PLUSHIES.find(p => p.id === stat.activePlushie) : null;
-        const plushieImg = plushie ? `<img src="${escapeHtml(plushie.image)}" alt="" class="leaderboard-plushie" title="${escapeHtml(plushie.name)}">` : '';
+        const plushieImg = plushie ? bkmpPlushieImgHtml(plushie, `class="leaderboard-plushie" title="${escapeHtml(plushie.name)}"`) : '';
         const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : '';
         const medal = bkmpUiMedal(i);
         return `
@@ -7063,7 +7351,7 @@
 
       const plushieEl = document.getElementById('playerProfilePlushie');
       const plushie = stat && stat.activePlushie ? BKMP_PLUSHIES.find(p => p.id === stat.activePlushie) : null;
-      plushieEl.innerHTML = plushie ? `<img src="${escapeHtml(plushie.image)}" alt="" title="${escapeHtml(plushie.name)}">` : '🙂';
+      plushieEl.innerHTML = plushie ? bkmpPlushieImgHtml(plushie, `title="${escapeHtml(plushie.name)}"`) : '🙂';
 
       const statsEl = document.getElementById('playerProfileStats');
       if (!stat) {
@@ -7151,7 +7439,7 @@
       const activePlushie = activePlushieId && ctx.ownedPlushies.includes(activePlushieId) ? BKMP_PLUSHIES.find(p => p.id === activePlushieId) : null;
       if (badgeIcon) {
         badgeIcon.innerHTML = activePlushie
-          ? `<img src="${escapeHtml(activePlushie.image)}" alt="" class="mc-name-badge-plushie">`
+          ? bkmpPlushieImgHtml(activePlushie, 'class="mc-name-badge-plushie"')
           : '⛏️';
       }
       const activeTitleName = typeof bkmpGetActiveTitleName === 'function' ? bkmpGetActiveTitleName() : '';
@@ -7206,7 +7494,7 @@
     // dieselbe Bugklasse wie am 25.07.2026: "Jake's Feldfahrt" wird von
     // echten Erfolgen als category genutzt, war aber nie hier eingetragen -
     // die betroffenen Erfolge liessen sich dadurch im Panel nie einsehen.
-    const BKMP_ACHIEVEMENT_CATEGORY_ORDER = ['Karten', 'Kartenideen', 'Zeit & Treue', 'Vielfalt', 'Bonk', "Jake's Feldfahrt", 'Idle Dorf', 'Runen', 'Weltboss', 'Arena', 'Gilde', 'Drachenzucht', 'Plüshies', 'Meilensteine', 'Easter Eggs', 'Feedback', 'Sonstiges'];
+    const BKMP_ACHIEVEMENT_CATEGORY_ORDER = ['Karten', 'Kartenideen', 'BK-Mod & Shops', 'Zeit & Treue', 'Vielfalt', 'Bonk', "Jake's Feldfahrt", 'Idle Dorf', 'Runen', 'Weltboss', 'Arena', 'Gilde', 'Drachenzucht', 'Plüshies', 'Meilensteine', 'Easter Eggs', 'Feedback', 'Sonstiges'];
     const bkmpAchievementCategoryOpen = {};
 
     function bkmpFormatRelativeTime(iso) {

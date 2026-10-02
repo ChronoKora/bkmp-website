@@ -420,6 +420,19 @@ function bkmpRaidToggleCombatView(show) {
   const compactNavCurrentlyActive = typeof bkmpProtoChudCompactActive !== 'undefined' && bkmpProtoChudCompactActive === true;
   if (tabs) tabs.style.display = show ? 'none' : (compactNavCurrentlyActive ? 'none' : '');
   if (combatView) combatView.style.display = show ? '' : 'none';
+  // 02.10.2026: Raid-Videos (Stadt + Boss) stehen in index.html nur als
+  // data-src, damit sie nicht bei jedem Seitenaufruf mitgeladen werden -
+  // erst beim ersten echten Einblenden der Kampfansicht laden. autoplay
+  // greift danach von selbst, play() ist nur Sicherheitsnetz.
+  if (show && combatView) {
+    combatView.querySelectorAll('video[data-src]').forEach(v => {
+      if (v.getAttribute('src')) return;
+      v.setAttribute('src', v.dataset.src);
+      v.preload = 'auto';
+      const p = v.play();
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    });
+  }
   panels.forEach(p => { if (show) p.style.display = 'none'; });
   if (!show) {
     const activeTab = bkmpIdleTabs.find(t => t.id === bkmpIdleActiveTab);

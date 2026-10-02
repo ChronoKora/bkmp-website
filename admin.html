@@ -20,7 +20,7 @@
 <title>BKMP — Admin</title>
 
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
-<link rel="stylesheet" href="style.css?v=20261001-yakshaimages2">
+<link rel="stylesheet" href="style.css?v=20261002-bureaucracy1">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 </head>
 <body>
@@ -72,9 +72,10 @@
   <div class="joke-overlay" id="adminPendingPopup">
     <div class="joke-card admin-pending-popup-card">
       <h3 id="adminPendingPopupTitle">Neue Anfragen</h3>
-      <p id="adminPendingPopupBody"></p>
+      <p>Wartet auf Prüfung – klick auf einen Eintrag, um direkt dorthin zu springen:</p>
+      <div class="admin-pending-popup-list" id="adminPendingPopupList"></div>
       <div class="joke-buttons">
-        <button class="btn-ja" id="adminPendingPopupClose" type="button">Ansehen</button>
+        <button class="btn-nein" id="adminPendingPopupClose" type="button">Später</button>
       </div>
     </div>
   </div>
@@ -1273,8 +1274,8 @@
        da admin.html kein window.BKMP_QA_MODE-Gate setzt; macht nur
        bkmpGetGameNow() fuer bkmp-events.js verfuegbar (identisch Date.now()). -->
   <script src="js/core/bkmp-game-clock.js?v=20260724-qafoundation1"></script>
-  <script src="supabase.js?v=20260927-dailyeventremoval1"></script>
-  <script src="app.js?v=20260913-wagepayout2"></script>
+  <script src="supabase.js?v=20261002-modachievements1"></script>
+  <script src="app.js?v=20261002-perfdeeplink1"></script>
   <!-- Redesign Phase 2a (17.07.): siehe index.html fuer die Begruendung der
        festen Ladereihenfolge (bkmp-idle-state.js zuerst, bkmp-idle-
        bootstrap.js zuletzt vor mapart.js). -->
@@ -1285,7 +1286,7 @@
   <script src="js/systems/bkmp-breeding.js?v=20260806-dragonstoragesync1"></script>
   <script src="js/systems/bkmp-guild.js?v=20260927-dailyeventremoval1"></script>
   <script src="js/systems/bkmp-runes.js?v=20260807-rerollspacing1"></script>
-  <script src="js/systems/bkmp-raid.js?v=20260927-dailyeventremoval1"></script>
+  <script src="js/systems/bkmp-raid.js?v=20261002-perfdeeplink1"></script>
   <script src="js/systems/bkmp-tower.js?v=20260726-stagebarvisfix1"></script>
   <script src="js/systems/bkmp-prestige.js?v=20260805-multicompanion7"></script>
   <script src="js/systems/bkmp-arena.js?v=20260820-titlecontextfix1"></script>
@@ -1293,7 +1294,7 @@
   <script src="js/systems/bkmp-skilltree.js?v=20260717-p2bfoundation"></script>
   <script src="js/systems/bkmp-cosmetics.js?v=20260804-skinpreview2"></script>
   <script src="js/systems/bkmp-events.js?v=20260726-guildtechext1"></script>
-  <script src="js/ui/bkmp-hud.js?v=20260906-pulseracefix1"></script>
+  <script src="js/ui/bkmp-hud.js?v=20261002-videoblob1"></script>
   <script src="js/systems/bkmp-leaderboard.js?v=20260717-p2cfoundation"></script>
   <script src="js/ui/bkmp-ui-components.js?v=20260731-guildtechtreev3"></script>
   <!-- Feedback-/Status-Board Stufe 1 (20.07.2026) - speist hier nur die
@@ -1481,34 +1482,58 @@
         return;
       }
       renderAll();
-      refreshAdminDataFromSupabase().then(showPendingSummaryPopup);
+      // Kam der Aufruf ueber einen Deep-Link (z.B. Discord "Website öffnen"),
+      // direkt dorthin springen und das Sammel-Popup weglassen - es wuerde
+      // sonst genau den Eintrag verdecken, zu dem man gerade will.
+      const viaDeepLink = bkmpAdminApplyDeepLink();
+      refreshAdminDataFromSupabase().then(() => { if (!viaDeepLink) showPendingSummaryPopup(); });
     }
 
     /* Liest absichtlich NUR aus dem bereits von refreshAdminDataFromSupabase()
        geladenen data-Objekt - card_catalog/wishes/investor_requests wurden
        gerade erst frisch geladen, ein erneuter Fetch hier waere reine
        Verdopplung derselben 3 Tabellen. */
+    /* 02.10.2026 (Nutzer-Meldung: "das bringt mich nicht zu dem Ort im
+       Admin Panel"): der einzige Knopf hiess "Ansehen", hat das Popup aber
+       nur geschlossen. Jetzt ist jede Kategorie ein eigener Knopf, der direkt
+       auf die passende Seite springt (gleicher echter Nav-Klick wie bei
+       Deep-Links). Zusaetzlich zaehlen jetzt auch die Karteneinreichungen aus
+       der Mod mit - die wurden zwar schon geladen, fehlten hier aber komplett. */
     function showPendingSummaryPopup() {
-      const pendingCardCatalog = (data.cardCatalog || []).filter(item => item.status === 'pending' && !item.isRead).length;
-      const pendingWishes = (data.wishes || []).filter(item => item.status === 'pending' && !item.isRead).length;
-      const pendingInvestorRequests = (data.investorRequests || []).filter(item => item.status === 'pending' && !item.isRead).length;
-      const pendingCardSaleRequests = (data.cardSaleRequests || []).filter(item => item.status === 'pending' && !item.isRead).length;
-      const pendingPartnerShops = (data.partnerShops || []).filter(item => item.status === 'pending' && !item.isRead).length;
-      const unreadFeedback = bkmpFeedbackCache.filter(f => !f.isRead && !f.isArchived).length;
-      const total = pendingCardCatalog + pendingWishes + pendingInvestorRequests + pendingCardSaleRequests + pendingPartnerShops + unreadFeedback;
+      const isNew = item => item.status === 'pending' && !item.isRead;
+      const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+      const groups = [
+        { page: 'cardsubmissions', icon: '🗺️', count: (data.cardSubmissions || []).filter(isNew).length, label: n => plural(n, 'Karteneinreichung aus der Mod', 'Karteneinreichungen aus der Mod') },
+        { page: 'cardcatalog', icon: '📇', count: (data.cardCatalog || []).filter(isNew).length, label: n => plural(n, 'Karte für die Kartendatenbank', 'Karten für die Kartendatenbank') },
+        { page: 'wishes', icon: '💡', count: (data.wishes || []).filter(isNew).length, label: n => plural(n, 'Kartenidee', 'Kartenideen') },
+        { page: 'partners', icon: '🏪', count: (data.partnerShops || []).filter(isNew).length, label: n => plural(n, 'PartnerShop-Anfrage', 'PartnerShop-Anfragen') },
+        { page: 'cardsales', icon: '💸', count: (data.cardSaleRequests || []).filter(isNew).length, label: n => plural(n, 'Verkaufsanfrage', 'Verkaufsanfragen') },
+        { page: 'investorRequests', icon: '📈', count: (data.investorRequests || []).filter(isNew).length, label: n => plural(n, 'Investoren-Anfrage', 'Investoren-Anfragen') },
+        { page: 'feedback', icon: '💬', count: bkmpFeedbackCache.filter(f => !f.isRead && !f.isArchived).length, label: n => plural(n, 'Feedback-Eintrag', 'Feedback-Einträge') }
+      ].filter(g => g.count > 0);
+      const total = groups.reduce((sum, g) => sum + g.count, 0);
       if (total === 0) return;
-
-      const parts = [];
-      if (pendingCardCatalog) parts.push(`${pendingCardCatalog} Karte${pendingCardCatalog === 1 ? '' : 'n'}`);
-      if (pendingWishes) parts.push(`${pendingWishes} Kartenidee${pendingWishes === 1 ? '' : 'n'}`);
-      if (pendingInvestorRequests) parts.push(`${pendingInvestorRequests} Investoren-Anfrage${pendingInvestorRequests === 1 ? '' : 'n'}`);
-      if (pendingCardSaleRequests) parts.push(`${pendingCardSaleRequests} Verkaufsanfrage${pendingCardSaleRequests === 1 ? '' : 'n'}`);
-      if (pendingPartnerShops) parts.push(`${pendingPartnerShops} PartnerShop-Anfrage${pendingPartnerShops === 1 ? '' : 'n'}`);
-      if (unreadFeedback) parts.push(`${unreadFeedback} Feedback-Eintrag${unreadFeedback === 1 ? '' : 'e'}`);
 
       const popup = document.getElementById('adminPendingPopup');
       document.getElementById('adminPendingPopupTitle').textContent = `Du hast ${total} neue Anfrage${total === 1 ? '' : 'n'}`;
-      document.getElementById('adminPendingPopupBody').textContent = `Wartet auf Prüfung: ${parts.join(', ')}.`;
+      const list = document.getElementById('adminPendingPopupList');
+      list.innerHTML = '';
+      groups.forEach(g => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'admin-pending-popup-item';
+        btn.innerHTML = `<span class="admin-pending-popup-icon" aria-hidden="true">${g.icon}</span><span class="admin-pending-popup-label"></span><span class="admin-pending-popup-arrow" aria-hidden="true">→</span>`;
+        btn.querySelector('.admin-pending-popup-label').textContent = g.label(g.count);
+        btn.addEventListener('click', () => {
+          popup.classList.remove('visible');
+          const navBtn = document.querySelector(`.admin-nav-btn[data-page="${g.page}"]`);
+          if (navBtn) {
+            navBtn.click();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+        });
+        list.appendChild(btn);
+      });
       popup.classList.add('visible');
     }
 
@@ -1586,6 +1611,67 @@
         if (page === 'swstats') refreshSwStatsAdminPage();
         if (page === 'mapartcompanies') refreshMapartCompaniesAdmin();
       });
+    });
+
+    /* ---------------- Deep-Links (02.10.2026) ----------------
+       admin.html#<seite>/<eintrag-id> oeffnet direkt die passende Seite
+       und hebt den Eintrag hervor (z.B. #cardsubmissions/<uuid>). Genutzt
+       von den "Website öffnen"-Knoepfen der Discord-Moderationsnachrichten
+       - vorher zeigten die nur auf admin.html und landeten immer auf der
+       Uebersicht. Loest bewusst einen echten Klick auf den Nav-Knopf aus,
+       damit exakt dieselbe Lade-Logik laeuft wie bei einem normalen Klick.
+       Die Seiten laden ihre Daten asynchron nach und bauen die Liste dabei
+       evtl. mehrfach neu - deshalb wird der Eintrag eine Weile per Intervall
+       gesucht und die Hervorhebung bei einem Neuaufbau erneut gesetzt. */
+    let bkmpAdminDeepLinkTimer = null;
+
+    function bkmpAdminParseDeepLink() {
+      const raw = decodeURIComponent((location.hash || '').replace(/^#/, ''));
+      if (!raw) return null;
+      const [page, entryId] = raw.split('/');
+      return page ? { page, entryId: entryId || null } : null;
+    }
+
+    function bkmpAdminApplyDeepLink() {
+      const link = bkmpAdminParseDeepLink();
+      if (!link) return false;
+      const navBtn = document.querySelector(`.admin-nav-btn[data-page="${CSS.escape(link.page)}"]`);
+      if (!navBtn) return false;
+      // Hash sofort entfernen: ein spaeteres Neuladen soll wieder normal auf
+      // der Uebersicht landen, nicht dauerhaft auf dieser einen Seite.
+      history.replaceState(null, '', location.pathname + location.search);
+      navBtn.click();
+      if (!link.entryId) return true;
+
+      window.clearInterval(bkmpAdminDeepLinkTimer);
+      const startedAt = Date.now();
+      let foundAt = 0;
+      let lastRow = null;
+      bkmpAdminDeepLinkTimer = window.setInterval(() => {
+        const section = document.getElementById('page-' + link.page);
+        const row = section && section.querySelector(`[data-entry-id="${CSS.escape(link.entryId)}"]`);
+        if (row && row !== lastRow) {
+          if (!foundAt) foundAt = Date.now();
+          lastRow = row;
+          row.classList.add('entry-row-deeplink');
+          row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        const now = Date.now();
+        if (foundAt && now - foundAt > 5000) {
+          window.clearInterval(bkmpAdminDeepLinkTimer);
+          if (lastRow) lastRow.classList.remove('entry-row-deeplink');
+        } else if (!foundAt && now - startedAt > 12000) {
+          window.clearInterval(bkmpAdminDeepLinkTimer);
+          showAdminToast('Der verlinkte Eintrag wurde nicht gefunden – evtl. schon bearbeitet oder gelöscht.', 'error');
+        }
+      }, 250);
+      return true;
+    }
+
+    window.addEventListener('hashchange', () => {
+      if (adminWrap.style.display !== 'block') return;
+      if (document.body.classList.contains('admin-mode-sheepeditor') || document.body.classList.contains('admin-mode-expenseseditor')) return;
+      bkmpAdminApplyDeepLink();
     });
 
     /* ---------------- Daten-Handling ---------------- */
@@ -3462,6 +3548,7 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
         const dims = item.widthMaps && item.heightMaps ? `${item.widthMaps}×${item.heightMaps} · ${item.totalMaps || item.widthMaps * item.heightMaps} Karten · ` : '';
         const row = document.createElement('div');
         row.className = 'entry-row partner-admin-row' + (!item.isRead ? ' is-unread' : '');
+        row.dataset.entryId = String(item.id);
         row.innerHTML = `
           ${item.image ? `<span class="partner-admin-thumb-wrap" data-bkmp-image-wrap data-empty-label="Karte"><img data-bkmp-img class="partner-admin-thumb" src="${item.image}" alt="" loading="lazy" decoding="async"></span>` : '<div class="partner-admin-thumb partner-admin-thumb-empty">Karte</div>'}
           <div class="desc">
@@ -4466,6 +4553,7 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       items.forEach(item => {
         const row = document.createElement('div');
         row.className = 'entry-row partner-admin-row' + (!item.isRead ? ' is-unread' : '');
+        row.dataset.entryId = String(item.id);
         const ownerLabel = item.ownerAuthUserId
           ? (bkmpPartnerShopOwnerNameCache[item.ownerAuthUserId] || item.ownerAuthUserId.slice(0, 8) + '…')
           : '';

@@ -2580,6 +2580,17 @@ label { display: block; font-size: 0.76rem; color: var(--muted); margin-bottom: 
 .entry-row .del-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
 .entry-row.is-unread { background: color-mix(in srgb, var(--gold) 7%, var(--paper)); border-left: 3px solid var(--gold); padding-left: calc(0.85rem - 3px); }
 .entry-row.is-unread:nth-child(even) { background: color-mix(in srgb, var(--gold) 10%, var(--paper-2)); }
+/* 02.10.2026 Deep-Link-Ziel (admin.html#seite/eintrag-id, z.B. aus Discord):
+   kurz pulsierender Rahmen, damit man den verlinkten Eintrag sofort findet. */
+.entry-row.entry-row-deeplink {
+  position: relative; z-index: 1;
+  box-shadow: 0 0 0 2px var(--purple), 0 0 18px color-mix(in srgb, var(--purple) 45%, transparent);
+  animation: entryRowDeeplinkPulse 1.1s ease-in-out 3;
+}
+@keyframes entryRowDeeplinkPulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--purple), 0 0 18px color-mix(in srgb, var(--purple) 45%, transparent); }
+  50% { box-shadow: 0 0 0 3px var(--purple), 0 0 30px color-mix(in srgb, var(--purple) 70%, transparent); }
+}
 .entry-row-unread-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); flex-shrink: 0; }
 .entry-row-warning { font-size: 0.76rem; color: #e8a05e; margin-top: 0.25rem; }
 
@@ -4995,6 +5006,417 @@ input.cardcatalog-search:focus {
   .investor-security-fp-ring { width: 112px; height: 112px; }
 }
 
+/* ============================================================
+   Auszahlungs-Buerokratie (02.10.2026), Engine in
+   js/easter-eggs/bkmp-payout-bureaucracy.js. Alle Klassen mit Praefix
+   bkb- - die bestehenden investor-security-Klassen bleiben unveraendert
+   und werden nur mitbenutzt. Lesetexte nutzen feste Farben (gold-fixed,
+   pos, neg), nie die per Regler aenderbare Akzentfarbe.
+   ============================================================ */
+.investor-security-card.bkb-active { max-width: min(520px, 94vw); }
+.investor-security-card .bkb-line {
+  font-size: 0.88rem; margin: 0.35rem 0; line-height: 1.45; color: var(--ink);
+}
+.investor-security-card .bkb-line.is-ok { color: var(--pos); font-weight: 600; }
+.investor-security-card .bkb-line.is-err { color: var(--neg); font-weight: 600; }
+.investor-security-card .bkb-line.is-muted { color: var(--muted); font-size: 0.82rem; }
+.investor-security-card .bkb-line.is-official { font-weight: 600; letter-spacing: 0.01em; }
+.investor-security-card .bkb-line.is-question { font-weight: 600; font-size: 0.95rem; margin-top: 0.9rem; }
+.investor-security-card .bkb-line.is-penalty,
+.investor-security-card .bkb-line.is-bonus {
+  display: inline-block; font-weight: 800; font-size: 0.95rem; padding: 0.25rem 0.75rem; border-radius: 999px; margin: 0.45rem 0;
+}
+.investor-security-card .bkb-line.is-penalty { color: var(--neg); background: color-mix(in srgb, var(--neg) 14%, transparent); }
+.investor-security-card .bkb-line.is-bonus { color: var(--pos); background: color-mix(in srgb, var(--pos) 14%, transparent); }
+.investor-security-card .bkb-feedback.is-muted { color: var(--muted); background: color-mix(in srgb, var(--line) 40%, transparent); }
+.bkb-screen h3 { margin-bottom: 0.7rem; }
+.bkb-kicker {
+  display: inline-block; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--gold-fixed); border: 1px solid color-mix(in srgb, var(--gold-fixed) 45%, transparent);
+  padding: 0.15rem 0.6rem; border-radius: 999px; margin-bottom: 0.6rem;
+}
+.bkb-seq { margin: 0.4rem 0 0.2rem; }
+.bkb-actions { margin-top: 0.9rem; flex-wrap: wrap; }
+.bkb-actions:empty { display: none; }
+.bkb-hint {
+  font-size: 0.8rem; color: var(--gold-fixed); border: 1px dashed color-mix(in srgb, var(--gold-fixed) 50%, transparent);
+  border-radius: 10px; padding: 0.45rem 0.7rem; margin: 0.6rem 0 0;
+}
+.bkb-big-text { display: block; font-family: 'Fraunces', serif; font-size: clamp(1.7rem, 6vw, 2.4rem); font-weight: 800; color: var(--gold-fixed); }
+
+/* Werkzeugleiste + Zaehler im Kopfbereich */
+.bkb-toolbar { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.35rem; margin: -0.6rem 0 0.8rem; }
+.bkb-tool {
+  font: 600 0.72rem/1 'Inter', sans-serif; padding: 0.38rem 0.65rem; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--paper); color: var(--muted);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.bkb-tool:hover { color: var(--ink); border-color: color-mix(in srgb, var(--purple) 50%, var(--line)); }
+.bkb-tool-exit:hover { color: var(--neg); border-color: color-mix(in srgb, var(--neg) 50%, var(--line)); }
+.investor-security-step .bkb-count { color: var(--gold-fixed); font-size: 0.95rem; }
+.investor-security-step { position: relative; }
+.investor-security-step.bkb-bump { animation: bkbBump 0.45s ease; }
+@keyframes bkbBump { 0% { transform: scale(1); } 40% { transform: scale(1.08); } 100% { transform: scale(1); } }
+.bkb-delta {
+  position: absolute; right: 0.4rem; top: -0.4rem; font-weight: 800; font-size: 0.85rem;
+  animation: bkbDelta 1.4s ease forwards; pointer-events: none;
+}
+.bkb-delta.is-up { color: var(--neg); }
+.bkb-delta.is-down { color: var(--pos); }
+@keyframes bkbDelta { 0% { opacity: 0; transform: translateY(6px); } 20% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-14px); } }
+
+/* Strafen, Stempel */
+.bkb-penalty-big {
+  font-family: 'Fraunces', serif; font-weight: 800; font-size: clamp(2.2rem, 9vw, 3.2rem); line-height: 1.05;
+  color: var(--neg); margin: 0.6rem 0; animation: bkbPenaltyIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  text-shadow: 0 0 22px color-mix(in srgb, var(--neg) 35%, transparent);
+}
+.bkb-penalty-big span { display: block; font-size: 0.42em; letter-spacing: 0.18em; }
+.bkb-penalty-big.is-bonus { color: var(--pos); }
+@keyframes bkbPenaltyIn { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: scale(1); } }
+.bkb-stamp {
+  display: inline-block; margin: 0.6rem 0; padding: 0.3rem 0.9rem; border: 3px solid var(--neg); border-radius: 6px;
+  color: var(--neg); font-weight: 900; letter-spacing: 0.16em; transform: rotate(-8deg); opacity: 0.85;
+  animation: bkbStampIn 0.35s ease-out;
+}
+.bkb-stamp.is-ok { border-color: var(--pos); color: var(--pos); }
+@keyframes bkbStampIn { from { transform: rotate(-8deg) scale(1.8); opacity: 0; } to { transform: rotate(-8deg) scale(1); opacity: 0.85; } }
+
+/* Auswahl-Buttons */
+.bkb-choices { display: flex; flex-direction: column; gap: 0.5rem; margin: 0.2rem 0 0.4rem; }
+.bkb-choices.is-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.bkb-choice {
+  font: 600 0.88rem/1.3 'Inter', sans-serif; padding: 0.7rem 0.9rem; border-radius: 12px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--paper); color: var(--ink);
+  transition: border-color 0.15s ease, transform 0.15s ease, background 0.15s ease;
+}
+.bkb-choice:hover:not(:disabled) { border-color: color-mix(in srgb, var(--purple) 55%, var(--line)); transform: translateY(-1px); }
+.bkb-choice:disabled { cursor: default; opacity: 0.55; }
+.bkb-choice.is-picked { opacity: 1; border-color: var(--purple); background: color-mix(in srgb, var(--purple) 14%, var(--paper)); }
+.bkb-weiter { letter-spacing: 0.08em; }
+.bkb-shapes { display: flex; justify-content: center; gap: 1.2rem; margin: 0.4rem 0 0.8rem; }
+.bkb-shape { width: 64px; height: 64px; border: none; cursor: pointer; background: var(--gold-fixed); transition: transform 0.15s ease; }
+.bkb-shape:hover:not(:disabled) { transform: scale(1.06); }
+.bkb-shape.is-circle { border-radius: 50%; }
+.bkb-shape.is-square { border-radius: 6px; }
+.bkb-shape.is-triangle { clip-path: polygon(50% 4%, 96% 94%, 4% 94%); }
+.bkb-shape.is-picked { background: var(--pos); }
+.bkb-colors { display: flex; justify-content: center; gap: 0.8rem; margin: 0.4rem 0 0.8rem; }
+.bkb-color { width: 56px; height: 56px; border-radius: 14px; border: 2px solid transparent; cursor: pointer; }
+.bkb-color.is-picked { border-color: var(--ink); }
+
+/* Eingaben */
+.bkb-input {
+  width: 100%; box-sizing: border-box; font: 500 0.9rem 'Inter', sans-serif; padding: 0.6rem 0.75rem; margin: 0.3rem 0 0.4rem;
+  border-radius: 10px; border: 1px solid var(--line); background: var(--paper); color: var(--ink);
+}
+.bkb-input[readonly] { color: var(--muted); }
+.bkb-textarea { resize: vertical; min-height: 54px; }
+.bkb-form { display: flex; flex-direction: column; gap: 0.35rem; text-align: left; }
+.bkb-form label { font-size: 0.78rem; font-weight: 600; color: var(--muted); }
+.bkb-center-row { justify-content: center; }
+.bkb-small-row { font-size: 0.78rem; margin-top: 0.4rem; }
+.bkb-small-row[hidden] { display: none; }
+.bkb-captcha-text {
+  display: flex; justify-content: center; gap: 0.15rem; margin: 0.3rem 0 0.6rem; padding: 0.7rem;
+  font: 800 1.5rem/1 'Courier New', monospace; color: var(--gold-fixed); letter-spacing: 0.05em;
+  background: repeating-linear-gradient(45deg, color-mix(in srgb, var(--line) 60%, transparent) 0 6px, transparent 6px 12px);
+  border-radius: 10px; user-select: none;
+}
+.bkb-captcha-text span { display: inline-block; }
+
+/* Reaktion / Countdown / Riesen- und Mini-Button */
+.bkb-reaction {
+  width: 100%; height: 150px; border-radius: 16px; border: none; cursor: pointer;
+  font: 700 1.1rem 'Inter', sans-serif; color: #fff; touch-action: manipulation;
+}
+.bkb-reaction.is-idle { background: color-mix(in srgb, var(--purple) 55%, #1a1626); }
+.bkb-reaction.is-red { background: #b91c1c; }
+.bkb-reaction.is-green { background: #16a34a; }
+.bkb-reaction.is-done { background: #334155; }
+.bkb-countdown { font-family: 'Fraunces', serif; font-size: 2.6rem; font-weight: 800; color: var(--gold-fixed); margin: 0.4rem 0; }
+.bkb-huge {
+  width: 100%; min-height: min(42vh, 300px); border-radius: 18px; border: none; cursor: pointer;
+  font: 900 clamp(2rem, 9vw, 3.4rem) 'Inter', sans-serif; letter-spacing: 0.06em; color: #14101d;
+  background: linear-gradient(135deg, #f0d48a, #c9a56a);
+}
+.bkb-tiny-area { position: relative; height: 170px; }
+.bkb-tiny {
+  position: absolute; right: 6px; bottom: 4px; font-size: 9px; padding: 1px 4px; border-radius: 4px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--paper); color: var(--muted); transition: font-size 0.3s ease, padding 0.3s ease;
+}
+.bkb-tiny.is-grown { font-size: 0.9rem; padding: 0.4rem 0.9rem; }
+
+/* Avatare, Bilder, Minecraft-Raster */
+.bkb-avatars, .bkb-chests { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 0.6rem; margin: 0.3rem 0 0.6rem; }
+.bkb-avatar, .bkb-chest {
+  display: flex; flex-direction: column; align-items: center; gap: 0.25rem; padding: 0.7rem 0.4rem; border-radius: 14px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--paper); color: var(--ink);
+}
+.bkb-avatar span, .bkb-chest span { font-size: 2.2rem; line-height: 1; }
+.bkb-avatar small, .bkb-chest small { font-size: 0.7rem; color: var(--muted); }
+.bkb-avatar:disabled, .bkb-chest:disabled { opacity: 0.45; cursor: default; }
+.bkb-avatar.is-picked { opacity: 1; border-color: var(--pos); }
+.bkb-chest.is-open { opacity: 0.6; }
+.bkb-image-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin: 0.3rem 0 0.6rem; }
+.bkb-image-tile {
+  aspect-ratio: 1; padding: 0.35rem; border-radius: 12px; cursor: pointer; border: 2px solid var(--line);
+  background: var(--paper); display: flex; align-items: center; justify-content: center;
+}
+.bkb-image-tile img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+.bkb-image-tile:disabled { opacity: 0.4; cursor: default; }
+.bkb-image-tile.is-picked { opacity: 1; border-color: var(--pos); }
+.bkb-image-tile.is-hinted, .bkb-tnt.is-hinted { box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold-fixed) 60%, transparent); }
+.bkb-creeper-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.35rem; max-width: 240px; margin: 0.3rem auto 0.6rem; }
+.bkb-creeper-tile {
+  aspect-ratio: 1; border-radius: 6px; cursor: pointer; border: 2px solid transparent;
+  background: linear-gradient(135deg, #4c9a3a, #3f7f31); image-rendering: pixelated;
+}
+.bkb-creeper-tile.is-picked { border-color: #fff; box-shadow: inset 0 0 0 3px rgba(0, 0, 0, 0.35); }
+.bkb-tnt-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.4rem; margin: 0.3rem 0 0.6rem; }
+.bkb-tnt {
+  padding: 0.9rem 0.2rem; border-radius: 6px; cursor: pointer; border: none; font: 900 1rem 'Courier New', monospace;
+  color: #fff; background: linear-gradient(180deg, #dc2626 0 35%, #f5f5f4 35% 65%, #dc2626 65% 100%);
+  text-shadow: 0 1px 0 #000;
+}
+.bkb-tnt:disabled { opacity: 0.35; cursor: default; }
+.bkb-tnt.is-picked { opacity: 1; outline: 3px solid var(--pos); }
+
+/* AGB, Datenschutz-Schalter */
+.bkb-agb {
+  max-height: 150px; overflow-y: auto; text-align: left; font-size: 0.78rem; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 10px; padding: 0.6rem 0.8rem; background: var(--paper);
+}
+.investor-security-card .bkb-agb p { font-size: 0.78rem; margin: 0 0 0.45rem; }
+.bkb-toggles {
+  max-height: 210px; overflow-y: auto; text-align: left; display: grid; gap: 0.3rem; margin: 0.4rem 0;
+  border: 1px solid var(--line); border-radius: 10px; padding: 0.5rem 0.7rem; background: var(--paper);
+}
+.bkb-toggles[hidden] { display: none; }
+.bkb-toggle { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; cursor: pointer; }
+.bkb-toggle input { accent-color: var(--purple); }
+
+/* Unterschrift */
+.bkb-signature {
+  width: 100%; height: 140px; touch-action: none; cursor: crosshair; border-radius: 12px;
+  border: 1px dashed color-mix(in srgb, var(--purple) 55%, var(--line)); background: var(--paper);
+}
+.bkb-empty-sig { display: inline-block; min-width: 120px; border-bottom: 1px dashed var(--muted); color: var(--muted); font-style: italic; }
+
+/* Drucker */
+.bkb-printer { position: relative; width: 180px; height: 150px; margin: 0.4rem auto 0.6rem; }
+.bkb-printer-body {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 74px; border-radius: 12px;
+  background: linear-gradient(180deg, #3f3f46, #27272a); z-index: 2;
+}
+.bkb-printer-light { position: absolute; right: 14px; top: 14px; width: 10px; height: 10px; border-radius: 50%; background: #22c55e; }
+.bkb-printer-light.is-error { background: #ef4444; animation: bkbBlink 0.8s steps(2) infinite; }
+@keyframes bkbBlink { 50% { opacity: 0.2; } }
+.bkb-paper {
+  position: absolute; left: 30px; right: 30px; bottom: 50px; height: 92px; z-index: 1; border-radius: 4px 4px 0 0;
+  background: #fafaf9; color: #57534e; font: 700 0.7rem 'Courier New', monospace; padding-top: 0.6rem;
+  transform: translateY(calc(var(--pull, 0) * -14px)); transition: transform 0.2s ease, opacity 0.3s ease;
+}
+.bkb-paper.is-printing { animation: bkbPrint 1.6s ease-in-out; }
+@keyframes bkbPrint { 0% { transform: translateY(40px); } 100% { transform: translateY(0); } }
+.bkb-paper.is-jammed { background: repeating-linear-gradient(-12deg, #fafaf9 0 10px, #e7e5e4 10px 12px); }
+.bkb-paper.is-pullable { cursor: pointer; }
+.bkb-paper.is-removed { opacity: 0; pointer-events: none; }
+
+/* Stempel */
+.bkb-stamp-area { position: relative; display: flex; align-items: center; justify-content: center; gap: 1rem; margin: 0.4rem 0 0.6rem; flex-wrap: wrap; }
+.bkb-doc {
+  width: 190px; padding: 0.8rem; border-radius: 6px; background: #fafaf9; color: #44403c; text-align: left;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+}
+.bkb-doc-lines span { display: block; height: 6px; margin: 0 0 6px; border-radius: 3px; background: #d6d3d1; }
+.bkb-doc-lines span.is-short { width: 55%; }
+.bkb-doc-field {
+  position: relative; margin-top: 0.6rem; height: 58px; border: 2px dashed #a8a29e; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center; font: 600 0.7rem 'Inter', sans-serif; color: #a8a29e;
+}
+.bkb-doc-mark {
+  position: absolute; inset: 6px; display: flex; align-items: center; justify-content: center;
+  border: 3px solid #dc2626; border-radius: 6px; color: #dc2626; font: 900 0.7rem 'Inter', sans-serif; letter-spacing: 0.1em;
+  transform: rotate(-6deg); background: rgba(250, 250, 249, 0.9);
+}
+.bkb-stamp-tool {
+  width: 66px; height: 66px; border-radius: 12px; border: none; cursor: grab; touch-action: none; user-select: none;
+  font: 900 1.2rem 'Inter', sans-serif; color: #fff; background: linear-gradient(180deg, #7c2d12, #431407);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35); position: relative; z-index: 3;
+}
+.bkb-stamp-tool.is-armed { box-shadow: 0 0 0 3px var(--gold-fixed), 0 6px 14px rgba(0, 0, 0, 0.35); }
+.bkb-stamp-tool[hidden] { display: none; }
+
+/* Risikoscore, Ticker, Warteschlange, Fehler */
+.bkb-risk { font-family: 'Fraunces', serif; font-size: 3rem; font-weight: 800; color: var(--gold-fixed); margin: 0.2rem 0 0.4rem; }
+.bkb-risk.is-high { color: var(--neg); }
+.bkb-risk small { font-size: 0.4em; color: var(--muted); }
+.bkb-queue { display: flex; flex-direction: column; align-items: center; margin: 0.3rem 0 0.5rem; }
+.bkb-queue small { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
+.bkb-queue strong { font-family: 'Fraunces', serif; font-size: 3rem; color: var(--gold-fixed); }
+.bkb-ticker {
+  display: flex; align-items: baseline; justify-content: center; gap: 0.6rem; padding: 0.7rem; border-radius: 12px;
+  background: #0f172a; color: #e2e8f0; font-family: 'Courier New', monospace; margin-bottom: 0.4rem;
+}
+.bkb-ticker strong { color: #f87171; font-size: 1.3rem; }
+.bkb-ticker small { color: #94a3b8; }
+.bkb-error-box {
+  display: flex; flex-direction: column; gap: 0.3rem; padding: 0.9rem; border-radius: 12px; margin-bottom: 0.4rem;
+  border: 2px solid var(--neg); color: var(--neg); background: color-mix(in srgb, var(--neg) 10%, transparent);
+}
+.bkb-error-box strong { font: 900 1.4rem 'Courier New', monospace; }
+.bkb-bluescreen {
+  text-align: left; padding: 1rem 1.1rem; border-radius: 12px; background: #1e3a8a; color: #e0e7ff;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+.investor-security-card .bkb-bluescreen p { font-size: 0.95rem; margin: 0.4rem 0; }
+.bkb-bluescreen.is-gone { opacity: 0.35; transform: scale(0.97); }
+.bkb-bsod-face { display: block; font-size: 2.4rem; line-height: 1; }
+.bkb-bluescreen small { display: block; font-size: 0.75rem; }
+.bkb-bsod-brand { opacity: 0.6; margin-top: 0.5rem; }
+
+/* Fake-Angebote */
+.bkb-offer {
+  padding: 1.1rem 1rem; border-radius: 16px; border: 1px solid color-mix(in srgb, var(--gold-fixed) 45%, var(--line));
+  background: linear-gradient(160deg, color-mix(in srgb, var(--gold-fixed) 10%, var(--paper)), var(--paper));
+}
+.bkb-offer.is-premium { border-color: color-mix(in srgb, var(--purple) 55%, var(--line)); background: linear-gradient(160deg, color-mix(in srgb, var(--purple) 14%, var(--paper)), var(--paper)); }
+.bkb-offer-badge { font-weight: 900; letter-spacing: 0.12em; color: var(--gold-fixed); margin-bottom: 0.4rem; }
+.investor-security-card .bkb-offer-title { font-family: 'Fraunces', serif; font-size: 1.3rem; margin: 0 0 0.2rem; }
+.bkb-prices { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0.4rem; margin: 0.6rem 0; }
+.bkb-price { font-weight: 800; padding: 0.3rem 0.7rem; border-radius: 999px; border: 1px solid var(--line); background: var(--paper-2); }
+.bkb-or { font-size: 0.75rem; color: var(--muted); }
+.investor-security-card .bkb-fineprint { font-size: 0.68rem; color: var(--muted); margin: 0.5rem 0 0; }
+.bkb-features { list-style: none; padding: 0; margin: 0.5rem 0; text-align: left; display: grid; gap: 0.3rem; font-size: 0.86rem; }
+.investor-security-card.bkb-premium { box-shadow: 0 0 0 2px var(--gold-fixed), 0 20px 60px rgba(0, 0, 0, 0.35); }
+.bkb-clerk em, .bkb-clerk-card em { font-style: normal; font-weight: 800; }
+.is-away { color: var(--neg); }
+.bkb-clerk-card em.is-ok { color: var(--pos); }
+.bkb-clerk-card {
+  display: flex; align-items: center; gap: 0.8rem; justify-content: center; padding: 0.7rem; border-radius: 14px;
+  border: 1px solid var(--line); background: var(--paper); margin-bottom: 0.4rem; text-align: left;
+}
+.bkb-clerk-avatar { font-size: 2rem; }
+.bkb-clerk-card strong { display: block; }
+.bkb-clerk-card small { color: var(--muted); }
+.bkb-stars { display: flex; justify-content: center; gap: 0.2rem; }
+.bkb-stars button { font-size: 1.7rem; border: none; background: none; cursor: pointer; color: color-mix(in srgb, var(--muted) 60%, transparent); }
+.bkb-stars button.is-on { color: var(--gold-fixed); }
+.bkb-fax { font-size: 2.4rem; margin: 0.2rem 0; }
+.bkb-dots { display: inline-flex; gap: 3px; vertical-align: middle; }
+.bkb-dots i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; animation: bkbDots 1s infinite; }
+.bkb-dots i:nth-child(2) { animation-delay: 0.15s; }
+.bkb-dots i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes bkbDots { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+
+/* Kalender */
+.bkb-calendar { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 0.35rem; margin: 0.3rem 0 0.6rem; }
+.bkb-day {
+  display: flex; flex-direction: column; gap: 0.15rem; padding: 0.5rem 0.3rem; border-radius: 10px; font-size: 0.76rem;
+  border: 1px solid var(--line); background: var(--paper); color: var(--muted);
+}
+.bkb-day small { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.05em; }
+.bkb-day.is-full small { color: var(--neg); }
+.bkb-day.is-free { cursor: pointer; color: var(--ink); border-color: var(--pos); }
+.bkb-day.is-free small { color: var(--pos); }
+.bkb-day.is-picked { background: color-mix(in srgb, var(--pos) 12%, var(--paper)); }
+.bkb-before { color: var(--muted); }
+.bkb-after { color: var(--neg); }
+
+/* Lotterie + Gluecksrad */
+.bkb-cards { display: flex; justify-content: center; gap: 0.7rem; margin: 0.4rem 0 0.6rem; }
+.bkb-card {
+  width: 82px; height: 112px; border-radius: 12px; cursor: pointer; border: 1px solid var(--line);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--purple) 40%, #1a1626), #1a1626);
+  color: #fff; font: 900 1.4rem 'Inter', sans-serif; transition: transform 0.35s ease;
+}
+.bkb-card.is-flipped { background: var(--paper); color: var(--ink); transform: rotateY(180deg); }
+.bkb-card.is-flipped span { display: inline-block; transform: rotateY(180deg); }
+.bkb-card.is-picked { outline: 3px solid var(--gold-fixed); }
+.bkb-wheel-wrap { position: relative; width: 220px; height: 220px; margin: 0.4rem auto 0.6rem; }
+.bkb-wheel-pointer { position: absolute; top: -6px; left: 50%; transform: translateX(-50%); z-index: 2; color: var(--gold-fixed); font-size: 1.3rem; }
+.bkb-wheel {
+  position: absolute; inset: 0; border-radius: 50%; border: 3px solid var(--gold-fixed);
+  background: conic-gradient(#7c3aed 0 60deg, #1e293b 60deg 120deg, #7c3aed 120deg 180deg, #1e293b 180deg 240deg, #7c3aed 240deg 300deg, #1e293b 300deg 360deg);
+  transition: transform 2.6s cubic-bezier(0.17, 0.67, 0.2, 1);
+}
+.bkb-wheel span {
+  position: absolute; left: 50%; top: 50%; width: 92px; margin-left: -46px; margin-top: -0.5em;
+  font: 700 0.58rem/1.1 'Inter', sans-serif; color: #fff; text-align: center;
+  transform: rotate(calc(var(--i) * 60deg + 30deg)) translateY(-66px);
+}
+
+/* Finale */
+.bkb-final-head {
+  font-family: 'Fraunces', serif; font-size: clamp(1.5rem, 6vw, 2.1rem); font-weight: 800; color: var(--pos);
+  letter-spacing: 0.02em; margin-bottom: 0.4rem;
+}
+.bkb-final-pct { font-family: 'Fraunces', serif; font-size: 2.2rem; font-weight: 800; color: var(--gold-fixed); margin: 0.2rem 0 0.4rem; }
+.bkb-final-actions { margin-top: 1.1rem; }
+.bkb-final-btn.btn-ja { font-size: 1.05rem; font-weight: 800; letter-spacing: 0.06em; padding: 0.9rem 1.6rem; }
+
+/* Toasts + Konfetti (liegen im Overlay, nicht in der scrollenden Karte) */
+.bkb-toast {
+  position: absolute; left: 50%; bottom: 4vh; z-index: 6; transform: translate(-50%, 20px); opacity: 0;
+  display: flex; flex-direction: column; gap: 0.15rem; padding: 0.7rem 1.1rem; border-radius: 14px;
+  background: #14101d; color: #f5f3ed; border: 1px solid color-mix(in srgb, var(--gold-fixed) 55%, transparent);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4); transition: opacity 0.3s ease, transform 0.3s ease; text-align: center;
+  max-width: min(380px, 90vw);
+}
+.bkb-toast.visible { opacity: 1; transform: translate(-50%, 0); }
+.bkb-toast strong { color: #f0d48a; font-size: 0.92rem; }
+.bkb-toast span { font-size: 0.76rem; color: #c4bdd6; }
+.bkb-confetti { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 5; }
+.bkb-confetti span {
+  position: absolute; top: -12px; width: 8px; height: 12px; border-radius: 2px;
+  animation: bkbConfetti linear forwards;
+}
+@keyframes bkbConfetti { to { transform: translateY(105vh) rotate(var(--rot, 360deg)); } }
+
+/* Ebenen: Support-Chat, Hotline, Abbruch */
+.bkb-layer {
+  position: absolute; inset: 0; z-index: 4; display: flex; align-items: center; justify-content: center;
+  background: rgba(8, 7, 10, 0.55); opacity: 0; transition: opacity 0.2s ease;
+}
+.bkb-layer.visible { opacity: 1; }
+.bkb-layer-card { width: min(400px, 92vw); max-width: none; max-height: 86vh; overflow-y: auto; }
+.bkb-layer-kicker { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: var(--purple); margin-bottom: 0.5rem; }
+.bkb-layer-card h3 { font-family: 'Fraunces', serif; font-size: 1.15rem; margin: 0 0 0.7rem; }
+.bkb-layer-card .bkb-line { font-size: 0.88rem; margin: 0.35rem 0; }
+.bkb-layer-card .bkb-line.is-err { color: var(--neg); font-weight: 600; }
+.bkb-layer-card .bkb-line.is-muted { color: var(--muted); }
+.bkb-layer-card .bkb-line.is-official { font-weight: 600; }
+.bkb-chat-head { display: flex; align-items: center; gap: 0.45rem; font-weight: 700; font-size: 0.88rem; margin-bottom: 0.6rem; }
+.bkb-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--pos); }
+.bkb-chat {
+  display: flex; flex-direction: column; gap: 0.4rem; min-height: 150px; max-height: 260px; overflow-y: auto;
+  padding: 0.6rem; border-radius: 12px; background: var(--paper); border: 1px solid var(--line); text-align: left;
+}
+.bkb-bubble { max-width: 82%; padding: 0.45rem 0.7rem; border-radius: 12px; font-size: 0.84rem; line-height: 1.35; }
+.bkb-bubble.is-bot { align-self: flex-start; background: color-mix(in srgb, var(--purple) 16%, var(--paper-2)); }
+.bkb-bubble.is-me { align-self: flex-end; background: color-mix(in srgb, var(--gold-fixed) 20%, var(--paper-2)); }
+.bkb-bubble.is-sys { align-self: center; font-size: 0.74rem; color: var(--muted); background: transparent; }
+.bkb-chat-options { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4rem; margin-top: 0.7rem; }
+.bkb-phone { min-height: 1.5rem; margin: 0.3rem 0; }
+
+/* Nachbemerkung unter dem Rickroll */
+.investor-payout-prank-caption { margin: 0.9rem 0 0.2rem; font-weight: 600; color: var(--gold-fixed); font-size: 0.95rem; }
+.investor-payout-prank-caption[hidden] { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bkb-penalty-big, .bkb-stamp, .bkb-delta, .investor-security-step.bkb-bump, .bkb-paper.is-printing { animation: none; }
+  .bkb-confetti { display: none; }
+  .bkb-wheel { transition-duration: 0.6s; }
+}
+@media (max-width: 560px) {
+  .bkb-toolbar { margin-top: -0.3rem; }
+  .bkb-tool { font-size: 0.68rem; padding: 0.34rem 0.55rem; }
+  .bkb-choices.is-grid { grid-template-columns: 1fr 1fr; }
+  .bkb-wheel-wrap { width: 190px; height: 190px; }
+  .bkb-wheel span { transform: rotate(calc(var(--i) * 60deg + 30deg)) translateY(-56px); width: 80px; margin-left: -40px; }
+}
+
 .feedback-list { display: flex; flex-direction: column; gap: 0.75rem; }
 .feedback-card {
   border: 1px solid var(--line);
@@ -5170,6 +5592,21 @@ input.cardcatalog-search:focus {
 .admin-pending-popup-card h3 { font-family: 'Fraunces', serif; font-size: 1.3rem; }
 .admin-pending-popup-card p { color: var(--muted); font-size: 0.94rem; }
 .admin-pending-popup-card a.btn-ja { text-decoration: none; display: inline-flex; align-items: center; }
+/* 02.10.2026: jede Kategorie ist jetzt ein eigener Sprung-Knopf. */
+.admin-pending-popup-list { display: flex; flex-direction: column; gap: 0.45rem; margin: -0.6rem 0 1.2rem; text-align: left; }
+.admin-pending-popup-item {
+  display: flex; align-items: center; gap: 0.6rem; width: 100%;
+  padding: 0.65rem 0.8rem; border-radius: 12px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--paper); color: var(--ink);
+  font: inherit; font-size: 0.9rem; text-align: left;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.15s ease;
+}
+.admin-pending-popup-item:hover, .admin-pending-popup-item:focus-visible {
+  border-color: var(--purple); background: color-mix(in srgb, var(--purple) 10%, var(--paper)); transform: translateX(2px);
+}
+.admin-pending-popup-icon { font-size: 1.1rem; flex-shrink: 0; }
+.admin-pending-popup-label { flex: 1; }
+.admin-pending-popup-arrow { color: var(--purple); font-weight: 700; }
 
 img[data-bkmp-img] {
   transition: opacity 0.18s ease, filter 0.18s ease;
@@ -5583,6 +6020,141 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 @media (prefers-reduced-motion: reduce) {
   body.bkmp-zerathor-shake { animation: none; }
   .bkmp-zerathor-flash, .bkmp-zerathor-message { animation: none; opacity: 1; transform: none; }
+}
+
+/* ---------- Warp-Teleport (Easter Egg: "/sw bk" tippen, 02.10.2026) ----------
+   Lila Nether-Portal-Wirbel + Minecraft-Chat-Zeilen, danach "Warp erfolgreich"-
+   Titel (Klasse .arrived, von triggerBkmpSwbkTeleport() nach 1,3s gesetzt).
+   Rein dekorativ: pointer-events:none, die Seite bleibt die ganze Zeit
+   bedienbar. Feste Farben (kein --gold), damit der Akzentfarb-Regler den
+   Effekt nicht unsichtbar machen kann. */
+.bkmp-swbk {
+  position: fixed;
+  inset: 0;
+  z-index: 98;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.45s ease;
+}
+.bkmp-swbk.visible { opacity: 1; }
+.bkmp-swbk-portal {
+  /* Kreis statt Rechteck, deutlich groesser als der Bildschirm (160vmax):
+     ein rotierendes Rechteck zeigte an den Ecken harte Kanten. */
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 160vmax;
+  height: 160vmax;
+  margin: -80vmax 0 0 -80vmax;
+  border-radius: 50%;
+  background:
+    repeating-conic-gradient(from 0deg, rgba(168, 85, 247, 0.55) 0deg 12deg, rgba(76, 29, 149, 0.55) 12deg 24deg),
+    radial-gradient(circle at 50% 50%, rgba(216, 180, 254, 0.75), rgba(88, 28, 135, 0.85) 45%, rgba(10, 0, 20, 0.92) 75%);
+  background-blend-mode: soft-light, normal;
+  filter: blur(6px) saturate(1.3);
+  animation: bkmpSwbkSwirl 2.4s linear infinite, bkmpSwbkWobble 0.9s ease-in-out infinite alternate;
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.bkmp-swbk.arrived .bkmp-swbk-portal { opacity: 0.35; transform: scale(1.25); }
+@keyframes bkmpSwbkSwirl { to { rotate: 360deg; } }
+@keyframes bkmpSwbkWobble { from { scale: 1; } to { scale: 1.08; } }
+.bkmp-swbk-particles span {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: #e9d5ff;
+  box-shadow: 0 0 8px #c084fc;
+  opacity: 0;
+  animation: bkmpSwbkParticle linear infinite;
+}
+@keyframes bkmpSwbkParticle {
+  0% { opacity: 0; transform: translateY(0); }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-38vh); }
+}
+.bkmp-swbk-chat {
+  position: absolute;
+  left: 1rem;
+  bottom: 1.2rem;
+  display: grid;
+  gap: 0.25rem;
+  font-family: 'Courier New', ui-monospace, monospace;
+  font-size: clamp(0.85rem, 2.2vw, 1.05rem);
+}
+.bkmp-swbk-chat p {
+  margin: 0;
+  padding: 0.25rem 0.6rem;
+  background: rgba(0, 0, 0, 0.55);
+  color: #f5f5f5;
+  text-shadow: 2px 2px 0 #3f3f3f;
+  width: fit-content;
+  opacity: 0;
+  animation: bkmpSwbkChatIn 0.25s ease-out forwards;
+}
+.bkmp-swbk-chat p:nth-child(2) { animation-delay: 0.45s; }
+.bkmp-swbk-chat-me { color: #a3a3a3; }
+.bkmp-swbk-chat p.bkmp-swbk-chat-sys { color: #fde68a; }
+.bkmp-swbk-chat-sys strong { color: #c084fc; }
+@keyframes bkmpSwbkChatIn { to { opacity: 1; } }
+.bkmp-swbk-title {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  gap: 0.35rem;
+  padding: 0 1rem;
+  opacity: 0;
+  transform: scale(0.9);
+  transition: opacity 0.45s ease, transform 0.45s ease;
+}
+.bkmp-swbk.arrived .bkmp-swbk-title { opacity: 1; transform: scale(1); }
+.bkmp-swbk-title strong {
+  font-family: 'Fraunces', serif;
+  font-size: clamp(1.8rem, 6vw, 3.4rem);
+  font-weight: 800;
+  color: #fde68a;
+  text-shadow: 3px 3px 0 #3f2a00, 0 0 24px rgba(192, 132, 252, 0.8);
+}
+.bkmp-swbk-title small {
+  font-size: clamp(0.9rem, 2.4vw, 1.15rem);
+  color: #f3e8ff;
+  text-shadow: 2px 2px 0 #2e1065;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bkmp-swbk-portal, .bkmp-swbk-particles span { animation: none; }
+  .bkmp-swbk-particles { display: none; }
+}
+
+/* BK-Mod & Shops (02.10.2026): Namens-Effekt "Nether-Portal" (Belohnung fuer
+   das "/sw bk"-Easter-Egg) - lila Wirbel-Verlauf + Praefix. */
+.mc-cosmetic-netherportal {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box,
+              linear-gradient(120deg, #581c87, #c084fc, #3b0764, #a855f7) border-box;
+  border: 1px solid transparent;
+  box-shadow: 0 0 16px rgba(168, 85, 247, 0.45);
+}
+.mc-cosmetic-netherportal #mcNameBadgeText,
+.mc-cosmetic-netherportal .cosmetic-swatch-name,
+.mc-cosmetic-netherportal .leaderboard-name-text {
+  background: linear-gradient(120deg, #c084fc, #f0abfc, #7c3aed, #c084fc);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: streamerShimmer 3.5s linear infinite;
+}
+.mc-cosmetic-netherportal #mcNameBadgeText::before,
+.mc-cosmetic-netherportal .cosmetic-swatch-name::before,
+.mc-cosmetic-netherportal .leaderboard-name-text::before {
+  content: '🌀 ';
+  -webkit-text-fill-color: initial;
+  color: initial;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mc-cosmetic-netherportal #mcNameBadgeText, .mc-cosmetic-netherportal .cosmetic-swatch-name, .mc-cosmetic-netherportal .leaderboard-name-text { animation: none; }
 }
 
 /* ---------- Matrix-Regen (Easter Egg: "matrix" tippen) ---------- */
@@ -7284,6 +7856,82 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   background-clip: text;
   color: transparent;
   animation: streamerShimmer 6s linear infinite;
+}
+
+/* BK-Mod & Shops (02.10.2026): drei Minecraft-thematische Namens-Effekte
+   mit kleinem Emoji-Praefix, gleiches ::before-Muster wie der Geld-Rahmen.
+   Redstone = pulsierendes Rot (verbundene Mod), Kartograf = Pergament/
+   Tinte (Mod-Karteneinreichung), Smaragd-Haendler = Villager-Smaragd
+   (eigener PartnerShop). */
+.mc-cosmetic-redstone {
+  color: #ff4d4d;
+  border-color: color-mix(in srgb, #dc2626 55%, var(--line));
+  box-shadow: 0 0 14px rgba(220, 38, 38, 0.45);
+  animation: bkmpRedstonePulse 1.6s ease-in-out infinite;
+}
+@keyframes bkmpRedstonePulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(220, 38, 38, 0.3); }
+  50% { box-shadow: 0 0 18px rgba(255, 77, 77, 0.65); }
+}
+.mc-cosmetic-redstone #mcNameBadgeText::before,
+.mc-cosmetic-redstone .cosmetic-swatch-name::before,
+.mc-cosmetic-redstone .leaderboard-name-text::before { content: '⚡ '; }
+
+.mc-cosmetic-kartograf {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box,
+              linear-gradient(120deg, #a16207, #e7c98a, #78350f) border-box;
+  border: 1px solid transparent;
+  box-shadow: 0 0 12px rgba(202, 138, 4, 0.3);
+}
+.mc-cosmetic-kartograf #mcNameBadgeText,
+.mc-cosmetic-kartograf .cosmetic-swatch-name,
+.mc-cosmetic-kartograf .leaderboard-name-text {
+  background: linear-gradient(120deg, #f5deb3, #d4a056, #f5deb3);
+  background-size: 220% 220%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: bkmpTierGlow 4.5s ease infinite;
+}
+.mc-cosmetic-kartograf #mcNameBadgeText::before,
+.mc-cosmetic-kartograf .cosmetic-swatch-name::before,
+.mc-cosmetic-kartograf .leaderboard-name-text::before {
+  content: '🗺️ ';
+  /* Emoji nicht vom transparenten Text-Clip mitverschlucken lassen. */
+  -webkit-text-fill-color: initial;
+  color: initial;
+}
+
+.mc-cosmetic-smaragd_haendler {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box,
+              linear-gradient(120deg, #047857, #34d399, #065f46) border-box;
+  border: 1px solid transparent;
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.4);
+}
+.mc-cosmetic-smaragd_haendler #mcNameBadgeText,
+.mc-cosmetic-smaragd_haendler .cosmetic-swatch-name,
+.mc-cosmetic-smaragd_haendler .leaderboard-name-text {
+  background: linear-gradient(120deg, #10b981, #a7f3d0, #10b981);
+  background-size: 220% 220%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: bkmpTierGlow 3.4s ease infinite;
+}
+.mc-cosmetic-smaragd_haendler #mcNameBadgeText::before,
+.mc-cosmetic-smaragd_haendler .cosmetic-swatch-name::before,
+.mc-cosmetic-smaragd_haendler .leaderboard-name-text::before {
+  content: '🏪 ';
+  -webkit-text-fill-color: initial;
+  color: initial;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mc-cosmetic-redstone,
+  .mc-cosmetic-kartograf #mcNameBadgeText, .mc-cosmetic-kartograf .cosmetic-swatch-name, .mc-cosmetic-kartograf .leaderboard-name-text,
+  .mc-cosmetic-smaragd_haendler #mcNameBadgeText, .mc-cosmetic-smaragd_haendler .cosmetic-swatch-name, .mc-cosmetic-smaragd_haendler .leaderboard-name-text { animation: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -11307,6 +11955,21 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 }
 @media (prefers-reduced-motion: reduce) {
   .title-gradient-farmgreen, .title-gradient-farmgold, .title-gradient-farmlegend { animation: none; }
+}
+/* BK-Mod & Shops (02.10.2026): Titel "Weltvermesser" (Pergament) und
+   "Ladenbesitzer" (Smaragd), gleiches Prinzip wie die Farm-Verlaeufe oben. */
+.title-gradient-parchment {
+  background: linear-gradient(120deg, #f5deb3, #d4a056, #fff8e7, #d4a056);
+  background-size: 260% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: streamerShimmer 5s linear infinite;
+}
+.title-gradient-emerald {
+  background: linear-gradient(120deg, #10b981, #a7f3d0, #10b981);
+  background-size: 220% 220%; -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: bkmpTierGlow 3.4s ease infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .title-gradient-parchment, .title-gradient-emerald { animation: none; }
 }
 
 /* ============================================================

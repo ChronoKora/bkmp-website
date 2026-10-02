@@ -924,6 +924,36 @@ function bkmpInitAccentColor() {
 }
 
 /* ============================================================
+   Pluesch-Vorschaubilder (02.10.2026)
+   Pluesch-Icons werden ueberall nur 22-64px gross angezeigt (Bestenliste,
+   Namens-Badge, Profil, Sammlung), geladen wurden aber die Originale mit
+   bis zu 2,8 MB - allein die Bestenliste zog beim Seitenaufruf ~18 MB.
+   scripts/optimize-images.mjs (128px) legt neben jedem Original eine
+   "<name>-web.webp" ab. Fehlt die (z.B. bei einem neu hinzugefuegten
+   Pluesch, bevor das Skript erneut lief), faellt das Bild einmalig still
+   auf das Original zurueck - siehe Fehler-Listener darunter.
+   ============================================================ */
+function bkmpPlushieThumbSrc(src) {
+  const s = String(src || '');
+  return /\.png$/i.test(s) && !/-web\.png$/i.test(s) ? s.replace(/\.png$/i, '-web.webp') : s;
+}
+
+function bkmpPlushieImgHtml(plushie, attrs) {
+  if (!plushie || !plushie.image) return '';
+  const full = escapeHtml(plushie.image);
+  const thumb = escapeHtml(bkmpPlushieThumbSrc(plushie.image));
+  return `<img src="${thumb}" data-full-src="${full}" alt="" loading="lazy" decoding="async" ${attrs || ''}>`;
+}
+
+document.addEventListener('error', e => {
+  const img = e.target;
+  if (!img || img.tagName !== 'IMG' || !img.dataset || !img.dataset.fullSrc) return;
+  if (img.dataset.thumbFallbackDone === '1') return;
+  img.dataset.thumbFallbackDone = '1';
+  img.src = img.dataset.fullSrc;
+}, true);
+
+/* ============================================================
    Robuste Bild-Ladehilfe
    Kurze Netzwerk- oder Storage-Haenger sollen Bilder nicht
    dauerhaft durch Platzhalter ersetzen.
