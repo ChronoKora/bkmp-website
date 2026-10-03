@@ -131,8 +131,11 @@ const IDLE_SKILL_NODES = [
   { id: 'forsch_kartografie', active: true, branch: 'forschung', sort_order: 5, name: 'Kartografie', description: 'Findet effizientere Wege zu neuen Drachen.', icon: '🗺️', cost_per_rank: 3, requires_node_id: 'forsch_drachenkunde', requires_rank: 3, effect_type: 'xp_pct', effect_value_per_rank: 3, max_rank: 5 }
 ];
 
+const { cloneVillageReferenceTables } = require('./village-reference');
+
 function cloneReferenceTables() {
   return {
+    ...cloneVillageReferenceTables(),
     idle_dragons: IDLE_DRAGONS.map(d => ({ ...d })),
     idle_game_config: IDLE_GAME_CONFIG.map(c => ({ ...c })),
     idle_skill_nodes: IDLE_SKILL_NODES.map(n => ({ ...n })),

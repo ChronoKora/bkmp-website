@@ -100,3 +100,83 @@ html[data-fx="aus"] .idle-dorf-cat-chevron { transition: none; }
   font-size: .86rem;
   line-height: 1.45;
 }
+
+/* ---------- Phase 2: Dorfentwicklung (Drachenhafen, Handelsposten) ---------- */
+.dd-village { display: flex; flex-direction: column; gap: .9rem; }
+.dd-village-intro h3 { margin: 0 0 .25rem; }
+.dd-muted { color: var(--app-muted, var(--muted, #b7a8c4)); font-size: .82rem; line-height: 1.45; margin: 0; }
+.dd-project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: .8rem;
+}
+.dd-project-card {
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+  padding: .9rem 1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, .1);
+  background: rgba(255, 255, 255, .035);
+}
+.dd-project-card.is-maxed { border-color: color-mix(in srgb, var(--gold-fixed, #c9a56a) 45%, transparent); }
+.dd-project-head { display: flex; align-items: center; gap: .65rem; }
+.dd-project-icon { font-size: 1.7rem; line-height: 1; }
+.dd-project-title { display: flex; flex-direction: column; min-width: 0; }
+.dd-project-name { font-weight: 800; font-size: 1rem; color: var(--app-ink, var(--ink, #f5f3ed)); }
+.dd-project-level { font-size: .74rem; color: var(--app-muted, var(--muted, #b7a8c4)); }
+.dd-project-desc { margin: 0; font-size: .82rem; line-height: 1.45; color: var(--app-muted, var(--muted, #b7a8c4)); }
+.dd-project-effects { margin: 0; padding-left: 1.05rem; font-size: .8rem; line-height: 1.5; color: var(--app-ink, var(--ink, #f5f3ed)); }
+.dd-project-next-label { font-size: .78rem; color: var(--app-muted, var(--muted, #b7a8c4)); }
+.dd-project-next-label strong { color: var(--gold-fixed, #c9a56a); }
+.dd-cost-list { display: flex; flex-wrap: wrap; gap: .35rem; }
+.dd-cost-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  padding: .18rem .5rem;
+  border-radius: 999px;
+  font-size: .76rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, .06);
+  color: var(--app-ink, var(--ink, #f5f3ed));
+}
+.dd-cost-chip.is-short { color: var(--neg, #f87171); background: rgba(248, 113, 113, .1); }
+.dd-project-req { font-size: .76rem; color: var(--neg, #f87171); }
+.dd-project-done { font-size: .82rem; font-weight: 700; color: var(--pos, #4ade80); }
+.dd-build-btn, .dd-trade-btn { align-self: flex-start; }
+
+.dd-trade { display: flex; flex-direction: column; gap: .6rem; }
+.dd-section-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .4rem; }
+.dd-section-head h4 { margin: 0; }
+.dd-trade-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: .7rem;
+}
+.dd-trade-card {
+  display: flex;
+  flex-direction: column;
+  gap: .45rem;
+  padding: .75rem .85rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, .1);
+  background: rgba(255, 255, 255, .03);
+}
+.dd-trade-card.is-bought { opacity: .6; }
+.dd-trade-label { font-weight: 700; font-size: .86rem; color: var(--app-ink, var(--ink, #f5f3ed)); }
+.dd-trade-swap { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; font-size: .8rem; color: var(--app-ink, var(--ink, #f5f3ed)); }
+.dd-trade-arrow { color: var(--gold-fixed, #c9a56a); font-weight: 800; }
+.dd-trade-get { font-weight: 700; color: var(--pos, #4ade80); }
+.dd-trade-done { font-size: .78rem; color: var(--app-muted, var(--muted, #b7a8c4)); }
+@media (max-width: 560px) {
+  .dd-project-grid, .dd-trade-grid { grid-template-columns: 1fr; }
+}
+/* Die allgemeine App-Modus-Regel fuer Absaetze im Idle-Dorf (gross fuer
+   Lesbarkeit) ist hier zu wuchtig - per ID gezielt auf Kartentext-Groesse. */
+#idlePanelDorf p.dd-project-desc,
+#idlePanelDorf p.dd-muted {
+  font-size: .84rem;
+  line-height: 1.45;
+}
+#idlePanelDorf .dd-village-intro p.dd-muted { font-size: .88rem; }

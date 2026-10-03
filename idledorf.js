@@ -3330,7 +3330,7 @@ function bkmpIdleRefreshLiveTabs() {
    nur der Render-Zeitpunkt - holt beim naechsten Kill oder sobald die Maus
    das Panel verlaesst zuverlaessig auf. */
 function bkmpIdleRefreshLiveTabsPanelId(tab) {
-  return { upgrades: 'idlePanelUpgrades', runen: 'idlePanelRunen', prestige: 'idlePanelPrestige', skins: 'idlePanelSkins', drachen: 'idlePanelDrachen' }[tab] || null;
+  return { upgrades: 'idlePanelUpgrades', runen: 'idlePanelRunen', prestige: 'idlePanelPrestige', skins: 'idlePanelSkins', drachen: 'idlePanelDrachen', dorf: 'idlePanelDorf' }[tab] || null;
 }
 function bkmpIdleRefreshLiveTabsRender() {
   const panelId = bkmpIdleRefreshLiveTabsPanelId(bkmpIdleActiveTab);
@@ -3343,6 +3343,9 @@ function bkmpIdleRefreshLiveTabsRender() {
   else if (bkmpIdleActiveTab === 'prestige') bkmpIdleRenderPrestigePanel();
   else if (bkmpIdleActiveTab === 'skins') bkmpIdleRenderSkinsPanel();
   else if (bkmpIdleActiveTab === 'drachen') bkmpIdleRenderDragonsPanel();
+  /* Dorfentwicklung: nur lokaler Neuaufbau aus dem Cache (Leistbarkeit der
+     Kosten waechst mit jedem Kill), kein Netzwerkaufruf - siehe bkmp-village.js. */
+  else if (bkmpIdleActiveTab === 'dorf' && typeof bkmpVillageRenderFromCache === 'function') bkmpVillageRenderFromCache();
 }
 
 function bkmpIdleInitTabs() {

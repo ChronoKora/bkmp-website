@@ -374,7 +374,124 @@ function renamePlayerAccountFixedPreview(store, uid, params) {
   return null;
 }
 
+/* ---------- Drachendorf-Ausbau Phase 2 (04.10.2026): Dorfentwicklung ----------
+   Originalgetreuer Nachbau von sql/20261004-02-village-projects.sql
+   (village_build / village_trade_offers / village_trade_execute). md5 statt
+   hashtext genau wie in der SQL-Datei, damit die Tagesangebote hier exakt
+   dieselben sind wie live. */
+const crypto = require('crypto');
+function villageGoldUnit(stage) {
+  return Math.max(6, Math.round(6 * Math.pow(1 + 0.05 * Math.max(0, Number(stage) || 0), 1.2)));
+}
+function villageSeedInt(text) {
+  return parseInt(crypto.createHash('md5').update(text).digest('hex').slice(0, 8), 16) & 0x7fffffff;
+}
+function villageBuildingLevel(store, uid, buildingId) {
+  const row = getTable(store, 'village_buildings').find(r => r.auth_user_id === uid && r.building_id === buildingId);
+  return row ? Number(row.level) || 0 : 0;
+}
+function villageTradeOfferIds(store, uid, day, level) {
+  const count = level >= 2 ? 4 : level >= 1 ? 3 : 0;
+  const ids = [];
+  const templates = getTable(store, 'village_trade_templates');
+  for (let i = 0; i < count; i++) {
+    const pool = templates
+      .filter(t => Number(t.min_handelsposten_level) <= level && !ids.includes(t.id))
+      .sort((a, b) => (a.sort_order - b.sort_order) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    const total = pool.reduce((s, t) => s + Number(t.weight), 0);
+    if (total <= 0) break;
+    const pick = villageSeedInt(`${uid}:${day}:${i}`) % total;
+    let acc = 0;
+    for (const t of pool) {
+      acc += Number(t.weight);
+      if (pick < acc) { ids.push(t.id); break; }
+    }
+  }
+  return ids;
+}
+function villagePlayerRow(store, uid) {
+  const row = getTable(store, 'idle_player_state').find(r => r.auth_user_id === uid);
+  if (!row) throw rpcError('no_player_state');
+  return row;
+}
+
 const RPC_HANDLERS = {
+  village_build(store, uid, params) {
+    if (!uid) throw rpcError('not_authenticated');
+    const state = villagePlayerRow(store, uid);
+    const buildingId = params.p_building_id;
+    const current = villageBuildingLevel(store, uid, buildingId);
+    const levels = getTable(store, 'village_building_levels');
+    const def = levels.find(r => r.building_id === buildingId && Number(r.level) === current + 1);
+    if (!def) {
+      if (levels.some(r => r.building_id === buildingId)) throw rpcError('max_level');
+      throw rpcError('invalid_building');
+    }
+    if (Number(state.highest_dragon_index || 0) < Number(def.min_stage || 0)) throw rpcError('stage_too_low');
+    const kinds = ['gold', 'wood', 'stone', 'crystals', 'essence'];
+    if (kinds.some(k => Number(state[k] || 0) < Number(def['cost_' + k] || 0))) throw rpcError('insufficient_resources');
+    kinds.forEach(k => { state[k] = Number(state[k] || 0) - Number(def['cost_' + k] || 0); });
+    const rows = getTable(store, 'village_buildings');
+    const existing = rows.find(r => r.auth_user_id === uid && r.building_id === buildingId);
+    if (existing) { existing.level = def.level; existing.name_key = state.name_key; existing.upgraded_at = store.clock.nowIso(); }
+    else rows.push({ auth_user_id: uid, name_key: state.name_key, building_id: buildingId, level: def.level, upgraded_at: store.clock.nowIso() });
+    return {
+      building_id: buildingId, level: def.level,
+      spent: { gold: def.cost_gold, wood: def.cost_wood, stone: def.cost_stone, crystals: def.cost_crystals, essence: def.cost_essence }
+    };
+  },
+  village_trade_offers(store, uid) {
+    if (!uid) throw rpcError('not_authenticated');
+    const level = villageBuildingLevel(store, uid, 'handelsposten');
+    const state = getTable(store, 'idle_player_state').find(r => r.auth_user_id === uid);
+    const unit = villageGoldUnit(state ? state.highest_dragon_index : 0);
+    const day = berlinDateStr(store.clock.nowMs());
+    const ids = villageTradeOfferIds(store, uid, day, level);
+    const log = getTable(store, 'village_trade_log');
+    const templates = getTable(store, 'village_trade_templates');
+    const offers = ids.map((id, i) => {
+      const t = templates.find(x => x.id === id);
+      return {
+        index: i, template_id: t.id, label: t.label,
+        cost_kind: t.cost_kind, cost_amount: t.cost_kind === 'gold' ? t.cost_gold_units * unit : t.cost_amount,
+        cost2_kind: t.cost2_kind, cost2_amount: t.cost2_amount,
+        reward_kind: t.reward_kind, reward_amount: t.reward_amount,
+        bought: log.some(l => l.auth_user_id === uid && l.trade_day === day && Number(l.offer_index) === i)
+      };
+    });
+    return { day, level, offers };
+  },
+  village_trade_execute(store, uid, params) {
+    if (!uid) throw rpcError('not_authenticated');
+    const state = villagePlayerRow(store, uid);
+    const level = villageBuildingLevel(store, uid, 'handelsposten');
+    if (level < 1) throw rpcError('not_built');
+    const day = berlinDateStr(store.clock.nowMs());
+    const ids = villageTradeOfferIds(store, uid, day, level);
+    const idx = params.p_offer_index;
+    if (idx == null || idx < 0 || idx >= ids.length) throw rpcError('invalid_offer');
+    const t = getTable(store, 'village_trade_templates').find(x => x.id === ids[idx]);
+    const log = getTable(store, 'village_trade_log');
+    if (log.some(l => l.auth_user_id === uid && l.trade_day === day && Number(l.offer_index) === Number(idx))) throw rpcError('already_bought');
+    const cost = t.cost_kind === 'gold' ? t.cost_gold_units * villageGoldUnit(state.highest_dragon_index) : Number(t.cost_amount);
+    if (Number(state[t.cost_kind] || 0) < cost) throw rpcError('insufficient_resources');
+    if (t.cost2_kind && Number(state[t.cost2_kind] || 0) < Number(t.cost2_amount)) throw rpcError('insufficient_resources');
+    let reward = Number(t.reward_amount);
+    if (t.reward_kind === 'fruit' || t.reward_kind === 'meat') {
+      const cap = 2000 + Number(state[t.reward_kind === 'fruit' ? 'obstgarten_level' : 'jagdhuette_level'] || 0) * 500;
+      const cur = Number(state[t.reward_kind] || 0);
+      if (cur >= cap) throw rpcError('storage_full');
+      reward = Math.min(reward, cap - cur);
+    }
+    log.push({ auth_user_id: uid, trade_day: day, offer_index: Number(idx), template_id: t.id, created_at: store.clock.nowIso() });
+    state[t.cost_kind] = Number(state[t.cost_kind] || 0) - cost;
+    if (t.cost2_kind) state[t.cost2_kind] = Number(state[t.cost2_kind] || 0) - Number(t.cost2_amount);
+    if (!['rune', 'egg'].includes(t.reward_kind)) state[t.reward_kind] = Number(state[t.reward_kind] || 0) + reward;
+    return {
+      index: Number(idx), template_id: t.id, cost_kind: t.cost_kind, cost_amount: cost,
+      cost2_kind: t.cost2_kind, cost2_amount: t.cost2_amount, reward_kind: t.reward_kind, reward_amount: reward
+    };
+  },
   rename_player_account(store, uid, params) { return renamePlayerAccountCurrentBuggyBehavior(store, uid, params); },
   rename_player_account_fixed_preview(store, uid, params) { return renamePlayerAccountFixedPreview(store, uid, params); },
 

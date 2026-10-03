@@ -30,6 +30,7 @@ const CLIENT_JS_FILES = [
   'js/systems/bkmp-meister.js', 'js/systems/bkmp-prestige.js',
   'js/systems/bkmp-raid.js', 'js/systems/bkmp-runes.js',
   'js/systems/bkmp-skilltree.js', 'js/systems/bkmp-tower.js',
+  'js/systems/bkmp-chronicle.js', 'js/systems/bkmp-village.js',
   'js/ui/bkmp-feedback-board.js', 'js/ui/bkmp-hud.js',
   'js/ui/bkmp-reward-presenter.js', 'js/ui/bkmp-ui-components.js'
 ].filter(f => fs.existsSync(path.join(ROOT, f)));
@@ -207,7 +208,11 @@ function readFile(rel) {
     [...content.matchAll(/data-testid=["']([^"']+)["']/g)].forEach(m => usedTestIds.add(m[1]));
   });
   const sourceCorpus = HTML_FILES.map(readFile).join('\n') + CLIENT_JS_FILES.map(readFile).join('\n');
+  /* Dynamisch gebaute IDs (z.B. data-testid="village-card-${id}") zaehlen als
+     vorhanden, wenn ihr fester Praefix im Quellcode steht. */
+  const dynamicPrefixes = [...sourceCorpus.matchAll(/data-testid="([a-z0-9_-]+)\$\{/gi)].map(m => m[1]);
   usedTestIds.forEach(id => {
+    if (dynamicPrefixes.some(p => id.startsWith(p))) return;
     if (!sourceCorpus.includes(`data-testid="${id}"`) && !sourceCorpus.includes(`data-testid: '${id}'`) && !sourceCorpus.includes(`'${id}'`)) {
       report('HIGH', 'verwaister-data-testid', '(tests/e2e)', '', `data-testid="${id}" wird in Tests referenziert, aber in keiner HTML-/JS-Quelldatei gefunden`);
     }

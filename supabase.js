@@ -6525,3 +6525,75 @@ window.importLocalCardCatalogToSupabase = importLocalCardCatalogToSupabase;
 window.importAllLocalDataToSupabase = importAllLocalDataToSupabase;
 
 window.importLocalIncomesToSupabase = importLocalIncomesToSupabase;
+
+/* ============================================================
+   Drachendorf-Ausbau Phase 2 (04.10.2026): Dorfentwicklung
+   (Drachenhafen, Handelsposten) - siehe sql/20261004-02-village-projects.sql.
+   Bauen/Handeln laufen nur ueber security-definer-RPCs (Server prueft und
+   zieht die Kosten ab), der Client spiegelt danach denselben Betrag lokal.
+   Fehlt die Migration noch, liefern die Lade-Funktionen { missing: true }
+   statt zu werfen - die Oberflaeche zeigt dann einen ruhigen Hinweis.
+   ============================================================ */
+function bkmpVillageErrorText(msg) {
+  const m = String(msg || '');
+  if (m.includes('insufficient_resources')) return 'Dafür fehlen dir noch Ressourcen.';
+  if (m.includes('stage_too_low')) return 'Dafür musst du im Kampf noch weiter vorankommen.';
+  if (m.includes('max_level')) return 'Dieses Projekt ist bereits voll ausgebaut.';
+  if (m.includes('already_bought')) return 'Dieses Angebot hast du heute schon angenommen.';
+  if (m.includes('storage_full')) return 'Dein Lager dafür ist voll.';
+  if (m.includes('not_built')) return 'Der Handelsposten ist noch nicht gebaut.';
+  if (m.includes('invalid_offer')) return 'Dieses Angebot gibt es heute nicht mehr - bitte neu laden.';
+  if (m.includes('not_authenticated')) return 'Du bist nicht eingeloggt (Sitzung abgelaufen?). Bitte neu einloggen.';
+  if (m.includes('no_player_state')) return 'Dein Spielstand wurde noch nicht gespeichert - bitte kurz warten und erneut versuchen.';
+  return 'Das hat nicht geklappt: ' + (m || 'unbekannter Fehler') + '. Bitte versuche es erneut.';
+}
+async function loadVillageBuildingLevels() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return { missing: true, rows: [] };
+  const { data, error } = await client.from('village_building_levels').select('*').order('sort_order', { ascending: true }).order('level', { ascending: true });
+  if (error) {
+    if (bkmpIsMissingDbObjectError(error)) return { missing: true, rows: [] };
+    throw error;
+  }
+  return { missing: false, rows: data || [] };
+}
+async function loadMyVillageBuildings() {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return { missing: true, levels: {} };
+  const { data: sessionData } = await client.auth.getSession();
+  const uid = sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
+  if (!uid) return { missing: false, levels: {} };
+  const { data, error } = await client.from('village_buildings').select('building_id, level').eq('auth_user_id', uid);
+  if (error) {
+    if (bkmpIsMissingDbObjectError(error)) return { missing: true, levels: {} };
+    throw error;
+  }
+  const levels = {};
+  (data || []).forEach(r => { levels[r.building_id] = Number(r.level) || 0; });
+  return { missing: false, levels };
+}
+async function bkmpVillageBuildRpc(buildingId) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { data, error } = await client.rpc('village_build', { p_building_id: buildingId });
+  if (error) throw new Error(bkmpVillageErrorText(error.message));
+  return Array.isArray(data) ? data[0] : data;
+}
+async function bkmpVillageTradeOffersRpc() {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return { missing: true, offers: [] };
+  const { data, error } = await client.rpc('village_trade_offers');
+  if (error) {
+    if (bkmpIsMissingDbObjectError(error)) return { missing: true, offers: [] };
+    throw new Error(bkmpVillageErrorText(error.message));
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  return { missing: false, day: row ? row.day : null, level: row ? Number(row.level) || 0 : 0, offers: (row && row.offers) || [] };
+}
+async function bkmpVillageTradeExecuteRpc(offerIndex) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { data, error } = await client.rpc('village_trade_execute', { p_offer_index: offerIndex });
+  if (error) throw new Error(bkmpVillageErrorText(error.message));
+  return Array.isArray(data) ? data[0] : data;
+}
