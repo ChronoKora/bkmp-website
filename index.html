@@ -177,6 +177,7 @@
      feldfahrt.js Datei-Kopf-Kommentar. -->
 <link rel="stylesheet" href="css/jakes-feldfahrt.css?v=20260807-jakesfeldfahrt3">
 <link rel="stylesheet" href="css/bkmp-chronicle.css?v=20261003-chronik4">
+<link rel="stylesheet" href="css/bkmp-drachendorf.css?v=20261004-p1">
 </head>
 <body>
 
@@ -872,35 +873,40 @@
       <div class="idle-dorf-hud" id="idleDorfHud"></div>
 
       <div class="idle-dorf-tabs" id="idleDorfTabs" data-testid="idle-tabs-bar">
-        <div class="idle-dorf-tab-group">
-          <div class="idle-dorf-tab-group-label" aria-hidden="true">Basis</div>
+        <!-- Drachendorf-Ausbau Phase 1 (04.10.2026): vier Kategorien (siehe
+             BKMP_IDLE_NAV_CATEGORIES in idledorf.js). Die Gruppen-Huellen sind
+             nur die Startreihenfolge - bkmp-app-mode-bootstrap.js baut daraus die
+             Seitenleiste mit Kategorie-Kopfzeilen bzw. das mobile Mehr-Menue. -->
+        <div class="idle-dorf-tab-group" data-nav-cat="abenteuer">
+          <div class="idle-dorf-tab-group-label" aria-hidden="true">⚔️ Abenteuer</div>
           <div class="idle-dorf-tab-group-buttons">
             <button type="button" class="idle-dorf-tab active" id="idleTabBtnKampf" data-testid="idle-tab-kampf">&#9876;&#65039; Kampf</button>
-            <button type="button" class="idle-dorf-tab" id="idleTabBtnUpgrades" data-testid="idle-tab-upgrades">&#11014;&#65039; Upgrades</button>
-            <button type="button" class="idle-dorf-tab" id="idleTabBtnSkilltree" data-testid="idle-tab-skilltree">&#127795; Skilltree</button>
-            <button type="button" class="idle-dorf-tab" id="idleTabBtnPrestige" data-testid="idle-tab-prestige">&#127756; Prestige</button>
-          </div>
-        </div>
-        <div class="idle-dorf-tab-group">
-          <div class="idle-dorf-tab-group-label" aria-hidden="true">Sammlung</div>
-          <div class="idle-dorf-tab-group-buttons">
-            <button type="button" class="idle-dorf-tab" id="idleTabBtnErfolge" data-testid="idle-tab-erfolge">&#127942; Erfolge</button>
-            <button type="button" class="idle-dorf-tab" id="idleTabBtnRunen" data-testid="idle-tab-runen">🔮 Runen</button>
-            <button type="button" class="idle-dorf-tab" id="idleTabBtnSkins" data-testid="idle-tab-skins">🖼️ Dorf-Skins</button>
-            <button type="button" class="idle-dorf-tab" id="idleTabBtnBestenliste" data-testid="idle-tab-bestenliste">&#128202; Bestenliste</button>
-            <button type="button" class="idle-dorf-tab" id="idleTabBtnDrachen" data-testid="idle-tab-drachen">🐉 Drachenzucht</button>
-          </div>
-        </div>
-        <div class="idle-dorf-tab-group">
-          <div class="idle-dorf-tab-group-label" aria-hidden="true">Herausforderungen</div>
-          <div class="idle-dorf-tab-group-buttons">
             <button type="button" class="idle-dorf-tab" id="idleTabBtnDungeon" data-testid="idle-tab-dungeon">🏛️ Dungeon</button>
             <button type="button" class="idle-dorf-tab" id="idleTabBtnTurm" data-testid="idle-tab-turm">🗼 Turm</button>
-            <button type="button" class="idle-dorf-tab" id="idleTabBtnArena" data-testid="idle-tab-arena">⚔️ Arena</button>
+            <button type="button" class="idle-dorf-tab" id="idleTabBtnArena" data-testid="idle-tab-arena">🥊 Arena</button>
           </div>
         </div>
-        <div class="idle-dorf-tab-group">
-          <div class="idle-dorf-tab-group-label" aria-hidden="true">Gilde</div>
+        <div class="idle-dorf-tab-group" data-nav-cat="entwicklung">
+          <div class="idle-dorf-tab-group-label" aria-hidden="true">🏡 Entwicklung</div>
+          <div class="idle-dorf-tab-group-buttons">
+            <button type="button" class="idle-dorf-tab" id="idleTabBtnUpgrades" data-testid="idle-tab-upgrades">&#11014;&#65039; Upgrades</button>
+            <button type="button" class="idle-dorf-tab" id="idleTabBtnDorf" data-testid="idle-tab-dorf">🏗️ Dorfentwicklung</button>
+            <button type="button" class="idle-dorf-tab" id="idleTabBtnSkilltree" data-testid="idle-tab-skilltree">&#127795; Skilltree</button>
+            <button type="button" class="idle-dorf-tab" id="idleTabBtnPrestige" data-testid="idle-tab-prestige">&#127756; Prestige</button>
+            <button type="button" class="idle-dorf-tab" id="idleTabBtnRunen" data-testid="idle-tab-runen">🔮 Runen</button>
+          </div>
+        </div>
+        <div class="idle-dorf-tab-group" data-nav-cat="drachen">
+          <div class="idle-dorf-tab-group-label" aria-hidden="true">🐉 Drachen &amp; Sammlung</div>
+          <div class="idle-dorf-tab-group-buttons">
+            <button type="button" class="idle-dorf-tab" id="idleTabBtnDrachen" data-testid="idle-tab-drachen">🐉 Drachenzucht</button>
+            <button type="button" class="idle-dorf-tab" id="idleTabBtnSkins" data-testid="idle-tab-skins">🖼️ Dorf-Skins</button>
+            <button type="button" class="idle-dorf-tab" id="idleTabBtnErfolge" data-testid="idle-tab-erfolge">&#127942; Erfolge</button>
+            <button type="button" class="idle-dorf-tab" id="idleTabBtnBestenliste" data-testid="idle-tab-bestenliste">&#128202; Bestenliste</button>
+          </div>
+        </div>
+        <div class="idle-dorf-tab-group" data-nav-cat="gemeinschaft">
+          <div class="idle-dorf-tab-group-label" aria-hidden="true">🛡️ Gemeinschaft</div>
           <div class="idle-dorf-tab-group-buttons">
             <button type="button" class="idle-dorf-tab" id="idleTabBtnGilde" data-testid="idle-tab-gilde">🛡️ Gilde</button>
             <button type="button" class="idle-dorf-tab" id="idleTabBtnGildeTech" data-testid="idle-tab-gildetech">🌳 Gilden-Tech</button>
@@ -1072,6 +1078,7 @@
         </div>
         <div class="idle-dorf-panel" id="idlePanelPrestige" style="display:none;"></div>
         <div class="idle-dorf-panel" id="idlePanelRunen" style="display:none;"></div>
+        <div class="idle-dorf-panel" id="idlePanelDorf" style="display:none;"></div>
         <div class="idle-dorf-panel" id="idlePanelSkins" style="display:none;"></div>
         <div class="idle-dorf-panel" id="idlePanelDungeon" style="display:none;"></div>
         <div class="idle-dorf-panel" id="idlePanelTurm" style="display:none;"></div>
@@ -1947,11 +1954,12 @@
   <script src="js/systems/bkmp-cosmetics.js?v=20260804-skinpreview2" defer></script>
   <script src="js/systems/bkmp-events.js?v=20261003-chronik1" defer></script>
   <script src="js/systems/bkmp-chronicle.js?v=20261003-chronik6" defer></script>
+  <script src="js/systems/bkmp-village.js?v=20261004-p1" defer></script>
   <script src="js/ui/bkmp-hud.js?v=20261003-chronik1" defer></script>
   <script src="js/systems/bkmp-leaderboard.js?v=20260717-p2cfoundation" defer></script>
   <script src="js/ui/bkmp-ui-components.js?v=20260731-guildtechtreev3" defer></script>
   <script src="js/ui/bkmp-reward-presenter.js?v=20260719-p55e" defer></script>
-  <script src="idledorf.js?v=20261004-p0" defer></script>
+  <script src="idledorf.js?v=20261004-p1" defer></script>
   <script src="mapart.js?v=20260717-kartenfirmen1" defer></script>
   <script src="js/core/bkmp-idle-bootstrap.js?v=20260717-p2afoundation" defer></script>
   <!-- Jake's Feldfahrt (07.08.2026) - eigenstaendiges Website-Easter-Egg-
@@ -1975,10 +1983,10 @@
   <!-- Oeffentliches Changelog (26.07.2026) - eigenstaendig, siehe Datei-Kopf-
        Kommentar in js/ui/bkmp-changelog.js. -->
   <script src="js/ui/bkmp-changelog.js?v=20260801-unreaddot1" defer></script>
-  <script src="js/core/bkmp-app-mode-bootstrap.js?v=20260806-perfaudit1" defer></script>
+  <script src="js/core/bkmp-app-mode-bootstrap.js?v=20261004-p1" defer></script>
   <!-- PROTOTYP 2 (18.07., isoliert & jederzeit entfernbar) - siehe Kommentar
        in js/prototype/bkmp-proto-compact-hud.js. Laedt bewusst zuletzt. -->
-  <script src="js/prototype/bkmp-proto-compact-hud.js?v=20260806-mobileredesign1" defer></script>
+  <script src="js/prototype/bkmp-proto-compact-hud.js?v=20261004-p1" defer></script>
   <!-- QA-Testgrundlage (24.07.2026, siehe CLAUDE.md) - laedt zuletzt, tut
        ausserhalb von window.BKMP_QA_MODE (nur localhost + ?qa=1) komplett
        nichts. Eigenstaendig, kein Redesign-/Business-Logic-Code. -->

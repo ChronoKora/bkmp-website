@@ -3206,24 +3206,78 @@ function bkmpIdleCatchUpCombatVisuals() {
   if (bkmpTowerActive && typeof bkmpTowerUpdateBanner === 'function') bkmpTowerUpdateBanner();
 }
 
+/* Drachendorf-Ausbau Phase 1 (04.10.2026): render-Eintraege sind jetzt
+   "lazy" (Funktionsname als Text, erst beim Klick aufgeloest). Vorher wurde
+   jede Render-Funktion schon beim Laden von idledorf.js direkt referenziert -
+   fehlte eine Datei auf einer Seite (z.B. bkmp-guild-tech.js in admin.html),
+   brach die GESAMTE Registry mit "ReferenceError ... is not defined" bzw.
+   "Cannot access 'bkmpIdleTabs' before initialization" ab (bekannter
+   Konsolenfehler in admin.html). */
+function bkmpIdleLazyRender(fnName) {
+  return function () {
+    const fn = window[fnName] || (typeof globalThis !== 'undefined' ? globalThis[fnName] : null);
+    if (typeof fn === 'function') return fn();
+    return undefined;
+  };
+}
 const bkmpIdleTabs = [
-  { id: 'kampf', btn: 'idleTabBtnKampf', panel: 'idlePanelKampf', render: bkmpIdleCatchUpCombatVisuals },
-  { id: 'upgrades', btn: 'idleTabBtnUpgrades', panel: 'idlePanelUpgrades', render: bkmpIdleRenderUpgradesPanel },
-  { id: 'skilltree', btn: 'idleTabBtnSkilltree', panel: 'idlePanelSkilltree', render: bkmpIdleRenderSkilltreePanel },
-  { id: 'erfolge', btn: 'idleTabBtnErfolge', panel: 'idlePanelErfolge', render: bkmpIdleRenderErfolgePanel },
-  { id: 'prestige', btn: 'idleTabBtnPrestige', panel: 'idlePanelPrestige', render: bkmpIdleRenderPrestigePanel },
-  { id: 'runen', btn: 'idleTabBtnRunen', panel: 'idlePanelRunen', render: bkmpIdleRenderRunenPanel },
-  { id: 'skins', btn: 'idleTabBtnSkins', panel: 'idlePanelSkins', render: bkmpIdleRenderSkinsPanel },
-  { id: 'dungeon', btn: 'idleTabBtnDungeon', panel: 'idlePanelDungeon', render: bkmpIdleRenderDungeonPanel },
-  { id: 'turm', btn: 'idleTabBtnTurm', panel: 'idlePanelTurm', render: bkmpIdleRenderTurmPanel },
-  { id: 'arena', btn: 'idleTabBtnArena', panel: 'idlePanelArena', render: bkmpIdleRenderArenaPanel },
-  { id: 'gilde', btn: 'idleTabBtnGilde', panel: 'idlePanelGilde', render: bkmpIdleRenderGildePanel },
-  { id: 'gildetech', btn: 'idleTabBtnGildeTech', panel: 'idlePanelGildeTech', render: bkmpIdleRenderGildeTechPanel },
-  { id: 'gildeboss', btn: 'idleTabBtnGildeBoss', panel: 'idlePanelGildeBoss', render: bkmpIdleRenderGildeBossPanel },
-  { id: 'clan', btn: 'idleTabBtnClan', panel: 'idlePanelClan', render: bkmpIdleRenderClanPanel },
-  { id: 'bestenliste', btn: 'idleTabBtnBestenliste', panel: 'idlePanelBestenliste', render: bkmpIdleRenderBestenlistePanel },
-  { id: 'drachen', btn: 'idleTabBtnDrachen', panel: 'idlePanelDrachen', render: bkmpIdleRenderDragonsPanel }
+  { id: 'kampf', btn: 'idleTabBtnKampf', panel: 'idlePanelKampf', render: bkmpIdleLazyRender('bkmpIdleCatchUpCombatVisuals') },
+  { id: 'upgrades', btn: 'idleTabBtnUpgrades', panel: 'idlePanelUpgrades', render: bkmpIdleLazyRender('bkmpIdleRenderUpgradesPanel') },
+  { id: 'skilltree', btn: 'idleTabBtnSkilltree', panel: 'idlePanelSkilltree', render: bkmpIdleLazyRender('bkmpIdleRenderSkilltreePanel') },
+  { id: 'erfolge', btn: 'idleTabBtnErfolge', panel: 'idlePanelErfolge', render: bkmpIdleLazyRender('bkmpIdleRenderErfolgePanel') },
+  { id: 'prestige', btn: 'idleTabBtnPrestige', panel: 'idlePanelPrestige', render: bkmpIdleLazyRender('bkmpIdleRenderPrestigePanel') },
+  { id: 'runen', btn: 'idleTabBtnRunen', panel: 'idlePanelRunen', render: bkmpIdleLazyRender('bkmpIdleRenderRunenPanel') },
+  { id: 'dorf', btn: 'idleTabBtnDorf', panel: 'idlePanelDorf', render: bkmpIdleLazyRender('bkmpIdleRenderDorfPanel') },
+  { id: 'skins', btn: 'idleTabBtnSkins', panel: 'idlePanelSkins', render: bkmpIdleLazyRender('bkmpIdleRenderSkinsPanel') },
+  { id: 'dungeon', btn: 'idleTabBtnDungeon', panel: 'idlePanelDungeon', render: bkmpIdleLazyRender('bkmpIdleRenderDungeonPanel') },
+  { id: 'turm', btn: 'idleTabBtnTurm', panel: 'idlePanelTurm', render: bkmpIdleLazyRender('bkmpIdleRenderTurmPanel') },
+  { id: 'arena', btn: 'idleTabBtnArena', panel: 'idlePanelArena', render: bkmpIdleLazyRender('bkmpIdleRenderArenaPanel') },
+  { id: 'gilde', btn: 'idleTabBtnGilde', panel: 'idlePanelGilde', render: bkmpIdleLazyRender('bkmpIdleRenderGildePanel') },
+  { id: 'gildetech', btn: 'idleTabBtnGildeTech', panel: 'idlePanelGildeTech', render: bkmpIdleLazyRender('bkmpIdleRenderGildeTechPanel') },
+  { id: 'gildeboss', btn: 'idleTabBtnGildeBoss', panel: 'idlePanelGildeBoss', render: bkmpIdleLazyRender('bkmpIdleRenderGildeBossPanel') },
+  { id: 'clan', btn: 'idleTabBtnClan', panel: 'idlePanelClan', render: bkmpIdleLazyRender('bkmpIdleRenderClanPanel') },
+  { id: 'bestenliste', btn: 'idleTabBtnBestenliste', panel: 'idlePanelBestenliste', render: bkmpIdleLazyRender('bkmpIdleRenderBestenlistePanel') },
+  { id: 'drachen', btn: 'idleTabBtnDrachen', panel: 'idlePanelDrachen', render: bkmpIdleLazyRender('bkmpIdleRenderDragonsPanel') }
 ];
+
+/* Drachendorf-Ausbau Phase 1 (04.10.2026, Auftrag Abschnitt 9): die
+   Inhalte sind in VIER Kategorien gegliedert. Einzige Quelle der Wahrheit
+   fuer Desktop-Seitenleiste (Kategorie-Kopfzeilen, einklappbar) UND das
+   mobile "Mehr"-Menue (bkmp-app-mode-bootstrap.js). Neue Funktionen werden
+   als Unterbereiche einsortiert, nicht als weitere Haupttabs. Der Weltboss
+   bleibt kontextuell (Banner/Raid-Ansicht). */
+const BKMP_IDLE_NAV_CATEGORIES = [
+  { key: 'abenteuer', icon: '⚔️', label: 'Abenteuer', tabs: ['kampf', 'dungeon', 'turm', 'arena'] },
+  { key: 'entwicklung', icon: '🏡', label: 'Entwicklung', tabs: ['upgrades', 'dorf', 'skilltree', 'prestige', 'runen'] },
+  { key: 'drachen', icon: '🐉', label: 'Drachen & Sammlung', tabs: ['drachen', 'skins', 'erfolge', 'bestenliste'] },
+  { key: 'gemeinschaft', icon: '🛡️', label: 'Gemeinschaft', tabs: ['gilde', 'gildetech', 'gildeboss', 'clan'] }
+];
+function bkmpIdleNavCategoryOfTab(tabId) {
+  return BKMP_IDLE_NAV_CATEGORIES.find(c => c.tabs.includes(tabId)) || null;
+}
+/* Letzte Auswahl merken (Auftrag Abschnitt 9: "Letzte Auswahl speichern"). */
+const BKMP_IDLE_LAST_TAB_KEY = 'bkmp-idle-last-tab';
+function bkmpIdleRememberTab(tabId) {
+  try { localStorage.setItem(BKMP_IDLE_LAST_TAB_KEY, tabId); } catch (e) { /* privater Modus - egal */ }
+}
+function bkmpIdleRememberedTab() {
+  try { return localStorage.getItem(BKMP_IDLE_LAST_TAB_KEY) || ''; } catch (e) { return ''; }
+}
+let bkmpIdleLastTabRestored = false;
+/* Einmal pro Seitenaufruf beim ersten Oeffnen: zuletzt benutzten Bereich
+   wieder aufschlagen (echter Klick auf den Tab-Button - dieselben Wege wie
+   ein Spieler-Klick, keine zweite Umschaltlogik). */
+function bkmpIdleRestoreLastTab() {
+  if (bkmpIdleLastTabRestored) return;
+  bkmpIdleLastTabRestored = true;
+  const wanted = bkmpIdleRememberedTab();
+  if (!wanted || wanted === bkmpIdleActiveTab) return;
+  const tab = bkmpIdleTabs.find(t => t.id === wanted);
+  if (!tab || tab.locked) return;
+  if ((typeof bkmpDungeonActive !== 'undefined' && bkmpDungeonActive) || (typeof bkmpTowerActive !== 'undefined' && bkmpTowerActive)) return;
+  const btn = document.getElementById(tab.btn);
+  if (btn) btn.click();
+}
 
 /* Test-Account (Nutzerwunsch 16.07.: "test123" braucht vollen Zugriff auf
    noch gesperrte Tabs zum Testen, ohne den Tab fuer alle anderen
@@ -3311,6 +3365,8 @@ function bkmpIdleInitTabs() {
         if (b) b.classList.toggle('active', other.id === t.id);
         if (p) p.style.display = other.id === t.id ? '' : 'none';
       });
+      bkmpIdleRememberTab(t.id);
+      if (typeof bkmpIdleNavApplyCategories === 'function') bkmpIdleNavApplyCategories();
       if (typeof t.render === 'function') t.render();
       /* Der Lager-Balken haengt am rechten Bildschirmrand ausserhalb der
          Karte (siehe .idle-runen-drawer) - muss deshalb bei JEDEM
@@ -3452,7 +3508,12 @@ async function bkmpIdleOpenModal() {
   if (bkmpRaidShouldShowCombatView()) {
     bkmpIdleStopLoop();
     bkmpRaidStartCombatView(bkmpRaidGetPhaseInfo().raidId);
+  } else {
+    /* Drachendorf-Ausbau Phase 1: zuletzt benutzten Bereich wieder
+       aufschlagen (nur beim ersten Oeffnen pro Seitenaufruf). */
+    bkmpIdleRestoreLastTab();
   }
+  if (typeof bkmpIdleNavApplyCategories === 'function') bkmpIdleNavApplyCategories();
   /* Ab hier hat bkmpRaidToggleCombatView() (synchroner Teil ganz am Anfang
      von bkmpRaidStartCombatView) bereits entschieden, welches Panel
      tatsaechlich sichtbar sein soll - jetzt erst aufdecken. Die reinen

@@ -60,6 +60,7 @@ const BKMP_PROTO_NAV_PRIMARY = [
    bkmp-app-mode-bootstrap.js (Skilltree/Dungeon neu dazugekommen, siehe
    oben), nur ungruppiert. */
 const BKMP_PROTO_NAV_SECONDARY = [
+  { id: 'dorf', btn: 'idleTabBtnDorf', label: 'Dorfentwicklung' },
   { id: 'skilltree', btn: 'idleTabBtnSkilltree', label: 'Skilltree' },
   { id: 'runen', btn: 'idleTabBtnRunen', label: 'Runen' },
   { id: 'erfolge', btn: 'idleTabBtnErfolge', label: 'Erfolge' },

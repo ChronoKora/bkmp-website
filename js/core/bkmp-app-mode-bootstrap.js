@@ -62,12 +62,28 @@
        dadurch bisher nur ueber das ungruppierte Sicherheitsnetz weiter unten
        im Menue - jetzt sauber der Gilde-Gruppe zugeordnet. */
     var BKMP_TAB_OVERFLOW_PRIMARY_IDS = ['idleTabBtnKampf', 'idleTabBtnUpgrades', 'idleTabBtnPrestige', 'idleTabBtnDrachen'];
-    var BKMP_TAB_OVERFLOW_GROUPS = [
-      { title: '📈 Fortschritt', ids: ['idleTabBtnSkilltree', 'idleTabBtnRunen', 'idleTabBtnErfolge'] },
-      { title: '⚔️ Kampf & Rang', ids: ['idleTabBtnDungeon', 'idleTabBtnArena', 'idleTabBtnBestenliste', 'idleTabBtnTurm'] },
-      { title: '🛡️ Gilde', ids: ['idleTabBtnGilde', 'idleTabBtnGildeTech', 'idleTabBtnGildeBoss', 'idleTabBtnClan'] },
-      { title: '🏆 Sammlung', ids: ['idleTabBtnSkins'] }
-    ];
+    /* Drachendorf-Ausbau Phase 1 (04.10.2026): "Mehr"-Menue nutzt jetzt
+       dieselben vier Kategorien wie die Desktop-Seitenleiste
+       (BKMP_IDLE_NAV_CATEGORIES in idledorf.js - einzige Quelle der
+       Wahrheit). Fallback-Liste nur, falls idledorf.js auf einer Seite fehlt. */
+    function bkmpNavCategoryList() {
+      if (typeof BKMP_IDLE_NAV_CATEGORIES !== 'undefined' && Array.isArray(BKMP_IDLE_NAV_CATEGORIES)) return BKMP_IDLE_NAV_CATEGORIES;
+      return [];
+    }
+    function bkmpNavTabBtnId(tabId) {
+      if (typeof bkmpIdleTabs !== 'undefined' && Array.isArray(bkmpIdleTabs)) {
+        var t = bkmpIdleTabs.find(function (x) { return x.id === tabId; });
+        if (t) return t.btn;
+      }
+      return null;
+    }
+    var BKMP_TAB_OVERFLOW_GROUPS = bkmpNavCategoryList().map(function (cat) {
+      return {
+        key: cat.key,
+        title: cat.icon + ' ' + cat.label,
+        ids: cat.tabs.map(bkmpNavTabBtnId).filter(function (id) { return id && BKMP_TAB_OVERFLOW_PRIMARY_IDS.indexOf(id) === -1; })
+      };
+    });
     var bkmpTabOverflowAllIdsInOrder = null;
     var bkmpTabOverflowBuilt = false;
     var bkmpTabOverflowCurrentlyCompact = null;
@@ -212,12 +228,93 @@
         });
         moreBtn.style.display = '';
       } else {
-        bkmpTabOverflowAllIdsInOrder.forEach(function (id) { var el = document.getElementById(id); if (el) tabsBar.appendChild(el); });
+        /* Drachendorf-Ausbau Phase 1 (04.10.2026): Desktop-Seitenleiste in
+           vier Kategorien mit Kopfzeilen. Alle Tab-Buttons bleiben echte,
+           sichtbare Elemente in #idleDorfTabs (keine Kopien) - nur ihre
+           Reihenfolge folgt jetzt den Kategorien, davor je eine Kopfzeile. */
+        var placed = {};
+        bkmpNavCategoryList().forEach(function (cat) {
+          tabsBar.appendChild(bkmpNavCategoryHeader(cat));
+          cat.tabs.forEach(function (tabId) {
+            var btnId = bkmpNavTabBtnId(tabId);
+            var el = btnId ? document.getElementById(btnId) : null;
+            if (!el) return;
+            el.setAttribute('data-nav-cat', cat.key);
+            tabsBar.appendChild(el);
+            placed[btnId] = true;
+          });
+        });
+        /* Sicherheitsnetz: ein Tab ohne Kategorie bleibt trotzdem sichtbar. */
+        bkmpTabOverflowAllIdsInOrder.forEach(function (id) {
+          if (placed[id]) return;
+          var el = document.getElementById(id);
+          if (el) tabsBar.appendChild(el);
+        });
         moreSheetGrid.querySelectorAll('.idle-app-more-sheet-group-title').forEach(function (h) { h.remove(); });
         moreBtn.style.display = 'none';
         if (moreSheet.classList.contains('open')) moreSheet.classList.remove('open');
       }
+      bkmpIdleNavApplyCategories();
     }
+
+    /* ---- Kategorie-Kopfzeilen (nur Desktop-Seitenleiste) ----
+       Einklappbar; eingeklappte Kategorien werden pro Browser gemerkt.
+       Die Kategorie des gerade aktiven Bereichs ist IMMER offen (sonst
+       waere der aktive Tab unsichtbar). Standard: alle offen. */
+    var BKMP_NAV_COLLAPSED_KEY = 'bkmp-idle-nav-collapsed';
+    var bkmpNavHeaderCache = {};
+    function bkmpNavCollapsedSet() {
+      try {
+        var raw = JSON.parse(localStorage.getItem(BKMP_NAV_COLLAPSED_KEY) || '[]');
+        return Array.isArray(raw) ? raw : [];
+      } catch (e) { return []; }
+    }
+    function bkmpNavSaveCollapsedSet(list) {
+      try { localStorage.setItem(BKMP_NAV_COLLAPSED_KEY, JSON.stringify(list)); } catch (e) { /* egal */ }
+    }
+    function bkmpNavCategoryHeader(cat) {
+      if (bkmpNavHeaderCache[cat.key]) return bkmpNavHeaderCache[cat.key];
+      var h = document.createElement('button');
+      h.type = 'button';
+      h.className = 'idle-dorf-cat-header';
+      h.setAttribute('data-nav-cat-header', cat.key);
+      h.setAttribute('data-testid', 'idle-nav-cat-' + cat.key);
+      h.setAttribute('aria-expanded', 'true');
+      h.innerHTML = '<span class="idle-dorf-cat-icon" aria-hidden="true">' + cat.icon + '</span>' +
+        '<span class="idle-dorf-cat-label">' + cat.label + '</span>' +
+        '<span class="idle-dorf-cat-chevron" aria-hidden="true">▾</span>';
+      h.addEventListener('click', function () {
+        var list = bkmpNavCollapsedSet();
+        var idx = list.indexOf(cat.key);
+        if (idx === -1) list.push(cat.key); else list.splice(idx, 1);
+        bkmpNavSaveCollapsedSet(list);
+        bkmpIdleNavApplyCategories();
+      });
+      bkmpNavHeaderCache[cat.key] = h;
+      return h;
+    }
+    function bkmpIdleNavApplyCategories() {
+      var compact = bkmpTabOverflowCurrentlyCompact === true;
+      var collapsed = bkmpNavCollapsedSet();
+      var activeTab = typeof bkmpIdleActiveTab !== 'undefined' ? bkmpIdleActiveTab : null;
+      bkmpNavCategoryList().forEach(function (cat) {
+        var header = bkmpNavHeaderCache[cat.key];
+        var containsActive = activeTab && cat.tabs.indexOf(activeTab) !== -1;
+        var isCollapsed = !compact && collapsed.indexOf(cat.key) !== -1 && !containsActive;
+        if (header) {
+          header.style.display = compact ? 'none' : '';
+          header.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+          header.classList.toggle('is-collapsed', isCollapsed);
+          header.classList.toggle('has-active', !!containsActive);
+        }
+        cat.tabs.forEach(function (tabId) {
+          var btnId = bkmpNavTabBtnId(tabId);
+          var el = btnId ? document.getElementById(btnId) : null;
+          if (el) el.classList.toggle('idle-dorf-tab-cat-hidden', isCollapsed);
+        });
+      });
+    }
+    window.bkmpIdleNavApplyCategories = bkmpIdleNavApplyCategories;
 
     bkmpIdleSyncTabOverflowForViewport();
 

@@ -1,0 +1,102 @@
+/* ============================================================
+   Drachendorf-Ausbau (ab 04.10.2026) - Navigation in 4 Kategorien,
+   Dorfentwicklung, Drachenhafen/Expeditionen, Drachen-Eigenschaften,
+   Event-Pass, Goettliche Erweckung.
+   Eigene Datei (wie css/bkmp-chronicle.css), damit die riesige
+   style.css nicht weiter waechst. Nutzt nur bestehende Tokens
+   (--app-gold/--app-muted/--app-ink aus html.bkmp-app-mode,
+   --gold-fixed, --rarity-* aus design-tokens.css) mit Fallbacks.
+   Performance-Regeln des Projekts: nur transform/opacity animieren,
+   keine Endlos-Animation von background-position/box-shadow/filter,
+   kein filter an Videos. Effektmodus "aus" und
+   prefers-reduced-motion werden respektiert.
+   ============================================================ */
+
+/* ---------- Phase 1: Kategorie-Kopfzeilen der Seitenleiste ---------- */
+.idle-dorf-cat-header {
+  display: none;
+}
+@media (min-width: 1000px) {
+  /* Eingeklappte Kategorie: nur wo die Kopfzeilen auch sichtbar sind (sonst
+     koennte ein zugeklappter Bereich bei schmalerem Fenster ohne sichtbaren
+     Aufklapp-Knopf verschwinden). */
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleDorfTabs .idle-dorf-tab.idle-dorf-tab-cat-hidden {
+    display: none !important;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleDorfTabs .idle-dorf-cat-header {
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+    width: 100%;
+    flex: 0 0 auto;
+    margin: .5rem 0 .05rem;
+    padding: .28rem .55rem;
+    min-height: 0;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    color: var(--app-muted, var(--muted, #b7a8c4));
+    font-size: .66rem;
+    font-weight: 800;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    text-align: left;
+    cursor: pointer;
+    transition: color .15s ease, background-color .15s ease;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleDorfTabs .idle-dorf-cat-header:first-child {
+    margin-top: 0;
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleDorfTabs .idle-dorf-cat-header:hover {
+    color: var(--app-gold, var(--gold-fixed, #c9a56a));
+    background: rgba(255, 255, 255, .04);
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleDorfTabs .idle-dorf-cat-header.has-active {
+    color: var(--gold-fixed, #c9a56a);
+  }
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleDorfTabs .idle-dorf-cat-header:focus-visible {
+    outline: 2px solid var(--gold-fixed, #c9a56a);
+    outline-offset: 1px;
+  }
+  .idle-dorf-cat-icon {
+    font-size: .9rem;
+    letter-spacing: 0;
+  }
+  .idle-dorf-cat-label {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .idle-dorf-cat-chevron {
+    display: inline-block;
+    font-size: .7rem;
+    transition: transform .18s ease;
+  }
+  .idle-dorf-cat-header.is-collapsed .idle-dorf-cat-chevron {
+    transform: rotate(-90deg);
+  }
+}
+@media (min-width: 1000px) and (max-height: 960px) {
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleDorfTabs .idle-dorf-cat-header {
+    margin: .3rem 0 0;
+    padding: .18rem .5rem;
+    font-size: .62rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .idle-dorf-cat-chevron { transition: none; }
+}
+html[data-fx="aus"] .idle-dorf-cat-chevron { transition: none; }
+
+/* Gemeinsamer Hinweis "Datenbank-Update ausstehend" fuer neue Bereiche */
+.idle-dd-pending {
+  margin: .6rem 0;
+  padding: .8rem 1rem;
+  border-radius: 12px;
+  border: 1px dashed rgba(255, 255, 255, .18);
+  color: var(--app-muted, var(--muted, #b7a8c4));
+  font-size: .86rem;
+  line-height: 1.45;
+}

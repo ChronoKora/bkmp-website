@@ -15,6 +15,8 @@ const IDLE_TABS = [
   { id: 'gilde', btn: 'idleTabBtnGilde', panel: 'idlePanelGilde' },
   { id: 'gildetech', btn: 'idleTabBtnGildeTech', panel: 'idlePanelGildeTech' },
   { id: 'gildeboss', btn: 'idleTabBtnGildeBoss', panel: 'idlePanelGildeBoss' },
+  { id: 'clan', btn: 'idleTabBtnClan', panel: 'idlePanelClan' },
+  { id: 'dorf', btn: 'idleTabBtnDorf', panel: 'idlePanelDorf' },
   { id: 'bestenliste', btn: 'idleTabBtnBestenliste', panel: 'idlePanelBestenliste' },
   { id: 'drachen', btn: 'idleTabBtnDrachen', panel: 'idlePanelDrachen' }
 ];
