@@ -139,6 +139,31 @@
   transition: background .15s ease, transform .15s ease;
 }
 .idle-chron-open-btn:hover { background: rgba(255, 215, 106, .2); transform: translateY(-1px); }
+/* Direkte Kurzlinks zu Kalender/Bestiarium/Ziele (03.10.2026, Spieler-Frage
+   "Wo finde ich dieses Bestiarium?" - war nur ueber den Reiter im Fenster
+   erreichbar). */
+.idle-chron-quicklinks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .3rem; }
+/* !important bei Polster/Hoehe/Radius: die globale App-Modus-Regel fuer
+   Knoepfe im Idle-Dorf (grosses Touch-Polster, min-height 44-46px) hat sonst
+   hoehere Spezifitaet und schneidet den dritten Link ab - gleiches, bereits
+   mehrfach dokumentiertes Muster wie .idle-dragon-mini-delete-btn. */
+.idle-chron-quicklink {
+  padding: .32rem .2rem !important;
+  min-height: 30px !important;
+  min-width: 0 !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(255, 255, 255, .12);
+  background: rgba(255, 255, 255, .04);
+  color: var(--app-ink, #f5f0ff);
+  font-size: .66rem !important;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background .15s ease, border-color .15s ease;
+}
+.idle-chron-quicklink:hover { background: rgba(255, 255, 255, .1); border-color: rgba(255, 215, 106, .45); }
 
 /* ---------- Chronik-Fenster ---------- */
 .bkmp-chron-overlay .joke-card.bkmp-chron-card {

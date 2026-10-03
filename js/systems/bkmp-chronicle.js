@@ -1343,6 +1343,11 @@ function bkmpChronicleRenderTrackerCard() {
     <div class="idle-chron-mini-list">${bkmpChronicle.daily.quests.map((q, i) => bkmpChronicleQuestRowHtml('daily', q, i, true)).join('')}</div>
     ${buff ? `<div class="idle-chron-card-event">${buff.icon} ${bkmpChronicleEsc(buff.name)} aktiv</div>` : ''}
     <button type="button" class="idle-chron-open-btn" data-chronicle-open="quests">${n > 0 ? `🎁 ${n} Belohnung${n === 1 ? '' : 'en'} abholen` : 'Chronik öffnen'}</button>
+    <div class="idle-chron-quicklinks">
+      <button type="button" class="idle-chron-quicklink" data-chronicle-open="calendar" title="Login-Kalender">📅 Kalender</button>
+      <button type="button" class="idle-chron-quicklink" data-chronicle-open="bestiary" title="Drachen-Bestiarium">📖 Bestiarium</button>
+      <button type="button" class="idle-chron-quicklink" data-chronicle-open="goals" title="Nächste Ziele">🎯 Ziele</button>
+    </div>
   `;
 }
 

@@ -16329,3 +16329,76 @@ html.bkmp-app-mode .idle-app-more-sheet-group-title:first-child {
     min-height: clamp(340px, 44dvh, 620px) !important;
   }
 }
+
+/* ============================================================
+   Performance-Fix "Hover reagiert stark verzoegert" (03.10.2026,
+   Spieler-Video: Hervorhebung laeuft der Maus ~0,5-0,8s hinterher, auch mit
+   "Effekte: Aus").
+   Root Cause per Chrome-Performance-Tracing BEWIESEN (nicht vermutet),
+   3s-Messfenster, Effekte aus, Kampf angehalten, 1920x1080:
+     - mit der Fenster-Animation:  ~6.000 ms Rasterarbeit, 155 Zeichenvorgaenge
+     - ohne die Fenster-Animation:      37 ms Rasterarbeit
+     - zusaetzlich Website darunter pausiert: 0 ms / 0 Zeichenvorgaenge
+   Ursache: .idle-dorf-card (das GESAMTE Dorf-Fenster, zwei Regeln mit 6s/7s)
+   und .idle-runen-drawer-panel liefen dauerhaft mit "bkmpTierGlow" - einer
+   background-position-Animation. background-position ist KEINE Compositor-
+   Eigenschaft: der Browser malt die komplette Karte (4 Hintergrundebenen +
+   0 30px 90px-Schatten) in JEDEM Bild neu, solange das Fenster offen ist,
+   voellig unabhaengig vom Effektmodus. Exakt dieselbe Fehlerklasse wurde am
+   17.07. bei der Glut (::before) bereits behoben - der Rahmen-Schimmer der
+   Karte selbst war dabei stehen geblieben. Auf schwaecheren Rechnern sind
+   die Raster-Threads damit dauerhaft ausgelastet, jedes neue Bild (auch
+   das einer Hover-Hervorhebung) muss warten.
+   Fix: Rahmen-Schimmer auf das erste Animationsbild eingefroren (optisch
+   praktisch identisch: derselbe Gold-Lila-Verlauf, nur ohne langsames
+   Wandern). Gilt fuer ALLE Effektmodi - die Mehrheit spielt mit "Hoch". */
+.idle-dorf-overlay .idle-dorf-card,
+html.bkmp-app-mode .idle-dorf-overlay .idle-dorf-card,
+html.bkmp-app-mode.zone-game .idle-dorf-overlay .idle-dorf-card,
+.idle-runen-drawer-panel {
+  animation: none !important;
+  background-position: 0% 50% !important;
+}
+
+/* "Effekte: Aus" stoppt jetzt wirklich alle dekorativen Dauer-Animationen im
+   Spiel (vorher deckte der Modus nur Schadenszahlen/Belohnungen/Status-
+   Einblendungen ab - Glut, EP-Schimmer und diverses Pulsieren liefen weiter).
+   Alles bleibt sichtbar, nur ohne Bewegung. */
+html[data-fx="aus"] .idle-dorf-overlay .idle-dorf-card::before {
+  animation: none !important;
+  opacity: 0 !important;
+}
+html[data-fx="aus"] .idle-xp-fill::after {
+  animation: none !important;
+  display: none !important;
+}
+html[data-fx="aus"] .idle-event-dragon-card,
+html[data-fx="aus"] .idle-dragon-nest-card.is-ready,
+html[data-fx="aus"] .idle-dungeon-banner,
+html[data-fx="aus"] .idle-skill-branch-pulse,
+html[data-fx="aus"] .raid-result-zerathor-code,
+html[data-fx="aus"].bkmp-app-mode .raid-join-banner.raid-urgent,
+html[data-fx="aus"].bkmp-app-mode .raid-join-banner.raid-urgent .raid-join-banner-countdown {
+  animation: none !important;
+}
+
+/* Solange das Dorf-Fenster offen ist, liegt die Website komplett darunter
+   (abgedunkelt, kaum sichtbar) - ihre Dauer-Animationen (Namens-Glanz,
+   Streamer-Schimmer, Easter-Egg-Figuren, Spotlight-Fortschritt ...) mussten
+   trotzdem in jedem Bild mitgezeichnet werden. Jetzt pausiert, solange das
+   Fenster offen ist; beim Schliessen laufen sie exakt dort weiter. Popups/
+   Benachrichtigungen liegen ausserhalb dieser Bereiche und bleiben
+   unberuehrt. Die Spotlight-/Haendler-Ecke im Banner hat zusaetzlich einen
+   teuren backdrop-filter-Blur und wird per JS weiter aktualisiert - unter
+   dem Fenster schlicht ausgeblendet (visibility, kein Layout-Sprung).
+   :has() statt einer JS-Klasse: deckt automatisch JEDEN Oeffnen-/Schliessen-
+   Pfad ab; Browser ohne :has()-Unterstuetzung verhalten sich wie bisher. */
+html:has(#idleDorfOverlay.visible) :is(.site-top-bar, #pollBanner, .top-actions-left, .top-actions, .login-btn-corner, header.hero, nav.topbar-wrap, #panelsViewport, footer.bkmp-footer, #bkmpPenguinEgg, #bkmpDerLiberHeader, #bkmpZzzBubble),
+html:has(#idleDorfOverlay.visible) :is(.site-top-bar, #pollBanner, .top-actions-left, .top-actions, .login-btn-corner, header.hero, nav.topbar-wrap, #panelsViewport, footer.bkmp-footer, #bkmpPenguinEgg, #bkmpDerLiberHeader, #bkmpZzzBubble) *,
+html:has(#idleDorfOverlay.visible) :is(.site-top-bar, #pollBanner, .top-actions-left, .top-actions, .login-btn-corner, header.hero, nav.topbar-wrap, #panelsViewport, footer.bkmp-footer, #bkmpPenguinEgg, #bkmpDerLiberHeader, #bkmpZzzBubble) *::before,
+html:has(#idleDorfOverlay.visible) :is(.site-top-bar, #pollBanner, .top-actions-left, .top-actions, .login-btn-corner, header.hero, nav.topbar-wrap, #panelsViewport, footer.bkmp-footer, #bkmpPenguinEgg, #bkmpDerLiberHeader, #bkmpZzzBubble) *::after {
+  animation-play-state: paused !important;
+}
+html:has(#idleDorfOverlay.visible) .global-header-side-stack {
+  visibility: hidden;
+}

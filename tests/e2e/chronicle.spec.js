@@ -310,9 +310,14 @@ test.describe('Chronik - Einstiegspunkte', () => {
     const card = page.locator('[data-testid="chronicle-card"]');
     await expect(card).toBeVisible();
     await expect(card.locator('.idle-chron-mini-row')).toHaveCount(3);
-    await card.locator('[data-chronicle-open]').click();
+    await card.locator('.idle-chron-open-btn').click();
     await expect(page.locator('#bkmpChronicleOverlay')).toHaveClass(/visible/);
     await expect(page.locator('#bkmpChronicleOverlay .bkmp-chron-quest')).toHaveCount(6);
+    // Kurzlink "Bestiarium" (Spieler-Frage 03.10.2026: "Wo finde ich dieses Bestiarium?")
+    await page.evaluate(() => bkmpChronicleCloseModal());
+    await card.locator('[data-chronicle-open="bestiary"]').click();
+    await expect(page.locator('#bkmpChronicleOverlay [data-tab-id="bestiary"]')).toHaveClass(/is-active/);
+    await expect(page.locator('#bkmpChronicleOverlay .bkmp-chron-beast').first()).toBeVisible();
   });
 
   test('Mobil: 📜-Knopf im kompakten HUD oeffnet das Fenster', async ({ page, qaBaseURL, fixtureData }) => {
