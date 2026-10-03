@@ -273,6 +273,7 @@ async function bkmpIdleRenderArenaPanel() {
           const opponentVillageSkin = opponent ? opponent.activeVillageSkin : 'standard';
           await bkmpArenaPlayBattleAnimation(myName, opponentName, result.won, myVillageSkin, opponentVillageSkin);
           if (result.won) bkmpGuildQuestAddDelta('arena_wins', 1);
+          if (typeof bkmpChronicleAddProgress === 'function') bkmpChronicleAddProgress('arena_fights', 1);
           const msg = result.won
             ? `⚔️ Sieg gegen ${result.defenderName}! +${result.ratingChange} Rating, +${result.goldReward} 💰 (jetzt ${result.newRating})`
             : `⚔️ Niederlage gegen ${result.defenderName}. ${result.ratingChange} Rating (jetzt ${result.newRating})`;

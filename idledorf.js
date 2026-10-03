@@ -517,7 +517,11 @@ function bkmpIdleRecomputeEffectiveStats() {
      Prestige-Ebene "Aufstieg") fliessen wie jede andere Quelle in denselben
      Sammel-Pott. */
   const ascensionTotals = typeof bkmpAscensionEffectTotals === 'function' ? bkmpAscensionEffectTotals() : {};
-  const t = key => (skillTotals[key] || 0) + (upgradeTotals[key] || 0) + (titleTotals[key] || 0) + (prestigeTotals[key] || 0) + (runeTotals[key] || 0) + (dragonTotals[key] || 0) + (upgradeMilestoneTotals[key] || 0) + (prestigeMilestoneTotals[key] || 0) + (ascensionTotals[key] || 0);
+  /* Chronik (03.10.2026): Drachen-Bestiarium-Stufen (Kills pro Drachenart,
+     siehe js/systems/bkmp-chronicle.js) fliessen wie jede andere Quelle in
+     denselben, weiter unten gedeckelten Sammel-Pott. */
+  const bestiaryTotals = typeof bkmpChronicleBestiaryEffectTotals === 'function' ? bkmpChronicleBestiaryEffectTotals() : {};
+  const t = key => (skillTotals[key] || 0) + (upgradeTotals[key] || 0) + (titleTotals[key] || 0) + (prestigeTotals[key] || 0) + (runeTotals[key] || 0) + (dragonTotals[key] || 0) + (upgradeMilestoneTotals[key] || 0) + (prestigeMilestoneTotals[key] || 0) + (ascensionTotals[key] || 0) + (bestiaryTotals[key] || 0);
   const prevMaxHp = bkmpIdleEffectiveStats ? bkmpIdleEffectiveStats.hp : null;
   const prevTickMs = bkmpIdleEffectiveStats ? bkmpIdleEffectiveStats.tickIntervalMs : null;
   /* extra_archer (Dorf) und ballista_unlock (Dorf) hatten vorher gar keinen
@@ -843,7 +847,11 @@ function bkmpIdleGetAchievementContextFields() {
       return sp && sp.rarity === 'legendaer';
     }).length,
     idleHasSteampunkSkin: bkmpPlayerVillageSkins.includes('steampunkdorf'),
-    idleTowerHighestWave: Number(s.turm_highest_wave || 0)
+    idleTowerHighestWave: Number(s.turm_highest_wave || 0),
+    /* Chronik (03.10.2026): Auftraege/Truhen/Weltereignisse/Bestiarium -
+       faellt auf den zwischengespeicherten Wert zurueck, solange die Chronik
+       noch nicht geladen ist (kein kurzes "Verschwinden" erspielter Titel). */
+    ...(typeof bkmpChronicleAchievementFields === 'function' ? bkmpChronicleAchievementFields(bkmpIdleGetCachedAchievementFields) : {})
   };
   try { localStorage.setItem(BKMP_IDLE_ACHIEVEMENT_CACHE_KEY, JSON.stringify(fields)); } catch (e) {}
   return fields;
@@ -925,8 +933,13 @@ function bkmpIdleHandleDragonDefeated() {
   /* Goldrausch/Wissensschub (siehe bkmpDungeonGrantBoost) wirkt auf JEDE
      Gold-/EXP-Quelle, nicht nur Dungeon-Laeufe selbst - hier der zweite
      (neben dem Dungeon) der beiden Haupt-Einkommenspfade. */
-  const goldBoost = typeof bkmpDungeonBoostMultiplier === 'function' ? bkmpDungeonBoostMultiplier('gold') : 1;
-  const xpBoost = typeof bkmpDungeonBoostMultiplier === 'function' ? bkmpDungeonBoostMultiplier('exp') : 1;
+  /* Chronik-Weltereignisse "Goldregen"/"Weisheitswind" (03.10.2026, siehe
+     js/systems/bkmp-chronicle.js): kurzlebige x2-Buffs, multiplikativ zum
+     bestehenden Dungeon-Booster. */
+  const worldGoldMult = typeof bkmpWorldEventGoldMult === 'function' ? bkmpWorldEventGoldMult() : 1;
+  const worldXpMult = typeof bkmpWorldEventXpMult === 'function' ? bkmpWorldEventXpMult() : 1;
+  const goldBoost = (typeof bkmpDungeonBoostMultiplier === 'function' ? bkmpDungeonBoostMultiplier('gold') : 1) * worldGoldMult;
+  const xpBoost = (typeof bkmpDungeonBoostMultiplier === 'function' ? bkmpDungeonBoostMultiplier('exp') : 1) * worldXpMult;
   const boostedGold = goldBoost > 1 ? Math.round(rewards.gold * goldBoost) : rewards.gold;
   const boostedXp = xpBoost > 1 ? Math.round(rewards.xp * xpBoost) : rewards.xp;
   /* Progression-Rebalance Phase 5 (26.07.2026): Prestige-Knoten
@@ -963,6 +976,7 @@ function bkmpIdleHandleDragonDefeated() {
   }
   bkmpIdleMaybeDropRune(bkmpIdleCurrentDragon.isBoss ? 'boss' : 'normal');
   bkmpIdleMaybeDropTreasure(bkmpIdleCurrentDragon);
+  if (typeof bkmpChronicleRecordKill === 'function') bkmpChronicleRecordKill(bkmpIdleCurrentDragon);
   bkmpDragonGrantCompanionBattleXp(bkmpIdleCurrentDragon.isBoss ? 25 : 4);
   const autoAdvance = bkmpIdleState.auto_advance !== false;
   const prevHighestIndex = Number(bkmpIdleState.highest_dragon_index || 0);
@@ -1163,6 +1177,10 @@ function bkmpIdleTick() {
 
   if (bkmpIdleGetAutoBuy()) bkmpIdleAutoBuyUpgrades();
   if (typeof bkmpIdleRunAutomationToggles === 'function') bkmpIdleRunAutomationToggles();
+  /* Chronik (03.10.2026): beide intern gedrosselt (4s/10s) - pro Tick nur
+     ein Zeitstempel-Vergleich. */
+  if (typeof bkmpChronicleTrack === 'function') bkmpChronicleTrack(false);
+  if (typeof bkmpWorldEventTick === 'function') bkmpWorldEventTick();
 
   /* Schildgenerator/Reparaturtempo (Burg): passive Regeneration der
      Stadt-Lebenspunkte - vorher wirkungslos, effect_type wurde nie
@@ -1183,7 +1201,10 @@ function bkmpIdleTick() {
   const defenseIgnorePct = Math.min(90, typeof bkmpPrestigeBonus === 'function' ? bkmpPrestigeBonus('defense_ignore_pct') : 0);
   const effectiveDragonDefense = Math.max(0, (bkmpIdleCurrentDragon.defense || 0) * (1 - defenseIgnorePct / 100));
   const eliteDmgPct = (bkmpDungeonActive || bkmpTowerActive) && typeof bkmpPrestigeBonus === 'function' ? bkmpPrestigeBonus('elite_dmg_pct') : 0;
-  const eliteMult = 1 + Math.max(0, eliteDmgPct) / 100;
+  /* Chronik-Weltereignis "Kampfrausch" (03.10.2026): +50% Schaden pro Treffer
+     (NICHT mehr Treffer - die Kill-Rate bleibt durch den 400ms-Tick-Boden
+     begrenzt, siehe Anti-Cheat-Guard). Ausserhalb von Dungeon/Turm. */
+  const eliteMult = (1 + Math.max(0, eliteDmgPct) / 100) * (typeof bkmpWorldEventDamageMult === 'function' ? bkmpWorldEventDamageMult() : 1);
   const vRoll = bkmpIdleDamageRoll(stats.attack * eliteMult, stats.critChance, stats.critDamage, effectiveDragonDefense);
   bkmpIdleCurrentDragon.hp = Math.max(0, bkmpIdleCurrentDragon.hp - vRoll.amount);
   if (showVisuals) {
@@ -2185,7 +2206,18 @@ async function bkmpIdleClaimOfflineProgress(name) {
 
 function bkmpIdleApplyOfflineResult(result) {
   if (!result || !result.newTotals || !bkmpIdleState) return;
+  const killsBeforeOffline = Number(bkmpIdleState.dragon_kills || 0);
+  const bossKillsBeforeOffline = Number(bkmpIdleState.boss_kills || 0);
   Object.assign(bkmpIdleState, result.newTotals);
+  /* Chronik-Bestiarium (03.10.2026): die Offline-Simulation kennt keine
+     einzelnen Drachenarten - die gutgeschriebenen Kills werden dort anteilig
+     nach den echten Spawn-Regeln verteilt (bkmpChronicleCreditOfflineKills). */
+  if (typeof bkmpChronicleCreditOfflineKills === 'function') {
+    bkmpChronicleCreditOfflineKills(
+      Number(bkmpIdleState.dragon_kills || 0) - killsBeforeOffline,
+      Number(bkmpIdleState.boss_kills || 0) - bossKillsBeforeOffline
+    );
+  }
   /* Bug-Fix (Spieler-Meldung 05.08.2026: "über nacht offline timer passiert
      auch nichts an Fortschritt" - gemeint war der Begleitdrache): der Server
      hat player_dragons.battle_xp bei einem erfolgreichen Offline-Claim jetzt
@@ -3347,6 +3379,18 @@ async function bkmpIdleOpenModal() {
   if (offlineResult) bkmpIdleApplyOfflineResult(offlineResult);
   bkmpIdleShowOfflineCard(offlineResult);
   bkmpIdleRecomputeEffectiveStats();
+  /* Chronik (03.10.2026, js/systems/bkmp-chronicle.js): VOR der Tagesserie
+     laden, damit eine auf einem anderen Geraet bereits abgeholte Login-
+     Belohnung erkannt wird (sonst doppelte Auszahlung). Hoechstens 2,5s
+     warten - bei langsamer/fehlender Verbindung laeuft alles wie bisher rein
+     lokal weiter, das Oeffnen des Fensters wird nie dauerhaft blockiert. */
+  if (typeof bkmpChronicleEnsureLoaded === 'function') {
+    await Promise.race([
+      bkmpChronicleEnsureLoaded(name).catch(() => null),
+      new Promise(resolve => window.setTimeout(resolve, 2500))
+    ]);
+  }
+  if (typeof bkmpWorldEventOnOpen === 'function') bkmpWorldEventOnOpen();
   bkmpIdleCheckDailyStreak();
 
   if (!bkmpIdleCurrentDragon) bkmpIdleSpawnDragon();
@@ -3418,6 +3462,12 @@ function bkmpIdleCloseModal() {
   bkmpPrestigeConfirmErrored = false;
   if (typeof bkmpPrestigeCloseCeremony === 'function') bkmpPrestigeCloseCeremony();
   bkmpDragonStopNestCountdownTicker();
+  /* Chronik (03.10.2026): eigenes Fenster mitschliessen (sonst haengt es
+     einsam ueber der Seite, gleiches Muster wie Drachen-Detail/Prestige
+     oben), anklickbare Weltereignisse entfernen, Stand sofort sichern. */
+  if (typeof bkmpChronicleCloseModal === 'function') bkmpChronicleCloseModal();
+  if (typeof bkmpWorldEventOnClose === 'function') bkmpWorldEventOnClose();
+  if (typeof bkmpChronicleSaveNow === 'function' && typeof bkmpChronicleDirty !== 'undefined' && bkmpChronicleDirty) bkmpChronicleSaveNow();
   document.body.classList.remove('modal-open');
   bkmpIdleModalOpen = false;
   bkmpRuneSyncDrawerVisibility();
@@ -3751,7 +3801,20 @@ window.BKMP_IDLE_ACHIEVEMENTS_EXTRA = [
   { id: 'streak_3', category: 'Idle Dorf', title: 'Dranbleiber', desc: 'Logge dich 3 Tage in Folge ein.', progress: ctx => [ctx.idleLoginStreak, 3], check: ctx => ctx.idleLoginStreak >= 3 },
   { id: 'streak_7', category: 'Idle Dorf', title: 'Wochentreue', desc: 'Logge dich 7 Tage in Folge ein.', progress: ctx => [ctx.idleLoginStreak, 7], check: ctx => ctx.idleLoginStreak >= 7 },
   { id: 'streak_30', category: 'Idle Dorf', title: 'Ein Monat treu', desc: 'Logge dich 30 Tage in Folge ein.', progress: ctx => [ctx.idleLoginStreak, 30], check: ctx => ctx.idleLoginStreak >= 30 },
-  { id: 'steampunk_owner', category: 'Idle Dorf', title: 'Zahnrad-Sammler', desc: 'Besitze den Dorf-Skin "Steampunk Dorf".', check: ctx => ctx.idleHasSteampunkSkin }
+  { id: 'steampunk_owner', category: 'Idle Dorf', title: 'Zahnrad-Sammler', desc: 'Besitze den Dorf-Skin "Steampunk Dorf".', check: ctx => ctx.idleHasSteampunkSkin },
+  /* Chronik (03.10.2026, js/systems/bkmp-chronicle.js): Tages-/Wochen-
+     auftraege, Weltereignisse, Drachen-Bestiarium. Titel mit gleichem Namen
+     (BKMP_IDLE_TITLES unten) zeigen ihren Bonus automatisch auf der
+     Erfolgs-Karte (bkmpAchievementLinkedTitleBonus). */
+  { id: 'chronicle_quest_1', category: 'Idle Dorf', title: 'Auftragnehmer', desc: 'Erfülle deinen ersten Auftrag aus der Chronik.', check: ctx => (ctx.idleQuestsDone || 0) >= 1 },
+  { id: 'chronicle_quest_25', category: 'Idle Dorf', title: 'Zuverlässiger Held', desc: 'Erfülle 25 Aufträge aus der Chronik.', progress: ctx => [ctx.idleQuestsDone || 0, 25], check: ctx => (ctx.idleQuestsDone || 0) >= 25 },
+  { id: 'chronicle_quest_100', category: 'Idle Dorf', title: 'Chronist', desc: 'Erfülle 100 Aufträge aus der Chronik.', progress: ctx => [ctx.idleQuestsDone || 0, 100], check: ctx => (ctx.idleQuestsDone || 0) >= 100 },
+  { id: 'chronicle_weekly_1', category: 'Idle Dorf', title: 'Wochenwerk', desc: 'Öffne deine erste Wochentruhe.', check: ctx => (ctx.idleWeeklyChests || 0) >= 1 },
+  { id: 'chronicle_weekly_10', category: 'Idle Dorf', title: 'Unermüdlicher Planer', desc: 'Öffne 10 Wochentruhen.', progress: ctx => [ctx.idleWeeklyChests || 0, 10], check: ctx => (ctx.idleWeeklyChests || 0) >= 10 },
+  { id: 'world_event_10', category: 'Idle Dorf', title: 'Glückspilz', desc: 'Erlebe 10 Weltereignisse im Kampf.', progress: ctx => [ctx.idleWorldEventsCaught || 0, 10], check: ctx => (ctx.idleWorldEventsCaught || 0) >= 10 },
+  { id: 'world_event_100', category: 'Idle Dorf', title: 'Ereignisjäger', desc: 'Erlebe 100 Weltereignisse im Kampf.', progress: ctx => [ctx.idleWorldEventsCaught || 0, 100], check: ctx => (ctx.idleWorldEventsCaught || 0) >= 100 },
+  { id: 'bestiary_10', category: 'Idle Dorf', title: 'Drachenkundler', desc: 'Erreiche insgesamt 10 Stufen im Drachen-Bestiarium.', progress: ctx => [ctx.idleBestiaryTiers || 0, 10], check: ctx => (ctx.idleBestiaryTiers || 0) >= 10 },
+  { id: 'bestiary_30', category: 'Idle Dorf', title: 'Meister des Bestiariums', desc: 'Erreiche insgesamt 30 Stufen im Drachen-Bestiarium.', progress: ctx => [ctx.idleBestiaryTiers || 0, 30], check: ctx => (ctx.idleBestiaryTiers || 0) >= 30 }
 ];
 
 /* Frueher zeigten alle Tier-Titel auf "unlockAchievement"-IDs (z. B.
@@ -3868,6 +3931,11 @@ window.BKMP_IDLE_TITLES = [
   /* Login-Streak. */
   { id: 'idletitle_streak7', name: 'Wochentreue', desc: '7 Tage in Folge eingeloggt.', unlockCustom: ctx => ctx.idleLoginStreak >= 7, effectType: 'xp_pct', effectValue: 3 },
   { id: 'idletitle_streak30', name: 'Der Unermüdliche', desc: '30 Tage in Folge eingeloggt.', unlockCustom: ctx => ctx.idleLoginStreak >= 30, effectType: 'xp_pct', effectValue: 8 },
+  /* Chronik (03.10.2026) - Namen identisch zu den gleichnamigen Erfolgen. */
+  { id: 'idletitle_chronist', name: 'Chronist', desc: '100 Aufträge aus der Chronik erfüllt.', unlockCustom: ctx => (ctx.idleQuestsDone || 0) >= 100, effectType: 'xp_pct', effectValue: 5 },
+  { id: 'idletitle_wochenwerk', name: 'Unermüdlicher Planer', desc: '10 Wochentruhen geöffnet.', unlockCustom: ctx => (ctx.idleWeeklyChests || 0) >= 10, effectType: 'gold_prod_pct', effectValue: 5 },
+  { id: 'idletitle_ereignisjaeger', name: 'Ereignisjäger', desc: '100 Weltereignisse erlebt.', unlockCustom: ctx => (ctx.idleWorldEventsCaught || 0) >= 100, effectType: 'loot_chance_pct', effectValue: 5 },
+  { id: 'idletitle_bestiarium', name: 'Meister des Bestiariums', desc: '30 Stufen im Drachen-Bestiarium erreicht.', unlockCustom: ctx => (ctx.idleBestiaryTiers || 0) >= 30, effectType: 'attack_pct', effectValue: 5 },
   { id: 'idletitle_zuchtmeister', name: 'Zuchtmeister', desc: 'Den kompletten Zucht-Skilltree-Zweig maximiert.', unlockCustom: () => {
     if (!bkmpIdleState || !bkmpIdleSkillDefs.length) return false;
     const alloc = bkmpIdleState.skill_allocations || {};

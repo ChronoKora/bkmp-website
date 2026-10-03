@@ -937,6 +937,9 @@ function bkmpIdleHandleDragonClick(e) {
   bkmpIdleSpawnClickDamage(clickDamage, e && typeof e.clientX === 'number' ? e.clientX : undefined, e && typeof e.clientY === 'number' ? e.clientY : undefined);
   bkmpIdleSpawnHitFlash('idleDragon');
   bkmpIdleUpdateDragonHpBar();
+  /* Chronik-Auftrag "Greife N-mal per Klick an" (03.10.2026) - zaehlt nur
+     Klicks, die alle Autoklicker-Pruefungen oben bestanden haben. */
+  if (typeof bkmpChronicleAddProgress === 'function') bkmpChronicleAddProgress('clicks', 1);
 
   if (bkmpIdleCurrentDragon.hp <= 0) {
     bkmpIdleHandleDragonDefeated();

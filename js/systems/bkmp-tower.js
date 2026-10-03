@@ -164,6 +164,7 @@ function bkmpTowerMilestoneDifficultyIdx(wave) {
 }
 function bkmpTowerHandleWaveCleared() {
   bkmpDragonGrantCompanionBattleXp(6);
+  if (typeof bkmpChronicleAddProgress === 'function') bkmpChronicleAddProgress('tower_waves', 1);
   const s = bkmpIdleEffectiveStats;
   const wave = bkmpTowerWave;
   const goldGain = Math.round(s.attack * 0.8);

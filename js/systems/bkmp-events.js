@@ -109,7 +109,10 @@ function bkmpIdleCheckDailyStreak() {
   const gameNow = typeof bkmpGetGameNow === 'function' ? bkmpGetGameNow() : Date.now();
   const data = bkmpIdleGetStreakData();
   const today = bkmpIdleDateStr(new Date(gameNow));
-  if (data.lastDate === today) return;
+  if (data.lastDate === today) {
+    if (typeof bkmpChronicleMirrorStreak === 'function') bkmpChronicleMirrorStreak(data, false);
+    return;
+  }
   const yesterday = bkmpIdleDateStr(new Date(gameNow - 86400000));
   /* Gilden-Technologie v2 (26.07.), "Streak-Schutz": ein ausgelassener
      Tag setzt die Serie nur um EINE Stufe zurueck statt komplett auf 1,
@@ -124,11 +127,46 @@ function bkmpIdleCheckDailyStreak() {
     newCount = 1;
   }
   bkmpIdleSaveStreakData({ count: newCount, lastDate: today });
-  const goldBonus = Math.min(10000, 500 * newCount);
-  const gemBonus = newCount % 5 === 0 ? 10 : 0;
-  bkmpIdleState.gold = Number(bkmpIdleState.gold || 0) + goldBonus;
-  if (gemBonus > 0) bkmpIdleState.crystals = Number(bkmpIdleState.crystals || 0) + gemBonus;
+  /* Chronik (03.10.2026, js/systems/bkmp-chronicle.js): 7-Tage-Login-Kalender
+     mit Belohnungen, die mit dem Spieler mitwachsen (vorher fest max. 10.000
+     Gold - fuer Langzeitspieler bedeutungslos). Die alte Formel bleibt dort als
+     Untergrenze erhalten (kein Spieler bekommt je weniger). Fehlt das Modul
+     (admin.html/idle-stream-mini.html binden es nicht ein), greift exakt das
+     bisherige Verhalten. Auszahlung bleibt HIER, vor jeder Anzeige - ein Reload
+     kann weiterhin nie doppelt auszahlen (lastDate ist oben bereits gesetzt). */
+  const chronicleReward = typeof bkmpChronicleLoginReward === 'function' && typeof bkmpChronicleGrant === 'function'
+    ? bkmpChronicleLoginReward(newCount)
+    : null;
+  const goldBonus = chronicleReward ? chronicleReward.gold : Math.min(10000, 500 * newCount);
+  const gemBonus = chronicleReward ? 0 : (newCount % 5 === 0 ? 10 : 0);
+  let chronicleParts = null;
+  if (chronicleReward) {
+    chronicleParts = bkmpChronicleGrant(chronicleReward);
+  } else {
+    bkmpIdleState.gold = Number(bkmpIdleState.gold || 0) + goldBonus;
+    if (gemBonus > 0) bkmpIdleState.crystals = Number(bkmpIdleState.crystals || 0) + gemBonus;
+  }
   bkmpIdleQueueSync();
+  if (typeof bkmpChronicleMirrorStreak === 'function') bkmpChronicleMirrorStreak({ count: newCount, lastDate: today }, true);
+  if (chronicleReward && chronicleParts) {
+    const isBig = chronicleReward.day === 7 || chronicleReward.boostGold || chronicleReward.boostExp || chronicleReward.crystals > 0;
+    if (typeof bkmpRewardPresent === 'function') {
+      bkmpRewardPresent({
+        tier: isBig ? 'card' : 'toast',
+        rarity: isBig ? (chronicleReward.day === 7 ? 'episch' : 'selten') : null,
+        icon: chronicleReward.icon,
+        title: isBig
+          ? `${newCount}. Tag in Folge! – ${chronicleReward.label}`
+          : `🔥 ${newCount}. Tag in Folge! ${chronicleParts.join(' ')}`,
+        description: isBig ? `${chronicleParts.join(' · ')}${chronicleReward.mult > 1 ? ` (Treuebonus +${Math.round((chronicleReward.mult - 1) * 100)}%)` : ''}` : undefined,
+        source: 'Login-Kalender',
+        dedupeKey: `login-streak-${today}`
+      });
+    } else if (typeof bkmpShowJannikToast === 'function') {
+      bkmpShowJannikToast(`🔥 ${newCount}. Tag in Folge! ${chronicleParts.join(' ')}`, 4200);
+    }
+    return;
+  }
   /* Phase 5.5 (19.07.): Belohnung ist bereits oben vergeben+lokal gespeichert
      (localStorage lastDate=heute), BEVOR hier irgendetwas angezeigt wird -
      ein Reload waehrend/nach der Anzeige kann also nie ein zweites Mal

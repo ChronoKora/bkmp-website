@@ -1,4 +1,4 @@
-const { test, expect, openAndLogin, waitForIdleStateReady } = require('../helpers/qa-fixtures');
+const { test, expect, openAndLogin, waitForIdleStateReady, waitForDragonReady } = require('../helpers/qa-fixtures');
 
 /* QA-Grundlage Phase 2 (24.07.2026) - siehe identischer Kommentar in
    buttons-inventory.spec.js: mehrere Tests hier klicken #idleTabBtnRunen
@@ -27,6 +27,12 @@ test.describe('Speichern/Laden', () => {
 
   test('Ressourcen/Level/EXP ueberleben einen Reload', async ({ page, qaBaseURL, fixtureData }) => {
     await openAndLogin(page, qaBaseURL, fixtureData);
+    /* Chronik (03.10.2026): erst den KOMPLETTEN Oeffnen-Ablauf abwarten
+       (inkl. Login-Belohnung - die waechst seitdem mit dem Spieler mit und
+       ist groesser als die Toleranz unten). Ohne das landete die Belohnung
+       zufaellig zwischen "changed" und dem Reload. bkmpIdleCurrentDragon
+       wird erst NACH der Tagesserie gesetzt (siehe bkmpIdleOpenModal). */
+    await waitForDragonReady(page);
     // Der Kampf-Loop laeuft im Hintergrund weiter (bkmpIdleTick/
     // bkmpIdleStartLoop) und resolved ueblicherweise mindestens einen Treffer
     // schon waehrend des Oeffnens/Reopenings selbst, BEVOR ein evaluate()-
@@ -64,6 +70,7 @@ test.describe('Speichern/Laden', () => {
 
     await page.reload();
     await reopenAfterReload(page);
+    await waitForDragonReady(page);
     await page.evaluate(() => bkmpIdleStopLoop());
 
     const after = await page.evaluate(() => ({

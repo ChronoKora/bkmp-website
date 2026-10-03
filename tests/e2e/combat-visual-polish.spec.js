@@ -270,26 +270,47 @@ test.describe('Kampf-Feinschliff (visuell)', () => {
     await waitForDragonReady(page);
     await page.evaluate(() => bkmpIdleStopLoop());
 
-    await page.evaluate(() => bkmpIdleSpawnHitFlash('idleVillage'));
-    // 06.09.2026 (Testfund, kein App-Bug - siehe Kommentar/Commit 96861cd
-    // vom 07.08.2026 bei bkmpIdleRestartAnimClass()): bkmpIdleSpawnHitFlash()
-    // setzt die Klassen ueber denselben doppelten requestAnimationFrame-
-    // Neustart-Trick (bewusster Performance-Fix, kein synchroner Reflow
-    // mehr) - ein Check direkt im selben evaluate()-Aufruf wie der Trigger
-    // (wie zuvor) liest immer VOR den 2 Frames, die der Trick braucht.
-    await expect.poll(() => page.evaluate(() =>
-      document.getElementById('idleVillage').classList.contains('idle-village-damage-pulse')
-    )).toBe(true);
-    const during = await page.evaluate(() => {
+    /* 03.10.2026 (Testfund, kein App-Bug - per Diagnose-Test bewiesen):
+       headless WebKit (mobile-large) lieferte auf dieser Maschine nur ~5
+       requestAnimationFrame-Durchlaeufe in 3s (Chromium: ~80). Die Klasse
+       erschien dadurch erst nach ~1,1s und blieb ~0,4s (bis animationend) -
+       genau ZWISCHEN zwei expect.poll-Abfragen (0/100/350/850/1850ms), der
+       Test lief 5/5 rot, auch auf dem unveraenderten Stand ohne die Chronik-
+       Aenderungen. Statt zu pollen, schneidet jetzt ein MutationObserver das
+       Erscheinen mit und liest die Animationsnamen GENAU in diesem Moment. */
+    await page.evaluate(() => {
       const villageEl = document.getElementById('idleVillage');
-      const sprite = villageEl.querySelector('.idle-village-sprite');
-      const hpBar = document.getElementById('idleVillageHpFill').parentElement;
-      return {
-        pulseClassPresent: villageEl.classList.contains('idle-village-damage-pulse'),
-        spriteAnimName: getComputedStyle(sprite).animationName,
-        hpBarAnimName: getComputedStyle(hpBar).animationName
-      };
+      window.__qaPulse = null;
+      const mo = new MutationObserver(() => {
+        if (window.__qaPulse || !villageEl.classList.contains('idle-village-damage-pulse')) return;
+        const sprite = villageEl.querySelector('.idle-village-sprite');
+        const hpBar = document.getElementById('idleVillageHpFill').parentElement;
+        window.__qaPulse = {
+          pulseClassPresent: true,
+          spriteAnimName: getComputedStyle(sprite).animationName,
+          hpBarAnimName: getComputedStyle(hpBar).animationName
+        };
+      });
+      mo.observe(villageEl, { attributes: true, attributeFilter: ['class'] });
+      mo.observe(document.getElementById('idleVillageHpFill').parentElement, { attributes: true, attributeFilter: ['class'] });
+      bkmpIdleSpawnHitFlash('idleVillage');
     });
+    // 06.09.2026 (siehe Kommentar/Commit 96861cd vom 07.08.2026 bei
+    // bkmpIdleRestartAnimClass()): die Klassen kommen ueber einen doppelten
+    // requestAnimationFrame-Neustart - deshalb ueberhaupt asynchron.
+    await expect.poll(() => page.evaluate(() => Boolean(window.__qaPulse)), { timeout: 5000 }).toBe(true);
+    /* Der HP-Balken bekommt seine Klasse im selben Frame wie das Dorf, aber
+       ueber einen eigenen rAF-Aufruf - kann einen Tick spaeter dran sein.
+       Falls er im Beobachtungsmoment noch fehlte, kurz nachfassen. */
+    await expect.poll(() => page.evaluate(() => {
+      if (window.__qaPulse && window.__qaPulse.hpBarAnimName !== 'idleHpBarFlash') {
+        const hpBar = document.getElementById('idleVillageHpFill').parentElement;
+        const name = getComputedStyle(hpBar).animationName;
+        if (name === 'idleHpBarFlash') window.__qaPulse.hpBarAnimName = name;
+      }
+      return window.__qaPulse.hpBarAnimName;
+    }), { timeout: 5000 }).toBe('idleHpBarFlash');
+    const during = await page.evaluate(() => window.__qaPulse);
     // Gewinnt trotz des immer vorhandenen Inline-"style.animation" auf
     // #idleVillageSprite (siehe bkmpApplyVillageSkinToElement) - echter,
     // beim eigenen Testen gefundener Bug, siehe Kommentar in bkmp-hud.js.

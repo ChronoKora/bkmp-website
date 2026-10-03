@@ -176,6 +176,7 @@
      komplett getrennt vom Idle-Dorf-Spiel, siehe js/easter-eggs/jakes-
      feldfahrt.js Datei-Kopf-Kommentar. -->
 <link rel="stylesheet" href="css/jakes-feldfahrt.css?v=20260807-jakesfeldfahrt3">
+<link rel="stylesheet" href="css/bkmp-chronicle.css?v=20261003-chronik2">
 </head>
 <body>
 
@@ -830,6 +831,7 @@
           <div class="bkmp-proto-chud-resources" id="bkmpProtoChudResources"></div>
           <button type="button" class="bkmp-proto-chud-icon-btn" id="bkmpProtoChudDetailsBtn" aria-expanded="false" title="Kampfwerte anzeigen">ⓘ</button>
           <button type="button" class="bkmp-proto-chud-icon-btn" id="bkmpProtoChudFxBtn" title="Effektmodus"></button>
+          <button type="button" class="bkmp-proto-chud-icon-btn bkmp-chronicle-hud-btn" id="bkmpProtoChudChronicleBtn" data-chronicle-open="quests" data-testid="chronicle-hud-btn" title="Chronik: Aufträge, Login-Kalender, Bestiarium, Ziele" aria-label="Chronik öffnen">📜<span class="bkmp-chronicle-badge" data-chronicle-badge hidden></span></button>
         </div>
         <div class="bkmp-proto-chud-details" id="bkmpProtoChudDetails" style="display:none;"></div>
         <div class="bkmp-proto-chud-fx-menu" id="bkmpProtoChudFxMenu" style="display:none;"></div>
@@ -1050,6 +1052,10 @@
                  keine zweite/abweichende Berechnung). -->
             <div class="idle-kampf-right-col" id="idleKampfRightCol">
               <div class="idle-stage-bar" id="idleStageBar"></div>
+              <!-- Chronik (03.10.2026, js/systems/bkmp-chronicle.js): kompakte
+                   Tagesauftrags-Karte, nur in der grossen Desktop-Ansicht
+                   (Mobil/App: 📜-Knopf im kompakten HUD). -->
+              <div class="idle-chronicle-card" id="idleChronicleCard" data-testid="chronicle-card"></div>
               <div class="idle-combat-boss-card" id="idleCombatBossCard"></div>
               <div class="idle-combat-rewards" id="idleCombatRewards"></div>
               <div class="idle-combat-stats" id="idleCombatStats"></div>
@@ -1915,7 +1921,7 @@
        liest. window.BKMP_QA_MODE selbst wird noch frueher gesetzt (Kopf-Skript
        oben, vor jedem <script src>). Reiner No-Op ausserhalb des QA-Modus. -->
   <script src="js/core/bkmp-game-clock.js?v=20260724-qafoundation1" defer></script>
-  <script src="supabase.js?v=20261002-modachievements1" defer></script>
+  <script src="supabase.js?v=20261003-chronik1" defer></script>
   <script src="app.js?v=20261002-perfdeeplink1" defer></script>
   <!-- Redesign Phase 2a (17.07.): idledorf.js in geteilten Zustand + Subsysteme
        zerlegt. Ladereihenfolge ist bewusst fest: bkmp-idle-state.js zuerst
@@ -1927,24 +1933,25 @@
   <script src="js/core/bkmp-idle-state.js?v=20260819-stagebarfix1" defer></script>
   <script src="js/systems/bkmp-achievements.js?v=20260717-p2cfoundation" defer></script>
   <script src="js/core/bkmp-combat-math.js?v=20260801-guildlvlcap1" defer></script>
-  <script src="js/systems/bkmp-dungeon.js?v=20260731-dungeonkeyfix1" defer></script>
-  <script src="js/systems/bkmp-breeding.js?v=20260806-dragonstoragesync1" defer></script>
+  <script src="js/systems/bkmp-dungeon.js?v=20261003-chronik1" defer></script>
+  <script src="js/systems/bkmp-breeding.js?v=20261003-chronik1" defer></script>
   <script src="js/systems/bkmp-guild.js?v=20260927-dailyeventremoval1" defer></script>
   <script src="js/systems/bkmp-guild-tech.js?v=20260801-zuchtcategory1" defer></script>
   <script src="js/systems/bkmp-runes.js?v=20260807-rerollspacing1" defer></script>
   <script src="js/systems/bkmp-raid.js?v=20261002-perfdeeplink1" defer></script>
-  <script src="js/systems/bkmp-tower.js?v=20260726-stagebarvisfix1" defer></script>
+  <script src="js/systems/bkmp-tower.js?v=20261003-chronik1" defer></script>
   <script src="js/systems/bkmp-prestige.js?v=20260805-multicompanion7" defer></script>
-  <script src="js/systems/bkmp-arena.js?v=20260820-titlecontextfix1" defer></script>
+  <script src="js/systems/bkmp-arena.js?v=20261003-chronik1" defer></script>
   <script src="js/systems/bkmp-meister.js?v=20260717-p2bfoundation" defer></script>
   <script src="js/systems/bkmp-skilltree.js?v=20260717-p2bfoundation" defer></script>
   <script src="js/systems/bkmp-cosmetics.js?v=20260804-skinpreview2" defer></script>
-  <script src="js/systems/bkmp-events.js?v=20260726-guildtechext1" defer></script>
-  <script src="js/ui/bkmp-hud.js?v=20261002-videoblob1" defer></script>
+  <script src="js/systems/bkmp-events.js?v=20261003-chronik1" defer></script>
+  <script src="js/systems/bkmp-chronicle.js?v=20261003-chronik5" defer></script>
+  <script src="js/ui/bkmp-hud.js?v=20261003-chronik1" defer></script>
   <script src="js/systems/bkmp-leaderboard.js?v=20260717-p2cfoundation" defer></script>
   <script src="js/ui/bkmp-ui-components.js?v=20260731-guildtechtreev3" defer></script>
   <script src="js/ui/bkmp-reward-presenter.js?v=20260719-p55e" defer></script>
-  <script src="idledorf.js?v=20260821-afkfixedvalue1" defer></script>
+  <script src="idledorf.js?v=20261003-chronik2" defer></script>
   <script src="mapart.js?v=20260717-kartenfirmen1" defer></script>
   <script src="js/core/bkmp-idle-bootstrap.js?v=20260717-p2afoundation" defer></script>
   <!-- Jake's Feldfahrt (07.08.2026) - eigenstaendiges Website-Easter-Egg-

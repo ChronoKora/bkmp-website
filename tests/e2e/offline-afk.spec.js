@@ -24,7 +24,18 @@ test.describe('Offline-/AFK-Fortschritt', () => {
   test('30 Minuten Abwesenheit zahlt eine Belohnung', async ({ page, qaBaseURL, fixtureData, store }) => {
     await openAndLogin(page, qaBaseURL, fixtureData);
     await waitForDragonReady(page);
-    const goldBefore = await page.evaluate(() => bkmpIdleState.gold);
+    /* Chronik (03.10.2026): bkmpIdleApplyOfflineResult() uebernimmt die
+       SERVER-Summen - ein Vergleich mit dem LOKALEN Gold vorher scheiterte,
+       sobald noch ungespeicherte lokale Gewinne existierten (die seitdem mit
+       dem Spieler mitwachsende Login-Belohnung ist groesser als der 30-Min.-
+       Ertrag). Ein vorheriges Speichern ist hier keine Loesung: es schreibt
+       last_seen_at mit ECHTER Uhrzeit, die virtuelle Mock-Uhr steht aber seit
+       Start des Testprozesses (in einem langen Gesamtlauf ~20 Min. Abstand ->
+       nur noch ~700s statt 1800s "Abwesenheit", auf WebKit gefunden).
+       Deshalb wird jetzt direkt der SERVER-Stand verglichen. */
+    await page.evaluate(() => bkmpIdleStopLoop());
+    const serverRow = () => store.tables.idle_player_state.find(r => r.name_key === fixtureData.nameKey);
+    const serverGoldBefore = Number(serverRow().gold || 0);
 
     store.clock.advance(30 * 60 * 1000);
     const result = await claimOffline(page);
@@ -32,9 +43,11 @@ test.describe('Offline-/AFK-Fortschritt', () => {
     expect(result.ok).toBe(true);
     expect(result.elapsedSeconds).toBeGreaterThan(1000);
     expect(result.rewards).not.toBeNull();
+    expect(result.rewards.gold).toBeGreaterThan(0);
+    expect(Number(result.newTotals.gold)).toBeGreaterThan(serverGoldBefore);
     await page.evaluate((r) => { bkmpIdleApplyOfflineResult(r); }, result);
     const goldAfter = await page.evaluate(() => bkmpIdleState.gold);
-    expect(goldAfter).toBeGreaterThan(goldBefore);
+    expect(goldAfter).toBe(Number(result.newTotals.gold));
   });
 
   test('4 Stunden Abwesenheit zahlt mehr als 30 Minuten', async ({ page, qaBaseURL, fixtureData, store }) => {

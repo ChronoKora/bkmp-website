@@ -1190,6 +1190,10 @@ async function bkmpDungeonFinish(success) {
   const elapsedMs = Date.now() - bkmpDungeonStartTime;
   const wavesCleared = success ? difficulty.waves : Math.max(0, bkmpDungeonWave - 1);
   bkmpDungeonActive = false;
+  /* Chronik-Auftrag "Bestreite N Dungeon-Laeufe" (03.10.2026) - jeder
+     beendete Lauf zaehlt (auch ein verlorener), damit schwaechere Spieler den
+     Auftrag ebenfalls schaffen koennen. */
+  if (typeof bkmpChronicleAddProgress === 'function') bkmpChronicleAddProgress('dungeon_runs', 1);
   if (bkmpDungeonTimerInterval) { clearInterval(bkmpDungeonTimerInterval); bkmpDungeonTimerInterval = null; }
 
   /* Auto-Lauf (siehe bkmpDungeonStartAuto): bei einem Sieg, der noch

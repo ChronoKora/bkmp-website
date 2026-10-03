@@ -439,6 +439,7 @@ async function bkmpDragonFeed(dragonId, amount) {
   const feedSaved = feedSaveChancePct > 0 && Math.random() * 100 < feedSaveChancePct;
   if (!feedSaved) bkmpIdleState[dragon.food_preference] -= feedAmount;
   dragon.growth_points = Math.min(species.growth_points_required, dragon.growth_points + feedAmount);
+  if (typeof bkmpChronicleAddProgress === 'function') bkmpChronicleAddProgress('dragon_feeds', 1);
   bkmpIdleRenderHud();
   bkmpIdleQueueSync();
   try { await updatePlayerDragon(dragonId, { growth_points: dragon.growth_points }); } catch (e) { console.warn('Idle Dorf: Fuetterung konnte nicht gespeichert werden.', e); }

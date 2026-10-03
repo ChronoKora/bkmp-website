@@ -4027,6 +4027,48 @@ async function loadGuildBossRewardCodes(instanceId, name) {
   return Array.isArray(data) ? data : [];
 }
 
+/* Idle-Dorf "Chronik" (03.10.2026, siehe js/systems/bkmp-chronicle.js +
+   sql/20261003-idle-player-meta.sql): EINE JSONB-Zeile pro Konto, gekoppelt
+   an auth_user_id (umbenennungssicher). Beide Funktionen WERFEN bei einem
+   Fehler (auch bei fehlender Tabelle) - der Aufrufer entscheidet selbst, ob
+   er lokal weiterspeichert. Rein additiv, keine bestehende Funktion veraendert. */
+async function bkmpIdleMetaCurrentUserId(client) {
+  if (typeof bkmpIdlePlayerStateUserIdCache !== 'undefined' && bkmpIdlePlayerStateUserIdCache) return bkmpIdlePlayerStateUserIdCache;
+  const { data: sessionData } = await client.auth.getSession();
+  return sessionData && sessionData.session && sessionData.session.user ? sessionData.session.user.id : null;
+}
+
+async function loadIdlePlayerMeta() {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return null;
+  const userId = await bkmpIdleMetaCurrentUserId(client);
+  if (!userId) return null;
+  const { data, error } = await client
+    .from('idle_player_meta')
+    .select('data, updated_at')
+    .eq('auth_user_id', userId)
+    .limit(1);
+  if (error) throw error;
+  return Array.isArray(data) && data[0] ? data[0] : null;
+}
+
+async function upsertIdlePlayerMeta(nameKey, metaData) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client || !metaData) return false;
+  const userId = await bkmpIdleMetaCurrentUserId(client);
+  if (!userId) return false;
+  const { error } = await client
+    .from('idle_player_meta')
+    .upsert({
+      auth_user_id: userId,
+      name_key: String(nameKey || '').trim().toLowerCase(),
+      data: metaData,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'auth_user_id' });
+  if (error) throw error;
+  return true;
+}
+
 async function loadIdlePlayerState(name) {
   const client = bkmpGetSupabaseClient();
   if (!client || !name) return null;
