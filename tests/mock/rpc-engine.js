@@ -415,7 +415,123 @@ function villagePlayerRow(store, uid) {
   return row;
 }
 
+/* ---------- Drachendorf-Ausbau Phase 3 (04.10.2026): Expeditionen ----------
+   Nachbau von sql/20261004-03-expeditions.sql; die Teambewertung kommt aus
+   demselben Regel-Modul wie die Spiel-Vorschau (js/systems/bkmp-expedition-rules.js). */
+const expeditionRules = require('../../js/systems/bkmp-expedition-rules.js');
+function expeditionHarborSlots(store, uid) {
+  const harbor = villageBuildingLevel(store, uid, 'drachenhafen');
+  const def = getTable(store, 'village_building_levels').find(r => r.building_id === 'drachenhafen' && Number(r.level) === harbor);
+  const slots = def && def.effects && def.effects.expedition_slots != null ? Number(def.effects.expedition_slots) : harbor;
+  return { harbor, slots };
+}
+function expeditionChanceHit(seedText, chance) {
+  return (villageSeedInt(seedText) % 10000) < Math.round(chance * 10000);
+}
+
 const RPC_HANDLERS = {
+  expedition_start(store, uid, params) {
+    if (!uid) throw rpcError('not_authenticated');
+    const state = villagePlayerRow(store, uid);
+    const mission = getTable(store, 'expedition_missions').find(m => m.id === params.p_mission_id && m.active !== false);
+    if (!mission) throw rpcError('invalid_mission');
+    const region = getTable(store, 'expedition_regions').find(r => r.id === mission.region_id);
+    const { harbor, slots } = expeditionHarborSlots(store, uid);
+    if (harbor < 1) throw rpcError('harbor_not_built');
+    if (harbor < Number(region.min_harbor_level)) throw rpcError('region_locked');
+    const expeditions = getTable(store, 'player_expeditions');
+    const running = expeditions.filter(e => e.auth_user_id === uid && e.status === 'running');
+    if (running.length >= slots) throw rpcError('no_free_slot');
+    const ids = Array.isArray(params.p_dragon_ids) ? params.p_dragon_ids : [];
+    if (ids.length !== Number(mission.team_size)) throw rpcError('wrong_team_size');
+    if (new Set(ids).size !== ids.length) throw rpcError('duplicate_dragon');
+    const dragons = getTable(store, 'player_dragons').filter(d => ids.includes(d.id) && d.auth_user_id === uid
+      && (d.stage === 'adult' || d.stage === 'divine') && !d.is_companion);
+    if (dragons.length !== ids.length) throw rpcError('dragon_not_available');
+    if (running.some(e => (e.dragon_ids || []).some(id => ids.includes(id)))) throw rpcError('dragon_on_expedition');
+    const speciesById = {};
+    getTable(store, 'dragon_species').forEach(s => { speciesById[s.id] = s; });
+    const team = dragons.map(d => {
+      const sp = speciesById[d.species_id] || {};
+      return { species_id: d.species_id, rarity: sp.rarity, affinities: sp.affinities || [], trait: d.trait || null, bond_level: expeditionRules.bkmpDragonBondLevel(d.bond_xp) };
+    });
+    const ev = expeditionRules.bkmpExpeditionTeamEval(mission, team);
+    if (ev.unmet.length) throw rpcError('requirements_not_met');
+    const id = crypto.randomUUID();
+    const score = ev.score + (villageSeedInt(id + ':quality') % 21);
+    const quality = expeditionRules.bkmpExpeditionQuality(score);
+    const mult = expeditionRules.bkmpExpeditionQualityMult(quality);
+    const unit = villageGoldUnit(state.highest_dragon_index);
+    const rw = mission.rewards || {};
+    const r = {
+      gold: Math.round(Number(rw.gold_units || 0) * unit * mult),
+      wood: Math.round(Number(rw.wood || 0) * mult), stone: Math.round(Number(rw.stone || 0) * mult),
+      crystals: Math.round(Number(rw.crystals || 0) * mult), essence: Math.round(Number(rw.essence || 0) * mult),
+      fruit: Math.round(Number(rw.fruit || 0) * mult), meat: Math.round(Number(rw.meat || 0) * mult),
+      bond_xp: Number(rw.bond_xp || 0), runes: 0, eggs: 0
+    };
+    const runeChance = Number(rw.rune_chance || 0), eggChance = Number(rw.egg_chance || 0);
+    r.runes = Math.floor(runeChance) + (expeditionChanceHit(id + ':rune', runeChance - Math.floor(runeChance)) ? 1 : 0);
+    r.eggs = Math.floor(eggChance) + (expeditionChanceHit(id + ':egg', eggChance - Math.floor(eggChance)) ? 1 : 0);
+    const traits = [...new Set(dragons.map(d => d.trait).filter(Boolean))];
+    const affs = [...new Set(team.flatMap(m => m.affinities))];
+    const events = [];
+    getTable(store, 'expedition_events').slice().sort((a, b) => (a.sort_order - b.sort_order) || (a.id < b.id ? -1 : 1)).forEach(e => {
+      if (events.length >= 2) return;
+      let chance = Number(e.base_chance) + (quality - 1) * 0.015;
+      Object.keys(e.affinity_bonus || {}).forEach(a => { if (affs.includes(a)) chance += Number(e.affinity_bonus[a]); });
+      Object.keys(e.trait_bonus || {}).forEach(t => { if (traits.includes(t)) chance += Number(e.trait_bonus[t]); });
+      if (!expeditionChanceHit(id + ':ev:' + e.id, chance)) return;
+      events.push({ id: e.id, name: e.name, icon: e.icon, description: e.description });
+      const er = e.reward || {};
+      r.gold += Math.round(Number(er.gold_units || 0) * unit);
+      ['wood', 'stone', 'crystals', 'essence', 'fruit', 'meat'].forEach(k => { r[k] += Number(er[k] || 0); });
+      r.runes += Number(er.runes || 0); r.eggs += Number(er.eggs || 0); r.bond_xp += Number(er.bond_xp || 0);
+    });
+    r.rune_tier = region.rune_tier; r.egg_tier = region.egg_tier;
+    const nowMs = store.clock.nowMs();
+    const row = {
+      id, auth_user_id: uid, name_key: state.name_key, mission_id: mission.id, region_id: mission.region_id,
+      dragon_ids: ids.slice(), started_at: new Date(nowMs).toISOString(),
+      ends_at: new Date(nowMs + Number(mission.duration_hours) * 3600000).toISOString(),
+      status: 'running', quality, quality_score: score, events, rewards: r, claimed_at: null
+    };
+    expeditions.push(row);
+    return { id, mission_id: mission.id, region_id: mission.region_id, dragon_ids: ids.slice(), started_at: row.started_at, ends_at: row.ends_at, status: 'running' };
+  },
+  expedition_claim(store, uid, params) {
+    if (!uid) throw rpcError('not_authenticated');
+    const exp = getTable(store, 'player_expeditions').find(e => e.id === params.p_expedition_id && e.auth_user_id === uid);
+    if (!exp) throw rpcError('invalid_expedition');
+    if (exp.status === 'claimed') return { id: exp.id, newly_claimed: false, quality: exp.quality, events: exp.events, rewards: exp.rewards };
+    if (Date.parse(exp.ends_at) > store.clock.nowMs()) throw rpcError('not_finished');
+    const state = villagePlayerRow(store, uid);
+    const rw = { ...exp.rewards };
+    const fruitCap = 2000 + Number(state.obstgarten_level || 0) * 500;
+    const meatCap = 2000 + Number(state.jagdhuette_level || 0) * 500;
+    rw.fruit = Math.max(0, Math.min(Number(rw.fruit || 0), fruitCap - Number(state.fruit || 0)));
+    rw.meat = Math.max(0, Math.min(Number(rw.meat || 0), meatCap - Number(state.meat || 0)));
+    ['gold', 'wood', 'stone', 'crystals', 'essence'].forEach(k => { state[k] = Number(state[k] || 0) + Number(rw[k] || 0); });
+    state.total_gold_earned = Number(state.total_gold_earned || 0) + Number(rw.gold || 0);
+    state.fruit = Number(state.fruit || 0) + rw.fruit;
+    state.meat = Number(state.meat || 0) + rw.meat;
+    getTable(store, 'player_dragons').forEach(d => {
+      if (!exp.dragon_ids.includes(d.id) || d.auth_user_id !== uid) return;
+      d.expeditions_completed = Number(d.expeditions_completed || 0) + 1;
+      d.bond_xp = Number(d.bond_xp || 0) + Number(rw.bond_xp || 0);
+    });
+    exp.status = 'claimed'; exp.claimed_at = store.clock.nowIso(); exp.rewards = rw;
+    return { id: exp.id, newly_claimed: true, quality: exp.quality, events: exp.events, rewards: rw };
+  },
+  expedition_status(store, uid) {
+    if (!uid) throw rpcError('not_authenticated');
+    const { harbor, slots } = expeditionHarborSlots(store, uid);
+    const expeditions = getTable(store, 'player_expeditions')
+      .filter(e => e.auth_user_id === uid && e.status === 'running')
+      .sort((a, b) => Date.parse(a.started_at) - Date.parse(b.started_at))
+      .map(e => ({ id: e.id, mission_id: e.mission_id, region_id: e.region_id, dragon_ids: e.dragon_ids, started_at: e.started_at, ends_at: e.ends_at, status: e.status }));
+    return { harbor_level: harbor, slots, server_now: store.clock.nowIso(), expeditions };
+  },
   village_build(store, uid, params) {
     if (!uid) throw rpcError('not_authenticated');
     const state = villagePlayerRow(store, uid);

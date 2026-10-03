@@ -332,7 +332,7 @@ async function bkmpVillageBuild(buildingId) {
       if (typeof window.bkmpVillageOnChange === 'function') window.bkmpVillageOnChange(buildingId);
     }
   } catch (e) {
-    bkmpVillageToast(e.message || String(e), 'error');
+    bkmpVillageToast(e.message || String(e), 'danger');
   }
   bkmpVillageBusy = false;
   bkmpVillageRenderFromCache();
@@ -364,7 +364,7 @@ async function bkmpVillageTrade(offerIndex) {
       bkmpVillageToast(`🤝 Tausch erfolgreich: ${bkmpVillageOfferSideHtml(res.reward_kind, res.reward_amount)}`, 'success');
     }
   } catch (e) {
-    bkmpVillageToast(e.message || String(e), 'error');
+    bkmpVillageToast(e.message || String(e), 'danger');
     if (/heute schon|nicht mehr/.test(String(e.message || ''))) await bkmpVillageEnsureOffers(true);
   }
   bkmpVillageBusy = false;

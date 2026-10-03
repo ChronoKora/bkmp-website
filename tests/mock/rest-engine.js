@@ -9,6 +9,7 @@
 
 const { table: getTable } = require('./store');
 const { applyIdlePlayerStateAntiCheatGuard } = require('./anticheat-guard');
+const { guardPlayerDragonPatch, guardPlayerDragonDelete, guardPlayerDragonInsert } = require('./dragon-guards');
 
 function coerce(raw) {
   if (raw === 'null') return null;
@@ -252,7 +253,8 @@ function handleRestRequest(store, { method, tableName, searchParams, body, heade
         Object.assign(existing, incoming);
         affected.push(existing);
       } else {
-        const row = { id: incoming.id != null ? incoming.id : store.nextId(), ...incoming };
+        const safeIncoming = tableName === 'player_dragons' ? guardPlayerDragonInsert(incoming) : incoming;
+        const row = { id: incoming.id != null ? incoming.id : store.nextId(), ...safeIncoming };
         rows.push(row);
         affected.push(row);
       }
@@ -262,6 +264,17 @@ function handleRestRequest(store, { method, tableName, searchParams, body, heade
 
   if (method === 'PATCH') {
     const matches = applyFilters(rows, searchParams);
+    /* Drachendorf-Ausbau: Nachbau der player_dragons-Trigger (siehe dragon-guards.js). */
+    if (tableName === 'player_dragons') {
+      try {
+        const cleaned = matches.map(row => guardPlayerDragonPatch(store, row, body));
+        matches.forEach((row, i) => Object.assign(row, cleaned[i]));
+        return { status: 200, json: applySelect(matches, searchParams, tableName, store) };
+      } catch (e) {
+        if (e.guardError) return { status: 400, json: { code: 'P0001', message: e.message } };
+        throw e;
+      }
+    }
     matches.forEach(row => {
       let patchBody = body;
       /* Anti-Cheat-Tempo-Guard (30.07.2026) - Nachbau des Postgres-Triggers
@@ -307,6 +320,13 @@ function handleRestRequest(store, { method, tableName, searchParams, body, heade
 
   if (method === 'DELETE') {
     const matches = applyFilters(rows, searchParams);
+    if (tableName === 'player_dragons') {
+      try { matches.forEach(row => guardPlayerDragonDelete(store, row)); }
+      catch (e) {
+        if (e.guardError) return { status: 400, json: { code: 'P0001', message: e.message } };
+        throw e;
+      }
+    }
     const matchSet = new Set(matches);
     store.tables[tableName] = rows.filter(r => !matchSet.has(r));
     return { status: 200, json: matches };

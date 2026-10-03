@@ -25,3 +25,13 @@ select '2026-10-04', 'feature',
 where not exists (
   select 1 from public.changelog_entries where entry_date = '2026-10-04' and title = 'Idle-Dorf: Dorfentwicklung – Drachenhafen & Handelsposten'
 );
+
+-- Erst nach sql/20261004-01-drachendorf-grundlage.sql und
+-- sql/20261004-03-expeditions.sql ausfuehren.
+insert into public.changelog_entries (entry_date, category, title, description)
+select '2026-10-04', 'feature',
+  'Idle-Dorf: Drachen-Expeditionen',
+  'Mit dem ⚓ Drachenhafen kannst du deine erwachsenen Drachen auf Expeditionen schicken (1, 4 oder 8 Stunden) – zu finden im Drachenzucht-Reiter. Fünf Regionen warten: 🌲 Flüsterwald, 🌋 Glutberge, ❄️ Frostklamm, 🌌 Endriss und das 🐲 Verbotene Drachental. Jede Mission hat eigene Bedingungen und Empfehlungen (z. B. Elemente oder verschiedene Arten) – es lohnt sich also, verschiedene Drachen einzusetzen, nicht nur die stärksten. Keine Expedition geht leer aus: Je besser das Team passt, desto höher die Qualität (⭐ bis ⭐⭐⭐⭐) und die Belohnung. Unterwegs passieren Ereignisse wie Schatztruhen, Kristalladern oder sogar ein geheimnisvolles Ei. „✨ Team vorschlagen“ hilft bei der Zusammenstellung. Drachen auf Expedition können nicht kämpfen oder freigelassen werden.'
+where not exists (
+  select 1 from public.changelog_entries where entry_date = '2026-10-04' and title = 'Idle-Dorf: Drachen-Expeditionen'
+);

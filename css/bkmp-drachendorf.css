@@ -180,3 +180,101 @@ html[data-fx="aus"] .idle-dorf-cat-chevron { transition: none; }
   line-height: 1.45;
 }
 #idlePanelDorf .dd-village-intro p.dd-muted { font-size: .88rem; }
+
+/* ---------- Phase 3: Expeditionen (Drachenzucht-Reiter + Fenster) ---------- */
+.dd-exp-section h4 { margin-bottom: .45rem; }
+.dd-exp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: .6rem;
+}
+.dd-exp-card {
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+  padding: .65rem .75rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, .1);
+  background: rgba(255, 255, 255, .035);
+  text-align: left;
+  color: var(--app-ink, var(--ink, #f5f3ed));
+}
+.dd-exp-card.is-ready { border-color: color-mix(in srgb, var(--pos, #4ade80) 55%, transparent); }
+#idlePanelDrachen button.dd-exp-card-free {
+  align-items: center;
+  justify-content: center;
+  min-height: 112px;
+  border-style: dashed;
+  font-weight: 800;
+  color: var(--app-muted, var(--muted, #b7a8c4));
+  cursor: pointer;
+}
+#idlePanelDrachen button.dd-exp-card-free:hover { color: var(--gold-fixed, #c9a56a); border-color: color-mix(in srgb, var(--gold-fixed, #c9a56a) 50%, transparent); }
+.dd-exp-card-region { font-size: .74rem; color: var(--app-muted, var(--muted, #b7a8c4)); }
+.dd-exp-card-mission { font-weight: 800; font-size: .9rem; }
+.dd-exp-team { display: flex; gap: .25rem; }
+.dd-exp-team .idle-dragon-thumb.dd-exp-thumb, .dd-exp-dragon .idle-dragon-thumb.dd-exp-thumb { width: 40px; height: 40px; object-fit: contain; }
+.dd-exp-countdown { font-size: .8rem; font-variant-numeric: tabular-nums; color: var(--app-muted, var(--muted, #b7a8c4)); }
+.dd-exp-away-badge {
+  font-size: .72rem;
+  font-weight: 700;
+  color: #7dd3fc;
+  background: rgba(56, 189, 248, .12);
+  border-radius: 999px;
+  padding: .12rem .5rem;
+  align-self: center;
+}
+.idle-dorf-tab.dd-has-ready, .bkmp-proto-nav-btn.dd-has-ready { position: relative; }
+.idle-dorf-tab.dd-has-ready::after, .bkmp-proto-nav-btn.dd-has-ready::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--pos, #4ade80);
+  box-shadow: 0 0 0 2px rgba(10, 10, 15, .8);
+}
+
+.dd-exp-modal-card { width: min(760px, 94vw); max-width: 760px; max-height: 88vh; overflow-y: auto; text-align: left; }
+.dd-exp-planner { display: flex; flex-direction: column; gap: .7rem; }
+.dd-exp-region-chips { display: flex; flex-wrap: wrap; gap: .35rem; }
+.bkmp-ui-modal-overlay .dd-exp-region-chip,
+.bkmp-ui-modal-overlay .dd-exp-mission,
+.bkmp-ui-modal-overlay .dd-exp-dragon {
+  font: inherit;
+  color: var(--app-ink, var(--ink, #f5f3ed));
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid rgba(255, 255, 255, .12);
+  cursor: pointer;
+  text-align: left;
+}
+.bkmp-ui-modal-overlay .dd-exp-region-chip { border-radius: 999px; padding: .3rem .7rem; font-size: .8rem; font-weight: 700; }
+.bkmp-ui-modal-overlay .dd-exp-region-chip.active { border-color: var(--gold-fixed, #c9a56a); color: var(--gold-fixed, #c9a56a); }
+.bkmp-ui-modal-overlay .dd-exp-region-chip.is-locked { opacity: .55; }
+.dd-exp-region-desc { font-size: .82rem; }
+.dd-exp-mission-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: .5rem; }
+.bkmp-ui-modal-overlay .dd-exp-mission { display: flex; flex-direction: column; gap: .2rem; border-radius: 12px; padding: .6rem .7rem; }
+.bkmp-ui-modal-overlay .dd-exp-mission.active { border-color: var(--gold-fixed, #c9a56a); background: rgba(201, 165, 106, .08); }
+.dd-exp-mission-name { font-weight: 800; font-size: .88rem; }
+.dd-exp-mission-meta, .dd-exp-mission-rewards { font-size: .74rem; color: var(--app-muted, var(--muted, #b7a8c4)); }
+.dd-exp-checklist { list-style: none; margin: .2rem 0; padding: 0; font-size: .8rem; line-height: 1.6; }
+.dd-exp-checklist .is-missing { color: var(--neg, #f87171); }
+.dd-exp-checklist .is-optional { color: var(--app-muted, var(--muted, #b7a8c4)); }
+.dd-exp-checklist small { color: var(--app-muted, var(--muted, #b7a8c4)); }
+.dd-exp-quality { font-size: .86rem; margin: .2rem 0 .5rem; }
+.dd-exp-dragon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: .4rem; max-height: min(40vh, 340px); overflow-y: auto; padding: 2px; }
+.bkmp-ui-modal-overlay .dd-exp-dragon { display: flex; flex-direction: column; align-items: center; gap: .1rem; border-radius: 10px; padding: .4rem; text-align: center; border-color: color-mix(in srgb, var(--dragon-rarity-color, #888) 40%, transparent); }
+.bkmp-ui-modal-overlay .dd-exp-dragon.is-selected { border-color: var(--gold-fixed, #c9a56a); background: rgba(201, 165, 106, .12); box-shadow: inset 0 0 0 1px var(--gold-fixed, #c9a56a); }
+.dd-exp-dragon-name { font-size: .76rem; font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dd-exp-dragon-meta { font-size: .68rem; color: var(--app-muted, var(--muted, #b7a8c4)); }
+.dd-aff { margin-left: .1rem; }
+.dd-exp-events { margin: .3rem 0; padding-left: 1.1rem; font-size: .82rem; line-height: 1.45; }
+.dd-exp-reward-list { list-style: none; margin: .4rem 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .25rem .6rem; font-size: .86rem; }
+@media (max-width: 560px) {
+  .dd-exp-mission-list { grid-template-columns: 1fr; }
+}
+.dd-exp-modal-card p { font-size: .84rem; margin-bottom: .4rem; }
+.dd-exp-modal-card h4 { margin: 0; }
+.dd-exp-modal-card .dd-exp-start-btn { width: 100%; margin-top: .4rem; }

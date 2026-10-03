@@ -539,9 +539,19 @@ function bkmpDragonActiveCompanions() {
     .sort((a, b) => strength(b) - strength(a))
     .slice(0, maxSlots);
 }
+/* Drachendorf-Ausbau Phase 3: ein Drache auf Expedition ist unterwegs - er
+   kann weder kaempfen, noch freigelassen oder geopfert werden (zusaetzlich
+   serverseitig per Trigger abgesichert, siehe sql/20261004-03-expeditions.sql). */
+function bkmpDragonIsAway(dragonId) {
+  return typeof bkmpExpIsDragonOnExpedition === 'function' && bkmpExpIsDragonOnExpedition(dragonId);
+}
+function bkmpDragonAwayToast() {
+  if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('⚓ Dieser Drache ist gerade auf Expedition.', 2800);
+}
 async function bkmpDragonSetCompanion(dragonId) {
   const dragon = bkmpPlayerDragons.find(d => d.id === dragonId);
   if (!dragon || dragon.is_companion) return;
+  if (bkmpDragonIsAway(dragonId)) { bkmpDragonAwayToast(); return; }
   if (dragon.stage === 'adult') {
     const equippedAdults = bkmpPlayerDragons.filter(d => d.is_companion && d.stage === 'adult').length;
     const maxSlots = bkmpDragonMaxCompanionSlots();
@@ -667,6 +677,7 @@ async function bkmpDragonRelease(dragonId) {
     if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast('Entferne den Drachen zuerst als Begleiter.', 2800);
     return;
   }
+  if (bkmpDragonIsAway(dragonId)) { bkmpDragonAwayToast(); return; }
   try {
     await releasePlayerDragon(dragonId);
     bkmpPlayerDragons = bkmpPlayerDragons.filter(d => d.id !== dragonId);
@@ -765,7 +776,7 @@ function bkmpDragonCanAscend(dragon) {
   return Boolean(species) && dragon.stage === 'adult' && Number(dragon.ascension_level || 0) < BKMP_DRAGON_ASCEND_MAX_LEVEL;
 }
 function bkmpDragonFindAscendFodder(dragon) {
-  return bkmpPlayerDragons.find(d => d.id !== dragon.id && d.species_id === dragon.species_id && d.stage === 'adult' && !d.is_favorite && !d.is_companion);
+  return bkmpPlayerDragons.find(d => d.id !== dragon.id && d.species_id === dragon.species_id && d.stage === 'adult' && !d.is_favorite && !d.is_companion && !bkmpDragonIsAway(d.id));
 }
 async function bkmpDragonAscend(dragonId) {
   const dragon = bkmpPlayerDragons.find(d => d.id === dragonId);
@@ -1583,6 +1594,7 @@ function bkmpIdleRenderDragonsPanel() {
             <div class="idle-skin-name">${escapeHtml(species.name)} <small>(${isTeen ? 'Jugendlich' : 'Erwachsen'})</small></div>
             <div class="idle-skin-desc">${rarity.name}</div>
             ${companionRankBadge}
+            ${typeof bkmpExpDragonBadgeHtml === 'function' ? bkmpExpDragonBadgeHtml(d.id) : ''}
             ${isTeen
               ? `<div class="idle-xp-bar"><div class="idle-xp-fill" style="width:${pct}%"></div></div>
                  <div class="idle-xp-label">${bkmpIdleFormatNumber(d.battle_xp)} / ${bkmpIdleFormatNumber(species.battle_xp_required)} Kampf-EP</div>`
@@ -1607,6 +1619,7 @@ function bkmpIdleRenderDragonsPanel() {
       <h4>🐲 Begleiter im Kampf (${activeCompanions.length}/${maxCompanionSlots})</h4>
       ${bkmpDragonRenderCompanionSlotBarHtml(activeCompanions, maxCompanionSlots, teenCompanion)}
     </div>
+    ${typeof bkmpExpSectionHtml === 'function' ? bkmpExpSectionHtml() : ''}
     <div class="idle-dragon-section">
       <h4>🍎🥩 Vorräte ${typeof bkmpUiTooltipHtml === 'function' ? `<button type="button" class="idle-dragon-vorraete-info" data-tooltip-id="dragonVorraeteTip" aria-label="Wo finde ich Gebäude-Upgrades?">ℹ️</button>${bkmpUiTooltipHtml('Gebäude-Upgrades findest du im Tab "⬆️ Upgrades".', 'dragonVorraeteTip')}` : ''}</h4>
       <p class="idle-skin-desc">

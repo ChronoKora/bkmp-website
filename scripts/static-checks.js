@@ -31,6 +31,7 @@ const CLIENT_JS_FILES = [
   'js/systems/bkmp-raid.js', 'js/systems/bkmp-runes.js',
   'js/systems/bkmp-skilltree.js', 'js/systems/bkmp-tower.js',
   'js/systems/bkmp-chronicle.js', 'js/systems/bkmp-village.js',
+  'js/systems/bkmp-expedition-rules.js', 'js/systems/bkmp-expeditions.js',
   'js/ui/bkmp-feedback-board.js', 'js/ui/bkmp-hud.js',
   'js/ui/bkmp-reward-presenter.js', 'js/ui/bkmp-ui-components.js'
 ].filter(f => fs.existsSync(path.join(ROOT, f)));

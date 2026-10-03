@@ -4528,13 +4528,29 @@ async function assignEggToDragonNest(nestId, eggId) {
   return Array.isArray(data) && data.length > 0;
 }
 
+const BKMP_PLAYER_DRAGON_BASE_COLUMNS = 'id, species_id, nickname, stage, food_preference, growth_points, battle_xp, is_companion, is_favorite, main_stat_key, stat_attack, stat_defense, stat_hp, substats, ascension_level, hatched_at, adult_at';
+/* Drachendorf-Ausbau (sql/20261004-01-drachendorf-grundlage.sql): Eigenschaft,
+   Bindung, Nutzung, Expeditionen, Goettliche Erweckung. Fehlen die Spalten
+   noch, wird automatisch nur die Basis geladen. */
+const BKMP_PLAYER_DRAGON_EXT_COLUMNS = 'trait, bond_xp, companion_seconds, companion_kills, companion_boss_kills, expeditions_completed, divine_offering_gold, divine_multiplier, awakened_at, origin_event';
+let bkmpPlayerDragonExtColumnsMissing = false;
 async function loadPlayerDragons(name) {
   const client = bkmpGetSupabaseClient();
   if (!client || !name) return [];
+  const key = String(name).trim().toLowerCase();
+  if (!bkmpPlayerDragonExtColumnsMissing) {
+    const { data, error } = await client
+      .from('player_dragons')
+      .select(BKMP_PLAYER_DRAGON_BASE_COLUMNS + ', ' + BKMP_PLAYER_DRAGON_EXT_COLUMNS)
+      .eq('name_key', key);
+    if (!error) return Array.isArray(data) ? data : [];
+    if (!bkmpIsMissingDbObjectError(error)) throw error;
+    bkmpPlayerDragonExtColumnsMissing = true;
+  }
   const { data, error } = await client
     .from('player_dragons')
-    .select('id, species_id, nickname, stage, food_preference, growth_points, battle_xp, is_companion, is_favorite, main_stat_key, stat_attack, stat_defense, stat_hp, substats, ascension_level, hatched_at, adult_at')
-    .eq('name_key', String(name).trim().toLowerCase());
+    .select(BKMP_PLAYER_DRAGON_BASE_COLUMNS)
+    .eq('name_key', key);
   if (error) throw error;
   return Array.isArray(data) ? data : [];
 }
@@ -6595,5 +6611,68 @@ async function bkmpVillageTradeExecuteRpc(offerIndex) {
   if (!client) throw new Error('Supabase ist nicht verbunden.');
   const { data, error } = await client.rpc('village_trade_execute', { p_offer_index: offerIndex });
   if (error) throw new Error(bkmpVillageErrorText(error.message));
+  return Array.isArray(data) ? data[0] : data;
+}
+
+/* ============================================================
+   Drachendorf-Ausbau Phase 3 (04.10.2026): Drachen-Expeditionen
+   (sql/20261004-03-expeditions.sql). Katalog oeffentlich lesbar, Starten/
+   Abholen nur ueber die serverseitigen Funktionen.
+   ============================================================ */
+function bkmpExpeditionErrorText(msg) {
+  const m = String(msg || '');
+  if (m.includes('harbor_not_built')) return 'Baue zuerst den Drachenhafen (🏗️ Dorfentwicklung).';
+  if (m.includes('region_locked')) return 'Diese Region braucht einen größeren Drachenhafen.';
+  if (m.includes('no_free_slot')) return 'Alle Expeditionsplätze sind belegt.';
+  if (m.includes('wrong_team_size')) return 'Für diese Mission brauchst du genau die angegebene Anzahl Drachen.';
+  if (m.includes('duplicate_dragon')) return 'Jeder Drache kann nur einmal mitfliegen.';
+  if (m.includes('dragon_not_available')) return 'Einer der Drachen ist nicht verfügbar (nur eigene, erwachsene Drachen, die gerade nicht kämpfen).';
+  if (m.includes('dragon_on_expedition')) return 'Einer der Drachen ist bereits auf Expedition.';
+  if (m.includes('requirements_not_met')) return 'Das Team erfüllt die Bedingungen der Mission noch nicht.';
+  if (m.includes('invalid_mission')) return 'Diese Mission gibt es nicht (mehr).';
+  if (m.includes('not_finished')) return 'Die Expedition ist noch unterwegs.';
+  if (m.includes('invalid_expedition')) return 'Diese Expedition wurde nicht gefunden.';
+  if (m.includes('not_authenticated')) return 'Du bist nicht eingeloggt (Sitzung abgelaufen?). Bitte neu einloggen.';
+  if (m.includes('no_player_state')) return 'Dein Spielstand wurde noch nicht gespeichert - bitte kurz warten und erneut versuchen.';
+  return 'Das hat nicht geklappt: ' + (m || 'unbekannter Fehler') + '. Bitte versuche es erneut.';
+}
+async function loadExpeditionCatalog() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return { missing: true, regions: [], missions: [], events: [] };
+  const [r, m, e] = await Promise.all([
+    client.from('expedition_regions').select('*').order('sort_order', { ascending: true }),
+    client.from('expedition_missions').select('*').order('sort_order', { ascending: true }),
+    client.from('expedition_events').select('*').order('sort_order', { ascending: true })
+  ]);
+  const err = r.error || m.error || e.error;
+  if (err) {
+    if (bkmpIsMissingDbObjectError(err)) return { missing: true, regions: [], missions: [], events: [] };
+    throw err;
+  }
+  return { missing: false, regions: r.data || [], missions: (m.data || []).filter(x => x.active !== false), events: e.data || [] };
+}
+async function bkmpExpeditionStatusRpc() {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return { missing: true };
+  const { data, error } = await client.rpc('expedition_status');
+  if (error) {
+    if (bkmpIsMissingDbObjectError(error)) return { missing: true };
+    throw new Error(bkmpExpeditionErrorText(error.message));
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  return { missing: false, ...(row || {}) };
+}
+async function bkmpExpeditionStartRpc(missionId, dragonIds) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { data, error } = await client.rpc('expedition_start', { p_mission_id: missionId, p_dragon_ids: dragonIds });
+  if (error) throw new Error(bkmpExpeditionErrorText(error.message));
+  return Array.isArray(data) ? data[0] : data;
+}
+async function bkmpExpeditionClaimRpc(expeditionId) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { data, error } = await client.rpc('expedition_claim', { p_expedition_id: expeditionId });
+  if (error) throw new Error(bkmpExpeditionErrorText(error.message));
   return Array.isArray(data) ? data[0] : data;
 }
