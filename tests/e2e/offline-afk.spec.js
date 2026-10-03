@@ -36,6 +36,10 @@ test.describe('Offline-/AFK-Fortschritt', () => {
     await page.evaluate(() => bkmpIdleStopLoop());
     const serverRow = () => store.tables.idle_player_state.find(r => r.name_key === fixtureData.nameKey);
     const serverGoldBefore = Number(serverRow().gold || 0);
+    /* Drachendorf-Ausbau Phase 0 (04.10.2026): noch ungespeicherte lokale
+       Gewinne (z.B. die Login-Belohnung) gehen beim Uebernehmen der
+       Server-Summen nicht mehr verloren - sie werden wieder aufgeschlagen. */
+    const unsavedGold = await page.evaluate(() => Math.max(0, Number(bkmpIdleState.gold || 0) - Number((bkmpIdleMergeBaseline || {}).gold || 0)));
 
     store.clock.advance(30 * 60 * 1000);
     const result = await claimOffline(page);
@@ -47,7 +51,24 @@ test.describe('Offline-/AFK-Fortschritt', () => {
     expect(Number(result.newTotals.gold)).toBeGreaterThan(serverGoldBefore);
     await page.evaluate((r) => { bkmpIdleApplyOfflineResult(r); }, result);
     const goldAfter = await page.evaluate(() => bkmpIdleState.gold);
-    expect(goldAfter).toBe(Number(result.newTotals.gold));
+    expect(goldAfter).toBe(Number(result.newTotals.gold) + unsavedGold);
+  });
+
+  test('REGRESSION: ungespeicherte lokale Ressourcen gehen beim Offline-Claim nicht verloren', async ({ page, qaBaseURL, fixtureData, store }) => {
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    await page.evaluate(() => bkmpIdleStopLoop());
+    await page.evaluate(() => bkmpIdleFlushSyncNow());
+    // Ab jetzt: lokaler Stand == gespeicherter Stand (Baseline). Danach lokal
+    // Gewinne erzeugen, die NICHT gespeichert werden.
+    await page.evaluate(() => { bkmpIdleState.gold += 777; bkmpIdleState.stone += 55; });
+    store.clock.advance(30 * 60 * 1000);
+    const result = await claimOffline(page);
+    expect(result.ok).toBe(true);
+    await page.evaluate((r) => { bkmpIdleApplyOfflineResult(r); }, result);
+    const after = await page.evaluate(() => ({ gold: bkmpIdleState.gold, stone: bkmpIdleState.stone }));
+    expect(after.gold).toBe(Number(result.newTotals.gold) + 777);
+    expect(after.stone).toBe(Number(result.newTotals.stone) + 55);
   });
 
   test('4 Stunden Abwesenheit zahlt mehr als 30 Minuten', async ({ page, qaBaseURL, fixtureData, store }) => {

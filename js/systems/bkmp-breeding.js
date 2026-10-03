@@ -80,7 +80,34 @@ function bkmpDragonStageImage(species, stage) {
   if (stage === 'egg') return species.egg_image;
   if (stage === 'baby') return species.baby_image;
   if (stage === 'teen') return species.teen_image;
+  /* Drachendorf-Ausbau (04.10.2026): optionale fuenfte Form (z.B. Lightnix/
+     Darknix "Goettlich") - rein datengetrieben ueber divine_image, faellt
+     ohne eigenes Bild auf die Erwachsenen-Form zurueck. */
+  if (stage === 'divine' && species.divine_image) return species.divine_image;
   return species.adult_image;
+}
+/* Drachendorf-Ausbau Phase 0 (04.10.2026): "ausgewachsen" heisst ab jetzt
+   Erwachsen ODER die optionale fuenfte Form - Begleiter, Expeditionen,
+   Lagerfilter usw. pruefen ueber diese eine Funktion statt ueber
+   stage === 'adult'. */
+function bkmpDragonIsGrown(dragon) {
+  return !!dragon && (dragon.stage === 'adult' || dragon.stage === 'divine');
+}
+/* Entwicklungsstufen einer Art (datengetrieben): normale Arten 4 Formen,
+   Arten mit stage_count >= 5 zusaetzlich ihre Spezial-Endstufe. */
+function bkmpDragonSpeciesStages(species) {
+  const stages = ['egg', 'baby', 'teen', 'adult'];
+  if (species && Number(species.stage_count || 4) >= 5) stages.push(String(species.final_stage_key || 'divine'));
+  return stages;
+}
+/* Event-/Einzelstueck-Arten (z.B. Lightnix/Darknix) duerfen NIE aus einem
+   normalen Ei-Wurf (Dungeon, Turm, Chronik, Expedition, Handelsposten)
+   kommen - nur ueber ihren eigenen, serverseitig geprueften Weg. */
+function bkmpDragonEggPoolEligible(species) {
+  if (!species || species.active === false) return false;
+  if (species.unique_per_account === true) return false;
+  if (species.egg_source === 'event_reward') return false;
+  return true;
 }
 /* Redesign Phase 1 (17.07.): die Original-Drachen-PNGs (aus Supabase,
    `egg_image`/`baby_image`/... Spalten, bis zu 3MB/1400px) bleiben

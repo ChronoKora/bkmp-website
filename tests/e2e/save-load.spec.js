@@ -158,11 +158,14 @@ test.describe('Speichern/Laden', () => {
      overwrote it moments later with its stale preloaded copy) - not
      something to patch blindly mid-session (the fix would need to extend
      the same kind of monotonic/staleness guard to upsertIdlePlayerState(),
-     a core, frequently-touched save path). test.fail() marks this as a
-     known, expected failure so it shows up as a tracked regression instead
-     of noise in the report. */
+     a core, frequently-touched save path).
+
+     FIXED 04.10.2026 (Drachendorf-Ausbau Phase 0): bkmpIdleShouldSaveOnLeave()
+     (idledorf.js) - a tab only saves on hide/unload if the idle window was
+     actually opened there (or real unsaved changes exist). Proven red/green:
+     with the guard forced to "always save" this test fails exactly as
+     before; with the guard it passes. test.fail() removed. */
   test('Aenderung in einem Tab ist nach Reload in einem zweiten Tab sichtbar', async ({ page, context, qaBaseURL, fixtureData }) => {
-    test.fail(true, 'Bekannter Bug: bkmpIdlePreloadStateIfNamed() + beforeunload-Flush im Hintergrund-Tab ueberschreibt neueren Stand aus dem anderen Tab - siehe Kommentar oben, noch nicht gefixt.');
     await openAndLogin(page, qaBaseURL, fixtureData);
 
     const secondPage = await context.newPage();

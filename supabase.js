@@ -4395,12 +4395,42 @@ async function unlockPlayerVillageSkin(nameKey, skinId) {
    SQL-Migration fuer die Begruendung. Nur legendaere Ei-Wuerfe (raid_finish)
    und der Epic-Ei-Meilenstein-Claim laufen serverseitig. */
 
+/* Drachendorf-Ausbau Phase 0 (04.10.2026): erkennt "Datenbank-Update fuer
+   dieses Feature wurde noch nicht eingespielt" (Tabelle/Spalte/Funktion
+   fehlt) - neue Features zeigen dann einen ruhigen Hinweis statt zu
+   brechen. Gleiche Fehlercodes wie bei der Chronik (idle_player_meta). */
+function bkmpIsMissingDbObjectError(error) {
+  if (!error) return false;
+  const code = String(error.code || '');
+  if (['PGRST202', 'PGRST204', 'PGRST205', '42P01', '42883', '42703'].includes(code)) return true;
+  const msg = String(error.message || error || '');
+  return /(does not exist|schema cache|could not find the function|could not find)/i.test(msg);
+}
+
+const BKMP_DRAGON_SPECIES_BASE_COLUMNS = 'id, name, rarity, egg_source, source_dragon_id, egg_drop_chance, brood_seconds, sacrifice_gold, sacrifice_crystals, growth_points_required, battle_xp_required, is_multi_stat, sub_stat_count_min, sub_stat_count_max, egg_image, baby_image, teen_image, adult_image, sort_order';
+/* Zusaetzliche, datengetriebene Spalten (sql/20261004-01-drachendorf-
+   grundlage.sql): Affinitaeten, optionale fuenfte Form, Event-Herkunft,
+   Einzelstueck-Regel, Spezial-Passive. Fehlen sie noch, laedt der Katalog
+   automatisch nur die Basisspalten (kein Ausfall der Drachenzucht). */
+const BKMP_DRAGON_SPECIES_EXT_COLUMNS = 'affinities, stage_count, final_stage_key, final_stage_label, divine_image, event_origin, unique_per_account, reward_group, special_passive, divine_config';
+let bkmpDragonSpeciesExtColumnsMissing = false;
+
 async function loadDragonSpeciesCatalog() {
   const client = bkmpGetSupabaseClient();
   if (!client) return [];
+  if (!bkmpDragonSpeciesExtColumnsMissing) {
+    const { data, error } = await client
+      .from('dragon_species')
+      .select(BKMP_DRAGON_SPECIES_BASE_COLUMNS + ', ' + BKMP_DRAGON_SPECIES_EXT_COLUMNS)
+      .eq('active', true)
+      .order('sort_order', { ascending: true });
+    if (!error) return Array.isArray(data) ? data : [];
+    if (!bkmpIsMissingDbObjectError(error)) throw error;
+    bkmpDragonSpeciesExtColumnsMissing = true;
+  }
   const { data, error } = await client
     .from('dragon_species')
-    .select('id, name, rarity, egg_source, source_dragon_id, egg_drop_chance, brood_seconds, sacrifice_gold, sacrifice_crystals, growth_points_required, battle_xp_required, is_multi_stat, sub_stat_count_min, sub_stat_count_max, egg_image, baby_image, teen_image, adult_image, sort_order')
+    .select(BKMP_DRAGON_SPECIES_BASE_COLUMNS)
     .eq('active', true)
     .order('sort_order', { ascending: true });
   if (error) throw error;

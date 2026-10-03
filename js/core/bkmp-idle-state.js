@@ -80,6 +80,13 @@ let bkmpIdleBackgroundStreamCatchupTimer = null;
    einen eigenen, parallelen Netzwerk-Request loszuschicken. */
 let bkmpIdleFlushInFlight = null;
 let bkmpIdleLastSaveFailToastAt = 0;
+/* Drachendorf-Ausbau Phase 0 (04.10.2026): wurde das Idle-Dorf-Fenster in
+   DIESEM Tab schon einmal geoeffnet? Ein Tab, der den Spielstand nur im
+   Hintergrund vorgeladen hat (bkmpIdlePreloadStateIfNamed), darf beim
+   Verstecken/Schliessen NICHT speichern - sein Stand ist evtl. aelter als
+   der eines anderen Tabs/Geraets (bekannter Zwei-Tab-Bug aus Phase 7.2,
+   save-load.spec.js). */
+let bkmpIdleModalEverOpened = false;
 let bkmpIdleConfigLoaded = false;
 /* Sieg-Status der seltenen Event-Drachen (siehe supabase-idle-event-
    dragons.sql), unabhaengig von bkmpIdleState geladen (eigene Tabelle,

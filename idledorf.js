@@ -2208,7 +2208,25 @@ function bkmpIdleApplyOfflineResult(result) {
   if (!result || !result.newTotals || !bkmpIdleState) return;
   const killsBeforeOffline = Number(bkmpIdleState.dragon_kills || 0);
   const bossKillsBeforeOffline = Number(bkmpIdleState.boss_kills || 0);
+  /* Drachendorf-Ausbau Phase 0 (04.10.2026): newTotals sind SUMMEN aus dem
+     Server-Stand. Lagen lokal noch ungespeicherte Ressourcen-Gewinne vor
+     (letzter Kill vor dem Verstecken, Speichern lief noch), wuerde ein
+     reines Object.assign sie ueberschreiben. Die positive Differenz zum
+     zuletzt gespeicherten Stand (bkmpIdleMergeBaseline) wird deshalb nach
+     dem Uebernehmen wieder aufgeschlagen - nur reine Ressourcen-Zaehler,
+     keine Werte mit Stufen-/Levellogik. */
+  const unsavedResourceGains = {};
+  if (bkmpIdleMergeBaseline) {
+    ['gold', 'wood', 'stone', 'crystals', 'essence'].forEach(key => {
+      const gain = Number(bkmpIdleState[key] || 0) - Number(bkmpIdleMergeBaseline[key] || 0);
+      if (Number.isFinite(gain) && gain > 0) unsavedResourceGains[key] = gain;
+    });
+  }
   Object.assign(bkmpIdleState, result.newTotals);
+  Object.keys(unsavedResourceGains).forEach(key => {
+    bkmpIdleState[key] = Number(bkmpIdleState[key] || 0) + unsavedResourceGains[key];
+  });
+  if (Object.keys(unsavedResourceGains).length && typeof bkmpIdleQueueSync === 'function') bkmpIdleQueueSync();
   /* Chronik-Bestiarium (03.10.2026): die Offline-Simulation kennt keine
      einzelnen Drachenarten - die gutgeschriebenen Kills werden dort anteilig
      nach den echten Spawn-Regeln verteilt (bkmpChronicleCreditOfflineKills). */
@@ -2457,6 +2475,20 @@ function bkmpIdleQueueSync() {
    wechsel (naechster Kill/Kauf) plant ganz normal wieder einen neuen
    Timer. Keine Daten gehen verloren, nur die verfruehte Schreibaktion
    direkt vor dem Auslesen wird verhindert. */
+/* Drachendorf-Ausbau Phase 0 (04.10.2026) - behebt den in Phase 7.2
+   gefundenen, bisher nur per test.fail() verfolgten Zwei-Tab-Bug: ein Tab,
+   in dem das Idle-Dorf nie geoeffnet wurde (Stand nur im Hintergrund
+   vorgeladen, bkmpIdlePreloadStateIfNamed), hat beim Verstecken/Neuladen
+   bisher trotzdem seinen (aelteren) Stand gespeichert und damit neueren
+   Fortschritt aus einem anderen Tab ueberschrieben. Beim Verlassen wird
+   jetzt nur noch gespeichert, wenn in diesem Tab wirklich gespielt wurde
+   (Fenster mindestens einmal geoeffnet) ODER ohnehin echte, noch
+   ungespeicherte Aenderungen anstehen. Die OBS-Stream-Seite ist ausgenommen
+   (dort laeuft der Kampf ohne Fenster). */
+function bkmpIdleShouldSaveOnLeave() {
+  return !!(bkmpIdleSyncPending || bkmpIdleModalEverOpened || window.BKMP_IDLE_IS_STREAM_PAGE);
+}
+
 function bkmpIdleCancelPendingSyncTimer() {
   if (bkmpIdleSyncTimer) { window.clearTimeout(bkmpIdleSyncTimer); bkmpIdleSyncTimer = null; }
 }
@@ -3315,6 +3347,7 @@ async function bkmpIdleOpenModal() {
   overlay.classList.add('visible');
   document.body.classList.add('modal-open');
   bkmpIdleModalOpen = true;
+  bkmpIdleModalEverOpened = true;
   /* Bug-Fix (23.07., ChronoKora: "Spiel zu auf der Website was gemacht und
      Spiel wieder geöffnet" - Tab-Leiste (Kampf/Upgrades/...) danach weg,
      obwohl HUD korrekt anzeigt): bkmpIdleSyncTabOverflowForViewport()/
@@ -3622,14 +3655,14 @@ function bkmpIdleInit() {
      werden, sonst bleibt genau die gleiche Bug-Klasse fuer Prestige/Runen
      bestehen, die fuer Gold/Skillpunkte schon gefixt wurde. */
   window.addEventListener('beforeunload', () => {
-    bkmpIdleQueueSync(); bkmpIdleFlushSync();
+    if (bkmpIdleShouldSaveOnLeave()) { bkmpIdleQueueSync(); bkmpIdleFlushSync(); }
     bkmpPrestigeFlushSyncNow();
     bkmpIdleFlushRuneSyncNow();
     if (typeof bkmpRuneFlushPendingEquipsNow === 'function') bkmpRuneFlushPendingEquipsNow();
   });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
-      bkmpIdleQueueSync(); bkmpIdleFlushSync();
+      if (bkmpIdleShouldSaveOnLeave()) { bkmpIdleQueueSync(); bkmpIdleFlushSync(); }
       bkmpPrestigeFlushSyncNow();
       bkmpIdleFlushRuneSyncNow();
       if (typeof bkmpRuneFlushPendingEquipsNow === 'function') bkmpRuneFlushPendingEquipsNow();

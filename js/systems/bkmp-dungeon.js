@@ -252,7 +252,13 @@ function bkmpDungeonRollEgg(difficultyIdx) {
   const rarityBonusPct = typeof bkmpPrestigeBonus === 'function' ? Math.min(150, bkmpPrestigeBonus('egg_rarity_bonus_pct')) : 0;
   const weights = bkmpDungeonApplyRarityBonus(baseWeights, 'standard', rarityBonusPct);
   const rarity = bkmpDungeonWeightedPick(weights) || 'standard';
-  const pool = bkmpDragonSpeciesCatalog.filter(sp => sp.active !== false && sp.rarity === rarity);
+  /* Drachendorf-Ausbau (04.10.2026): Event-/Einzelstueck-Arten (Lightnix/
+     Darknix) sind nie Teil eines normalen Ei-Wurfs - siehe
+     bkmpDragonEggPoolEligible() in bkmp-breeding.js. */
+  const eligible = typeof bkmpDragonEggPoolEligible === 'function'
+    ? bkmpDragonEggPoolEligible
+    : (sp => sp.active !== false);
+  const pool = bkmpDragonSpeciesCatalog.filter(sp => eligible(sp) && sp.rarity === rarity);
   const species = pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
   return species ? { speciesId: species.id, name: species.name, rarity } : null;
 }

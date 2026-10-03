@@ -11,6 +11,12 @@ Automatisch von Claude Code gepflegt: **nach jeder Code-/SQL-Änderung kommt hie
 
 ---
 
+## 2026-10-04 (Drachendorf-Ausbau – Branch `feature/drachendorf-ausbau`, Phase für Phase committed)
+
+- **[Fix] Phase 0 – Zwei-Tab-Überschreiben:** Ein Tab, in dem das Idle-Dorf nie geöffnet wurde (Spielstand nur im Hintergrund vorgeladen), hat beim Verstecken/Neuladen seinen älteren Stand gespeichert und neueren Fortschritt aus einem anderen Tab überschrieben (seit 21.07. bekannter, per `test.fail()` verfolgter Bug). Neu: `bkmpIdleShouldSaveOnLeave()` – gespeichert wird beim Verlassen nur noch, wenn das Fenster in diesem Tab geöffnet war oder echte ungespeicherte Änderungen anstehen (OBS-Seite ausgenommen). Rot/grün bewiesen (Schutz testweise abgeschaltet → Test rot, mit Schutz grün), `test.fail()` entfernt. — `idledorf.js`, `js/core/bkmp-idle-state.js`, `tests/e2e/save-load.spec.js` — 🟡 lokal
+- **[Fix] Phase 0 – Offline-Belohnung überschrieb ungespeicherte Ressourcen:** `bkmpIdleApplyOfflineResult()` übernahm die Server-Summen per `Object.assign` und warf noch nicht gespeicherte lokale Gewinne (Gold/Holz/Stein/Kristalle/Essenz) weg. Positive Differenz zum zuletzt gespeicherten Stand wird jetzt wieder aufgeschlagen. Neuer Regressionstest. — `idledorf.js`, `tests/e2e/offline-afk.spec.js` — 🟡 lokal
+- **[Neu] Phase 0 – Grundlagen:** `bkmpDragonIsGrown()` (Erwachsen oder fünfte Form), `bkmpDragonSpeciesStages()` (datengetriebene Stufenzahl), `bkmpDragonEggPoolEligible()` (Event-/Einzelstück-Arten nie im normalen Ei-Wurf – jetzt in `bkmpDungeonRollEgg`), `bkmpIsMissingDbObjectError()` und ein Drachenkatalog, der neue Spalten lädt und ohne Datenbank-Update automatisch auf die alten zurückfällt. — `js/systems/bkmp-breeding.js`, `js/systems/bkmp-dungeon.js`, `supabase.js` — 🟡 lokal
+
 ## 2026-10-03 (Drachenzucht: 4 weitere neue Arten „dracheeeee“)
 
 - **[Neu]** 4 weitere Zucht-Drachenarten, jede mit Ei/Baby/Jugendlich/Erwachsen (16 Bilder aus `Desktop\dracheeeee`): **Ccatched** und **Sunnyyvi** → **legendär** (goldene Technik-Rüstung mit Leuchtkern bzw. holografischer Regenbogen mit Gold – die aufwendigsten Designs der Vier), **Byalex** (Minecraft-Pixel-Look, blau/schwarz) und **Danw** (blau/schwarz mit pinken Akzenten) → **episch**. Werte 1:1 wie die bisherigen Batches. Keine Code-Änderung (datengetriebener Katalog, kein Cache-Busting). Nach beiden Batches: episch 23, legendär 13 Arten im Ei-Wurf (Bestand vor „neue drachen2“: 11/5).
