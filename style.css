@@ -8929,10 +8929,14 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
    selbst brauchte dafuer keine Aenderung - sie setzt weiterhin nur die
    Klasse .idle-sprite-attacking auf den (jetzt ggf. video-haltigen)
    #idleDragonSprite-Container. */
+/* Performance-Fix Teil 2 (03.10.2026, siehe Ende dieser Datei): ohne
+   drop-shadow im Puls - ein animierter Weichzeichner auf einem Video muss
+   in jedem Bild neu gerechnet werden. Der Schatten kommt jetzt dauerhaft
+   als box-shadow vom Video selbst, der Puls hellt nur noch auf + skaliert. */
 @keyframes idleDragonVideoAttackPulse {
-  0% { filter: brightness(1) drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35)); transform: scale(1); }
-  30% { filter: brightness(1.6) drop-shadow(0 6px 18px rgba(249, 115, 22, 0.75)); transform: scale(1.04); }
-  100% { filter: brightness(1) drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35)); transform: scale(1); }
+  0% { filter: brightness(1); transform: scale(1); }
+  30% { filter: brightness(1.6); transform: scale(1.04); }
+  100% { filter: brightness(1); transform: scale(1); }
 }
 .idle-sprite-attacking > .idle-dragon-sprite-video { animation: idleDragonVideoAttackPulse 0.75s ease-out 1; }
 @media (prefers-reduced-motion: reduce) {
@@ -9049,9 +9053,12 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
    nie dauerhaft. */
 .idle-village-damage-pulse .idle-village-sprite { animation: idleVillageDamagePulse 0.4s ease !important; }
 @keyframes idleVillageDamagePulse {
-  0% { box-shadow: inset 0 0 0 rgba(248, 113, 113, 0); }
-  25% { box-shadow: inset 0 0 34px rgba(248, 113, 113, 0.55); }
-  100% { box-shadow: inset 0 0 0 rgba(248, 113, 113, 0); }
+  /* --bkmp-village-outer-shadow: Aussenschatten der Video-Doerfer (siehe
+     "Performance-Fix Teil 2" am Ende dieser Datei) - bleibt waehrend des
+     Pulses erhalten. Ohne Video-Dorf greift der unsichtbare Platzhalter. */
+  0% { box-shadow: var(--bkmp-village-outer-shadow, 0 0 0 transparent), inset 0 0 0 rgba(248, 113, 113, 0); }
+  25% { box-shadow: var(--bkmp-village-outer-shadow, 0 0 0 transparent), inset 0 0 34px rgba(248, 113, 113, 0.55); }
+  100% { box-shadow: var(--bkmp-village-outer-shadow, 0 0 0 transparent), inset 0 0 0 rgba(248, 113, 113, 0); }
 }
 .idle-hp-bar-flash { animation: idleHpBarFlash 0.4s ease; }
 @keyframes idleHpBarFlash {
@@ -11467,10 +11474,13 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
    Atem/Abklingen) stecken jetzt in der Video-Schleife selbst drin - der
    Angriffs-Hinweis beim Klick/Tick (bkmpRaidPlayBossAttackSprite) wird
    deshalb per Aufhellungs-/Skalierungs-Puls statt Frame-Wechsel gezeigt. */
+/* Performance-Fix Teil 2 (03.10.2026, siehe Ende dieser Datei): gleicher
+   Grund wie bei idleDragonVideoAttackPulse - Schatten als statischer
+   box-shadow, der Puls hellt nur noch auf + skaliert. */
 @keyframes raidBossSpriteAttackPulse {
-  0% { filter: brightness(1) drop-shadow(0 10px 18px rgba(239, 68, 68, 0.4)); transform: scale(1); }
-  30% { filter: brightness(1.6) drop-shadow(0 10px 26px rgba(248, 113, 113, 0.8)); transform: scale(1.04); }
-  100% { filter: brightness(1) drop-shadow(0 10px 18px rgba(239, 68, 68, 0.4)); transform: scale(1); }
+  0% { filter: brightness(1); transform: scale(1); }
+  30% { filter: brightness(1.6); transform: scale(1.04); }
+  100% { filter: brightness(1); transform: scale(1); }
 }
 .raid-boss-attacking .raid-boss-sprite { animation: raidBossSpriteAttackPulse 0.75s ease-out 1; }
 @media (prefers-reduced-motion: reduce) {
@@ -16401,4 +16411,55 @@ html:has(#idleDorfOverlay.visible) :is(.site-top-bar, #pollBanner, .top-actions-
 }
 html:has(#idleDorfOverlay.visible) .global-header-side-stack {
   visibility: hidden;
+}
+
+/* ============================================================
+   Performance-Fix Teil 2 "Kampf-Tab hovert noch leicht verzoegert"
+   (03.10.2026, Spieler-Rueckmeldung nach Teil 1: "in allen anderen Tabs
+   perfekt, nur im Kampf-Fenster noch leicht verzoegert").
+   Root Cause per Chrome-Tracing BEWIESEN, Nutzerzustand (Effekte: Aus,
+   Videos stehen still, keine Animation laeuft), 1920x1080, 3s Hover:
+     - Kampf-Tab wie bisher:              16 Bilder/s, 40 Frames in 3s
+     - nur die Sprite-Filter entfernt:    47 Bilder/s, 120 Frames
+     - Upgrades-Tab zum Vergleich:        61 Bilder/s, 165 Frames
+   Ursache: Drache und Dorf sind <video>-Elemente. Ein Video ist IMMER eine
+   eigene Grafikebene - ein filter: drop-shadow() auf dem Video oder einem
+   Elternelement kann dadurch nicht einmal vorgezeichnet und gemerkt werden,
+   sondern muss vom Compositor bei JEDEM Bild neu als Unschaerfe berechnet
+   werden (auch wenn das Video pausiert ist). Der Drache trug dabei sogar
+   vier Weichzeichner-Schatten uebereinander (2x am Video, 2x am Container),
+   das Dorf zwei. Jede Hover-Hervorhebung musste darauf warten.
+   Fix: dieselben Schatten als box-shadow statt filter. Ein Video ist ein
+   undurchsichtiges (abgerundetes) Rechteck - ein box-shadow sieht darum
+   praktisch gleich aus wie der drop-shadow (Pixelvergleich: mittlere
+   Abweichung ~1 von 255), wird aber nur EINMAL gezeichnet und danach
+   wiederverwendet. Gilt nur, wenn wirklich ein Video drinsteckt (:has) -
+   Bild-Sprites mit transparenten Raendern behalten ihren drop-shadow (der
+   folgt dort der Silhouette und wird als normales Bild ohnehin nur einmal
+   gerastert, kostet also nichts pro Bild).
+   Die --bkmp-village-outer-shadow-Variable haelt den Aussenschatten beim
+   Treffer-Puls (idleVillageDamagePulse animiert ebenfalls box-shadow) am
+   Leben, statt ihn fuer 0,4s verschwinden zu lassen. */
+html.bkmp-app-mode .idle-dragon-sprite:has(> .idle-dragon-sprite-video) {
+  filter: none;
+}
+html.bkmp-app-mode .idle-dragon-sprite > .idle-dragon-sprite-video {
+  filter: none;
+  box-shadow: 0 10px 14px rgba(0, 0, 0, .5), 0 0 18px rgba(255, 140, 61, .3), 0 20px 24px rgba(0, 0, 0, .2), 0 0 36px rgba(255, 140, 61, .25);
+}
+html.bkmp-app-mode .idle-village-sprite:has(> .idle-village-video) {
+  filter: none;
+  --bkmp-village-outer-shadow: 0 10px 14px rgba(0, 0, 0, .5), 0 0 18px rgba(255, 140, 61, .3), 0 0 30px rgba(255, 140, 61, .15);
+  box-shadow: var(--bkmp-village-outer-shadow);
+}
+
+/* Weltboss/Gildenboss-Ansicht: dieselbe Falle - Stadt und Boss sind
+   <video>-Elemente mit eigenem drop-shadow. */
+video.raid-city-sprite {
+  filter: none;
+  box-shadow: 0 8px 14px rgba(0, 0, 0, .4);
+}
+video.raid-boss-sprite {
+  filter: none;
+  box-shadow: 0 10px 18px rgba(239, 68, 68, .4);
 }
