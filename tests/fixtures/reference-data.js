@@ -133,11 +133,15 @@ const IDLE_SKILL_NODES = [
 
 const { cloneVillageReferenceTables } = require('./village-reference');
 const { cloneExpeditionReferenceTables } = require('./expedition-reference');
+const { cloneTraitReferenceTables } = require('./trait-reference');
+const { cloneGuildProjectReferenceTables } = require('./guild-project-reference');
 
 function cloneReferenceTables() {
   return {
     ...cloneVillageReferenceTables(),
     ...cloneExpeditionReferenceTables(),
+    ...cloneTraitReferenceTables(),
+    ...cloneGuildProjectReferenceTables(),
     idle_dragons: IDLE_DRAGONS.map(d => ({ ...d })),
     idle_game_config: IDLE_GAME_CONFIG.map(c => ({ ...c })),
     idle_skill_nodes: IDLE_SKILL_NODES.map(n => ({ ...n })),

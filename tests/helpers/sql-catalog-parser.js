@@ -15,11 +15,19 @@ function splitTuples(txt) {
   return out;
 }
 function splitFields(t) {
-  const out = []; let cur = '', inStr = false;
+  /* Kommas innerhalb von array[...] / (...) trennen keine Felder. */
+  const out = []; let cur = '', inStr = false, depth = 0;
   for (let k = 0; k < t.length; k++) {
     const c = t[k];
-    if (c === "'") { if (inStr && t[k + 1] === "'") { cur += "'"; k++; continue; } inStr = !inStr; continue; }
-    if (!inStr && c === ',') { out.push(cur.trim()); cur = ''; continue; }
+    if (c === "'") {
+      if (inStr && t[k + 1] === "'") { cur += "'"; k++; continue; }
+      inStr = !inStr;
+      if (depth > 0) cur += c;
+      continue;
+    }
+    if (!inStr && (c === '[' || c === '(')) depth++;
+    if (!inStr && (c === ']' || c === ')')) depth--;
+    if (!inStr && depth === 0 && c === ',') { out.push(cur.trim()); cur = ''; continue; }
     cur += c;
   }
   out.push(cur.trim());

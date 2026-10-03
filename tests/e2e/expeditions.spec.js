@@ -1,5 +1,5 @@
 const path = require('path');
-const { test, expect, openAndLogin } = require('../helpers/qa-fixtures');
+const { test, expect, openAndLogin, waitForDragonReady } = require('../helpers/qa-fixtures');
 const { readInsertTuples } = require('../helpers/sql-catalog-parser');
 const { EXPEDITION_REGIONS, EXPEDITION_MISSIONS, EXPEDITION_EVENTS } = require('../fixtures/expedition-reference');
 const rules = require('../../js/systems/bkmp-expedition-rules.js');
@@ -94,8 +94,8 @@ test.describe('Expeditionen – Katalog & Regeln', () => {
     ]);
     expect(good.unmet).toEqual([]);
     expect(good.met).toEqual([0, 1, 2]);
-    // 25 + 3*15 + 3 Seltenheiten*5 + 3 Elemente*4 + (7-1)*2 = 109
-    expect(good.score).toBe(109);
+    // 25 + 3*15 + 3 Seltenheiten*5 + 3 Elemente*4 + (7-1)*2 + 3 Mitglieder mit Bindung 4+ * 3 = 118
+    expect(good.score).toBe(118);
     expect(rules.bkmpDragonBondLevel(0)).toBe(1);
     expect(rules.bkmpDragonBondLevel(99)).toBe(1);
     expect(rules.bkmpDragonBondLevel(100)).toBe(2);
@@ -128,6 +128,7 @@ test.describe('Expeditionen – im Spiel (Teststand C)', () => {
     page.on('pageerror', e => errors.push(String(e)));
     seedDragons(store, fixtureData, 1);
     await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
     await page.evaluate(() => bkmpIdleStopLoop());
     await openDrachenTab(page);
 
@@ -237,6 +238,10 @@ test.describe('Expeditionen – im Spiel (Teststand C)', () => {
   test('Doppelklick: zwei gleichzeitige Abholungen schreiben nur einmal gut', async ({ page, qaBaseURL, fixtureData, store }) => {
     seedDragons(store, fixtureData, 2);
     await openAndLogin(page, qaBaseURL, fixtureData);
+    /* Erst das komplette Oeffnen abwarten (Login-Belohnung der Tagesserie wird
+       erst NACH dem Chronik-Laden gutgeschrieben), sonst landet sie zwischen
+       Messung und Abholung im Server-Gold. */
+    await waitForDragonReady(page);
     await page.evaluate(() => bkmpIdleStopLoop());
     const started = await page.evaluate(id => bkmpExpeditionStartRpc('fw_waldrand', [id]), D.wind);
     store.clock.advance(2 * 3600 * 1000);

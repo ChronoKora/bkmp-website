@@ -1166,6 +1166,7 @@ async function bkmpIdleRenderGildePanel() {
         </div>
       </div>
     ` : ''}
+    ${typeof bkmpGuildProjectSectionHtml === 'function' ? bkmpGuildProjectSectionHtml() : ''}
     <div class="idle-arena-history">
       <h4 style="margin-top:1rem;">🎯 Tägliche Gildenquests</h4>
       ${bkmpGuildQuests.length === 0 ? '<p class="empty-hint">⏳ Lade Quests...</p>' : bkmpGuildQuests.map(q => {

@@ -183,7 +183,8 @@ const BKMP_CHRONICLE_QUEST_TYPES = {
 const BKMP_CHRONICLE_COUNTER_TO_TYPE = { kills: 'kills', bossKills: 'boss_kills', gold: 'gold', playtime: 'playtime', upgrades: 'upgrades', runeUp: 'rune_upgrades' };
 const BKMP_CHRONICLE_TAB_BUTTONS = {
   kampf: 'idleTabBtnKampf', upgrades: 'idleTabBtnUpgrades', runen: 'idleTabBtnRunen', dungeon: 'idleTabBtnDungeon',
-  turm: 'idleTabBtnTurm', arena: 'idleTabBtnArena', drachen: 'idleTabBtnDrachen', prestige: 'idleTabBtnPrestige', erfolge: 'idleTabBtnErfolge'
+  turm: 'idleTabBtnTurm', arena: 'idleTabBtnArena', drachen: 'idleTabBtnDrachen', prestige: 'idleTabBtnPrestige', erfolge: 'idleTabBtnErfolge',
+  skilltree: 'idleTabBtnSkilltree', gilde: 'idleTabBtnGilde', dorf: 'idleTabBtnDorf'
 };
 
 function bkmpChronicleQuestTarget(scope, type) {
@@ -237,6 +238,11 @@ function bkmpChronicleEmpty() {
     trackersAt: 0,
     streak: null,
     bestiary: {},
+    /* Drachendorf-Ausbau Phase 4: Dex-Rekorde pro Art [hoechste Form 0-4,
+       hoechster Aufstieg, hoechste Bindung, Expeditionen] - nur steigend. */
+    dex: {},
+    /* Drachendorf-Ausbau Phase 5: abgeholte Dorfpfad-Ziele { zielId: 1 } (nur ODER). */
+    path: {},
     life: { questsDone: 0, dailyChests: 0, weeklyChests: 0, eventsCaught: 0, eventsByType: {} }
   };
 }
@@ -272,6 +278,23 @@ function bkmpChronicleNormalize(raw) {
   if (raw.bestiary && typeof raw.bestiary === 'object') {
     Object.keys(raw.bestiary).slice(0, 80).forEach(k => {
       if (/^[a-z0-9_-]{1,40}$/i.test(k)) c.bestiary[k] = Math.floor(bkmpChronicleNum(raw.bestiary[k]));
+    });
+  }
+  if (raw.dex && typeof raw.dex === 'object') {
+    Object.keys(raw.dex).slice(0, 200).forEach(k => {
+      const v = raw.dex[k];
+      if (!/^[a-z0-9_-]{1,40}$/i.test(k) || !Array.isArray(v)) return;
+      c.dex[k] = [
+        Math.min(4, Math.floor(bkmpChronicleNum(v[0]))),
+        Math.min(100, Math.floor(bkmpChronicleNum(v[1]))),
+        Math.min(10, Math.floor(bkmpChronicleNum(v[2]))),
+        Math.min(1e7, Math.floor(bkmpChronicleNum(v[3])))
+      ];
+    });
+  }
+  if (raw.path && typeof raw.path === 'object') {
+    Object.keys(raw.path).slice(0, 300).forEach(k => {
+      if (/^[a-z0-9_-]{1,40}$/i.test(k) && raw.path[k]) c.path[k] = 1;
     });
   }
   if (raw.life && typeof raw.life === 'object') {
@@ -324,6 +347,12 @@ function bkmpChronicleMerge(local, remote) {
   new Set([...Object.keys(local.bestiary), ...Object.keys(remote.bestiary)]).forEach(k => {
     m.bestiary[k] = Math.max(local.bestiary[k] || 0, remote.bestiary[k] || 0);
   });
+  new Set([...Object.keys(local.dex || {}), ...Object.keys(remote.dex || {})]).forEach(k => {
+    const a = (local.dex || {})[k] || [0, 0, 0, 0];
+    const b = (remote.dex || {})[k] || [0, 0, 0, 0];
+    m.dex[k] = [0, 1, 2, 3].map(i => Math.max(a[i] || 0, b[i] || 0));
+  });
+  Object.keys(Object.assign({}, local.path || {}, remote.path || {})).forEach(k => { m.path[k] = 1; });
   ['questsDone', 'dailyChests', 'weeklyChests', 'eventsCaught'].forEach(k => { m.life[k] = Math.max(local.life[k] || 0, remote.life[k] || 0); });
   new Set([...Object.keys(local.life.eventsByType), ...Object.keys(remote.life.eventsByType)]).forEach(k => {
     m.life.eventsByType[k] = Math.max(local.life.eventsByType[k] || 0, remote.life.eventsByType[k] || 0);
@@ -687,6 +716,8 @@ function bkmpChronicleClaimableCount() {
     n += p.quests.filter(q => !q.claimed && q.progress >= q.target).length;
     if (!p.chestClaimed && p.quests.length && p.quests.every(q => q.claimed)) n += 1;
   });
+  /* Drachendorf-Ausbau Phase 5: abholbare Dorfpfad-Ziele zaehlen mit. */
+  if (typeof bkmpPathClaimableCount === 'function') n += bkmpPathClaimableCount();
   return n;
 }
 async function bkmpChronicleClaimQuest(scope, index) {
@@ -1355,6 +1386,7 @@ function bkmpChronicleRenderTrackerCard() {
 const BKMP_CHRONICLE_MODAL_TABS = [
   { id: 'quests', label: '📜 Aufträge' },
   { id: 'calendar', label: '📅 Kalender' },
+  { id: 'path', label: '🛤️ Pfad' },
   { id: 'bestiary', label: '📖 Bestiarium' },
   { id: 'goals', label: '🎯 Ziele' }
 ];
@@ -1389,6 +1421,8 @@ function bkmpChronicleEnsureModal() {
     else if (action === 'reroll') bkmpChronicleRerollQuest(Number(actionEl.dataset.index));
     else if (action === 'goto') { bkmpChronicleCloseModal(); bkmpChronicleGoToTab(actionEl.dataset.tab); }
     else if (action === 'chrontab') { bkmpChronicleModalTab = actionEl.dataset.tabId; bkmpChronicleRenderModalBody(); }
+    else if (action === 'pathclaim' && typeof bkmpPathClaim === 'function') bkmpPathClaim([actionEl.dataset.goalId]);
+    else if (action === 'pathclaimall' && typeof bkmpPathClaim === 'function') bkmpPathClaim(bkmpPathClaimable().map(g => g.goal.id));
   });
   overlay.addEventListener('keydown', (e) => { if (e.key === 'Escape') bkmpChronicleCloseModal(); });
   document.getElementById('bkmpChronicleCloseBtn').addEventListener('click', bkmpChronicleCloseModal);
@@ -1434,6 +1468,7 @@ function bkmpChronicleRenderModalBody() {
   else if (bkmpChronicleModalTab === 'calendar') html = bkmpChronicleCalendarHtml();
   else if (bkmpChronicleModalTab === 'bestiary') html = bkmpChronicleBestiaryHtml();
   else if (bkmpChronicleModalTab === 'goals') html = bkmpChronicleGoalsHtml();
+  else if (bkmpChronicleModalTab === 'path' && typeof bkmpPathHtml === 'function') html = bkmpPathHtml();
   else html = bkmpChronicleQuestsHtml();
   /* Nur ersetzen, wenn sich wirklich etwas geaendert hat - verhindert, dass
      Knoepfe unter dem Mauszeiger/Fokus grundlos neu erzeugt werden. */
@@ -1449,6 +1484,7 @@ function bkmpChronicleQuestsHtml() {
     ? '<p class="bkmp-chron-note">ℹ️ Dein Chronik-Fortschritt wird gerade nur auf diesem Gerät gespeichert.</p>'
     : '';
   return `
+    ${typeof bkmpPathNextGoalsHtml === 'function' ? bkmpPathNextGoalsHtml() : ''}
     <section class="bkmp-chron-section">
       <header class="bkmp-chron-section-head"><h4>Tagesaufträge</h4><span class="bkmp-chron-reset">Neue Aufträge in ${bkmpChronicleFormatDuration(bkmpChronicleMsUntilNextDay(now))}</span></header>
       ${d.quests.map((q, i) => bkmpChronicleQuestRowHtml('daily', q, i, false)).join('')}
@@ -1619,3 +1655,26 @@ function bkmpChronicleInitDom() {
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bkmpChronicleInitDom);
 else bkmpChronicleInitDom();
+
+
+/* ---------------- Dex-Rekorde (Drachendorf-Ausbau Phase 4) ----------------
+   Dauerhafte Hoechstwerte pro Drachenart, auch wenn der Drache spaeter
+   freigelassen oder geopfert wird. Nur steigend (Merge = Maximum). */
+function bkmpChronicleDexRecords() {
+  return (bkmpChronicle && bkmpChronicle.dex) || {};
+}
+function bkmpChronicleRecordDex(speciesId, form, asc, bond, exp) {
+  if (!bkmpChronicle || !speciesId || !/^[a-z0-9_-]{1,40}$/i.test(speciesId)) return false;
+  if (!bkmpChronicle.dex) bkmpChronicle.dex = {};
+  const cur = bkmpChronicle.dex[speciesId] || [0, 0, 0, 0];
+  const next = [
+    Math.max(cur[0], Math.min(4, Math.floor(Number(form) || 0))),
+    Math.max(cur[1], Math.min(100, Math.floor(Number(asc) || 0))),
+    Math.max(cur[2], Math.min(10, Math.floor(Number(bond) || 0))),
+    Math.max(cur[3], Math.min(1e7, Math.floor(Number(exp) || 0)))
+  ];
+  if (bkmpChronicle.dex[speciesId] && next.every((v, i) => v === cur[i])) return false;
+  bkmpChronicle.dex[speciesId] = next;
+  bkmpChronicleMarkDirty();
+  return true;
+}

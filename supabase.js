@@ -6676,3 +6676,83 @@ async function bkmpExpeditionClaimRpc(expeditionId) {
   if (error) throw new Error(bkmpExpeditionErrorText(error.message));
   return Array.isArray(data) ? data[0] : data;
 }
+
+/* ============================================================
+   Drachendorf-Ausbau Phase 4 (04.10.2026): Eigenschaften & Bindung
+   (sql/20261004-04-dragon-traits-bond.sql)
+   ============================================================ */
+async function loadDragonTraits() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return { missing: true, rows: [] };
+  const { data, error } = await client.from('dragon_traits').select('*').order('sort_order', { ascending: true });
+  if (error) {
+    if (bkmpIsMissingDbObjectError(error)) return { missing: true, rows: [] };
+    throw error;
+  }
+  return { missing: false, rows: data || [] };
+}
+async function bkmpDragonEnsureTraitsRpc() {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return { missing: true, rows: [] };
+  const { data, error } = await client.rpc('dragon_ensure_traits');
+  if (error) {
+    if (bkmpIsMissingDbObjectError(error)) return { missing: true, rows: [] };
+    throw error;
+  }
+  return { missing: false, rows: Array.isArray(data) ? data : [] };
+}
+async function bkmpDragonActivityTickRpc() {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return { missing: true };
+  const { data, error } = await client.rpc('dragon_activity_tick');
+  if (error) {
+    if (bkmpIsMissingDbObjectError(error)) return { missing: true };
+    throw error;
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  return { missing: false, ...(row || {}) };
+}
+
+/* ============================================================
+   Drachendorf-Ausbau Phase 6 (04.10.2026): Gildenprojekte
+   (sql/20261004-05-guild-projects.sql)
+   ============================================================ */
+function bkmpGuildProjectErrorText(msg) {
+  const m = String(msg || '');
+  if (m.includes('insufficient_resources')) return 'Dafür fehlen dir die Ressourcen.';
+  if (m.includes('amount_too_small')) return 'Das ist zu wenig für einen Projektpunkt.';
+  if (m.includes('kind_not_needed')) return 'Diese Ressource braucht das Projekt diese Woche nicht.';
+  if (m.includes('project_completed')) return 'Das Projekt ist schon fertig!';
+  if (m.includes('not_completed')) return 'Das Projekt ist noch nicht fertig.';
+  if (m.includes('too_little_contribution')) return 'Für die Belohnung musst du mindestens 10 Punkte beitragen.';
+  if (m.includes('already_claimed')) return 'Diese Belohnung hast du schon abgeholt.';
+  if (m.includes('not_in_guild')) return 'Du bist in keiner Gilde.';
+  if (m.includes('not_authenticated')) return 'Du bist nicht eingeloggt (Sitzung abgelaufen?). Bitte neu einloggen.';
+  if (m.includes('no_player_state')) return 'Dein Spielstand wurde noch nicht gespeichert - bitte kurz warten und erneut versuchen.';
+  return 'Das hat nicht geklappt: ' + (m || 'unbekannter Fehler') + '.';
+}
+async function bkmpGuildProjectStatusRpc() {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return { missing: true };
+  const { data, error } = await client.rpc('guild_project_status');
+  if (error) {
+    if (bkmpIsMissingDbObjectError(error)) return { missing: true };
+    throw new Error(bkmpGuildProjectErrorText(error.message));
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  return { missing: false, ...(row || {}) };
+}
+async function bkmpGuildProjectContributeRpc(kind, amount) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { data, error } = await client.rpc('guild_project_contribute', { p_kind: kind, p_amount: Math.floor(Number(amount) || 0) });
+  if (error) throw new Error(bkmpGuildProjectErrorText(error.message));
+  return Array.isArray(data) ? data[0] : data;
+}
+async function bkmpGuildProjectClaimRpc() {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { data, error } = await client.rpc('guild_project_claim');
+  if (error) throw new Error(bkmpGuildProjectErrorText(error.message));
+  return Array.isArray(data) ? data[0] : data;
+}

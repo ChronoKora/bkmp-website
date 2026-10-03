@@ -3520,6 +3520,8 @@ async function bkmpIdleOpenModal() {
   /* Drachendorf-Ausbau Phase 3: Expeditions-Status leise nachladen (Signal
      "Expedition fertig" am Drachenzucht-Reiter), siehe bkmp-expeditions.js. */
   if (typeof bkmpExpOnIdleOpen === 'function') bkmpExpOnIdleOpen();
+  /* Phase 4: Bindungs-Takt (echte Begleiter-Nutzung) starten. */
+  if (typeof bkmpDragonTraitsOnIdleOpen === 'function') bkmpDragonTraitsOnIdleOpen();
   /* Ab hier hat bkmpRaidToggleCombatView() (synchroner Teil ganz am Anfang
      von bkmpRaidStartCombatView) bereits entschieden, welches Panel
      tatsaechlich sichtbar sein soll - jetzt erst aufdecken. Die reinen

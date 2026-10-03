@@ -278,3 +278,59 @@ html[data-fx="aus"] .idle-dorf-cat-chevron { transition: none; }
 .dd-exp-modal-card p { font-size: .84rem; margin-bottom: .4rem; }
 .dd-exp-modal-card h4 { margin: 0; }
 .dd-exp-modal-card .dd-exp-start-btn { width: 100%; margin-top: .4rem; }
+
+/* ---------- Phase 4: Elemente, Eigenschaften, Bindung, Dex ---------- */
+.dd-dragon-identity {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: .2rem .3rem;
+  font-size: .72rem;
+  line-height: 1.35;
+  color: var(--app-muted, var(--muted, #b7a8c4));
+}
+.dd-id-trait { color: var(--app-ink, var(--ink, #f5f3ed)); font-weight: 700; }
+.dd-id-bond { font-variant-numeric: tabular-nums; }
+.dd-id-bond.is-soul { color: #f472b6; font-weight: 800; }
+.dd-id-sep { opacity: .5; }
+/* Bindungsmeilenstein 6: besonderer Rahmen (statisch, keine Animation). */
+.idle-dragon-lager-card.dd-bond-frame { outline: 1px solid rgba(244, 114, 182, .45); outline-offset: -3px; }
+.idle-dragon-lager-card.dd-bond-soul { outline: 2px solid rgba(244, 114, 182, .8); outline-offset: -3px; }
+.dd-detail-extra, .dd-dex-info { display: flex; flex-direction: column; gap: .2rem; font-size: .8rem; line-height: 1.45; text-align: left; margin-top: .4rem; }
+.dd-dex-stats { margin: -.2rem 0 .5rem; }
+.idle-dragon-dex-dot.is-reached { box-shadow: inset 0 0 0 2px rgba(74, 222, 128, .7); }
+
+/* ---------- Phase 5: Pfad des Drachendorfs (in der Chronik) ---------- */
+.bkmp-path-next {
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+  padding: .7rem .8rem;
+  margin-bottom: .8rem;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--gold-fixed, #c9a56a) 40%, transparent);
+  background: rgba(201, 165, 106, .06);
+}
+.bkmp-path-next-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .4rem; }
+.bkmp-path-more { align-self: flex-start; }
+.bkmp-path-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .6rem; font-size: .88rem; }
+.bkmp-path-chapter { margin-bottom: .8rem; }
+.bkmp-path-chapter h4 { margin: .2rem 0 .4rem; font-size: .9rem; }
+.bkmp-path-chapter h4 small { color: var(--app-muted, var(--muted, #b7a8c4)); font-weight: 600; }
+.bkmp-path-goal.is-claimed { opacity: .55; }
+.bkmp-path-reward { font-size: .72rem; color: var(--app-muted, var(--muted, #b7a8c4)); margin-top: .15rem; }
+.bkmp-path-ch { font-weight: 600; color: var(--app-muted, var(--muted, #b7a8c4)); }
+.bkmp-path-done { font-size: 1.1rem; }
+.bkmp-path-claim-btn, .bkmp-path-claimall { flex: 0 0 auto; }
+
+/* ---------- Phase 6: Gildenprojekt der Woche ---------- */
+.dd-gp-head { display: flex; align-items: center; gap: .6rem; margin: .3rem 0 .5rem; }
+.dd-gp-icon { font-size: 1.8rem; line-height: 1; }
+.dd-gp-donate { display: flex; flex-direction: column; gap: .35rem; margin: .5rem 0; }
+.dd-gp-kind { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
+.dd-gp-kind-label { flex: 1 1 180px; font-size: .84rem; }
+.dd-gp-kind-label small { color: var(--app-muted, var(--muted, #b7a8c4)); }
+.dd-gp-note { font-size: .8rem; color: var(--app-muted, var(--muted, #b7a8c4)); margin: .3rem 0; }
+.dd-gp-top { margin: .4rem 0 0; padding-left: 1.1rem; font-size: .8rem; line-height: 1.5; }
+.dd-gp-badges { font-size: .8rem; margin-left: .3rem; }

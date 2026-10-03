@@ -916,6 +916,7 @@ function bkmpDragonRenderLexikonSection() {
   return `
     <div class="idle-dragon-section">
       <h4>📖 Drachen-Lexikon (${discoveredCount}/${species.length})</h4>
+      ${typeof bkmpDexStatsLineHtml === 'function' ? bkmpDexStatsLineHtml() : ''}
       <div class="idle-skin-grid idle-dragon-dex-grid">${cardsHtml}</div>
     </div>`;
 }
@@ -931,6 +932,15 @@ function bkmpDragonOpenDexDetail(speciesId) {
   const discovered = Boolean(bkmpIdleState && bkmpIdleState.dragon_species_discovered_at && bkmpIdleState.dragon_species_discovered_at[speciesId]);
   bkmpDragonDexPageIndex = 0;
   overlay.dataset.speciesId = speciesId;
+  /* Drachendorf-Ausbau Phase 4: Anzahl der Formen pro Art (4, bei Event-
+     Arten mit fuenfter Form 5) - Punkte werden passend neu aufgebaut. */
+  const stagesForSpecies = typeof bkmpDragonSpeciesStages === 'function' ? bkmpDragonSpeciesStages(species) : BKMP_DRAGON_DEX_STAGES;
+  overlay.dataset.stages = stagesForSpecies.join(',');
+  const dotsEl = overlay.querySelector('.idle-dragon-dex-dots');
+  if (dotsEl) {
+    const rec = typeof bkmpDexRecord === 'function' ? bkmpDexRecord(speciesId) : null;
+    dotsEl.innerHTML = stagesForSpecies.map((st, i) => `<span class="idle-dragon-dex-dot${rec && i <= rec[0] ? ' is-reached' : ''}" data-stage="${st}" title="${bkmpDragonDexStageLabel(species, st)}"></span>`).join('');
+  }
   overlay.dataset.discovered = discovered ? '1' : '0';
   /* .onclick statt addEventListener: haelt pro Element garantiert genau
      EINEN Handler, kein manuelles removeEventListener-Bookkeeping noetig,
@@ -959,7 +969,7 @@ function bkmpDragonRenderDexPage() {
   if (!species) return;
   const discovered = overlay.dataset.discovered === '1';
   const rarity = bkmpDragonRarityMeta(species.rarity);
-  const stage = BKMP_DRAGON_DEX_STAGES[bkmpDragonDexPageIndex];
+  const stage = bkmpDragonDexStagesOf(overlay)[bkmpDragonDexPageIndex];
   const img = document.getElementById('idleDragonDexImg');
   if (img) {
     img.src = bkmpDragonStageImage(species, stage) || '';
@@ -968,7 +978,9 @@ function bkmpDragonRenderDexPage() {
   const nameEl = document.getElementById('idleDragonDexName');
   if (nameEl) nameEl.textContent = discovered ? species.name : '???';
   const stageEl = document.getElementById('idleDragonDexStage');
-  if (stageEl) stageEl.textContent = BKMP_DRAGON_DEX_STAGE_LABELS[stage];
+  if (stageEl) stageEl.textContent = bkmpDragonDexStageLabel(species, stage);
+  const infoEl = document.getElementById('idleDragonDexInfo');
+  if (infoEl) infoEl.innerHTML = typeof bkmpDexInfoHtml === 'function' ? bkmpDexInfoHtml(species, discovered) : '';
   const rarityEl = document.getElementById('idleDragonDexRarity');
   if (rarityEl) { rarityEl.textContent = discovered ? rarity.name : ''; rarityEl.style.color = rarity.color; }
   const descEl = document.getElementById('idleDragonDexDesc');
@@ -981,16 +993,26 @@ function bkmpDragonRenderDexPage() {
   const prevBtn = document.getElementById('idleDragonDexPrevBtn');
   const nextBtn = document.getElementById('idleDragonDexNextBtn');
   if (prevBtn) prevBtn.disabled = bkmpDragonDexPageIndex === 0;
-  if (nextBtn) nextBtn.disabled = bkmpDragonDexPageIndex === BKMP_DRAGON_DEX_STAGES.length - 1;
+  if (nextBtn) nextBtn.disabled = bkmpDragonDexPageIndex === bkmpDragonDexStagesOf(overlay).length - 1;
+}
+function bkmpDragonDexStagesOf(overlay) {
+  const raw = overlay && overlay.dataset.stages;
+  return raw ? raw.split(',') : BKMP_DRAGON_DEX_STAGES;
+}
+function bkmpDragonDexStageLabel(species, stage) {
+  if (stage === 'divine') return (species && species.final_stage_label) || 'Göttlich';
+  return BKMP_DRAGON_DEX_STAGE_LABELS[stage] || stage;
 }
 
 function bkmpDragonDexPage(delta) {
-  bkmpDragonDexPageIndex = Math.max(0, Math.min(BKMP_DRAGON_DEX_STAGES.length - 1, bkmpDragonDexPageIndex + delta));
+  const max = bkmpDragonDexStagesOf(document.getElementById('idleDragonDexOverlay')).length - 1;
+  bkmpDragonDexPageIndex = Math.max(0, Math.min(max, bkmpDragonDexPageIndex + delta));
   bkmpDragonRenderDexPage();
 }
 
 function bkmpDragonDexGoToPage(index) {
-  bkmpDragonDexPageIndex = Math.max(0, Math.min(BKMP_DRAGON_DEX_STAGES.length - 1, index));
+  const max = bkmpDragonDexStagesOf(document.getElementById('idleDragonDexOverlay')).length - 1;
+  bkmpDragonDexPageIndex = Math.max(0, Math.min(max, index));
   bkmpDragonRenderDexPage();
 }
 
@@ -1060,6 +1082,8 @@ function bkmpDragonOpenDetail(dragonId) {
       : dragon.stage === 'adult'
         ? '⚠️ Als Begleiter markiert, aber Platzlimit erreicht - trägt aktuell nicht bei'
         : '✅ Wächst gerade als Begleiter heran';
+  const extraEl = document.getElementById('idleDragonDetailTraits');
+  if (extraEl) extraEl.innerHTML = typeof bkmpDragonDetailExtraHtml === 'function' ? bkmpDragonDetailExtraHtml(dragon, species) : '';
   overlay.classList.add('visible');
   document.body.classList.add('modal-open');
   const closeBtn = document.getElementById('idleDragonDetailCloseBtn');
@@ -1093,6 +1117,9 @@ async function bkmpIdleLoadDragonBreedingState(name) {
     bkmpPlayerDragonNests = Array.isArray(nests) ? nests : [];
     bkmpPlayerDragons = Array.isArray(dragons) ? dragons : [];
     bkmpDragonReconcileDiscovered();
+    /* Drachendorf-Ausbau Phase 4: fehlende Eigenschaften serverseitig
+       vergeben (genau einmal) + Dex-Rekorde nachziehen. */
+    if (typeof bkmpDragonTraitsAfterLoad === 'function') bkmpDragonTraitsAfterLoad();
   } catch (e) {
     console.warn('Idle Dorf: Drachenzucht-Daten konnten nicht geladen werden (Migration evtl. noch nicht ausgefuehrt - siehe supabase-dragon-breeding.sql).', e);
   }
@@ -1444,6 +1471,7 @@ function bkmpIdleRenderDragonsPanel() {
   const panel = document.getElementById('idlePanelDrachen');
   if (!panel || !bkmpIdleState) return;
   bkmpIdleAccrueBuildingResources();
+  if (typeof bkmpDragonTraitsMaybeAssign === 'function') bkmpDragonTraitsMaybeAssign();
 
   const unassignedEggs = bkmpPlayerDragonEggs.filter(e => !bkmpPlayerDragonNests.some(n => n.egg_id === e.id));
   const eggGroups = {};
@@ -1588,13 +1616,14 @@ function bkmpIdleRenderDragonsPanel() {
           ? `<div class="idle-dragon-companion-rank-badge">${companionRankIdx === 0 ? '⭐' : ''} Rang ${companionRankIdx + 1} · ${Math.round((BKMP_DRAGON_COMPANION_SLOT_WEIGHTS[companionRankIdx] || 0) * 100)}%</div>`
           : (!isTeen && d.is_companion ? `<div class="idle-dragon-companion-rank-badge is-inactive">⚠️ Platzlimit erreicht - trägt nicht bei</div>` : '');
         return `
-          <div class="idle-skin-card idle-dragon-lager-card ${d.is_companion ? 'idle-skin-card-equipped' : ''}" style="--dragon-rarity-color:${rarity.color}" data-dragon-id="${d.id}">
+          <div class="idle-skin-card idle-dragon-lager-card ${d.is_companion ? 'idle-skin-card-equipped' : ''}${!isTeen && typeof bkmpDragonBondCardClass === 'function' ? bkmpDragonBondCardClass(d) : ''}" style="--dragon-rarity-color:${rarity.color}" data-dragon-id="${d.id}">
             ${d.is_favorite ? '<div class="idle-dragon-fav-badge">★</div>' : ''}
             ${bkmpDragonThumbHtml(bkmpDragonStageImage(species, d.stage), escapeHtml(species.name))}
-            <div class="idle-skin-name">${escapeHtml(species.name)} <small>(${isTeen ? 'Jugendlich' : 'Erwachsen'})</small></div>
+            <div class="idle-skin-name">${escapeHtml(species.name)} <small>(${isTeen ? 'Jugendlich' : (d.stage === 'divine' ? escapeHtml(species.final_stage_label || 'Göttlich') : 'Erwachsen')})</small></div>
             <div class="idle-skin-desc">${rarity.name}</div>
             ${companionRankBadge}
             ${typeof bkmpExpDragonBadgeHtml === 'function' ? bkmpExpDragonBadgeHtml(d.id) : ''}
+            ${!isTeen && typeof bkmpDragonIdentityHtml === 'function' ? bkmpDragonIdentityHtml(d, species) : ''}
             ${isTeen
               ? `<div class="idle-xp-bar"><div class="idle-xp-fill" style="width:${pct}%"></div></div>
                  <div class="idle-xp-label">${bkmpIdleFormatNumber(d.battle_xp)} / ${bkmpIdleFormatNumber(species.battle_xp_required)} Kampf-EP</div>`

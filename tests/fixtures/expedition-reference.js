@@ -223,7 +223,7 @@ const EXPEDITION_MISSIONS = [
       },
       {
         "type": "trait",
-        "value": "schuerfer"
+        "value": "mutig"
       }
     ],
     "rewards": {
@@ -280,7 +280,7 @@ const EXPEDITION_MISSIONS = [
       },
       {
         "type": "trait",
-        "value": "gelehrter"
+        "value": "forscher"
       }
     ],
     "rewards": {
@@ -529,7 +529,7 @@ const EXPEDITION_EVENTS = [
       "arkan": 0.02
     },
     "trait_bonus": {
-      "schuerfer": 0.08
+      "schatzsucher": 0.06
     },
     "reward": {
       "crystals": 20
@@ -546,7 +546,7 @@ const EXPEDITION_EVENTS = [
       "arkan": 0.03
     },
     "trait_bonus": {
-      "gelehrter": 0.06
+      "forscher": 0.06
     },
     "reward": {
       "runes": 1
@@ -563,7 +563,7 @@ const EXPEDITION_EVENTS = [
       "licht": 0.04
     },
     "trait_bonus": {
-      "gelehrter": 0.04
+      "forscher": 0.04
     },
     "reward": {
       "essence": 18
@@ -581,7 +581,7 @@ const EXPEDITION_EVENTS = [
       "erde": 0.02
     },
     "trait_bonus": {
-      "spaeher": 0.06
+      "entdecker": 0.04
     },
     "reward": {
       "stone": 250,
@@ -615,7 +615,7 @@ const EXPEDITION_EVENTS = [
     "base_chance": 0.07,
     "affinity_bonus": {},
     "trait_bonus": {
-      "charmant": 0.08
+      "gierig": 0.06
     },
     "reward": {
       "gold_units": 40,
@@ -652,7 +652,7 @@ const EXPEDITION_EVENTS = [
       "arkan": 0.01
     },
     "trait_bonus": {
-      "spaeher": 0.02
+      "entdecker": 0.02
     },
     "reward": {
       "eggs": 1

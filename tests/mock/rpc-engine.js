@@ -425,11 +425,167 @@ function expeditionHarborSlots(store, uid) {
   const slots = def && def.effects && def.effects.expedition_slots != null ? Number(def.effects.expedition_slots) : harbor;
   return { harbor, slots };
 }
-function expeditionChanceHit(seedText, chance) {
-  return (villageSeedInt(seedText) % 10000) < Math.round(chance * 10000);
+
+/* ---------- Drachendorf-Ausbau Phase 4: Eigenschaften & Bindung ----------
+   Nachbau von sql/20261004-04-dragon-traits-bond.sql. */
+function dragonTraitFor(store, dragonId) {
+  const traits = getTable(store, 'dragon_traits').slice().sort((a, b) => (a.sort_order - b.sort_order) || (a.id < b.id ? -1 : 1));
+  if (!traits.length) return null;
+  return traits[villageSeedInt('trait:' + dragonId) % traits.length].id;
+}
+
+/* ---------- Drachendorf-Ausbau Phase 6: Gildenprojekte ----------
+   Nachbau von sql/20261004-05-guild-projects.sql. */
+function guildProjectWeekStart(store) {
+  const day = berlinDateStr(store.clock.nowMs());
+  const d = new Date(day + 'T00:00:00Z');
+  const isoDow = d.getUTCDay() === 0 ? 7 : d.getUTCDay();
+  d.setUTCDate(d.getUTCDate() - (isoDow - 1));
+  return d.toISOString().slice(0, 10);
+}
+function guildProjectTarget(store, guildId) {
+  const weekAgo = store.clock.nowMs() - 7 * 864e5;
+  const members = getTable(store, 'guild_members').filter(m => m.guild_id === guildId);
+  const active = members.filter(m => {
+    const st = getTable(store, 'idle_player_state').find(r => r.auth_user_id === m.auth_user_id);
+    return st && Date.parse(st.updated_at || 0) > weekAgo;
+  }).length;
+  const guild = getTable(store, 'guilds').find(g => g.id === guildId) || {};
+  const levels = getTable(store, 'guild_level_thresholds').filter(t => Number(t.xp_required) <= Number(guild.guild_xp || 0));
+  const level = levels.length ? Math.max(...levels.map(t => Number(t.level))) : 1;
+  return Math.max(600, Math.min(8000, 400 + 250 * Math.max(1, active) + 40 * level));
+}
+function guildProjectEnsure(store, guildId) {
+  const week = guildProjectWeekStart(store);
+  const rows = getTable(store, 'guild_projects');
+  let row = rows.find(p => p.guild_id === guildId && p.week_start === week);
+  if (row) return row;
+  const defs = getTable(store, 'guild_project_defs').slice().sort((a, b) => (a.sort_order - b.sort_order) || (a.id < b.id ? -1 : 1));
+  const def = defs[villageSeedInt(guildId + ':' + week) % Math.max(1, defs.length)];
+  row = { guild_id: guildId, week_start: week, def_id: def.id, target_points: guildProjectTarget(store, guildId), progress_points: 0, completed_at: null };
+  rows.push(row);
+  return row;
 }
 
 const RPC_HANDLERS = {
+  guild_project_status(store, uid) {
+    if (!uid) throw rpcError('not_authenticated');
+    const member = getTable(store, 'guild_members').find(m => m.auth_user_id === uid);
+    if (!member) return { in_guild: false };
+    const proj = guildProjectEnsure(store, member.guild_id);
+    const def = getTable(store, 'guild_project_defs').find(d => d.id === proj.def_id);
+    const contribs = getTable(store, 'guild_project_contributions').filter(c => c.guild_id === member.guild_id && c.week_start === proj.week_start);
+    const mine = contribs.find(c => c.auth_user_id === uid);
+    const claimed = getTable(store, 'guild_project_claims').some(c => c.guild_id === member.guild_id && c.week_start === proj.week_start && c.auth_user_id === uid);
+    const guild = getTable(store, 'guilds').find(g => g.id === member.guild_id) || {};
+    const st = getTable(store, 'idle_player_state').find(r => r.auth_user_id === uid);
+    return {
+      in_guild: true, guild_id: member.guild_id, week_start: proj.week_start,
+      def: { id: def.id, name: def.name, icon: def.icon, description: def.description, resource_kinds: def.resource_kinds },
+      target_points: proj.target_points, progress_points: proj.progress_points, completed: !!proj.completed_at,
+      my_points: mine ? mine.points : 0, claimed, badges: Number(guild.projects_completed || 0),
+      gold_unit: villageGoldUnit(st ? st.highest_dragon_index : 0),
+      top: contribs.slice().sort((a, b) => b.points - a.points).slice(0, 5).map(c => ({ name: c.display_name, points: c.points }))
+    };
+  },
+  guild_project_contribute(store, uid, params) {
+    if (!uid) throw rpcError('not_authenticated');
+    const member = getTable(store, 'guild_members').find(m => m.auth_user_id === uid);
+    if (!member) throw rpcError('not_in_guild');
+    const kind = params.p_kind, amount = Number(params.p_amount);
+    if (!['gold', 'wood', 'stone', 'crystals', 'essence'].includes(kind)) throw rpcError('invalid_kind');
+    if (!(amount > 0)) throw rpcError('invalid_amount');
+    const proj = guildProjectEnsure(store, member.guild_id);
+    if (proj.completed_at) throw rpcError('project_completed');
+    const def = getTable(store, 'guild_project_defs').find(d => d.id === proj.def_id);
+    if (!def.resource_kinds.includes(kind)) throw rpcError('kind_not_needed');
+    const state = villagePlayerRow(store, uid);
+    const perPoint = kind === 'gold' ? 20 * villageGoldUnit(state.highest_dragon_index) : (kind === 'wood' || kind === 'stone') ? 100 : 5;
+    let points = Math.floor(amount / perPoint);
+    if (points < 1) throw rpcError('amount_too_small');
+    points = Math.min(points, proj.target_points - proj.progress_points);
+    const cost = points * perPoint;
+    if (Number(state[kind] || 0) < cost) throw rpcError('insufficient_resources');
+    state[kind] = Number(state[kind] || 0) - cost;
+    const contribs = getTable(store, 'guild_project_contributions');
+    let c = contribs.find(x => x.guild_id === member.guild_id && x.week_start === proj.week_start && x.auth_user_id === uid);
+    if (!c) { c = { guild_id: member.guild_id, week_start: proj.week_start, auth_user_id: uid, name_key: member.name_key, display_name: member.display_name, points: 0 }; contribs.push(c); }
+    c.points += points;
+    proj.progress_points += points;
+    if (proj.progress_points >= proj.target_points) {
+      proj.completed_at = store.clock.nowIso();
+      const guild = getTable(store, 'guilds').find(g => g.id === member.guild_id);
+      if (guild) guild.projects_completed = Number(guild.projects_completed || 0) + 1;
+    }
+    return { kind, spent: cost, points, progress_points: proj.progress_points, target_points: proj.target_points, completed: !!proj.completed_at };
+  },
+  guild_project_claim(store, uid) {
+    if (!uid) throw rpcError('not_authenticated');
+    const member = getTable(store, 'guild_members').find(m => m.auth_user_id === uid);
+    if (!member) throw rpcError('not_in_guild');
+    const week = guildProjectWeekStart(store);
+    const proj = getTable(store, 'guild_projects').find(p => p.guild_id === member.guild_id && p.week_start === week);
+    if (!proj || !proj.completed_at) throw rpcError('not_completed');
+    const mine = getTable(store, 'guild_project_contributions').find(c => c.guild_id === member.guild_id && c.week_start === week && c.auth_user_id === uid);
+    if (!mine || mine.points < 10) throw rpcError('too_little_contribution');
+    const claims = getTable(store, 'guild_project_claims');
+    if (claims.some(c => c.guild_id === member.guild_id && c.week_start === week && c.auth_user_id === uid)) throw rpcError('already_claimed');
+    claims.push({ guild_id: member.guild_id, week_start: week, auth_user_id: uid, claimed_at: store.clock.nowIso() });
+    const state = villagePlayerRow(store, uid);
+    state.crystals = Number(state.crystals || 0) + 150;
+    state.essence = Number(state.essence || 0) + 100;
+    return { crystals: 150, essence: 100, runes: 1, rune_tier: 2 };
+  },
+  dragon_ensure_traits(store, uid) {
+    if (!uid) throw rpcError('not_authenticated');
+    const out = [];
+    getTable(store, 'player_dragons').forEach(d => {
+      if (d.auth_user_id !== uid || !(d.stage === 'adult' || d.stage === 'divine') || d.trait) return;
+      d.trait = dragonTraitFor(store, d.id);
+      out.push({ id: d.id, trait: d.trait });
+    });
+    return out;
+  },
+  dragon_activity_tick(store, uid) {
+    if (!uid) throw rpcError('not_authenticated');
+    const ips = villagePlayerRow(store, uid);
+    const acts = getTable(store, 'player_activity_state');
+    const nowMs = store.clock.nowMs();
+    let act = acts.find(a => a.auth_user_id === uid);
+    if (!act) {
+      acts.push({ auth_user_id: uid, last_report_at_ms: nowMs, last_kills: Number(ips.dragon_kills || 0), last_boss_kills: Number(ips.boss_kills || 0), kill_carry: 0 });
+      return { bond_gain: 0, kills: 0, dragons: [] };
+    }
+    let elapsed = (nowMs - act.last_report_at_ms) / 1000;
+    if (elapsed < 20) return { bond_gain: 0, kills: 0, dragons: [], too_soon: true };
+    elapsed = Math.min(elapsed, 180);
+    let kills = Math.max(0, Number(ips.dragon_kills || 0) - act.last_kills);
+    kills = Math.min(kills, Math.floor(elapsed * 3));
+    let boss = Math.max(0, Number(ips.boss_kills || 0) - act.last_boss_kills);
+    boss = Math.min(boss, Math.floor(elapsed / 20) + 1);
+    const running = getTable(store, 'player_expeditions').filter(e => e.status === 'running');
+    const companions = getTable(store, 'player_dragons').filter(d => d.auth_user_id === uid && d.is_companion
+      && (d.stage === 'adult' || d.stage === 'divine') && !running.some(e => (e.dragon_ids || []).includes(d.id)));
+    const total = act.kill_carry + kills;
+    let bond = Math.min(Math.floor(total / 40) + boss, 3 * Math.ceil(elapsed / 60));
+    const out = [];
+    if (companions.length) {
+      companions.forEach(d => {
+        d.bond_xp = Math.min(7500, Number(d.bond_xp || 0) + bond);
+        d.companion_kills = Number(d.companion_kills || 0) + kills;
+        d.companion_boss_kills = Number(d.companion_boss_kills || 0) + boss;
+        d.companion_seconds = Number(d.companion_seconds || 0) + Math.floor(elapsed);
+        out.push({ id: d.id, bond_xp: d.bond_xp, companion_kills: d.companion_kills, companion_boss_kills: d.companion_boss_kills, companion_seconds: d.companion_seconds });
+      });
+    } else {
+      bond = 0;
+    }
+    act.last_report_at_ms = nowMs;
+    act.last_kills = Number(ips.dragon_kills || 0);
+    act.last_boss_kills = Number(ips.boss_kills || 0);
+    act.kill_carry = companions.length ? total % 40 : 0;
+    return { bond_gain: bond, kills, boss_kills: boss, dragons: out };
+  },
   expedition_start(store, uid, params) {
     if (!uid) throw rpcError('not_authenticated');
     const state = villagePlayerRow(store, uid);
@@ -458,37 +614,11 @@ const RPC_HANDLERS = {
     const ev = expeditionRules.bkmpExpeditionTeamEval(mission, team);
     if (ev.unmet.length) throw rpcError('requirements_not_met');
     const id = crypto.randomUUID();
-    const score = ev.score + (villageSeedInt(id + ':quality') % 21);
-    const quality = expeditionRules.bkmpExpeditionQuality(score);
-    const mult = expeditionRules.bkmpExpeditionQualityMult(quality);
-    const unit = villageGoldUnit(state.highest_dragon_index);
-    const rw = mission.rewards || {};
-    const r = {
-      gold: Math.round(Number(rw.gold_units || 0) * unit * mult),
-      wood: Math.round(Number(rw.wood || 0) * mult), stone: Math.round(Number(rw.stone || 0) * mult),
-      crystals: Math.round(Number(rw.crystals || 0) * mult), essence: Math.round(Number(rw.essence || 0) * mult),
-      fruit: Math.round(Number(rw.fruit || 0) * mult), meat: Math.round(Number(rw.meat || 0) * mult),
-      bond_xp: Number(rw.bond_xp || 0), runes: 0, eggs: 0
-    };
-    const runeChance = Number(rw.rune_chance || 0), eggChance = Number(rw.egg_chance || 0);
-    r.runes = Math.floor(runeChance) + (expeditionChanceHit(id + ':rune', runeChance - Math.floor(runeChance)) ? 1 : 0);
-    r.eggs = Math.floor(eggChance) + (expeditionChanceHit(id + ':egg', eggChance - Math.floor(eggChance)) ? 1 : 0);
-    const traits = [...new Set(dragons.map(d => d.trait).filter(Boolean))];
-    const affs = [...new Set(team.flatMap(m => m.affinities))];
-    const events = [];
-    getTable(store, 'expedition_events').slice().sort((a, b) => (a.sort_order - b.sort_order) || (a.id < b.id ? -1 : 1)).forEach(e => {
-      if (events.length >= 2) return;
-      let chance = Number(e.base_chance) + (quality - 1) * 0.015;
-      Object.keys(e.affinity_bonus || {}).forEach(a => { if (affs.includes(a)) chance += Number(e.affinity_bonus[a]); });
-      Object.keys(e.trait_bonus || {}).forEach(t => { if (traits.includes(t)) chance += Number(e.trait_bonus[t]); });
-      if (!expeditionChanceHit(id + ':ev:' + e.id, chance)) return;
-      events.push({ id: e.id, name: e.name, icon: e.icon, description: e.description });
-      const er = e.reward || {};
-      r.gold += Math.round(Number(er.gold_units || 0) * unit);
-      ['wood', 'stone', 'crystals', 'essence', 'fruit', 'meat'].forEach(k => { r[k] += Number(er[k] || 0); });
-      r.runes += Number(er.runes || 0); r.eggs += Number(er.eggs || 0); r.bond_xp += Number(er.bond_xp || 0);
+    const out = expeditionRules.bkmpExpeditionOutcome({
+      mission, region, team, events: getTable(store, 'expedition_events'),
+      goldUnit: villageGoldUnit(state.highest_dragon_index), seedInt: villageSeedInt, id
     });
-    r.rune_tier = region.rune_tier; r.egg_tier = region.egg_tier;
+    const quality = out.quality, score = out.score, events = out.events, r = out.rewards;
     const nowMs = store.clock.nowMs();
     const row = {
       id, auth_user_id: uid, name_key: state.name_key, mission_id: mission.id, region_id: mission.region_id,

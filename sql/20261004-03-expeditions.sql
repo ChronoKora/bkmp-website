@@ -94,13 +94,13 @@ insert into public.expedition_missions (id, region_id, name, description, durati
    '{"distinct_affinities_min":2}', '[{"type":"affinity","value":"feuer"},{"type":"affinity","value":"erde"}]',
    '{"gold_units":70,"crystals":22,"stone":350,"bond_xp":30}', 5),
   ('gb_glutkern', 'glutberge', 'Der Glutkern', 'Bis zum glühenden Kern des Berges - höchstens ein legendärer Drache darf mit.', 8, 3,
-   '{"affinity_min":{"feuer":1},"rarity_max":{"legendaer":1}}', '[{"type":"affinity_count","value":"feuer","count":2},{"type":"trait","value":"schuerfer"}]',
+   '{"affinity_min":{"feuer":1},"rarity_max":{"legendaer":1}}', '[{"type":"affinity_count","value":"feuer","count":2},{"type":"trait","value":"mutig"}]',
    '{"gold_units":150,"essence":40,"crystals":30,"bond_xp":50}', 6),
   ('fk_eisgrat', 'frostklamm', 'Eisgrat', 'Ein kurzer Erkundungsflug über den Eisgrat.', 1, 1,
    '{}', '[{"type":"affinity","value":"wasser"},{"type":"affinity","value":"wind"}]',
    '{"crystals":8,"stone":100,"bond_xp":10}', 7),
   ('fk_frostwaechter', 'frostklamm', 'Die Frostwächter', 'Alte Eiswächter bewachen vergessene Runen.', 4, 2,
-   '{"affinity_min":{"wasser":1}}', '[{"type":"distinct_affinities","value":2},{"type":"trait","value":"gelehrter"}]',
+   '{"affinity_min":{"wasser":1}}', '[{"type":"distinct_affinities","value":2},{"type":"trait","value":"forscher"}]',
    '{"gold_units":50,"crystals":32,"rune_chance":0.25,"bond_xp":30}', 8),
   ('fk_gletscherherz', 'frostklamm', 'Gletscherherz', 'Drei verschiedene Drachen suchen das Herz des Gletschers.', 8, 3,
    '{"distinct_species_min":3}', '[{"type":"affinity","value":"wasser"},{"type":"affinity","value":"wind"},{"type":"affinity","value":"licht"}]',
@@ -129,14 +129,14 @@ on conflict (id) do update set region_id = excluded.region_id, name = excluded.n
 
 insert into public.expedition_events (id, name, icon, description, base_chance, affinity_bonus, trait_bonus, reward, sort_order) values
   ('schatztruhe',         'Alte Schatztruhe',    '💰', 'Unter Wurzeln vergraben lag eine alte Truhe voller Gold.', 0.12, '{"erde":0.03}', '{"schatzsucher":0.10}', '{"gold_units":60}', 1),
-  ('kristallader',        'Kristallader',        '💎', 'Eine frei liegende Kristallader glitzerte im Fels.', 0.10, '{"erde":0.03,"arkan":0.02}', '{"schuerfer":0.08}', '{"crystals":20}', 2),
-  ('verlassene_ruine',    'Verlassene Ruine',    '🏚️', 'In einer verfallenen Ruine lag eine vergessene Rune.', 0.07, '{"arkan":0.03}', '{"gelehrter":0.06}', '{"runes":1}', 3),
-  ('alter_schrein',       'Alter Schrein',       '⛩️', 'Ein alter Schrein schenkte dem Team leuchtende Essenz.', 0.08, '{"licht":0.04}', '{"gelehrter":0.04}', '{"essence":18}', 4),
-  ('unbekannte_hoehle',   'Unbekannte Höhle',    '🕳️', 'Eine unentdeckte Höhle voller Stein und Holzreste.', 0.10, '{"dunkel":0.03,"erde":0.02}', '{"spaeher":0.06}', '{"stone":250,"wood":150}', 5),
+  ('kristallader',        'Kristallader',        '💎', 'Eine frei liegende Kristallader glitzerte im Fels.', 0.10, '{"erde":0.03,"arkan":0.02}', '{"schatzsucher":0.06}', '{"crystals":20}', 2),
+  ('verlassene_ruine',    'Verlassene Ruine',    '🏚️', 'In einer verfallenen Ruine lag eine vergessene Rune.', 0.07, '{"arkan":0.03}', '{"forscher":0.06}', '{"runes":1}', 3),
+  ('alter_schrein',       'Alter Schrein',       '⛩️', 'Ein alter Schrein schenkte dem Team leuchtende Essenz.', 0.08, '{"licht":0.04}', '{"forscher":0.04}', '{"essence":18}', 4),
+  ('unbekannte_hoehle',   'Unbekannte Höhle',    '🕳️', 'Eine unentdeckte Höhle voller Stein und Holzreste.', 0.10, '{"dunkel":0.03,"erde":0.02}', '{"entdecker":0.04}', '{"stone":250,"wood":150}', 5),
   ('verlorene_lieferung', 'Verlorene Lieferung', '📦', 'Eine verlorene Händlerlieferung mit Futter für die Nester.', 0.10, '{"wind":0.03}', '{"sammler":0.08}', '{"fruit":150,"meat":150}', 6),
-  ('wandernder_haendler', 'Wandernder Händler',  '🧳', 'Ein wandernder Händler bezahlte für Begleitschutz.', 0.07, '{}', '{"charmant":0.08}', '{"gold_units":40,"crystals":8}', 7),
+  ('wandernder_haendler', 'Wandernder Händler',  '🧳', 'Ein wandernder Händler bezahlte für Begleitschutz.', 0.07, '{}', '{"gierig":0.06}', '{"gold_units":40,"crystals":8}', 7),
   ('verletzter_drache',   'Verletzter Drache',   '🩹', 'Das Team half einem verletzten wilden Drachen - das schweißt zusammen.', 0.06, '{"licht":0.04,"wasser":0.02}', '{"heiler":0.10}', '{"bond_xp":60,"essence":8}', 8),
-  ('geheimnisvolles_ei',  'Geheimnisvolles Ei',  '🥚', 'In einem verlassenen Nest lag ein geheimnisvolles Ei.', 0.03, '{"arkan":0.01}', '{"spaeher":0.02}', '{"eggs":1}', 9)
+  ('geheimnisvolles_ei',  'Geheimnisvolles Ei',  '🥚', 'In einem verlassenen Nest lag ein geheimnisvolles Ei.', 0.03, '{"arkan":0.01}', '{"entdecker":0.02}', '{"eggs":1}', 9)
 on conflict (id) do update set name = excluded.name, icon = excluded.icon, description = excluded.description,
   base_chance = excluded.base_chance, affinity_bonus = excluded.affinity_bonus, trait_bonus = excluded.trait_bonus,
   reward = excluded.reward, sort_order = excluded.sort_order;
@@ -251,9 +251,27 @@ begin
   end loop;
 
   v_score := 25 + jsonb_array_length(v_met) * 15 + v_distinct_rarity * 5 + v_distinct_aff * 4 + floor((v_avg_bond - 1) * 2)::integer;
+  -- Bindungsmeilenstein 4: +3 je Teammitglied mit Bindung 4+
+  v_score := v_score + 3 * (select count(*) from jsonb_array_elements(p_team) m where coalesce((m->>'bond_level')::integer, 1) >= 4)::integer;
+  -- Eigenschaften (Phase 4): Mutig (8-Std.-Missionen), Gesellig (Teams), Einzelgaenger (solo)
+  if p_mission.duration_hours = 8 then
+    v_score := v_score + floor(10 * public.expedition_trait_strength(p_team, 'mutig'))::integer;
+  end if;
+  if p_mission.team_size >= 2 then
+    v_score := v_score + floor(4 * (p_mission.team_size - 1) * public.expedition_trait_strength(p_team, 'gesellig'))::integer;
+  end if;
+  if p_mission.team_size = 1 then
+    v_score := v_score + floor(12 * public.expedition_trait_strength(p_team, 'einzelgaenger'))::integer;
+  end if;
   return jsonb_build_object('unmet', v_unmet, 'met', v_met, 'score', v_score);
 end;
 $$;
+
+create or replace function public.expedition_trait_strength(p_team jsonb, p_trait text)
+returns numeric language sql immutable as $
+  select coalesce(max(case when coalesce((m->>'bond_level')::integer, 1) >= 8 then 1.5 else 1 end), 0)
+    from jsonb_array_elements(coalesce(p_team, '[]'::jsonb)) m where m->>'trait' = p_trait;
+$;
 
 create or replace function public.expedition_quality(p_score integer)
 returns integer language sql immutable as $$
@@ -280,6 +298,7 @@ declare
   v_eval jsonb;
   v_id uuid := gen_random_uuid();
   v_roll integer;
+  v_span integer;
   v_score integer;
   v_quality integer;
   v_mult numeric;
@@ -340,23 +359,29 @@ begin
   v_eval := public.expedition_team_eval(v_mission, v_team);
   if jsonb_array_length(v_eval->'unmet') > 0 then raise exception 'requirements_not_met'; end if;
 
-  v_roll := (public.village_seed_int(v_id::text || ':quality') % 21)::integer;
+  v_span := 21 + case when public.expedition_trait_strength(v_team, 'glueckskind') > 1 then 8
+                      when public.expedition_trait_strength(v_team, 'glueckskind') > 0 then 5 else 0 end;
+  v_roll := (public.village_seed_int(v_id::text || ':quality') % v_span)::integer;
+  v_roll := greatest(v_roll, case when public.expedition_trait_strength(v_team, 'beschuetzer') > 1 then 12
+                                  when public.expedition_trait_strength(v_team, 'beschuetzer') > 0 then 8 else 0 end);
   v_score := (v_eval->>'score')::integer + v_roll;
   v_quality := public.expedition_quality(v_score);
   v_mult := public.expedition_quality_mult(v_quality);
   v_unit := public.village_gold_unit(v_state.highest_dragon_index);
   v_rw := v_mission.rewards;
 
-  v_gold := round(coalesce((v_rw->>'gold_units')::numeric, 0) * v_unit * v_mult);
-  v_wood := round(coalesce((v_rw->>'wood')::numeric, 0) * v_mult);
-  v_stone := round(coalesce((v_rw->>'stone')::numeric, 0) * v_mult);
-  v_crystals := round(coalesce((v_rw->>'crystals')::numeric, 0) * v_mult);
-  v_essence := round(coalesce((v_rw->>'essence')::numeric, 0) * v_mult);
-  v_fruit := round(coalesce((v_rw->>'fruit')::numeric, 0) * v_mult);
-  v_meat := round(coalesce((v_rw->>'meat')::numeric, 0) * v_mult);
-  v_bond := coalesce((v_rw->>'bond_xp')::integer, 0);
+  -- Eigenschaften: Gierig (Gold), Sammler (Material/Futter), Schatzsucher
+  -- (Kristalle), Forscher (Essenz + Runenchance), Heiler (Bindung)
+  v_gold := round(coalesce((v_rw->>'gold_units')::numeric, 0) * v_unit * v_mult * (1 + 0.15 * public.expedition_trait_strength(v_team, 'gierig')));
+  v_wood := round(coalesce((v_rw->>'wood')::numeric, 0) * v_mult * (1 + 0.15 * public.expedition_trait_strength(v_team, 'sammler')));
+  v_stone := round(coalesce((v_rw->>'stone')::numeric, 0) * v_mult * (1 + 0.15 * public.expedition_trait_strength(v_team, 'sammler')));
+  v_crystals := round(coalesce((v_rw->>'crystals')::numeric, 0) * v_mult * (1 + 0.10 * public.expedition_trait_strength(v_team, 'schatzsucher')));
+  v_essence := round(coalesce((v_rw->>'essence')::numeric, 0) * v_mult * (1 + 0.10 * public.expedition_trait_strength(v_team, 'forscher')));
+  v_fruit := round(coalesce((v_rw->>'fruit')::numeric, 0) * v_mult * (1 + 0.15 * public.expedition_trait_strength(v_team, 'sammler')));
+  v_meat := round(coalesce((v_rw->>'meat')::numeric, 0) * v_mult * (1 + 0.15 * public.expedition_trait_strength(v_team, 'sammler')));
+  v_bond := round(coalesce((v_rw->>'bond_xp')::numeric, 0) * (1 + 0.25 * public.expedition_trait_strength(v_team, 'heiler')));
   -- Runen/Eier: ganze Anteile sicher, Rest als Chance (deterministisch).
-  v_frac := coalesce((v_rw->>'rune_chance')::numeric, 0);
+  v_frac := coalesce((v_rw->>'rune_chance')::numeric, 0) * (1 + 0.15 * public.expedition_trait_strength(v_team, 'forscher'));
   v_runes := floor(v_frac)::integer
     + case when (public.village_seed_int(v_id::text || ':rune') % 10000) < round((v_frac - floor(v_frac)) * 10000) then 1 else 0 end;
   v_frac := coalesce((v_rw->>'egg_chance')::numeric, 0);
@@ -366,7 +391,7 @@ begin
   -- Ereignisse (hoechstens 2)
   for v_ev in select * from public.expedition_events ee order by ee.sort_order, ee.id loop
     exit when jsonb_array_length(v_events) >= 2;
-    v_chance := v_ev.base_chance + (v_quality - 1) * 0.015;
+    v_chance := v_ev.base_chance + (v_quality - 1) * 0.015 + 0.03 * public.expedition_trait_strength(v_team, 'entdecker');
     for v_key, v_val in select * from jsonb_each(v_ev.affinity_bonus) loop
       if v_affs is not null and v_key = any(v_affs) then v_chance := v_chance + (v_val)::text::numeric; end if;
     end loop;
