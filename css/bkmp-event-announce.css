@@ -1,0 +1,272 @@
+/* ============================================================
+   Event-Ankuendigungs-Popup (04.10.2026) - siehe js/systems/
+   bkmp-event-announce.js. Das Artwork ist selbst das Fenster; hier liegt
+   nur die transparente Huelle, die Klickflaechen und leichte Effekte.
+
+   Performance-Regeln (wie im restlichen Projekt): ausschliesslich
+   transform und opacity animieren - kein filter, kein backdrop-filter,
+   kein drop-shadow, keine background-position-Animation, keine Videos.
+   Effektmodus:  Hoch = alles | Reduziert = Oeffnen/Schliessen + dezentes
+   Funkeln | Aus und prefers-reduced-motion = keine Dauer-Animation.
+   ============================================================ */
+
+.bkmp-ann-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-modal, 1000) + 50);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
+  background: radial-gradient(ellipse at 50% 46%, rgba(12, 9, 26, 0.62) 0%, rgba(0, 0, 0, 0.78) 100%);
+  opacity: 0;
+  transition: opacity 0.32s ease;
+  overscroll-behavior: contain;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.bkmp-ann-overlay.is-open { opacity: 1; }
+.bkmp-ann-overlay.is-closing { opacity: 0; transition-duration: 0.24s; }
+.bkmp-ann-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+/* Fenster = Artwork. Seitenverhaeltnis kommt aus der Konfiguration. */
+.bkmp-ann-window {
+  --ann-h: 90vh;
+  position: relative;
+  width: min(96vw, calc(var(--ann-h) * var(--ann-ratio, 0.8)), 1122px);
+  opacity: 0;
+  transform: scale(0.88) translateY(20px);
+  transition: opacity 0.42s ease-out, transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  -webkit-user-select: none;
+}
+@supports (height: 1dvh) {
+  .bkmp-ann-window { --ann-h: 90dvh; }
+}
+@media (max-width: 760px), (max-height: 520px) {
+  .bkmp-ann-window { --ann-h: 92vh; width: min(94vw, calc(var(--ann-h) * var(--ann-ratio, 0.8)), 1122px); }
+  @supports (height: 1dvh) {
+    .bkmp-ann-window { --ann-h: 92dvh; }
+  }
+}
+.bkmp-ann-overlay.is-open .bkmp-ann-window { opacity: 1; transform: none; }
+.bkmp-ann-overlay.is-closing .bkmp-ann-window {
+  opacity: 0;
+  transform: scale(0.94);
+  transition-duration: 0.22s, 0.22s;
+  transition-timing-function: ease-in;
+}
+
+.bkmp-ann-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+/* Nach dem Einblenden zeichnet die lebendige Kopie die Plakette; das
+   Grundbild bekommt dafuer ein Loch (SVG-Clip aus dem Skript). */
+.bkmp-ann-overlay.has-face.is-settled .bkmp-ann-art { clip-path: url(#bkmpAnnHole); }
+
+.bkmp-ann-fx {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* ---------- Klickflaechen ---------- */
+.bkmp-ann-cta,
+.bkmp-ann-close {
+  position: absolute;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.bkmp-ann-cta { min-height: 44px; border-radius: 14px; }
+.bkmp-ann-close {
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+}
+.bkmp-ann-cta:focus-visible,
+.bkmp-ann-close:focus-visible {
+  outline: 2px solid #ffe29a;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.55);
+}
+.bkmp-ann-close::after {
+  content: '';
+  position: absolute;
+  inset: 4%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 230, 150, 0.34) 0%, rgba(255, 210, 110, 0) 72%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.bkmp-ann-close:hover::after,
+.bkmp-ann-close:focus-visible::after { opacity: 1; }
+
+/* ---------- "Event ansehen": lebendige Kopie der Plakette ---------- */
+.bkmp-ann-face {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0;
+  transform-origin: 50% 50%;
+  /* Kein Einblenden: das Loch im Grundbild entsteht im selben Moment (sonst
+     schimmert kurz die Seite durch die Plakette). */
+  transition: transform 0.18s ease-out;
+}
+.bkmp-ann-overlay.is-settled .bkmp-ann-face { opacity: 1; }
+.bkmp-ann-face-in {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background-repeat: no-repeat;
+  transform-origin: 50% 50%;
+}
+.bkmp-ann-face-in::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  /* Goldglanz am Rand der Plakette - die Schrift in der Mitte bleibt kontrastreich. */
+  box-shadow: inset 0 0 20px 3px rgba(255, 240, 175, 0.6);
+  opacity: 0;
+  transition: opacity 0.22s ease;
+}
+.bkmp-ann-cta:hover ~ .bkmp-ann-face,
+.bkmp-ann-cta:focus-visible ~ .bkmp-ann-face { transform: translateY(-2px) scale(1.04); }
+.bkmp-ann-cta:hover ~ .bkmp-ann-face .bkmp-ann-face-in::after,
+.bkmp-ann-cta:focus-visible ~ .bkmp-ann-face .bkmp-ann-face-in::after { opacity: 1; }
+.bkmp-ann-cta:active ~ .bkmp-ann-face,
+.bkmp-ann-overlay.is-launching .bkmp-ann-face { transform: scale(0.97); transition-duration: 0.1s; }
+.bkmp-ann-face-shine {
+  position: absolute;
+  top: -12%;
+  bottom: -12%;
+  left: -40%;
+  width: 26%;
+  background: linear-gradient(100deg, rgba(255, 255, 255, 0) 0%, rgba(255, 248, 205, 0.62) 50%, rgba(255, 255, 255, 0) 100%);
+  transform: translateX(-120%) skewX(-18deg);
+  opacity: 0;
+}
+
+/* ---------- Dekoration (liegt nur im Fenster, nie ausserhalb des Artworks) ---------- */
+.bkmp-ann-glow {
+  position: absolute;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+}
+.bkmp-ann-glow-light { background: radial-gradient(circle, rgba(255, 228, 150, 0.5) 0%, rgba(255, 200, 100, 0.18) 45%, rgba(255, 200, 100, 0) 70%); }
+.bkmp-ann-glow-dark { background: radial-gradient(circle, rgba(176, 130, 255, 0.5) 0%, rgba(130, 80, 230, 0.18) 45%, rgba(130, 80, 230, 0) 70%); }
+.bkmp-ann-spark {
+  position: absolute;
+  width: var(--sz, 5px);
+  height: var(--sz, 5px);
+  border-radius: 50%;
+  opacity: 0;
+}
+.bkmp-ann-spark-light { background: radial-gradient(circle, #fff7d0 0%, #ffd36b 50%, rgba(255, 211, 107, 0) 72%); }
+.bkmp-ann-spark-dark { background: radial-gradient(circle, #f1e7ff 0%, #b794ff 50%, rgba(183, 148, 255, 0) 72%); }
+.bkmp-ann-twinkle {
+  position: absolute;
+  width: 5%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%) scale(0.5);
+  opacity: 0;
+}
+.bkmp-ann-twinkle::before,
+.bkmp-ann-twinkle::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 100%;
+  height: 3px;
+  margin-top: -1.5px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.95) 50%, rgba(255, 255, 255, 0));
+}
+.bkmp-ann-twinkle::after { transform: rotate(90deg); }
+
+/* ---------- Bewegung: nur im Effektmodus "Hoch" ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-fx="aus"]):not([data-fx="reduziert"]) .bkmp-ann-overlay.is-settled:not(.is-closing) .bkmp-ann-glow {
+    animation: bkmpAnnGlowPulse 4.4s ease-in-out infinite;
+  }
+  html:not([data-fx="aus"]):not([data-fx="reduziert"]) .bkmp-ann-overlay.is-settled:not(.is-closing) .bkmp-ann-glow-dark { animation-delay: -2.2s; }
+  html:not([data-fx="aus"]):not([data-fx="reduziert"]) .bkmp-ann-overlay.is-settled:not(.is-closing) .bkmp-ann-spark {
+    animation: bkmpAnnRise var(--d, 5.5s) linear infinite;
+    animation-delay: var(--dl, 0s);
+  }
+  html:not([data-fx="aus"]):not([data-fx="reduziert"]) .bkmp-ann-overlay.is-settled:not(.is-closing) .bkmp-ann-face-in {
+    animation: bkmpAnnBreathe 4.8s ease-in-out infinite;
+  }
+  html:not([data-fx="aus"]):not([data-fx="reduziert"]) .bkmp-ann-overlay.is-settled:not(.is-closing) .bkmp-ann-face-shine {
+    animation: bkmpAnnShine 8s linear infinite;
+  }
+  /* Reduziert: nur dezentes Funkeln (wenige Sterne + je 3 Funken, nur Opacity). */
+  html[data-fx="reduziert"] .bkmp-ann-overlay.is-settled:not(.is-closing) .bkmp-ann-spark.is-minor {
+    animation: bkmpAnnFlicker 5.2s ease-in-out infinite;
+    animation-delay: var(--dl, 0s);
+  }
+  /* Funkeln der Rahmen-Edelsteine: Hoch und Reduziert. */
+  html:not([data-fx="aus"]) .bkmp-ann-overlay.is-settled:not(.is-closing) .bkmp-ann-twinkle {
+    animation: bkmpAnnTwinkle 3.4s ease-in-out infinite;
+    animation-delay: var(--dl, 0s);
+  }
+  /* Kurzer Lichtimpuls beim Klick auf "Event ansehen". */
+  .bkmp-ann-overlay.is-launching .bkmp-ann-glow {
+    animation: none;
+    opacity: 0.95;
+    transition: opacity 0.22s ease-out;
+  }
+  html[data-fx="aus"] .bkmp-ann-overlay.is-launching .bkmp-ann-glow { opacity: 0; }
+}
+.bkmp-ann-overlay.is-paused *,
+.bkmp-ann-overlay.is-paused { animation-play-state: paused !important; }
+
+@keyframes bkmpAnnGlowPulse {
+  0%, 100% { opacity: 0.16; transform: translate(-50%, -50%) scale(0.96); }
+  50% { opacity: 0.5; transform: translate(-50%, -50%) scale(1.04); }
+}
+@keyframes bkmpAnnRise {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) scale(0.6); }
+  15% { opacity: 0.9; }
+  85% { opacity: 0.6; }
+  100% { opacity: 0; transform: translate3d(var(--dx, 6px), -70px, 0) scale(1); }
+}
+@keyframes bkmpAnnFlicker {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 0.8; }
+}
+@keyframes bkmpAnnTwinkle {
+  0%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+  45% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  70% { opacity: 0.2; transform: translate(-50%, -50%) scale(0.6); }
+}
+@keyframes bkmpAnnBreathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.025); }
+}
+@keyframes bkmpAnnShine {
+  0%, 78% { opacity: 0; transform: translateX(-120%) skewX(-18deg); }
+  80% { opacity: 1; }
+  98% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(560%) skewX(-18deg); }
+}
+
+/* Bewegungsarm (Betriebssystem-Einstellung): nur kurz ein-/ausblenden. */
+@media (prefers-reduced-motion: reduce) {
+  .bkmp-ann-window,
+  .bkmp-ann-overlay.is-closing .bkmp-ann-window { transform: none; transition-property: opacity; transition-duration: 0.15s; }
+  .bkmp-ann-overlay { transition-duration: 0.15s; }
+  .bkmp-ann-cta:hover ~ .bkmp-ann-face,
+  .bkmp-ann-cta:focus-visible ~ .bkmp-ann-face,
+  .bkmp-ann-cta:active ~ .bkmp-ann-face,
+  .bkmp-ann-overlay.is-launching .bkmp-ann-face { transform: none; }
+}

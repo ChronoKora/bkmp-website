@@ -14,7 +14,8 @@
 --   update public.special_events set archived = true where id = 'zwielicht';
 --
 -- Konfiguration (Quests, Stufenbelohnungen, Texte) steht als JSON unten
--- zwischen den $cfg$-Markierungen (Balance per Simulation, siehe
+-- zwischen den $cfg$-Markierungen (inkl. announcementPopup = Tages-Popup auf der
+-- Website, siehe 20261004-11-event-announcement-popup.sql; Balance per Simulation, siehe
 -- MASTER_DOKUMENTATION_BKINVESTMENT.md). Erneutes Ausfuehren aktualisiert
 -- NUR Texte/Konfiguration, nie Termine oder den Schalter.
 --
@@ -696,6 +697,112 @@ values (
    "theme": "Dunkelheit",
    "text": "Offensive, seltene Funde und gefährliche Expeditionen. Göttlich: Aura der Finsternis."
   }
+ },
+ "announcementPopup": {
+  "enabled": true,
+  "daily": true,
+  "action": "open_event",
+  "image": "assets/events/zwielicht-announcement.webp?v=1",
+  "width": 1122,
+  "height": 1402,
+  "alt": "Das Erwachen des Zwielichts – 7-Tage-Event: Stufe 10 Dayman, Stufe 20 Surebrec, Stufe 30 Lightnix oder Darknix",
+  "ctaLabel": "Zwielicht-Event ansehen",
+  "closeLabel": "Event-Ankündigung schließen",
+  "close": {
+   "x": 1040,
+   "y": 118,
+   "r": 48
+  },
+  "cta": {
+   "x": 282,
+   "y": 1190,
+   "w": 574,
+   "h": 144,
+   "face": [
+    [
+     346,
+     1205
+    ],
+    [
+     304,
+     1262
+    ],
+    [
+     346,
+     1318
+    ],
+    [
+     794,
+     1318
+    ],
+    [
+     836,
+     1262
+    ],
+    [
+     794,
+     1205
+    ]
+   ]
+  },
+  "glows": [
+   {
+    "tone": "light",
+    "x": 402,
+    "y": 690,
+    "r": 220
+   },
+   {
+    "tone": "dark",
+    "x": 736,
+    "y": 690,
+    "r": 220
+   }
+  ],
+  "sparks": [
+   {
+    "tone": "light",
+    "x": 70,
+    "y": 330,
+    "w": 400,
+    "h": 680,
+    "count": 7
+   },
+   {
+    "tone": "dark",
+    "x": 650,
+    "y": 330,
+    "w": 400,
+    "h": 680,
+    "count": 7
+   }
+  ],
+  "twinkles": [
+   [
+    562,
+    92
+   ],
+   [
+    30,
+    425
+   ],
+   [
+    1092,
+    425
+   ],
+   [
+    62,
+    1105
+   ],
+   [
+    1060,
+    1105
+   ],
+   [
+    562,
+    1332
+   ]
+  ]
  }
 }$cfg$::jsonb,
   'zwielicht', 1, 'player_choice', array['lightnix', 'darknix'],

@@ -31,7 +31,7 @@ const CLIENT_JS_FILES = [
   'js/systems/bkmp-raid.js', 'js/systems/bkmp-runes.js',
   'js/systems/bkmp-skilltree.js', 'js/systems/bkmp-tower.js',
   'js/systems/bkmp-chronicle.js', 'js/systems/bkmp-village.js',
-  'js/systems/bkmp-expedition-rules.js', 'js/systems/bkmp-expeditions.js', 'js/systems/bkmp-dragon-traits.js', 'js/systems/bkmp-village-path.js', 'js/systems/bkmp-guild-projects.js', 'js/systems/bkmp-event-rules.js', 'js/systems/bkmp-special-events.js', 'js/systems/bkmp-divine.js', 'js/systems/bkmp-skill-builds.js',
+  'js/systems/bkmp-expedition-rules.js', 'js/systems/bkmp-expeditions.js', 'js/systems/bkmp-dragon-traits.js', 'js/systems/bkmp-village-path.js', 'js/systems/bkmp-guild-projects.js', 'js/systems/bkmp-event-rules.js', 'js/systems/bkmp-special-events.js', 'js/systems/bkmp-event-announce.js', 'js/systems/bkmp-divine.js', 'js/systems/bkmp-skill-builds.js',
   'js/ui/bkmp-feedback-board.js', 'js/ui/bkmp-hud.js',
   'js/ui/bkmp-reward-presenter.js', 'js/ui/bkmp-ui-components.js'
 ].filter(f => fs.existsSync(path.join(ROOT, f)));

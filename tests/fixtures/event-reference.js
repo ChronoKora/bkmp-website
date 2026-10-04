@@ -21,8 +21,16 @@ function readZwielichtConfig() {
 const ZWIELICHT_CONFIG = readZwielichtConfig();
 
 /* Event-Zeile wie in der SQL (enabled=false, ohne Termine) - Tests setzen
-   Termine/Schalter selbst (wie special_event_schedule()). */
+   Termine/Schalter selbst (wie special_event_schedule()).
+   Das Website-Ankuendigungs-Popup (config.announcementPopup, siehe
+   js/systems/bkmp-event-announce.js) ist hier standardmaessig ENTFERNT: es
+   legt sich nach dem Laden ueber die Seite und wuerde jeden Pass-Test stoeren,
+   der auf der Website klickt. Nur tests/e2e/event-announcement-popup.spec.js
+   verlangt es ausdruecklich mit { keepAnnouncement: true }. */
 function makeZwielichtEventRow(overrides) {
+  const { keepAnnouncement, ...rest } = overrides || {};
+  const config = JSON.parse(JSON.stringify(ZWIELICHT_CONFIG));
+  if (!keepAnnouncement) delete config.announcementPopup;
   return {
     id: 'zwielicht',
     name: '☀️🌑 Das Erwachen des Zwielichts',
@@ -31,10 +39,10 @@ function makeZwielichtEventRow(overrides) {
     lore: '',
     announce_at: null, starts_at: null, ends_at: null, timezone: 'Europe/Berlin',
     enabled: false, archived: false, tier_count: 30, points_per_tier: 100,
-    config: JSON.parse(JSON.stringify(ZWIELICHT_CONFIG)),
+    config,
     reward_group: 'zwielicht', lifetime_claim_limit: 1, choice_mode: 'player_choice',
     reward_species: ['lightnix', 'darknix'], assets: {},
-    ...(overrides || {})
+    ...rest
   };
 }
 
