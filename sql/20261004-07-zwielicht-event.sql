@@ -28,13 +28,13 @@
 -- Garantierte Pass-Eier (Stufe 10 = dayman, Stufe 20 = surebrec) brauchen die
 -- echten Arten aus 20261003-dragon-species-neue-drachen2.sql. Fehlt eine,
 -- bricht diese Datei ab, statt spaeter beim Abholen zu scheitern.
-do $
+do $$
 begin
   if not exists (select 1 from public.dragon_species ds where ds.id = 'dayman')
      or not exists (select 1 from public.dragon_species ds where ds.id = 'surebrec') then
     raise exception 'Zwielicht-Pass: Drachenarten dayman/surebrec fehlen - bitte zuerst sql/20261003-dragon-species-neue-drachen2.sql ausfuehren.';
   end if;
-end $;
+end $$;
 
 insert into public.special_events (id, name, subtitle, description, lore, timezone, enabled, archived,
   tier_count, points_per_tier, config, reward_group, lifetime_claim_limit, choice_mode, reward_species, assets)

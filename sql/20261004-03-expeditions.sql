@@ -272,10 +272,10 @@ end;
 $$;
 
 create or replace function public.expedition_trait_strength(p_team jsonb, p_trait text)
-returns numeric language sql immutable as $
+returns numeric language sql immutable as $$
   select coalesce(max(case when coalesce((m->>'bond_level')::integer, 1) >= 8 then 1.5 else 1 end), 0)
     from jsonb_array_elements(coalesce(p_team, '[]'::jsonb)) m where m->>'trait' = p_trait;
-$;
+$$;
 
 create or replace function public.expedition_quality(p_score integer)
 returns integer language sql immutable as $$

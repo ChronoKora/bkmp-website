@@ -220,6 +220,27 @@ function readFile(rel) {
   });
 }
 
+// ---------- 10. SQL: einzelnes "$" statt "$$" als Dollar-Quote ----------
+// (04.10.2026: "do $ ... end $;" in 20261004-07 und "as $ ... $;" in -03 sind in
+// Supabase mit "syntax error at or near $" gescheitert - die lokale Test-
+// umgebung fuehrt SQL nicht aus und hat das nie bemerkt.)
+{
+  const sqlDir = path.join(ROOT, 'sql');
+  if (fs.existsSync(sqlDir)) {
+    fs.readdirSync(sqlDir).filter(f => f.endsWith('.sql')).forEach(f => {
+      const lines = fs.readFileSync(path.join(sqlDir, f), 'utf8').split('\n');
+      lines.forEach((line, i) => {
+        const t = line.trim();
+        if (t.startsWith('--')) return;
+        const noStrings = t.replace(/'[^'\n]*'/g, '');
+        if (/(?<![$\w])\$(?![$\w{])/.test(noStrings)) {
+          report('HIGH', 'sql-einzelnes-dollar-quote', 'sql/' + f, i + 1, `einzelnes "$" statt "$$" (Dollar-Quote): ${t.slice(0, 80)}`);
+        }
+      });
+    });
+  }
+}
+
 // ---------- Ausgabe ----------
 const order = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3, INFO: 4 };
 findings.sort((a, b) => order[a.severity] - order[b.severity]);
