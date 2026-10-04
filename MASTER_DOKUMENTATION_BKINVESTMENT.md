@@ -50,7 +50,7 @@
 | Website-Funktionen | 304 in `bkmp-site.js` |
 | Datenbank-Wrapper | 356 in `supabase.js` |
 | Playwright-Testdateien | 74, mit 628 `test(...)`-Aufrufen |
-| Letzter voller Testlauf | 1.324 bestanden, 456 übersprungen; das sind ausgeführte Testfälle über 3 Geräteprofile |
+| Letzter voller Testlauf | 04.10.2026 (nach dem Drachendorf-Ausbau): 1.477 bestanden, 494 übersprungen, 0 Fehler – ausgeführte Testfälle über 3 Geräteprofile |
 
 ---
 
@@ -2161,7 +2161,7 @@ Sechs Vorlagen, alle aus, einplanbar wie das Zwielicht: Brutwoche (Brutzeit −2
 **Neue RPCs:** `village_build`, `village_trade_offers`, `village_trade_execute`, `expedition_start`, `expedition_claim`, `expedition_status`, `dragon_ensure_traits`, `dragon_activity_tick`, `guild_project_status`, `guild_project_contribute`, `guild_project_claim`, `special_events_visible`, `event_tick`, `event_claim_tiers`, `event_choose_reward`, `special_event_schedule` (nur Betreiber), `divine_status`, `divine_offer`, `divine_awaken`, `bkmp_event_modifier`.
 
 ## 21.15 Tests
-Neue Testdateien: `nav-categories`, `village`, `expeditions`, `dragon-traits-bond`, `village-path`, `guild-projects`, `special-event` (14 Tests: Konfiguration aus SQL, SQL↔Regel-Gleichheit, Status/Zeitzone inkl. Zeitumstellung, Tagesaufgaben/Reset, Deckel, Punkte, Hardcore-Woche, Stufenbelohnungen, Wahl/Claim-Limit/Wiederholung, Ei-Schutz, kleine Events, 3 Browser-Abläufe) und `divine-awakening` (4 Tests: Artdaten/Auren, Opfergabe in Teilen, Erweckung + Bonus nicht doppelt bei Reload/2 Tabs, Einzelstück-Regeln + Expeditions-Aura). Alle neuen Tests laufen auf Desktop, Handy klein und Handy groß.
+Neue Testdateien: `nav-categories`, `village`, `expeditions`, `dragon-traits-bond`, `village-path`, `guild-projects`, `special-event` (14 Tests: Konfiguration aus SQL, SQL↔Regel-Gleichheit, Status/Zeitzone inkl. Zeitumstellung, Tagesaufgaben/Reset, Deckel, Punkte, Hardcore-Woche, Stufenbelohnungen, Wahl/Claim-Limit/Wiederholung, Ei-Schutz, kleine Events, 3 Browser-Abläufe) und `divine-awakening` (4 Tests: Artdaten/Auren, Opfergabe in Teilen, Erweckung + Bonus nicht doppelt bei Reload/2 Tabs, Einzelstück-Regeln + Expeditions-Aura). Alle neuen Tests laufen auf Desktop, Handy klein und Handy groß. Voller Lauf aller Testdateien danach (3 Geräteprofile): 1.477 bestanden, 494 übersprungen, 0 Fehler (ein einziger Ausreißer – 1 Kristall Produktion während eines Klicks – war ein Test-Timing-Detail und ist im Test berücksichtigt).
 
 ---
 
