@@ -48,7 +48,10 @@ module.exports = async function handler(req, res) {
     return send(res, 500, { error: 'folder_read_failed', detail: String(e && e.message || e).slice(0, 300) });
   }
 
-  const imageFiles = files.filter(f => /\.(png|jpg|jpeg|webp)$/i.test(f));
+  // Die "<name>-web.png/.webp"-Vorschaubilder (128px, von scripts/optimize-images.mjs)
+  // sind keine eigenen Pluschies - ohne diesen Filter wuerde der Scan seit dem
+  // 02.10.2026 fuer jedes Bild einen Muell-Kandidaten "<id>_web" vorschlagen.
+  const imageFiles = files.filter(f => /\.(png|jpg|jpeg|webp)$/i.test(f) && !/-web\.(png|webp)$/i.test(f));
   const candidates = imageFiles.map(file => {
     const ext = path.extname(file);
     const base = path.basename(file, ext);

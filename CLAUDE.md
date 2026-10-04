@@ -4496,6 +4496,14 @@ Nutzer: „so nochmal 4 Drachen. selber wieder entscheiden“ (`Desktop\dracheee
 
 **Gefunden+behoben unterwegs:** Zwei-Tab-Überschreiben (P0), Offline-Claim überschrieb ungespeicherte Ressourcen (P0), Drachen-Detailkarte auf Handys nicht scrollbar (P10), Test-Timing-Loch in zwei Expeditions-Tests (Login-Belohnung nach Messung).
 
+## Neuer Drache Moorrisss + Plüschies Ccatched/Tsheyn/Sunnyyvi (04.10.2026) — Assets im Repo, SQL noch nicht ausgeführt
+
+Nutzer: „1x Morris, neuer Drache, episch“ (Ordner `Desktop\moorrisss`) + Ordner `Desktop\Plüshie` mit 3 Plüschie-Bildern. Details/Verifikation: CHANGELOG.md 04.10.2026. **Nichts committed/gepusht.**
+- **Drache:** `sql/20261004-dragon-species-moorrisss.sql` (episch, `sort_order` 46, Werte 1:1 wie die anderen epischen Arten). Schreibweise „Moorrisss“ (wie vorhandenes Plüschie + Ordnername), der Nutzer schrieb „Morris“ – bei Bedarf nur `name` ändern.
+- **Plüschies:** `sql/20261004-plushies-ccatched-tsheyn-sunnyyvi.sql` legt `plushies`-Zeilen direkt an (ersetzt den „Ordner scannen“-Klick; id aus Dateiname, Name `<Name> Plüshie`, Seltenheit `Episch`). Ein Plüschie-Bild braucht Original (`assets/plushies/<Name>.png`) + `-web.webp/-web.png` (128 px, `scripts/optimize-images.mjs <ordner> 128`) – die Website zeigt überall nur das `-web.webp`.
+- **Bildfalle (nicht zum ersten Mal):** Tsheyn/Sunnyyvi waren **RGB ohne Alpha mit echt schwarzem Hintergrund** (der Bildbetrachter zeigt Schwarz und Transparenz gleich an!). Immer `metadata().channels`/`hasAlpha` prüfen UND Ecken-Pixel lesen, bevor ein Bild als „freigestellt“ gilt. Schwarz-auf-Weiß-Freistellung: Flood-Fill vom Rand (Schwelle max-Kanal ≤ 40), 2× erodieren, 3×3-Weichzeichner auf Alpha, Randpixel bekommen die Durchschnittsfarbe der inneren Nachbarn (sonst dunkler Saum bei hellem Fell).
+- **Fix nebenbei:** `api/scan-plushie-folder.js` ignoriert jetzt `-web.png/-web.webp` (sonst 58 Müll-Kandidaten `<id>_web` seit dem Performance-Fix vom 02.10.).
+
 ## Bestehende Konventionen (weiter gültig)
 
 - **Changelog, zweigleisig (ab 26.07.2026), IMMER automatisch, ohne dass der Nutzer danach fragen muss:**
