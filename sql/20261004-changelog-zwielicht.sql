@@ -12,7 +12,7 @@
 insert into public.changelog_entries (entry_date, category, title, description)
 select '2026-10-16', 'feature',
   'Idle-Dorf: ☀️🌑 Das Erwachen des Zwielichts',
-  'Das erste große Spezial-Event im Drachendorf! Sieben Tage lang, von Montag 00:00 bis Sonntag 23:59 Uhr, läuft der kostenlose Zwielicht-Pass mit 30 Stufen. Jeden Tag gibt es 5 neue Prüfungen und einen Tagesabschluss, dazu große Wochenquests. Unterwegs warten Truhen, Runen, Dracheneier, der Titel „Zwielicht-Wanderer“, ein Abzeichen und die Namensfarbe „Zwielicht“. Wer Stufe 30 erreicht, wählt seinen Weg: ☀️ Lightnix oder 🌑 Darknix – nur einer pro Account. Beide Drachen haben fünf Entwicklungsstufen bis hin zur göttlichen Form. Hinweis: Das Event verlangt echtes Spielen über mehrere Tage, Stufe 30 ist frühestens gegen Ende der Woche erreichbar.'
+  'Das erste große Spezial-Event im Drachendorf! Sieben Tage lang, von Montag 00:00 bis Sonntag 23:59 Uhr, läuft der kostenlose Zwielicht-Pass mit 30 Stufen. Jeden Tag gibt es 5 neue Prüfungen und einen Tagesabschluss, dazu große Wochenquests. Unterwegs warten Truhen, Runen, zwei garantierte Dracheneier (🥚 Dayman auf Stufe 10, 🥚 Surebrec auf Stufe 20 – kein Zufall), der Titel „Zwielicht-Wanderer“, ein Abzeichen und die Namensfarbe „Zwielicht“. Wer Stufe 30 erreicht, wählt seinen Weg: ☀️ Lightnix oder 🌑 Darknix – nur einer pro Account. Beide Drachen haben fünf Entwicklungsstufen bis hin zur göttlichen Form. Hinweis: Das Event verlangt echtes Spielen über mehrere Tage, Stufe 30 ist frühestens gegen Ende der Woche erreichbar.'
 where not exists (
   select 1 from public.changelog_entries where entry_date = '2026-10-16' and title = 'Idle-Dorf: ☀️🌑 Das Erwachen des Zwielichts'
 );

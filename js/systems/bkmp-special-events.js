@@ -213,6 +213,7 @@ function bkmpEventRewardText(rw) {
   if (rw.fruit) parts.push(`🍎 ${bkmpEventNum(rw.fruit)}`);
   if (rw.meat) parts.push(`🥩 ${bkmpEventNum(rw.meat)}`);
   (rw.runes || []).forEach(r => parts.push(`🔮 ${r.count}× Rune`));
+  (rw.species_eggs || []).forEach(id => parts.push(`🥚 Garantiertes ${bkmpEventEggSpeciesName(id)}-Ei`));
   if (rw.eggs) parts.push(`🥚 ${rw.eggs}× Drachenei`);
   (rw.boosts || []).forEach(b => parts.push(b === 'gold' ? '⏱️ 30 Min. Goldrausch' : '⏱️ 30 Min. Wissensschub'));
   if (rw.unlock === 'title_zwielicht') parts.push('🏷️ Titel');
@@ -241,6 +242,49 @@ function bkmpEventSpeciesName(ev, id) {
 }
 
 /* ---------------- Pass-Karte (Desktop) + HUD-Knopf ---------------- */
+/* Garantierte Pass-Eier (reward.species_eggs): Name/Bild aus dem echten
+   Artenkatalog; ohne geladenen Katalog (z.B. Website ohne Login) reicht
+   der Name aus der Art-ID. */
+function bkmpEventEggSpecies(id) {
+  return typeof bkmpDragonSpeciesById === 'function' ? bkmpDragonSpeciesById(id) : null;
+}
+function bkmpEventEggSpeciesName(id) {
+  const sp = bkmpEventEggSpecies(id);
+  if (sp && sp.name) return sp.name;
+  const s = String(id || '');
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+function bkmpEventEggThumbHtml(id) {
+  const sp = bkmpEventEggSpecies(id);
+  if (!sp || !sp.egg_image || typeof bkmpDragonThumbHtml !== 'function') return '';
+  return bkmpDragonThumbHtml(sp.egg_image, bkmpEventEsc(bkmpEventEggSpeciesName(id) + '-Ei'), 'bkmp-event-egg-thumb');
+}
+/* Die grossen Meilensteine (feste Eier + Hauptbelohnung), damit man schon
+   beim Start sieht, worauf man hinarbeitet - rein aus der Konfiguration. */
+function bkmpEventHighlights(ev) {
+  const out = [];
+  ((ev && ev.config && ev.config.tiers) || []).forEach(t => {
+    const rw = t.reward || {};
+    (rw.species_eggs || []).forEach(id => out.push({ tier: t.tier, kind: 'egg', id, text: `🥚 Garantiertes ${bkmpEventEggSpeciesName(id)}-Ei` }));
+    if (rw.choice) out.push({ tier: t.tier, kind: 'choice', text: '☀️ Lightnix oder 🌑 Darknix' });
+  });
+  return out;
+}
+function bkmpEventHighlightsHtml(ev, prog) {
+  const list = bkmpEventHighlights(ev);
+  if (!list.length) return '';
+  const tier = prog && prog.joined ? Number(prog.tier || 0) : 0;
+  return `<div class="bkmp-event-highlights" data-testid="event-highlights">${list.map(h => `
+    <div class="bkmp-event-highlight${h.tier <= tier ? ' is-reached' : ''}${h.kind === 'choice' ? ' is-choice' : ''}" data-testid="event-highlight-${h.tier}">
+      ${h.kind === 'egg' ? bkmpEventEggThumbHtml(h.id) : '<span class="bkmp-event-highlight-icon">☀️🌑</span>'}
+      <span class="bkmp-event-highlight-tier">Stufe ${h.tier}</span>
+      <span class="bkmp-event-highlight-text">${bkmpEventEsc(h.text)}</span>
+    </div>`).join('')}</div>`;
+}
+function bkmpEventNextHighlight(ev, prog) {
+  const tier = prog && prog.joined ? Number(prog.tier || 0) : 0;
+  return bkmpEventHighlights(ev).find(h => h.tier > tier) || null;
+}
 function bkmpEventEnsureEntryPoints() {
   if (!document.getElementById('idleEventPassCard')) {
     const chron = document.getElementById('idleChronicleCard');
@@ -294,6 +338,7 @@ function bkmpEventCardHtml(ev, prog) {
   const claimable = bkmpEventClaimableTiers(ev, prog).length;
   const choice = bkmpEventChoiceOpen(prog);
   const dailyDone = (prog.day_quests || []).filter(q => q.done).length;
+  const nextHl = bkmpEventNextHighlight(ev, prog);
   return `
     <div class="idle-event-card-head">
       <span class="idle-event-card-title">${bkmpEventEsc(texts.pass_name || ev.name)}</span>
@@ -301,6 +346,7 @@ function bkmpEventCardHtml(ev, prog) {
     </div>
     <div class="idle-xp-bar idle-event-bar"><div class="idle-xp-fill" style="width:${tp.maxed ? 100 : Math.round(tp.into / tp.need * 100)}%"></div></div>
     <div class="idle-event-card-sub">${tp.maxed ? '✨ Stufe 30 erreicht' : `${tp.into} / ${tp.need} ${bkmpEventEsc(texts.points_name || 'Punkte')}`} · Heute ${dailyDone}/${(prog.day_quests || []).length}</div>
+    ${nextHl ? `<div class="idle-event-card-next" data-testid="event-card-next">Als Nächstes: <strong>Stufe ${nextHl.tier}</strong> · ${bkmpEventEsc(nextHl.text)}</div>` : ''}
     ${status === 'LIVE' ? `<div class="idle-event-card-countdown">Endet in <strong data-event-countdown="${bkmpEventEsc(ev.ends_at)}">${bkmpEventCountdown(Date.parse(ev.ends_at) - bkmpEventNow())}</strong></div>` : ''}
     <button type="button" class="idle-chron-open-btn" data-event-open="${choice ? 'choice' : 'today'}">${choice ? '✨ Deine Wahl wartet' : claimable ? `🎁 ${claimable} Belohnung${claimable === 1 ? '' : 'en'} abholen` : 'Pass öffnen'}</button>`;
 }
@@ -538,7 +584,7 @@ function bkmpEventRewardsHtml(ev, prog) {
   const tier = prog && prog.joined ? Number(prog.tier || 0) : 0;
   const claimed = new Set(((prog && prog.tier_claimed) || []).map(Number));
   const texts = ev.config.texts || {};
-  return bkmpEventChoiceHtml(ev, prog) + `<div class="bkmp-event-track">${tiers.map(t => {
+  return bkmpEventChoiceHtml(ev, prog) + bkmpEventHighlightsHtml(ev, prog) + `<div class="bkmp-event-track">${tiers.map(t => {
     const reached = t.tier <= tier;
     const isLast = t.tier === ev.tier_count;
     const milestone = !!t.reward.label;
@@ -549,8 +595,9 @@ function bkmpEventRewardsHtml(ev, prog) {
         <div class="bkmp-event-final-text">${bkmpEventEsc(reached ? (prog && prog.choice_species ? bkmpEventSpeciesName(ev, prog.choice_species) + ' erhalten ✅' : 'Triff deine Wahl!') : (texts.tier30_text || 'Erreiche Stufe 30 und entscheide deinen Weg.'))}</div>
       </div>`;
     }
-    return `<div class="bkmp-event-tier-row ${state}${milestone ? ' is-milestone' : ''}">
-      <span class="bkmp-event-tier-num">${t.tier}</span>
+    const eggIds = t.reward.species_eggs || [];
+    return `<div class="bkmp-event-tier-row ${state}${milestone ? ' is-milestone' : ''}${eggIds.length ? ' has-egg' : ''}" data-testid="event-tier-row-${t.tier}">
+      <span class="bkmp-event-tier-num">${t.tier}</span>${eggIds.map(bkmpEventEggThumbHtml).join('')}
       <span class="bkmp-event-tier-reward">${milestone ? `<strong>${bkmpEventEsc(t.reward.label)}</strong><br>` : ''}${bkmpEventEsc(bkmpEventRewardText(t.reward))}</span>
       <span class="bkmp-event-tier-state">${claimed.has(t.tier) ? '✅' : reached ? '🎁' : '🔒'}</span>
     </div>`;
@@ -592,7 +639,7 @@ function bkmpEventRenderModalBody() {
     b.setAttribute('aria-selected', active ? 'true' : 'false');
   });
   let html;
-  if (status === 'COMING_SOON') html = `<div class="bkmp-event-info">${(ev.config.texts.website_points || []).map(p => `<div>• ${bkmpEventEsc(p)}</div>`).join('')}</div>` + bkmpEventFaqHtml(ev);
+  if (status === 'COMING_SOON') html = bkmpEventHighlightsHtml(ev, prog) + `<div class="bkmp-event-info">${(ev.config.texts.website_points || []).map(p => `<div>• ${bkmpEventEsc(p)}</div>`).join('')}</div>` + bkmpEventFaqHtml(ev);
   else if (bkmpEventModalTab === 'week') html = bkmpEventWeekHtml(ev, prog);
   else if (bkmpEventModalTab === 'rewards') html = bkmpEventRewardsHtml(ev, prog);
   else if (bkmpEventModalTab === 'faq') html = bkmpEventFaqHtml(ev);
@@ -610,6 +657,7 @@ async function bkmpEventClaimTiers() {
   try {
     if (typeof bkmpIdleFlushSyncNow === 'function') { try { await bkmpIdleFlushSyncNow(); } catch (e) { /* weiter */ } }
     const res = await bkmpEventClaimTiersRpc(ev.id);
+    let serverEggs = [];
     if (res && typeof bkmpIdleState !== 'undefined' && bkmpIdleState) {
       const c = res.credited || {};
       ['wood', 'stone', 'crystals', 'essence', 'fruit', 'meat'].forEach(k => { bkmpIdleState[k] = Number(bkmpIdleState[k] || 0) + Number(c[k] || 0); });
@@ -633,6 +681,18 @@ async function bkmpEventClaimTiers() {
         const egg = typeof bkmpDungeonRollEgg === 'function' ? bkmpDungeonRollEgg(2) : null;
         if (egg && typeof bkmpDungeonPersistEgg === 'function') bkmpDungeonPersistEgg(egg);
       }
+      /* Garantierte Eier (species_eggs) hat der Server bereits angelegt -
+         hier nur lokal uebernehmen (nie selbst einfuegen, sonst doppelt). */
+      serverEggs = Array.isArray(res.eggs) ? res.eggs : [];
+      if (serverEggs.length && typeof bkmpPlayerDragonEggs !== 'undefined' && Array.isArray(bkmpPlayerDragonEggs)) {
+        serverEggs.forEach(e => {
+          if (e && e.id && !bkmpPlayerDragonEggs.some(x => x.id === e.id)) {
+            bkmpPlayerDragonEggs.push({ id: e.id, species_id: e.species_id, name_key: bkmpIdleState ? bkmpIdleState.name_key : '', created_at: new Date().toISOString() });
+          }
+        });
+        if (typeof bkmpDexReconcile === 'function') { try { bkmpDexReconcile(); } catch (err) { /* nur Anzeige */ } }
+        if (typeof bkmpIdleRenderDragonsPanel === 'function' && typeof bkmpIdleActiveTab !== 'undefined' && bkmpIdleActiveTab === 'drachen') bkmpIdleRenderDragonsPanel();
+      }
       if (bkmpEventProgress && bkmpEventProgressFor === ev.id) {
         bkmpEventProgress.tier_claimed = Array.from(new Set([...(bkmpEventProgress.tier_claimed || []), ...(res.items || []).map(i => i.tier)]));
         bkmpEventProgress.unlocks = res.unlocks || bkmpEventProgress.unlocks;
@@ -645,6 +705,12 @@ async function bkmpEventClaimTiers() {
       if (typeof bkmpIdleQueueSync === 'function') bkmpIdleQueueSync();
       const n = (res.items || []).length;
       bkmpEventToast(`🎁 ${n} Stufenbelohnung${n === 1 ? '' : 'en'} abgeholt!`, 'success');
+      serverEggs.forEach(e => {
+        const sp = bkmpEventEggSpecies(e.species_id);
+        if (typeof bkmpRewardPresent === 'function') {
+          bkmpRewardPresent({ tier: 'card', rarity: (sp && sp.rarity) || 'episch', title: `🥚 ${bkmpEventEggSpeciesName(e.species_id)}-Ei erhalten!`, description: `Garantierte Belohnung von Stufe ${e.tier}. Das Ei liegt im Drachenlager und kann wie gewohnt ausgebrütet werden.`, dedupeKey: 'event-egg-' + e.id });
+        }
+      });
     }
   } catch (e) {
     bkmpEventToast(e.message || String(e), 'danger');

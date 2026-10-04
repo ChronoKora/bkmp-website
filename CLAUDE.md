@@ -4488,6 +4488,10 @@ Nutzer: „so nochmal 4 Drachen. selber wieder entscheiden“ (`Desktop\dracheee
 - Göttlich: Multiplikator nur aus der gespeicherten Spalte `divine_multiplier` lesen (`bkmpDragonDivineMult`), nie selbst multiplizieren/speichern. „Erwachsen“ im Code heißt `bkmpDragonIsGrown()` (adult **oder** divine).
 - Einzelstück-Arten (`unique_per_account`): kein Freilassen, kein Duplikat-Aufstieg, Eier nur serverseitig.
 
+**Folgeupdate 04.10.2026 (gleicher Branch, nichts ausgeführt/gepusht):**
+- **Zwielicht-Pass:** Stufe 10 = garantiertes Dayman-Ei (+ Titel), Stufe 20 = garantiertes Surebrec-Ei (+ Namensfarbe), keine Zufallseier mehr (Stufe 28 dafür +100 Kristalle/+150 Essenz). Feste Eier stehen als `reward.species_eggs` in der Konfiguration und werden in `event_claim_tiers()` serverseitig angelegt (Zeilensperre, fehlende Art bricht ab, Ei-Schutz aus `-08` bleibt aktiv). `-07` bricht ab, wenn `dayman`/`surebrec` fehlen → `20261003-dragon-species-neue-drachen2.sql` muss vorher laufen. Die Tests lesen die Arten direkt aus dieser SQL-Datei (`PASS_EGG_SPECIES`).
+- **Skilltree-Komfort:** MAX-Knopf für alle; Builds (3 Plätze) ab dem ersten möglichen Aufstieg; Auto-Skilltree über Prestige-Knoten `meister_der_pfade` (Automation-Zweig hat jetzt 11 Knoten). Builds liegen im Chronik-Zustand (`skillBuilds`, Normalisieren/Zusammenführen in `js/systems/bkmp-skill-builds.js`). **Jeder Skill-Kauf läuft über `bkmpIdleAllocateSkillRanksQuiet()`** (gleiche Prüfung wie „+1“, inkl. Meister-Sperre) – nie Ränge direkt in `skill_allocations` schreiben. Auto-Skilltree nur an festen Auslösern (Level-Aufstieg in `bkmpIdleAddXp`, Offline-Nachtrag, Öffnen, Prestige, Einschalten, Reset), nie pro Frame. Details: Master-Doku 21.16, Tests `skilltree-qol.spec.js`.
+
 **Gefunden+behoben unterwegs:** Zwei-Tab-Überschreiben (P0), Offline-Claim überschrieb ungespeicherte Ressourcen (P0), Drachen-Detailkarte auf Handys nicht scrollbar (P10), Test-Timing-Loch in zwei Expeditions-Tests (Login-Belohnung nach Messung).
 
 ## Bestehende Konventionen (weiter gültig)

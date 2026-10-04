@@ -98,4 +98,30 @@ function readEventSpecies() {
 }
 const EVENT_SPECIES = readEventSpecies();
 
-module.exports = { ZWIELICHT_CONFIG, makeZwielichtEventRow, scheduleFor, berlinMidnightIso, SQL_FILE, EVENT_SPECIES };
+/* Garantierte Pass-Eier (reward.species_eggs, z.B. Stufe 10 = dayman):
+   die echten Arten aus sql/20261003-dragon-species-neue-drachen2.sql -
+   gleiche IDs wie spaeter in der Datenbank, keine erfundenen Testarten. */
+const PASS_EGG_SPECIES_SQL_FILE = path.join(__dirname, '..', '..', 'sql', '20261003-dragon-species-neue-drachen2.sql');
+function readPassEggSpecies() {
+  const { readInsertTuples } = require('../helpers/sql-catalog-parser');
+  const wanted = new Set();
+  (ZWIELICHT_CONFIG.tiers || []).forEach(t => ((t.reward || {}).species_eggs || []).forEach(id => wanted.add(id)));
+  const cols = ['id', 'name', 'rarity', 'egg_source', 'source_dragon_id', 'egg_drop_chance', 'brood_seconds',
+    'sacrifice_gold', 'sacrifice_crystals', 'growth_points_required', 'battle_xp_required', 'is_multi_stat',
+    'sub_stat_count_min', 'sub_stat_count_max', 'egg_image', 'baby_image', 'teen_image', 'adult_image', 'sort_order'];
+  const num = new Set(['egg_drop_chance', 'brood_seconds', 'sacrifice_gold', 'sacrifice_crystals', 'growth_points_required',
+    'battle_xp_required', 'sub_stat_count_min', 'sub_stat_count_max', 'sort_order']);
+  const rows = readInsertTuples(PASS_EGG_SPECIES_SQL_FILE, 'dragon_species').map(t => {
+    const row = { active: true, stage_count: 4, unique_per_account: false, event_origin: null };
+    cols.forEach((c, i) => {
+      const v = t[i];
+      row[c] = v === 'null' ? null : num.has(c) ? Number(v) : c === 'is_multi_stat' ? v === 'true' : v;
+    });
+    return row;
+  }).filter(r => wanted.has(r.id));
+  if (rows.length !== wanted.size) throw new Error('Pass-Ei-Art fehlt in ' + PASS_EGG_SPECIES_SQL_FILE);
+  return rows;
+}
+const PASS_EGG_SPECIES = readPassEggSpecies();
+
+module.exports = { ZWIELICHT_CONFIG, makeZwielichtEventRow, scheduleFor, berlinMidnightIso, SQL_FILE, EVENT_SPECIES, PASS_EGG_SPECIES };

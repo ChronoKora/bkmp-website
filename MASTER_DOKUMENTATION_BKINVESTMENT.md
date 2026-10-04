@@ -40,7 +40,7 @@
 | Dorf-Skins | 18 [live], davon 1 inaktiv |
 | Plüschtiere | 26 [live] |
 | Skilltree-Knoten | 50 [live], davon 1 inaktiv |
-| Prestige-Knoten | 52 [Code] |
+| Prestige-Knoten | 53 [Code] (seit 04.10.2026 + „Meister der Pfade“) |
 | Gilden-Technologie-Knoten | 23 [live] |
 | Upgrades | 9 normale Upgrades, 8 Produktionsgebäude |
 | Datenbank-Tabellen | ca. 99, dazu 2 Views |
@@ -929,6 +929,7 @@ Zählt Siege **pro Kampf-Drachenart** (nur normaler Kampf, keine Event-Drachen).
 
 - **Kosten:** 1 Skillpunkt pro Level. Ränge kosten je nach Knoten 1–20 Punkte. Voraussetzungen haben die Form „Knoten X mindestens Rang N“.
 - **Zurücksetzen:** gratis, alle Punkte zurück, **24 Stunden Abklingzeit** (`last_skilltree_reset_at`).
+- **Komfort (seit 04.10.2026):** MAX-Knopf pro Knoten (alle), Skilltree-Builds mit 3 Plätzen (ab Stufe 100 / erstem Prestige), Auto-Skilltree per Prestige-Knoten „Meister der Pfade“ – siehe 21.16.
 
 **Zweige (live aktiv):**
 
@@ -986,7 +987,7 @@ Zählt Siege **pro Kampf-Drachenart** (nur normaler Kampf, keine Event-Drachen).
 | 💰 **Wirtschaft** | Goldene Ranken +8 % Gold (STRONG) · Reiche Ernte +4 % Holz+Stein (MEDIUM) · Kristalladern +3 % Kristalle (MEDIUM) · Essenzstrom +3 % Essenz (MEDIUM) · Händlergeschick −1 % Upgradekosten (STRONG) · Effiziente Baukunst −1 % Gebäudekosten (STRONG) · Schatzsucher +1 % doppelte Beute (SPECIAL) · Offline-Imperium +3 % Offline-Produktion (MEDIUM) · Zeitdehnung +2 h Gebäude-Aufholung (MEDIUM) · Massenkauf +5 Auto-Käufe/Tick (WEAK) |
 | 🐉 **Drachen** | Drachenwissen +4 % Begleiter-Kampf-EP (MEDIUM) · Schnelle Reifung −2 % Brutzeit (STRONG) · Größeres Drachenlager +1 Platz (WEAK) · Seltene Brut +2 % Ei-Seltenheit (MEDIUM) · Mächtige Abstammung +2 % Begleiter-Hauptwerte (MEDIUM) · Futtermeister +4 % Frucht/Fleisch (MEDIUM) · Sparsame Fütterung +1 % gratis Füttern (SPECIAL) · Aktiver Begleiter +2 % Begleiter-Zusatzwerte (MEDIUM) · Passive Bindung +2 % Regeneration (MEDIUM) · Zuchtsegen −2 % Nestkosten (STRONG) |
 | 💠 **Runen & Dungeons** (ab 100 investierten Punkten) | Runenglück +2 % Runen-Seltenheit im Dungeon (MEDIUM) · Runenmeister +1 Startstufe für Dungeon-Runen (WEAK, max. 15) · Effiziente Aufwertung −1 % Runenkosten (STRONG) · Schmelzmeister +3 % Schmelzbelohnung (MEDIUM) · Dungeonjäger +3 % Dungeon-Belohnung (MEDIUM) · Schlüsselbund +1 max. Schlüssel (WEAK, **max. 3, kein Paragon**) · Sparsamer Eintritt +1 % kein Schlüsselverbrauch (SPECIAL) · Bosskammer +2 % Erfolgsbonus (MEDIUM) · Seltene Funde +1 % Zusatz-Ei/-Rune (MEDIUM, max. 60 %) |
-| ⚙️ **Automation** (ab 100 investierten Punkten) | Erweiterter Auto-Kauf +5 (WEAK) · Auto-Kauf mehrerer Stufen +5 (WEAK, derselbe Hebel) · Automatische Runenaufwertung · Automatische Ei-Ausbrütung · Automatische Dungeon-Wiederholung · Automatischer Bosskampf · Gespeicherte Ausrüstungssets (alle TOGGLE) · Höhere Kampfgeschwindigkeit +3 % Angriffstempo (MEDIUM) · Automatische Prestige-Vorschau · Automatische Verteilung (TOGGLE) |
+| ⚙️ **Automation** (ab 100 investierten Punkten) | Erweiterter Auto-Kauf +5 (WEAK) · Auto-Kauf mehrerer Stufen +5 (WEAK, derselbe Hebel) · Automatische Runenaufwertung · Automatische Ei-Ausbrütung · Automatische Dungeon-Wiederholung · Automatischer Bosskampf · Gespeicherte Ausrüstungssets (alle TOGGLE) · Höhere Kampfgeschwindigkeit +3 % Angriffstempo (MEDIUM) · Automatische Prestige-Vorschau · Automatische Verteilung (TOGGLE) · 🧠 Meister der Pfade – Auto-Skilltree (TOGGLE, seit 04.10.2026, siehe 21.16) |
 | 🌌 **Vermächtnis** | Zeitraffer +8 % EP (STRONG) · Portal-Meisterschaft +8 % Prestige-Punkte (eigene Kurve) · **Weitere Gefährten** (2 Ränge: 1.500 / 3.000 Punkte → 2. und 3. Begleiter-Platz, kein Paragon) |
 
 **Entfernte und geänderte Knoten:**
@@ -2110,7 +2111,9 @@ select public.special_event_schedule('zwielicht', '2026-10-19', 3);
 
 **Fortschritt ohne Server-Anfrage pro Kill:** `event_tick()` etwa einmal pro Minute, solange das Dorf-Fenster offen ist. Gezählt werden gespeicherte Zähler (Kills, Bosse, Kampfzeit, Runen-Aufwertungen, Dungeon-Läufe aus `dungeon_progress`, abgeschlossene Expeditionen, Gildenprojekt-Punkte); Kills und Bosse nur aus echter Kampfzeit (Offline-Siege zählen nicht), alles auf echte Zeit gedeckelt. Nur Turmstufen, Fütterungen und Weltereignisse meldet das Spiel selbst (je Minute und Tag gedeckelt: 130/80/30).
 
-**Belohnungen (Server schreibt Ressourcen gut, Runen/Eier/Booster wie Dungeon-Funde):** über alle Stufen Gold, Holz, Stein, Kristalle (1.330), Essenz (1.100), Futter, 6 Runen, 2 Dracheneier, 6 Booster. Meilensteine: 5 Kleine Zwielicht-Truhe · 10 Titel „Zwielicht-Wanderer“ (+3 % EP) · 15 Zwielicht-Abzeichen · 20 Namensfarbe „Zwielicht“ + Ei · 25 Große Zwielicht-Truhe · 28 Schatz des Zwielichts · 29 „Das Zwielicht ruft …“ · 30 Wahl Lightnix/Darknix (halb Licht, halb Dunkel dargestellt).
+**Belohnungen (Server schreibt Ressourcen gut und legt die festen Eier an; Runen/Booster wie Dungeon-Funde):** über alle Stufen Gold, Holz, Stein, Kristalle (1.330), Essenz (1.250), Futter, 6 Runen, 6 Booster und **zwei garantierte Eier fester Arten – kein Zufallsei**: Stufe 10 🥚 Dayman (Art-ID `dayman`), Stufe 20 🥚 Surebrec (`surebrec`). Meilensteine: 5 Kleine Zwielicht-Truhe · 10 garantiertes Dayman-Ei + Titel „Zwielicht-Wanderer“ (+3 % EP) · 15 Zwielicht-Abzeichen · 20 garantiertes Surebrec-Ei + Namensfarbe „Zwielicht“ · 25 Große Zwielicht-Truhe · 28 Schatz des Zwielichts (Rune Stufe 3, 500 Kristalle, 150 Essenz) · 29 „Das Zwielicht ruft …“ · 30 Wahl Lightnix/Darknix (halb Licht, halb Dunkel dargestellt).
+
+**Garantierte Eier (Folgeupdate 04.10.2026):** in der Konfiguration als `reward.species_eggs: ["dayman"]`. `event_claim_tiers()` legt sie beim Abholen serverseitig an (unter derselben Zeilensperre wie die übrigen Stufenbelohnungen → zwei Tabs/Geräte können nie zwei Eier erzeugen). Fehlt eine Art, bricht das Abholen ab und nichts wird als abgeholt markiert; `-07` prüft die Arten schon beim Ausführen. Dayman und Surebrec sind normale Arten (kein `unique_per_account`): auch wer schon einen besitzt, bekommt das Ei. Eine Einzelstück-Art (z. B. Lightnix) als festes Ei würde vom Ei-Schutz aus `-08` abgelehnt. Im Pass vorab sichtbar: Meilenstein-Leiste mit Ei-Bildern (Stufe 10/20/30), Ei-Bild + „Garantiertes …-Ei“ in den Stufenzeilen, „Als Nächstes: Stufe 10 · 🥚 Garantiertes Dayman-Ei“ auf der Pass-Karte, Punkt auf der Website und eine FAQ-Antwort.
 
 **Anzeige:** Pass-Karte im Kampf-Reiter (Desktop), ☀️🌑-Knopf im kompakten HUD (Handy/App), Fenster mit Heute/Woche/Belohnungen/FAQ, Teaser mit Countdown, Ankündigung im Website-Bereich „Was gibt’s Neues?“ (ohne Login), Archiv „Vergangene Events“ im Chronik-Reiter „Ziele“. Nach der Wahl nur noch „☀️ Lightnix erhalten ✅“.
 
@@ -2161,7 +2164,23 @@ Sechs Vorlagen, alle aus, einplanbar wie das Zwielicht: Brutwoche (Brutzeit −2
 **Neue RPCs:** `village_build`, `village_trade_offers`, `village_trade_execute`, `expedition_start`, `expedition_claim`, `expedition_status`, `dragon_ensure_traits`, `dragon_activity_tick`, `guild_project_status`, `guild_project_contribute`, `guild_project_claim`, `special_events_visible`, `event_tick`, `event_claim_tiers`, `event_choose_reward`, `special_event_schedule` (nur Betreiber), `divine_status`, `divine_offer`, `divine_awaken`, `bkmp_event_modifier`.
 
 ## 21.15 Tests
+Folgeupdate 04.10.2026: `special-event` +9 Tests (feste Eier auf Stufe 10/20 bei 12 Spielern/Tagen, nie eine andere Art, 0 → 30 auf einmal, vorhandener Dayman/Surebrec, Doppel-Abholen, fehlende Art, Einzelstück-Schutz, Anzeige vorab, Abholen + Reload, zwei Tabs gleichzeitig) und neue Datei `skilltree-qol` (12 Tests, siehe 21.16).
 Neue Testdateien: `nav-categories`, `village`, `expeditions`, `dragon-traits-bond`, `village-path`, `guild-projects`, `special-event` (14 Tests: Konfiguration aus SQL, SQL↔Regel-Gleichheit, Status/Zeitzone inkl. Zeitumstellung, Tagesaufgaben/Reset, Deckel, Punkte, Hardcore-Woche, Stufenbelohnungen, Wahl/Claim-Limit/Wiederholung, Ei-Schutz, kleine Events, 3 Browser-Abläufe) und `divine-awakening` (4 Tests: Artdaten/Auren, Opfergabe in Teilen, Erweckung + Bonus nicht doppelt bei Reload/2 Tabs, Einzelstück-Regeln + Expeditions-Aura). Alle neuen Tests laufen auf Desktop, Handy klein und Handy groß. Voller Lauf aller Testdateien danach (3 Geräteprofile): 1.477 bestanden, 494 übersprungen, 0 Fehler (ein einziger Ausreißer – 1 Kristall Produktion während eines Klicks – war ein Test-Timing-Detail und ist im Test berücksichtigt).
+
+## 21.16 Skilltree-Komfort: MAX, Builds, Auto-Skilltree (Folgeupdate 04.10.2026)
+Spieler-Feedback: nach jedem Prestige muss der normale Skilltree von Hand neu aufgebaut werden. Ziel: Entscheidungen behalten, Wiederholungsklicks entfernen – Knoten, Kosten und Wirkungen bleiben unverändert.
+
+**Ausgangslage (live, 50 Knoten, 1.167 Ränge, 3.787 Punkte für alles; 1 Skillpunkt pro Level; Prestige setzt Level, Punkte und Verteilung zurück; Zurücksetzen 1×/24 h):** jeder Rang war ein Klick. Typische Klicks nach einem Prestige (Median der Spieler mit Prestige, live gemessen): Midgame (Level ~650) ~250 Klicks auf ~13 Knoten · Late (Level ~2.000) ~870 Klicks auf ~37 Knoten · Endgame (Level 4.000+) ~1.150 Klicks auf 49 Knoten – verteilt über viele Besuche, weil die Punkte nach und nach mit dem Level zurückkommen.
+
+| Stufe | Freischaltung | Klicks danach |
+|---|---|---|
+| **MAX ×N** neben „+1“ (kauft so viele Ränge wie gerade möglich) | sofort, alle Spieler | ein Klick pro Knoten und Besuch |
+| **Skilltree-Builds** (3 Plätze: speichern, anwenden, umbenennen, löschen) | ab dem ersten möglichen Aufstieg (Stufe 100) | ein Klick pro Besuch („Build anwenden“/„weiterbauen“) |
+| **Auto-Skilltree** | Prestige-Knoten 🧠 **Meister der Pfade** (Zweig Automation, Schalter, 50 Punkte wie die anderen Automatiken) | keiner |
+
+**Regeln:** Ein Build ist nur eine Vorlage { Knoten: Wunschrang }. Anwenden gibt nur verfügbare Punkte aus, Rang für Rang über dieselbe Prüfung wie „+1“ (Punkte, Max-Rang, Voraussetzung, gesperrter Meister-Zweig) – nie kostenlose Ränge. Die Reihenfolge wird bei jedem Anwenden aus den aktuellen Knotendaten berechnet (nicht gespeichert, damit Katalogänderungen nichts kaputt machen): Voraussetzungen zuerst, dann die günstigsten Ränge, gleich teure gleichmäßig verteilt. Reichen die Punkte nicht, wird ein Teil wiederhergestellt („80 / 500 Skillpunkte“), der Build bleibt aktiv. Nach einem Prestige erscheint „🌳 Skilltree zurückgesetzt – Gespeicherter Build …“ mit [Build anwenden] / [Manuell verteilen]. Auto-Skilltree läuft nur bei Level-Aufstieg, Offline-Nachtrag, Laden, Prestige, Einschalten und nach einem Skilltree-Reset (Hinweis im Reset-Dialog) – nie pro Frame.
+
+**Speicherung:** im Chronik-Zustand (`idle_player_meta`, eine JSONB-Zeile pro Konto, bereits live) – geräteübergreifend, ohne neue SQL; pro Platz gewinnt die neuere Änderung (auch ein Löschen). Code: `js/systems/bkmp-skill-builds.js` (Planung als reine, getestete Funktionen), `js/systems/bkmp-skilltree.js` (MAX, gemeinsame Kauf-Funktion), Prestige-Knoten in `js/systems/bkmp-prestige.js`.
 
 ---
 
@@ -2309,7 +2328,7 @@ Diese Punkte haben in der bisherigen Projektübersicht wahrscheinlich gefehlt:
 | Idle-Tabs / Website-Tabs / Admin-Seiten | 16 / 10 / 26 |
 | Overlays | 41 fest + ~10 dynamisch |
 | Tests | 74 Dateien, 628 `test()`-Aufrufe, ~1.780 Testfälle über 3 Projekte (1.324 + 456 übersprungen) |
-| Inhalte | 431 Erfolge, 287 Titel, 83 Kosmetiken, 52 Prestige-Knoten, 50 Skill-Knoten, 23 Gilden-Tech-Knoten, 37 Drachen (12 Kampf + 25 Zucht), 18 Skins, 26 Plüschtiere |
+| Inhalte | 431 Erfolge, 287 Titel, 83 Kosmetiken, 53 Prestige-Knoten, 50 Skill-Knoten, 23 Gilden-Tech-Knoten, 37 Drachen (12 Kampf + 25 Zucht), 18 Skins, 26 Plüschtiere |
 
 ---
 

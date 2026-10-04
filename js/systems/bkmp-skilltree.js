@@ -14,8 +14,20 @@ const BKMP_IDLE_BRANCH_LABELS = { dorf: '🏹 Dorf', burg: '🏰 Burg', wirtscha
    Zweige"-Schwelle also nicht rueckwirkend. */
 const BKMP_IDLE_BRANCH_ORDER = ['dorf', 'burg', 'wirtschaft', 'forschung', 'magie', 'meister', 'zucht'];
 
-function bkmpIdleCanAllocateSkill(node) {
-  if (!bkmpIdleState) return false;
+/* Folgeupdate 04.10.2026: der Meister-Zweig ist bis zur Freischaltung
+   (alle 5 Basis-Zweige gemaxed + Grimbold-Szene gesehen) gesperrt. Bisher
+   reichte dafuer, dass gesperrte Knoten keinen Knopf bekamen - seit
+   Skilltree-Builds/MAX ueber dieselbe Kauf-Funktion laufen, prueft sie die
+   Sperre selbst (ein gespeicherter Build darf nie in einen gesperrten
+   Zweig investieren). */
+function bkmpIdleSkillBranchLocked(branch) {
+  if (branch !== 'meister') return false;
+  const seen = typeof bkmpMeisterDialogSeen === 'function' ? bkmpMeisterDialogSeen() : false;
+  return !(seen && bkmpIdleCountMaxedBranches() >= 5);
+}
+
+function bkmpIdleCanAllocateSkill(node, opts) {
+  if (!bkmpIdleState || !node) return false;
   const alloc = bkmpIdleState.skill_allocations || {};
   const currentRank = Number(alloc[node.id] || 0);
   if (currentRank >= node.max_rank) return false;
@@ -24,20 +36,59 @@ function bkmpIdleCanAllocateSkill(node) {
     const reqRank = Number(alloc[node.requires_node_id] || 0);
     if (reqRank < node.requires_rank) return false;
   }
+  if (node.branch === 'meister' && !(opts && opts.skipBranchLock) && bkmpIdleSkillBranchLocked('meister')) return false;
   return true;
 }
 
-function bkmpIdleAllocateSkill(nodeId) {
+/* Wie viele Raenge dieses Knotens sind JETZT kaufbar (Punkte, Max-Rang,
+   Voraussetzung, Zweig-Sperre)? Grundlage fuer den MAX-Knopf. */
+function bkmpIdleSkillMaxBuyable(node) {
+  if (!bkmpIdleCanAllocateSkill(node)) return 0;
+  const rank = Number((bkmpIdleState.skill_allocations || {})[node.id] || 0);
+  const cost = Math.max(1, Number(node.cost_per_rank) || 1);
+  return Math.max(0, Math.min(Number(node.max_rank) - rank, Math.floor(Number(bkmpIdleState.skill_points_available || 0) / cost)));
+}
+
+/* Kauft bis zu "count" Raenge - Rang fuer Rang mit genau derselben Pruefung
+   wie der "+1"-Knopf (keine Punkte aus dem Nichts, keine uebersprungene
+   Voraussetzung). Ohne Neuzeichnen/Speichern (das macht der Aufrufer EINMAL
+   am Ende) - gibt die Anzahl tatsaechlich gekaufter Raenge zurueck. */
+function bkmpIdleAllocateSkillRanksQuiet(nodeId, count) {
   const node = bkmpIdleSkillDefs.find(n => n.id === nodeId);
-  if (!node || !bkmpIdleCanAllocateSkill(node)) return;
+  if (!node || !bkmpIdleState) return 0;
   const alloc = bkmpIdleState.skill_allocations || (bkmpIdleState.skill_allocations = {});
-  alloc[nodeId] = Number(alloc[nodeId] || 0) + 1;
-  bkmpIdleState.skill_points_available -= node.cost_per_rank;
-  bkmpIdleState.skill_points_spent += node.cost_per_rank;
+  let bought = 0;
+  const want = Math.max(0, Math.floor(Number(count) || 0));
+  while (bought < want && bkmpIdleCanAllocateSkill(node)) {
+    alloc[nodeId] = Number(alloc[nodeId] || 0) + 1;
+    bkmpIdleState.skill_points_available -= node.cost_per_rank;
+    bkmpIdleState.skill_points_spent += node.cost_per_rank;
+    bought += 1;
+  }
+  return bought;
+}
+/* Nach einer oder mehreren Kauf-Runden: Werte neu rechnen, anzeigen,
+   speichern - genau einmal. */
+function bkmpIdleAfterSkillAllocation(renderPanel) {
   bkmpIdleRecomputeEffectiveStats();
-  bkmpIdleRenderSkilltreePanel();
+  if (renderPanel || (typeof bkmpIdleActiveTab !== 'undefined' && bkmpIdleActiveTab === 'skilltree')) bkmpIdleRenderSkilltreePanel();
   bkmpIdleRenderHud();
   bkmpIdleQueueSync();
+}
+function bkmpIdleAllocateSkillRanks(nodeId, count) {
+  const bought = bkmpIdleAllocateSkillRanksQuiet(nodeId, count);
+  if (bought > 0) bkmpIdleAfterSkillAllocation(true);
+  return bought;
+}
+function bkmpIdleAllocateSkill(nodeId) {
+  return bkmpIdleAllocateSkillRanks(nodeId, 1);
+}
+/* MAX-Knopf (fuer alle Spieler, keine Freischaltung): so viele Raenge wie
+   gerade moeglich, ohne kuenstliche Verzoegerung. */
+function bkmpIdleAllocateSkillMax(nodeId) {
+  const node = bkmpIdleSkillDefs.find(n => n.id === nodeId);
+  if (!node) return 0;
+  return bkmpIdleAllocateSkillRanks(nodeId, bkmpIdleSkillMaxBuyable(node));
 }
 
 const BKMP_SKILLTREE_RESET_COOLDOWN_MS = 24 * 60 * 60 * 1000;
@@ -56,9 +107,11 @@ function bkmpIdleSkilltreeResetCooldownMsLeft() {
    nicht bei jedem Kampf hin- und hergeschaltet wird. */
 async function bkmpIdleResetSkilltree() {
   if (!bkmpIdleState || bkmpIdleSkilltreeResetCooldownMsLeft() > 0) return;
+  const autoName = typeof bkmpSkillBuildsAutoActiveName === 'function' ? bkmpSkillBuildsAutoActiveName() : '';
   const confirmed = await bkmpConfirmDialog(
     '🔄 Skilltree zurücksetzen?',
-    'Alle investierten Skillpunkte werden erstattet und können neu verteilt werden.',
+    'Alle investierten Skillpunkte werden erstattet und können neu verteilt werden.'
+      + (autoName ? `\n\n🧠 Auto-Skilltree ist an: deine Punkte werden danach sofort nach dem Build „${autoName}“ neu verteilt. Zum freien Verteilen vorher Auto-Skilltree ausschalten.` : ''),
     'Zurücksetzen',
     'Abbrechen'
   );
@@ -69,6 +122,7 @@ async function bkmpIdleResetSkilltree() {
   bkmpIdleState.last_skilltree_reset_at = new Date().toISOString();
   bkmpIdleRecomputeEffectiveStats();
   bkmpIdleSkillBranchOpenState = null; // nach Reset frisch entscheiden, welcher Zweig aufklappt
+  if (typeof bkmpSkillBuildsAutoRun === 'function') bkmpSkillBuildsAutoRun('reset');
   bkmpIdleRenderSkilltreePanel();
   bkmpIdleRenderHud();
   bkmpIdleQueueSync();
@@ -191,6 +245,7 @@ function bkmpIdleRenderSkilltreePanel() {
         return `<button type="button" class="btn-nein idle-skilltree-reset-btn" id="idleSkilltreeResetBtn">🔄 Zurücksetzen</button>`;
       })()}
     </div>
+    ${typeof bkmpSkillBuildsPanelHtml === 'function' ? bkmpSkillBuildsPanelHtml() : ''}
     ${branches.map(({ branch, nodes, rows, investedRanks, maxRanks, hasAllocatable, isLocked }) => {
       const isOpen = !!bkmpIdleSkillBranchOpenState[branch];
       if (isLocked) {
@@ -231,10 +286,16 @@ function bkmpIdleRenderSkilltreePanel() {
                         <div class="idle-skill-node-name">${escapeHtml(node.name)}</div>
                         <div class="idle-skill-node-desc">${escapeHtml(node.description || '')}</div>
                         ${parentNode ? `<div class="idle-skill-node-requires">Braucht ${escapeHtml(parentNode.name)} Rang ${node.requires_rank}</div>` : ''}
-                        <div class="idle-skill-node-rank">Rang ${rank}/${node.max_rank}</div>
-                        <button type="button" class="btn-ja idle-skill-node-btn" data-node-id="${node.id}" ${!canAllocate ? 'disabled' : ''}>
-                          ${maxed ? 'Max' : `+1 (${node.cost_per_rank} 🔹)`}
-                        </button>
+                        <div class="idle-skill-node-rank">Rang ${rank}/${node.max_rank}${maxed ? '' : ` · ${node.cost_per_rank} 🔹/Rang`}</div>
+                        <div class="idle-skill-node-buttons">
+                          <button type="button" class="btn-ja idle-skill-node-btn" data-node-id="${node.id}" ${!canAllocate ? 'disabled' : ''} title="${maxed ? 'Maximaler Rang erreicht' : `1 Rang für ${node.cost_per_rank} Skillpunkt${node.cost_per_rank === 1 ? '' : 'e'}`}" aria-label="${maxed ? 'Maximaler Rang' : `Einen Rang kaufen: ${escapeHtml(node.name)}`}">
+                            ${maxed ? 'Max' : '+1'}
+                          </button>
+                          ${!maxed && Number(node.max_rank) > 1 ? (() => {
+                            const n = canAllocate ? bkmpIdleSkillMaxBuyable(node) : 0;
+                            return `<button type="button" class="btn-ja idle-skill-node-max-btn" data-node-max-id="${node.id}" ${n < 1 ? 'disabled' : ''} title="${n > 0 ? `Kauft ${n} Rang/Ränge für ${n * node.cost_per_rank} Skillpunkte` : 'Gerade kein Rang kaufbar'}" aria-label="Maximal kaufen: ${escapeHtml(node.name)}">MAX${n > 1 ? ` ×${n}` : ''}</button>`;
+                          })() : ''}
+                        </div>
                       </div>`;
                   }).join('')}
                 </div>`).join('')}
@@ -244,6 +305,8 @@ function bkmpIdleRenderSkilltreePanel() {
       </div>`;
     }).join('')}`;
   panel.querySelectorAll('.idle-skill-node-btn').forEach(btn => btn.addEventListener('click', () => bkmpIdleAllocateSkill(btn.dataset.nodeId)));
+  panel.querySelectorAll('.idle-skill-node-max-btn').forEach(btn => btn.addEventListener('click', () => bkmpIdleAllocateSkillMax(btn.dataset.nodeMaxId)));
+  if (typeof bkmpSkillBuildsWire === 'function') bkmpSkillBuildsWire(panel);
   /* Verbindungslinien nur fuer bereits aufgeklappte Zweige zeichnen - bei
      collapsed (grid-template-rows:0fr) liefert getBoundingClientRect()
      ueberall (0,0), das Nachzeichnen passiert stattdessen im Toggle-Handler

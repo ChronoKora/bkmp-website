@@ -11,6 +11,7 @@ const crypto = require('crypto');
 const { table: getTable } = require('./store');
 const rules = require('../../js/systems/bkmp-event-rules.js');
 const expeditionRules = require('../../js/systems/bkmp-expedition-rules.js');
+const { guardEventEggInsert } = require('./dragon-guards');
 
 function rpcError(message) { const e = new Error(message); e.isRpcError = true; return e; }
 function seedInt(text) { return parseInt(crypto.createHash('md5').update(String(text)).digest('hex').slice(0, 8), 16) & 0x7fffffff; }
@@ -161,6 +162,7 @@ const EVENT_HANDLERS = {
     const items = [];
     const claimed = row.tier_claimed.slice();
     const unlocks = row.unlocks.slice();
+    const eggSpecies = [];
     for (let t = 1; t <= tier; t++) {
       if (claimed.includes(t)) continue;
       claimed.push(t);
@@ -169,16 +171,28 @@ const EVENT_HANDLERS = {
       c.gold += Math.round(Number(rw.gold_units || 0) * unit);
       ['wood', 'stone', 'crystals', 'essence', 'fruit', 'meat'].forEach(k => { c[k] += Number(rw[k] || 0); });
       if (rw.unlock && !unlocks.includes(rw.unlock)) unlocks.push(rw.unlock);
+      (rw.species_eggs || []).forEach(sp => eggSpecies.push({ species_id: sp, tier: t }));
       items.push({ tier: t, reward: rw });
     }
+    /* Garantierte Eier fester Arten: wie der Server erst pruefen (fehlende
+       Art / Einzelstueck-Schutz bricht alles ab, nichts wird abgeholt). */
+    eggSpecies.forEach(e => {
+      if (!getTable(store, 'dragon_species').some(sp => sp.id === e.species_id)) throw rpcError('reward_species_missing');
+      try { guardEventEggInsert(store, { species_id: e.species_id }); } catch (err) { throw rpcError(err.message); }
+    });
     c.fruit = Math.max(0, Math.min(c.fruit, 2000 + Number(st.obstgarten_level || 0) * 500 - Number(st.fruit || 0)));
     c.meat = Math.max(0, Math.min(c.meat, 2000 + Number(st.jagdhuette_level || 0) * 500 - Number(st.meat || 0)));
     st.gold = Number(st.gold || 0) + c.gold;
     st.total_gold_earned = Number(st.total_gold_earned || 0) + c.gold;
     ['wood', 'stone', 'crystals', 'essence', 'fruit', 'meat'].forEach(k => { st[k] = Number(st[k] || 0) + c[k]; });
+    const eggs = eggSpecies.map(e => {
+      const id = crypto.randomUUID();
+      getTable(store, 'player_dragon_eggs').push({ id, name_key: st.name_key, auth_user_id: uid, species_id: e.species_id, created_at: nowIso(store) });
+      return { id, species_id: e.species_id, tier: e.tier };
+    });
     row.tier_claimed = claimed;
     row.unlocks = unlocks;
-    return { items, unlocks, credited: c };
+    return { items, unlocks, eggs, credited: c };
   },
 
   event_choose_reward(store, uid, params) {

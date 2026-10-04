@@ -247,6 +247,9 @@ function bkmpChronicleEmpty() {
        unlocks[] } } - bleibt erhalten, auch wenn ein Event spaeter
        ausgeblendet wird (Titel/Abzeichen/Kosmetik gehen nie verloren). */
     events: {},
+    /* Folgeupdate 04.10.2026: Skilltree-Builds (3 Plaetze, aktiver Build,
+       Auto-Schalter) - Format/Zusammenfuehren in bkmp-skill-builds.js. */
+    skillBuilds: null,
     life: { questsDone: 0, dailyChests: 0, weeklyChests: 0, eventsCaught: 0, eventsByType: {} }
   };
 }
@@ -308,6 +311,9 @@ function bkmpChronicleNormalize(raw) {
       c.events[k] = bkmpChronicleNormalizeEventRecord(v);
     });
   }
+  if (raw.skillBuilds && typeof raw.skillBuilds === 'object') {
+    c.skillBuilds = typeof bkmpSkillBuildsNormalize === 'function' ? bkmpSkillBuildsNormalize(raw.skillBuilds) : raw.skillBuilds;
+  }
   if (raw.life && typeof raw.life === 'object') {
     ['questsDone', 'dailyChests', 'weeklyChests', 'eventsCaught'].forEach(k => { c.life[k] = Math.floor(bkmpChronicleNum(raw.life[k])); });
     if (raw.life.eventsByType && typeof raw.life.eventsByType === 'object') {
@@ -368,6 +374,11 @@ function bkmpChronicleMerge(local, remote) {
   new Set([...Object.keys(local.events || {}), ...Object.keys(remote.events || {})]).forEach(k => {
     m.events[k] = bkmpChronicleMergeEventRecord((local.events || {})[k], (remote.events || {})[k]);
   });
+  if (local.skillBuilds || remote.skillBuilds) {
+    m.skillBuilds = typeof bkmpSkillBuildsMerge === 'function'
+      ? bkmpSkillBuildsMerge(local.skillBuilds, remote.skillBuilds)
+      : (local.skillBuilds || remote.skillBuilds);
+  }
   ['questsDone', 'dailyChests', 'weeklyChests', 'eventsCaught'].forEach(k => { m.life[k] = Math.max(local.life[k] || 0, remote.life[k] || 0); });
   new Set([...Object.keys(local.life.eventsByType), ...Object.keys(remote.life.eventsByType)]).forEach(k => {
     m.life.eventsByType[k] = Math.max(local.life.eventsByType[k] || 0, remote.life.eventsByType[k] || 0);

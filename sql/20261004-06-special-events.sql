@@ -24,7 +24,8 @@
 --     (md5), einmal erzeugt und gespeichert - Reload aendert nichts.
 --     Wochenquests: mehrstufig, bei der ersten Teilnahme erzeugt.
 --     Gesperrte Systeme bekommen Alternativen.
---   * event_claim_tiers(): Stufenbelohnungen genau einmal (Zeilensperre).
+--   * event_claim_tiers(): Stufenbelohnungen genau einmal (Zeilensperre);
+--     garantierte Eier fester Arten (reward.species_eggs) legt der Server an.
 --   * event_choose_reward(): Hauptbelohnung waehlen (z.B. Lightnix ODER
 --     Darknix) - nur mit EARNED, dauerhaft, lebenslanges Limit pro
 --     reward_group, auch nach Eventende moeglich.
@@ -472,12 +473,20 @@ declare
   v_fruit bigint := 0; v_meat bigint := 0;
   v_unlocks text[];
   v_claimed integer[];
+  v_sp text;
+  v_i integer;
+  v_egg uuid;
+  v_egg_species text[] := '{}'::text[];
+  v_egg_tiers integer[] := '{}'::integer[];
+  v_eggs jsonb := '[]'::jsonb;
 begin
   if v_uid is null then raise exception 'not_authenticated'; end if;
   select * into v_event from public.special_events se where se.id = p_event_id;
   if not found then raise exception 'invalid_event'; end if;
   v_status := public.special_event_status_of(v_event.enabled, v_event.archived, v_event.announce_at, v_event.starts_at, v_event.ends_at);
   if v_status = 'HIDDEN' then raise exception 'invalid_event'; end if;
+  -- Zeilensperre: zwei Tabs/Geraete holen nacheinander ab, der zweite sieht
+  -- die Stufen schon als abgeholt (keine doppelten Eier/Ressourcen).
   select * into v_row from public.player_event_progress p where p.event_id = p_event_id and p.auth_user_id = v_uid for update;
   if not found then raise exception 'not_joined'; end if;
   select * into v_state from public.idle_player_state ips where ips.auth_user_id = v_uid for update;
@@ -501,6 +510,12 @@ begin
     v_fruit := v_fruit + coalesce((v_rw->>'fruit')::bigint, 0);
     v_meat := v_meat + coalesce((v_rw->>'meat')::bigint, 0);
     if v_rw ? 'unlock' and not ((v_rw->>'unlock') = any(v_unlocks)) then v_unlocks := array_append(v_unlocks, v_rw->>'unlock'); end if;
+    -- Garantierte Eier einer festen Art (z.B. Zwielicht Stufe 10 = dayman):
+    -- serverseitig angelegt, die Art steht in der Konfiguration, nie Zufall.
+    for v_sp in select jsonb_array_elements_text(coalesce(v_rw->'species_eggs', '[]'::jsonb)) loop
+      v_egg_species := array_append(v_egg_species, v_sp);
+      v_egg_tiers := array_append(v_egg_tiers, v_t);
+    end loop;
     v_items := v_items || jsonb_build_array(jsonb_build_object('tier', v_t, 'reward', v_rw));
   end loop;
   -- Futter respektiert den Lagerdeckel (wie Handelsposten/Expeditionen).
@@ -514,9 +529,21 @@ begin
       fruit = coalesce(ips.fruit, 0) + v_fruit, meat = coalesce(ips.meat, 0) + v_meat
     where ips.auth_user_id = v_uid;
   end if;
+  -- Feste Arten-Eier: normale Arten (kein Einzelstueck) - der Ei-Schutz aus
+  -- 20261004-08 bleibt aktiv (kein bkmp.trusted), eine Einzelstueck-Art in
+  -- species_eggs wuerde also abgelehnt. Fehlt die Art, bricht alles ab und
+  -- es wird NICHTS als abgeholt markiert (spaeter erneut abholbar).
+  for v_i in 1 .. coalesce(array_length(v_egg_species, 1), 0) loop
+    if not exists (select 1 from public.dragon_species ds where ds.id = v_egg_species[v_i]) then
+      raise exception 'reward_species_missing';
+    end if;
+    insert into public.player_dragon_eggs (name_key, auth_user_id, species_id)
+    values (v_state.name_key, v_uid, v_egg_species[v_i]) returning id into v_egg;
+    v_eggs := v_eggs || jsonb_build_array(jsonb_build_object('id', v_egg, 'species_id', v_egg_species[v_i], 'tier', v_egg_tiers[v_i]));
+  end loop;
   update public.player_event_progress p set tier_claimed = v_claimed, unlocks = v_unlocks, updated_at = now()
    where p.event_id = p_event_id and p.auth_user_id = v_uid;
-  return jsonb_build_object('items', v_items, 'unlocks', to_jsonb(v_unlocks),
+  return jsonb_build_object('items', v_items, 'unlocks', to_jsonb(v_unlocks), 'eggs', v_eggs,
     'credited', jsonb_build_object('gold', v_gold, 'wood', v_wood, 'stone', v_stone, 'crystals', v_crystals,
       'essence', v_essence, 'fruit', v_fruit, 'meat', v_meat));
 end;

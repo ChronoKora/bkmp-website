@@ -18,9 +18,22 @@
 -- MASTER_DOKUMENTATION_BKINVESTMENT.md). Erneutes Ausfuehren aktualisiert
 -- NUR Texte/Konfiguration, nie Termine oder den Schalter.
 --
--- Voraussetzung: 20261004-06-special-events.sql. NOCH NICHT AUSGEFUEHRT.
+-- Voraussetzung: 20261003-dragon-species-neue-drachen2.sql (Arten dayman +
+-- surebrec fuer die garantierten Eier) und 20261004-06-special-events.sql.
+-- NOCH NICHT AUSGEFUEHRT.
 -- Die Arten lightnix/darknix legt 20261004-08-lightnix-darknix.sql an.
 -- ============================================================
+
+-- Garantierte Pass-Eier (Stufe 10 = dayman, Stufe 20 = surebrec) brauchen die
+-- echten Arten aus 20261003-dragon-species-neue-drachen2.sql. Fehlt eine,
+-- bricht diese Datei ab, statt spaeter beim Abholen zu scheitern.
+do $
+begin
+  if not exists (select 1 from public.dragon_species ds where ds.id = 'dayman')
+     or not exists (select 1 from public.dragon_species ds where ds.id = 'surebrec') then
+    raise exception 'Zwielicht-Pass: Drachenarten dayman/surebrec fehlen - bitte zuerst sql/20261003-dragon-species-neue-drachen2.sql ausfuehren.';
+  end if;
+end $;
 
 insert into public.special_events (id, name, subtitle, description, lore, timezone, enabled, archived,
   tier_count, points_per_tier, config, reward_group, lifetime_claim_limit, choice_mode, reward_species, assets)
@@ -429,9 +442,11 @@ values (
   {
    "tier": 10,
    "reward": {
-    "label": "Titel „Zwielicht-Wanderer“",
+    "label": "Garantiertes Dayman-Ei + Titel „Zwielicht-Wanderer“",
     "unlock": "title_zwielicht",
-    "crystals": 100
+    "species_eggs": [
+     "dayman"
+    ]
    }
   },
   {
@@ -506,9 +521,11 @@ values (
   {
    "tier": 20,
    "reward": {
-    "label": "Namensfarbe „Zwielicht“ + Drachenei",
+    "label": "Garantiertes Surebrec-Ei + Namensfarbe „Zwielicht“",
     "unlock": "cosmetic_zwielicht",
-    "eggs": 1
+    "species_eggs": [
+     "surebrec"
+    ]
    }
   },
   {
@@ -573,14 +590,14 @@ values (
    "tier": 28,
    "reward": {
     "label": "Schatz des Zwielichts",
-    "eggs": 1,
     "runes": [
      {
       "count": 1,
       "tier": 3
      }
     ],
-    "crystals": 400
+    "crystals": 500,
+    "essence": 150
    }
   },
   {
@@ -618,6 +635,7 @@ values (
   "end_chosen": "Dein {species} begleitet dich weiterhin.",
   "website_points": [
    "30 Pass-Stufen mit Belohnungen auf dem ganzen Weg",
+   "Garantierte Dracheneier: 🥚 Dayman auf Stufe 10 und 🥚 Surebrec auf Stufe 20 – keine Zufallseier",
    "Jeden Tag 5 neue Prüfungen + Tagesabschluss (Reset 00:00 Uhr)",
    "Große Wochenquests über die ganze Woche",
    "Hauptbelohnung auf Stufe 30: ☀️ Lightnix ODER 🌑 Darknix – du entscheidest selbst",
@@ -627,6 +645,10 @@ values (
    "Kostenlos – kein Echtgeld, keine gekauften Stufen"
   ],
   "faq": [
+   [
+    "Welche Dracheneier gibt es im Pass?",
+    "Zwei feste Eier statt Zufall: Auf Stufe 10 ein Dayman-Ei, auf Stufe 20 ein Surebrec-Ei. Beide sind normale Drachenarten – du bekommst sie auch, wenn du schon einen Dayman oder Surebrec hast."
+   ],
    [
     "Kann ich beide bekommen?",
     "Nein. Du wählst einen der beiden Drachen – Lightnix oder Darknix."

@@ -193,6 +193,12 @@ const BKMP_PRESTIGE_UPGRADES = [
   { id: 'gespeicherte_ausruestungssets', branch: 'automation', name: 'Gespeicherte Ausrüstungssets', desc: 'Schaltet einen Schnellspeicher-Slot für deine aktuelle Runen-Ausrüstung frei.', icon: '💾', effectType: 'rune_loadout_unlock', effectPerRank: 1, ...bkmpPrestigeTierDef('TOGGLE') },
   { id: 'hoehere_kampfgeschwindigkeit', branch: 'automation', name: 'Höhere Kampfgeschwindigkeit', desc: '+3% Angriffsgeschwindigkeit pro Rang (wirkt auf denselben Wert wie der Skilltree).', icon: '⚡', effectType: 'attack_speed_pct', effectPerRank: 3, ...bkmpPrestigeTierDef('MEDIUM') },
   { id: 'automatische_prestige_vorschau', branch: 'automation', name: 'Automatische Prestige-Vorschau', desc: 'Zeigt einen Hinweis-Banner, sobald ein Aufstieg möglich ist.', icon: '🔔', effectType: 'auto_prestige_notice_unlock', effectPerRank: 1, ...bkmpPrestigeTierDef('TOGGLE') },
+  /* Folgeupdate 04.10.2026 (Spieler-Feedback "Skilltree nach jedem Prestige
+     neu klicken"): Auto-Skilltree als weitere Komfort-Freischaltung im
+     vorhandenen Automation-Zweig - gleicher TOGGLE-Preis wie die uebrigen
+     Automatiken. MAX-Knopf und Builds selbst brauchen KEINE Freischaltung
+     hier (siehe js/systems/bkmp-skill-builds.js). */
+  { id: 'meister_der_pfade', branch: 'automation', name: 'Meister der Pfade', desc: 'Auto-Skilltree: neue Skillpunkte werden automatisch nach deinem aktiven Skilltree-Build verteilt (nach Level-Aufstiegen, Offline-Fortschritt und jedem Prestige). Schalter im Skilltree-Reiter.', icon: '🧠', effectType: 'auto_skilltree_unlock', effectPerRank: 1, ...bkmpPrestigeTierDef('TOGGLE') },
   { id: 'automatische_verteilung', branch: 'automation', name: 'Automatische Verteilung', desc: 'Schaltet einen "Empfohlene Verteilung"-Knopf frei, der verfügbare Prestige-Punkte automatisch nach Kosten sinnvoll verteilt.', icon: '🧭', effectType: 'auto_prestige_allocate_unlock', effectPerRank: 1, ...bkmpPrestigeTierDef('TOGGLE') },
 
   /* ---------------- Vermächtnis (2 bestehende Knoten, passen thematisch in keinen der 5 Zweige) ---------------- */
@@ -1109,6 +1115,8 @@ async function bkmpPrestigeExecuteReset() {
     catch (e) { console.warn('Prestige: Speichern fehlgeschlagen (Migration ausgefuehrt?).', e); }
 
     bkmpIdleRenderActiveTabContent();
+    /* Folgeupdate 04.10.2026: Hinweis auf den gespeicherten Skilltree-Build. */
+    if (typeof bkmpSkillBuildsOnPrestige === 'function') bkmpSkillBuildsOnPrestige();
   } finally {
     bkmpPrestigeSaving = false;
   }

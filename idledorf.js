@@ -881,6 +881,10 @@ function bkmpIdleAddXp(amount) {
     }
   }
   if (leveled) {
+    /* Folgeupdate 04.10.2026: Auto-Skilltree verteilt die neuen Punkte nach
+       dem aktiven Build (nur mit Prestige-Knoten "Meister der Pfade" und nur
+       hier beim Aufstieg - keine Dauerabfrage). */
+    if (typeof bkmpSkillBuildsAutoRun === 'function') bkmpSkillBuildsAutoRun('level', { quiet: true });
     bkmpIdleRecomputeEffectiveStats();
     /* Spieler-Meldung 17.07.: Level-Aufstieg (und damit neue Skillpunkte)
        liess die "+1"-Kaufbuttons im offenen Skilltree-Tab faelschlich
@@ -2259,6 +2263,9 @@ function bkmpIdleApplyOfflineResult(result) {
       }).catch(() => {});
     }
   }
+  /* Folgeupdate 04.10.2026: offline gewonnene Skillpunkte nach dem aktiven
+     Build verteilen (nur mit Auto-Skilltree). */
+  if (typeof bkmpSkillBuildsAutoRun === 'function') bkmpSkillBuildsAutoRun('offline');
 }
 
 /* Perf-Audit 06.08.2026 (Nutzer-Messung: 288-312ms INP beim Klick auf
@@ -3488,6 +3495,8 @@ async function bkmpIdleOpenModal() {
   }
   if (typeof bkmpWorldEventOnOpen === 'function') bkmpWorldEventOnOpen();
   bkmpIdleCheckDailyStreak();
+  /* Folgeupdate 04.10.2026: Auto-Skilltree beim Laden (wartet selbst auf die Chronik). */
+  if (typeof bkmpSkillBuildsOnIdleOpen === 'function') bkmpSkillBuildsOnIdleOpen().catch(() => {});
 
   if (!bkmpIdleCurrentDragon) bkmpIdleSpawnDragon();
   /* Auch wenn der Drache schon im Speicher war (Fenster nur geschlossen,

@@ -57,7 +57,7 @@ test.describe('Prestige-Baum v2: Struktur/Kosten/Paragon/Meilensteine (Teststand
     expect(counts.wirtschaft).toBe(10);
     expect(counts.drachen).toBe(10);
     expect(counts.runen_dungeon).toBe(9); // Schluesselmeister komplett entfernt (Nutzerwunsch: feste Schluesselzeiten machen den Knoten wirkungslos)
-    expect(counts.automation).toBe(10);
+    expect(counts.automation).toBe(11); // "Meister der Pfade" (Auto-Skilltree, 04.10.2026) ergaenzt
     expect(counts.legacy).toBe(3); // "Weitere Gefaehrten" (05.08.2026, Spieler-Idee MCSoGGe) ergaenzt
   });
 

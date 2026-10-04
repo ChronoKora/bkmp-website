@@ -381,6 +381,18 @@ html[data-fx="aus"] .idle-dorf-cat-chevron { transition: none; }
 .bkmp-event-tier-row.is-milestone { border-color: rgba(253, 230, 138, .4); background: rgba(253, 230, 138, .05); }
 .bkmp-event-tier-row.is-ready { border-color: rgba(74, 222, 128, .55); }
 .bkmp-event-tier-row.is-claimed { opacity: .6; }
+/* Folgeupdate 04.10.2026: garantierte Pass-Eier (feste Arten) + Meilenstein-Leiste */
+.bkmp-event-egg-thumb.idle-dragon-thumb { width: 40px; height: 40px; object-fit: contain; flex: 0 0 auto; margin: 0; }
+.bkmp-event-tier-row.has-egg { border-color: rgba(167, 139, 250, .55); background: rgba(167, 139, 250, .08); }
+.bkmp-event-highlights { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .4rem; margin: .5rem 0 .2rem; }
+.bkmp-event-highlight { display: flex; align-items: center; gap: .45rem; padding: .45rem .55rem; border-radius: 12px; border: 1px solid rgba(167, 139, 250, .45); background: rgba(167, 139, 250, .08); font-size: .74rem; min-width: 0; }
+.bkmp-event-highlight.is-choice { border-color: rgba(253, 230, 138, .5); background: linear-gradient(90deg, rgba(253, 230, 138, .1), rgba(76, 29, 149, .18)); }
+.bkmp-event-highlight.is-reached { border-color: rgba(74, 222, 128, .55); }
+.bkmp-event-highlight-icon { font-size: 1.1rem; flex: 0 0 auto; }
+.bkmp-event-highlight-tier { font-weight: 700; white-space: nowrap; color: var(--app-ink, #f5f0ff); }
+.bkmp-event-highlight-text { color: var(--app-muted, rgba(245, 240, 255, .78)); min-width: 0; overflow-wrap: anywhere; }
+.idle-event-card-next { font-size: .7rem; color: var(--app-muted, rgba(245, 240, 255, .78)); margin-top: .15rem; }
+.idle-event-card-next strong { color: var(--app-ink, #f5f0ff); }
 .bkmp-event-tier-num { flex: none; width: 1.8rem; text-align: center; font-weight: 900; color: #fde68a; }
 .bkmp-event-tier-reward { flex: 1; min-width: 0; }
 .bkmp-event-tier-state { flex: none; }

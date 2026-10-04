@@ -10,7 +10,9 @@ const { createStore, seedStore } = require('../mock/store');
 const { handleRpcRequest } = require('../mock/rpc-engine');
 const { handleRestRequest } = require('../mock/rest-engine');
 const { makePlayerStateRow } = require('../fixtures/base-player-state');
-const { ZWIELICHT_CONFIG, makeZwielichtEventRow, scheduleFor, EVENT_SPECIES } = require('../fixtures/event-reference');
+const { ZWIELICHT_CONFIG, makeZwielichtEventRow, scheduleFor, EVENT_SPECIES, PASS_EGG_SPECIES } = require('../fixtures/event-reference');
+/* Event-Arten (Lightnix/Darknix) + die echten Arten der garantierten Pass-Eier. */
+const ALL_SPECIES = () => [...EVENT_SPECIES, ...PASS_EGG_SPECIES].map(s => ({ ...s }));
 const rules = require('../../js/systems/bkmp-event-rules.js');
 
 const UID = 'qa-ev-0000-4000-8000-000000000001';
@@ -29,7 +31,7 @@ function makeWorld(startIso, opts) {
         display_name: 'QaEvent', dragon_kills: 300000, playtime_seconds: 100 * 3600, boss_kills: 1000, highest_dragon_index: 500,
         gold: 1e9, crystals: 1e6, essence: 1e6, ...((opts && opts.state) || {})
       })],
-      dragon_species: EVENT_SPECIES.map(s => ({ ...s })),
+      dragon_species: ALL_SPECIES(),
       special_events: [makeZwielichtEventRow((opts && opts.event) || {})],
       player_dragons: (opts && opts.dragons) || [],
       idle_player_runes: (opts && opts.runes) || [],
@@ -306,6 +308,126 @@ test.describe('Zwielicht-Pass – Konfiguration & Regeln', () => {
   });
 });
 
+
+/* ---------- Folgeupdate: garantierte Pass-Eier (Dayman / Surebrec) ---------- */
+test.describe('Zwielicht-Pass – garantierte Eier', () => {
+  function eggsOf(store, uid) { return (store.tables.player_dragon_eggs || []).filter(e => e.auth_user_id === (uid || UID)); }
+  function speciesOf(store, uid) { return eggsOf(store, uid).map(e => e.species_id); }
+
+  test('Konfiguration: Stufe 10 = Dayman, Stufe 20 = Surebrec, keine Zufallseier, Stufe 30 unverändert', () => {
+    const c = ZWIELICHT_CONFIG;
+    const t = n => c.tiers.find(x => x.tier === n).reward;
+    expect(t(10).species_eggs).toEqual(['dayman']);
+    expect(t(10).unlock).toBe('title_zwielicht');
+    expect(t(20).species_eggs).toEqual(['surebrec']);
+    expect(t(20).unlock).toBe('cosmetic_zwielicht');
+    // Genau diese zwei Ei-Meilensteine, nirgends ein zufaelliges Ei
+    expect(c.tiers.filter(x => x.reward.eggs)).toEqual([]);
+    expect(c.tiers.flatMap(x => (x.reward.species_eggs || []).map(id => [x.tier, id]))).toEqual([[10, 'dayman'], [20, 'surebrec']]);
+    // Stufe 30 bleibt die Wahl Lightnix/Darknix, ohne zusaetzliche Eier
+    expect(t(30)).toEqual({ label: 'Die Wahl des Zwielichts: ☀️ Lightnix oder 🌑 Darknix', choice: true });
+    // Echte Arten aus der Drachen-SQL, normale Arten (kein Einzelstueck)
+    expect(PASS_EGG_SPECIES.map(sp => [sp.id, sp.name, sp.rarity])).toEqual([['dayman', 'Dayman', 'episch'], ['surebrec', 'Surebrec', 'episch']]);
+    // Die SQL prueft vorab genau diese Arten (kein spaeteres Scheitern beim Abholen)
+    const sql = fs.readFileSync(path.join(__dirname, '../../sql/20261004-07-zwielicht-event.sql'), 'utf8');
+    const pre = sql.slice(0, sql.indexOf('insert into public.special_events'));
+    ['dayman', 'surebrec'].forEach(id => expect(pre).toContain(`ds.id = '${id}'`));
+  });
+
+  test('Stufe 10 gibt genau ein Dayman-Ei, Stufe 20 genau ein Surebrec-Ei – nie eine andere Art', () => {
+    // Mehrere Spieler/Tage: die Art haengt nie vom Zufall oder Spieler ab.
+    for (let i = 0; i < 12; i++) {
+      const uid = `qa-ev-0000-4000-8000-0000000001${String(i).padStart(2, '0')}`;
+      const store = makeWorld(new Date(Date.parse('2026-10-19T03:00:00Z') + i * 11 * HOUR).toISOString(), { event: SCHED });
+      store.tables.idle_player_state[0].auth_user_id = uid;
+      rpc(store, 'event_tick', { p_event_id: 'zwielicht' }, uid);
+      const row = store.tables.player_event_progress[0];
+      row.points = 999; // Stufe 9
+      rpc(store, 'event_claim_tiers', { p_event_id: 'zwielicht' }, uid);
+      expect(speciesOf(store, uid)).toEqual([]);
+      row.points = 1000; // Stufe 10
+      const r10 = rpc(store, 'event_claim_tiers', { p_event_id: 'zwielicht' }, uid);
+      expect(r10.items.map(x => x.tier)).toEqual([10]);
+      expect(r10.eggs.map(e => [e.species_id, e.tier])).toEqual([['dayman', 10]]);
+      expect(speciesOf(store, uid)).toEqual(['dayman']);
+      expect(r10.unlocks).toContain('title_zwielicht');
+      row.points = 1999; // Stufe 19
+      expect(rpc(store, 'event_claim_tiers', { p_event_id: 'zwielicht' }, uid).eggs).toEqual([]);
+      row.points = 2000; // Stufe 20
+      const r20 = rpc(store, 'event_claim_tiers', { p_event_id: 'zwielicht' }, uid);
+      expect(r20.eggs.map(e => [e.species_id, e.tier])).toEqual([['surebrec', 20]]);
+      expect(r20.unlocks).toContain('cosmetic_zwielicht');
+      row.points = 3590; // alles bis Stufe 30
+      expect(rpc(store, 'event_claim_tiers', { p_event_id: 'zwielicht' }, uid).eggs).toEqual([]);
+      expect(speciesOf(store, uid)).toEqual(['dayman', 'surebrec']);
+      expect(eggsOf(store, uid).every(e => e.name_key === NAME)).toBe(true);
+    }
+  });
+
+  test('Mehrere Stufen auf einmal (0 → 30): beide Eier genau einmal, Stufe 30 bleibt die Wahl', () => {
+    const store = makeWorld('2026-10-24T10:00:00Z', { event: SCHED });
+    rpc(store, 'event_tick', { p_event_id: 'zwielicht' });
+    Object.assign(store.tables.player_event_progress[0], { points: 3000, earned: true });
+    const r = rpc(store, 'event_claim_tiers', { p_event_id: 'zwielicht' });
+    expect(r.items).toHaveLength(30);
+    expect(r.eggs.map(e => e.species_id)).toEqual(['dayman', 'surebrec']);
+    expect(speciesOf(store)).toEqual(['dayman', 'surebrec']);
+    // Kein Lightnix/Darknix durch das Abholen - nur ueber die Wahl
+    rpc(store, 'event_choose_reward', { p_event_id: 'zwielicht', p_species_id: 'lightnix' });
+    expect(speciesOf(store)).toEqual(['dayman', 'surebrec', 'lightnix']);
+    expect(rpcErr(store, 'event_choose_reward', { p_event_id: 'zwielicht', p_species_id: 'darknix' })).toBe('already_chosen');
+  });
+
+  test('Vorhandener Dayman/Surebrec (Ei und Drache) verhindert das Abholen nicht', () => {
+    const dragons = ['dayman', 'surebrec'].map((sp, i) => ({ id: 'qa-own-' + i, name_key: NAME, auth_user_id: UID, species_id: sp, stage: 'adult', food_preference: 'fruit' }));
+    const store = makeWorld('2026-10-20T10:00:00Z', { event: SCHED, dragons });
+    store.tables.player_dragon_eggs = [
+      { id: 'qa-own-egg-1', name_key: NAME, auth_user_id: UID, species_id: 'dayman' },
+      { id: 'qa-own-egg-2', name_key: NAME, auth_user_id: UID, species_id: 'surebrec' }
+    ];
+    rpc(store, 'event_tick', { p_event_id: 'zwielicht' });
+    store.tables.player_event_progress[0].points = 2000;
+    const r = rpc(store, 'event_claim_tiers', { p_event_id: 'zwielicht' });
+    expect(r.eggs.map(e => e.species_id)).toEqual(['dayman', 'surebrec']);
+    expect(speciesOf(store).sort()).toEqual(['dayman', 'dayman', 'surebrec', 'surebrec']);
+    expect(store.tables.player_dragons).toHaveLength(2);
+  });
+
+  test('Doppelt abholen (zweiter Tab/Gerät, erneuter Klick): nie ein zweites Ei', () => {
+    const store = makeWorld('2026-10-20T10:00:00Z', { event: SCHED });
+    rpc(store, 'event_tick', { p_event_id: 'zwielicht' });
+    store.tables.player_event_progress[0].points = 2100;
+    const first = rpc(store, 'event_claim_tiers', { p_event_id: 'zwielicht' });
+    const second = rpc(store, 'event_claim_tiers', { p_event_id: 'zwielicht' });
+    const third = rpc(store, 'event_claim_tiers', { p_event_id: 'zwielicht' });
+    expect(first.eggs).toHaveLength(2);
+    expect(second.items).toEqual([]);
+    expect(second.eggs).toEqual([]);
+    expect(third.eggs).toEqual([]);
+    expect(speciesOf(store)).toEqual(['dayman', 'surebrec']);
+  });
+
+  test('Fehlende Art: nichts wird abgeholt (später erneut möglich); Einzelstück-Arten sind als festes Ei gesperrt', () => {
+    const store = makeWorld('2026-10-20T10:00:00Z', { event: SCHED });
+    store.tables.dragon_species = store.tables.dragon_species.filter(sp => sp.id !== 'dayman');
+    rpc(store, 'event_tick', { p_event_id: 'zwielicht' });
+    store.tables.player_event_progress[0].points = 1000;
+    const before = { ...state(store) };
+    expect(rpcErr(store, 'event_claim_tiers', { p_event_id: 'zwielicht' })).toBe('reward_species_missing');
+    expect(store.tables.player_event_progress[0].tier_claimed).toEqual([]);
+    expect(state(store).gold).toBe(before.gold);
+    expect(speciesOf(store)).toEqual([]);
+    store.tables.dragon_species.push(PASS_EGG_SPECIES.find(sp => sp.id === 'dayman'));
+    expect(rpc(store, 'event_claim_tiers', { p_event_id: 'zwielicht' }).eggs.map(e => e.species_id)).toEqual(['dayman']);
+    // Eine Einzelstueck-Art (Lightnix) als festes Ei wird vom Ei-Schutz abgelehnt
+    const ev = store.tables.special_events[0];
+    ev.config.tiers.find(t => t.tier === 11).reward.species_eggs = ['lightnix'];
+    store.tables.player_event_progress[0].points = 1100;
+    expect(rpcErr(store, 'event_claim_tiers', { p_event_id: 'zwielicht' })).toBe('event_species_egg_not_allowed');
+    expect(speciesOf(store)).toEqual(['dayman']);
+  });
+});
+
 /* ---------- im Spiel (Browser) ---------- */
 test.describe('Zwielicht-Pass – im Spiel', () => {
   test.use({ teststand: 'C' });
@@ -324,7 +446,7 @@ test.describe('Zwielicht-Pass – im Spiel', () => {
   test('Angekündigt: Teaser mit Countdown im Spiel und auf der Website (auch ohne Login)', async ({ page, qaBaseURL, fixtureData, store }) => {
     const now = store.clock.nowMs();
     store.tables.special_events = [makeZwielichtEventRow({ announce_at: new Date(now - HOUR).toISOString(), starts_at: new Date(now + 2 * 24 * HOUR).toISOString(), ends_at: new Date(now + 9 * 24 * HOUR).toISOString(), enabled: true })];
-    store.tables.dragon_species = EVENT_SPECIES.map(s => ({ ...s }));
+    store.tables.dragon_species = ALL_SPECIES();
     await page.goto(qaBaseURL + '/');
     const announce = page.locator('[data-testid="event-announcement"]');
     await expect(announce).toHaveCount(1, { timeout: 15000 });
@@ -341,7 +463,7 @@ test.describe('Zwielicht-Pass – im Spiel', () => {
 
   test('Live: Pass mit Stufe, 5 Tagesaufgaben + Abschluss, 30 Stufen (Stufe 30 Licht/Dunkel), Belohnungen abholen', async ({ page, qaBaseURL, fixtureData, store }) => {
     store.tables.special_events = [makeZwielichtEventRow(liveSchedule(store))];
-    store.tables.dragon_species = EVENT_SPECIES.map(s => ({ ...s }));
+    store.tables.dragon_species = ALL_SPECIES();
     await openAndLogin(page, qaBaseURL, fixtureData);
     await waitForDragonReady(page);
     await page.evaluate(() => bkmpIdleStopLoop());
@@ -370,7 +492,7 @@ test.describe('Zwielicht-Pass – im Spiel', () => {
 
   test('Stufe 30: Wahl mit deutlicher Warnung, Ei im Lager, danach nur kompakter Status statt Werbung', async ({ page, qaBaseURL, fixtureData, store }) => {
     store.tables.special_events = [makeZwielichtEventRow(liveSchedule(store))];
-    store.tables.dragon_species = EVENT_SPECIES.map(s => ({ ...s }));
+    store.tables.dragon_species = ALL_SPECIES();
     await openAndLogin(page, qaBaseURL, fixtureData);
     await waitForDragonReady(page);
     await page.evaluate(() => bkmpIdleStopLoop());
@@ -389,5 +511,96 @@ test.describe('Zwielicht-Pass – im Spiel', () => {
     expect(store.tables.player_dragon_eggs.filter(e => e.species_id === 'lightnix')).toHaveLength(1);
     expect(await page.evaluate(() => bkmpPlayerDragonEggs.some(e => e.species_id === 'lightnix'))).toBe(true);
     expect(await page.locator('[data-testid="event-choose-darknix"]').count()).toBe(0);
+  });
+
+  test('Garantierte Eier sind vorab sichtbar (Meilensteine, Stufen-Zeilen, Pass-Karte) – kein Zufallsei', async ({ page, qaBaseURL, fixtureData, store }) => {
+    store.tables.special_events = [makeZwielichtEventRow(liveSchedule(store))];
+    store.tables.dragon_species = ALL_SPECIES();
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    await page.evaluate(() => bkmpIdleStopLoop());
+    await expect.poll(() => (store.tables.player_event_progress || []).length, { timeout: 15000 }).toBe(1);
+    await page.evaluate(() => bkmpEventTick(true));
+    const card = page.locator('[data-testid="event-card-next"]');
+    if (await page.locator('#idleEventPassCard').isVisible().catch(() => false)) {
+      await expect(card).toContainText('Stufe 10');
+      await expect(card).toContainText('Garantiertes Dayman-Ei');
+    }
+    await openPass(page);
+    await page.locator('#bkmpEventPassTabs [data-tab-id="rewards"]').click();
+    await expect(page.locator('[data-testid="event-highlight-10"]')).toContainText('Garantiertes Dayman-Ei');
+    await expect(page.locator('[data-testid="event-highlight-20"]')).toContainText('Garantiertes Surebrec-Ei');
+    await expect(page.locator('[data-testid="event-highlight-30"]')).toContainText('Lightnix oder');
+    await expect(page.locator('[data-testid="event-tier-row-10"]')).toContainText('Garantiertes Dayman-Ei');
+    await expect(page.locator('[data-testid="event-tier-row-10"]')).toContainText('Titel');
+    await expect(page.locator('[data-testid="event-tier-row-20"]')).toContainText('Garantiertes Surebrec-Ei');
+    await expect(page.locator('[data-testid="event-tier-row-20"]')).toContainText('Namensfarbe');
+    // Ei-Vorschau aus dem echten Artenkatalog
+    await expect(page.locator('[data-testid="event-tier-row-10"] img.bkmp-event-egg-thumb')).toHaveAttribute('src', /egg\/dayman-web\.png$/);
+    await expect(page.locator('[data-testid="event-highlight-20"] img.bkmp-event-egg-thumb')).toHaveAttribute('src', /egg\/surebrec-web\.png$/);
+    await expect(page.locator('.bkmp-event-track')).not.toContainText('Drachenei');
+    await expect(page.locator('[data-testid="event-tier-30"]')).toContainText('DAS ZWIELICHT WARTET');
+  });
+
+  test('Stufe 10 + 20 abholen: Dayman- und Surebrec-Ei im Lager, Reload ändert die Art nicht', async ({ page, qaBaseURL, fixtureData, store }) => {
+    store.tables.special_events = [makeZwielichtEventRow(liveSchedule(store))];
+    store.tables.dragon_species = ALL_SPECIES();
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    await page.evaluate(() => bkmpIdleStopLoop());
+    await expect.poll(() => (store.tables.player_event_progress || []).length, { timeout: 15000 }).toBe(1);
+    const uid = fixtureData.authUserId;
+    const before = store.tables.player_dragon_eggs.filter(e => e.auth_user_id === uid).length;
+    store.tables.player_event_progress[0].points = 2050;
+    await page.evaluate(() => bkmpEventTick(true));
+    await openPass(page);
+    await page.locator('[data-testid="event-claim-btn"]').click();
+    await expect(page.locator('[data-testid="event-claim-btn"]')).toHaveCount(0, { timeout: 10000 });
+    const serverEggs = () => store.tables.player_dragon_eggs.filter(e => e.auth_user_id === uid);
+    expect(serverEggs()).toHaveLength(before + 2);
+    const newEggs = serverEggs().filter(e => e.species_id === 'dayman' || e.species_id === 'surebrec');
+    expect(newEggs.map(e => e.species_id).sort()).toEqual(['dayman', 'surebrec']);
+    const ids = newEggs.map(e => e.id).sort();
+    const local = await page.evaluate(ids => bkmpPlayerDragonEggs.filter(e => ids.includes(e.id)).map(e => e.species_id).sort(), ids);
+    expect(local).toEqual(['dayman', 'surebrec']);
+    // Reload: dieselben Eier mit derselben Art, nichts doppelt, kein neuer Abhol-Knopf
+    await page.reload();
+    await page.waitForFunction(() => typeof bkmpIdleOpenModal === 'function');
+    await page.evaluate(() => bkmpIdleOpenModal());
+    await waitForDragonReady(page);
+    await page.evaluate(() => bkmpIdleStopLoop());
+    await expect.poll(() => page.evaluate(ids => bkmpPlayerDragonEggs.filter(e => ids.includes(e.id)).map(e => e.id + ':' + e.species_id).sort(), ids), { timeout: 15000 })
+      .toEqual(newEggs.map(e => e.id + ':' + e.species_id).sort());
+    expect(serverEggs()).toHaveLength(before + 2);
+    await page.evaluate(() => bkmpEventTick(true));
+    await openPass(page);
+    await expect(page.locator('[data-testid="event-claim-btn"]')).toHaveCount(0);
+  });
+
+  test('Zwei Tabs holen gleichzeitig ab: genau ein Dayman-Ei', async ({ page, context, qaBaseURL, fixtureData, store }) => {
+    test.setTimeout(90000);
+    store.tables.special_events = [makeZwielichtEventRow(liveSchedule(store))];
+    store.tables.dragon_species = ALL_SPECIES();
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    await page.evaluate(() => bkmpIdleStopLoop());
+    await expect.poll(() => (store.tables.player_event_progress || []).length, { timeout: 15000 }).toBe(1);
+    const page2 = await context.newPage();
+    await page2.goto(page.url());
+    await page2.evaluate(() => typeof bkmpIdleOpenModal === 'function' && bkmpIdleOpenModal());
+    await waitForDragonReady(page2);
+    await page2.evaluate(() => bkmpIdleStopLoop());
+    const uid = fixtureData.authUserId;
+    const before = store.tables.player_dragon_eggs.filter(e => e.auth_user_id === uid).length;
+    store.tables.player_event_progress[0].points = 1000;
+    await Promise.all([page.evaluate(() => bkmpEventTick(true)), page2.evaluate(() => bkmpEventTick(true))]);
+    await Promise.all([page.evaluate(() => bkmpEventClaimTiers()), page2.evaluate(() => bkmpEventClaimTiers())]);
+    const eggs = store.tables.player_dragon_eggs.filter(e => e.auth_user_id === uid);
+    expect(eggs).toHaveLength(before + 1);
+    expect(eggs.filter(e => e.species_id === 'dayman')).toHaveLength(1);
+    const count = p => p.evaluate(() => bkmpPlayerDragonEggs.filter(e => e.species_id === 'dayman').length);
+    expect((await count(page)) + (await count(page2))).toBe(1);
+    expect(store.tables.player_event_progress[0].tier_claimed.filter(t => t === 10)).toHaveLength(1);
+    await page2.close();
   });
 });
