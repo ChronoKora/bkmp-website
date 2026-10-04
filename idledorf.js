@@ -840,7 +840,7 @@ function bkmpIdleGetAchievementContextFields() {
     idleDungeonCleared: bkmpDungeonIsHardestCleared(),
     idleLoginStreak: bkmpIdleGetStreakData().count,
     idleDragonsHatched: bkmpPlayerDragons.length,
-    idleDragonsAdult: bkmpPlayerDragons.filter(d => d.stage === 'adult').length,
+    idleDragonsAdult: bkmpPlayerDragons.filter(d => d.stage === 'adult' || d.stage === 'divine').length,
     idleDragonSpeciesOwned: new Set(bkmpPlayerDragons.map(d => d.species_id)).size,
     idleLegendaryDragonsOwned: bkmpPlayerDragons.filter(d => {
       const sp = bkmpDragonSpeciesById(d.species_id);
@@ -851,7 +851,9 @@ function bkmpIdleGetAchievementContextFields() {
     /* Chronik (03.10.2026): Auftraege/Truhen/Weltereignisse/Bestiarium -
        faellt auf den zwischengespeicherten Wert zurueck, solange die Chronik
        noch nicht geladen ist (kein kurzes "Verschwinden" erspielter Titel). */
-    ...(typeof bkmpChronicleAchievementFields === 'function' ? bkmpChronicleAchievementFields(bkmpIdleGetCachedAchievementFields) : {})
+    ...(typeof bkmpChronicleAchievementFields === 'function' ? bkmpChronicleAchievementFields(bkmpIdleGetCachedAchievementFields) : {}),
+    /* Drachendorf-Ausbau Phase 8: Event-Freischaltungen (Titel/Abzeichen/Kosmetik). */
+    ...(typeof bkmpEventAchievementFields === 'function' ? bkmpEventAchievementFields(bkmpIdleGetCachedAchievementFields) : {})
   };
   try { localStorage.setItem(BKMP_IDLE_ACHIEVEMENT_CACHE_KEY, JSON.stringify(fields)); } catch (e) {}
   return fields;
@@ -940,8 +942,10 @@ function bkmpIdleHandleDragonDefeated() {
   const worldXpMult = typeof bkmpWorldEventXpMult === 'function' ? bkmpWorldEventXpMult() : 1;
   const goldBoost = (typeof bkmpDungeonBoostMultiplier === 'function' ? bkmpDungeonBoostMultiplier('gold') : 1) * worldGoldMult;
   const xpBoost = (typeof bkmpDungeonBoostMultiplier === 'function' ? bkmpDungeonBoostMultiplier('exp') : 1) * worldXpMult;
-  const boostedGold = goldBoost > 1 ? Math.round(rewards.gold * goldBoost) : rewards.gold;
-  const boostedXp = xpBoost > 1 ? Math.round(rewards.xp * xpBoost) : rewards.xp;
+  /* Bossjagd (Phase 11): mehr Gold/EP fuer Bosse und Minibosse. */
+  const bossEventMult = wasBoss ? 1 + Math.min(100, (typeof bkmpEventModifierPct === 'function' ? bkmpEventModifierPct('boss_reward_pct') : 0)) / 100 : 1;
+  const boostedGold = goldBoost * bossEventMult > 1 ? Math.round(rewards.gold * goldBoost * bossEventMult) : rewards.gold;
+  const boostedXp = xpBoost * bossEventMult > 1 ? Math.round(rewards.xp * xpBoost * bossEventMult) : rewards.xp;
   /* Progression-Rebalance Phase 5 (26.07.2026): Prestige-Knoten
      "Kristalladern"/"Essenzstrom" (Zweig Wirtschaft) erhoehen die aus
      Kaempfen erhaltene Kristall-/Essenzmenge; "Schatzsucher" (Zweig
@@ -3522,6 +3526,8 @@ async function bkmpIdleOpenModal() {
   if (typeof bkmpExpOnIdleOpen === 'function') bkmpExpOnIdleOpen();
   /* Phase 4: Bindungs-Takt (echte Begleiter-Nutzung) starten. */
   if (typeof bkmpDragonTraitsOnIdleOpen === 'function') bkmpDragonTraitsOnIdleOpen();
+  /* Phase 7/8: Special-Event / Zwielicht-Pass (Teaser, Fortschritt ~1x/Minute). */
+  if (typeof bkmpEventOnIdleOpen === 'function') bkmpEventOnIdleOpen().catch(() => {});
   /* Ab hier hat bkmpRaidToggleCombatView() (synchroner Teil ganz am Anfang
      von bkmpRaidStartCombatView) bereits entschieden, welches Panel
      tatsaechlich sichtbar sein soll - jetzt erst aufdecken. Die reinen
@@ -3916,7 +3922,11 @@ window.BKMP_IDLE_ACHIEVEMENTS_EXTRA = [
   { id: 'world_event_10', category: 'Idle Dorf', title: 'Glückspilz', desc: 'Erlebe 10 Weltereignisse im Kampf.', progress: ctx => [ctx.idleWorldEventsCaught || 0, 10], check: ctx => (ctx.idleWorldEventsCaught || 0) >= 10 },
   { id: 'world_event_100', category: 'Idle Dorf', title: 'Ereignisjäger', desc: 'Erlebe 100 Weltereignisse im Kampf.', progress: ctx => [ctx.idleWorldEventsCaught || 0, 100], check: ctx => (ctx.idleWorldEventsCaught || 0) >= 100 },
   { id: 'bestiary_10', category: 'Idle Dorf', title: 'Drachenkundler', desc: 'Erreiche insgesamt 10 Stufen im Drachen-Bestiarium.', progress: ctx => [ctx.idleBestiaryTiers || 0, 10], check: ctx => (ctx.idleBestiaryTiers || 0) >= 10 },
-  { id: 'bestiary_30', category: 'Idle Dorf', title: 'Meister des Bestiariums', desc: 'Erreiche insgesamt 30 Stufen im Drachen-Bestiarium.', progress: ctx => [ctx.idleBestiaryTiers || 0, 30], check: ctx => (ctx.idleBestiaryTiers || 0) >= 30 }
+  { id: 'bestiary_30', category: 'Idle Dorf', title: 'Meister des Bestiariums', desc: 'Erreiche insgesamt 30 Stufen im Drachen-Bestiarium.', progress: ctx => [ctx.idleBestiaryTiers || 0, 30], check: ctx => (ctx.idleBestiaryTiers || 0) >= 30 },
+  /* Drachendorf-Ausbau Phase 8: Zwielicht-Pass (Freischaltungen aus dem Event-Archiv der Chronik). */
+  { id: 'event_zwielicht_10', category: 'Idle Dorf', title: 'Zwielicht-Wanderer', desc: 'Erreiche Stufe 10 im Zwielicht-Pass.', check: ctx => (ctx.idleEventUnlocks || []).includes('title_zwielicht') },
+  { id: 'event_zwielicht_15', category: 'Idle Dorf', title: 'Zwielicht-Abzeichen', desc: 'Erreiche Stufe 15 im Zwielicht-Pass.', check: ctx => (ctx.idleEventUnlocks || []).includes('badge_zwielicht') },
+  { id: 'event_zwielicht_30', category: 'Idle Dorf', title: 'Bezwinger des Zwielichts', desc: 'Erreiche Stufe 30 im Zwielicht-Pass.', check: ctx => (ctx.idleEventEarned || 0) >= 1 }
 ];
 
 /* Frueher zeigten alle Tier-Titel auf "unlockAchievement"-IDs (z. B.
@@ -4038,6 +4048,8 @@ window.BKMP_IDLE_TITLES = [
   { id: 'idletitle_wochenwerk', name: 'Unermüdlicher Planer', desc: '10 Wochentruhen geöffnet.', unlockCustom: ctx => (ctx.idleWeeklyChests || 0) >= 10, effectType: 'gold_prod_pct', effectValue: 5 },
   { id: 'idletitle_ereignisjaeger', name: 'Ereignisjäger', desc: '100 Weltereignisse erlebt.', unlockCustom: ctx => (ctx.idleWorldEventsCaught || 0) >= 100, effectType: 'loot_chance_pct', effectValue: 5 },
   { id: 'idletitle_bestiarium', name: 'Meister des Bestiariums', desc: '30 Stufen im Drachen-Bestiarium erreicht.', unlockCustom: ctx => (ctx.idleBestiaryTiers || 0) >= 30, effectType: 'attack_pct', effectValue: 5 },
+  /* Drachendorf-Ausbau Phase 8: Zwielicht-Pass Stufe 10 (Name = gleichnamiger Erfolg). */
+  { id: 'idletitle_zwielicht', name: 'Zwielicht-Wanderer', desc: 'Stufe 10 im Zwielicht-Pass erreicht.', unlockCustom: ctx => (ctx.idleEventUnlocks || []).includes('title_zwielicht'), effectType: 'xp_pct', effectValue: 3 },
   { id: 'idletitle_zuchtmeister', name: 'Zuchtmeister', desc: 'Den kompletten Zucht-Skilltree-Zweig maximiert.', unlockCustom: () => {
     if (!bkmpIdleState || !bkmpIdleSkillDefs.length) return false;
     const alloc = bkmpIdleState.skill_allocations || {};
@@ -4084,7 +4096,9 @@ window.BKMP_IDLE_COSMETICS = [
      Eskalations-Logik wie oben, nur an ctx.idlePrestigeLevel gekoppelt. */
   { id: 'portal_wirbel', name: 'Portal-Wirbel', desc: 'Verzerrtes Violett-Türkis wie ein sich schließendes Portal.', rarity: 'Legendär', unlockCustom: ctx => ctx.idlePrestigeLevel >= 10 },
   { id: 'ewiger_kreislauf', name: 'Ewiger Kreislauf', desc: 'Ein Verlauf, der nie endet, für die, die nie aufhören.', rarity: 'Mythisch', unlockCustom: ctx => ctx.idlePrestigeLevel >= 20 },
-  { id: 'jenseits_der_sterne', name: 'Jenseits der Sterne', desc: 'Nur für die wenigen, die den Turm der Aufstiege bis hierher bezwungen haben.', rarity: 'Mythisch', unlockCustom: ctx => ctx.idlePrestigeLevel >= 30 }
+  { id: 'jenseits_der_sterne', name: 'Jenseits der Sterne', desc: 'Nur für die wenigen, die den Turm der Aufstiege bis hierher bezwungen haben.', rarity: 'Mythisch', unlockCustom: ctx => ctx.idlePrestigeLevel >= 30 },
+  /* Drachendorf-Ausbau Phase 8: Zwielicht-Pass Stufe 20 (bewusst statisch, keine Dauer-Animation). */
+  { id: 'zwielicht', name: 'Zwielicht', desc: 'Halb Licht, halb Dunkelheit – Belohnung aus dem Zwielicht-Pass (Stufe 20).', rarity: 'Legendär', unlockCustom: ctx => (ctx.idleEventUnlocks || []).includes('cosmetic_zwielicht') }
 ];
 
 

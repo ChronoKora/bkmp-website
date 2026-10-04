@@ -334,3 +334,139 @@ html[data-fx="aus"] .idle-dorf-cat-chevron { transition: none; }
 .dd-gp-note { font-size: .8rem; color: var(--app-muted, var(--muted, #b7a8c4)); margin: .3rem 0; }
 .dd-gp-top { margin: .4rem 0 0; padding-left: 1.1rem; font-size: .8rem; line-height: 1.5; }
 .dd-gp-badges { font-size: .8rem; margin-left: .3rem; }
+
+/* ---------- Phase 7-9: Special Event / Zwielicht-Pass ----------
+   Bewusst ruhig: keine Dauer-Animationen (siehe Performance-Regeln in
+   CLAUDE.md), Licht/Dunkel nur ueber statische Verlaeufe. */
+#idleEventPassCard { display: none; }
+@media (min-width: 1000px) {
+  html.bkmp-app-mode:not(.zone-game) #idleDorfOverlay #idleEventPassCard:not([hidden]):not(:empty) {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    gap: .4rem;
+    border-radius: 16px;
+    border: 1px solid rgba(167, 139, 250, .45);
+    background: linear-gradient(100deg, rgba(253, 230, 138, .12) 0%, rgba(253, 230, 138, .05) 48%, rgba(76, 29, 149, .25) 52%, rgba(15, 10, 40, .45) 100%);
+    padding: .7rem .85rem;
+  }
+}
+.idle-event-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; }
+.idle-event-card-title { font-size: .82rem; font-weight: 800; color: var(--app-ink, #f5f0ff); }
+.idle-event-card-tier { font-size: .72rem; font-weight: 800; color: #fde68a; white-space: nowrap; }
+.idle-event-card-sub, .idle-event-card-teaser, .idle-event-card-countdown { font-size: .7rem; color: var(--app-muted, rgba(245, 240, 255, .7)); }
+.idle-event-card-countdown strong { color: var(--app-ink, #f5f0ff); }
+.idle-event-bar .idle-xp-fill { background: linear-gradient(90deg, #fde68a, #a78bfa); }
+.bkmp-event-hud-btn[hidden] { display: none !important; }
+.bkmp-event-hud-btn { font-size: .7rem; letter-spacing: -.1em; position: relative; }
+
+.bkmp-event-card { max-width: min(640px, 96vw); }
+.bkmp-event-head { display: flex; flex-direction: column; gap: .35rem; margin-bottom: .6rem; }
+.bkmp-event-tierline { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .4rem; }
+.bkmp-event-tier { font-size: 1.15rem; font-weight: 900; color: #fde68a; }
+.bkmp-event-points { font-size: .82rem; color: var(--app-muted, rgba(245, 240, 255, .7)); }
+.bkmp-event-ends, .bkmp-event-hint { font-size: .78rem; color: var(--app-muted, rgba(245, 240, 255, .7)); margin: 0 0 .4rem; }
+.bkmp-event-end { font-size: .9rem; font-weight: 700; color: var(--app-ink, #f5f0ff); }
+.bkmp-event-claim-btn { align-self: flex-start; }
+.bkmp-event-quest { display: flex; align-items: center; gap: .6rem; }
+.bkmp-event-quest .bkmp-chron-quest-main { flex: 1; min-width: 0; }
+.bkmp-event-quest-pts { flex: none; font-weight: 800; color: #c4b5fd; font-size: .82rem; }
+.bkmp-event-quest.is-hard { border-color: rgba(167, 139, 250, .55); }
+.bkmp-event-hard { font-size: .66rem; font-weight: 800; color: #c4b5fd; text-transform: uppercase; letter-spacing: .04em; }
+.bkmp-event-closure { border-style: dashed; }
+.bkmp-event-pip { display: inline-block; min-width: 1.4em; margin-left: .15rem; padding: 0 .25em; border-radius: 6px; font-size: .66rem; text-align: center; border: 1px solid rgba(255, 255, 255, .25); color: var(--app-muted, rgba(245, 240, 255, .7)); }
+.bkmp-event-pip.is-done { border-color: rgba(74, 222, 128, .7); color: #4ade80; }
+.bkmp-event-track { display: flex; flex-direction: column; gap: .3rem; margin-top: .4rem; }
+.bkmp-event-tier-row { display: flex; align-items: center; gap: .6rem; padding: .4rem .55rem; border-radius: 10px; border: 1px solid rgba(255, 255, 255, .1); font-size: .78rem; }
+.bkmp-event-tier-row.is-milestone { border-color: rgba(253, 230, 138, .4); background: rgba(253, 230, 138, .05); }
+.bkmp-event-tier-row.is-ready { border-color: rgba(74, 222, 128, .55); }
+.bkmp-event-tier-row.is-claimed { opacity: .6; }
+.bkmp-event-tier-num { flex: none; width: 1.8rem; text-align: center; font-weight: 900; color: #fde68a; }
+.bkmp-event-tier-reward { flex: 1; min-width: 0; }
+.bkmp-event-tier-state { flex: none; }
+.bkmp-event-tier-final {
+  flex-direction: column;
+  align-items: stretch;
+  text-align: center;
+  padding: .9rem .7rem;
+  border: 1px solid rgba(196, 181, 253, .7);
+  background: linear-gradient(90deg, #fff7d6 0%, #fde68a 49.5%, #1e1238 50.5%, #0b0718 100%);
+}
+.bkmp-event-tier-final.is-claimed { opacity: 1; }
+.bkmp-event-final-title { align-self: center; padding: .15rem .8rem; border-radius: 999px; background: rgba(10, 6, 24, .62); font-weight: 900; font-size: 1rem; letter-spacing: .04em; color: #fff; }
+.bkmp-event-final-text { align-self: center; margin-top: .3rem; padding: .1rem .7rem; border-radius: 999px; background: rgba(10, 6, 24, .62); font-size: .8rem; color: #fff; }
+.bkmp-event-faq details { border-bottom: 1px solid rgba(255, 255, 255, .1); padding: .45rem 0; }
+.bkmp-event-faq summary { cursor: pointer; font-weight: 700; font-size: .85rem; }
+.bkmp-event-faq p { margin: .35rem 0 0; font-size: .82rem; color: var(--app-muted, rgba(245, 240, 255, .75)); }
+.bkmp-event-teaser { padding: .8rem; border-radius: 14px; border: 1px solid rgba(196, 181, 253, .45); background: linear-gradient(100deg, rgba(253, 230, 138, .1), rgba(30, 18, 56, .55)); }
+.bkmp-event-teaser-title { font-weight: 900; font-size: 1.05rem; margin-bottom: .3rem; }
+.bkmp-event-teaser p { margin: .15rem 0; font-size: .85rem; }
+.bkmp-event-teaser-when { margin-top: .45rem; font-size: .8rem; color: var(--app-muted, rgba(245, 240, 255, .75)); }
+.bkmp-event-info { display: flex; flex-direction: column; gap: .25rem; font-size: .82rem; margin-bottom: .6rem; }
+.bkmp-event-choice-wrap { margin-bottom: .8rem; }
+.bkmp-event-choice-title { text-align: center; font-weight: 900; font-size: 1.05rem; letter-spacing: .05em; margin-bottom: .5rem; }
+.bkmp-event-choice-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: .6rem; }
+.bkmp-event-choice { display: flex; flex-direction: column; align-items: center; gap: .35rem; padding: .7rem; border-radius: 14px; text-align: center; }
+.bkmp-event-choice img { width: 120px; height: 120px; object-fit: contain; }
+.bkmp-event-choice-lightnix { border: 1px solid rgba(253, 230, 138, .7); background: linear-gradient(180deg, rgba(253, 230, 138, .16), rgba(0, 0, 0, .25)); }
+.bkmp-event-choice-darknix { border: 1px solid rgba(167, 139, 250, .7); background: linear-gradient(180deg, rgba(76, 29, 149, .35), rgba(0, 0, 0, .35)); }
+.bkmp-event-choice-name { font-weight: 900; letter-spacing: .06em; }
+.bkmp-event-choice-text { font-size: .78rem; color: var(--app-muted, rgba(245, 240, 255, .78)); }
+.bkmp-event-chosen { padding: .55rem .7rem; border-radius: 12px; border: 1px solid rgba(74, 222, 128, .5); font-weight: 700; margin-bottom: .6rem; }
+.bkmp-event-archive { display: flex; flex-direction: column; gap: .15rem; padding: .6rem .7rem; border-radius: 12px; border: 1px solid rgba(196, 181, 253, .35); font-size: .82rem; margin-bottom: .5rem; }
+.bkmp-event-archive-title { font-weight: 800; }
+
+/* Website: Bereich "Was gibt es Neues" */
+.special-event-announce {
+  margin: 0 0 1.2rem;
+  padding: 1.1rem 1.2rem;
+  border-radius: 18px;
+  border: 1px solid rgba(196, 181, 253, .45);
+  background: linear-gradient(100deg, rgba(253, 230, 138, .1) 0%, rgba(253, 230, 138, .04) 48%, rgba(76, 29, 149, .3) 52%, rgba(10, 6, 24, .6) 100%);
+  color: var(--ink, #f5f3ed);
+}
+.special-event-announce-kicker { font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: #c4b5fd; }
+.special-event-announce-title { margin: .25rem 0; font-size: 1.35rem; }
+.special-event-announce-sub { margin: 0 0 .5rem; color: var(--muted, #b7a8c4); }
+.special-event-announce-when { display: flex; flex-wrap: wrap; gap: .4rem 1.2rem; font-size: .85rem; margin-bottom: .6rem; }
+.special-event-announce-points { margin: 0 0 .6rem; padding-left: 1.1rem; line-height: 1.55; font-size: .88rem; }
+.special-event-announce-lore { margin: 0; font-style: italic; font-size: .85rem; color: var(--muted, #b7a8c4); }
+
+/* Namensfarbe "Zwielicht" (Pass-Stufe 20) - statisch, ohne Animation. */
+.mc-cosmetic-zwielicht {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--paper-2), var(--paper-2)) padding-box, linear-gradient(90deg, #fde68a 0%, #fde68a 48%, #7c3aed 52%, #1e1238 100%) border-box;
+  border: 1px solid transparent;
+}
+.mc-cosmetic-zwielicht #mcNameBadgeText, .mc-cosmetic-zwielicht .cosmetic-swatch-name, .mc-cosmetic-zwielicht .leaderboard-name-text {
+  background: linear-gradient(90deg, #fde68a 0%, #fef3c7 45%, #a78bfa 55%, #7c3aed 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+
+/* ---------- Phase 10: Weg zur Goettlichkeit (Drachen-Detail) ---------- */
+.dd-divine { display: flex; flex-direction: column; gap: .3rem; margin-top: .6rem; padding: .65rem .75rem; border-radius: 12px; border: 1px solid rgba(253, 230, 138, .45); background: rgba(253, 230, 138, .05); text-align: left; font-size: .8rem; }
+.dd-divine-title { font-weight: 900; font-size: .9rem; }
+.dd-divine-line.is-done { color: #86efac; }
+.dd-divine-bar { height: 6px; }
+.dd-divine-offers { display: flex; flex-wrap: wrap; gap: .35rem; }
+.dd-divine-offers button { flex: 1 1 110px; font-size: .74rem; line-height: 1.25; }
+.dd-divine-aura { padding: .45rem .55rem; border-radius: 10px; border: 1px dashed rgba(196, 181, 253, .55); }
+.dd-divine-awaken { margin-top: .3rem; }
+
+/* Phase 11: kleine Wochenereignisse (laufende Boni) */
+.idle-event-mods { display: flex; flex-direction: column; gap: .3rem; }
+.idle-event-mod { display: flex; flex-direction: column; gap: .1rem; padding: .35rem .5rem; border-radius: 10px; border: 1px solid rgba(74, 222, 128, .45); background: rgba(74, 222, 128, .06); font-size: .7rem; color: var(--app-muted, rgba(245, 240, 255, .75)); }
+.idle-event-mod strong { color: var(--app-ink, #f5f0ff); font-size: .74rem; }
+
+/* Drachen-Detail: mit Eigenschaft, Bindung und "Weg zur Goettlichkeit" wird
+   die Karte auf Handys hoeher als der Bildschirm - vorher war der untere Teil
+   (z.B. der Erweckungs-Knopf) gar nicht erreichbar (Playwright, mobile-small). */
+#idleDragonDetailOverlay .idle-dragon-detail-card { max-height: 92dvh; overflow-y: auto; overscroll-behavior: contain; }
+
+/* Kompakt-HUD auf schmalen Handys: mit dem zusaetzlichen Event-Knopf passen
+   fuenf 44-px-Knoepfe nicht mehr in eine Zeile (360 px: Umbruch kostete eine
+   ganze Zeile Kampfflaeche) - nur dann etwas kleiner (38 px). */
+@media (max-width: 420px) {
+  .bkmp-proto-chud-row:has(.bkmp-event-hud-btn:not([hidden])) { gap: .25rem; }
+  .bkmp-proto-chud-row:has(.bkmp-event-hud-btn:not([hidden])) .bkmp-proto-chud-icon-btn { width: 38px; height: 38px; min-width: 38px; min-height: 38px; }
+}

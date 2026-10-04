@@ -1,0 +1,393 @@
+/* Drachendorf-Ausbau Phase 7-9/11 (04.10.2026): Special-Event-Framework,
+   Zwielicht-Pass, Wahl Lightnix/Darknix, kleine Wochenereignisse.
+   Server-Nachbau: tests/mock/event-engine.js (nutzt dieselben Regeln wie
+   das Spiel: js/systems/bkmp-event-rules.js). Konfiguration + Arten werden
+   direkt aus sql/20261004-07/-08 gelesen. */
+const fs = require('fs');
+const path = require('path');
+const { test, expect, openAndLogin, waitForDragonReady } = require('../helpers/qa-fixtures');
+const { createStore, seedStore } = require('../mock/store');
+const { handleRpcRequest } = require('../mock/rpc-engine');
+const { handleRestRequest } = require('../mock/rest-engine');
+const { makePlayerStateRow } = require('../fixtures/base-player-state');
+const { ZWIELICHT_CONFIG, makeZwielichtEventRow, scheduleFor, EVENT_SPECIES } = require('../fixtures/event-reference');
+const rules = require('../../js/systems/bkmp-event-rules.js');
+
+const UID = 'qa-ev-0000-4000-8000-000000000001';
+const NAME = 'qaevent';
+const HOUR = 3600 * 1000;
+
+/* ---------- reine Server-/Regel-Tests (ohne Browser) ---------- */
+function makeWorld(startIso, opts) {
+  const start = Date.parse(startIso);
+  const store = createStore(start);
+  seedStore(store, {
+    startTimeMs: start,
+    users: [],
+    tables: {
+      idle_player_state: [makePlayerStateRow(UID, NAME, startIso, {
+        display_name: 'QaEvent', dragon_kills: 300000, playtime_seconds: 100 * 3600, boss_kills: 1000, highest_dragon_index: 500,
+        gold: 1e9, crystals: 1e6, essence: 1e6, ...((opts && opts.state) || {})
+      })],
+      dragon_species: EVENT_SPECIES.map(s => ({ ...s })),
+      special_events: [makeZwielichtEventRow((opts && opts.event) || {})],
+      player_dragons: (opts && opts.dragons) || [],
+      idle_player_runes: (opts && opts.runes) || [],
+      guild_members: (opts && opts.guild) || []
+    }
+  });
+  return store;
+}
+function rpc(store, fn, params, uid) {
+  const r = handleRpcRequest(store, uid === undefined ? UID : uid, fn, params || {});
+  if (r.status !== 200) { const e = new Error(r.json && r.json.message); e.rpc = r.json; throw e; }
+  return r.json;
+}
+function rpcErr(store, fn, params) {
+  try { rpc(store, fn, params); return 'ok'; } catch (e) { return e.message; }
+}
+function state(store) { return store.tables.idle_player_state.find(r => r.auth_user_id === UID); }
+/* Spieler kaempft "secs" Sekunden lang mit "kph" Kills/Stunde (gespeicherte Zaehler). */
+function play(store, secs, kph, bossesPerHour) {
+  const st = state(store);
+  st.playtime_seconds += secs;
+  st.dragon_kills += Math.round(kph * secs / 3600);
+  st.boss_kills += Math.round((bossesPerHour || 0) * secs / 3600);
+  store.clock.advance(secs * 1000);
+}
+/* Termine: Montag 19.10.2026 (Winterzeit-Umstellung erst am 25.10.). */
+const MONDAY = '2026-10-19';
+const SCHED = scheduleFor(MONDAY, 3);
+
+test.describe('Zwielicht-Pass – Konfiguration & Regeln', () => {
+  test('Konfiguration aus der SQL: 30 Stufen, Meilensteine, Punkte-Spielraum, bekannte Kennzahlen', () => {
+    const c = ZWIELICHT_CONFIG;
+    expect(c.tiers.map(t => t.tier)).toEqual(Array.from({ length: 30 }, (_, i) => i + 1));
+    expect(c.tiers[29].reward.choice).toBe(true);
+    [5, 10, 15, 20, 25, 28, 29].forEach(t => expect(c.tiers[t - 1].reward.label, 'Meilenstein ' + t).toBeTruthy());
+    expect(c.tiers.find(t => t.tier === 10).reward.unlock).toBe('title_zwielicht');
+    expect(c.tiers.find(t => t.tier === 15).reward.unlock).toBe('badge_zwielicht');
+    expect(c.tiers.find(t => t.tier === 20).reward.unlock).toBe('cosmetic_zwielicht');
+    const daily = 7 * (c.daily.normal_count * c.daily.normal_points + c.daily.hard_points + c.daily.closure.points);
+    const weekly = c.weekly.reduce((a, q) => a + q.stages.reduce((b, s) => b + s[1], 0), 0);
+    expect(daily).toBe(2450);
+    expect(daily + weekly).toBeGreaterThanOrEqual(3400);
+    expect(daily + weekly).toBeLessThanOrEqual(3600);
+    // Wochenquests mit Freischalt-Bedingung haben eine gleichwertige Alternative.
+    c.weekly.filter(q => q.requires).forEach(q => {
+      const alt = c.weekly_alts.find(a => a.id === q.alt);
+      expect(alt, q.id).toBeTruthy();
+      expect(alt.stages.reduce((b, s) => b + s[1], 0)).toBe(q.stages.reduce((b, s) => b + s[1], 0));
+    });
+    const metrics = [...c.daily.normal, ...c.daily.hard, ...c.weekly, ...c.weekly_alts].map(q => q.metric);
+    metrics.forEach(m => expect(rules.BKMP_EVENT_METRIC_META[m], m).toBeTruthy());
+  });
+
+  test('SQL und Regelmodul rechnen dieselben Deckel', () => {
+    const sql = fs.readFileSync(path.join(__dirname, '../../sql/20261004-06-special-events.sql'), 'utf8');
+    const block = sql.slice(sql.indexOf('function public.event_metric_cap'), sql.indexOf('function public.event_client_day_cap'));
+    const re = /when '([a-z_]+)' then (?:floor\(p_elapsed(?: (\*|\/) (\d+))?\)(?: \+ (\d+))?|(\d+))/g;
+    let m, n = 0;
+    while ((m = re.exec(block))) {
+      n++;
+      for (const e of [0, 7, 59, 60, 600]) {
+        let expected;
+        if (m[5] !== undefined) expected = Number(m[5]);
+        else expected = Math.floor(!m[2] ? e : m[2] === '*' ? e * Number(m[3]) : e / Number(m[3])) + Number(m[4] || 0);
+        expect(rules.bkmpEventMetricCap(m[1], e), `${m[1]} @${e}s`).toBe(expected);
+      }
+    }
+    expect(n).toBeGreaterThanOrEqual(10);
+    ['tower', 'feedings', 'world_events'].forEach(k => {
+      const v = Number(sql.match(new RegExp(`when '${k}' then (\\d+)`, 'g')).pop().match(/(\d+)$/)[1]);
+      expect(rules.bkmpEventClientDayCap(k)).toBe(v);
+    });
+  });
+
+  test('Status: aus/ohne Termin unsichtbar, Ankündigung, Montag 00:00 live, Sonntag 23:59 vorbei, Archiv', () => {
+    const ev = makeZwielichtEventRow(SCHED);
+    const at = iso => rules.bkmpEventStatus(ev, Date.parse(iso));
+    expect(rules.bkmpEventStatus(makeZwielichtEventRow(), Date.parse('2026-10-20T10:00:00Z'))).toBe('HIDDEN');
+    expect(rules.bkmpEventStatus({ ...ev, enabled: false }, Date.parse('2026-10-20T10:00:00Z'))).toBe('HIDDEN');
+    expect(at('2026-10-15T21:59:59Z')).toBe('HIDDEN'); // Do 23:59:59 Berlin
+    expect(at('2026-10-15T22:00:00Z')).toBe('COMING_SOON'); // Fr 00:00 Berlin
+    expect(at('2026-10-18T21:59:59Z')).toBe('COMING_SOON');
+    expect(at('2026-10-18T22:00:00Z')).toBe('LIVE'); // Mo 00:00 Berlin (Sommerzeit)
+    expect(at('2026-10-25T22:58:59Z')).toBe('LIVE'); // So 23:58:59 Berlin (Winterzeit)
+    expect(at('2026-10-25T22:59:00Z')).toBe('ENDED'); // So 23:59 Berlin
+    expect(rules.bkmpEventStatus({ ...ev, archived: true }, Date.parse('2026-11-30T10:00:00Z'))).toBe('ARCHIVED');
+    // Berliner Kalendertag + naechste Mitternacht ueber die Zeitumstellung hinweg
+    expect(rules.bkmpEventBerlinDayKey(Date.parse('2026-10-24T22:30:00Z'))).toBe('2026-10-25');
+    expect(new Date(rules.bkmpEventNextBerlinMidnight(Date.parse('2026-10-25T12:00:00Z'))).toISOString()).toBe('2026-10-25T23:00:00.000Z');
+  });
+
+  test('Tagesaufgaben: 4 normale + 1 schwere, gleich bei Reload, neu am nächsten Tag, keine gesperrten Systeme', () => {
+    const store = makeWorld('2026-10-19T08:00:00Z', { event: SCHED });
+    const a = rpc(store, 'event_tick', { p_event_id: 'zwielicht' });
+    expect(a.joined).toBe(true);
+    play(store, 60, 3000);
+    const b = rpc(store, 'event_tick', { p_event_id: 'zwielicht' });
+    expect(b.day_quests).toHaveLength(5);
+    expect(b.day_quests.filter(q => q.kind === 'hard')).toHaveLength(1);
+    // Ohne Gilde/Drachenhafen/Babys/Runen: keine solche Pflichtaufgabe.
+    b.day_quests.forEach(q => expect(['guild', 'expeditions', 'feedings', 'runes']).not.toContain(q.metric));
+    // Kein Neuwuerfeln innerhalb des Tages
+    play(store, 60, 3000);
+    const c = rpc(store, 'event_tick', { p_event_id: 'zwielicht' });
+    expect(c.day_quests.map(q => q.id)).toEqual(b.day_quests.map(q => q.id));
+    // Wochenquests: Alternativen statt gesperrter Systeme
+    expect(c.weekly_quests.map(q => q.id)).toEqual(['w_kills', 'w_bosses', 'w_active', 'w_dungeons', 'w_tower', 'w_world', 'w_hunt', 'w_trials']);
+    // Naechster Berliner Tag -> neue Aufgaben (deterministisch, nicht zufaellig pro Aufruf)
+    const keys = new Set([c.day_key]);
+    const sets = new Set([c.day_quests.map(q => q.id).join()]);
+    for (let d = 0; d < 4; d++) {
+      play(store, 24 * 3600, 0);
+      const t = rpc(store, 'event_tick', { p_event_id: 'zwielicht' });
+      keys.add(t.day_key);
+      sets.add(t.day_quests.map(q => q.id).join());
+    }
+    expect(keys.size).toBe(5);
+    expect(sets.size).toBeGreaterThan(1);
+  });
+
+  test('Fortschritt: nur echte Kampfzeit zählt, Offline-Kills nicht, Deckel pro Minute und Tag', () => {
+    const store = makeWorld('2026-10-19T08:00:00Z', { event: SCHED });
+    rpc(store, 'event_tick', { p_event_id: 'zwielicht' });
+    // Offline-Belohnung: 50.000 Kills ohne Kampfzeit -> zaehlt nicht
+    state(store).dragon_kills += 50000;
+    store.clock.advance(60 * 1000);
+    let t = rpc(store, 'event_tick', { p_event_id: 'zwielicht' });
+    expect(t.cumulative.kills).toBe(0);
+    // 10 Minuten echtes Spiel bei 3.000/h -> 500 Kills
+    play(store, 600, 3000);
+    t = rpc(store, 'event_tick', { p_event_id: 'zwielicht' });
+    expect(t.cumulative.kills).toBe(500);
+    expect(t.cumulative.active).toBe(600);
+    // Unrealistischer Kill-Sprung: Deckel 3 Kills/Sekunde echter Kampfzeit
+    const st = state(store);
+    st.playtime_seconds += 60; st.dragon_kills += 100000; store.clock.advance(60 * 1000);
+    t = rpc(store, 'event_tick', { p_event_id: 'zwielicht' });
+    expect(t.cumulative.kills).toBe(500 + 180);
+    // Vom Spiel gemeldete Zaehler: pro Minute und pro Tag gedeckelt
+    store.clock.advance(60 * 1000);
+    t = rpc(store, 'event_tick', { p_event_id: 'zwielicht', p_client: { tower: 999, world_events: 999, feedings: 3 } });
+    expect(t.client_accepted).toEqual({ tower: 21, feedings: 3, world_events: 1 });
+    for (let i = 0; i < 20; i++) { store.clock.advance(600 * 1000); rpc(store, 'event_tick', { p_event_id: 'zwielicht', p_client: { tower: 999 } }); }
+    t = rpc(store, 'event_tick', { p_event_id: 'zwielicht' });
+    expect(t.cumulative.tower).toBe(130);
+  });
+
+  test('Punkte: Tagesaufgaben + Tagesabschluss genau einmal, Wochenstufen, mehrere Passstufen auf einmal', () => {
+    const store = makeWorld('2026-10-19T08:00:00Z', { event: SCHED });
+    rpc(store, 'event_tick', { p_event_id: 'zwielicht' });
+    const st = state(store);
+    // 3 Stunden Kampf + 10 Dungeons + Turm + Weltereignisse am ersten Tag
+    store.tables.dungeon_progress = [{ auth_user_id: UID, dungeon_type: 'gold', total_keys_spent: 0 }];
+    for (let i = 0; i < 18; i++) {
+      play(store, 600, 3000, 120);
+      store.tables.dungeon_progress[0].total_keys_spent += 1;
+      rpc(store, 'event_tick', { p_event_id: 'zwielicht', p_client: { tower: 5, world_events: 1 } });
+    }
+    const t = rpc(store, 'event_tick', { p_event_id: 'zwielicht' });
+    expect(t.day_quests.every(q => q.done)).toBe(true);
+    expect(t.day_closure_done).toBe(true);
+    const dayPts = 4 * 40 + 90 + 100;
+    const weeklyPts = t.weekly_quests.reduce((a, q) => a + q.stages.slice(0, t.weekly_done[q.id]).reduce((b, s) => b + s[1], 0), 0);
+    expect(t.points).toBe(dayPts + weeklyPts);
+    expect(t.tier).toBe(Math.floor(t.points / 100));
+    expect(t.tier).toBeGreaterThanOrEqual(3);
+    // Weitere Aufrufe am selben Tag: keine doppelten Punkte
+    play(store, 600, 3000);
+    const t2 = rpc(store, 'event_tick', { p_event_id: 'zwielicht' });
+    expect(t2.points - t.points).toBe(t2.weekly_quests.reduce((a, q) => a + q.stages.slice(t.weekly_done[q.id], t2.weekly_done[q.id]).reduce((b, s) => b + s[1], 0), 0));
+    expect(st.playtime_seconds).toBeGreaterThan(0);
+  });
+
+  test('Hardcore-Woche: Montag bis Freitag unmöglich, frühestens Samstag Stufe 30, danach EARNED auch nach Eventende', () => {
+    const store = makeWorld('2026-10-18T22:00:30Z', { event: SCHED });
+    store.tables.dungeon_progress = [{ auth_user_id: UID, dungeon_type: 'gold', total_keys_spent: 0 }];
+    rpc(store, 'event_tick', { p_event_id: 'zwielicht' });
+    const tierAtEndOf = {};
+    for (let day = 0; day < 7; day++) {
+      // 10 Stunden extremes Spiel pro Tag in 10-Minuten-Schritten, alles was geht
+      for (let i = 0; i < 60; i++) {
+        play(store, 600, 3500, 180);
+        store.tables.dungeon_progress[0].total_keys_spent += 1;
+        rpc(store, 'event_tick', { p_event_id: 'zwielicht', p_client: { tower: 30, world_events: 5, feedings: 10 } });
+      }
+      const t = rpc(store, 'event_tick', { p_event_id: 'zwielicht' });
+      tierAtEndOf[day] = t.tier;
+      store.clock.setNow(Date.parse(SCHED.starts_at) + (day + 1) * 24 * HOUR + 30 * 1000);
+    }
+    expect(tierAtEndOf[4], 'Freitag').toBeLessThan(30);
+    expect(tierAtEndOf[5], 'Samstag').toBe(30);
+    const row = store.tables.player_event_progress[0];
+    expect(row.earned).toBe(true);
+    // Nach Sonntag 23:59: keine neuen Punkte, EARNED bleibt
+    store.clock.setNow(Date.parse(SCHED.ends_at) + HOUR);
+    const pts = row.points;
+    play(store, 3600, 3500);
+    const after = rpc(store, 'event_tick', { p_event_id: 'zwielicht' });
+    expect(after.status).toBe('ENDED');
+    expect(after.points).toBe(pts);
+    expect(after.earned).toBe(true);
+  });
+
+  test('Stufenbelohnungen: genau einmal, Futter mit Lagerdeckel, Freischaltungen gespeichert', () => {
+    const store = makeWorld('2026-10-19T08:00:00Z', { event: SCHED, state: { fruit: 1950, obstgarten_level: 0 } });
+    rpc(store, 'event_tick', { p_event_id: 'zwielicht' });
+    store.tables.player_event_progress[0].points = 1050; // Stufe 10
+    const goldBefore = state(store).gold;
+    const r = rpc(store, 'event_claim_tiers', { p_event_id: 'zwielicht' });
+    expect(r.items.map(i => i.tier)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(r.unlocks).toEqual(['title_zwielicht']);
+    const unit = Math.max(6, Math.round(6 * Math.pow(1 + 0.05 * 500, 1.2)));
+    expect(state(store).gold - goldBefore).toBe(Math.round(120 * unit) + Math.round(300 * unit) + Math.round(180 * unit));
+    expect(r.credited.fruit).toBe(50); // Lagerdeckel 2.000
+    const again = rpc(store, 'event_claim_tiers', { p_event_id: 'zwielicht' });
+    expect(again.items).toEqual([]);
+    expect(state(store).gold - goldBefore).toBe(r.credited.gold);
+  });
+
+  test('Wahl: erst ab Stufe 30, genau einer, dauerhaft – auch nach Eventende und bei Wiederholung nie ein zweiter', () => {
+    const store = makeWorld('2026-10-19T08:00:00Z', { event: SCHED });
+    rpc(store, 'event_tick', { p_event_id: 'zwielicht' });
+    expect(rpcErr(store, 'event_choose_reward', { p_event_id: 'zwielicht', p_species_id: 'lightnix' })).toBe('not_earned');
+    const row = store.tables.player_event_progress[0];
+    row.points = 3000; row.earned = true;
+    expect(rpcErr(store, 'event_choose_reward', { p_event_id: 'zwielicht', p_species_id: 'feuerdrache' })).toBe('invalid_choice');
+    store.clock.setNow(Date.parse(SCHED.ends_at) + 2 * 24 * HOUR); // nach dem Event
+    const res = rpc(store, 'event_choose_reward', { p_event_id: 'zwielicht', p_species_id: 'darknix' });
+    expect(res.species_id).toBe('darknix');
+    expect(store.tables.player_dragon_eggs.filter(e => e.auth_user_id === UID).map(e => e.species_id)).toEqual(['darknix']);
+    expect(rpcErr(store, 'event_choose_reward', { p_event_id: 'zwielicht', p_species_id: 'lightnix' })).toBe('already_chosen');
+    // Wiederholung des Events (neue ID, gleiche Belohnungsgruppe): kein zweiter Drache
+    const nextMonday = '2027-03-01';
+    store.tables.special_events.push(makeZwielichtEventRow({ id: 'zwielicht2', ...scheduleFor(nextMonday, 3) }));
+    store.clock.setNow(Date.parse(scheduleFor(nextMonday, 3).starts_at) + HOUR);
+    const t = rpc(store, 'event_tick', { p_event_id: 'zwielicht2' });
+    expect(t.already_claimed_group).toBe(true);
+    store.tables.player_event_progress.find(p => p.event_id === 'zwielicht2').earned = true;
+    expect(rpcErr(store, 'event_choose_reward', { p_event_id: 'zwielicht2', p_species_id: 'lightnix' })).toBe('claim_limit_reached');
+    expect(store.tables.player_dragon_eggs.filter(e => e.auth_user_id === UID)).toHaveLength(1);
+  });
+
+  test('Schutz: Event-Eier nie aus dem Spiel, Einzelstück-Drache nur aus eigenem Ei und höchstens einmal', () => {
+    const store = makeWorld('2026-10-19T08:00:00Z', { event: SCHED });
+    const post = (table, body) => handleRestRequest(store, { method: 'POST', tableName: table, searchParams: new URLSearchParams(), body, headers: {} });
+    expect(post('player_dragon_eggs', { name_key: NAME, auth_user_id: UID, species_id: 'lightnix' }).status).toBe(400);
+    const dragon = { name_key: NAME, auth_user_id: UID, species_id: 'lightnix', stage: 'baby', food_preference: 'fruit' };
+    expect(post('player_dragons', { ...dragon }).json.message).toBe('unique_species_needs_egg');
+    store.tables.player_dragon_eggs = [{ id: 'egg-1', name_key: NAME, auth_user_id: UID, species_id: 'lightnix' }];
+    const ok = post('player_dragons', { ...dragon });
+    expect(ok.status).toBe(201);
+    expect(ok.json[0].origin_event).toBe('zwielicht');
+    expect(post('player_dragons', { ...dragon }).json.message).toBe('unique_species_already_owned');
+    // Normale Arten bleiben unberuehrt
+    store.tables.dragon_species.push({ id: 'qa-normal', rarity: 'standard', stage_count: 4, unique_per_account: false, event_origin: null });
+    expect(post('player_dragon_eggs', { name_key: NAME, auth_user_id: UID, species_id: 'qa-normal' }).status).toBe(201);
+  });
+
+  test('Kleine Wochenereignisse: Bonus nur solange das Event läuft, höchstens 100 %', () => {
+    const sql = fs.readFileSync(path.join(__dirname, '../../sql/20261004-10-small-weekly-events.sql'), 'utf8');
+    const ids = Array.from(sql.matchAll(/\('([a-z]+)', '([^']+)', '[^']*',/g)).map(m => m[1]);
+    expect(ids).toEqual(['brutwoche', 'runenmond', 'bossjagd', 'erntefest', 'expeditionsfieber', 'gildenwoche']);
+    const { eventModifier } = require('../mock/event-engine');
+    const store = makeWorld('2026-11-02T08:00:00Z', {});
+    const base = { name: 'Gildenwoche', config: { kind: 'modifier', modifiers: { guild_project_points_pct: 50 } }, tier_count: 1, points_per_tier: 1 };
+    store.tables.special_events.push({ id: 'gildenwoche', ...base, enabled: false, archived: false, starts_at: null, ends_at: null });
+    expect(eventModifier(store, 'guild_project_points_pct')).toBe(0);
+    Object.assign(store.tables.special_events[1], scheduleFor('2026-11-02', 0));
+    expect(eventModifier(store, 'guild_project_points_pct')).toBe(50);
+    store.tables.special_events.push({ id: 'x2', ...base, ...scheduleFor('2026-11-02', 0), config: { modifiers: { guild_project_points_pct: 80 } } });
+    expect(eventModifier(store, 'guild_project_points_pct')).toBe(100);
+    store.clock.setNow(Date.parse('2026-11-09T12:00:00Z'));
+    expect(eventModifier(store, 'guild_project_points_pct')).toBe(0);
+  });
+});
+
+/* ---------- im Spiel (Browser) ---------- */
+test.describe('Zwielicht-Pass – im Spiel', () => {
+  test.use({ teststand: 'C' });
+
+  function liveSchedule(store) {
+    const now = store.clock.nowMs();
+    return { announce_at: new Date(now - 4 * 24 * HOUR).toISOString(), starts_at: new Date(now - HOUR).toISOString(), ends_at: new Date(now + 5 * 24 * HOUR).toISOString(), enabled: true };
+  }
+  async function openPass(page) {
+    const hud = page.locator('#bkmpProtoChudEventBtn');
+    if (await hud.isVisible().catch(() => false)) await hud.click();
+    else await page.locator('#idleEventPassCard [data-event-open]').first().click();
+    await expect(page.locator('#bkmpEventPassOverlay')).toHaveClass(/visible/);
+  }
+
+  test('Angekündigt: Teaser mit Countdown im Spiel und auf der Website (auch ohne Login)', async ({ page, qaBaseURL, fixtureData, store }) => {
+    const now = store.clock.nowMs();
+    store.tables.special_events = [makeZwielichtEventRow({ announce_at: new Date(now - HOUR).toISOString(), starts_at: new Date(now + 2 * 24 * HOUR).toISOString(), ends_at: new Date(now + 9 * 24 * HOUR).toISOString(), enabled: true })];
+    store.tables.dragon_species = EVENT_SPECIES.map(s => ({ ...s }));
+    await page.goto(qaBaseURL + '/');
+    const announce = page.locator('[data-testid="event-announcement"]');
+    await expect(announce).toHaveCount(1, { timeout: 15000 });
+    await expect(announce).toContainText('Das Erwachen des Zwielichts');
+    await expect(announce).toContainText('Lightnix');
+    await expect(announce).toContainText('Beginnt in');
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    await openPass(page);
+    await expect(page.locator('[data-testid="event-teaser"]')).toContainText('DAS ZWIELICHT NAHT');
+    await expect(page.locator('[data-testid="event-teaser"] [data-event-countdown]')).toContainText(/T\./);
+    expect(store.tables.player_event_progress || []).toEqual([]);
+  });
+
+  test('Live: Pass mit Stufe, 5 Tagesaufgaben + Abschluss, 30 Stufen (Stufe 30 Licht/Dunkel), Belohnungen abholen', async ({ page, qaBaseURL, fixtureData, store }) => {
+    store.tables.special_events = [makeZwielichtEventRow(liveSchedule(store))];
+    store.tables.dragon_species = EVENT_SPECIES.map(s => ({ ...s }));
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    await page.evaluate(() => bkmpIdleStopLoop());
+    await expect.poll(() => (store.tables.player_event_progress || []).length, { timeout: 15000 }).toBe(1);
+    await openPass(page);
+    await expect(page.locator('[data-testid="event-tier"]')).toHaveText('Stufe 0 / 30');
+    await page.evaluate(() => bkmpEventTick(true));
+    await expect(page.locator('[data-testid="event-daily-quest"]')).toHaveCount(5);
+    await expect(page.locator('[data-testid="event-daily-closure"]')).toContainText('4 von 5');
+    await page.locator('#bkmpEventPassTabs [data-tab-id="week"]').click();
+    await expect(page.locator('[data-testid="event-weekly-quest"]')).toHaveCount(8);
+    await page.locator('#bkmpEventPassTabs [data-tab-id="rewards"]').click();
+    await expect(page.locator('[data-testid="event-tier-30"]')).toContainText('DAS ZWIELICHT WARTET');
+    const bg = await page.locator('[data-testid="event-tier-30"]').evaluate(el => getComputedStyle(el).backgroundImage);
+    expect(bg).toContain('linear-gradient');
+    // Stufe 7 erreicht -> Belohnungen abholen, lokaler Stand = Serverstand
+    store.tables.player_event_progress[0].points = 750;
+    await page.evaluate(() => bkmpEventTick(true));
+    await page.locator('[data-testid="event-claim-btn"]').click();
+    await expect(page.locator('[data-testid="event-claim-btn"]')).toHaveCount(0, { timeout: 10000 });
+    const server = store.tables.idle_player_state.find(r => r.auth_user_id === fixtureData.authUserId);
+    expect(await page.evaluate(() => bkmpIdleState.crystals)).toBe(Number(server.crystals));
+    expect(store.tables.player_event_progress[0].tier_claimed).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(await page.evaluate(() => bkmpIdlePlayerRunes.length)).toBeGreaterThan(0);
+  });
+
+  test('Stufe 30: Wahl mit deutlicher Warnung, Ei im Lager, danach nur kompakter Status statt Werbung', async ({ page, qaBaseURL, fixtureData, store }) => {
+    store.tables.special_events = [makeZwielichtEventRow(liveSchedule(store))];
+    store.tables.dragon_species = EVENT_SPECIES.map(s => ({ ...s }));
+    await openAndLogin(page, qaBaseURL, fixtureData);
+    await waitForDragonReady(page);
+    await page.evaluate(() => bkmpIdleStopLoop());
+    await expect.poll(() => (store.tables.player_event_progress || []).length, { timeout: 15000 }).toBe(1);
+    Object.assign(store.tables.player_event_progress[0], { points: 3000, earned: true });
+    await page.evaluate(() => bkmpEventTick(true));
+    await openPass(page);
+    await expect(page.locator('[data-testid="event-choice"]')).toContainText('DAS ZWIELICHT ANTWORTET');
+    await page.locator('[data-testid="event-choose-lightnix"]').click();
+    await expect(page.locator('#bkmpConfirmOverlay')).toHaveClass(/visible/);
+    await expect(page.locator('#bkmpConfirmTitle')).toHaveText('⚠️ Diese Wahl ist dauerhaft.');
+    await expect(page.locator('#bkmpConfirmBody')).toContainText('Du kannst während dieses Events nur einen der beiden Drachen erhalten.');
+    await expect(page.locator('#bkmpConfirmBody')).toContainText('Möchtest du wirklich Lightnix wählen?');
+    await page.locator('#bkmpConfirmOkBtn').click();
+    await expect(page.locator('[data-testid="event-chosen"]')).toContainText('Lightnix erhalten ✅', { timeout: 10000 });
+    expect(store.tables.player_dragon_eggs.filter(e => e.species_id === 'lightnix')).toHaveLength(1);
+    expect(await page.evaluate(() => bkmpPlayerDragonEggs.some(e => e.species_id === 'lightnix'))).toBe(true);
+    expect(await page.locator('[data-testid="event-choose-darknix"]').count()).toBe(0);
+  });
+});

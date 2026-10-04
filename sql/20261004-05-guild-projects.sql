@@ -150,6 +150,8 @@ begin
     'target_points', v_proj.target_points, 'progress_points', v_proj.progress_points,
     'completed', v_proj.completed_at is not null, 'my_points', v_mine, 'claimed', v_claimed, 'badges', v_badges,
     'gold_unit', (select public.village_gold_unit(ips.highest_dragon_index) from public.idle_player_state ips where ips.auth_user_id = v_uid),
+    -- Kleine Wochenereignisse (Phase 11, "Gildenwoche"): Bonus in %, macht jeden Punkt guenstiger.
+    'point_mod_pct', public.bkmp_event_modifier('guild_project_points_pct'),
     'top', coalesce((select jsonb_agg(jsonb_build_object('name', c.display_name, 'points', c.points) order by c.points desc)
                        from (select * from public.guild_project_contributions c2 where c2.guild_id = v_guild and c2.week_start = v_proj.week_start order by c2.points desc limit 5) c), '[]'::jsonb));
 end;
@@ -188,6 +190,8 @@ begin
   v_per_point := case p_kind
     when 'gold' then 20 * public.village_gold_unit(v_state.highest_dragon_index)
     when 'wood' then 100 when 'stone' then 100 else 5 end;
+  -- Gildenwoche (Phase 11): Punkte werden guenstiger, solange das Event laeuft.
+  v_per_point := greatest(1, round(v_per_point / (1 + public.bkmp_event_modifier('guild_project_points_pct') / 100)))::bigint;
   v_points := floor(p_amount / v_per_point)::integer;
   if v_points < 1 then raise exception 'amount_too_small'; end if;
   v_room := v_proj.target_points - v_proj.progress_points;

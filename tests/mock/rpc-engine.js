@@ -16,6 +16,8 @@
    no-op fallback so they don't crash login/state-merge flows. */
 
 const { table: getTable } = require('./store');
+/* Drachendorf-Ausbau Phase 7-11: Events + Goettliche Erweckung (event-engine.js). */
+const { EVENT_HANDLERS, eventModifier } = require('./event-engine');
 
 const DUNGEON_TYPES = ['gold', 'exp', 'egg', 'meat', 'fruit', 'gem', 'rune'];
 const DIFFICULTY_LADDER = ['leicht', 'mittel', 'schwer', 'albtraum'];
@@ -485,6 +487,7 @@ const RPC_HANDLERS = {
       target_points: proj.target_points, progress_points: proj.progress_points, completed: !!proj.completed_at,
       my_points: mine ? mine.points : 0, claimed, badges: Number(guild.projects_completed || 0),
       gold_unit: villageGoldUnit(st ? st.highest_dragon_index : 0),
+      point_mod_pct: eventModifier(store, 'guild_project_points_pct'),
       top: contribs.slice().sort((a, b) => b.points - a.points).slice(0, 5).map(c => ({ name: c.display_name, points: c.points }))
     };
   },
@@ -500,7 +503,8 @@ const RPC_HANDLERS = {
     const def = getTable(store, 'guild_project_defs').find(d => d.id === proj.def_id);
     if (!def.resource_kinds.includes(kind)) throw rpcError('kind_not_needed');
     const state = villagePlayerRow(store, uid);
-    const perPoint = kind === 'gold' ? 20 * villageGoldUnit(state.highest_dragon_index) : (kind === 'wood' || kind === 'stone') ? 100 : 5;
+    const perPoint0 = kind === 'gold' ? 20 * villageGoldUnit(state.highest_dragon_index) : (kind === 'wood' || kind === 'stone') ? 100 : 5;
+    const perPoint = Math.max(1, Math.round(perPoint0 / (1 + eventModifier(store, 'guild_project_points_pct') / 100)));
     let points = Math.floor(amount / perPoint);
     if (points < 1) throw rpcError('amount_too_small');
     points = Math.min(points, proj.target_points - proj.progress_points);
@@ -609,14 +613,16 @@ const RPC_HANDLERS = {
     getTable(store, 'dragon_species').forEach(s => { speciesById[s.id] = s; });
     const team = dragons.map(d => {
       const sp = speciesById[d.species_id] || {};
-      return { species_id: d.species_id, rarity: sp.rarity, affinities: sp.affinities || [], trait: d.trait || null, bond_level: expeditionRules.bkmpDragonBondLevel(d.bond_xp) };
+      const aura = d.stage === 'divine' && sp.special_passive && sp.special_passive.divine_aura ? (sp.special_passive.divine_aura.expedition || null) : null;
+      return { species_id: d.species_id, rarity: sp.rarity, affinities: sp.affinities || [], trait: d.trait || null, bond_level: expeditionRules.bkmpDragonBondLevel(d.bond_xp), aura };
     });
     const ev = expeditionRules.bkmpExpeditionTeamEval(mission, team);
     if (ev.unmet.length) throw rpcError('requirements_not_met');
     const id = crypto.randomUUID();
     const out = expeditionRules.bkmpExpeditionOutcome({
       mission, region, team, events: getTable(store, 'expedition_events'),
-      goldUnit: villageGoldUnit(state.highest_dragon_index), seedInt: villageSeedInt, id
+      goldUnit: villageGoldUnit(state.highest_dragon_index), seedInt: villageSeedInt, id,
+      eventModPct: eventModifier(store, 'expedition_reward_pct')
     });
     const quality = out.quality, score = out.score, events = out.events, r = out.rewards;
     const nowMs = store.clock.nowMs();
@@ -2041,6 +2047,8 @@ const RPC_HANDLERS = {
     return { boss_hp: inst.boss_hp, status: inst.status, own_damage_dealt: p.damage_dealt, own_crits_landed: p.crits_landed, own_clicks_landed: p.clicks_landed };
   }
 };
+
+Object.assign(RPC_HANDLERS, EVENT_HANDLERS);
 
 function handleRpcRequest(store, uid, fnName, params) {
   const handler = RPC_HANDLERS[fnName];

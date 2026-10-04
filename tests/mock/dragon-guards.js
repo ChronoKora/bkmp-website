@@ -6,7 +6,7 @@
 const { table: getTable } = require('./store');
 
 const TRUSTED_FIELDS = ['trait', 'bond_xp', 'companion_seconds', 'companion_kills', 'companion_boss_kills',
-  'expeditions_completed', 'divine_offering_gold', 'divine_multiplier', 'awakened_at', 'origin_event'];
+  'expeditions_completed', 'divine_offering_gold', 'divine_offering_units', 'divine_multiplier', 'awakened_at', 'origin_event'];
 
 function dragonOnRunningExpedition(store, dragonId) {
   return getTable(store, 'player_expeditions').some(e => e.status === 'running' && (e.dragon_ids || []).includes(dragonId));
@@ -36,4 +36,24 @@ function guardPlayerDragonInsert(incoming) {
   return row;
 }
 
-module.exports = { guardPlayerDragonPatch, guardPlayerDragonDelete, guardPlayerDragonInsert, dragonOnRunningExpedition, TRUSTED_FIELDS };
+/* Nachbau von player_dragon_eggs_event_guard + player_dragons_unique_guard
+   (sql/20261004-08-lightnix-darknix.sql): Event-/Einzelstueck-Eier nie aus
+   dem Spiel, Einzelstueck-Drachen nur aus eigenem Ei und hoechstens einer. */
+function guardError(msg) { const err = new Error(msg); err.guardError = true; return err; }
+function speciesOf(store, id) { return getTable(store, 'dragon_species').find(s => s.id === id) || null; }
+function guardEventEggInsert(store, incoming) {
+  const sp = speciesOf(store, incoming.species_id);
+  if (sp && (sp.unique_per_account || sp.event_origin)) throw guardError('event_species_egg_not_allowed');
+}
+function guardUniqueDragonInsert(store, row) {
+  const sp = speciesOf(store, row.species_id);
+  if (!sp || !sp.unique_per_account) return row;
+  const dragons = getTable(store, 'player_dragons');
+  if (dragons.some(d => d.auth_user_id === row.auth_user_id && d.species_id === row.species_id)) throw guardError('unique_species_already_owned');
+  if (!getTable(store, 'player_dragon_eggs').some(e => e.auth_user_id === row.auth_user_id && e.species_id === row.species_id)) {
+    throw guardError('unique_species_needs_egg');
+  }
+  return { ...row, origin_event: sp.event_origin || null };
+}
+
+module.exports = { guardPlayerDragonPatch, guardPlayerDragonDelete, guardPlayerDragonInsert, guardEventEggInsert, guardUniqueDragonInsert, dragonOnRunningExpedition, TRUSTED_FIELDS };

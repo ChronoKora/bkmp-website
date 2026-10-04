@@ -1995,7 +1995,9 @@ function bkmpIdleMaybeDropRune(source) {
    bleibt aber gleich - fruehe Aufwertungen bleiben also sicher, erst nahe
    +15 wird es wirklich riskant. */
 function bkmpIdleRuneUpgradeFailChance(rune) {
-  return Math.min(0.30, Number(rune.upgrade_level || 0) * 0.02);
+  /* Runenmond (Phase 11): Fehlschlagchance waehrend des Events reduziert. */
+  const eventPct = Math.min(100, (typeof bkmpEventModifierPct === 'function' ? bkmpEventModifierPct('rune_fail_reduction_pct') : 0));
+  return Math.min(0.30, Number(rune.upgrade_level || 0) * 0.02) * (1 - eventPct / 100);
 }
 function bkmpIdleRuneUpgradeCost(rune) {
   const rarity = window.BKMP_RUNE_RARITIES.find(r => r.id === rune.rarity);

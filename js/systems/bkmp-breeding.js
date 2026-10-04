@@ -308,7 +308,10 @@ function bkmpDragonEffectiveBroodSeconds(species) {
   // Skilltree/Prestige, gleicher gedeckelter Pool.
   const guildPct = typeof bkmpGuildTechBonus === 'function' ? bkmpGuildTechBonus('broodSpeedPct') : 0;
   const reductionPct = Math.min(40, bkmpDragonSkillBonus('brood_time_pct') + bkmpDragonPrestigeBonus('brood_time_pct') + guildPct);
-  return species.brood_seconds * (1 - reductionPct / 100);
+  /* Kleine Wochenereignisse (Phase 11, "Brutwoche"): eigener Faktor
+     ausserhalb des 40-%-Deckels, selbst hoechstens 50 %. */
+  const eventPct = Math.min(50, (typeof bkmpEventModifierPct === 'function' ? bkmpEventModifierPct('brood_speed_pct') : 0));
+  return species.brood_seconds * (1 - reductionPct / 100) * (1 - eventPct / 100);
 }
 function bkmpDragonNestReady(nest) {
   if (!nest || !nest.egg_id || !nest.started_at) return false;
@@ -465,7 +468,9 @@ async function bkmpDragonFeed(dragonId, amount) {
   const feedSaveChancePct = Math.min(75, bkmpDragonPrestigeBonus('feed_save_chance_pct'));
   const feedSaved = feedSaveChancePct > 0 && Math.random() * 100 < feedSaveChancePct;
   if (!feedSaved) bkmpIdleState[dragon.food_preference] -= feedAmount;
-  dragon.growth_points = Math.min(species.growth_points_required, dragon.growth_points + feedAmount);
+  /* Brutwoche (Phase 11): mehr Wachstum pro Futter, Verbrauch unveraendert. */
+  const growthGain = Math.round(feedAmount * (1 + Math.min(100, (typeof bkmpEventModifierPct === 'function' ? bkmpEventModifierPct('dragon_growth_pct') : 0)) / 100));
+  dragon.growth_points = Math.min(species.growth_points_required, dragon.growth_points + growthGain);
   if (typeof bkmpChronicleAddProgress === 'function') bkmpChronicleAddProgress('dragon_feeds', 1);
   bkmpIdleRenderHud();
   bkmpIdleQueueSync();
@@ -534,7 +539,7 @@ function bkmpDragonActiveCompanions() {
   const maxSlots = bkmpDragonMaxCompanionSlots();
   const strength = d => Number(d.stat_attack || 0) + Number(d.stat_defense || 0) + Number(d.stat_hp || 0) / 10;
   return bkmpPlayerDragons
-    .filter(d => d.is_companion && d.stage === 'adult')
+    .filter(d => d.is_companion && bkmpDragonIsGrown(d))
     .slice()
     .sort((a, b) => strength(b) - strength(a))
     .slice(0, maxSlots);
@@ -552,8 +557,8 @@ async function bkmpDragonSetCompanion(dragonId) {
   const dragon = bkmpPlayerDragons.find(d => d.id === dragonId);
   if (!dragon || dragon.is_companion) return;
   if (bkmpDragonIsAway(dragonId)) { bkmpDragonAwayToast(); return; }
-  if (dragon.stage === 'adult') {
-    const equippedAdults = bkmpPlayerDragons.filter(d => d.is_companion && d.stage === 'adult').length;
+  if (bkmpDragonIsGrown(dragon)) {
+    const equippedAdults = bkmpPlayerDragons.filter(d => d.is_companion && bkmpDragonIsGrown(d)).length;
     const maxSlots = bkmpDragonMaxCompanionSlots();
     if (equippedAdults >= maxSlots) {
       if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`🐲 Maximal ${maxSlots} Begleiter gleichzeitig - lege zuerst einen ab (Prestige-Baum: "Weitere Gefährten" schaltet mehr Plätze frei).`, 3800);
@@ -700,9 +705,17 @@ async function bkmpDragonConfirmAndRelease(dragonId) {
   const dragon = bkmpPlayerDragons.find(d => d.id === dragonId);
   const species = dragon ? bkmpDragonSpeciesById(dragon.species_id) : null;
   if (!dragon || !species) return;
+  /* Drachendorf-Ausbau Phase 9: Einzelstueck-Eventdrachen (Lightnix/Darknix,
+     datengetrieben ueber unique_per_account) gibt es nur einmal pro Konto -
+     sie lassen sich nicht freilassen, damit niemand sie versehentlich fuer
+     immer verliert. */
+  if (species.unique_per_account) {
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`✨ ${species.name} ist einzigartig und kann nicht freigelassen werden.`, 3600);
+    return;
+  }
   const rarity = bkmpDragonRarityMeta(species.rarity);
   const stats = bkmpDragonMainStatLine(dragon) || '';
-  const stageLabel = dragon.stage === 'adult' ? 'Erwachsen' : dragon.stage === 'teen' ? 'Jugendlich' : 'Baby';
+  const stageLabel = bkmpDragonDexStageLabel(species, dragon.stage);
   const body = `${species.name} (${rarity.name}, ${stageLabel}) ${stats}\n\nDiese Aktion kann nicht rückgängig gemacht werden.`;
   const confirmed = typeof bkmpConfirmDialog === 'function'
     ? await bkmpConfirmDialog('🏞️ Drachen freilassen?', body, 'Ja, freilassen', 'Abbrechen')
@@ -769,11 +782,23 @@ const BKMP_DRAGON_ASCEND_BONUS_PCT = 10;
 const BKMP_DRAGON_ASCEND_COST_GOLD = 150000;
 function bkmpDragonAscendedMainStat(dragon, rawValue) {
   const level = Number(dragon.ascension_level || 0);
-  return Math.round(Number(rawValue || 0) * (1 + level * BKMP_DRAGON_ASCEND_BONUS_PCT / 100) * 10) / 10;
+  return Math.round(Number(rawValue || 0) * (1 + level * BKMP_DRAGON_ASCEND_BONUS_PCT / 100) * bkmpDragonDivineMult(dragon) * 10) / 10;
+}
+/* Phase 10: Staerke-Multiplikator der fuenften Form. Wird vom Server bei der
+   Erweckung EINMAL in player_dragons.divine_multiplier gespeichert (geschuetzte
+   Spalte) - hier nur gelesen und auf 1..2 begrenzt; ein Reload oder mehrere
+   Tabs koennen ihn dadurch nie doppelt anwenden. */
+function bkmpDragonDivineMult(dragon) {
+  if (!dragon || dragon.stage !== 'divine') return 1;
+  return Math.max(1, Math.min(2, Number(dragon.divine_multiplier) || 1));
+}
+/* Zusatzwerte steigen nur um die Haelfte des Hauptwert-Bonus (1,25 -> 1,125). */
+function bkmpDragonDivineSubMult(dragon) {
+  return 1 + (bkmpDragonDivineMult(dragon) - 1) / 2;
 }
 function bkmpDragonCanAscend(dragon) {
   const species = bkmpDragonSpeciesById(dragon.species_id);
-  return Boolean(species) && dragon.stage === 'adult' && Number(dragon.ascension_level || 0) < BKMP_DRAGON_ASCEND_MAX_LEVEL;
+  return Boolean(species) && !species.unique_per_account && dragon.stage === 'adult' && Number(dragon.ascension_level || 0) < BKMP_DRAGON_ASCEND_MAX_LEVEL;
 }
 function bkmpDragonFindAscendFodder(dragon) {
   return bkmpPlayerDragons.find(d => d.id !== dragon.id && d.species_id === dragon.species_id && d.stage === 'adult' && !d.is_favorite && !d.is_companion && !bkmpDragonIsAway(d.id));
@@ -830,7 +855,9 @@ function bkmpDragonResourceRatePerHour(kind, level) {
      (siehe bkmpIdleBuildingPrestigeBonusPct weiter unten), deshalb hier
      mit-nachgezogen statt nur bei den neuen Gebaeuden. */
   const prestigeBonusPct = typeof bkmpIdleBuildingPrestigeBonusPct === 'function' ? bkmpIdleBuildingPrestigeBonusPct() : 0;
-  return BKMP_DRAGON_BASE_RESOURCE_PER_HOUR * (1 + Number(level || 0) * 0.5) * (1 + (companionBonusPct + skillBonusPct + prestigeBonusPct) / 100);
+  /* Erntefest (Phase 11): eigener Faktor auf Fruechte/Fleisch. */
+  const harvestPct = Math.min(100, (typeof bkmpEventModifierPct === 'function' ? bkmpEventModifierPct('harvest_pct') : 0));
+  return BKMP_DRAGON_BASE_RESOURCE_PER_HOUR * (1 + Number(level || 0) * 0.5) * (1 + (companionBonusPct + skillBonusPct + prestigeBonusPct) / 100) * (1 + harvestPct / 100);
 }
 function bkmpDragonResourceCap(level) {
   return BKMP_DRAGON_RESOURCE_CAP_BASE + Number(level || 0) * 500;
@@ -1063,7 +1090,7 @@ function bkmpDragonOpenDetail(dragonId) {
   if (!dragon || !species || !overlay) return;
   const rarity = bkmpDragonRarityMeta(species.rarity);
   const isTeen = dragon.stage === 'teen';
-  const stageLabel = dragon.stage === 'baby' ? 'Baby' : (isTeen ? 'Jugendlich' : 'Erwachsen');
+  const stageLabel = dragon.stage === 'baby' ? 'Baby' : (isTeen ? 'Jugendlich' : (dragon.stage === 'divine' ? (species.final_stage_label || 'Göttlich') : 'Erwachsen'));
   const substatsHtml = (dragon.substats || []).map(s => `<div>${bkmpDragonSubstatLabel(s.stat)} +${s.value}${bkmpDragonSubstatSuffix(s.stat)}</div>`).join('') || '<div class="idle-skin-desc">–</div>';
   document.getElementById('idleDragonDetailImg').src = bkmpDragonStageImage(species, dragon.stage);
   document.getElementById('idleDragonDetailName').textContent = `${species.name} (${stageLabel})`;
@@ -1071,19 +1098,21 @@ function bkmpDragonOpenDetail(dragonId) {
   document.getElementById('idleDragonDetailRarity').style.color = rarity.color;
   document.getElementById('idleDragonDetailFood').textContent = dragon.food_preference === 'fruit' ? '🍎 Früchte' : '🥩 Fleisch';
   document.getElementById('idleDragonDetailHatched').textContent = dragon.hatched_at ? new Date(dragon.hatched_at).toLocaleDateString('de-DE') : '–';
-  document.getElementById('idleDragonDetailStats').innerHTML = dragon.stage === 'adult'
-    ? `<div>${bkmpDragonMainStatLine(dragon) || '–'}</div>${substatsHtml}`
+  document.getElementById('idleDragonDetailStats').innerHTML = bkmpDragonIsGrown(dragon)
+    ? `<div>${bkmpDragonMainStatLine(dragon) || '–'}</div>${substatsHtml}${dragon.stage === 'divine' ? `<div class="dd-muted">✨ Göttlich: Hauptwerte ×${bkmpDragonDivineMult(dragon)}, Zusatzwerte ×${bkmpDragonDivineSubMult(dragon)}</div>` : ''}`
     : '<div class="idle-skin-desc">Werte werden erst als erwachsener Drache enthüllt.</div>';
-  const companionRankIdx = dragon.is_companion && dragon.stage === 'adult' ? bkmpDragonActiveCompanions().findIndex(c => c.id === dragon.id) : -1;
+  const companionRankIdx = dragon.is_companion && bkmpDragonIsGrown(dragon) ? bkmpDragonActiveCompanions().findIndex(c => c.id === dragon.id) : -1;
   document.getElementById('idleDragonDetailCompanion').textContent = !dragon.is_companion
     ? ''
     : companionRankIdx >= 0
       ? `✅ Aktiver Begleiter - Rang ${companionRankIdx + 1} (${Math.round((BKMP_DRAGON_COMPANION_SLOT_WEIGHTS[companionRankIdx] || 0) * 100)}% Wirkung)`
-      : dragon.stage === 'adult'
+      : bkmpDragonIsGrown(dragon)
         ? '⚠️ Als Begleiter markiert, aber Platzlimit erreicht - trägt aktuell nicht bei'
         : '✅ Wächst gerade als Begleiter heran';
   const extraEl = document.getElementById('idleDragonDetailTraits');
   if (extraEl) extraEl.innerHTML = typeof bkmpDragonDetailExtraHtml === 'function' ? bkmpDragonDetailExtraHtml(dragon, species) : '';
+  /* Phase 10: "Weg zur Goettlichkeit" fuer Arten mit fuenfter Form. */
+  if (extraEl && typeof bkmpDivineDetailMount === 'function') bkmpDivineDetailMount(dragon, species, extraEl);
   overlay.classList.add('visible');
   document.body.classList.add('modal-open');
   const closeBtn = document.getElementById('idleDragonDetailCloseBtn');
@@ -1237,10 +1266,21 @@ function bkmpIdleDragonCompanionEffectTotals() {
     if (dragon.stat_attack) totals.attack_flat = (totals.attack_flat || 0) + bkmpDragonAscendedMainStat(dragon, dragon.stat_attack) * (1 + attackBoostPct / 100) * weight;
     if (dragon.stat_defense) totals.defense_flat = (totals.defense_flat || 0) + bkmpDragonAscendedMainStat(dragon, dragon.stat_defense) * (1 + defenseBoostPct / 100) * weight;
     if (dragon.stat_hp) totals.hp_flat = (totals.hp_flat || 0) + bkmpDragonAscendedMainStat(dragon, dragon.stat_hp) * (1 + hpBoostPct / 100) * weight;
+    const divineSub = bkmpDragonDivineSubMult(dragon);
     (dragon.substats || []).forEach(s => {
       if (['fruit_bonus_pct', 'meat_bonus_pct', 'dragon_xp_bonus_pct'].includes(s.stat)) return;
-      totals[s.stat] = (totals[s.stat] || 0) + Number(s.value || 0) * (1 + substatBoostPct / 100) * weight;
+      totals[s.stat] = (totals[s.stat] || 0) + Number(s.value || 0) * (1 + substatBoostPct / 100) * weight * divineSub;
     });
+  });
+  /* Phase 10: goettliche Aura (dragon_species.special_passive.divine_aura.effects)
+     wirkt voll, solange der goettliche Drache ein aktiver Begleiter ist -
+     unabhaengig vom Platz, die bestehenden Deckel des Sammel-Potts greifen. */
+  companions.forEach(dragon => {
+    if (dragon.stage !== 'divine') return;
+    const sp = bkmpDragonSpeciesById(dragon.species_id);
+    const aura = sp && sp.special_passive && sp.special_passive.divine_aura;
+    if (!aura || !aura.effects) return;
+    Object.keys(aura.effects).forEach(k => { totals[k] = (totals[k] || 0) + Number(aura.effects[k] || 0); });
   });
   return totals;
 }
@@ -1571,7 +1611,7 @@ function bkmpIdleRenderDragonsPanel() {
       }).join('')
     : '';
 
-  let grown = bkmpPlayerDragons.filter(d => d.stage === 'teen' || d.stage === 'adult');
+  let grown = bkmpPlayerDragons.filter(d => d.stage === 'teen' || bkmpDragonIsGrown(d));
   const teenCompanion = bkmpPlayerDragons.find(d => d.is_companion && d.stage === 'teen');
   const maxCompanionSlots = bkmpDragonMaxCompanionSlots();
   const activeCompanions = bkmpDragonActiveCompanions();
@@ -1635,7 +1675,7 @@ function bkmpIdleRenderDragonsPanel() {
                 ? `<button type="button" class="btn-nein idle-skin-action idle-dragon-uncompanion-btn" data-dragon-id="${d.id}">Ablegen</button>`
                 : `<button type="button" class="btn-ja idle-skin-action idle-dragon-companion-btn" data-dragon-id="${d.id}" ${!isTeen ? `title="Belegt einen von ${maxCompanionSlots} Kampf-Plätzen"` : ''}>Als Begleiter</button>`}
               <button type="button" class="idle-dragon-fav-btn" data-dragon-id="${d.id}" title="Favorit">${d.is_favorite ? '★' : '☆'}</button>
-              <button type="button" class="idle-dragon-release-btn" data-dragon-id="${d.id}" title="Freilassen">🗑️</button>
+              ${species.unique_per_account ? '' : `<button type="button" class="idle-dragon-release-btn" data-dragon-id="${d.id}" title="Freilassen">🗑️</button>`}
             </div>
           </div>`;
       }).join('')}</div>`

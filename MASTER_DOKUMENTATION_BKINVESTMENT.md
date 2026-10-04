@@ -27,7 +27,7 @@
 | Bereich | Anzahl |
 |---|---|
 | Website-Hauptbereiche (Tabs) | 10 |
-| Idle-Dorf-Tabs | 16 |
+| Idle-Dorf-Tabs | 17 (neu: Dorfentwicklung, Abschnitt 21) |
 | Admin-Panel-Seiten | 26 |
 | Feste Overlays/Fenster in `index.html` | 41, dazu dynamisch erzeugte Fenster |
 | Erfolge | 431, dazu 1 Streamer-Erfolg pro eingetragenem Creator |
@@ -36,7 +36,7 @@
 | Website-Namensrahmen | 55 |
 | Idle-Kosmetiken (Namensfarben) | 28 |
 | Kampf-Drachen | 12 [live] |
-| Zucht-Drachenarten | 25 [live] |
+| Zucht-Drachenarten | 25 [live], dazu 20 normale + 2 Event-Arten vorbereitet (Abschnitt 21.1) |
 | Dorf-Skins | 18 [live], davon 1 inaktiv |
 | Plüschtiere | 26 [live] |
 | Skilltree-Knoten | 50 [live], davon 1 inaktiv |
@@ -76,6 +76,7 @@
 - **18.** Tests
 - **19.** Unbenutzter, alter oder unfertiger Code
 - **20.** Implementiert vs. nur geplant
+- **21.** Drachendorf-Ausbau (04.10.2026): Navigation, Dorfentwicklung, Expeditionen, Eigenschaften/Bindung, Dorfpfad, Gildenprojekte, Event-Framework, Zwielicht-Pass, Lightnix/Darknix, Göttliche Erweckung, kleine Wochenereignisse
 - **A.** Systemübersicht (System → Unterfunktionen → wichtigste Abhängigkeiten)
 - **B.** Vollständige Feature-Liste (Checkliste)
 - **C.** Vergessene oder versteckte Systeme
@@ -1979,21 +1980,17 @@ Alles hier ist im Code oder in der Datenbank **vorhanden**, aber ungenutzt, wirk
 
 ## 20.1 Bereits implementiert (Auswahl der letzten Ausbaustufen)
 
+- **Drachendorf-Ausbau** (Abschnitt 21, Branch `feature/drachendorf-ausbau`, Datenbank-Dateien noch nicht ausgeführt)
 - **Chronik** (Aufträge, Kalender, Bestiarium, Weltereignisse, Ziele)
 - **Leistung:** Hover-/Performance-Fixes Teil 1 + 2
 - **Spieler:** mehrere Begleiter, Gilden-Tech v3, Gilden-Arena, Anti-Cheat-Trigger, Prestige-Baum v2 mit Paragon und Aufstieg, Kartenverkauf-Auszahlungen, BK-Mod-Anbindung inkl. PartnerShops, Shardhändler, SW-Besucherstatistik, Umsatz-Dashboard
 
 ## 20.2 Nur geplant oder notiert, nicht umgesetzt
 
-**Aus `IDLE_DORF_WEITERENTWICKLUNG.md` (Roadmap 03.10.):**
-- Drachen-Expeditionen
-- Element-Affinität
-- Drachen-Charakterzüge
-- Saison-Pass „Drachensaison“
-- Wochenend-Events
+**Aus `IDLE_DORF_WEITERENTWICKLUNG.md` (Roadmap 03.10.):** *(Expeditionen, Element-Affinität, Charakterzüge, Event-Pass und kleine Wochenereignisse sind seit dem Drachendorf-Ausbau umgesetzt, siehe Abschnitt 21)*
+- Saison-Pass „Drachensaison“ (größere allgemeine Saison – bewusst erst später)
 - Gilden-Chronik
 - Mana wiederbeleben oder entfernen
-- Händler-Tagesangebote
 - Chronik/Bestiarium im Website-Profil
 - Plüschtier-Chance in der Wochentruhe
 - Chronik-Fortschritt in der BK-Mod
@@ -2002,14 +1999,13 @@ Alles hier ist im Code oder in der Datenbank **vorhanden**, aber ungenutzt, wirk
 - Technische Punkte:
   - Erfolgs-Cache drosseln
   - HUD gezielt aktualisieren
-  - Offline-Ergebnis als Zuwachs statt Summe übernehmen
+  - ~~Offline-Ergebnis als Zuwachs statt Summe übernehmen~~ – behoben (Abschnitt 21.2)
   - `idledorf.js` weiter aufteilen
   - Zusatzdaten in `idle_player_meta`
 
 **Aus der Progression-Rebalance (26.07.), bewusst nicht umgesetzt:**
 - Dungeon-Schlüssel kaufen
 - Stadtprojekte
-- Gildenprojekte
 - Kosmetik-Endgame-Shop
 
 **Aus der Gilden-Tech-Sammlung (26.07.), zurückgestellte Ideen:**
@@ -2029,13 +2025,143 @@ Alles hier ist im Code oder in der Datenbank **vorhanden**, aber ungenutzt, wirk
 - Lebensbalken als Overlay auf dem Motiv
 - echte Vergrößerung der Dorf-/Drachen-Sprites
 - Tests (Abschnitte 21–36 des Testauftrags): Erfolge-Tiefenprüfung, Belohnungs-Stresstests, Kosmetik-/Einstellungs-Suiten, volles Geräteraster, visuelle Referenzbilder, Netzwerkfehler-Simulation, Speicherleck-/Fuzz-Tests
-- Speicher-Wettlauf zwischen zwei Tabs beheben (bekannter offener Fehler)
+- ~~Speicher-Wettlauf zwischen zwei Tabs beheben~~ – behoben im Drachendorf-Ausbau, Phase 0 (Abschnitt 21.2)
 - QA-Modus für Admin-Panel und OBS-Overlay
 
 **Offene Betreiber-Schritte, die in Dateien notiert sind:**
 - Meister-Zweig-SQL ausführen oder verwerfen
 - Android-App (TWA) veröffentlichen **[unklar]**
 - Stripe aktivieren, sobald Live-Webhook getestet ist
+
+---
+
+# 21. Drachendorf-Ausbau (04.10.2026)
+
+Großer Ausbau in elf Phasen auf dem Branch `feature/drachendorf-ausbau` (nicht `main`). Jede Phase wurde einzeln getestet und committed. **Alle Datenbank-Änderungen liegen als Dateien in `sql/` und sind noch nicht ausgeführt** (Reihenfolge siehe 21.13). Ohne die Datenbank-Dateien bleiben die neuen Bereiche ruhig ausgeblendet – das Spiel läuft wie bisher.
+
+## 21.1 Drachenbestand
+
+| | Anzahl |
+|---|---|
+| Zucht-Arten live (vor diesem Ausbau) | 25 |
+| neue normale Arten (vorbereitet, `20261003-…-neue-drachen2.sql` + `…-dracheeeee.sql`) | 20: 8 legendär (Almerio, Alphorius, MaxEnder, Ronjawolf, Tsheyn, Vaelith, Ccatched, Sunnyyvi), 12 episch (Dayman, GrumpyJedi, Jodeljochen, Lukas, MiaTao, Randomauto, Scusy, StarManius, Troasa, Surebrec, Byalex, Danw) |
+| Event-Arten | 2: **Lightnix** ☀️ und **Darknix** 🌑 (legendär, je 5 Stufen, nur über das Zwielicht-Event) |
+| Gesamt nach allen Dateien | 47 |
+
+Normale Arten haben weiterhin **vier** Stufen (Ei → Baby → Jugendlich → Erwachsen). Eine optionale **fünfte Stufe** ist datengetrieben (`dragon_species.stage_count = 5`, `final_stage_key/-label`, `divine_image`, `divine_config`, `special_passive`, `event_origin`, `unique_per_account`, `reward_group`) – nichts ist fest auf Lightnix/Darknix programmiert. „Göttlich“ ist eine **Stufe**, keine Seltenheit.
+
+## 21.2 Technische Gesundheit (Phase 0)
+- Zwei-Tab-Überschreiben behoben (Hintergrund-Tab speichert beim Verlassen nur noch, wenn das Dorf dort offen war oder echte Änderungen anstehen).
+- Offline-Belohnung überschreibt keine ungespeicherten lokalen Ressourcen mehr.
+- Event-/Einzelstück-Arten kommen nie im normalen Ei-Wurf vor (`bkmpDragonEggPoolEligible`).
+- Neue Funktionen erkennen fehlende Datenbank-Objekte (`bkmpIsMissingDbObjectError`) und bleiben dann still.
+
+## 21.3 Navigation (Phase 1)
+Vier Bereiche aus **einer** Liste (`BKMP_IDLE_NAV_CATEGORIES`): ⚔️ Abenteuer (Kampf, Dungeon, Turm, Arena) · 🏡 Entwicklung (Upgrades, Dorfentwicklung, Skilltree, Prestige, Runen) · 🐉 Drachen & Sammlung (Drachenzucht, Dorf-Skins, Erfolge, Bestenliste) · 🛡️ Gemeinschaft (Gilde, Gilden-Tech, Gildenboss, Gilden-Arena). Desktop: einklappbare Kopfzeilen; Handy/App: „Mehr“-Menü in denselben Gruppen. Der zuletzt geöffnete Bereich wird gemerkt. Idle-Dorf-Tabs jetzt **17** (neu: Dorfentwicklung).
+
+## 21.4 Dorfentwicklung, Drachenhafen, Handelsposten (Phase 2)
+Kosten/Voraussetzungen/Wirkungen stehen in `village_building_levels`. Bauen und Handeln laufen nur serverseitig (`village_build`, `village_trade_offers`, `village_trade_execute`).
+
+| Gebäude | Mindest-Stufe | Kosten (Gold/Holz/Stein/Kristalle/Essenz) | Wirkung |
+|---|---|---|---|
+| Drachenhafen I | 50 | 120.000 / 4.000 / 4.000 / 250 / 100 | 1 Expeditionsplatz; Flüsterwald, Glutberge |
+| Drachenhafen II | 400 | 5 Mio. / 40.000 / 40.000 / 3.000 / 1.500 | 2 Plätze; Frostklamm, Endriss |
+| Drachenhafen III | 1.500 | 60 Mio. / 150.000 / 150.000 / 20.000 / 10.000 | 3 Plätze; Verbotenes Drachental |
+| Handelsposten I | 100 | 400.000 / 10.000 / 10.000 / 500 / 250 | 3 Tagesangebote |
+| Handelsposten II | 800 | 15 Mio. / 60.000 / 60.000 / 5.000 / 2.500 | 4 Tagesangebote |
+
+Handelsangebote: deterministisch pro Konto und Berliner Tag (Reload ändert nichts), jedes genau einmal.
+
+## 21.5 Expeditionen (Phase 3)
+5 Regionen, 15 Missionen (1/4/8 Std., 1–3 Drachen), 9 Ereignisse – alles in der Datenbank. Nur eigene, erwachsene/göttliche, freie Drachen (nicht Kampfbegleiter, nicht schon unterwegs). Pflichtbedingungen (Element, verschiedene Arten, Seltenheitsgrenzen) und Empfehlungen. Qualität ⭐–⭐⭐⭐⭐ aus Passung + Vielfalt + Bindung + Eigenschaften + Zufall; **nie Totalausfall**. Ergebnis wird beim Start serverseitig festgelegt, beim Abholen atomar genau einmal gutgeschrieben. Server-Trigger sperren Freilassen/Begleiter-Setzen während einer Expedition. Gemeinsames Regelmodul `js/systems/bkmp-expedition-rules.js` (exakter Spiegel der SQL).
+
+## 21.6 Affinitäten, Eigenschaften, Bindung, Dex (Phase 4)
+- **Affinitäten**: 1–2 Elemente je Art (feuer, wasser, erde, wind, blitz, licht, dunkel, arkan, neutral), für alle Arten gesetzt.
+- **Eigenschaften (Traits)**: genau eine positive Eigenschaft pro erwachsenem Drachen, serverseitig und deterministisch (md5 der Drachen-ID), nie neu würfelbar. 11 Stück: Gierig, Entdecker, Sammler, Mutig, Schatzsucher, Gesellig, Einzelgänger, Forscher, Beschützer, Glückskind, Heiler. Wirkung nur auf Expeditionen.
+- **Bindung 1–10** (Schwellen 0/100/250/500/900/1.500/2.400/3.600/5.200/7.500 Bindungs-EP): wächst nur aus echten, gespeicherten Siegen als Begleiter (`dragon_activity_tick`, höchstens alle 20 s, auf echte Zeit gedeckelt) und aus Expeditionen. Meilensteine: 2 Herz, 4 Expeditionsbonus fürs Team, 6 Rahmen, 8 stärkere Eigenschaft, 10 seelengebunden.
+- **Drachen-Dex**: Element, Herkunft, Anzahl Formen (5 bei Event-Arten), persönliche Rekorde bleiben auch nach dem Freilassen (Chronik-Speicher).
+
+## 21.7 Dorfpfad (Phase 5)
+Reiter „🛤️ Pfad“ in der Chronik: 6 Kapitel (Die ersten Mauern · Die Drachenzüchter · Die Chronisten · Meister des Dorfes · Jenseits des Horizonts · Legenden), 33 Ziele aus vorhandenen Zählern, **rückwirkend**, „Alle abholen“, nächste Ziele mit „Los →“.
+
+## 21.8 Gildenprojekte (Phase 6)
+5 Wochenprojekte (Großer Wachturm, Gemeinsamer Drachenstall, Kristallschmiede, Festhalle, Sternwarte), jeden Montag deterministisch eines pro Gilde, je 3 erlaubte Ressourcen. 1 Punkt = 20 Goldeinheiten bzw. 100 Holz/Stein bzw. 5 Kristalle/Essenz. Ziel = 400 + 250 × aktive Mitglieder (7 Tage) + 40 × Gildenstufe, 600–8.000. Fertig → jede Person mit ≥10 Punkten holt **einmal** 150 Kristalle + 100 Essenz + 1 Rune ab; Gilden-Abzeichen 🏅.
+
+## 21.9 Special-Event-Framework (Phase 7)
+Tabelle `special_events` (Name, Untertitel, Beschreibung, Lore, Ankündigung/Start/Ende, Zeitzone, Pass-Stufen, Punkte je Stufe, Quests + Belohnungen + Texte als `config`, Drachenbelohnung `reward_species`, `lifetime_claim_limit`, `choice_mode`, Assets, Archiv-Schalter). Status wird berechnet: HIDDEN → COMING_SOON → LIVE → ENDED, `archived` → ARCHIVED. Spieler-Fortschritt: `player_event_progress`; lebenslange Belohnungen: `player_event_reward_claims` (Gruppe „zwielicht“). Ein Event ist erst sichtbar, wenn der Betreiber es einplant:
+
+```sql
+select public.special_event_schedule('zwielicht', '2026-10-19', 3);
+```
+→ Ankündigung Freitag 00:00, Start Montag 00:00, Ende Sonntag 23:59 (Europe/Berlin).
+
+## 21.10 Zwielicht-Pass (Phase 8)
+☀️🌑 **Das Erwachen des Zwielichts** – kostenloser Pass, 30 Stufen × 100 Zwielichtpunkte = 3.000 nötig, keine Währung, kein Echtgeld.
+
+**Punkte pro Tag (max. 350):** 4 normale Prüfungen à 40 + 1 schwere à 90 + Tagesabschluss 100 („Erledige 4 von 5“). Tagesreset 00:00 Berlin; Aufgaben werden pro Spieler und Tag einmal deterministisch erzeugt und gespeichert.
+- Normale Prüfungen (Auswahl 4 aus den freigeschalteten): Drachenjäger (1.500 Drachen, skaliert), Bossbrecher (15 Bosse), Veteran (45 Min. Kampfzeit), Dungeonläufer (3 Dungeons), Turmstürmer (15 Turmstufen), Runenschmied (15 Aufwertungen, nur mit Runen), Drachenhüter (8× füttern, nur mit Babydrachen), Entdecker (1 Expedition, nur mit Drachenhafen), Gildenhelfer (10 Projektpunkte, nur mit Gilde und offenem Projekt), Zeuge des Zwielichts (2 Weltereignisse).
+- Schwere Prüfung (1 aus 4): 4.200 Drachen (skaliert), 90 Min. Kampfzeit, 45 Bosse, 7 Dungeons.
+
+**Wochenquests (3 Stufen, zusammen 1.140):** Der große Drachenkrieg (6.000/15.000/30.000 Drachen, skaliert), Bezwinger des Zwielichts (60/180/400 Bosse), Veteran des Zwielichts (3/6/11 Std.), Dungeonmeister (10/25/50), Gipfelstürmer (60/180/350 Turmstufen), Runenmeister (50/150/300; sonst „Zeichen am Himmel“ 6/18/40 Weltereignisse), Drachenzüchter (20/60/120 Fütterungen; sonst „Jäger der Dämmerung“ 40/120/260 Bosse), Weltenwanderer (3/8/14 Expeditionen; sonst „Pfad der Prüfungen“ 6/18/36 Dungeons).
+
+**Skalierung:** Kill-Ziele × (eigene Lebenszeit-Kills pro Kampfstunde ÷ 3.000), begrenzt auf 0,6–1,6.
+
+**Maximum:** 7 × 350 + 1.140 = **3.590** Punkte (Spielraum ~590 über den nötigen 3.000).
+
+**Fortschritt ohne Server-Anfrage pro Kill:** `event_tick()` etwa einmal pro Minute, solange das Dorf-Fenster offen ist. Gezählt werden gespeicherte Zähler (Kills, Bosse, Kampfzeit, Runen-Aufwertungen, Dungeon-Läufe aus `dungeon_progress`, abgeschlossene Expeditionen, Gildenprojekt-Punkte); Kills und Bosse nur aus echter Kampfzeit (Offline-Siege zählen nicht), alles auf echte Zeit gedeckelt. Nur Turmstufen, Fütterungen und Weltereignisse meldet das Spiel selbst (je Minute und Tag gedeckelt: 130/80/30).
+
+**Belohnungen (Server schreibt Ressourcen gut, Runen/Eier/Booster wie Dungeon-Funde):** über alle Stufen Gold, Holz, Stein, Kristalle (1.330), Essenz (1.100), Futter, 6 Runen, 2 Dracheneier, 6 Booster. Meilensteine: 5 Kleine Zwielicht-Truhe · 10 Titel „Zwielicht-Wanderer“ (+3 % EP) · 15 Zwielicht-Abzeichen · 20 Namensfarbe „Zwielicht“ + Ei · 25 Große Zwielicht-Truhe · 28 Schatz des Zwielichts · 29 „Das Zwielicht ruft …“ · 30 Wahl Lightnix/Darknix (halb Licht, halb Dunkel dargestellt).
+
+**Anzeige:** Pass-Karte im Kampf-Reiter (Desktop), ☀️🌑-Knopf im kompakten HUD (Handy/App), Fenster mit Heute/Woche/Belohnungen/FAQ, Teaser mit Countdown, Ankündigung im Website-Bereich „Was gibt’s Neues?“ (ohne Login), Archiv „Vergangene Events“ im Chronik-Reiter „Ziele“. Nach der Wahl nur noch „☀️ Lightnix erhalten ✅“.
+
+**Simulation** (`sim-pass.js`, gleiche Regeln wie Server): Gelegenheitsspieler (0,6 h an 5 Tagen) ≈ Stufe 7; täglich 0,6 h ≈ Stufe 10; engagiert (1,6 h täglich) erreicht Stufe 30 am **Sonntag**; mit einem Pausentag Stufe 29; Hardcore (4 h) und Extrem (10 h) frühestens **Samstag** (Freitagabend max. 2.890 Punkte).
+
+## 21.11 Lightnix, Darknix und die Wahl (Phase 9)
+- Stufe 30 setzt serverseitig **EARNED**. Wahl über `event_choose_reward` mit deutlicher Warnung („⚠️ Diese Wahl ist dauerhaft …“), legt das Ei serverseitig an.
+- Höchstens **ein** Eventdrache pro Konto **für immer** (auch bei Wiederholungen des Events).
+- Nach Sonntag 23:59 keine neuen Punkte; wer vorher Stufe 30 erreicht hat, darf **auch danach** noch wählen. Ohne Stufe 30 kein Ei, die übrigen Stufenbelohnungen bleiben.
+- Schutz: Eier von Event-/Einzelstück-Arten nur serverseitig (Trigger), ein Einzelstück-Drache entsteht nur aus dem eigenen Ei und höchstens einmal. Einzelstücke lassen sich nicht freilassen und brauchen keine zweite Kopie (kein normaler Aufstieg – ihr Weg ist die Göttliche Erweckung).
+- Bilder: `assets/dragons/breeding/{egg,baby,teen,adult,divine}/{lightnix,darknix}.png`.
+
+## 21.12 Göttliche Erweckung (Phase 10)
+„✨ Weg zur Göttlichkeit“ in der Drachen-Detailansicht (für jede Art mit fünfter Form):
+
+| Säule | Voraussetzung (Lightnix/Darknix) |
+|---|---|
+| ❤️ Bindung | Stufe 5 |
+| ⚔️ Gemeinsame Nutzung | 10 Std. als Kampfbegleiter, 50 gemeinsame Bosse, 10 Expeditionen |
+| 💰 Opfergabe | 600.000 **Goldeinheiten** in beliebig vielen Einzahlungen (Wert pro Einzahlung zum aktuellen Stand fixiert – das Ziel wächst nicht mit) |
+| 💎🧪 bei der Erweckung | 2.000 Kristalle, 1.000 Essenz |
+
+100 % Erfolg, kein Zufall, atomar (`divine_offer`, `divine_awaken`). Name, Besitzer, Favorit, Eigenschaft, Bindung und Historie bleiben. Stärke: Hauptwerte ×1,25, Zusatzwerte ×1,125 (Multiplikator einmal gespeichert in `divine_multiplier`, wird nie erneut angewendet) – zusammen ≈ **+23 %** Drachenleistung, dazu die Aura (nur als göttlicher Begleiter):
+- ☀️ **Göttliche Aura des Lichts**: +6 % Verteidigung, +6 % Leben, +4 % Schildstärke; Expeditionen +6 Teampunkte.
+- 🌑 **Göttliche Aura der Finsternis**: +6 % Angriff, +8 % Krit-Schaden, +4 % Gold; Expeditionen +10 % Kristalle/Essenz und +5 % Ereignischance.
+Beide gleichwertig (Test vergleicht die Auren in „Zusatzwert-Maximalwürfen“, Abweichung < 10 %).
+
+**Opfergabe-Dauer** (`sim-divine.js`, halbe Einnahmen fließen in die Opfergabe): Midgame ≈ 14 Tage, Late ≈ 5 Tage, Endgame ≈ 1,5 Tage, Spitze < 1 Tag (dort bestimmen Bindung und Nutzung die Dauer). Andere legendäre Drachen mit Aufstieg 5 (×1,50) bleiben in reinen Werten stärker.
+
+## 21.13 Kleine Wochenereignisse (Phase 11)
+Sechs Vorlagen, alle aus, einplanbar wie das Zwielicht: Brutwoche (Brutzeit −25 %, +25 % Wachstum), Runenmond (Runen-Fehlschläge −50 %), Bossjagd (+50 % Gold/EP von Bossen), Erntefest (+50 % Früchte/Fleisch), Expeditionsfieber (+25 % Expeditionsbeute, serverseitig), Gildenwoche (+50 % Gildenprojekt-Punkte, serverseitig). Boni höchstens 100 %, laufende Events erscheinen als kleine Hinweise auf der Pass-Karte.
+
+## 21.14 Datenbank-Dateien (in dieser Reihenfolge ausführen)
+1. `20261003-dragon-species-neue-drachen2.sql`, `20261003-dragon-species-dracheeeee.sql` (falls noch offen)
+2. `20261004-01-drachendorf-grundlage.sql` – Zusatzspalten, Affinitäten, Schutz-Trigger, `bkmp_event_modifier`
+3. `20261004-02-village-projects.sql` – Dorfentwicklung, Handelsposten
+4. `20261004-03-expeditions.sql` – Expeditionen (inkl. Eigenschaften, Auren, Expeditionsfieber)
+5. `20261004-04-dragon-traits-bond.sql` – Eigenschaften, Bindung
+6. `20261004-05-guild-projects.sql` – Gildenprojekte (inkl. Gildenwoche)
+7. `20261004-06-special-events.sql` – Event-Framework
+8. `20261004-07-zwielicht-event.sql` – Zwielicht-Daten (aus)
+9. `20261004-08-lightnix-darknix.sql` – Arten + Schutz
+10. `20261004-09-divine-awakening.sql` – Göttliche Erweckung
+11. `20261004-10-small-weekly-events.sql` – kleine Events (aus)
+12. danach: `20261004-changelog-drachendorf-ausbau.sql`; `20261004-changelog-zwielicht.sql` erst am Ankündigungstag.
+
+**Neue Tabellen:** `village_building_levels`, `village_buildings`, `village_trade_templates`, `village_trade_log`, `expedition_regions`, `expedition_missions`, `expedition_events`, `player_expeditions`, `dragon_traits`, `player_activity_state`, `guild_project_defs`, `guild_projects`, `guild_project_contributions`, `guild_project_claims`, `special_events`, `player_event_progress`, `player_event_reward_claims`.
+**Neue RPCs:** `village_build`, `village_trade_offers`, `village_trade_execute`, `expedition_start`, `expedition_claim`, `expedition_status`, `dragon_ensure_traits`, `dragon_activity_tick`, `guild_project_status`, `guild_project_contribute`, `guild_project_claim`, `special_events_visible`, `event_tick`, `event_claim_tiers`, `event_choose_reward`, `special_event_schedule` (nur Betreiber), `divine_status`, `divine_offer`, `divine_awaken`, `bkmp_event_modifier`.
+
+## 21.15 Tests
+Neue Testdateien: `nav-categories`, `village`, `expeditions`, `dragon-traits-bond`, `village-path`, `guild-projects`, `special-event` (14 Tests: Konfiguration aus SQL, SQL↔Regel-Gleichheit, Status/Zeitzone inkl. Zeitumstellung, Tagesaufgaben/Reset, Deckel, Punkte, Hardcore-Woche, Stufenbelohnungen, Wahl/Claim-Limit/Wiederholung, Ei-Schutz, kleine Events, 3 Browser-Abläufe) und `divine-awakening` (4 Tests: Artdaten/Auren, Opfergabe in Teilen, Erweckung + Bonus nicht doppelt bei Reload/2 Tabs, Einzelstück-Regeln + Expeditions-Aura). Alle neuen Tests laufen auf Desktop, Handy klein und Handy groß.
 
 ---
 

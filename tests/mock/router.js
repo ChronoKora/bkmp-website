@@ -32,6 +32,7 @@ const PUBLIC_RPC_NAMES = new Set([
   'get_card_sale_daily_earnings',
   'get_trending_cards',
   'get_card_teleport_stats',
+  'special_events_visible',
 ]);
 
 function route(store, { method, url, headers, body }) {

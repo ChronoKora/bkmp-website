@@ -6756,3 +6756,95 @@ async function bkmpGuildProjectClaimRpc() {
   if (error) throw new Error(bkmpGuildProjectErrorText(error.message));
   return Array.isArray(data) ? data[0] : data;
 }
+
+/* ---------- Special Events / Zwielicht-Pass (Drachendorf-Ausbau Phase 7-9, 04.10.2026) ----------
+   sql/20261004-06-special-events.sql. Fehlt die Migration, liefert
+   bkmpSpecialEventsVisible() einfach eine leere Liste - kein Fehler. */
+function bkmpEventErrorText(msg) {
+  const m = String(msg || '');
+  if (m.includes('not_earned')) return 'Du hast Stufe 30 noch nicht erreicht.';
+  if (m.includes('already_chosen')) return 'Du hast deine Wahl bereits getroffen.';
+  if (m.includes('claim_limit_reached')) return 'Du hast bereits einen Drachen aus diesem Event erhalten.';
+  if (m.includes('invalid_choice')) return 'Diese Wahl ist nicht möglich.';
+  if (m.includes('not_joined')) return 'Du hast an diesem Event noch nicht teilgenommen.';
+  if (m.includes('invalid_event')) return 'Dieses Event ist gerade nicht verfügbar.';
+  if (m.includes('not_authenticated')) return 'Du bist nicht eingeloggt (Sitzung abgelaufen?). Bitte neu einloggen.';
+  if (m.includes('no_player_state')) return 'Dein Spielstand wurde noch nicht gespeichert - bitte kurz warten und erneut versuchen.';
+  return 'Das hat nicht geklappt: ' + (m || 'unbekannter Fehler') + '.';
+}
+async function bkmpSpecialEventsVisible() {
+  const client = bkmpGetSupabaseClient();
+  if (!client) return { missing: true, events: [] };
+  const { data, error } = await client.rpc('special_events_visible');
+  if (error) {
+    if (bkmpIsMissingDbObjectError(error)) return { missing: true, events: [] };
+    throw new Error(bkmpEventErrorText(error.message));
+  }
+  return { missing: false, events: Array.isArray(data) ? data : [] };
+}
+async function bkmpEventTickRpc(eventId, clientDeltas) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { data, error } = await client.rpc('event_tick', { p_event_id: eventId, p_client: clientDeltas || {} });
+  if (error) {
+    if (bkmpIsMissingDbObjectError(error)) return { missing: true };
+    throw new Error(bkmpEventErrorText(error.message));
+  }
+  return Array.isArray(data) ? data[0] : data;
+}
+async function bkmpEventClaimTiersRpc(eventId) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { data, error } = await client.rpc('event_claim_tiers', { p_event_id: eventId });
+  if (error) throw new Error(bkmpEventErrorText(error.message));
+  return Array.isArray(data) ? data[0] : data;
+}
+async function bkmpEventChooseRewardRpc(eventId, speciesId) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { data, error } = await client.rpc('event_choose_reward', { p_event_id: eventId, p_species_id: speciesId });
+  if (error) throw new Error(bkmpEventErrorText(error.message));
+  return Array.isArray(data) ? data[0] : data;
+}
+
+/* ---------- Goettliche Erweckung (Phase 10, sql/20261004-09-divine-awakening.sql) ---------- */
+function bkmpDivineErrorText(msg) {
+  const m = String(msg || '');
+  if (m.includes('bond_too_low')) return 'Die Bindung ist noch nicht stark genug.';
+  if (m.includes('usage_too_low')) return 'Ihr habt noch nicht genug gemeinsam erlebt.';
+  if (m.includes('offering_incomplete')) return 'Die Opfergabe ist noch nicht vollständig.';
+  if (m.includes('offering_complete')) return 'Die Opfergabe ist bereits vollständig.';
+  if (m.includes('insufficient_resources')) return 'Dir fehlen Kristalle oder Essenz.';
+  if (m.includes('amount_too_small')) return 'Das ist zu wenig Gold für eine Einzahlung.';
+  if (m.includes('already_divine')) return 'Dieser Drache ist bereits göttlich.';
+  if (m.includes('not_adult')) return 'Erst ein erwachsener Drache kann erweckt werden.';
+  if (m.includes('dragon_on_expedition')) return 'Der Drache ist gerade auf Expedition.';
+  if (m.includes('not_divine_species')) return 'Diese Art besitzt keine göttliche Form.';
+  if (m.includes('not_authenticated')) return 'Du bist nicht eingeloggt (Sitzung abgelaufen?). Bitte neu einloggen.';
+  return 'Das hat nicht geklappt: ' + (m || 'unbekannter Fehler') + '.';
+}
+async function bkmpDivineStatusRpc(dragonId) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) return { missing: true };
+  const { data, error } = await client.rpc('divine_status', { p_dragon_id: dragonId });
+  if (error) {
+    if (bkmpIsMissingDbObjectError(error)) return { missing: true };
+    throw new Error(bkmpDivineErrorText(error.message));
+  }
+  const row = Array.isArray(data) ? data[0] : data;
+  return { missing: false, ...(row || {}) };
+}
+async function bkmpDivineOfferRpc(dragonId, gold) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { data, error } = await client.rpc('divine_offer', { p_dragon_id: dragonId, p_gold: Math.floor(Number(gold) || 0) });
+  if (error) throw new Error(bkmpDivineErrorText(error.message));
+  return Array.isArray(data) ? data[0] : data;
+}
+async function bkmpDivineAwakenRpc(dragonId) {
+  const client = bkmpGetPlayerAuthClient();
+  if (!client) throw new Error('Supabase ist nicht verbunden.');
+  const { data, error } = await client.rpc('divine_awaken', { p_dragon_id: dragonId });
+  if (error) throw new Error(bkmpDivineErrorText(error.message));
+  return Array.isArray(data) ? data[0] : data;
+}

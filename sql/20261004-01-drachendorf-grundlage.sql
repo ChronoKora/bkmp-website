@@ -174,4 +174,30 @@ create trigger player_dragons_protect_trusted_trg
   before insert or update on public.player_dragons
   for each row execute function public.player_dragons_protect_trusted();
 
+-- ---------- 4) Kleine Wochenereignisse (Phase 11): sicherer Bonus-Leser ----------
+-- Summe eines Bonus-Schluessels (config.modifiers) aller gerade laufenden,
+-- eingeschalteten Events, sonst 0. Funktioniert auch, solange die Event-
+-- Tabelle (20261004-06) noch gar nicht existiert - Expeditionen und
+-- Gildenprojekte duerfen dadurch nie scheitern.
+create or replace function public.bkmp_event_modifier(p_key text)
+returns numeric language plpgsql stable security definer set search_path = public as $$
+declare
+  v numeric := 0;
+begin
+  if to_regclass('public.special_events') is null then return 0; end if;
+  execute 'select coalesce(sum((se.config->''modifiers''->>$1)::numeric), 0)
+             from public.special_events se
+            where se.enabled and not se.archived
+              and se.starts_at is not null and se.ends_at is not null
+              and now() >= se.starts_at and now() < se.ends_at
+              and coalesce(se.config->''modifiers'', ''{}''::jsonb) ? $1'
+    into v using p_key;
+  return greatest(0, least(coalesce(v, 0), 100));
+exception when others then
+  return 0;
+end;
+$$;
+revoke all on function public.bkmp_event_modifier(text) from public;
+grant execute on function public.bkmp_event_modifier(text) to anon, authenticated;
+
 notify pgrst, 'reload schema';

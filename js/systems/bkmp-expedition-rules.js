@@ -130,13 +130,16 @@ function bkmpExpeditionTeamEval(mission, team) {
   if (gesellig && teamSize >= 2) score += Math.floor(4 * (teamSize - 1) * gesellig);
   const solo = bkmpExpeditionTraitStrength(members, 'einzelgaenger');
   if (solo && teamSize === 1) score += Math.floor(12 * solo);
+  /* Goettliche Aura (Phase 10): nur Drachen in der fuenften Form bringen ihr
+     "expedition"-Objekt (aus dragon_species.special_passive) mit. */
+  score += Math.floor(members.reduce((a, m) => a + Number((m.aura && m.aura.score_bonus) || 0), 0));
   return { unmet, met, score };
 }
 
 /* Vollstaendiges Ergebnis einer Expedition - exakter Spiegel von
    expedition_start() in sql/20261004-03-expeditions.sql. seedInt(text)
    liefert eine ganze Zahl 0..2^31-1 (Server: md5-basiert). */
-function bkmpExpeditionOutcome({ mission, region, team, events, goldUnit, seedInt, id }) {
+function bkmpExpeditionOutcome({ mission, region, team, events, goldUnit, seedInt, id, eventModPct }) {
   const ev = bkmpExpeditionTeamEval(mission, team);
   const roll = bkmpExpeditionRoll(seedInt(id + ':quality'), team);
   const score = ev.score + roll;
@@ -150,6 +153,8 @@ function bkmpExpeditionOutcome({ mission, region, team, events, goldUnit, seedIn
   const ess = 1 + 0.10 * s('forscher');
   const runeMult = 1 + 0.15 * s('forscher');
   const bondMult = 1 + 0.25 * s('heiler');
+  const auraPct = (team || []).reduce((a, m) => a + Number((m.aura && m.aura.reward_pct) || 0), 0);
+  const auraEvent = (team || []).reduce((a, m) => a + Number((m.aura && m.aura.event_bonus) || 0), 0);
   const r = {
     gold: Math.round(Number(rw.gold_units || 0) * goldUnit * mult * gold),
     wood: Math.round(Number(rw.wood || 0) * mult * mat),
@@ -161,6 +166,8 @@ function bkmpExpeditionOutcome({ mission, region, team, events, goldUnit, seedIn
     bond_xp: Math.round(Number(rw.bond_xp || 0) * bondMult),
     runes: 0, eggs: 0
   };
+  r.crystals = Math.round(r.crystals * (1 + auraPct / 100));
+  r.essence = Math.round(r.essence * (1 + auraPct / 100));
   const hit = (key, chance) => (seedInt(id + ':' + key) % 10000) < Math.round(chance * 10000);
   const runeChance = Number(rw.rune_chance || 0) * runeMult;
   const eggChance = Number(rw.egg_chance || 0);
@@ -172,7 +179,7 @@ function bkmpExpeditionOutcome({ mission, region, team, events, goldUnit, seedIn
   const happened = [];
   (events || []).slice().sort((a, b) => (a.sort_order - b.sort_order) || (a.id < b.id ? -1 : 1)).forEach(e => {
     if (happened.length >= 2) return;
-    let chance = Number(e.base_chance) + (quality - 1) * 0.015 + 0.03 * s('entdecker');
+    let chance = Number(e.base_chance) + (quality - 1) * 0.015 + 0.03 * s('entdecker') + auraEvent;
     Object.keys(e.affinity_bonus || {}).forEach(a => { if (affs.has(a)) chance += Number(e.affinity_bonus[a]); });
     Object.keys(e.trait_bonus || {}).forEach(t => { if (traits.has(t)) chance += Number(e.trait_bonus[t]); });
     if (!hit('ev:' + e.id, chance)) return;
@@ -184,6 +191,9 @@ function bkmpExpeditionOutcome({ mission, region, team, events, goldUnit, seedIn
     r.eggs += Number(er.eggs || 0);
     r.bond_xp += Number(er.bond_xp || 0);
   });
+  /* Kleine Wochenereignisse (Phase 11, z.B. Expeditionsfieber). */
+  const mod = Math.max(0, Math.min(100, Number(eventModPct) || 0));
+  if (mod > 0) ['gold', 'wood', 'stone', 'crystals', 'essence', 'fruit', 'meat'].forEach(k => { r[k] = Math.round(r[k] * (1 + mod / 100)); });
   r.rune_tier = region ? Number(region.rune_tier || 0) : 0;
   r.egg_tier = region ? Number(region.egg_tier || 0) : 0;
   return { score, quality, rewards: r, events: happened, eval: ev };

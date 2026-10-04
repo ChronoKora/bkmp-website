@@ -243,6 +243,10 @@ function bkmpChronicleEmpty() {
     dex: {},
     /* Drachendorf-Ausbau Phase 5: abgeholte Dorfpfad-Ziele { zielId: 1 } (nur ODER). */
     path: {},
+    /* Drachendorf-Ausbau Phase 8: Event-Archiv { eventId: { tier, earned, choice,
+       unlocks[] } } - bleibt erhalten, auch wenn ein Event spaeter
+       ausgeblendet wird (Titel/Abzeichen/Kosmetik gehen nie verloren). */
+    events: {},
     life: { questsDone: 0, dailyChests: 0, weeklyChests: 0, eventsCaught: 0, eventsByType: {} }
   };
 }
@@ -295,6 +299,13 @@ function bkmpChronicleNormalize(raw) {
   if (raw.path && typeof raw.path === 'object') {
     Object.keys(raw.path).slice(0, 300).forEach(k => {
       if (/^[a-z0-9_-]{1,40}$/i.test(k) && raw.path[k]) c.path[k] = 1;
+    });
+  }
+  if (raw.events && typeof raw.events === 'object') {
+    Object.keys(raw.events).slice(0, 30).forEach(k => {
+      const v = raw.events[k];
+      if (!/^[a-z0-9_-]{1,40}$/i.test(k) || !v || typeof v !== 'object') return;
+      c.events[k] = bkmpChronicleNormalizeEventRecord(v);
     });
   }
   if (raw.life && typeof raw.life === 'object') {
@@ -353,6 +364,10 @@ function bkmpChronicleMerge(local, remote) {
     m.dex[k] = [0, 1, 2, 3].map(i => Math.max(a[i] || 0, b[i] || 0));
   });
   Object.keys(Object.assign({}, local.path || {}, remote.path || {})).forEach(k => { m.path[k] = 1; });
+  m.events = {};
+  new Set([...Object.keys(local.events || {}), ...Object.keys(remote.events || {})]).forEach(k => {
+    m.events[k] = bkmpChronicleMergeEventRecord((local.events || {})[k], (remote.events || {})[k]);
+  });
   ['questsDone', 'dailyChests', 'weeklyChests', 'eventsCaught'].forEach(k => { m.life[k] = Math.max(local.life[k] || 0, remote.life[k] || 0); });
   new Set([...Object.keys(local.life.eventsByType), ...Object.keys(remote.life.eventsByType)]).forEach(k => {
     m.life.eventsByType[k] = Math.max(local.life.eventsByType[k] || 0, remote.life.eventsByType[k] || 0);
@@ -672,6 +687,9 @@ function bkmpChronicleApplyProgress(type, amount) {
 /* Oeffentlicher Einstieg fuer Ereignis-Fortschritt (Dungeon/Turm/Klick/...). */
 function bkmpChronicleAddProgress(type, amount) {
   const n = Math.max(0, Number(amount) || 0);
+  /* Drachendorf-Ausbau Phase 8: dieselben Spiel-Ereignisse zaehlen fuer den
+     Event-Pass (gesammelt, nur einmal pro Minute an den Server gemeldet). */
+  if (n && typeof bkmpEventNoteProgress === 'function') bkmpEventNoteProgress(type, n);
   if (!n || !BKMP_CHRONICLE_QUEST_TYPES[type]) return;
   if (!bkmpChronicleReady()) {
     if (bkmpChroniclePendingProgress.length < 500) bkmpChroniclePendingProgress.push({ type, amount: n });
@@ -1467,7 +1485,7 @@ function bkmpChronicleRenderModalBody() {
   if (!bkmpChronicleReady()) html = '<p class="bkmp-chron-empty">⏳ Chronik wird geladen…</p>';
   else if (bkmpChronicleModalTab === 'calendar') html = bkmpChronicleCalendarHtml();
   else if (bkmpChronicleModalTab === 'bestiary') html = bkmpChronicleBestiaryHtml();
-  else if (bkmpChronicleModalTab === 'goals') html = bkmpChronicleGoalsHtml();
+  else if (bkmpChronicleModalTab === 'goals') html = bkmpChronicleGoalsHtml() + (typeof bkmpEventArchiveHtml === 'function' ? bkmpEventArchiveHtml() : '');
   else if (bkmpChronicleModalTab === 'path' && typeof bkmpPathHtml === 'function') html = bkmpPathHtml();
   else html = bkmpChronicleQuestsHtml();
   /* Nur ersetzen, wenn sich wirklich etwas geaendert hat - verhindert, dass
@@ -1660,6 +1678,38 @@ else bkmpChronicleInitDom();
 /* ---------------- Dex-Rekorde (Drachendorf-Ausbau Phase 4) ----------------
    Dauerhafte Hoechstwerte pro Drachenart, auch wenn der Drache spaeter
    freigelassen oder geopfert wird. Nur steigend (Merge = Maximum). */
+function bkmpChronicleNormalizeEventRecord(v) {
+  const unlocks = Array.isArray(v.unlocks) ? v.unlocks.filter(u => typeof u === 'string' && /^[a-z0-9_-]{1,40}$/i.test(u)).slice(0, 20) : [];
+  return {
+    tier: Math.min(100, Math.floor(bkmpChronicleNum(v.tier))),
+    earned: Boolean(v.earned),
+    choice: typeof v.choice === 'string' && /^[a-z0-9_-]{1,40}$/i.test(v.choice) ? v.choice : '',
+    joined: Boolean(v.joined),
+    unlocks
+  };
+}
+function bkmpChronicleMergeEventRecord(a, b) {
+  const x = bkmpChronicleNormalizeEventRecord(a || {});
+  const y = bkmpChronicleNormalizeEventRecord(b || {});
+  return {
+    tier: Math.max(x.tier, y.tier), earned: x.earned || y.earned, joined: x.joined || y.joined,
+    choice: x.choice || y.choice, unlocks: Array.from(new Set([...x.unlocks, ...y.unlocks])).slice(0, 20)
+  };
+}
+/* Drachendorf-Ausbau Phase 8: Event-Archiv lesen/schreiben (nur steigend/ODER). */
+function bkmpChronicleEventRecords() {
+  return (bkmpChronicle && bkmpChronicle.events) || {};
+}
+function bkmpChronicleRecordEvent(eventId, rec) {
+  if (!bkmpChronicle || !eventId || !/^[a-z0-9_-]{1,40}$/i.test(eventId)) return false;
+  if (!bkmpChronicle.events) bkmpChronicle.events = {};
+  const cur = bkmpChronicle.events[eventId];
+  const next = bkmpChronicleMergeEventRecord(cur, rec);
+  if (cur && JSON.stringify(cur) === JSON.stringify(next)) return false;
+  bkmpChronicle.events[eventId] = next;
+  bkmpChronicleMarkDirty();
+  return true;
+}
 function bkmpChronicleDexRecords() {
   return (bkmpChronicle && bkmpChronicle.dex) || {};
 }

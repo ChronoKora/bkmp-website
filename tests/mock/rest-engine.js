@@ -9,7 +9,7 @@
 
 const { table: getTable } = require('./store');
 const { applyIdlePlayerStateAntiCheatGuard } = require('./anticheat-guard');
-const { guardPlayerDragonPatch, guardPlayerDragonDelete, guardPlayerDragonInsert } = require('./dragon-guards');
+const { guardPlayerDragonPatch, guardPlayerDragonDelete, guardPlayerDragonInsert, guardEventEggInsert, guardUniqueDragonInsert } = require('./dragon-guards');
 
 function coerce(raw) {
   if (raw === 'null') return null;
@@ -247,13 +247,25 @@ function handleRestRequest(store, { method, tableName, searchParams, body, heade
     const isUpsert = prefer.includes('resolution=merge-duplicates') || searchParams.has('on_conflict');
     const conflictCols = (searchParams.get('on_conflict') || '').split(',').map(s => s.trim()).filter(Boolean);
     const affected = [];
+    /* Drachendorf-Ausbau Phase 9: Event-/Einzelstueck-Schutz (dragon-guards.js). */
+    if (tableName === 'player_dragon_eggs' || tableName === 'player_dragons') {
+      try {
+        incomingList.forEach(incoming => {
+          if (tableName === 'player_dragon_eggs') guardEventEggInsert(store, incoming);
+          else guardUniqueDragonInsert(store, guardPlayerDragonInsert(incoming));
+        });
+      } catch (e) {
+        if (e.guardError) return { status: 400, json: { code: 'P0001', message: e.message } };
+        throw e;
+      }
+    }
     incomingList.forEach(incoming => {
       let existing = isUpsert && conflictCols.length ? findConflictMatch(rows, incoming, conflictCols) : null;
       if (existing) {
         Object.assign(existing, incoming);
         affected.push(existing);
       } else {
-        const safeIncoming = tableName === 'player_dragons' ? guardPlayerDragonInsert(incoming) : incoming;
+        const safeIncoming = tableName === 'player_dragons' ? guardUniqueDragonInsert(store, guardPlayerDragonInsert(incoming)) : incoming;
         const row = { id: incoming.id != null ? incoming.id : store.nextId(), ...safeIncoming };
         rows.push(row);
         affected.push(row);

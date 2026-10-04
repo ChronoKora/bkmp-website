@@ -263,6 +263,10 @@ begin
   if p_mission.team_size = 1 then
     v_score := v_score + floor(12 * public.expedition_trait_strength(p_team, 'einzelgaenger'))::integer;
   end if;
+  -- Goettliche Aura (Phase 10, datengetrieben aus dragon_species.special_passive):
+  -- nur Drachen in der fuenften Form bringen ihr "expedition"-Objekt mit.
+  v_score := v_score + coalesce((select sum(coalesce((m->'aura'->>'score_bonus')::numeric, 0))
+                                   from jsonb_array_elements(p_team) m), 0)::integer;
   return jsonb_build_object('unmet', v_unmet, 'met', v_met, 'score', v_score);
 end;
 $$;
@@ -315,6 +319,9 @@ declare
   v_traits text[];
   v_affs text[];
   v_ends timestamptz;
+  v_aura_pct numeric;
+  v_aura_event numeric;
+  v_event_mod numeric;
 begin
   if v_uid is null then raise exception 'not_authenticated'; end if;
   select * into v_state from public.idle_player_state ips where ips.auth_user_id = v_uid for update;
@@ -347,7 +354,8 @@ begin
 
   select jsonb_agg(jsonb_build_object('species_id', ds.id, 'rarity', ds.rarity,
            'affinities', to_jsonb(coalesce(ds.affinities, '{}'::text[])), 'trait', pd.trait,
-           'bond_level', public.dragon_bond_level(pd.bond_xp))),
+           'bond_level', public.dragon_bond_level(pd.bond_xp),
+           'aura', case when pd.stage = 'divine' then ds.special_passive->'divine_aura'->'expedition' else null end)),
          array_agg(distinct pd.trait) filter (where pd.trait is not null)
     into v_team, v_traits
     from public.player_dragons pd join public.dragon_species ds on ds.id = pd.species_id
@@ -377,6 +385,13 @@ begin
   v_stone := round(coalesce((v_rw->>'stone')::numeric, 0) * v_mult * (1 + 0.15 * public.expedition_trait_strength(v_team, 'sammler')));
   v_crystals := round(coalesce((v_rw->>'crystals')::numeric, 0) * v_mult * (1 + 0.10 * public.expedition_trait_strength(v_team, 'schatzsucher')));
   v_essence := round(coalesce((v_rw->>'essence')::numeric, 0) * v_mult * (1 + 0.10 * public.expedition_trait_strength(v_team, 'forscher')));
+  -- Goettliche Aura der Finsternis & Co.: +reward_pct auf Kristalle/Essenz,
+  -- +event_bonus auf jede Ereignis-Chance.
+  select coalesce(sum(coalesce((m->'aura'->>'reward_pct')::numeric, 0)), 0),
+         coalesce(sum(coalesce((m->'aura'->>'event_bonus')::numeric, 0)), 0)
+    into v_aura_pct, v_aura_event from jsonb_array_elements(v_team) m;
+  v_crystals := round(v_crystals * (1 + v_aura_pct / 100));
+  v_essence := round(v_essence * (1 + v_aura_pct / 100));
   v_fruit := round(coalesce((v_rw->>'fruit')::numeric, 0) * v_mult * (1 + 0.15 * public.expedition_trait_strength(v_team, 'sammler')));
   v_meat := round(coalesce((v_rw->>'meat')::numeric, 0) * v_mult * (1 + 0.15 * public.expedition_trait_strength(v_team, 'sammler')));
   v_bond := round(coalesce((v_rw->>'bond_xp')::numeric, 0) * (1 + 0.25 * public.expedition_trait_strength(v_team, 'heiler')));
@@ -391,7 +406,7 @@ begin
   -- Ereignisse (hoechstens 2)
   for v_ev in select * from public.expedition_events ee order by ee.sort_order, ee.id loop
     exit when jsonb_array_length(v_events) >= 2;
-    v_chance := v_ev.base_chance + (v_quality - 1) * 0.015 + 0.03 * public.expedition_trait_strength(v_team, 'entdecker');
+    v_chance := v_ev.base_chance + (v_quality - 1) * 0.015 + 0.03 * public.expedition_trait_strength(v_team, 'entdecker') + v_aura_event;
     for v_key, v_val in select * from jsonb_each(v_ev.affinity_bonus) loop
       if v_affs is not null and v_key = any(v_affs) then v_chance := v_chance + (v_val)::text::numeric; end if;
     end loop;
@@ -412,6 +427,19 @@ begin
       v_bond := v_bond + coalesce((v_ev.reward->>'bond_xp')::integer, 0);
     end if;
   end loop;
+
+  -- Kleine Wochenereignisse (Phase 11, z.B. "Expeditionsfieber"): Bonus in %
+  -- auf alle Ressourcen, nur solange ein solches Event laeuft (sonst 0).
+  v_event_mod := public.bkmp_event_modifier('expedition_reward_pct');
+  if v_event_mod > 0 then
+    v_gold := round(v_gold * (1 + v_event_mod / 100));
+    v_wood := round(v_wood * (1 + v_event_mod / 100));
+    v_stone := round(v_stone * (1 + v_event_mod / 100));
+    v_crystals := round(v_crystals * (1 + v_event_mod / 100));
+    v_essence := round(v_essence * (1 + v_event_mod / 100));
+    v_fruit := round(v_fruit * (1 + v_event_mod / 100));
+    v_meat := round(v_meat * (1 + v_event_mod / 100));
+  end if;
 
   v_ends := now() + make_interval(hours => v_mission.duration_hours);
   insert into public.player_expeditions (id, auth_user_id, name_key, mission_id, region_id, dragon_ids, started_at, ends_at,

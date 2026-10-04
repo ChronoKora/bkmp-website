@@ -19,9 +19,12 @@ const BKMP_GUILD_PROJECT_KIND_META = {
 };
 /* Wie viel einer Ressource ergibt 1 Projektpunkt (identisch zur SQL). */
 function bkmpGuildProjectPerPoint(kind) {
-  if (kind === 'gold') return 20 * Number((bkmpGuildProjectStatus && bkmpGuildProjectStatus.gold_unit) || 6);
-  if (kind === 'wood' || kind === 'stone') return 100;
-  return 5;
+  let base = 5;
+  if (kind === 'gold') base = 20 * Number((bkmpGuildProjectStatus && bkmpGuildProjectStatus.gold_unit) || 6);
+  else if (kind === 'wood' || kind === 'stone') base = 100;
+  /* Gildenwoche (Phase 11): Server liefert den laufenden Bonus mit. */
+  const mod = Math.max(0, Math.min(100, Number((bkmpGuildProjectStatus && bkmpGuildProjectStatus.point_mod_pct) || 0)));
+  return Math.max(1, Math.round(base / (1 + mod / 100)));
 }
 function bkmpGuildProjectEsc(s) { return typeof escapeHtml === 'function' ? escapeHtml(s) : String(s == null ? '' : s); }
 function bkmpGuildProjectFmt(n) { return typeof bkmpIdleFormatNumber === 'function' ? bkmpIdleFormatNumber(n) : String(n); }
