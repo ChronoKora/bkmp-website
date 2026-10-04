@@ -8820,7 +8820,7 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   max-width: 520px;
   margin: 0 auto;
   aspect-ratio: 1164 / 199;
-  background-image: url('assets/dragons/dorf.png?v=20260709-singleframe');
+  background-image: url('assets/dragons/dorf.webp?v=20261004-webp');
   background-repeat: no-repeat;
   background-size: 100% 100%;
   image-rendering: pixelated;

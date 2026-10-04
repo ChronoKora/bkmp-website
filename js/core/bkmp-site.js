@@ -600,7 +600,7 @@
         void bkmpBonkImg.offsetWidth;
         bkmpBonkImg.src = 'assets/bonk-animated.gif';
         clearTimeout(bkmpBonkAnimTimer);
-        bkmpBonkAnimTimer = setTimeout(() => { bkmpBonkImg.src = 'assets/bonk-idle.png'; }, 3100);
+        bkmpBonkAnimTimer = setTimeout(() => { bkmpBonkImg.src = 'assets/bonk-idle.webp'; }, 3100);
         if (typeof renderAchievementBadge === 'function') renderAchievementBadge();
       });
     }

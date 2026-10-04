@@ -52,7 +52,7 @@ function bkmpMeisterRenderDialogStep() {
   const text = document.getElementById('idleMeisterDialogText');
   const btn = document.getElementById('idleMeisterDialogNextBtn');
   const step = document.getElementById('idleMeisterDialogStep');
-  if (img) img.src = `assets/dwarf/dwarf-${line.face}.png`;
+  if (img) img.src = `assets/dwarf/dwarf-${line.face}.webp`;
   if (text) text.textContent = line.text;
   if (step) step.textContent = `${bkmpMeisterDialogIndex + 1}/${BKMP_MEISTER_DIALOG_LINES.length}`;
   const isLast = bkmpMeisterDialogIndex >= BKMP_MEISTER_DIALOG_LINES.length - 1;
