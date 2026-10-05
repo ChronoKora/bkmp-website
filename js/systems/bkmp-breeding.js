@@ -15,8 +15,21 @@ let bkmpDragonUiEggFilter = null;
    vorherigen 3 <select>-Dropdowns (Seltenheit/Stufe/Sortierung) durch 3
    einfache Umschalt-Knoepfe + den bereits bestehenden Favoriten-Schalter.
    stage/sort waren nur ueber die jetzt entfernten Dropdowns aenderbar -
-   Sortierung ist seitdem fest auf Seltenheit (war ohnehin der Standard). */
-let bkmpDragonLagerFilter = { rarity: 'all', favoritesOnly: false };
+   Sortierung ist seitdem fest auf Seltenheit (war ohnehin der Standard).
+   Nutzerwunsch (05.10.2026, Spieler Kaledoss: "Wann duerfen wir wieder die
+   Drachen nach Namen sortieren?"): kleiner Umschalt-Knopf "A-Z" neben den
+   Rarity-Knoepfen, KEIN Dropdown zurueck. Aus = Seltenheit (Standard), an =
+   alphabetisch nach Artname. Die Wahl ist eine Vorliebe und wird im Browser
+   gemerkt (localStorage, wie die Hintergrund-Automatik-Schalter) - die
+   Rarity-/Favoriten-Filter bleiben bewusst nur pro Sitzung. */
+const BKMP_DRAGON_LAGER_SORT_KEY = 'bkmp-dragon-lager-sort-name';
+function bkmpDragonLagerLoadSortPref() {
+  try { return localStorage.getItem(BKMP_DRAGON_LAGER_SORT_KEY) === '1'; } catch (e) { return false; }
+}
+function bkmpDragonLagerSaveSortPref(on) {
+  try { localStorage.setItem(BKMP_DRAGON_LAGER_SORT_KEY, on ? '1' : '0'); } catch (e) { /* nur Vorliebe */ }
+}
+let bkmpDragonLagerFilter = { rarity: 'all', favoritesOnly: false, sortByName: bkmpDragonLagerLoadSortPref() };
 
 /* Kosten fuer Nest 2-5 (Index 0 = Nest 1, immer 0/automatisch frei) -
    deutlich steigend wie vom Spieler vorgegeben ("Nest 5: besonders teuer"). */
@@ -1624,9 +1637,23 @@ function bkmpIdleRenderDragonsPanel() {
     });
   }
   if (bkmpDragonLagerFilter.favoritesOnly) grown = grown.filter(d => d.is_favorite);
+  const STAGE_ORDER = { divine: 0, adult: 1, teen: 2 };
   grown = grown.slice().sort((a, b) => {
     const spA = bkmpDragonSpeciesById(a.species_id);
     const spB = bkmpDragonSpeciesById(b.species_id);
+    if (bkmpDragonLagerFilter.sortByName) {
+      /* Alphabetisch nach Artname (deutsche Regeln, Gross/Klein egal, Zahlen
+         natuerlich). Gleiche Art: weiter entwickelte Stufe zuerst, dann hoeherer
+         Aufstieg, zuletzt die id - dadurch bleibt die Reihenfolge bei jedem
+         Neuzeichnen exakt gleich (kein Springen der Karten). */
+      const byName = String(spA ? spA.name : '').localeCompare(String(spB ? spB.name : ''), 'de', { sensitivity: 'base', numeric: true });
+      if (byName) return byName;
+      const byStage = (STAGE_ORDER[a.stage] ?? 3) - (STAGE_ORDER[b.stage] ?? 3);
+      if (byStage) return byStage;
+      const byAscension = Number(b.ascension_level || 0) - Number(a.ascension_level || 0);
+      if (byAscension) return byAscension;
+      return String(a.id).localeCompare(String(b.id));
+    }
     return RARITY_ORDER.indexOf(spA ? spA.rarity : 'standard') - RARITY_ORDER.indexOf(spB ? spB.rarity : 'standard');
   });
   const RARITY_FILTER_BUTTONS = [
@@ -1637,6 +1664,7 @@ function bkmpIdleRenderDragonsPanel() {
   const filterBarHtml = `
     <div class="idle-dragon-filter-bar">
       ${RARITY_FILTER_BUTTONS.map(r => `<button type="button" class="idle-dragon-rarity-filter-btn${bkmpDragonLagerFilter.rarity === r.key ? ' active' : ''}" data-rarity="${r.key}" style="--rarity-filter-color:${bkmpDragonRarityMeta(r.key).color}">${r.label}</button>`).join('')}
+      <button type="button" class="idle-dragon-sort-btn${bkmpDragonLagerFilter.sortByName ? ' active' : ''}" id="idleDragonSortName" aria-pressed="${bkmpDragonLagerFilter.sortByName ? 'true' : 'false'}" title="Drachen alphabetisch nach Namen sortieren (aus = nach Seltenheit)">🔤 A–Z</button>
       <label class="idle-dragon-filter-fav"><input type="checkbox" id="idleDragonFilterFav" ${bkmpDragonLagerFilter.favoritesOnly ? 'checked' : ''}> ★ nur Favoriten</label>
     </div>`;
   const grownHtml = grown.length
@@ -1747,6 +1775,12 @@ function bkmpIdleRenderDragonsPanel() {
     bkmpDragonLagerFilter.rarity = bkmpDragonLagerFilter.rarity === key ? 'all' : key;
     bkmpIdleRenderDragonsPanel();
   }));
+  const sortNameBtn = document.getElementById('idleDragonSortName');
+  if (sortNameBtn) sortNameBtn.addEventListener('click', () => {
+    bkmpDragonLagerFilter.sortByName = !bkmpDragonLagerFilter.sortByName;
+    bkmpDragonLagerSaveSortPref(bkmpDragonLagerFilter.sortByName);
+    bkmpIdleRenderDragonsPanel();
+  });
   const filterFav = document.getElementById('idleDragonFilterFav');
   if (filterFav) filterFav.addEventListener('change', () => { bkmpDragonLagerFilter.favoritesOnly = filterFav.checked; bkmpIdleRenderDragonsPanel(); });
 

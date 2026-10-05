@@ -9846,7 +9846,8 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
    Radius, grosses Innenpolster, 46px Mindesthoehe) hat sonst hoehere
    Spezifitaet und wuerde aus der schlanken Pille wieder ein grosses
    eckiges Rechteck machen. */
-.idle-dragon-rarity-filter-btn {
+.idle-dragon-rarity-filter-btn,
+.idle-dragon-sort-btn {
   font-size: 0.78rem !important; font-weight: 600;
   padding: 0.38rem 0.85rem !important;
   border-radius: 999px !important;
@@ -9858,13 +9859,21 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
   white-space: nowrap;
   transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
-.idle-dragon-rarity-filter-btn:hover { color: var(--ink); }
-.idle-dragon-rarity-filter-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
-.idle-dragon-rarity-filter-btn.active {
+.idle-dragon-rarity-filter-btn:hover,
+.idle-dragon-sort-btn:hover { color: var(--ink); }
+.idle-dragon-rarity-filter-btn:focus-visible,
+.idle-dragon-sort-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.idle-dragon-rarity-filter-btn.active,
+.idle-dragon-sort-btn.active {
   border-color: color-mix(in srgb, var(--rarity-filter-color, var(--gold)) 55%, var(--line));
   background: color-mix(in srgb, var(--rarity-filter-color, var(--gold)) 16%, var(--paper));
   color: var(--rarity-filter-color, var(--gold));
 }
+/* A-Z-Sortierknopf (05.10.2026): hat keine eigene Rarity-Farbe, soll aber wie
+   alle informationstragenden Gold-Texte bei frei gewaehltem (auch schwarzem)
+   Akzent lesbar bleiben -> fester Gold-Ton statt --gold (siehe Akzentfarb-
+   Kontrast-Audit 30.08.2026). */
+.idle-dragon-sort-btn.active { --rarity-filter-color: var(--gold-fixed, #c9a56a); }
 .idle-dragon-lager-card { cursor: pointer; }
 .idle-dragon-detail-card { max-width: 360px; text-align: center; }
 .idle-dragon-detail-img { width: 100%; max-width: 160px; margin: 0 auto 0.6rem; display: block; }
@@ -14003,6 +14012,7 @@ html.bkmp-app-mode .idle-dorf-panel .idle-dragon-release-btn {
 html.bkmp-app-mode .idle-dorf-panel .idle-dragon-fav-badge { font-size: 1.3rem !important; }
 html.bkmp-app-mode .idle-dorf-panel .idle-dragon-mini-delete-btn { width: 30px !important; height: 30px !important; font-size: 0.92rem !important; }
 html.bkmp-app-mode .idle-dorf-panel .idle-dragon-filter-fav,
+html.bkmp-app-mode .idle-dorf-panel .idle-dragon-sort-btn,
 html.bkmp-app-mode .idle-dorf-panel .idle-dragon-rarity-filter-btn {
   font-size: .86rem !important;
   min-height: 44px !important;
