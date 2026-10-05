@@ -17,6 +17,8 @@ function guardPlayerDragonPatch(store, row, patch) {
   const clean = { ...patch };
   TRUSTED_FIELDS.forEach(f => { if (f in clean) delete clean[f]; });
   delete clean.species_id;
+  // sql/20261005-dragon-graduate-unequip.sql: beim Erwachsenwerden faellt der Begleiter-Status immer weg
+  if (row.stage === 'teen' && clean.stage === 'adult') clean.is_companion = false;
   if (row.stage === 'divine' && 'stage' in clean) clean.stage = 'divine';
   else if (clean.stage === 'divine') delete clean.stage;
   if (clean.is_companion === true && !row.is_companion && dragonOnRunningExpedition(store, row.id)) {

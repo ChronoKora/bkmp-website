@@ -1,0 +1,225 @@
+/* Event-Analyse im Admin-Panel (05.10.2026) - nur von admin.html eingebunden.
+   Eigene Datei, damit style.css nicht weiter waechst. Alle Klassen beginnen mit aev-.
+
+   Hinweise aus fruehen Fehlern dieses Projekts:
+   - Text-Akzentfarbe immer --gold-fixed (nicht --gold): --gold kann der Nutzer im
+     Akzentfarb-Regler auf Schwarz stellen, dann waere Text unlesbar.
+   - Fuellflaechen/Balken sind display:block (ein inline-span ignoriert width/height).
+   - Kommentare in CSS niemals mit Stern direkt vor Schraegstrich beenden oder dort
+     verkuerzen - das schliesst den Kommentar vorzeitig. */
+
+/* ---------- Werkzeugleiste ---------- */
+.aev-toolbar { display: flex; flex-wrap: wrap; gap: 0.7rem 1rem; align-items: flex-end; margin-bottom: 1rem; }
+.aev-toolbar-field { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.74rem; color: var(--muted); min-width: 0; }
+.aev-toolbar select {
+  min-width: 240px; max-width: 100%; padding: 0.55rem 0.7rem; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--paper); color: var(--ink); font: inherit; font-size: 0.86rem;
+}
+.aev-auto { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; color: var(--muted); cursor: pointer; }
+.aev-updated { font-size: 0.76rem; color: var(--muted); margin-left: auto; }
+
+.aev-body { display: grid; gap: 1.1rem; min-width: 0; }
+.aev-card {
+  background: var(--paper-2); border: 1px solid var(--line); border-radius: 16px;
+  padding: 1.2rem 1.3rem; min-width: 0;
+}
+.aev-h3 { font-family: 'Fraunces', serif; font-size: 1.02rem; margin: 0 0 0.85rem; display: flex; align-items: center; gap: 0.1rem; }
+.aev-sub-title { font-weight: 700; font-size: 0.82rem; margin: 1.1rem 0 0.5rem; color: var(--ink); }
+.aev-sub-title small { font-weight: 500; color: var(--muted); }
+.aev-sub { color: var(--muted); font-size: 0.82rem; margin-top: 0.15rem; }
+.aev-muted { color: var(--muted); font-size: 0.84rem; }
+.aev-error { border-color: var(--neg); }
+.aev-error strong { color: var(--neg); }
+.aev-note { background: var(--paper); border: 1px dashed var(--line); border-radius: 10px; padding: 0.55rem 0.8rem; font-size: 0.78rem; color: var(--muted); margin-bottom: 0.8rem; }
+.aev-note p { margin: 0.2rem 0; }
+.aev-note strong { color: var(--ink); }
+.aev-check { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.6rem; cursor: pointer; }
+
+/* ---------- Info-Symbol + Sprechblase ---------- */
+.aev-info {
+  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  width: 16px; height: 16px; margin-left: 0.35rem; border-radius: 50%;
+  border: 1px solid var(--line); font-size: 0.64rem; font-weight: 700; font-style: normal; line-height: 1;
+  color: var(--muted); cursor: help; vertical-align: middle; background: var(--paper);
+}
+.aev-info:hover, .aev-info:focus-visible { color: var(--gold-fixed); border-color: var(--gold-fixed); outline: none; }
+.aev-tip {
+  position: fixed; z-index: 10050; left: 0; top: 0; width: 260px; padding: 0.55rem 0.7rem;
+  background: #14101d; color: #f5f3ed; border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 10px;
+  font-size: 0.76rem; line-height: 1.45; font-weight: 400; text-align: left;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45); opacity: 0; visibility: hidden; pointer-events: none;
+}
+.aev-tip.on { opacity: 1; visibility: visible; }
+
+/* ---------- Kopf ---------- */
+.aev-head-top { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 0.8rem; }
+.aev-title { font-family: 'Fraunces', serif; font-size: 1.35rem; margin: 0; }
+.aev-head-status { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.aev-time { font-size: 0.84rem; color: var(--gold-fixed); font-weight: 600; }
+.aev-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.7rem 1.2rem; margin: 1rem 0 0; }
+.aev-facts > div { min-width: 0; }
+.aev-facts dt { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; display: flex; align-items: center; }
+.aev-facts dd { margin: 0.15rem 0 0; font-size: 0.92rem; font-weight: 600; overflow-wrap: anywhere; }
+.aev-id { margin-top: 0.9rem; font-size: 0.7rem; color: var(--muted); }
+
+.aev-badge {
+  display: inline-block; padding: 0.14rem 0.6rem; border-radius: 999px; font-size: 0.7rem; font-weight: 700;
+  border: 1px solid var(--line); color: var(--muted); white-space: nowrap; background: var(--paper);
+}
+.aev-badge-live { color: var(--pos); border-color: var(--pos); }
+.aev-badge-soon { color: #f59e0b; border-color: #f59e0b; }
+.aev-badge-done { color: var(--gold-fixed); border-color: var(--gold-fixed); }
+.aev-badge-ended, .aev-badge-archived, .aev-badge-hidden { color: var(--muted); }
+
+/* ---------- Kennzahlen ---------- */
+.aev-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.7rem; }
+.aev-kpi { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 0.8rem 0.9rem; min-width: 0; }
+.aev-kpi-label { font-size: 0.72rem; color: var(--muted); display: flex; flex-wrap: wrap; align-items: center; row-gap: 0.2rem; min-width: 0; }
+.aev-kpi-value { font-size: 1.6rem; font-weight: 700; margin-top: 0.25rem; font-variant-numeric: tabular-nums; }
+.aev-kpi-sub { font-size: 0.72rem; color: var(--muted); margin-top: 0.1rem; }
+
+/* ---------- Stufenverteilung ---------- */
+.aev-hist { display: flex; align-items: stretch; gap: 2px; height: 170px; }
+.aev-bar {
+  flex: 1 1 0; min-width: 0; min-height: 0; padding: 0; margin: 0; border: 0; border-radius: 0;
+  background: transparent; cursor: pointer; display: flex; align-items: flex-end; position: relative;
+  border-bottom: 2px solid var(--line);
+}
+.aev-bar.ms { border-bottom-color: var(--gold-fixed); }
+.aev-bar-fill { display: block; width: 100%; background: var(--gold-fixed); border-radius: 3px 3px 0 0; opacity: 0.8; transition: opacity 0.12s ease; }
+.aev-bar:hover .aev-bar-fill, .aev-bar:focus-visible .aev-bar-fill { opacity: 1; }
+.aev-bar:focus-visible { outline: 2px solid var(--gold-fixed); outline-offset: 1px; }
+.aev-axis { display: flex; gap: 2px; margin-top: 0.3rem; }
+.aev-axis-tick { flex: 1 1 0; min-width: 0; text-align: center; font-size: 0.62rem; color: var(--muted); white-space: nowrap; }
+.aev-readout { margin-top: 0.7rem; font-size: 0.8rem; color: var(--muted); min-height: 1.2em; }
+
+/* ---------- Meilensteine / Auswahl ---------- */
+.aev-ms-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0.8rem; }
+.aev-ms { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 0.85rem 0.95rem; min-width: 0; }
+.aev-ms-tier { font-size: 0.72rem; font-weight: 700; color: var(--gold-fixed); text-transform: uppercase; letter-spacing: 0.04em; }
+.aev-ms-reward { font-size: 0.86rem; font-weight: 600; margin: 0.2rem 0 0.6rem; overflow-wrap: anywhere; }
+.aev-ms-row { display: grid; grid-template-columns: 1fr auto; gap: 0 0.5rem; font-size: 0.78rem; align-items: baseline; margin-top: 0.25rem; }
+.aev-ms-row span { color: var(--muted); }
+.aev-ms-row strong { text-align: right; font-variant-numeric: tabular-nums; }
+.aev-ms-row em { grid-column: 1 / -1; font-style: normal; font-size: 0.7rem; color: var(--muted); margin-top: -0.05rem; }
+.aev-meter { display: block; height: 6px; border-radius: 999px; background: var(--paper-3); overflow: hidden; margin-top: 0.55rem; }
+.aev-meter > span { display: block; height: 100%; background: var(--gold-fixed); border-radius: 999px; }
+.aev-meter.sm { display: inline-block; width: 56px; vertical-align: middle; margin: 0 0 0 0.45rem; }
+.aev-meter.lg { height: 10px; margin: 0.8rem 0 0.2rem; }
+
+.aev-choice-row { display: grid; grid-template-columns: minmax(110px, 190px) 1fr auto; gap: 0.7rem; align-items: center; margin-bottom: 0.55rem; }
+.aev-choice-name { font-weight: 600; font-size: 0.88rem; overflow-wrap: anywhere; }
+.aev-choice-icon { margin-right: 0.35rem; }
+.aev-choice-bar { display: block; height: 14px; border-radius: 999px; background: var(--paper-3); overflow: hidden; }
+.aev-choice-bar > span { display: block; height: 100%; background: var(--gold-fixed); }
+.aev-choice-val { text-align: right; font-variant-numeric: tabular-nums; font-size: 0.86rem; min-width: 64px; }
+.aev-choice-val em { display: block; font-style: normal; font-size: 0.7rem; color: var(--muted); }
+.aev-choice-sum { display: flex; flex-wrap: wrap; gap: 0.4rem 1.4rem; margin-top: 0.8rem; font-size: 0.82rem; color: var(--muted); }
+.aev-choice-sum strong { color: var(--ink); }
+.aev-open, .aev-open strong { color: #f59e0b; }
+
+/* ---------- Diagramm ---------- */
+.aev-legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1.1rem; font-size: 0.76rem; color: var(--muted); margin-bottom: 0.4rem; }
+.aev-legend-item { display: inline-flex; align-items: center; gap: 0.35rem; }
+.aev-legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+.aev-chart-wrap { overflow-x: auto; }
+.aev-chart { display: block; width: 100%; min-width: 360px; height: auto; }
+.aev-grid { stroke: var(--line); stroke-width: 1; }
+.aev-line { fill: none; stroke-width: 2.2; stroke-linejoin: round; stroke-linecap: round; }
+.s1 { stroke: #38bdf8; }
+.s2 { stroke: var(--gold-fixed); }
+.s3 { stroke: var(--pos); }
+.aev-dot.s1, .aev-legend-dot.s1 { fill: #38bdf8; background: #38bdf8; }
+.aev-dot.s2, .aev-legend-dot.s2 { fill: var(--gold-fixed); background: var(--gold-fixed); }
+.aev-dot.s3, .aev-legend-dot.s3 { fill: var(--pos); background: var(--pos); }
+.aev-dot { stroke: none; }
+.aev-hit { fill: transparent; cursor: pointer; }
+.aev-hit:hover { fill: rgba(255, 255, 255, 0.05); }
+.aev-xlab, .aev-ylab { fill: var(--muted); font-size: 10px; }
+.aev-na { color: var(--muted); }
+
+/* ---------- Tabellen ---------- */
+.aev-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; margin-top: 0.4rem; }
+.aev-table-wrap.aev-tall { max-height: 460px; overflow-y: auto; }
+.aev-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.aev-table th {
+  text-align: left; padding: 0.5rem 0.65rem; border-bottom: 1px solid var(--line); color: var(--muted);
+  font-weight: 600; white-space: nowrap; background: var(--paper); position: sticky; top: 0; z-index: 1;
+}
+.aev-table td { padding: 0.45rem 0.65rem; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.aev-table tr:last-child td { border-bottom: 0; }
+.aev-table .r { text-align: right; font-variant-numeric: tabular-nums; }
+.aev-table td small { color: var(--muted); font-size: 0.72rem; }
+.aev-table td.r small { white-space: nowrap; }
+.aev-table td:first-child small { display: block; }
+.aev-table tbody tr:hover { background: var(--paper-3); }
+.aev-table tr.aev-today { background: color-mix(in srgb, var(--gold-fixed) 10%, transparent); }
+.aev-table tr.aev-ms-row-hl td:first-child { color: var(--gold-fixed); font-weight: 700; }
+.aev-sort {
+  background: none; border: 0; padding: 0; margin: 0; min-height: 0; min-width: 0; font: inherit; color: inherit;
+  font-weight: 600; cursor: pointer; white-space: nowrap; border-radius: 4px;
+}
+.aev-sort:hover, .aev-sort:focus-visible { color: var(--gold-fixed); outline: none; }
+.aev-sort.on { color: var(--gold-fixed); }
+.aev-sort.on.asc::after { content: ' ▲'; font-size: 0.7em; }
+.aev-sort.on.desc::after { content: ' ▼'; font-size: 0.7em; }
+.aev-rate { font-variant-numeric: tabular-nums; }
+.aev-closure { display: flex; flex-wrap: wrap; gap: 0.3rem 1.4rem; font-size: 0.84rem; color: var(--muted); }
+.aev-closure strong { color: var(--ink); }
+
+.aev-players-tools { margin-bottom: 0.7rem; }
+.aev-players-tools input {
+  width: min(360px, 100%); padding: 0.55rem 0.75rem; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--paper); color: var(--ink); font: inherit; font-size: 0.86rem;
+}
+.aev-player-row { cursor: pointer; }
+.aev-player-row:focus-visible { outline: 2px solid var(--gold-fixed); outline-offset: -2px; }
+.aev-pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem; margin-top: 0.7rem; font-size: 0.8rem; color: var(--muted); }
+.aev-pager-btns { display: inline-flex; align-items: center; gap: 0.6rem; }
+
+.aev-limits summary { cursor: pointer; font-weight: 700; font-size: 0.88rem; }
+.aev-limits ul { margin: 0.7rem 0 0; padding-left: 1.2rem; font-size: 0.82rem; color: var(--muted); }
+.aev-limits li { margin: 0.35rem 0; }
+.aev-limits strong { color: var(--ink); }
+
+/* ---------- Spieler-Einzelansicht ---------- */
+.aev-modal-overlay {
+  position: fixed; inset: 0; z-index: 10000; background: rgba(0, 0, 0, 0.62);
+  display: flex; align-items: center; justify-content: center; padding: 1rem;
+}
+.aev-modal {
+  position: relative; background: var(--paper-2); color: var(--ink); border: 1px solid var(--line); border-radius: 16px;
+  width: min(760px, 100%); max-height: 92dvh; overflow: auto; padding: 1.4rem 1.4rem 1.6rem;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+.aev-modal-close {
+  position: absolute; top: 0.7rem; right: 0.7rem; width: 36px; height: 36px; min-height: 0; padding: 0;
+  border-radius: 50%; border: 1px solid var(--line); background: var(--paper); color: var(--ink); cursor: pointer; font-size: 1rem;
+}
+.aev-modal-title { font-family: 'Fraunces', serif; font-size: 1.25rem; margin: 0 2.4rem 0 0; }
+.aev-qlist { list-style: none; margin: 0; padding: 0; font-size: 0.84rem; }
+.aev-qlist li { padding: 0.3rem 0; border-bottom: 1px solid var(--line); }
+.aev-qlist li:last-child { border-bottom: 0; }
+.aev-qlist li.done span { color: var(--pos); }
+.aev-qlist small { color: var(--muted); }
+.aev-details { margin-top: 1rem; font-size: 0.82rem; }
+.aev-details summary { cursor: pointer; font-weight: 600; }
+
+/* ---------- Handy ---------- */
+@media (max-width: 760px) {
+  .aev-card { padding: 1rem 0.9rem; }
+  .aev-toolbar select { min-width: 0; width: 100%; }
+  .aev-toolbar-field { width: 100%; }
+  .aev-updated { margin-left: 0; width: 100%; }
+  .aev-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .aev-kpi-value { font-size: 1.35rem; }
+  .aev-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .aev-hist { height: 140px; }
+  .aev-choice-row { grid-template-columns: 1fr auto; }
+  .aev-choice-bar { grid-column: 1 / -1; order: 3; }
+  .aev-modal { padding: 1.1rem 0.9rem 1.3rem; }
+  .aev-modal-overlay { align-items: flex-end; padding: 0.5rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .aev-bar-fill { transition: none; }
+}

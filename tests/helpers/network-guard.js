@@ -58,6 +58,19 @@ function isAllowedHost(hostname) {
   return !!hostname && (ALLOWED_HOSTS.has(hostname) || ALLOWED_EXTRA_HOSTS.has(hostname));
 }
 
+/* Host einer Anfrage-Adresse. Sonderfall blob:/data: (05.10.2026): `new URL('blob:http://127.0.0.1:1234/uuid').hostname`
+   ist leer (opaker Ursprung) - die Sperre hielt solche Adressen deshalb fuer einen fremden Host und brach sie ab.
+   Chromium meldet Blob-Zugriffe nie an page.route, WebKit (Projekt mobile-large) schon: Die Funktion
+   "Event-Ankuendigungs-Popup" laedt ihr Bild per fetch -> Blob -> <img src=blob:...>, dadurch scheiterten dort
+   28 Tests. Eine Blob-/Data-Adresse liegt nur im Arbeitsspeicher des Browsers und kann nie das Netz erreichen;
+   bei blob: zaehlt der eingebettete Ursprung (muss selbst erlaubt sein), data: ist immer harmlos. */
+function hostnameOfRequestUrl(rawUrl) {
+  const u = new URL(rawUrl);
+  if (u.protocol === 'data:') return '127.0.0.1';
+  if (u.protocol === 'blob:') return new URL(String(rawUrl).slice(5)).hostname;
+  return u.hostname;
+}
+
 function violationMessage(kind, url, index) {
   return `[network-guard] BLOCKED ${kind} request #${index} to a disallowed host: ${url}\n` +
     'Nur localhost/127.0.0.1/::1 (+ die dokumentierte minotar.net-Ausnahme, siehe ' +
@@ -116,7 +129,7 @@ const test = base.test.extend({
     await context.route('**/*', (route) => {
       const req = route.request();
       let hostname;
-      try { hostname = new URL(req.url()).hostname; } catch (e) { return route.continue(); }
+      try { hostname = hostnameOfRequestUrl(req.url()); } catch (e) { return route.continue(); }
       if (isAllowedHost(hostname)) return route.continue();
       networkGuardViolations.push(violationMessage(req.method(), req.url(), networkGuardViolations.length + 1));
       return route.abort('blockedbyclient');
@@ -174,4 +187,4 @@ const test = base.test.extend({
 
 const expect = base.expect;
 
-module.exports = { test, expect, PROD_HOSTS, ALLOWED_HOSTS, ALLOWED_EXTRA_HOSTS, isAllowedHost, qaUrl, createQaServer };
+module.exports = { test, expect, PROD_HOSTS, ALLOWED_HOSTS, ALLOWED_EXTRA_HOSTS, isAllowedHost, hostnameOfRequestUrl, qaUrl, createQaServer };

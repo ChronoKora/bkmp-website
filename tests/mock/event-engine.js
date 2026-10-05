@@ -126,7 +126,8 @@ const EVENT_HANDLERS = {
         last_metrics: serverMetrics(store, uid), last_tick_at_ms: now, kill_scale: scale,
         day_key: null, day_base: {}, day_quests: [], day_closure_done: false, day_client: {},
         weekly_quests: rules.bkmpEventGenerateWeek(ev.config, scale, r => requirementOk(store, uid, r)),
-        weekly_done: {}, tier_claimed: [], unlocks: [], earned: false, earned_at: null, choice_species: null, chosen_at: null
+        weekly_done: {}, tier_claimed: [], unlocks: [], earned: false, earned_at: null, choice_species: null, chosen_at: null,
+        joined_day: berlinDay(now)   // Spalten-Default village_berlin_today() (20261005-event-admin-stats.sql)
       };
       rows.push(row);
     }
@@ -141,7 +142,17 @@ const EVENT_HANDLERS = {
       });
       const earnedNow = out.row.earned_at_pending;
       delete out.row.earned_at_pending;
+      /* Spiegel des Triggers event_log_day_rollover (20261005-event-admin-stats.sql): beim
+         Tageswechsel wird der alte Tag (Quests + Punktestand am Tagesende) gesichert. */
+      const before = JSON.parse(JSON.stringify({ day_key: row.day_key, quests: row.day_quests, closure: row.day_closure_done, points: row.points }));
       Object.assign(row, out.row, { last_tick_at_ms: now });
+      if (before.day_key && row.day_key !== before.day_key) {
+        const log = getTable(store, 'event_player_day_log');
+        if (!log.some(l => l.event_id === ev.id && l.auth_user_id === uid && l.day_key === before.day_key)) {
+          log.push({ event_id: ev.id, auth_user_id: uid, day_key: before.day_key, quests: before.quests,
+            closure_done: Boolean(before.closure), points_end: Number(before.points || 0) });
+        }
+      }
       if (earnedNow) row.earned_at = nowIso(store);
       accepted = out.accepted;
     }

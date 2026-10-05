@@ -21,7 +21,7 @@
    Jeder ANDERE, unbeabsichtigte Verstoss in jedem ANDEREN Test bleibt davon
    komplett unberuehrt und faellt weiterhin durch. */
 
-const { test, expect, PROD_HOSTS } = require('../helpers/network-guard');
+const { test, expect, PROD_HOSTS, isAllowedHost, hostnameOfRequestUrl } = require('../helpers/network-guard');
 
 const PROD_HOST = PROD_HOSTS[0];
 
@@ -115,6 +115,34 @@ test.describe('network-guard @network-guard', () => {
 
     // Kein Fallback-Kontakt zu irgendeinem nicht erlaubten Host - die einzige
     // "Anfrage" war der gescheiterte lokale Verbindungsversuch selbst.
+    expect(networkGuardViolations).toEqual([]);
+  });
+
+  /* 05.10.2026: auf WebKit (mobile-large) wurden blob:-Adressen der EIGENEN Seite als "fremder Host" abgebrochen
+     (new URL('blob:http://127.0.0.1:1/x').hostname ist leer) - 28 Tests des Event-Popups, das sein Bild per
+     fetch -> Blob -> <img src=blob:> laedt, scheiterten dort. */
+  test('blob:/data:-Adressen: lokaler Ursprung erlaubt, fremder Ursprung bleibt gesperrt', async () => {
+    expect(isAllowedHost(hostnameOfRequestUrl('blob:http://127.0.0.1:4173/3b677e55-f78d-42f8-ab0d-afa432556ec0'))).toBe(true);
+    expect(isAllowedHost(hostnameOfRequestUrl('blob:http://localhost:4173/abc'))).toBe(true);
+    expect(isAllowedHost(hostnameOfRequestUrl('data:image/png;base64,AAAA'))).toBe(true);
+    expect(isAllowedHost(hostnameOfRequestUrl('blob:https://' + PROD_HOST + '/abc'))).toBe(false);
+    expect(isAllowedHost(hostnameOfRequestUrl('blob:https://evil.example/abc'))).toBe(false);
+    expect(isAllowedHost(hostnameOfRequestUrl('https://' + PROD_HOST + '/rest/v1/x'))).toBe(false);
+  });
+
+  test('Seite darf ein Bild per fetch -> Blob -> <img> laden (kein Verstoss, Bild wird wirklich dargestellt)', async ({ page, qaServer, networkGuardViolations }) => {
+    await page.goto(qaServer.url('/'));
+    const result = await page.evaluate(async () => {
+      const resp = await fetch('/assets/events/zwielicht-announcement.webp');
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      const ok = await new Promise(res => { img.onload = () => res(true); img.onerror = () => res(false); img.src = url; });
+      return { ok, w: img.naturalWidth, h: img.naturalHeight, isBlob: url.startsWith('blob:') };
+    });
+    expect(result.isBlob).toBe(true);
+    expect(result.ok, 'Das Blob-Bild haette geladen werden muessen').toBe(true);
+    expect(result.w).toBeGreaterThan(0);
     expect(networkGuardViolations).toEqual([]);
   });
 });

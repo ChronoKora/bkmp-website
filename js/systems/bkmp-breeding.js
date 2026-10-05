@@ -557,6 +557,31 @@ function bkmpDragonActiveCompanions() {
     .sort((a, b) => strength(b) - strength(a))
     .slice(0, maxSlots);
 }
+/* Aufraeumen haengengebliebener Begleiter-Markierungen (05.10.2026).
+   Erwachsene mit is_companion=true, die in KEINEM der freigeschalteten
+   Kampf-Plaetze liegen, tragen nichts bei (Anzeige: "Platzlimit erreicht -
+   trägt nicht bei"), blockieren aber Expeditionen und das Freilassen. Sie
+   entstanden vor allem, weil ein Jugendlicher beim Erwachsenwerden die
+   Markierung behielt, ausserdem nach einem Aufstieg, der "Weitere Gefaehrten"
+   zuruecksetzt. Die Markierung wird entfernt (Bindung und alles andere
+   bleibt). Nur wenn der Prestige-Stand sicher geladen ist - sonst waere das
+   Platzlimit faelschlich 1 und echte Begleiter wuerden abgelegt. Gibt die Zahl
+   der bereinigten Drachen zurueck. */
+function bkmpDragonHealStaleCompanions() {
+  if (typeof bkmpPrestigeState === 'undefined' || !bkmpPrestigeState || (typeof bkmpPrestigeLoadFailed !== 'undefined' && bkmpPrestigeLoadFailed)) return 0;
+  const active = new Set(bkmpDragonActiveCompanions().map(d => d.id));
+  const stale = bkmpPlayerDragons.filter(d => d.is_companion && bkmpDragonIsGrown(d) && !active.has(d.id));
+  stale.forEach(d => {
+    d.is_companion = false;
+    if (typeof updatePlayerDragon === 'function') updatePlayerDragon(d.id, { is_companion: false }).catch(() => {});
+  });
+  if (stale.length && typeof bkmpShowJannikToast === 'function') {
+    bkmpShowJannikToast(stale.length === 1
+      ? '🐲 Ein Drache ohne freien Kampfplatz wurde aus dem Begleiter-Status genommen - er steht wieder für Expeditionen bereit.'
+      : `🐲 ${stale.length} Drachen ohne freien Kampfplatz wurden aus dem Begleiter-Status genommen - sie stehen wieder für Expeditionen bereit.`, 5200);
+  }
+  return stale.length;
+}
 /* Drachendorf-Ausbau Phase 3: ein Drache auf Expedition ist unterwegs - er
    kann weder kaempfen, noch freigelassen oder geopfert werden (zusaetzlich
    serverseitig per Trigger abgesichert, siehe sql/20261004-03-expeditions.sql). */
@@ -652,7 +677,14 @@ async function bkmpDragonEvolveToAdult(dragonId) {
   const species = dragon ? bkmpDragonSpeciesById(dragon.species_id) : null;
   if (!dragon || !species || dragon.stage !== 'teen' || dragon.battle_xp < species.battle_xp_required) return;
   const rolled = bkmpIdleRollAdultDragonStats(species);
-  const patch = { stage: 'adult', adult_at: new Date().toISOString(), ...rolled };
+  /* 05.10.2026: is_companion wird beim Erwachsenwerden GELOESCHT. Der
+     Jugendliche stand im Trainings-Platz; blieb die Markierung stehen, war er
+     danach still als erwachsener Kampf-Begleiter "ausgeruestet" - er blockierte
+     Expeditionen und das Freilassen, sammelte unbemerkt Bindung/Begleiter-Zeit/
+     Boss-Siege und tauchte bei vollen Kampf-Plaetzen in keinem Platz auf. Wer
+     ihn als Kampf-Begleiter will, setzt ihn bewusst. (Serverseitig zusaetzlich
+     per Trigger abgesichert, siehe sql/20261005-dragon-graduate-unequip.sql.) */
+  const patch = { stage: 'adult', adult_at: new Date().toISOString(), is_companion: false, ...rolled };
   try {
     await updatePlayerDragon(dragonId, patch);
     Object.assign(dragon, patch);
@@ -1200,6 +1232,7 @@ async function bkmpIdleLoadDragonBreedingState(name) {
     bkmpPlayerDragonNests = Array.isArray(nests) ? nests : [];
     bkmpPlayerDragons = Array.isArray(dragons) ? dragons : [];
     bkmpDragonReconcileDiscovered();
+    bkmpDragonHealStaleCompanions();
     /* Drachendorf-Ausbau Phase 4: fehlende Eigenschaften serverseitig
        vergeben (genau einmal) + Dex-Rekorde nachziehen. */
     if (typeof bkmpDragonTraitsAfterLoad === 'function') bkmpDragonTraitsAfterLoad();

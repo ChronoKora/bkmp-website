@@ -18,6 +18,7 @@
 const { table: getTable } = require('./store');
 /* Drachendorf-Ausbau Phase 7-11: Events + Goettliche Erweckung (event-engine.js). */
 const { EVENT_HANDLERS, eventModifier } = require('./event-engine');
+const { ADMIN_EVENT_HANDLERS } = require('./event-admin-engine');
 
 const DUNGEON_TYPES = ['gold', 'exp', 'egg', 'meat', 'fruit', 'gem', 'rune'];
 const DIFFICULTY_LADDER = ['leicht', 'mittel', 'schwer', 'albtraum'];
@@ -2049,6 +2050,7 @@ const RPC_HANDLERS = {
 };
 
 Object.assign(RPC_HANDLERS, EVENT_HANDLERS);
+Object.assign(RPC_HANDLERS, ADMIN_EVENT_HANDLERS);   // Event-Analyse im Admin-Panel (20261005-event-admin-stats.sql)
 
 function handleRpcRequest(store, uid, fnName, params) {
   const handler = RPC_HANDLERS[fnName];

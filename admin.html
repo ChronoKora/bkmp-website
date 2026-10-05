@@ -22,6 +22,7 @@
 <link rel="preconnect" href="https://zgknyrwzpohvfdweomxf.supabase.co">
 <link rel="stylesheet" href="style.css?v=20261005-dorfloader1">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
+<link rel="stylesheet" href="css/bkmp-admin-events.css?v=20261005-eventstats1">
 </head>
 <body>
 
@@ -196,6 +197,10 @@
         <button class="admin-nav-btn" data-page="idledorf">
           <svg viewBox="0 0 24 24"><path d="M4 21V10l8-6 8 6v11"/><path d="M9 21v-6h6v6"/></svg>
           Idle Dorf
+        </button>
+        <button class="admin-nav-btn" data-page="events" data-testid="admin-nav-events">
+          <svg viewBox="0 0 24 24"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-8"/><path d="M22 20H2"/></svg>
+          Events
         </button>
         <button class="admin-nav-btn" data-page="mapartcompanies">
           <svg viewBox="0 0 24 24"><path d="M4 8h16v11H4z"/><path d="M7 8V5h10v3"/><path d="M8 13h8"/></svg>
@@ -1029,6 +1034,21 @@
           </div>
         </section>
 
+        <!-- Event-Analyse (05.10.2026) - nur Ansicht, Daten aus den admin_event_*-Funktionen, Logik in js/admin/bkmp-admin-events.js -->
+        <section class="admin-page" id="page-events" data-testid="aev-page">
+          <div class="admin-section">
+            <h2>Events &mdash; Auswertung</h2>
+            <p class="admin-help-text">Nur Ansicht: Beteiligung, Stufen, Aufgaben und Belohnungen jedes Events. Hier lassen sich keine Punkte, Stufen oder Belohnungen verändern. Tage zählen nach Berliner Zeit.</p>
+            <div class="aev-toolbar">
+              <label class="aev-toolbar-field"><span>Event</span><select id="aevEventSelect" data-testid="aev-event-select"><option value="">Wird geladen …</option></select></label>
+              <button class="btn" id="aevRefresh" data-testid="aev-refresh" type="button">↻ Aktualisieren</button>
+              <label class="aev-auto"><input type="checkbox" id="aevAuto" data-testid="aev-auto"> alle 60 s automatisch</label>
+              <span class="aev-updated" id="aevUpdated" data-testid="aev-last-updated">Noch nicht geladen</span>
+            </div>
+            <div class="aev-body" id="aevBody"></div>
+          </div>
+        </section>
+
         <!-- Kartenfirmen -->
         <section class="admin-page" id="page-mapartcompanies">
           <div class="admin-section">
@@ -1283,7 +1303,7 @@
   <script src="js/systems/bkmp-achievements.js?v=20260717-p2cfoundation"></script>
   <script src="js/core/bkmp-combat-math.js?v=20260801-guildlvlcap1"></script>
   <script src="js/systems/bkmp-dungeon.js?v=20261004-p0"></script>
-  <script src="js/systems/bkmp-breeding.js?v=20261005-dexreveal1"></script>
+  <script src="js/systems/bkmp-breeding.js?v=20261005-graduatefix1"></script>
   <script src="js/systems/bkmp-guild.js?v=20261004-p6"></script>
   <script src="js/systems/bkmp-runes.js?v=20261004-p10"></script>
   <script src="js/systems/bkmp-raid.js?v=20261002-perfdeeplink1"></script>
@@ -1306,6 +1326,7 @@
   <script src="idledorf.js?v=20261004-skillqol1"></script>
   <script src="js/core/bkmp-idle-bootstrap.js?v=20260717-p2afoundation"></script>
   <script src="mapart.js?v=20260717-kartenfirmen1"></script>
+  <script src="js/admin/bkmp-admin-events.js?v=20261005-eventstats1"></script>
   <script>
     bkmpInitTheme();
 
@@ -1606,6 +1627,7 @@
         if (page === 'plushies') { bkmpRefreshPlushieDefinitionsAdmin(); refreshPlushieCodesList(); }
         if (page === 'polls') refreshPollsAdmin();
         if (page === 'idledorf') refreshIdleDorfAdmin();
+        if (page === 'events' && typeof bkmpAdminEventsOnOpen === 'function') bkmpAdminEventsOnOpen();
         if (page === 'access') refreshAdminAccessList();
         if (page === 'employees') refreshEmployeePayoutPage();
         if (page === 'swstats') refreshSwStatsAdminPage();
