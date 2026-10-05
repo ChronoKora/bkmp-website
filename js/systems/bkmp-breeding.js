@@ -936,6 +936,33 @@ function bkmpDragonMainStatLine(dragon) {
    hat... sobald dann in Voller Farbe". Nutzt bkmpDragonSpeciesCatalog (ALLE
    bekannten Arten, nicht nur besessene) + dragon_species_discovered_at
    (siehe bkmpDragonReconcileDiscovered) fuer den Besitz-Status. */
+/* Nutzer-Meldung (05.10.2026): "Man sieht sobald man das EGG hat alle Stufen
+   bereits vom Drachen wie sie aussehen." Bisher war "entdeckt" nur pro ART
+   (schon ein Ei genuegte) - Lexikon-Raster UND Detailansicht zeigten dann
+   jede Form in voller Farbe, auch die noch nie erreichten. Jetzt gilt das
+   auch pro FORM: farbig ist nur, was man mit dieser Art schon erreicht hat;
+   spaetere Formen bleiben schwarze Silhouetten (wie bei unentdeckten Arten,
+   Nutzerwunsch 17.07.: "Alle Schwarz ausgeblendet die man noch nicht hat ...
+   sobald dann in Voller Farbe").
+   Rueckgabe: Index der hoechsten erreichten Form (0 Ei, 1 Baby, 2 Jugendlich,
+   3 Erwachsen, 4 fuenfte Form), -1 = Art noch nicht entdeckt. Quellen: die
+   dauerhafte Dex-Aufzeichnung (bkmpDexRecord, bleibt auch nach Freilassen/
+   Aufstieg erhalten) UND der aktuelle Besitz - Letzteres, damit die Anzeige
+   auch dann stimmt, wenn die Aufzeichnung noch nicht geladen/abgeglichen ist.
+   Wer eine Form VOR Einfuehrung der Aufzeichnung (04.10.) erreicht und den
+   Drachen danach freigelassen hat, sieht sie als Silhouette, bis er die Form
+   erneut erreicht. */
+const BKMP_DRAGON_DEX_FORM_INDEX = { egg: 0, baby: 1, teen: 2, adult: 3, divine: 4 };
+function bkmpDragonDexReachedIndex(speciesId) {
+  const discovered = Boolean(bkmpIdleState && bkmpIdleState.dragon_species_discovered_at && bkmpIdleState.dragon_species_discovered_at[speciesId]);
+  if (!discovered) return -1;
+  const rec = typeof bkmpDexRecord === 'function' ? bkmpDexRecord(speciesId) : null;
+  let best = rec && Number.isFinite(Number(rec[0])) ? Number(rec[0]) : 0;
+  (bkmpPlayerDragons || []).forEach(d => {
+    if (d.species_id === speciesId) best = Math.max(best, BKMP_DRAGON_DEX_FORM_INDEX[d.stage] ?? 0);
+  });
+  return best;
+}
 function bkmpDragonRenderLexikonSection() {
   bkmpDragonReconcileDiscovered();
   const discovered = (bkmpIdleState && bkmpIdleState.dragon_species_discovered_at) || {};
@@ -945,9 +972,15 @@ function bkmpDragonRenderLexikonSection() {
     ? species.map(sp => {
         const isDiscovered = Boolean(discovered[sp.id]);
         const rarity = bkmpDragonRarityMeta(sp.rarity);
+        /* Entdeckte Art: Bild der hoechsten ERREICHTEN Form (nicht mehr immer
+           die Erwachsenen-Form). Unentdeckte Art: wie bisher die schwarze
+           Erwachsenen-Silhouette (verraet nichts, siehe .is-locked). */
+        const reachedIdx = bkmpDragonDexReachedIndex(sp.id);
+        const spStages = bkmpDragonSpeciesStages(sp);
+        const thumbPath = isDiscovered ? bkmpDragonStageImage(sp, spStages[Math.min(Math.max(reachedIdx, 0), spStages.length - 1)]) : sp.adult_image;
         return `
-          <div class="idle-skin-card idle-dragon-dex-card ${isDiscovered ? 'is-discovered' : 'is-locked'}" data-species-id="${sp.id}" style="--dragon-rarity-color:${rarity.color}">
-            ${bkmpDragonThumbHtml(sp.adult_image, isDiscovered ? escapeHtml(sp.name) : 'Unentdeckte Art')}
+          <div class="idle-skin-card idle-dragon-dex-card ${isDiscovered ? 'is-discovered' : 'is-locked'}" data-species-id="${sp.id}" data-reached-form="${reachedIdx}" style="--dragon-rarity-color:${rarity.color}">
+            ${bkmpDragonThumbHtml(thumbPath, isDiscovered ? escapeHtml(sp.name) : 'Unentdeckte Art')}
             <div class="idle-skin-name">${isDiscovered ? escapeHtml(sp.name) : '???'}</div>
             <div class="idle-skin-desc">${isDiscovered ? rarity.name : 'Noch nicht entdeckt'}</div>
           </div>`;
@@ -978,8 +1011,8 @@ function bkmpDragonOpenDexDetail(speciesId) {
   overlay.dataset.stages = stagesForSpecies.join(',');
   const dotsEl = overlay.querySelector('.idle-dragon-dex-dots');
   if (dotsEl) {
-    const rec = typeof bkmpDexRecord === 'function' ? bkmpDexRecord(speciesId) : null;
-    dotsEl.innerHTML = stagesForSpecies.map((st, i) => `<span class="idle-dragon-dex-dot${rec && i <= rec[0] ? ' is-reached' : ''}" data-stage="${st}" title="${bkmpDragonDexStageLabel(species, st)}"></span>`).join('');
+    const reachedIdx = bkmpDragonDexReachedIndex(speciesId);
+    dotsEl.innerHTML = stagesForSpecies.map((st, i) => `<span class="idle-dragon-dex-dot${i <= reachedIdx ? ' is-reached' : ''}" data-stage="${st}" title="${bkmpDragonDexStageLabel(species, st)}"></span>`).join('');
   }
   overlay.dataset.discovered = discovered ? '1' : '0';
   /* .onclick statt addEventListener: haelt pro Element garantiert genau
@@ -1010,10 +1043,16 @@ function bkmpDragonRenderDexPage() {
   const discovered = overlay.dataset.discovered === '1';
   const rarity = bkmpDragonRarityMeta(species.rarity);
   const stage = bkmpDragonDexStagesOf(overlay)[bkmpDragonDexPageIndex];
+  /* Pro Form: nur bereits erreichte Formen in Farbe, alle spaeteren als
+     Silhouette (siehe bkmpDragonDexReachedIndex). Bei einer unentdeckten Art
+     ist ohnehin alles gesperrt (reachedIdx = -1). */
+  const stageLocked = !discovered || bkmpDragonDexPageIndex > bkmpDragonDexReachedIndex(species.id);
+  overlay.dataset.stageLocked = stageLocked ? '1' : '0';
   const img = document.getElementById('idleDragonDexImg');
   if (img) {
     img.src = bkmpDragonStageImage(species, stage) || '';
-    img.classList.toggle('idle-dragon-dex-img-locked', !discovered);
+    img.classList.toggle('idle-dragon-dex-img-locked', stageLocked);
+    img.alt = stageLocked ? 'Noch nicht erreichte Form' : `${species.name} – ${bkmpDragonDexStageLabel(species, stage)}`;
   }
   const nameEl = document.getElementById('idleDragonDexName');
   if (nameEl) nameEl.textContent = discovered ? species.name : '???';
@@ -1025,9 +1064,11 @@ function bkmpDragonRenderDexPage() {
   if (rarityEl) { rarityEl.textContent = discovered ? rarity.name : ''; rarityEl.style.color = rarity.color; }
   const descEl = document.getElementById('idleDragonDexDesc');
   if (descEl) {
-    descEl.textContent = discovered
-      ? `${bkmpDragonFormatDuration(bkmpDragonEffectiveBroodSeconds(species) * 1000)} Brutzeit`
-      : 'Noch nicht entdeckt - besiege Drachen, gewinne Weltboss-Raids oder finde besondere Ereignisse.';
+    descEl.textContent = !discovered
+      ? 'Noch nicht entdeckt - besiege Drachen, gewinne Weltboss-Raids oder finde besondere Ereignisse.'
+      : (stageLocked
+        ? '🔒 Diese Form hast du noch nicht erreicht – zieh einen Drachen dieser Art groß, um sie zu enthüllen.'
+        : `${bkmpDragonFormatDuration(bkmpDragonEffectiveBroodSeconds(species) * 1000)} Brutzeit`);
   }
   document.querySelectorAll('.idle-dragon-dex-dot').forEach((dot, i) => dot.classList.toggle('is-active', i === bkmpDragonDexPageIndex));
   const prevBtn = document.getElementById('idleDragonDexPrevBtn');
