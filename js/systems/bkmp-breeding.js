@@ -802,6 +802,74 @@ async function bkmpDragonReleaseEgg(eggId) {
   }
 }
 
+/* Alle Eier EINER Art freilassen (Spieler-Wunsch ByAlex0, 05.10.2026: "von
+   manchen Eiern fast 100 Stueck ... dauert zu lange die alle einzeln zu
+   loeschen"). Aendert die bewusste Entscheidung vom 02.08. ("kein
+   Massenloeschen"), aber mit Sicherungen:
+     - eigener Knopf, nur wenn es mindestens 2 freie Eier der Art gibt
+     - Eier, die gerade in einem Nest brueten, sind NIE betroffen (das Nest
+       wuerde sonst still leer - nest.egg_id steht auf "on delete set null")
+     - Einzelstueck-Arten (unique_per_account) sind ausgenommen
+     - episch/legendaer: zweite "Wirklich sicher?"-Abfrage wie bei Drachen
+     - welche Eier geloescht werden, wird NACH der Bestaetigung neu bestimmt
+       (waehrend der Dialog offen war, kann ein Ei in ein Nest gelegt worden
+       sein), und nur genau diese IDs gehen an den Server */
+let bkmpDragonBulkEggReleaseBusy = false;
+function bkmpDragonFreeEggsOfSpecies(speciesId) {
+  const nested = new Set(bkmpPlayerDragonNests.map(n => n.egg_id).filter(Boolean));
+  return bkmpPlayerDragonEggs.filter(e => e.species_id === speciesId && !nested.has(e.id));
+}
+async function bkmpDragonReleaseAllEggsOfSpecies(speciesId) {
+  if (bkmpDragonBulkEggReleaseBusy) return;
+  const species = bkmpDragonSpeciesById(speciesId);
+  /* Art unbekannt (Katalog noch nicht geladen): Einzelstueck-Schutz laesst
+     sich nicht pruefen -> nichts Unwiderrufliches im Sammelverfahren. */
+  if (!species) return;
+  if (species.unique_per_account) {
+    if (typeof bkmpShowJannikToast === 'function') bkmpShowJannikToast(`✨ ${species.name} ist einzigartig - dieses Ei kann nicht freigelassen werden.`, 3600);
+    return;
+  }
+  const count = bkmpDragonFreeEggsOfSpecies(speciesId).length;
+  if (count < 1) return;
+  bkmpDragonBulkEggReleaseBusy = true;
+  try {
+    const label = species ? species.name : `${speciesId}`;
+    const rarityName = species ? bkmpDragonRarityMeta(species.rarity).name : '';
+    const body = `${count} × ${label}-Ei${rarityName ? ` (${rarityName})` : ''}\n\nEier, die gerade in einem Nest brüten, bleiben erhalten.\nDiese Aktion kann nicht rückgängig gemacht werden.`;
+    const confirmed = typeof bkmpConfirmDialog === 'function'
+      ? await bkmpConfirmDialog(`🥚 Alle ${count} Eier freilassen?`, body, `Ja, alle ${count} freilassen`, 'Abbrechen')
+      : window.confirm(body);
+    if (!confirmed) return;
+    if (species && (species.rarity === 'episch' || species.rarity === 'legendaer')) {
+      const again = typeof bkmpConfirmDialog === 'function'
+        ? await bkmpConfirmDialog('⚠️ Wirklich sicher?', `${count} ${species.name}-Eier (${rarityName.toLowerCase()}) gehen dauerhaft verloren.`, 'Ja, endgültig freilassen', 'Abbrechen')
+        : window.confirm('Wirklich endgültig freilassen?');
+      if (!again) return;
+    }
+    const ids = bkmpDragonFreeEggsOfSpecies(speciesId).map(e => e.id);   // NEU bestimmt - Nester koennen sich waehrend des Dialogs geaendert haben
+    if (!ids.length) return;
+    let deleted = [];
+    let failed = false;
+    try {
+      deleted = await deletePlayerDragonEggs(ids);
+    } catch (e) {
+      failed = true;
+      deleted = (e && e.deletedIds) || [];
+      console.warn('Idle Dorf: Eier konnten nicht (alle) freigelassen werden.', e);
+    }
+    const gone = new Set(deleted);
+    bkmpPlayerDragonEggs = bkmpPlayerDragonEggs.filter(e => !gone.has(e.id));
+    bkmpIdleRenderDragonsPanel();
+    if (typeof bkmpShowJannikToast === 'function') {
+      bkmpShowJannikToast(failed
+        ? `⚠️ ${gone.size} von ${ids.length} Eiern freigelassen - der Rest ließ sich gerade nicht löschen. Bitte später erneut versuchen.`
+        : `🥚 ${gone.size} ${gone.size === 1 ? 'Ei' : 'Eier'} freigelassen.`, 4200);
+    }
+  } finally {
+    bkmpDragonBulkEggReleaseBusy = false;
+  }
+}
+
 async function bkmpDragonToggleFavorite(dragonId) {
   const dragon = bkmpPlayerDragons.find(d => d.id === dragonId);
   if (!dragon) return;
@@ -1630,6 +1698,11 @@ function bkmpIdleRenderDragonsPanel() {
             </div>`;
         }
         const rarity = bkmpDragonRarityMeta(species.rarity);
+        /* "Alle freilassen" nur bei mindestens 2 freien Eiern und nie bei
+           Einzelstueck-Arten (ByAlex0, 05.10.2026). */
+        const bulkReleaseBtn = (eggGroups[speciesId] >= 2 && !species.unique_per_account)
+          ? `<button type="button" class="btn-nein idle-skin-action idle-dragon-egg-release-all-btn" data-species-id="${escapeHtml(speciesId)}" title="Alle ${eggGroups[speciesId]} freien Eier dieser Art freilassen">🗑️ Alle ${eggGroups[speciesId]} freilassen</button>`
+          : '';
         return `
           <div class="idle-skin-card" style="--dragon-rarity-color:${rarity.color}">
             <button type="button" class="idle-dragon-mini-delete-btn idle-dragon-egg-delete-btn" data-egg-id="${eggId}" title="Ei freilassen">🗑️</button>
@@ -1637,6 +1710,7 @@ function bkmpIdleRenderDragonsPanel() {
             <div class="idle-skin-name">${escapeHtml(species.name)}-Ei</div>
             <div class="idle-skin-desc">${rarity.name} &middot; x${eggGroups[speciesId]} &middot; ${bkmpDragonFormatDuration(bkmpDragonEffectiveBroodSeconds(species) * 1000)} Brutzeit</div>
             <button type="button" class="btn-ja idle-skin-action idle-dragon-assign-btn" data-egg-id="${eggId}">In freies Nest legen</button>
+            ${bulkReleaseBtn}
           </div>`;
       }).join('')}</div>`
     : `<p class="idle-skin-empty-hint">Noch keine Eier im Lager - besiege Drachen, gewinne Weltboss-Raids oder finde besondere Ereignisse.</p>`;
@@ -1835,6 +1909,7 @@ function bkmpIdleRenderDragonsPanel() {
   panel.querySelectorAll('.idle-dragon-release-btn').forEach(btn => btn.addEventListener('click', () => bkmpDragonConfirmAndRelease(btn.dataset.dragonId)));
   panel.querySelectorAll('.idle-dragon-baby-delete-btn').forEach(btn => btn.addEventListener('click', () => bkmpDragonConfirmAndRelease(btn.dataset.dragonId)));
   panel.querySelectorAll('.idle-dragon-egg-delete-btn').forEach(btn => btn.addEventListener('click', () => bkmpDragonReleaseEgg(btn.dataset.eggId)));
+  panel.querySelectorAll('.idle-dragon-egg-release-all-btn').forEach(btn => btn.addEventListener('click', () => bkmpDragonReleaseAllEggsOfSpecies(btn.dataset.speciesId)));
   const expandBtn = document.getElementById('idleDragonExpandStorageBtn');
   if (expandBtn) expandBtn.addEventListener('click', bkmpDragonExpandStorage);
   if (typeof bkmpUiWireTooltipTrigger === 'function') {

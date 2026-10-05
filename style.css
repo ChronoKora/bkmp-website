@@ -9709,6 +9709,17 @@ html.fx-off-legendaryPulse .idle-runen-item[style*="facc15"] { animation: none !
 .idle-skin-afford + .idle-skin-locked-hint { margin-top: 0.35rem; }
 .idle-skin-action { width: 100%; padding: 0.4rem 0.6rem; font-size: 0.78rem; margin-top: auto; }
 .idle-skin-action:disabled { opacity: 0.7; cursor: default; }
+/* Zweiter Knopf unter "In freies Nest legen" (Eier-Karte, 05.10.2026): nur der
+   erste Knopf schluckt den freien Platz (margin-top:auto), der zweite folgt
+   direkt darunter - sonst teilten sich beide den Leerraum und rutschten
+   auseinander. */
+.idle-skin-action.idle-dragon-egg-release-all-btn { margin-top: 0.4rem; font-size: 0.74rem; opacity: 0.92; }
+html.bkmp-app-mode .idle-dorf-panel .idle-skin-action.idle-dragon-egg-release-all-btn {
+  margin-top: 0.4rem !important;
+  padding: .55rem .8rem !important;
+  font-size: .8rem !important;
+  min-height: 40px !important;
+}
 .idle-skin-buy:disabled { opacity: 0.5; cursor: not-allowed; }
 /* Echtgeld-Artikel (z.B. Steampunk Dorf) - dezent von Gold-Kosmetik
    abgesetzt, damit sofort klar ist "das ist eine andere Waehrung". */

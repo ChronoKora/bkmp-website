@@ -4471,6 +4471,27 @@ async function deletePlayerDragonEgg(eggId) {
   return true;
 }
 
+/* Mehrere Eier auf einmal freilassen (Spieler-Wunsch ByAlex0, 05.10.2026:
+   "von manchen Eiern fast 100 Stueck ... dauert zu lange die alle einzeln zu
+   loeschen"). Loescht NUR die uebergebenen IDs (nie "alle Eier einer Art"
+   per Filter - das Spiel entscheidet vorher, welche frei sind) in Paketen
+   von 80 und liefert die IDs zurueck, die der Server wirklich geloescht hat.
+   Bei einem Fehler mittendrin haengt die Funktion die bis dahin geloeschten
+   IDs als error.deletedIds an, damit die Anzeige trotzdem stimmt. */
+async function deletePlayerDragonEggs(eggIds) {
+  const client = bkmpGetPlayerAuthClient();
+  const ids = Array.isArray(eggIds) ? eggIds.filter(Boolean) : [];
+  if (!client || !ids.length) return [];
+  const deleted = [];
+  for (let i = 0; i < ids.length; i += 80) {
+    const chunk = ids.slice(i, i + 80);
+    const { data, error } = await client.from('player_dragon_eggs').delete().in('id', chunk).select('id');
+    if (error) { error.deletedIds = deleted.slice(); throw error; }
+    (data || []).forEach(r => deleted.push(r.id));
+  }
+  return deleted;
+}
+
 async function loadPlayerDragonNests(name) {
   const client = bkmpGetSupabaseClient();
   if (!client || !name) return [];
