@@ -8152,7 +8152,9 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
 .idle-dorf-card.idle-dorf-loading .idle-dorf-offline-card {
   visibility: hidden;
 }
-.idle-dorf-card.idle-dorf-loading::after {
+/* Rueckfall: nur wenn die Karte KEINEN eigenen Ladebildschirm hat (siehe
+   .idle-dorf-loader unten) bleibt der schlichte Text. */
+.idle-dorf-card.idle-dorf-loading:not(:has(> .idle-dorf-loader))::after {
   content: '⏳ Lädt…';
   position: absolute;
   top: 50%;
@@ -8164,6 +8166,120 @@ body.bkmp-zerathor-shake { animation: bkmpBurningShake 0.15s ease-in-out 7; }
   opacity: .85;
   pointer-events: none;
 }
+
+/* ---- Ladebildschirm beim Klick ins Drachen-Idle-Game (05.10.2026) ----
+   Nutzerwunsch: das "Ladebildschirm-Prinzip" nur dort, nicht auf der ganzen
+   Startseite. Haengt komplett an der bereits bestehenden Klasse
+   .idle-dorf-loading (siehe oben + bkmpIdleOpenModal): solange sie gesetzt
+   ist, laeuft der Ladebildschirm - verschwindet sie (Laden fertig ODER
+   Ladefehler), ist er per display:none weg. Es gibt keinen eigenen Timer, der
+   haengen bleiben koennte.
+   - Erscheint erst nach 250 ms (animation-delay + opacity 0): bei einem
+     schnellen Wiederoeffnen sieht man gar nichts, kein Aufblitzen.
+   - pointer-events:none: blockiert nie einen Klick - Tableiste und
+     Schliessen-Knopf bleiben immer bedienbar (Lehre aus Phase 7.3).
+   - Nur transform/opacity werden animiert (kein Neuzeichnen grosser Flaechen,
+     siehe Performance-Fixes vom 03.10.).
+   - Die ID in der Selektorkette ist eine Zusatzabsicherung: die generische
+     Regel ".idle-dorf-overlay .idle-dorf-card > *" (2 Klassen) setzt jedes
+     direkte Kind auf position:relative und wuerde die absolute Zentrierung
+     aushebeln. Mit den 3 Klassen der Kette gewinnt diese Regel zwar schon
+     allein, die ID haelt das aber auch dann, wenn die Kette spaeter einmal
+     gekuerzt wird. */
+.idle-dorf-loader { display: none; }
+.idle-dorf-card.idle-dorf-loading #idleDorfLoader.idle-dorf-loader {
+  display: flex;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 5;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  width: min(300px, 82%);
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  animation: idleDorfLoaderIn 0.25s ease 0.25s forwards;
+}
+@keyframes idleDorfLoaderIn { to { opacity: 1; } }
+.idle-dorf-loader-badge {
+  position: relative;
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid color-mix(in srgb, var(--gold-fixed, #ff8a4c) 60%, transparent);
+  background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--gold-fixed, #ff8a4c) 24%, transparent), transparent 72%), var(--paper);
+}
+.idle-dorf-loader-badge::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 2px solid var(--gold-fixed, #ff8a4c);
+  opacity: 0;
+  animation: idleDorfLoaderPulse 1.6s ease-out infinite;
+}
+@keyframes idleDorfLoaderPulse {
+  0% { transform: scale(0.95); opacity: 0.7; }
+  100% { transform: scale(1.55); opacity: 0; }
+}
+.idle-dorf-loader-icon {
+  font-size: 2rem;
+  line-height: 1;
+  animation: idleDorfLoaderBob 1.6s ease-in-out infinite;
+}
+@keyframes idleDorfLoaderBob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+.idle-dorf-loader-title {
+  font-family: 'Fraunces', serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.idle-dorf-loader-bar {
+  width: 170px;
+  height: 4px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--ink) 12%, transparent);
+}
+.idle-dorf-loader-bar span {
+  display: block;
+  width: 40%;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, var(--gold-fixed, #ff8a4c), transparent);
+  animation: idleDorfLoaderBar 1.3s ease-in-out infinite;
+}
+@keyframes idleDorfLoaderBar {
+  0% { transform: translateX(-110%); }
+  100% { transform: translateX(260%); }
+}
+/* Hinweis erst nach 12 s - nur bei wirklich langsamer Verbindung sichtbar. */
+.idle-dorf-loader-slow {
+  font-size: 0.78rem;
+  color: var(--muted);
+  opacity: 0;
+  animation: idleDorfLoaderSlow 0.4s ease 12s forwards;
+}
+@keyframes idleDorfLoaderSlow { to { opacity: 1; } }
+/* Effekte "Aus" und reduzierte Bewegung: nichts bewegt sich, der Text bleibt. */
+@media (prefers-reduced-motion: reduce) {
+  .idle-dorf-loader-badge::after { display: none; }
+  .idle-dorf-loader-icon, .idle-dorf-loader-bar span { animation: none; }
+  .idle-dorf-loader-bar span { width: 100%; opacity: 0.45; }
+}
+html[data-fx="aus"] .idle-dorf-loader-badge::after { display: none; }
+html[data-fx="aus"] .idle-dorf-loader-icon,
+html[data-fx="aus"] .idle-dorf-loader-bar span { animation: none; }
+html[data-fx="aus"] .idle-dorf-loader-bar span { width: 100%; opacity: 0.45; }
 
 .idle-dorf-close {
   position: absolute;

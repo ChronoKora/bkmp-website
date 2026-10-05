@@ -170,7 +170,7 @@
 <link rel="preload" as="image" href="assets/top-banner.webp" fetchpriority="high">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin>
-<link rel="stylesheet" href="style.css?v=20261005-dragonsort1">
+<link rel="stylesheet" href="style.css?v=20261005-dorfloader1">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 <!-- Jake's Feldfahrt (07.08.2026) - eigenstaendiges Website-Easter-Egg,
      komplett getrennt vom Idle-Dorf-Spiel, siehe js/easter-eggs/jakes-
@@ -800,6 +800,22 @@
           <span></span><span></span><span></span><span></span><span></span>
           <span></span><span></span><span></span><span></span><span></span>
         </div>
+      </div>
+      <!-- Ladebildschirm (05.10.2026, Nutzerwunsch: "dieses Ladebildschirm-
+           Prinzip erst auf den Klick ins Drachen-Idle-Game"). Rein
+           dekorativ und komplett an die BESTEHENDE Klasse
+           "idle-dorf-loading" gekoppelt (siehe bkmpIdleOpenModal in
+           idledorf.js: wird beim Klick gesetzt, am Ende des Ladens - auch
+           bei einem Ladefehler - wieder entfernt). Per CSS nur sichtbar,
+           solange diese Klasse gesetzt ist, und erst nach 250 ms (schnelles
+           Wiederoeffnen zeigt gar nichts). pointer-events:none -> blockiert
+           nie einen Klick (Tableiste/Schliessen-Knopf bleiben bedienbar).
+           Statisches Markup, wird von keinem render()/innerHTML angefasst. -->
+      <div class="idle-dorf-loader" id="idleDorfLoader" role="status" aria-live="polite">
+        <div class="idle-dorf-loader-badge" aria-hidden="true"><span class="idle-dorf-loader-icon">🐲</span></div>
+        <div class="idle-dorf-loader-title">Dein Dorf wird geladen…</div>
+        <div class="idle-dorf-loader-bar" aria-hidden="true"><span></span></div>
+        <div class="idle-dorf-loader-slow">Das dauert länger als sonst – bitte prüfe deine Verbindung.</div>
       </div>
       <!-- Bug-Fix 18.07. (Spieler-Meldung: Feedback-Button funktioniert bei
            einigen Spielern nicht zuverlaessig): Ursache war, dass der
