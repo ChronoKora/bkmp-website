@@ -2672,19 +2672,50 @@ function bkmpMapInvestorRequestToSupabase(item) {
   };
 }
 
+/* UUID v4 fuer Anfragen, die der Browser selbst vergibt (siehe
+   saveInvestorRequest). Bevorzugt crypto.randomUUID, sonst aus
+   crypto.getRandomValues zusammengesetzt; Math.random nur als letzter Notnagel
+   (die ID ist nur ein Nachschlage-Griff, kein Geheimnis - aber unvorhersagbar
+   soll sie trotzdem bleiben, solange der Browser es irgendwie kann). */
+function bkmpNewRequestId() {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+    const b = new Uint8Array(16);
+    if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') crypto.getRandomValues(b);
+    else for (let i = 0; i < 16; i += 1) b[i] = Math.floor(Math.random() * 256);
+    b[6] = (b[6] & 0x0f) | 0x40;
+    b[8] = (b[8] & 0x3f) | 0x80;
+    const h = Array.from(b, x => x.toString(16).padStart(2, '0')).join('');
+    return h.slice(0, 8) + '-' + h.slice(8, 12) + '-' + h.slice(12, 16) + '-' + h.slice(16, 20) + '-' + h.slice(20);
+  } catch (e) {
+    return null;
+  }
+}
+
 async function saveInvestorRequest(item) {
   const client = bkmpGetSupabaseClient();
   if (!client) throw new Error('Supabase ist nicht verbunden.');
+  /* Die ID vergibt der Browser selbst (23.07. 1x-Popup-Benachrichtigung: der
+     Aufrufer merkt sie sich lokal, siehe BKMP_PENDING_INVESTOR_KEY in
+     bkmp-site.js, und fragt spaeter per get_investor_request_status()-RPC nach,
+     ob schon entschieden wurde).
+
+     WICHTIG - NICHT wieder auf .insert(...).select('id') umstellen: investor_requests
+     ist bewusst nicht oeffentlich lesbar (RLS: select nur is_active_admin(),
+     siehe sql/supabase-investor-requests-schema.sql). Ein .select() fordert die
+     Zeile zurueck (Prefer: return=representation) und PostgREST prueft dafuer
+     die SELECT-Regel - fuer jeden Nicht-Admin schlaegt dann das ganze Einfuegen
+     mit "new row violates row-level security policy" (42501) fehl. Genau das
+     hat vom 23.07. bis 06.10.2026 JEDE Investoren-Anfrage von normalen
+     Besuchern scheitern lassen ("Deine Anfrage konnte nicht gesendet werden").
+     Mit eigener ID reicht ein reines Einfuegen (return=minimal); die Tabelle
+     vergibt sonst selbst eine, ein mitgeschickter id-Wert wird akzeptiert. */
+  const id = bkmpNewRequestId();
   const payload = { ...bkmpMapInvestorRequestToSupabase(item), status: 'pending' };
-  /* .select('id').single() (23.07., 1x-Popup-Benachrichtigung bei
-     Entscheidung): der Aufrufer merkt sich diese ID lokal (siehe
-     BKMP_PENDING_INVESTOR_REQUESTS_KEY in bkmp-site.js), um spaeter per
-     get_investor_request_status()-RPC nachzufragen, ob schon entschieden
-     wurde - ohne diese ID gaebe es keine Moeglichkeit, eine anonyme
-     Anfrage spaeter wiederzufinden. */
-  const { data, error } = await client.from('investor_requests').insert(payload).select('id').single();
+  if (id) payload.id = id;
+  const { error } = await client.from('investor_requests').insert(payload);
   if (error) throw error;
-  return data ? data.id : null;
+  return id;
 }
 
 async function loadInvestorRequests() {

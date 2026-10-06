@@ -35,6 +35,17 @@ const PUBLIC_RPC_NAMES = new Set([
   'special_events_visible',
 ]);
 
+/* 06.10.2026: Tabellen, in die JEDER einfuegen darf, die aber nur Admins lesen
+   duerfen (RLS: insert fuer anon/authenticated, select nur is_active_admin()) -
+   siehe sql/supabase-investor-requests-schema.sql. Das echte Backend lehnt dort
+   ein Einfuegen ab, das die Zeile zurueckverlangt (Prefer: return=representation
+   bzw. supabase-js .insert(...).select()), mit 42501 "new row violates row-level
+   security policy" - live am 06.10.2026 mit anon-Key nachgewiesen (dieselbe
+   Anfrage mit return=minimal kam bis zur Betrags-Pruefung durch). Der Mock hat
+   keine Admin-Konten, also gilt es hier fuer jeden Aufrufer. Ohne diese Regel
+   haette der Fehler in den Tests nie auffallen koennen. */
+const INSERT_ONLY_TABLES = new Set(['investor_requests']);
+
 function route(store, { method, url, headers, body }) {
   const parsed = new URL(url, 'http://qa-mock.internal');
   const pathname = parsed.pathname;
@@ -54,6 +65,13 @@ function route(store, { method, url, headers, body }) {
 
   if (pathname.startsWith('/rest/v1/')) {
     const tableName = pathname.slice('/rest/v1/'.length);
+    if (method === 'POST' && INSERT_ONLY_TABLES.has(tableName)) {
+      const prefer = String(headers['prefer'] || headers['Prefer'] || '');
+      if (/return=representation/.test(prefer) || searchParams.has('select')) {
+        return { status: 401, json: { code: '42501', details: null, hint: null,
+          message: 'new row violates row-level security policy for table "' + tableName + '"' } };
+      }
+    }
     return handleRestRequest(store, { method, tableName, searchParams, body, headers });
   }
 
