@@ -22,7 +22,8 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..', '..');
-const sqlFile = name => fs.readFileSync(path.join(ROOT, 'sql', name), 'utf8');
+// CRLF -> LF: unter Windows (core.autocrlf) sind die SQL-Dateien CRLF, die Marker in between() sind LF.
+const sqlFile = name => fs.readFileSync(path.join(ROOT, 'sql', name), 'utf8').replace(/\r\n/g, '\n');
 
 function between(text, startMarker, endMarker) {
   const a = text.indexOf(startMarker);
