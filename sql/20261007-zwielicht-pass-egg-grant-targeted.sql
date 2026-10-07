@@ -1,0 +1,106 @@
+-- ============================================================
+-- Zwielicht-Pass: fehlendes garantiertes Ei GEZIELT nachholen (07.10.2026)
+--
+-- Anlass: byalex0 meldet, auf Stufe 20 kein Surebrec-Ei bekommen zu haben.
+-- Der allgemeine Nachhol-Lauf (20261005-zwielicht-pass-egg-catchup.sql) ueberspringt
+-- bewusst jeden, der aktuell ein Ei der Art besitzt ODER seit Eventstart einen
+-- Drachen der Art geschluepft hat. Dayman/Surebrec fallen aber AUCH normal aus dem
+-- Ei-Dungeon - wer so einen Drachen hat, wird deshalb uebersprungen, obwohl das
+-- Pass-Ei fehlt. Diese Datei vergibt das Ei fuer NAMENTLICH genannte Spieler,
+-- nachdem du mit sql/20261007-diagnose-zwielicht-stage20-byalex0.sql geprueft hast,
+-- dass es wirklich fehlt.
+--
+-- BEDIENUNG: unten bei "WER / WELCHE STUFE" die Liste anpassen, dann komplett ausfuehren.
+--   * Standard: nur byalex0, nur Stufe 20.
+--   * Mehrere Spieler:  array['byalex0', 'anderer_name']
+--   * Mehrere Stufen:   array[10, 20]
+--
+-- Pro (Spieler, Stufe, Art) wird HOECHSTENS EIN Ei vergeben, und nur wenn ALLE gelten:
+--   * die Stufe steht wirklich in tier_claimed (sonst "Abholen" im Spiel, das vergibt das Ei selbst)
+--   * die Event-Konfiguration nennt fuer diese Stufe die Art in species_eggs
+--   * die Art existiert und ist kein Einzelstueck/Event-Drache
+--   * noch kein Log-Eintrag in event_tier_egg_catchup  (=> beliebig oft ausfuehrbar, nie doppelt)
+--   * der Spieler besitzt AKTUELL kein Ei dieser Art (sonst hat er es vermutlich)
+-- BEWUSST NICHT geprueft: "Drache der Art seit Eventstart geschluepft" - das ist genau
+-- die Heuristik, die den Fall oben verpasst. Wer sein Pass-Ei schon ausgebruetet hat,
+-- bekommt hiermit ein zweites; das siehst du vorher in Abfrage 5 der Diagnose.
+--
+-- Aendert nur: neue Zeilen in player_dragon_eggs und event_tier_egg_catchup.
+-- NOCH NICHT AUSGEFUEHRT.
+-- ============================================================
+
+create table if not exists public.event_tier_egg_catchup (
+  event_id text not null,
+  auth_user_id uuid not null,
+  tier integer not null,
+  species_id text not null,
+  egg_id uuid,
+  granted_at timestamptz not null default now(),
+  primary key (event_id, auth_user_id, tier, species_id)
+);
+alter table public.event_tier_egg_catchup enable row level security;
+revoke all on public.event_tier_egg_catchup from anon, authenticated;
+
+do $$
+declare
+  -- ===== WER / WELCHE STUFE (hier anpassen) =====
+  v_names text[]   := array['byalex0'];
+  v_tiers integer[] := array[20];
+  -- ==============================================
+  r record;
+  v_egg uuid;
+  v_name text;
+  v_granted integer := 0;
+begin
+  for r in
+    select se.id as event_id, p.auth_user_id, p.name_key,
+           (tj->>'tier')::integer as tier, sp.value as species_id
+      from public.player_event_progress p
+      join public.special_events se on se.id = p.event_id
+     cross join lateral jsonb_array_elements(coalesce(se.config->'tiers', '[]'::jsonb)) tj
+     cross join lateral jsonb_array_elements_text(coalesce(tj->'reward'->'species_eggs', '[]'::jsonb)) sp
+     where p.name_key = any(v_names)
+       and (tj->>'tier')::integer = any(v_tiers)
+       and (tj->>'tier')::integer = any(p.tier_claimed)
+     order by p.auth_user_id, (tj->>'tier')::integer
+  loop
+    -- Spielerzeile sperren (wie event_claim_tiers) und die Bedingung unter Sperre erneut pruefen.
+    perform 1 from public.player_event_progress p2
+     where p2.event_id = r.event_id and p2.auth_user_id = r.auth_user_id
+       and r.tier = any(p2.tier_claimed)
+     for update;
+    if not found then continue; end if;
+    -- Art muss existieren und ein normaler Ei-Wurf-Typ sein (Einzelstuecke lehnt der Ei-Schutz ab).
+    perform 1 from public.dragon_species ds
+     where ds.id = r.species_id
+       and not coalesce(ds.unique_per_account, false) and ds.event_origin is null;
+    if not found then continue; end if;
+    -- schon (nach-)geholt?
+    perform 1 from public.event_tier_egg_catchup c
+     where c.event_id = r.event_id and c.auth_user_id = r.auth_user_id
+       and c.tier = r.tier and c.species_id = r.species_id;
+    if found then continue; end if;
+    -- besitzt er das Ei aktuell?
+    perform 1 from public.player_dragon_eggs e
+     where e.auth_user_id = r.auth_user_id and e.species_id = r.species_id;
+    if found then continue; end if;
+
+    v_name := coalesce(nullif(r.name_key, ''),
+      (select ips.name_key from public.idle_player_state ips where ips.auth_user_id = r.auth_user_id), '');
+    if v_name = '' then continue; end if;
+
+    insert into public.player_dragon_eggs (name_key, auth_user_id, species_id)
+    values (v_name, r.auth_user_id, r.species_id) returning id into v_egg;
+    insert into public.event_tier_egg_catchup (event_id, auth_user_id, tier, species_id, egg_id)
+    values (r.event_id, r.auth_user_id, r.tier, r.species_id, v_egg);
+    v_granted := v_granted + 1;
+  end loop;
+  raise notice 'Zwielicht-Pass gezielt nachgeholt: % Ei(er)', v_granted;
+end
+$$;
+
+-- Kontrolle: was wurde (jetzt oder frueher) nachgeholt?
+select ps.name_key as spieler, c.tier as stufe, c.species_id as art, c.egg_id, c.granted_at
+  from public.event_tier_egg_catchup c
+  left join public.player_stats ps on ps.auth_user_id = c.auth_user_id
+ order by c.granted_at desc, c.tier;
