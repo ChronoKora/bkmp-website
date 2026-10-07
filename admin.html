@@ -3126,6 +3126,21 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
       renderAnticheatFlagsList();
     }
 
+    /* Wirtschafts-Alarm (07.10.2026, triggered_by 'economy'): Gold/Holz/... stiegen schneller, als
+       das Spiel es hergibt. economy_details = { enforced, stage_ref, details: { gold: {gain, allowed, ratio}, ... } }.
+       Die Kill-Spalten tragen bei diesen Alarmen nur Fensterwerte und wuerden hier in die Irre fuehren. */
+    function bkmpEconomyFlagText(f) {
+      const d = f.economy_details || {};
+      const labels = { gold: 'Gold', wood: 'Holz', stone: 'Stein', crystals: 'Kristalle', essence: 'Essenz', xp: 'Erfahrung' };
+      const fmt = n => Number(n || 0).toLocaleString('de-DE');
+      const parts = Object.keys(labels).filter(k => d.details && d.details[k]).map(k => {
+        const x = d.details[k];
+        return `${labels[k]} +${fmt(x.gain)} (erlaubt ${fmt(x.allowed)}, ${Number(x.ratio || 0).toLocaleString('de-DE', { maximumFractionDigits: 1 })}×)`;
+      });
+      const mode = d.enforced ? '<strong>gekappt</strong>' : 'nur gemeldet (Spielstand unverändert)';
+      return `Wirtschaft: ${parts.length ? parts.map(escapeHtml).join(' · ') : 'Zuwachs über der Grenze'} · ${mode}`;
+    }
+
     function renderAnticheatFlagsList() {
       const el = document.getElementById('anticheatFlagsList');
       if (!el) return;
@@ -3142,7 +3157,7 @@ function bkmpAdminPromptTextModal({ titleText, labelText, confirmText, placehold
             <span class="feedback-card-name">${escapeHtml(f.name_key || '')}</span>
             <span class="feedback-card-date">${escapeHtml(f.flagged_at ? new Date(f.flagged_at).toLocaleString('de-DE') : '')}</span>
           </div>
-          <p class="feedback-card-message">Ausgelöst durch: <strong>${escapeHtml(f.triggered_by || 'dragon_kills')}</strong> · Kills ${escapeHtml(String(f.claimed_dragon_kills_delta ?? '?'))} von erlaubt ${escapeHtml(String(f.allowed_dragon_kills_delta ?? '?'))}${f.claimed_level_delta != null ? ` · Level ${escapeHtml(String(f.claimed_level_delta))} von erlaubt ${escapeHtml(String(f.allowed_level_delta))}` : ''}${f.claimed_skillpoints_delta != null ? ` · Skillpunkte ${escapeHtml(String(f.claimed_skillpoints_delta))} von erlaubt ${escapeHtml(String(f.allowed_skillpoints_delta))}` : ''} · Faktor ${escapeHtml(Number(f.ratio_applied || 0).toFixed(4))}${f.dismissed ? ` · <strong>Geprüft (falscher Alarm) von ${escapeHtml(f.dismissed_by || '?')}</strong>` : ''}</p>
+          ${String(f.triggered_by || '') === 'economy' ? `<p class="feedback-card-message">Ausgelöst durch: <strong>economy</strong> · ${bkmpEconomyFlagText(f)}${f.dismissed ? ` · <strong>Geprüft (falscher Alarm) von ${escapeHtml(f.dismissed_by || '?')}</strong>` : ''}</p>` : `<p class="feedback-card-message">Ausgelöst durch: <strong>${escapeHtml(f.triggered_by || 'dragon_kills')}</strong> · Kills ${escapeHtml(String(f.claimed_dragon_kills_delta ?? '?'))} von erlaubt ${escapeHtml(String(f.allowed_dragon_kills_delta ?? '?'))}${f.claimed_level_delta != null ? ` · Level ${escapeHtml(String(f.claimed_level_delta))} von erlaubt ${escapeHtml(String(f.allowed_level_delta))}` : ''}${f.claimed_skillpoints_delta != null ? ` · Skillpunkte ${escapeHtml(String(f.claimed_skillpoints_delta))} von erlaubt ${escapeHtml(String(f.allowed_skillpoints_delta))}` : ''} · Faktor ${escapeHtml(Number(f.ratio_applied || 0).toFixed(4))}${f.dismissed ? ` · <strong>Geprüft (falscher Alarm) von ${escapeHtml(f.dismissed_by || '?')}</strong>` : ''}</p>`}
           ${f.dismissed ? '' : '<div class="feedback-card-actions"><button class="edit-btn dismiss-btn" type="button">✅ Als geprüft markieren (falscher Alarm)</button><button class="edit-btn hide-btn" type="button">🙈 Account dauerhaft ausblenden</button></div>'}
         </div>`;
       el.innerHTML = openFlags.map(rowHtml).join('') + dismissedFlags.map(rowHtml).join('');
