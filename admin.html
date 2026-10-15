@@ -23,6 +23,7 @@
 <link rel="stylesheet" href="style.css?v=20261005-eggbulk1">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 <link rel="stylesheet" href="css/bkmp-admin-events.css?v=20261005-eventstats1">
+<link rel="stylesheet" href="css/bkmp-admin-tzimport.css?v=20261015-tzimport1">
 </head>
 <body>
 
@@ -137,6 +138,10 @@
         <button class="admin-nav-btn" data-page="income">
           <svg viewBox="0 0 24 24"><path d="M12 3v18M6 8l6-5 6 5M6 16l6 5 6-5"/></svg>
           Einnahmen
+        </button>
+        <button class="admin-nav-btn" data-page="tzimport" data-testid="admin-nav-tzimport">
+          <svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5"/><rect x="3" y="17" width="18" height="4" rx="1.5"/></svg>
+          Tageszähler-Import
         </button>
         <button class="admin-nav-btn" data-page="expenses" data-role="expenses_editor">
           <svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
@@ -307,6 +312,16 @@
             <label class="admin-checkbox-label"><input type="checkbox" id="incomeDiscountOrder"> Rabatt-Bestellung (Betrag &amp; Anzahl unabh&auml;ngig eintragen)</label>
             <p class="income-calc-hint" id="incomeCalcHint">W&auml;hle eine Kategorie und gib optional eine Anzahl ein.</p>
             <button class="btn btn-primary" id="addIncome">+ Einnahme hinzufügen</button>
+          </div>
+        </section>
+
+        <!-- Tageszaehler-Import (15.10.2026): bestaetigte Nettouebernahme aus dem
+             OPSUCHT-Tageszaehler, siehe js/admin/bkmp-tageszaehler-import.js und
+             sql/20261015-tageszaehler-import.sql. -->
+        <section class="admin-page" id="page-tzimport" data-testid="tzi-page">
+          <div class="admin-section">
+            <h2>Tageszähler-Import</h2>
+            <div data-tzi-root></div>
           </div>
         </section>
 
@@ -1327,6 +1342,8 @@
   <script src="js/core/bkmp-idle-bootstrap.js?v=20260717-p2afoundation"></script>
   <script src="mapart.js?v=20260717-kartenfirmen1"></script>
   <script src="js/admin/bkmp-admin-events.js?v=20261005-eventstats1"></script>
+  <script src="js/admin/bkmp-tageszaehler-import-core.js?v=20261015-tzimport1"></script>
+  <script src="js/admin/bkmp-tageszaehler-import.js?v=20261015-tzimport1"></script>
   <script>
     bkmpInitTheme();
 
@@ -1628,6 +1645,7 @@
         if (page === 'polls') refreshPollsAdmin();
         if (page === 'idledorf') refreshIdleDorfAdmin();
         if (page === 'events' && typeof bkmpAdminEventsOnOpen === 'function') bkmpAdminEventsOnOpen();
+        if (page === 'tzimport' && typeof bkmpTzImportOnOpen === 'function') bkmpTzImportOnOpen();
         if (page === 'access') refreshAdminAccessList();
         if (page === 'employees') refreshEmployeePayoutPage();
         if (page === 'swstats') refreshSwStatsAdminPage();
@@ -1951,6 +1969,8 @@
     async function refreshIncomesFromSupabase() {
       await syncIncomesFromSupabase(data, function () { renderAll(); }, { force: true });
     }
+    // Tageszaehler-Import (15.10.2026): nach einer Uebernahme die Einnahmen neu laden.
+    window.addEventListener('bkmp:incomes-changed', function () { refreshIncomesFromSupabase(); });
 
     async function refreshInvestorsFromSupabase() {
       await syncInvestorsFromSupabase(data, function () { renderAll(); }, { force: true });
