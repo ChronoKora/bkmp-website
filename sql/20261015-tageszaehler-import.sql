@@ -426,3 +426,7 @@ revoke all on function public.tageszaehler_import_preview(text, date[]) from pub
 revoke all on function public.tageszaehler_import_apply(uuid, text, jsonb) from public, anon, authenticated;
 grant execute on function public.tageszaehler_import_preview(text, date[]) to authenticated;
 grant execute on function public.tageszaehler_import_apply(uuid, text, jsonb) to authenticated;
+
+-- REST-Schnittstelle (PostgREST) die neuen Tabellen/Funktionen sofort bekannt machen
+-- (sonst 404, siehe sql/20260801-reload-postgrest-schema-cache.sql).
+notify pgrst, 'reload schema';
