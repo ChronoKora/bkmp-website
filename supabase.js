@@ -806,18 +806,33 @@ function bkmpIncomeSignature(income) {
   ].join('|');
 }
 
+/* Seitenweise (15.10.2026): Supabase liefert je Abfrage hoechstens 1.000 Zeilen
+   (PostgREST max-rows). Mit einer einzigen Abfrage fehlten ab der 1.001. Einnahme
+   die NEUESTEN Buchungen in Admin-Liste, Summen und auf der oeffentlichen Seite.
+   Jetzt in Bloecken zu 1.000 bis ein Block nicht mehr voll ist. id als letzter
+   Sortierschluessel: Zeilen mit gleichem Datum und gleichem created_at (z. B. ein
+   Tageszaehler-Import) kommen an einer Blockgrenze weder doppelt noch gar nicht. */
 async function loadIncomes() {
   const client = bkmpGetSupabaseClient();
   if (!client) return null;
 
-  const { data, error } = await client
-    .from('incomes')
-    .select('id, category, amount, date, note, quantity, created_at')
-    .order('date', { ascending: true })
-    .order('created_at', { ascending: true });
+  const pageSize = 1000;
+  const rows = [];
+  for (let from = 0; from < 1000000; from += pageSize) {
+    const { data, error } = await client
+      .from('incomes')
+      .select('id, category, amount, date, note, quantity, created_at')
+      .order('date', { ascending: true })
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, from + pageSize - 1);
 
-  if (error) throw error;
-  return (data || []).map(bkmpMapIncomeFromSupabase);
+    if (error) throw error;
+    const page = data || [];
+    rows.push(...page);
+    if (page.length < pageSize) break;
+  }
+  return rows.map(bkmpMapIncomeFromSupabase);
 }
 
 async function saveIncome(income) {

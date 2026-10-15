@@ -238,6 +238,9 @@ function handleRestRequest(store, { method, tableName, searchParams, body, heade
     let result = applyFilters(rows, searchParams);
     result = applyOrder(result, searchParams);
     result = applyLimitOffset(result, searchParams);
+    /* Wie Supabase (PostgREST max-rows, Standard 1.000): hoechstens so viele Zeilen je
+       Abfrage. Nur wenn ein Test store.maxRows setzt (tests/e2e/incomes-over-1000.spec.js). */
+    if (typeof store.maxRows === 'number') result = result.slice(0, store.maxRows);
     result = applySelect(result, searchParams, tableName, store);
     return { status: 200, json: result };
   }
