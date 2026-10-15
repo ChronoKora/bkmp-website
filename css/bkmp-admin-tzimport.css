@@ -1,0 +1,85 @@
+/* Tageszaehler-Import im Admin-Panel (15.10.2026), siehe js/admin/bkmp-tageszaehler-import.js */
+#page-tzimport .tzi-intro { margin-bottom: 16px; }
+#page-tzimport .tzi-intro p { max-width: 920px; line-height: 1.5; }
+#page-tzimport .tzi-file { display: inline-flex; gap: 10px; align-items: center; font-weight: 600; margin-top: 6px; }
+#page-tzimport .tzi-card {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin: 12px 0;
+  background: rgba(255, 255, 255, 0.03);
+}
+#page-tzimport .tzi-card h3 { margin: 0 0 8px; font-size: 1.05rem; }
+#page-tzimport .tzi-muted { opacity: 0.72; font-size: 0.88rem; }
+#page-tzimport .tzi-warn { color: #f0b44c; font-size: 0.88rem; }
+#page-tzimport .tzi-error {
+  color: #ff8a80;
+  border: 1px solid rgba(255, 138, 128, 0.45);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+#page-tzimport .tzi-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+#page-tzimport .tzi-table th,
+#page-tzimport .tzi-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); vertical-align: top; }
+#page-tzimport .tzi-table .tzi-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+#page-tzimport .tzi-table select { min-width: 170px; }
+#page-tzimport .tzi-day-head { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; }
+#page-tzimport .tzi-sums { display: flex; flex-wrap: wrap; gap: 10px 28px; margin: 8px 0 10px; }
+#page-tzimport .tzi-sums div { display: flex; flex-direction: column; }
+#page-tzimport .tzi-sums strong { font-variant-numeric: tabular-nums; font-size: 1.05rem; }
+#page-tzimport .tzi-kind { font-weight: 600; }
+#page-tzimport .tzi-kind-new .tzi-kind,
+#page-tzimport .tzi-kind-update .tzi-kind { color: #7fd48a; }
+#page-tzimport .tzi-kind-remove .tzi-kind,
+#page-tzimport .tzi-kind-deleted .tzi-kind,
+#page-tzimport .tzi-kind-older .tzi-kind { color: #f0b44c; }
+#page-tzimport .tzi-kind-unchanged { opacity: 0.7; }
+#page-tzimport .tzi-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  padding: 1px 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  margin-left: 4px;
+}
+#page-tzimport .tzi-decision {
+  border-left: 3px solid #f0b44c;
+  padding: 6px 10px;
+  margin: 2px 0 6px;
+  background: rgba(240, 180, 76, 0.07);
+}
+#page-tzimport .tzi-decision p { margin: 0 0 6px; }
+#page-tzimport .tzi-choice { display: block; margin: 3px 0; cursor: pointer; }
+#page-tzimport .tzi-confirm button { margin-top: 10px; }
+#page-tzimport .tzi-done { border-color: rgba(127, 212, 138, 0.5); }
+@media (max-width: 700px) {
+  #page-tzimport .tzi-table { font-size: 0.84rem; }
+  #page-tzimport .tzi-table select { min-width: 120px; }
+}
+/* Tabellen scrollen innerhalb ihrer Karte statt die Seite zu verbreitern (Handy). */
+#page-tzimport .tzi-scroll { overflow-x: auto; max-width: 100%; }
+#page-tzimport p,
+#page-tzimport .tzi-decision { overflow-wrap: anywhere; }
+/* Die allgemeine Admin-Label-Gestaltung (Grossbuchstaben) gilt hier nicht fuer Auswahltexte. */
+#page-tzimport label.tzi-choice,
+#page-tzimport label.tzi-file { text-transform: none; letter-spacing: normal; font-weight: 400; font-size: 0.95rem; }
+#page-tzimport label.tzi-file { font-weight: 600; }
+#page-tzimport .tzi-decisions { margin-top: 10px; }
+#page-tzimport .tzi-decisions-title { margin: 0 0 6px; font-size: 0.95rem; }
+#page-tzimport .tzi-decision-wrap h4 { margin: 8px 0 2px; font-size: 0.92rem; }
+#page-tzimport .tzi-choice input { margin-right: 6px; }
+/* Handy: .admin-layout richtet die Hauptspalte nach ihrem Inhalt aus (align-items: flex-start).
+   Damit breite Tabellen oder der Dateiwaehler die Seite nicht verbreitern, ist der Inhalt hier
+   umbrechbar und die Tabellenbereiche tragen ihre Inhaltsbreite nicht nach aussen (contain). */
+#page-tzimport [data-tzi-root] { overflow-wrap: anywhere; }
+#page-tzimport .tzi-file { flex-wrap: wrap; }
+#page-tzimport .tzi-file input[type="file"] { max-width: 100%; min-width: 0; }
+#page-tzimport .tzi-scroll { contain: inline-size; }
+/* Tabellen nie buchstabenweise umbrechen: Mindestbreite, auf dem Handy seitlich scrollen. */
+#page-tzimport .tzi-table { min-width: 560px; }
+#page-tzimport .tzi-table th,
+#page-tzimport .tzi-table td { overflow-wrap: normal; word-break: normal; }
+#page-tzimport [data-testid="tzi-mapping"] .tzi-table td:last-child { min-width: 200px; }

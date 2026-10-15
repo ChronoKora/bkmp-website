@@ -2332,6 +2332,39 @@ Diese Punkte haben in der bisherigen Projektübersicht wahrscheinlich gefehlt:
 | Tests | 74 Dateien, 628 `test()`-Aufrufe, ~1.780 Testfälle über 3 Projekte (1.324 + 456 übersprungen) |
 | Inhalte | 431 Erfolge, 287 Titel, 83 Kosmetiken, 53 Prestige-Knoten, 50 Skill-Knoten, 23 Gilden-Tech-Knoten, 37 Drachen (12 Kampf + 25 Zucht), 18 Skins, 26 Plüschtiere |
 
+# F. Tageszähler-Import (Admin-Panel, 15.10.2026)
+
+Bestätigte Nettoübernahme aus dem OPSUCHT-Tageszähler (Desktop-Programm, eigenes Projekt) in `incomes`.
+Der Zähler sendet nichts selbst: Er erzeugt nach Freigabe eine Importdatei (Format `bkmp-tageszaehler-import`,
+Version 1: je Tag Revision, Revisionszeitpunkt, SHA-256-Fingerabdruck, Positionen mit Zähler-Kategorie,
+Nettobetrag als Text und in Cent, Menge nur bei vollständig bekannter Menge). Im Admin-Reiter
+„Tageszähler-Import“ wird sie geladen.
+
+* **Dateien:** `js/admin/bkmp-tageszaehler-import-core.js` (reine Regeln, Dual-Mode: Datei prüfen, Zuordnung,
+  Plan, Auftrag), `js/admin/bkmp-tageszaehler-import.js` (Oberfläche), `css/bkmp-admin-tzimport.css`,
+  `sql/20261015-tageszaehler-import.sql`.
+* **Datenbank:** `tageszaehler_import_lines` (je `tz1:<konto>:<datum>:<zähler-kategorie>`: Website-Kategorie,
+  zugehörige `incomes.id`, Revision, Fingerabdruck, Verlauf inkl. ersetzter Altzeilen; Status aktiv/entfernt),
+  `tageszaehler_import_batches` (je bestätigtem Auftrag genau einmal, gespeichertes Ergebnis). Beide ohne
+  direkte Rechte. `tageszaehler_import_preview(konto, tage)` (lesend: Importzeilen + alle Einnahmen der Tage +
+  Stand-Fingerabdruck), `tageszaehler_import_apply(batch, stand, auftrag)` (atomar). Rechte wie beim normalen
+  Einnahmen-Eintragen: `is_active_admin()`. Kein Fremdschlüssel auf `incomes` – Löschen im Einnahmen-Reiter
+  bleibt unverändert; eine gelöschte Importzeile erscheint in der nächsten Vorschau als „auf der Website gelöscht“.
+* **Schutzregeln:** Betrag unverändert (numeric, ≤ 2 Nachkommastellen; kein Stückpreis aus `incomeUnitPrices`,
+  keine Umrechnung); geänderter Stand seit der Vorschau → `stale_preview`, nichts geschrieben; gleiche
+  Auftragskennung → gespeichertes Ergebnis (`wiederholt`), andere Daten mit derselben Kennung → `batch_conflict`;
+  ältere Revision → `older_revision`; von Hand erfasste Einnahmen werden nur ersetzt, wenn sie in der Vorschau
+  ausgewählt wurden (gleicher Tag + Kategorie, nicht selbst importiert); erlaubte Kategorien = `BKMP_INCOME_CATEGORIES`.
+* **Fachlich wichtig:** Die bisher von Hand erfassten Zeilen sind Bruttobeträge (z. B. Bücher × 2.500), der
+  Import liefert Netto (× 2.475). Für Tage mit Altzeilen verlangt die Vorschau je Kategorie eine Entscheidung
+  (ersetzen / beide behalten / nicht importieren), sonst würde doppelt gezählt. Kategorien in
+  `BKMP_EMPLOYEE_WAGE_CATEGORIES` ab 15.08.2026 fließen in die Mitarbeiter-Abrechnung ein (in der Vorschau
+  als „Lohn“ markiert). Zähler-„Karten“ (99 je Stück) ≠ Website-„Karten“ (150.000) – Zuordnung bewusst wählen.
+* **Tests:** `tests/e2e/tageszaehler-import-sql.spec.js` (PGlite, echte Datei), `…-parity.spec.js`
+  (Nachbau `tests/mock/tageszaehler-import-engine.js` ≡ SQL), `…-ui.spec.js` (Admin-Login gegen Mock, 3 Projekte).
+  Achtung bei Netzwerk-Tests: Die Seite spricht die Produktionsadresse an, die Fixtures leiten sie per
+  Kontext-Route auf den Mock um – in eigenen `page.route`-Handlern nie `route.fetch()` verwenden.
+
 ---
 
 *Die folgenden Anhänge wurden automatisch aus dem laufenden Code bzw. der Live-Datenbank erzeugt (Stand 03.10.2026).*
