@@ -68,6 +68,9 @@
 #page-tzimport label.tzi-file { text-transform: none; letter-spacing: normal; font-weight: 400; font-size: 0.95rem; }
 #page-tzimport label.tzi-file { font-weight: 600; }
 #page-tzimport .tzi-decisions { margin-top: 10px; }
+/* 19.10.2026: Ausgaben (Ankaeufe) je Tag - optisch von den Einnahmen abgesetzt. */
+#page-tzimport .tzi-expenses { margin-top: 14px; padding-top: 10px; border-top: 1px dashed rgba(255, 255, 255, 0.15); }
+#page-tzimport .tzi-expenses .tzi-num { color: #f0a0a0; }
 #page-tzimport .tzi-decisions-title { margin: 0 0 6px; font-size: 0.95rem; }
 #page-tzimport .tzi-decision-wrap h4 { margin: 8px 0 2px; font-size: 0.92rem; }
 #page-tzimport .tzi-choice input { margin-right: 6px; }

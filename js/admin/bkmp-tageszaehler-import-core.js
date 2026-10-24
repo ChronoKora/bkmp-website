@@ -9,13 +9,20 @@
        von Hand erfasste Zeilen derselben Kategorie als Entscheidung vorlegen
      * daraus den Auftrag fuer tageszaehler_import_apply bilden
 
+   19.10.2026 (Importdatei Version 2, Tageszaehler ab 2.4.0): "Einnahmen sind Einnahmen und alles,
+   was wir ankaufen, sind Ausgaben." Je Tag kommen zusaetzlich die Ankaeufe als Ausgaben; sie
+   werden mit denselben Regeln (neu / Aenderung / unveraendert / entfaellt / geloescht) in die
+   Ausgaben uebernommen. Von Hand erfasste Ausgaben werden nur angezeigt, nie geaendert.
+   Version-1-Dateien bleiben lesbar (ohne Ausgaben).
+
    Betraege werden in ganzen Cent gerechnet (keine Gleitkomma-Summen). Der Betrag
    kommt immer unveraendert aus dem Zaehler - kein Stueckpreis, keine Umrechnung. */
 (function (root) {
   'use strict';
 
   const FORMAT = 'bkmp-tageszaehler-import';
-  const VERSION = 1;
+  const VERSION = 2;              // hoechste unterstuetzte Version
+  const VERSIONS = [1, 2];
 
   /* Vorschlag fuer die erste Zuordnung. Alles andere -> "Custom". Der Nutzer
      bestaetigt die Zuordnung in der Vorschau; spaetere Importe uebernehmen die
@@ -81,7 +88,7 @@
     let raw;
     try { raw = JSON.parse(String(text || '').replace(/^\uFEFF/, '')); } catch (e) { fail('Die Datei ist kein gültiges JSON.'); }
     if (!raw || raw.format !== FORMAT) fail('Das ist keine Importdatei des Tageszählers (format fehlt oder ist falsch).');
-    if (raw.version !== VERSION) fail('Diese Importdatei hat Version ' + raw.version + '; unterstützt wird Version ' + VERSION + '.');
+    if (!VERSIONS.includes(raw.version)) fail('Diese Importdatei hat Version ' + raw.version + '; unterstützt werden Version 1 und 2.');
     const quelle = raw.quelle || {};
     if (!KONTO_RE.test(String(quelle.konto || ''))) fail('Konto-Kennung in der Datei fehlt oder ist ungültig.');
     if (!Array.isArray(raw.tage) || raw.tage.length === 0) fail('Die Datei enthält keine Tage.');
@@ -89,6 +96,7 @@
 
     const seenDates = new Set();
     let fileCents = 0;
+    let fileExpenseCents = 0;
     const days = raw.tage.map(function (t, i) {
       const label = 'Tag ' + (i + 1);
       if (!DATE_RE.test(String(t.datum || ''))) fail(label + ': Datum fehlt oder ist ungültig.');
@@ -122,26 +130,62 @@
       });
       if (t.summeCent !== dayCents) fail(formatDateDe(t.datum) + ': Tagessumme passt nicht zu den Positionen.');
       fileCents += dayCents;
+
+      // Version 2: Ankaeufe als Ausgaben (je Zaehler-Kategorie hoechstens eine Zeile).
+      let expenses = [];
+      let dayExpenseCents = 0;
+      if (raw.version >= 2) {
+        if (!Array.isArray(t.ausgaben)) fail(formatDateDe(t.datum) + ': Ausgaben fehlen.');
+        const seenExp = new Set();
+        expenses = t.ausgaben.map(function (a) {
+          if (!CAT_RE.test(String(a.kategorieId || ''))) fail(formatDateDe(t.datum) + ': ungültige Kategorie-Kennung einer Ausgabe „' + a.kategorieId + '“.');
+          if (seenExp.has(a.kategorieId)) fail(formatDateDe(t.datum) + ': Ausgabe „' + a.kategorieId + '“ doppelt.');
+          seenExp.add(a.kategorieId);
+          const name = String(a.kategorieName || '').trim();
+          if (!name || name.length > 60) fail(formatDateDe(t.datum) + ': Name einer Ausgabe fehlt.');
+          const cents = amountTextToCents(a.betrag);
+          if (cents == null) fail(formatDateDe(t.datum) + ', Ankauf ' + name + ': Betrag „' + a.betrag + '“ ist ungültig.');
+          if (a.betragCent !== cents) fail(formatDateDe(t.datum) + ', Ankauf ' + name + ': Betrag und Cent-Angabe passen nicht zusammen.');
+          const purchases = a.ankaeufe == null ? null : a.ankaeufe;
+          if (purchases != null && (!Number.isInteger(purchases) || purchases < 0)) fail(formatDateDe(t.datum) + ', Ankauf ' + name + ': Anzahl der Ankäufe ist ungültig.');
+          const note = a.hinweis == null ? '' : String(a.hinweis).trim();
+          if (note.length > 300) fail(formatDateDe(t.datum) + ', Ankauf ' + name + ': Hinweis ist zu lang.');
+          dayExpenseCents += cents;
+          return { categoryId: a.kategorieId, categoryName: name, label: 'Ankauf ' + name, cents, amountText: centsToAmountText(cents), purchases, note };
+        });
+        if (t.ausgabenCent !== dayExpenseCents) fail(formatDateDe(t.datum) + ': Ausgabensumme passt nicht zu den Ausgaben.');
+      }
+      fileExpenseCents += dayExpenseCents;
       return {
         date: t.datum, revisionId: String(t.revisionId), revisionCreatedAt: String(t.revisionErstellt),
         fingerprint: String(t.fingerabdruck), erfassung: String(t.erfassung || ''), cents: dayCents,
-        transactions: Number.isInteger(t.verkaufszeilen) ? t.verkaufszeilen : null, positions
+        transactions: Number.isInteger(t.verkaufszeilen) ? t.verkaufszeilen : null, positions,
+        expenses, expenseCents: dayExpenseCents
       };
     });
     if (raw.summeCent !== fileCents) fail('Gesamtsumme der Datei passt nicht zu den Tagen.');
+    if (raw.version >= 2 && raw.ausgabenCent !== fileExpenseCents) fail('Ausgaben der Datei passen nicht zu den Tagen.');
     days.sort((a, b) => a.date.localeCompare(b.date));
     return {
+      version: raw.version,
       konto: quelle.konto, kontoName: String(quelle.kontoName || quelle.konto), programm: String(quelle.programm || ''),
       programmVersion: String(quelle.version || ''), createdAt: String(raw.erstelltAm || ''),
-      freigabe: raw.freigabe ? String(raw.freigabe.text || '') : '', days, cents: fileCents
+      freigabe: raw.freigabe ? String(raw.freigabe.text || '') : '', days, cents: fileCents, expenseCents: fileExpenseCents
     };
   }
+
+  /* Fruehere Importe nach Art (Vorschau vor der Ausgaben-SQL kennt kein "kind" -> Einnahmen). */
+  function kindOf(imp) { return imp.kind || 'einnahme'; }
+  function incomeImports(preview) { return ((preview && preview.imports) || []).filter(i => kindOf(i) === 'einnahme'); }
+  function expenseImports(preview) { return ((preview && preview.imports) || []).filter(i => kindOf(i) === 'ausgabe'); }
+  /* Kennt die Datenbank schon Ausgaben (sql/20261019-tageszaehler-ausgaben.sql ausgefuehrt)? */
+  function previewKnowsExpenses(preview) { return !!preview && Array.isArray(preview.expenses); }
 
   /* ---------- Zuordnung ---------- */
   function suggestMapping(file, preview, remembered) {
     const mapping = {};
     const fromImports = {};
-    ((preview && preview.imports) || []).slice().sort((a, b) => String(a.imported_at || '').localeCompare(String(b.imported_at || '')))
+    incomeImports(preview).slice().sort((a, b) => String(a.imported_at || '').localeCompare(String(b.imported_at || '')))
       .forEach(imp => { fromImports[imp.counter_category_id] = imp.website_category; });
     file.days.forEach(d => d.positions.forEach(p => {
       if (mapping[p.categoryId]) return;
@@ -155,10 +199,68 @@
        Konflikt mit von Hand erfassten Zeilen: 'replace' | 'keep' | 'skip'
        frueher importiert, auf der Website geloescht: 'recreate' | 'skip'           */
   function lineKey(konto, date, categoryId) { return 'tz1:' + konto + ':' + date + ':' + categoryId; }
+  function expenseKey(konto, date, categoryId) { return 'tz1:' + konto + ':' + date + ':ausgabe:' + categoryId; }
+
+  /* Ausgaben eines Tages (Version 2): wie die Einnahmen, aber ohne Website-Kategorie und ohne
+     Konflikte - von Hand erfasste Ausgaben werden nur angezeigt.
+     choices[key] fuer eine frueher importierte, auf der Website geloeschte Ausgabe: 'recreate' | 'skip'. */
+  function planExpenses(file, day, preview, choices) {
+    const dayImports = expenseImports(preview).filter(i => i.date === day.date);
+    const lines = [];
+    day.expenses.forEach(x => {
+      const key = expenseKey(file.konto, day.date, x.categoryId);
+      const prev = dayImports.find(i => i.counter_category_id === x.categoryId) || null;
+      const line = {
+        key, expense: true, date: day.date, categoryId: x.categoryId, categoryName: x.categoryName, label: x.label,
+        cents: x.cents, amountText: x.amountText, note: x.note, purchases: x.purchases, previous: prev,
+        kind: null, action: null, needsChoice: false, choice: choices[key] || null, blocked: null, diffCents: 0
+      };
+      const prevActive = prev && prev.status === 'aktiv';
+      if (prevActive && Date.parse(prev.revision_created_at) > Date.parse(day.revisionCreatedAt)) {
+        line.kind = 'older';
+        line.blocked = 'Auf der Website steht bereits eine neuere Revision dieses Tages.';
+        line.action = 'skip';
+      } else if (prevActive && prev.expense) {
+        const same = prev.revision_id === day.revisionId && prev.fingerprint === day.fingerprint
+          && numberToCents(prev.expense.amount) === x.cents && prev.expense.category === x.label;
+        line.kind = same ? 'unchanged' : 'update';
+        line.action = 'update';
+        line.diffCents = x.cents - numberToCents(prev.expense.amount);
+      } else if (prevActive && !prev.expense) {
+        line.kind = 'deleted';
+        line.needsChoice = true;
+        line.action = line.choice === 'recreate' ? 'create' : 'skip';
+        line.diffCents = line.action === 'create' ? x.cents : 0;
+        if (!['recreate', 'skip'].includes(line.choice)) line.missingChoice = true;
+      } else {
+        line.kind = 'new';
+        line.action = 'create';
+        line.diffCents = x.cents;
+      }
+      lines.push(line);
+    });
+    // Frueher importiert, in dieser Revision nicht mehr enthalten -> entfernen.
+    dayImports.filter(i => i.status === 'aktiv' && !day.expenses.some(x => x.categoryId === i.counter_category_id)).forEach(i => {
+      const older = Date.parse(i.revision_created_at) > Date.parse(day.revisionCreatedAt);
+      lines.push({
+        key: i.import_key, expense: true, date: day.date, categoryId: i.counter_category_id, categoryName: i.counter_category_name,
+        label: i.website_category, cents: 0, amountText: '0.00', note: '', purchases: null, previous: i,
+        kind: older ? 'older' : 'remove', action: older ? 'skip' : 'remove',
+        blocked: older ? 'Auf der Website steht bereits eine neuere Revision dieses Tages.' : null,
+        needsChoice: false, choice: null, diffCents: older || !i.expense ? 0 : -numberToCents(i.expense.amount)
+      });
+    });
+    const dayExpenses = ((preview && preview.expenses) || []).filter(e => e.date === day.date);
+    const beforeCents = dayExpenses.reduce((s, e) => s + numberToCents(e.amount), 0);
+    return {
+      lines, beforeCents, afterCents: beforeCents + lines.reduce((s, l) => s + l.diffCents, 0),
+      manual: dayExpenses.filter(e => !e.from_import)
+    };
+  }
 
   function buildPlan(file, preview, mapping, choices) {
     choices = choices || {};
-    const imports = (preview && preview.imports) || [];
+    const imports = incomeImports(preview);
     const incomes = (preview && preview.incomes) || [];
     const days = file.days.map(day => {
       const dayImports = imports.filter(i => i.date === day.date);
@@ -239,20 +341,27 @@
       const beforeCents = dayIncomes.reduce((s, i) => s + numberToCents(i.amount), 0);
       const afterCents = beforeCents + lines.reduce((s, l) => s + l.diffCents, 0);
       const untouched = manual.filter(m => !usedManual.has(m.id));
+      const exp = planExpenses(file, day, preview, choices);
       return {
         date: day.date, revisionId: day.revisionId, revisionCreatedAt: day.revisionCreatedAt, fingerprint: day.fingerprint,
-        erfassung: day.erfassung, transactions: day.transactions, cents: day.cents, lines, beforeCents, afterCents, untouched
+        erfassung: day.erfassung, transactions: day.transactions, cents: day.cents, lines, beforeCents, afterCents, untouched,
+        expenseCents: day.expenseCents, expenseLines: exp.lines, expBeforeCents: exp.beforeCents, expAfterCents: exp.afterCents,
+        manualExpenses: exp.manual
       };
     });
-    const allLines = days.flatMap(d => d.lines);
+    const allLines = days.flatMap(d => d.lines.concat(d.expenseLines));
     const missing = allLines.filter(l => l.missingChoice).length;
     const writes = allLines.filter(l => l.action !== 'skip' && l.kind !== 'unchanged').length;
+    // Ausgaben zu schreiben, aber die Datenbank kennt sie noch nicht -> nicht bestaetigen.
+    const needsExpenseSql = !previewKnowsExpenses(preview) && days.some(d => d.expenseLines.length > 0);
     return {
-      konto: file.konto, days, missingChoices: missing,
+      konto: file.konto, days, missingChoices: missing, needsExpenseSql,
       hasChanges: writes > 0,
-      canConfirm: missing === 0 && writes > 0,
-      importCents: allLines.filter(l => l.action === 'create' || l.action === 'update').reduce((s, l) => s + l.cents, 0),
-      diffCents: days.reduce((s, d) => s + (d.afterCents - d.beforeCents), 0)
+      canConfirm: missing === 0 && writes > 0 && !needsExpenseSql,
+      importCents: allLines.filter(l => !l.expense && (l.action === 'create' || l.action === 'update')).reduce((s, l) => s + l.cents, 0),
+      diffCents: days.reduce((s, d) => s + (d.afterCents - d.beforeCents), 0),
+      expenseDiffCents: days.reduce((s, d) => s + (d.expAfterCents - d.expBeforeCents), 0),
+      hasExpenses: days.some(d => d.expenseLines.length > 0)
     };
   }
 
@@ -271,6 +380,15 @@
       }
       lines.push(out);
     }));
+    // Ausgaben (Version 2) - Einnahme-Zeilen bleiben ohne "kind", wie bisher.
+    plan.days.forEach(day => day.expenseLines.forEach(l => {
+      if (l.missingChoice) fail('Für ' + formatDateDe(l.date) + ', ' + l.label + ' fehlt noch eine Entscheidung.');
+      lines.push({
+        kind: 'ausgabe', date: l.date, counter_category_id: l.categoryId, counter_category_name: l.categoryName,
+        amount: l.amountText, quantity: null, quantity_status: 'offen', note: l.note || null,
+        revision_id: day.revisionId, revision_created_at: day.revisionCreatedAt, fingerprint: day.fingerprint, action: l.action
+      });
+    }));
     return { konto: plan.konto, lines };
   }
 
@@ -284,21 +402,23 @@
     not_imported: 'Eine zu aktualisierende Position ist auf der Website nicht (mehr) vorhanden. Bitte die Vorschau neu laden.',
     invalid_replace: 'Eine zum Ersetzen ausgewählte Einnahme passt nicht (anderer Tag, andere Kategorie oder selbst aus einem Import).',
     invalid_website_category: 'Unbekannte Website-Kategorie.',
-    mixed_revisions: 'Für einen Tag wurden zwei verschiedene Revisionen übergeben.'
+    mixed_revisions: 'Für einen Tag wurden zwei verschiedene Revisionen übergeben.',
+    invalid_kind: 'Die Datenbank kennt diese Art von Zeile nicht – ist sql/20261019-tageszaehler-ausgaben.sql ausgeführt?',
+    invalid_note: 'Der Hinweis einer Ausgabe ist zu lang.'
   };
   function errorText(err) {
     const raw = String((err && (err.message || err.code)) || err || '');
     const code = Object.keys(ERROR_TEXTS).find(k => raw.includes(k));
     if (code) return { code, text: ERROR_TEXTS[code] };
     if (/invalid_/.test(raw)) return { code: 'invalid', text: 'Die Datenbank hat den Auftrag als ungültig abgelehnt (' + raw + '). Es wurde nichts gespeichert.' };
-    if (/Could not find the function|PGRST202|404/.test(raw)) return { code: 'missing_sql', text: 'Die Import-Funktionen sind in der Datenbank noch nicht eingerichtet (sql/20261015-tageszaehler-import.sql ausführen).' };
+    if (/Could not find the function|PGRST202|404/.test(raw)) return { code: 'missing_sql', text: 'Die Import-Funktionen sind in der Datenbank noch nicht eingerichtet (sql/20261015-tageszaehler-import.sql und danach sql/20261019-tageszaehler-ausgaben.sql ausführen).' };
     return { code: 'unknown', text: raw || 'Unbekannter Fehler.' };
   }
 
   const api = {
-    FORMAT, VERSION, DEFAULT_MAPPING, MAPPING_NOTES, WAGE_CATEGORIES, WAGE_START,
+    FORMAT, VERSION, VERSIONS, DEFAULT_MAPPING, MAPPING_NOTES, WAGE_CATEGORIES, WAGE_START,
     amountTextToCents, centsToAmountText, numberToCents, formatCents, formatDateDe,
-    parseImportFile, suggestMapping, buildPlan, buildRequest, lineKey, errorText
+    parseImportFile, suggestMapping, buildPlan, buildRequest, lineKey, expenseKey, errorText, previewKnowsExpenses
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.BKMP_TZ_IMPORT = api;
