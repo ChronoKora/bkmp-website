@@ -215,3 +215,107 @@ test.describe('Tageszähler-Import: Sicherheit und Fehlerfälle', () => {
     expect(table(store, 'incomes').filter(i => i.date === '2026-10-14').reduce((s, i) => s + Math.round(i.amount * 100), 0)).toBe(171870930);
   });
 });
+
+/* ============ 19.10.2026: Importdatei Version 2 - Verkaeufe als Einnahmen, Ankaeufe als Ausgaben ============ */
+function dayV2(date, revisionId, revisionAt, fp, positions, ausgaben) {
+  const d = day(date, revisionId, revisionAt, fp, positions);
+  d.ausgaben = ausgaben.map(([id, name, betrag, ankaeufe, hinweis]) => ({
+    kategorieId: id, kategorieName: name, betrag, betragCent: Math.round(Number(betrag) * 100), ankaeufe, hinweis }));
+  d.ausgabenCent = d.ausgaben.reduce((s, a) => s + a.betragCent, 0);
+  return d;
+}
+function importFileV2(days) {
+  const f = importFile(days);
+  f.version = 2;
+  f.quelle.version = '2.4.0';
+  f.ausgabenCent = days.reduce((s, d) => s + d.ausgabenCent, 0);
+  return f;
+}
+/* Wie der echte 18.10.: Einnahmen 1.779.525 + 220.725,83 = 2.000.250,83; Ausgaben 268.173,22; Gewinn 1.732.077,61 */
+const DAY_18 = dayV2('2026-10-18', '20261019-012709-957-90e4e5', '2026-10-18T23:27:09Z', 'c', [
+  ['buecher', 'Bücher', '1779525.00', 719, 'vollstaendig'],
+  ['rohstoffe', 'Rohstoffe & Blöcke', '220725.83', null, 'offen', '42 Artikel']
+], [['rohstoffe', 'Rohstoffe & Blöcke', '268173.22', 25, '11 Artikel, größte: Quarzziegel 189.647,68 $']]);
+const FILE_18 = importFileV2([DAY_18]);
+
+test.describe('Tageszähler-Import: Ausgaben (Importdatei Version 2)', () => {
+  test('Einnahmen und Ausgaben übernehmen, von Hand erfasste Ausgabe bleibt, Ausgaben-Seite aktualisiert, kein Doppelimport', async ({ page, store, qaBaseURL }) => {
+    store.clock.setNow(Date.parse('2026-10-19T08:00:00Z'));
+    seedAccount(store, { name: 'chef', role: 'admin', uidN: 900 });
+    table(store, 'expenses').push({ id: uid(601), category: 'Marketing', amount: 500, date: '2026-10-18', note: null, created_at: '2026-10-18T09:00:00Z' });
+    await loginAndOpen(page, qaBaseURL);
+    await upload(page, FILE_18);
+
+    await expect(page.locator('[data-testid="tzi-file-total"]')).toHaveText('2.000.250,83 €');
+    await expect(page.locator('[data-testid="tzi-file-ausgaben"]')).toHaveText('268.173,22 €');
+    await expect(page.locator('[data-testid="tzi-day-gewinn"]')).toHaveText('1.732.077,61 €');
+    const ankauf = page.locator('[data-testid="tzi-expense-line"][data-key="tz1:chestshop-hauptkonto:2026-10-18:ausgabe:rohstoffe"]');
+    await expect(ankauf).toContainText('Ankauf Rohstoffe & Blöcke');
+    await expect(ankauf).toContainText('268.173,22 €');
+    await expect(ankauf).toContainText('Quarzziegel');
+    await expect(ankauf).toContainText('25 Ankäufe');
+    await expect(ankauf.locator('[data-testid="tzi-kind"]')).toHaveText('neu');
+    // Ausgaben vorher 500 (von Hand), nachher 268.673,22; die von Hand erfasste wird nur angezeigt
+    await expect(page.locator('[data-testid="tzi-day-ausgaben-after"]')).toHaveText('268.673,22 €');
+    await expect(page.locator('[data-testid="tzi-manual-expenses"]')).toContainText('Marketing 500,00 €');
+    await expect(page.locator('[data-testid="tzi-diff-ausgaben"]')).toHaveText('268.173,22 €');
+    await expect(page.locator('[data-testid="tzi-confirm-text"]')).toHaveText('18.10.2026 mit Einnahmen 2.000.250,83 € und Ausgaben 268.173,22 € an BK Investment übertragen.');
+    const overflow = await page.evaluate(() => [...document.querySelectorAll('#page-tzimport .tzi-card')]
+      .map(c => Math.round(c.getBoundingClientRect().right - window.innerWidth)).filter(d => d > 1));
+    expect(overflow).toEqual([]);
+
+    await page.check('input[data-tzi-confirmed]');
+    await page.click('[data-testid="tzi-apply"]');
+    await expect(page.locator('[data-testid="tzi-result"]')).toContainText('3 angelegt');
+    await expect(page.locator('[data-testid="tzi-result"]')).toContainText('Ausgaben: Import 268.173,22 €, alle Ausgaben des Tages 268.673,22 € (2 Zeilen)');
+
+    const rows = table(store, 'expenses').filter(e => e.date === '2026-10-18');
+    expect(rows.map(e => [e.category, e.amount]).sort()).toEqual([['Ankauf Rohstoffe & Blöcke', 268173.22], ['Marketing', 500]]);
+    expect(rows.find(e => e.category === 'Ankauf Rohstoffe & Blöcke').note)
+      .toBe('Ankauf aus Tageszähler: Rohstoffe & Blöcke – 11 Artikel, größte: Quarzziegel 189.647,68 $');
+    expect(table(store, 'incomes').filter(i => i.date === '2026-10-18').map(i => [i.category, i.amount, i.quantity]).sort())
+      .toEqual([['Bücher', 1779525, 719], ['Custom', 220725.83, null]]);
+
+    // Die Ausgaben-Seite des Admin-Bereichs zeigt den Ankauf ohne Neuladen der Seite.
+    const nav = page.locator('.admin-nav-btn[data-page="expenses"]');
+    await nav.scrollIntoViewIfNeeded();
+    await nav.click();
+    await expect(page.locator('#expenseList')).toContainText('Ankauf Rohstoffe & Blöcke');
+
+    // Dieselbe Datei nochmal: nichts zu tun, keine zweite Ausgabe
+    await page.locator('[data-testid="admin-nav-tzimport"]').click();
+    await upload(page, FILE_18, 'bk-import-18-nochmal.json');
+    await expect(page.locator('[data-testid="tzi-nothing"]')).toBeVisible();
+    expect(table(store, 'expenses').filter(e => e.date === '2026-10-18')).toHaveLength(2);
+  });
+
+  test('Datenbank ohne Ausgaben-SQL: Datei mit Ausgaben wird nicht übernommen, klarer Hinweis', async ({ page, store, qaBaseURL }) => {
+    test.skip(!isDesktop(), 'Detailtest auf dem Desktop-Projekt.');
+    store.clock.setNow(Date.parse('2026-10-19T08:00:00Z'));
+    seedAccount(store, { name: 'chef', role: 'admin', uidN: 900 });
+    // Vorschau wie mit dem alten SQL (kennt keine Ausgaben) - direkt aus dem Nachbau, ohne Netzwerk.
+    await page.route('**/rest/v1/rpc/tageszaehler_import_preview', async route => {
+      const data = TWIN.tageszaehler_import_preview(store, uid(900), route.request().postDataJSON());
+      delete data.expenses;
+      data.imports.forEach(i => { delete i.kind; delete i.expense; delete i.expense_id; });
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data) });
+    });
+    await loginAndOpen(page, qaBaseURL);
+    await upload(page, FILE_18);
+    await expect(page.locator('[data-testid="tzi-needs-sql"]')).toContainText('sql/20261019-tageszaehler-ausgaben.sql');
+    await expect(page.locator('[data-testid="tzi-apply"]')).toHaveCount(0);
+    expect(table(store, 'incomes')).toHaveLength(0);
+    expect(table(store, 'expenses')).toHaveLength(0);
+  });
+
+  test('Datei mit falscher Ausgabensumme wird abgelehnt', async ({ page, store, qaBaseURL }) => {
+    test.skip(!isDesktop(), 'Detailtest auf dem Desktop-Projekt.');
+    seedAccount(store, { name: 'chef', role: 'admin', uidN: 900 });
+    await loginAndOpen(page, qaBaseURL);
+    const kaputt = JSON.parse(JSON.stringify(FILE_18));
+    kaputt.tage[0].ausgabenCent += 1;
+    await upload(page, kaputt);
+    await expect(page.locator('[data-testid="tzi-error"]')).toContainText('Ausgabensumme passt nicht zu den Ausgaben');
+    await expect(page.locator('[data-testid="tzi-day"]')).toHaveCount(0);
+  });
+});

@@ -23,7 +23,7 @@
 <link rel="stylesheet" href="style.css?v=20261005-eggbulk1">
 <link rel="stylesheet" href="design-tokens.css?v=20260717-p3tokens">
 <link rel="stylesheet" href="css/bkmp-admin-events.css?v=20261005-eventstats1">
-<link rel="stylesheet" href="css/bkmp-admin-tzimport.css?v=20261015-tzimport1">
+<link rel="stylesheet" href="css/bkmp-admin-tzimport.css?v=20261019-tzausgaben1">
 </head>
 <body>
 
@@ -1342,8 +1342,8 @@
   <script src="js/core/bkmp-idle-bootstrap.js?v=20260717-p2afoundation"></script>
   <script src="mapart.js?v=20260717-kartenfirmen1"></script>
   <script src="js/admin/bkmp-admin-events.js?v=20261005-eventstats1"></script>
-  <script src="js/admin/bkmp-tageszaehler-import-core.js?v=20261015-tzimport1"></script>
-  <script src="js/admin/bkmp-tageszaehler-import.js?v=20261015-tzimport1"></script>
+  <script src="js/admin/bkmp-tageszaehler-import-core.js?v=20261019-tzausgaben1"></script>
+  <script src="js/admin/bkmp-tageszaehler-import.js?v=20261019-tzausgaben1"></script>
   <script>
     bkmpInitTheme();
 
@@ -1979,6 +1979,8 @@
     async function refreshExpensesFromSupabase() {
       await syncExpensesFromSupabase(data, function () { renderAll(); }, { force: true });
     }
+    // Tageszaehler-Import mit Ausgaben (19.10.2026): nach einer Uebernahme die Ausgaben neu laden.
+    window.addEventListener('bkmp:expenses-changed', function () { refreshExpensesFromSupabase(); });
 
     async function refreshUpdatesFromSupabase() {
       await syncUpdatesFromSupabase(data, function () { renderAll(); }, { force: true });

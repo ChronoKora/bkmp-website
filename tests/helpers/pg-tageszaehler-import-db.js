@@ -1,5 +1,5 @@
 /* Echtes Postgres (PGlite, WebAssembly) fuer den Tageszaehler-Import
-   (sql/20261015-tageszaehler-import.sql).
+   (sql/20261015-tageszaehler-import.sql + Ausgaben-Erweiterung sql/20261019-tageszaehler-ausgaben.sql).
 
    Nachgebaut wird nur, was die Funktionen wirklich brauchen - und zwar aus den
    ECHTEN Projektdateien, nicht als zweiter Nachbau:
@@ -59,8 +59,38 @@ async function createImportDb(options) {
   await db.exec(between(sqlFile('supabase-security-hardening.sql'),
     'create policy "Admins insert incomes"', 'drop policy if exists "Allow anon insert expenses"'));
   await db.exec('grant insert, update, delete on public.incomes to authenticated;');
-  if (!options || options.install !== false) await db.exec(sqlFile('20261015-tageszaehler-import.sql'));
+  // 19.10.2026: echte expenses-Tabelle (Schema, Spalte entered_by_auth_user_id, Policies wie in Produktion).
+  await db.exec(between(sqlFile('supabase-schema.sql'), 'create table if not exists public.expenses', 'create table if not exists public.investors'));
+  await db.exec(sqlFile('20260816-expenses-editor-payroll-deduction.sql'));
+  await db.exec(`
+    alter table public.expenses enable row level security;
+    create policy "Allow anon read expenses" on public.expenses for select to anon, authenticated using (true);
+    grant select on public.expenses to anon, authenticated;
+  `);
+  await db.exec(between(sqlFile('supabase-security-hardening.sql'),
+    'create policy "Admins insert expenses"', '-- investors / updates'));
+  await db.exec('grant insert, update, delete on public.expenses to authenticated;');
+  if (!options || options.install !== false) {
+    await db.exec(sqlFile('20261015-tageszaehler-import.sql'));
+    // Ausgaben-Erweiterung (19.10.2026) wird wie in Produktion danach ausgefuehrt.
+    if (!options || options.ausgaben !== false) await db.exec(sqlFile('20261019-tageszaehler-ausgaben.sql'));
+  }
   return db;
+}
+
+/* Ausgabe wie im Admin-Formular (direktes Einfuegen als Eigentuemer = Testaufbau). */
+async function addExpense(db, row) {
+  const res = await db.query(
+    'insert into public.expenses (id, category, amount, date, note, created_at) values (coalesce($6::uuid, gen_random_uuid()), $1, $2, $3, $4, coalesce($5, now())) returning id',
+    [row.category, row.amount, row.date, row.note || null, row.created_at || null, row.id || null]);
+  return res.rows[0].id;
+}
+
+async function expenses(db, date) {
+  const res = await db.query(
+    'select id, category, amount::text as amount, date::text as date, note, entered_by_auth_user_id from public.expenses' +
+    (date ? ' where date = $1' : '') + ' order by date, category, created_at, id', date ? [date] : []);
+  return res.rows;
 }
 
 /* Einnahme wie im Admin-Formular (direktes Einfuegen als Eigentuemer = Testaufbau). */
@@ -83,4 +113,4 @@ async function importLines(db) {
   return res.rows;
 }
 
-module.exports = { createImportDb, addIncome, incomes, importLines, callAs: harness.callAs, rpc: harness.rpc, addAdminProfile: harness.addAdminProfile };
+module.exports = { createImportDb, addIncome, incomes, addExpense, expenses, importLines, callAs: harness.callAs, rpc: harness.rpc, addAdminProfile: harness.addAdminProfile };
