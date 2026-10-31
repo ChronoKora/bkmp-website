@@ -232,6 +232,15 @@ a { color: inherit; text-decoration: none; }
   transition: filter 0.2s ease;
 }
 .mod-cta-btn:hover { filter: brightness(1.06); }
+/* 31.10.2026: zweite Pille daneben fuer die ChronoKit-Seite (/chronokit),
+   in den ChronoKit-Farben; die Reihe bricht auf schmalen Bildschirmen um. */
+.mod-cta-row { flex-wrap: wrap; gap: 0.6rem; }
+.mod-cta-btn--chronokit {
+  background: linear-gradient(135deg, #8fe6ef, #45c8d8);
+  color: #04212a;
+  text-decoration: none;
+  box-shadow: 0 6px 18px rgba(69, 200, 216, 0.35);
+}
 @media (max-width: 640px) {
   .mod-cta-btn { padding: 0.5rem 0.9rem; font-size: 0.76rem; }
   .mod-cta-btn-label { max-width: 62vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

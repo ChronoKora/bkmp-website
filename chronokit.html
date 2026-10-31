@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ChronoKit</title>
+<meta name="description" content="ChronoKit – die Fabric-Mod für OPSUCHT: Preise im Tooltip, Job-Anzeige, Kleine Freunde, Mimi-Spiele, Map-Art-Werkstatt und über 80 Animationen.">
+<meta property="og:title" content="ChronoKit – deine Mod für OPSUCHT">
+<meta property="og:description" content="Preise, Jobs, Mimis, Map-Art und über 80 Animationen. Für Minecraft 1.21.11 mit Fabric oder LabyMod.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://bkinvestment.de/chronokit">
+<meta property="og:site_name" content="ChronoKit">
+<meta property="og:image" content="https://bkinvestment.de/assets/chronokit/teilen.jpg">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="720">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#45c8d8">
+<link rel="canonical" href="https://bkinvestment.de/chronokit">
+<link rel="icon" href="/assets/chronokit/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Rubik:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --bg: #0a1219;
+    --bg-2: #0e1821;
+    --panel: #121f2a;
+    --panel-2: #172836;
+    --line: #22394a;
+    --text: #e3ecf1;
+    --muted: #8ea4b2;
+    --cyan: #45c8d8;
+    --cyan-deep: #1d7f8d;
+    --gold: #f2c14b;
+    --green: #5fd38d;
+    --red: #ff6f6f;
+    --pixel: "Pixelify Sans", "Courier New", monospace;
+    --sans: "Rubik", "Segoe UI", system-ui, sans-serif;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 400 16px/1.6 var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  img { max-width: 100%; height: auto; display: block; }
+  .small-shot { max-width: 440px; }
+  a { color: var(--cyan); }
+  .wrap {
+    max-width: 1140px;
+    margin: 0 auto;
+    padding-left: max(20px, env(safe-area-inset-left, 0px));
+    padding-right: max(20px, env(safe-area-inset-right, 0px));
+  }
+  h1, h2, h3 { font-family: var(--pixel); font-weight: 700; line-height: 1.12; text-wrap: balance; margin: 0; }
+  h2 { font-size: clamp(28px, 4vw, 40px); }
+  h3 { font-size: 22px; font-weight: 500; }
+  p { margin: 0; }
+  .label {
+    font: 500 13px/1 var(--pixel);
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--cyan);
+  }
+
+  /* ---- header ---- */
+  header {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 20;
+    background: color-mix(in srgb, var(--bg) 86%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  body::before {
+    content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px);
+    z-index: 21; background: var(--bg);
+  }
+  .bar { display: flex; align-items: center; gap: 24px; padding-block: 12px; }
+  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); }
+  .brand img { width: 34px; height: 34px; image-rendering: auto; }
+  .brand span { font: 700 21px/1 var(--pixel); }
+  nav { display: flex; gap: 22px; margin-left: auto; align-items: center; }
+  nav a { color: var(--muted); text-decoration: none; font-size: 15px; }
+  nav a:hover { color: var(--text); }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 20px; border-radius: 8px;
+    font: 600 15px/1 var(--sans); text-decoration: none;
+    border: 1px solid transparent; transition: transform .15s, background .15s;
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn-main { background: var(--cyan); color: #04212a; }
+  .btn-main:hover { background: #63d5e3; }
+  .btn-ghost { border-color: var(--line); color: var(--text); background: var(--panel); }
+  .btn-ghost:hover { background: var(--panel-2); }
+  nav .btn { padding: 9px 14px; font-size: 14px; }
+  @media (max-width: 760px) { nav a:not(.btn) { display: none; } }
+
+  /* ---- hero ---- */
+  .hero {
+    position: relative; overflow: hidden;
+    background:
+      radial-gradient(700px 380px at 82% 10%, rgba(242, 193, 75, .13), transparent 70%),
+      radial-gradient(800px 500px at 10% 0%, rgba(69, 200, 216, .14), transparent 70%),
+      var(--bg);
+  }
+  .hero .wrap { display: grid; grid-template-columns: 1fr 1.15fr; gap: 48px; align-items: center; padding-block: 72px 56px; }
+  .hero h1 { font-size: clamp(40px, 6vw, 66px); }
+  .hero h1 em { font-style: normal; color: var(--gold); }
+  .hero .lead { color: var(--muted); font-size: 18px; margin-top: 18px; max-width: 46ch; }
+  .hero .cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+  .hero .meta { margin-top: 18px; font-size: 14px; color: var(--muted); }
+  .shot {
+    border-radius: 12px; overflow: hidden;
+    border: 1px solid var(--line);
+    box-shadow: 0 30px 60px -20px rgba(0, 0, 0, .7), 0 0 0 6px rgba(18, 31, 42, .9);
+    background: var(--panel);
+  }
+  .hero .wrap > * { min-width: 0; }
+  .hero .shot { transform: rotate(1.2deg); }
+  @media (max-width: 900px) {
+    .hero .wrap { grid-template-columns: 1fr; padding-block: 48px 40px; }
+    .hero .shot { transform: none; }
+  }
+
+  /* ---- numbers ---- */
+  .stats { border-block: 1px solid var(--line); background: var(--bg-2); }
+  .stats .wrap { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding-block: 26px; }
+  .stat b { display: block; font: 700 34px/1 var(--pixel); color: var(--gold); }
+  .stat span { color: var(--muted); font-size: 14px; }
+  @media (max-width: 700px) { .stats .wrap { grid-template-columns: repeat(2, 1fr); row-gap: 22px; } }
+
+  /* ---- feature rows ---- */
+  section { padding-block: 84px; }
+  .intro { max-width: 640px; margin-bottom: 48px; }
+  .intro p { color: var(--muted); margin-top: 14px; font-size: 17px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
+  .row + .row { margin-top: 88px; }
+  .row.flip .text { order: 2; }
+  .row .text > * + * { margin-top: 14px; }
+  .row .text p { color: var(--muted); }
+  .row ul { list-style: none; padding: 0; margin: 18px 0 0; display: grid; gap: 9px; }
+  .row li { position: relative; padding-left: 22px; }
+  .row li::before {
+    content: ""; position: absolute; left: 2px; top: .62em; width: 8px; height: 8px;
+    background: var(--cyan); box-shadow: 2px 2px 0 var(--cyan-deep);
+  }
+  .row li b { font-weight: 600; }
+  .row .text, .row .media { min-width: 0; }
+  @media (max-width: 860px) {
+    .row { grid-template-columns: 1fr; gap: 28px; }
+    .row.flip .text { order: 0; }
+    .row + .row { margin-top: 64px; }
+  }
+
+  /* price tooltip quote: the real number format */
+  .ticket {
+    display: inline-grid; grid-template-columns: auto auto; gap: 2px 14px;
+    background: #1a0b26; border: 2px solid #3b1a62; border-radius: 6px;
+    padding: 10px 14px; font: 500 15px/1.35 var(--pixel); margin-top: 18px;
+  }
+  .ticket .k { color: var(--cyan); }
+  .ticket .down { color: var(--red); }
+
+  /* show gallery */
+  .gallery { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .gallery figure { margin: 0; position: relative; min-width: 0; }
+  @media (max-width: 600px) { .gallery { grid-template-columns: 1fr; } }
+  .gallery figcaption {
+    position: absolute; left: 10px; bottom: 10px;
+    font: 500 14px/1 var(--pixel); background: rgba(10, 18, 25, .82);
+    padding: 6px 9px; border-radius: 5px;
+  }
+
+  /* small cards */
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 22px; display: flex; flex-direction: column; gap: 10px; min-width: 0;
+  }
+  .card .ico { font: 700 13px/1 var(--pixel); color: var(--gold); letter-spacing: .1em; }
+  .card p { color: var(--muted); font-size: 15px; }
+  .card.wide { grid-column: span 2; display: grid; grid-template-columns: 1fr 1.1fr; gap: 22px; align-items: center; }
+  .card.wide .shot { box-shadow: none; }
+  @media (max-width: 900px) {
+    .cards { grid-template-columns: 1fr 1fr; }
+    .card.wide { grid-column: span 2; }
+  }
+  @media (max-width: 620px) {
+    .cards { grid-template-columns: 1fr; }
+    .card.wide { grid-column: auto; grid-template-columns: 1fr; }
+  }
+
+  /* install */
+  .install { background: var(--bg-2); border-block: 1px solid var(--line); }
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; counter-reset: step; }
+  .step { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 24px; min-width: 0; }
+  .step::before {
+    counter-increment: step; content: counter(step);
+    display: grid; place-items: center; width: 38px; height: 38px; border-radius: 8px;
+    background: var(--gold); color: #2a1d00; font: 700 20px/1 var(--pixel); margin-bottom: 16px;
+  }
+  .step p { color: var(--muted); margin-top: 8px; font-size: 15px; }
+  code { font: 500 14px/1.4 ui-monospace, "Cascadia Mono", Consolas, monospace; background: #0b141c; border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; color: var(--text); overflow-wrap: anywhere; }
+  @media (max-width: 800px) { .steps { grid-template-columns: 1fr; } }
+
+  /* faq */
+  .faq { display: grid; gap: 12px; max-width: 820px; }
+  details { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 20px; }
+  summary { cursor: pointer; font-weight: 600; list-style: none; display: flex; justify-content: space-between; gap: 16px; }
+  summary::after { content: "+"; font: 700 20px/1 var(--pixel); color: var(--cyan); }
+  details[open] summary::after { content: "–"; }
+  details p { color: var(--muted); margin-top: 10px; }
+
+  /* final call */
+  .final { text-align: center; }
+  .final .box {
+    background:
+      radial-gradient(500px 220px at 50% 0%, rgba(69, 200, 216, .18), transparent 70%),
+      var(--panel);
+    border: 1px solid var(--line); border-radius: 16px; padding: 56px 24px;
+  }
+  .final img { width: 72px; margin: 0 auto 18px; }
+  .final p { color: var(--muted); margin: 14px auto 28px; max-width: 52ch; }
+  footer { padding-block: 34px 40px; color: var(--muted); font-size: 13px; }
+  footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap bar">
+    <a class="brand" href="#top"><img src="/assets/chronokit/logo.png" alt=""><span>ChronoKit</span></a>
+    <nav>
+      <a href="/">← BKInvestment</a>
+      <a href="#funktionen">Funktionen</a>
+      <a href="#mimis">Mimis</a>
+      <a href="#animationen">Animationen</a>
+      <a href="#installieren">Installieren</a>
+      <a class="btn btn-main" href="https://discord.gg/WGuDqz7x96" target="_blank" rel="noopener">Discord</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <div class="hero">
+    <div class="wrap">
+      <div>
+        <p class="label">Fabric-Mod für OPSUCHT</p>
+        <h1 style="margin-top:14px">Alles im Blick. <em>Mit Stil.</em></h1>
+        <p class="lead">Marktpreise direkt im Tooltip, deine Job-Werte live, kleine Freunde an deiner Seite und Animationen, die jedes Werkzeug zur Show machen.</p>
+        <div class="cta">
+          <a class="btn btn-main" href="https://discord.gg/WGuDqz7x96" target="_blank" rel="noopener">Im Discord holen</a>
+          <a class="btn btn-ghost" href="#funktionen">Funktionen ansehen</a>
+        </div>
+        <p class="meta">Minecraft 1.21.11 · Fabric oder LabyMod · Menü mit Taste <code>P</code></p>
+      </div>
+      <div class="shot"><img src="/assets/chronokit/mimis-garten.jpg" alt="Acht Mimis im Kirschblüten-Garten: Drache, Besen, Pony, UFO, Engel, Ballon und ein Happy Ghast" width="1936" height="740"></div>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="wrap">
+      <div class="stat"><b>48</b><span>Shows beim Werkzeugwechsel</span></div>
+      <div class="stat"><b>40</b><span>Arten von Kleinen Freunden</span></div>
+      <div class="stat"><b>4</b><span>Mimi-Spiele mit Bestenliste</span></div>
+      <div class="stat"><b>16×16</b><span>Karten groß wird deine Map-Art</span></div>
+    </div>
+  </div>
+
+  <section id="funktionen">
+    <div class="wrap">
+      <div class="intro">
+        <p class="label">Funktionen</p>
+        <h2 style="margin-top:12px">Gemacht für den Alltag auf OPSUCHT</h2>
+        <p>ChronoKit liest, was der Server dir ohnehin zeigt, und macht daraus Werte, die du sofort verstehst. Klicken und spielen tust du weiter selbst.</p>
+      </div>
+
+      <div class="row">
+        <div class="text">
+          <p class="label">Preise</p>
+          <h3>Was ist das wert? Steht schon da.</h3>
+          <p>Fahr mit der Maus über ein Item und du siehst Markt, Auktionshaus und Händlerkurs auf einen Blick.</p>
+          <div class="ticket" aria-label="Beispiel-Tooltip für einen Netheritbarren">
+            <span class="k">Markt</span><span>Kauf 10.260 $ · Verkauf 9.850 $</span>
+            <span class="k">AH</span><span>ab 10.000 $</span>
+            <span class="k">Händler</span><span>74,23 <span class="down">▼ 1,03 %</span></span>
+          </div>
+          <ul>
+            <li><b>Inventarwert</b> und Wert ganzer Kisten und Shulker</li>
+            <li><b>Rezeptpreis</b>: was die Zutaten zusammen kosten</li>
+            <li><b>Inhaltsvorschau</b> für Rucksack, Filter und Komprimierer</li>
+          </ul>
+        </div>
+        <div class="media"><div class="shot"><img src="/assets/chronokit/preis-netherit.jpg" alt="Tooltip eines Netheritbarrens mit Markt-, Auktionshaus- und Händlerpreis" width="660" height="440" loading="lazy"></div></div>
+      </div>
+
+      <div class="row flip">
+        <div class="text">
+          <p class="label">Jobs</p>
+          <h3>Dein Job-Fortschritt, live</h3>
+          <p>Die Job-Anzeige liest die Actionbar mit und rechnet für dich weiter.</p>
+          <ul>
+            <li><b>Fortschritt</b> bis zum nächsten Level und wann es so weit ist</li>
+            <li><b>Geld und XP pro Stunde</b>, Pausen werden nicht mitgezählt</li>
+            <li><b>Jobschatz-Zähler</b>: wie weit bis zum nächsten Schatz</li>
+            <li><b>Erz-Ertrag</b>: was das Abbauen pro Stunde wirklich bringt</li>
+          </ul>
+        </div>
+        <div class="media"><div class="shot small-shot"><img src="/assets/chronokit/job-hud.jpg" alt="Job-Anzeige: Builder Level 67, 43,93 Prozent Fortschritt" width="644" height="440" loading="lazy"></div></div>
+      </div>
+
+      <div class="row" id="mapart">
+        <div class="text">
+          <p class="label">Map-Art-Werkstatt</p>
+          <h3>Bild rein, Bauplan raus</h3>
+          <p>Zieh ein Bild ins Minecraft-Fenster. ChronoKit macht daraus einen Litematica-Bauplan, mit Blockliste und Kosten nach OPSUCHT-Preisen.</p>
+          <ul>
+            <li><b>2D mit Teppich</b> oder <b>3D niedrig</b> mit Wolle oder allen Blöcken</li>
+            <li>Bis zu <b>16 × 16 Karten</b>, mit Höhengrenze für die Bauwelt</li>
+            <li>Speichern, wohin du willst, auch in neue Ordner</li>
+          </ul>
+        </div>
+        <div class="media"><div class="shot"><img src="/assets/chronokit/mapart.jpg" alt="Map-Art-Werkstatt mit einem Regenbogen-Bild, 2 mal 1 Karten, 47 Farben" width="1188" height="722" loading="lazy"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="mimis" style="background:var(--bg-2);border-block:1px solid var(--line)">
+    <div class="wrap">
+      <div class="row flip">
+        <div class="text">
+          <p class="label">Kleine Freunde</p>
+          <h3>Mimis: Mini-Ichs, die mit dir unterwegs sind</h3>
+          <p>Bis zu 20 Mimis mit eigenem Skin. Sie laufen, reiten, fliegen oder sitzen auf deinem Werkzeug, und andere Spieler mit ChronoKit sehen sie auch.</p>
+          <ul>
+            <li><b>40 Arten</b>: Drache, Besen, UFO, Happy Ghast, Engel, Pony und mehr</li>
+            <li>Sie <b>spielen miteinander</b>: High-Five, Tanzen, Ball, Fangen</li>
+            <li><b>Mimi-Spiele</b>: Schere-Stein-Papier, Vier in einer Reihe, Mimi-Fußball und Tanz-Battle, mit Bestenliste</li>
+            <li>Einladen mit einem Klick auf den Namen im Chat</li>
+          </ul>
+        </div>
+        <div class="media" style="display:grid;gap:12px">
+          <div class="shot"><img src="/assets/chronokit/mimis-nah.jpg" alt="Mimis aus der Nähe: Drache, Pony, Besen und UFO" width="1606" height="740" loading="lazy"></div>
+          <div class="shot"><img src="/assets/chronokit/vier-in-einer-reihe.jpg" alt="Vier in einer Reihe gegen einen anderen Spieler, als Brett in der Welt" width="840" height="480" loading="lazy"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="animationen">
+    <div class="wrap">
+      <div class="intro">
+        <p class="label">Animationen</p>
+        <h2 style="margin-top:12px">Jeder Werkzeugwechsel eine Show</h2>
+        <p>48 Shows, 18 Begleiter, 14 Stile für beide Hände und das Arsenal der Welten. Beim Abbauen und Kämpfen schaltet der Arbeitsmodus auf einen kurzen Zug um, damit nichts stört.</p>
+      </div>
+      <div class="gallery">
+        <figure class="shot"><img src="/assets/chronokit/show-drache.jpg" alt="Show Drachenfeuer: Flammen am Spitzhacken-Griff" width="1936" height="960" loading="lazy"><figcaption>Drachenfeuer</figcaption></figure>
+        <figure class="shot"><img src="/assets/chronokit/show-singularitaet.jpg" alt="Show Singularität: leuchtender Runenkreis vor dem Spieler" width="1936" height="960" loading="lazy"><figcaption>Singularität</figcaption></figure>
+        <figure class="shot"><img src="/assets/chronokit/show-eiszeit.jpg" alt="Show Eiszeit: der Boden friert, Eissäulen wachsen" width="1936" height="960" loading="lazy"><figcaption>Eiszeit</figcaption></figure>
+        <figure class="shot"><img src="/assets/chronokit/show-leviathan.jpg" alt="Show Leviathan: die Welt taucht unter Wasser" width="1936" height="960" loading="lazy"><figcaption>Leviathan</figcaption></figure>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding-top:0">
+    <div class="wrap">
+      <div class="intro">
+        <p class="label">Und noch mehr</p>
+        <h2 style="margin-top:12px">Kleine Helfer für jeden Tag</h2>
+      </div>
+      <div class="cards">
+        <div class="card wide">
+          <div>
+            <p class="ico">RANDOM TELEPORT</p>
+            <h3 style="margin-top:8px">Ein Klick, und du bist im Biom</h3>
+            <p style="margin-top:10px">Alle Farmwelten und Nether-Ziele mit Preis, Favoriten und Wartezeit in einem Fenster.</p>
+          </div>
+          <div class="shot"><img src="/assets/chronokit/rtp.jpg" alt="Random-Teleport-Fenster mit Biomen und Preisen" width="870" height="670" loading="lazy"></div>
+        </div>
+        <div class="card"><p class="ico">BRUCH-SPERRE</p><h3>Kein Werkzeug geht mehr kaputt</h3><p>Fast kaputte Werkzeuge bauen und schlagen nicht mehr. Vorher gibt es eine Warnung.</p></div>
+        <div class="card"><p class="ico">PLATZWART</p><h3>Was darf weg?</h3><p>Beim Bauen mit Litematica zeigt dir ChronoKit, welche Blöcke im Inventar du noch brauchst.</p></div>
+        <div class="card"><p class="ico">CHAT</p><h3>Uhrzeit, Textersatz, Antwort-Knöpfe</h3><p>Kürzel werden zu ganzen Sätzen, Namen sind anklickbar, und der Link-Schutz hält Nachrichten mit Links erst mal zurück.</p></div>
+        <div class="card"><p class="ico">SIGN-GENERATOR</p><h3>Items signieren mit Stil</h3><p>Namen und Lore mit Farbverläufen und Symbolen, mit Vorschau, wie es im Spiel aussieht.</p></div>
+        <div class="card"><p class="ico">HUD</p><h3>Alles dahin, wo du willst</h3><p>Jede Anzeige frei verschieben und mit dem Mausrad größer oder kleiner machen.</p></div>
+        <div class="card"><p class="ico">SCHNELLSCHALTER</p><h3>Nur, was du brauchst</h3><p>Ganze Bereiche wie Preise, Chat oder Animationen mit einem Klick an oder aus.</p></div>
+        <div class="card"><p class="ico">UPDATES</p><h3>Immer aktuell</h3><p>Gibt es eine neue Version, fragt ChronoKit im Chat. Ein Klick, und beim nächsten Start ist sie da.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="install" id="installieren">
+    <div class="wrap">
+      <div class="intro">
+        <p class="label">Installieren</p>
+        <h2 style="margin-top:12px">In drei Schritten startklar</h2>
+      </div>
+      <div class="steps">
+        <div class="step"><h3>Minecraft vorbereiten</h3><p>Minecraft <b>1.21.11</b> mit Fabric Loader und Fabric API. Oder LabyMod: der nimmt Fabric-Mods auch.</p></div>
+        <div class="step"><h3>Datei reinlegen</h3><p>Hol dir <code>ChronoKit-Fabric-Oeffentlich.jar</code> im Discord und leg sie in den Ordner <code>mods</code>.</p></div>
+        <div class="step"><h3>Starten</h3><p>Spiel starten, auf OPSUCHT gehen und <code>P</code> drücken. Dort findest du alle Funktionen und Einstellungen.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="intro">
+        <p class="label">Fragen</p>
+        <h2 style="margin-top:12px">Gut zu wissen</h2>
+      </div>
+      <div class="faq">
+        <details><summary>Läuft ChronoKit mit LabyMod?</summary><p>Ja. LabyMod lädt Fabric-Mods aus seinem eigenen mods-Ordner. Wichtig: nicht zusammen mit dem alten ChronoKit-Addon aus dem Ordner „addons“, sonst läuft alles doppelt.</p></details>
+        <details><summary>Spielt ChronoKit für mich?</summary><p>Nein. ChronoKit zeigt an, rechnet und warnt. Jede Aktion im Spiel machst du selbst.</p></details>
+        <details><summary>Wer sieht meine Mimis?</summary><p>Alle Spieler in deiner Nähe, die ChronoKit haben. Dafür prüft der ChronoKit-Server einmal deinen Minecraft-Namen, so wie ein Server beim Beitreten.</p></details>
+        <details><summary>Wie bekomme ich Updates?</summary><p>ChronoKit fragt im Chat, wenn es etwas Neues gibt. Was neu ist, steht im Menü unter „Neuigkeiten“.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <section class="final" id="discord" style="padding-top:0">
+    <div class="wrap">
+      <div class="box">
+        <img src="/assets/chronokit/logo.png" alt="">
+        <h2>Bereit für deine eigenen Mimis?</h2>
+        <p>Die öffentliche Version, Hilfe, Updates und eure Ideen gibt es in unserem Discord.</p>
+        <a class="btn btn-main" href="https://discord.gg/WGuDqz7x96" target="_blank" rel="noopener">Zum Discord</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>© 2026 ChronoKora · ChronoKit</span>
+    <span>Kein offizielles Produkt von OPSUCHT oder Mojang.</span>
+  </div>
+</footer>
+
+</body>
+</html>
