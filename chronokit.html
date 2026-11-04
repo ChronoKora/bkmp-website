@@ -256,7 +256,8 @@
       <a href="#mimis">Mimis</a>
       <a href="#animationen">Animationen</a>
       <a href="#installieren">Installieren</a>
-      <a class="btn btn-main" href="https://discord.gg/WGuDqz7x96" target="_blank" rel="noopener">Discord</a>
+      <a href="https://discord.gg/WGuDqz7x96" target="_blank" rel="noopener">Discord</a>
+      <a class="btn btn-main" href="https://chronokit-mimis.vercel.app/download/ChronoKit.jar">Download</a>
     </nav>
   </div>
 </header>
@@ -269,10 +270,10 @@
         <h1 style="margin-top:14px">Alles im Blick. <em>Mit Stil.</em></h1>
         <p class="lead">Marktpreise direkt im Tooltip, deine Job-Werte live, Mimis an deiner Seite, Gokart-Rennen mit deinen Freunden und Shows, die jeden Werkzeugwechsel zur Bühne machen. Alles in einem Menü.</p>
         <div class="cta">
-          <a class="btn btn-main" href="https://discord.gg/WGuDqz7x96" target="_blank" rel="noopener">Im Discord holen</a>
-          <a class="btn btn-ghost" href="#funktionen">Funktionen ansehen</a>
+          <a class="btn btn-main" href="https://chronokit-mimis.vercel.app/download/ChronoKit.jar">ChronoKit herunterladen</a>
+          <a class="btn btn-ghost" href="https://discord.gg/WGuDqz7x96" target="_blank" rel="noopener">Zum Discord</a>
         </div>
-        <p class="meta">Minecraft 1.21.11 · Fabric oder LabyMod · Menü mit Taste <code>P</code></p>
+        <p class="meta"><span data-version>Immer die neueste Version</span> · Minecraft 1.21.11 · Fabric oder LabyMod · Menü mit Taste <code>P</code></p>
       </div>
       <div class="shot"><img src="/assets/chronokit/mimis-garten.jpg" alt="Acht Mimis im Kirschblüten-Garten: Drache, Besen, Pony, UFO, Engel, Ballon und ein Happy Ghast" width="1936" height="740"></div>
     </div>
@@ -495,7 +496,7 @@
       </div>
       <div class="steps">
         <div class="step"><h3>Minecraft vorbereiten</h3><p>Minecraft <b>1.21.11</b> mit Fabric Loader und Fabric API (0.141 oder neuer). Oder LabyMod: der nimmt Fabric-Mods auch.</p></div>
-        <div class="step"><h3>Datei reinlegen</h3><p>Hol dir <code>ChronoKit.jar</code> im Discord und leg sie zusammen mit Fabric API in den Ordner <code>mods</code>. Mit Litematica gibt es zusätzlich Platzwart und die Kartenvorschau.</p></div>
+        <div class="step"><h3>Datei reinlegen</h3><p><a href="https://chronokit-mimis.vercel.app/download/ChronoKit.jar">Lade <code>ChronoKit.jar</code> hier herunter</a> (oder im Discord) und leg sie zusammen mit Fabric API in den Ordner <code>mods</code>. Mit Litematica gibt es zusätzlich Platzwart und die Kartenvorschau.</p></div>
         <div class="step"><h3>Starten</h3><p>Spiel starten, auf OPSUCHT gehen und <code>P</code> drücken. Beim ersten Mal begrüßt dich ChronoKit im Chat und fragt, ob andere deine Mimis und Cosmetics sehen dürfen.</p></div>
       </div>
     </div>
@@ -523,12 +524,31 @@
       <div class="box">
         <img src="/assets/chronokit/logo.png" alt="">
         <h2>Bereit für deine eigenen Mimis?</h2>
-        <p>Die öffentliche Version, Hilfe, Updates und eure Ideen gibt es in unserem Discord.</p>
-        <a class="btn btn-main" href="https://discord.gg/WGuDqz7x96" target="_blank" rel="noopener">Zum Discord</a>
+        <p>Hier gibt es immer die neueste Version. Danach hält sich ChronoKit selbst aktuell. Hilfe und eure Ideen gibt es in unserem Discord.</p>
+        <div class="cta" style="justify-content:center;display:flex;flex-wrap:wrap;gap:12px">
+          <a class="btn btn-main" href="https://chronokit-mimis.vercel.app/download/ChronoKit.jar">ChronoKit herunterladen</a>
+          <a class="btn btn-ghost" href="https://discord.gg/WGuDqz7x96" target="_blank" rel="noopener">Zum Discord</a>
+        </div>
+        <p class="meta" style="margin:16px auto 0;font-size:14px"><span data-version>Immer die neueste Version</span></p>
       </div>
     </div>
   </section>
 </main>
+
+<script>
+  // The version on the download buttons: from the update server (the same file the button
+  // gives), so the page never needs touching for a new release.
+  fetch('https://chronokit-mimis.vercel.app/download/version.json', { cache: 'no-cache' })
+    .then((answer) => answer.ok ? answer.json() : null)
+    .then((info) => {
+      if (!info || !info.version) return;
+      const mb = (info.size / 1048576).toLocaleString('de-DE', { maximumFractionDigits: 1 });
+      document.querySelectorAll('[data-version]').forEach((el) => {
+        el.textContent = 'Version ' + info.version + ' · ' + mb + ' MB · Stand ' + info.date;
+      });
+    })
+    .catch(() => {});
+</script>
 
 <footer>
   <div class="wrap">
