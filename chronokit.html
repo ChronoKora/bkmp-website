@@ -353,13 +353,13 @@
           <h3>Bild rein, Bauplan raus</h3>
           <p>Zieh ein Bild ins Minecraft-Fenster. ChronoKit macht daraus einen Litematica-Bauplan, mit Blockliste und Kosten nach OPSUCHT-Preisen.</p>
           <ul>
-            <li><b>2D mit Teppich</b>, <b>3D mit Wolle</b> oder <b>3D mit allen Blöcken</b></li>
-            <li>Bis zu <b>16 × 16 Karten</b>, die Bauhöhe stellst du selbst ein</li>
+            <li><b>Alle Blöcke</b> oder <b>Teppich</b>, jeweils <b>2D</b> oder <b>3D</b>: 3D baut die klassische Treppe ohne Sprünge, Teppich in 3D wird aus Wolle gebaut</li>
+            <li>Bis zu <b>16 × 16 Karten</b>, gebaut ab Höhe 66 bis höchstens 194, „Alle Blöcke“ nimmt Wolle statt Teppich</li>
             <li>Speichern, wohin du willst, auch in neue Ordner</li>
             <li><b>Kartenvorschau beim Bauen</b> (mit Litematica): eine Karte in der Hand zeigt den Plan, Gebautes blendet sich aus</li>
           </ul>
         </div>
-        <div class="media"><div class="shot"><img src="/assets/chronokit/mapart.jpg" alt="Map-Art-Werkstatt mit einem Regenbogen-Bild, 2 mal 1 Karten, 47 Farben" width="1188" height="722" loading="lazy"></div></div>
+        <div class="media"><div class="shot"><img src="/assets/chronokit/mapart.jpg" alt="Map-Art-Werkstatt: Blöcke Alle Blöcke oder Teppich, Bauweise 2D oder 3D, daneben die Vorschau eines Abendhimmels auf 2 mal 1 Karten, 60 Blöcke hoch, 35 Farben" width="1188" height="685" loading="lazy"></div></div>
       </div>
 
       <div class="row flip" id="bk-karten">
@@ -418,6 +418,7 @@
             <li><b>Liedzeile</b> oben rechts, das gesungene Wort leuchtet, und eine kleine <b>Musik-Ecke</b> unten links, beide verschiebbar</li>
             <li><b>Stimmung zur Musikrichtung</b>: Entspannt mit Glühwürmchen, Rock mit Glut und Wetterleuchten, Elektro mit Lasern, Pop mit Lichtkugeln, Hip-Hop mit Bass-Wellen, Klassik mit Polarlicht. Leise Stellen ruhiger, laute kräftiger, Pulse im Takt</li>
             <li>Zeile und Wörter stehen, wo du hinschaust, <b>fest in einer Himmelsrichtung</b> oder unter Sonne und Mond. Höhe und Breite stellst du ein: eng zusammen oder weit gefächert</li>
+            <li><b>Quelle</b>: nur Spotify, Spotify &amp; YouTube oder alles. Livestreams wie Twitch zählen nicht als Lied, und findet sich kein Liedtext, sucht <b>„Neu suchen“</b> noch einmal</li>
             <li>Farbe, Schrift, Entfernung, Größe und Liedtext-Zeit stellst du selbst ein. Ohne Anmeldung, Liedtexte von lrclib.net, Musikrichtung von MusicBrainz, nur unter Windows</li>
           </ul>
         </div>
@@ -620,7 +621,9 @@
           <div class="shot"><img src="/assets/chronokit/rtp.jpg" alt="Random-Teleport-Fenster mit Biomen und Preisen" width="870" height="670" loading="lazy"></div>
         </div>
         <div class="card"><p class="ico">BRUCH-SPERRE</p><h3>Kein Werkzeug geht mehr kaputt</h3><p>Fast kaputte Werkzeuge bauen und schlagen nicht mehr. Vorher gibt es eine Warnung.</p></div>
-        <div class="card"><p class="ico">PLATZWART</p><h3>Was darf weg?</h3><p>Beim Bauen mit Litematica zeigt dir ChronoKit, welche Blöcke im Inventar du noch brauchst.</p></div>
+        <div class="card"><p class="ico">PLATZWART</p><h3>Was darf weg?</h3><p>Beim Bauen mit Litematica zeigt dir ChronoKit, welche Blöcke im Inventar du noch brauchst. Fehlt Easy Place ein Block, öffnet sich der Markt mit der Suche danach.</p></div>
+        <div class="card"><p class="ico">DROP-SPERRE</p><h3>OP-Items bleiben bei dir</h3><p>Die Drop-Taste wirft OPSUCHT-Items, wertvolle Stapel und auf Wunsch verzauberte Ausrüstung nicht mehr weg. Mit Shift geht es trotzdem.</p></div>
+        <div class="card"><p class="ico">SPRÜHDOSEN</p><h3>Färben nach Plan</h3><p>Der Block im Fadenkreuz bekommt die Farbe aus deinem Litematica-Plan, oder im Malmodus jeder Block deine Malfarbe.</p></div>
         <div class="card"><p class="ico">CHAT</p><h3>Uhrzeit, Textersatz, Antwort-Knöpfe</h3><p>Kürzel werden zu ganzen Sätzen, Namen sind anklickbar, und der Link-Schutz hält Nachrichten mit Links erst mal zurück. Geschickt wird nie von allein.</p></div>
         <div class="card"><p class="ico">SIGN-GENERATOR</p><h3>Items signieren mit Stil</h3><p>Namen und Lore mit Farbverläufen und Symbolen, mit Vorschau, wie es im Spiel aussieht.</p></div>
         <div class="card"><p class="ico">HUD</p><h3>Alles dahin, wo du willst</h3><p>Jede Anzeige frei verschieben und mit dem Mausrad größer oder kleiner machen.</p></div>
@@ -653,7 +656,7 @@
       <div class="faq">
         <details><summary>Läuft ChronoKit mit LabyMod?</summary><p>Ja. LabyMod lädt Fabric-Mods aus seinem eigenen mods-Ordner. Wichtig: nicht zusammen mit dem alten ChronoKit-Addon aus dem Ordner „addons“, sonst läuft alles doppelt.</p></details>
         <details><summary>Spielt ChronoKit für mich?</summary><p>Nein. ChronoKit zeigt an, rechnet und warnt. Jede Aktion im Spiel machst du selbst.</p></details>
-        <details><summary>Welche Mods kann ich weglassen?</summary><p>ChronoKit macht schon, was diese machen: opmod, die LabyMod-Addons ChatTime, Chat Utilities und Quick Messages, Platzwart, Haltbarkeits-Warnungen fürs Werkzeug und Zieh-Animations-Mods. Nimm sie raus, sonst läuft manches doppelt.</p></details>
+        <details><summary>Welche Mods kann ich weglassen?</summary><p>ChronoKit macht schon, was diese machen: opmod, OPmatica, der BK-Kartenbrowser, die LabyMod-Addons ChatTime, Chat Utilities und Quick Messages, Platzwart, Haltbarkeits-Warnungen fürs Werkzeug und Zieh-Animations-Mods. Nimm sie raus, sonst läuft manches doppelt.</p></details>
         <details><summary>Wer sieht meine Mimis und Cosmetics?</summary><p>Alle Spieler in deiner Nähe, die ChronoKit haben, aber nur, wenn du beim ersten Start „Ja“ sagst. Dann gehen dein Minecraft-Name und deine Mimis und Cosmetics an den ChronoKit-Server. Ändern kannst du das jederzeit im Menü oder mit <code>/chronokit teilen nein</code>.</p></details>
         <details><summary>Was wird beim Gokart und bei den Spielen übertragen?</summary><p>Wer ein Spiel oder Rennen startet, meldet sich beim ChronoKit-Server an. Deinen Minecraft-Namen bestätigt dabei Mojang, so wie ein Server beim Beitreten. Dein Passwort sieht ChronoKit nie. Eine Rekordrunde geht nur mit deinem Namen hoch, wenn du das Teilen erlaubt hast.</p></details>
         <details><summary>Wie bekomme ich Updates?</summary><p>ChronoKit fragt im Chat, wenn es etwas Neues gibt. Ein Klick, Minecraft neu starten, fertig. Jede Datei ist digital signiert: installiert wird nur, was wirklich von ChronoKora kommt. Was neu ist, steht im Menü unter „Neuigkeiten“.</p></details>
