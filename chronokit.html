@@ -164,7 +164,8 @@
     background: #1a0b26; border: 2px solid #3b1a62; border-radius: 6px;
     padding: 10px 14px; font: 500 15px/1.35 var(--pixel); margin-top: 18px;
   }
-  .ticket .k { color: var(--cyan); }
+  .ticket .k { color: #FFBF1F; }
+  .ticket .up { color: #4ADE80; }
   .ticket .down { color: var(--red); }
 
   /* show gallery */
@@ -282,7 +283,7 @@
   <div class="stats">
     <div class="wrap">
       <div class="stat"><b>58</b><span>Shows beim Werkzeugwechsel</span></div>
-      <div class="stat"><b>67</b><span>Arten von Mimis</span></div>
+      <div class="stat"><b>93</b><span>Arten von Mimis</span></div>
       <div class="stat"><b>16</b><span>Fahrer in einem Gokart-Rennen</span></div>
       <div class="stat"><b>1</b><span>Taste für alles: <code>P</code></span></div>
     </div>
@@ -315,20 +316,22 @@
         <div class="text">
           <p class="label">Preise</p>
           <h3>Was ist das wert? Steht schon da.</h3>
-          <p>Fahr mit der Maus über ein Item und du siehst Markt und Auktionshaus auf einen Blick. Den Shardhändler-Kurs schaltest du dazu, wenn du willst.</p>
+          <p>Fahr mit der Maus über ein Item und du siehst Markt, den Allround-Shop bei /sw ABC und das Auktionshaus auf einen Blick. Den Shardhändler-Kurs schaltest du dazu, wenn du willst.</p>
           <div class="ticket" aria-label="Beispiel-Tooltip für einen Netheritbarren">
-            <span class="k">Markt</span><span>Kauf 10.260 $ · Verkauf 9.850 $</span>
+            <span class="k">Markt</span><span>Kauf 12.400 $ · Verkauf 8.800 $</span>
+            <span class="k">ABC</span><span>Kauf 12.777 $ · Verkauf 7.222 $</span>
             <span class="k">AH</span><span>ab 10.000 $</span>
-            <span class="k">Händler</span><span>74,23 <span class="down">▼ 1,03 %</span></span>
+            <span class="k">Händler</span><span>81,06 <span class="up">▲ 8,08 %</span></span>
           </div>
           <ul>
+            <li><b>Neu: SW-ABC-Preis</b> direkt unter dem Markt: was der Allround-Shop bei /sw ABC verlangt und zahlt, aus der Preisliste von Kn0cki</li>
             <li><b>Inventarwert</b> und Wert ganzer Kisten und Shulker</li>
             <li><b>Rezeptpreis</b>: was die Zutaten zusammen kosten</li>
             <li><b>Verkaufs-Tipp</b>: ob der Block oder die einzelnen Items mehr bringen</li>
             <li><b>Inhaltsvorschau</b> für Rucksack, Filter und Komprimierer</li>
           </ul>
         </div>
-        <div class="media"><div class="shot"><img src="/assets/chronokit/preis-netherit.jpg" alt="Tooltip eines Netheritbarrens mit Markt-, Auktionshaus- und Händlerpreis" width="660" height="440" loading="lazy"></div></div>
+        <div class="media"><div class="shot"><img src="/assets/chronokit/preis-netherit.jpg" alt="Tooltip eines Netheritbarrens mit Markt-, SW-ABC- und Händlerpreis, die Beschriftungen in Gold" width="660" height="440" loading="lazy"></div></div>
       </div>
 
       <div class="row flip">
@@ -563,7 +566,7 @@
           <h3>Mimis: Mini-Ichs, die mit dir unterwegs sind</h3>
           <p>Bis zu 40 Mimis mit eigenem Skin, eigener Größe, Flügeln, Hut und Ohren. Sie laufen, reiten, fliegen oder sitzen auf deinem Werkzeug, und andere Spieler mit ChronoKit sehen sie auch, wenn du das erlaubst.</p>
           <ul>
-            <li><b>79 Arten</b>: Drache, Besen, UFO, Happy Ghast, Engel, Pony, Gokart, Allay, Huckepack und mehr</li>
+            <li><b>93 Arten</b>: Drache, Besen, UFO, Happy Ghast, Engel, Pony, Gokart, Allay, Huckepack, Steckenpferd, Creeper, Endermännchen und mehr</li>
             <li>Sie <b>spielen miteinander</b>: High-Five, Tanzen, Ball, Fangen und kleine Szenen</li>
             <li><b>Mimi-Spiele</b>: Schere-Stein-Papier, Vier in einer Reihe, Mimi-Fußball, Tanz-Battle und Gokart, mit <b>Bestenliste</b>: Podest, Woche, Gesamt und deine eigenen Werte</li>
             <li>Einladen mit einem Klick auf den Namen im Chat</li>
@@ -637,6 +640,20 @@
           </ul>
         </div>
         <div class="media"><div class="shot"><img src="/assets/chronokit/mimis-am-koerper.jpg" alt="Spieler von schräg vorn: ein Mimi schaut aus der orangen Bauchtasche, ein zweites klammert am Bein, daneben fahren Mimis auf Einrad und Pogo-Stick" width="1188" height="669" loading="lazy"></div></div>
+      </div>
+
+      <div class="row" id="mimi-reittiere" style="margin-top:48px">
+        <div class="text">
+          <p class="label">Neu · Mimis</p>
+          <h3>Mimis auf Mini-Reittieren</h3>
+          <p>14 neue Arten: ein Steckenpferd und kleine Tiere und Monster, auf denen dein Mimi reitet. Alle im Kleinformat, alle in deinen eigenen Farben.</p>
+          <ul>
+            <li><b>Steckenpferd</b>: galoppiert neben dir her und bäumt sich auf, wenn du stehen bleibst</li>
+            <li><b>Tiere</b>: Kuh mit Pilzkuh, Schaf in Wunschfarbe, Esel mit Kisten und ein Hoglin-Ferkel</li>
+            <li><b>Monster in klein</b>: Creeper, der zischt und nur „Puff“ macht, Spinne, Skelettpferdchen, Endermännchen, Eisengolem mit Mohnblume, Magmawürfel, Lohe, Wärterchen und Breeze</li>
+          </ul>
+        </div>
+        <div class="media"><div class="shot"><img src="/assets/chronokit/mimis-reittiere.jpg" alt="Mimis auf ihren neuen Mini-Reittieren nebeneinander: Magmawürfel, Pilzkuh, Lohe, Creeper, Schaf, Eisengolem, Steckenpferd, Endermännchen, Spinne, Wärterchen, Esel, Hoglin, Breeze und Skelettpferdchen" width="1188" height="669" loading="lazy"></div></div>
       </div>
     </div>
   </section>
